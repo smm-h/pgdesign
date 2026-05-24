@@ -2,5 +2,5 @@ dist/
 build/
 *.egg-info/
 __pycache__/
-pgspec/_bin/pgspec
-pgspec/_bin/pgspec.exe
+pgdesign/_bin/pgdesign
+pgdesign/_bin/pgdesign.exe

@@ -6,8 +6,8 @@
 
 ### Features
 
-- **npm wrapper.** Install via `npm install pgspec`.
-- **PyPI wrapper.** Install via `pip install pgspec`.
+- **npm wrapper.** Install via `npm install pgdesign`.
+- **PyPI wrapper.** Install via `pip install pgdesign`.
 
 ## 0.1.0
 

@@ -33,7 +33,7 @@ function getPlatformArch() {
 function downloadUrl() {
   const { os, arch } = getPlatformArch();
   const ext = os === "windows" ? "zip" : "tar.gz";
-  return `https://github.com/smm-h/pgspec/releases/download/v${version}/pgspec_${version}_${os}_${arch}.${ext}`;
+  return `https://github.com/smm-h/pgdesign/releases/download/v${version}/pgdesign_${version}_${os}_${arch}.${ext}`;
 }
 
 function follow(url, redirects) {
@@ -42,7 +42,7 @@ function follow(url, redirects) {
   }
   return new Promise((resolve, reject) => {
     const proto = url.startsWith("https") ? https : http;
-    proto.get(url, { headers: { "User-Agent": "pgspec-npm" } }, (res) => {
+    proto.get(url, { headers: { "User-Agent": "pgdesign-npm" } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         resolve(follow(res.headers.location, redirects + 1));
         return;
@@ -82,7 +82,7 @@ function extract(archive, destDir) {
 }
 
 function findBinary(dir) {
-  const name = process.platform === "win32" ? "pgspec.exe" : "pgspec";
+  const name = process.platform === "win32" ? "pgdesign.exe" : "pgdesign";
   // Check top-level first
   const top = path.join(dir, name);
   if (fs.existsSync(top)) return top;
@@ -99,13 +99,13 @@ function findBinary(dir) {
 async function main() {
   const url = downloadUrl();
   const isZip = url.endsWith(".zip");
-  const archiveName = `pgspec-download${isZip ? ".zip" : ".tar.gz"}`;
+  const archiveName = `pgdesign-download${isZip ? ".zip" : ".tar.gz"}`;
   const archivePath = path.join(__dirname, archiveName);
-  const extractDir = path.join(__dirname, "pgspec-extract");
-  const binaryName = process.platform === "win32" ? "pgspec.exe" : "pgspec";
+  const extractDir = path.join(__dirname, "pgdesign-extract");
+  const binaryName = process.platform === "win32" ? "pgdesign.exe" : "pgdesign";
   const binaryDest = path.join(__dirname, binaryName);
 
-  console.log(`Downloading pgspec v${version}...`);
+  console.log(`Downloading pgdesign v${version}...`);
   console.log(`  ${url}`);
 
   await download(url, archivePath);
@@ -124,10 +124,10 @@ async function main() {
   fs.unlinkSync(archivePath);
   fs.rmSync(extractDir, { recursive: true, force: true });
 
-  console.log(`pgspec v${version} installed successfully.`);
+  console.log(`pgdesign v${version} installed successfully.`);
 }
 
 main().catch((err) => {
-  console.error(`Failed to install pgspec: ${err.message}`);
+  console.error(`Failed to install pgdesign: ${err.message}`);
   process.exit(1);
 });

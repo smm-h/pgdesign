@@ -1,18 +1,18 @@
 {
-  "name": "pgspec",
+  "name": "pgdesign",
   "version": "0.2.0",
   "description": "PostgreSQL schema compiler with strict enforcement, NF auditing, and declarative migrations",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/smm-h/pgspec.git"
+    "url": "git+https://github.com/smm-h/pgdesign.git"
   },
-  "homepage": "https://github.com/smm-h/pgspec",
+  "homepage": "https://github.com/smm-h/pgdesign",
   "scripts": {
     "postinstall": "node install.js"
   },
   "bin": {
-    "pgspec": "bin/pgspec"
+    "pgdesign": "bin/pgdesign"
   },
   "files": [
     "install.js",

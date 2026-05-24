@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pgspec"
+name = "pgdesign"
 version = "0.2.0"
 description = "PostgreSQL schema compiler with strict enforcement, NF auditing, and declarative migrations"
 license = "MIT"
@@ -12,8 +12,8 @@ readme = "README.md"
 keywords = ["rlsbl"]
 
 [project.urls]
-Homepage = "https://github.com/smm-h/pgspec"
-Repository = "https://github.com/smm-h/pgspec"
+Homepage = "https://github.com/smm-h/pgdesign"
+Repository = "https://github.com/smm-h/pgdesign"
 
 [project.scripts]
-pgspec = "pgspec:main"
+pgdesign = "pgdesign:main"
