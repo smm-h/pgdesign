@@ -13,6 +13,7 @@ pgdesign/
     parse/               TOML parser via go-toml-edit AST walk
     model/               Resolved IR + Build() pipeline (resolve -> order -> enrich)
     fd/                  Functional dependency algorithms (closure, minimal cover, candidate keys)
+    format/              Canonical TOML formatter (pgdesign fmt)
     validate/            Strict validation rules + anti-pattern detection
     sql/                 Shared SQL builder (quoting, statements, naming)
     generate/            DDL generator (IR -> SQL/D2/JSON)

@@ -38,7 +38,7 @@ If resolve() fails on some tables, it still returns a partial IR for the tables 
 
 1. If table has explicit `pk = [...]` field, those columns are the PK regardless of types.
 2. Else if exactly one column has semantic type `id` or `auto_id`, that column is the PK.
-3. Else: diagnostic E004 "table missing primary key".
+3. Else: diagnostic E100 "table missing primary key" (build-phase error, surfaces as E203 in validate/).
 
 ## Cycle handling
 

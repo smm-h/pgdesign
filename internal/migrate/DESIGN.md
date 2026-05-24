@@ -36,7 +36,7 @@ down = { op = "drop_index_concurrently", name = "idx_game_like_game_id" }
 [[dml]]
 op = "backfill"
 sql = "UPDATE game.players SET level = 1 WHERE level IS NULL"
-down = "irreversible"
+down = { irreversible = true }
 ```
 
 ## DDL op types

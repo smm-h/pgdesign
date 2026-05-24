@@ -21,7 +21,7 @@ testdata/
     missing-comment.toml  -- Triggers E202
     missing-pk.toml       -- Triggers E203
     fk-no-on-delete.toml  -- Triggers E201
-    circular-fk.toml      -- Triggers E205
+    circular-fk.toml      -- Triggers W008
     varchar-usage.toml    -- Triggers E207
     bad-ref.toml          -- Triggers E204
   audit/
