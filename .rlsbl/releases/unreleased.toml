@@ -1,3 +1,0 @@
-bump = "major"
-include = ["go", "npm", "pypi"]
-exclude = []
