@@ -1,0 +1,32 @@
+{
+  "version": "0.1.2",
+  "base_url": "https://pgdesign.smmh.dev",
+  "language": "go",
+  "source": [
+    "internal/diagnostic",
+    "internal/semtype",
+    "internal/parse",
+    "internal/model",
+    "internal/fd",
+    "internal/format",
+    "internal/validate",
+    "internal/sql",
+    "internal/generate",
+    "internal/audit",
+    "internal/discover",
+    "internal/risk",
+    "internal/extregistry",
+    "internal/introspect",
+    "internal/diff",
+    "internal/migrate",
+    "internal/serve"
+  ],
+  "docs": "docs/",
+  "output": "docs/_build/",
+  "versions": [{"version": "0.1.2", "indexed": true}],
+  "locales": [{"code": "en", "label": "English", "default": true}],
+  "deploy": {
+    "provider": "cloudflare-pages",
+    "project": "pgdesign"
+  }
+}
