@@ -1,0 +1,6 @@
+{
+  "targets": [
+    "go"
+  ],
+  "private": false
+}
