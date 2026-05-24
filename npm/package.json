@@ -1,0 +1,24 @@
+{
+  "name": "pgspec",
+  "version": "0.1.0",
+  "description": "PostgreSQL schema compiler with strict enforcement, NF auditing, and declarative migrations",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smm-h/pgspec.git"
+  },
+  "homepage": "https://github.com/smm-h/pgspec",
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "bin": {
+    "pgspec": "bin/pgspec"
+  },
+  "files": [
+    "install.js",
+    "bin/"
+  ],
+  "keywords": [
+    "rlsbl"
+  ]
+}
