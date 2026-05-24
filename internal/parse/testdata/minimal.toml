@@ -1,0 +1,52 @@
+[meta]
+version = 1
+schema = "test"
+extensions = ["pgcrypto"]
+
+[types.status]
+kind = "enum"
+values = ["active", "inactive"]
+comment = "User status"
+
+[tables.users]
+comment = "User accounts"
+
+[tables.users.columns.id]
+type = "id"
+
+[tables.users.columns.name]
+type = "text"
+
+[tables.users.columns.email]
+type = "email"
+
+[tables.users.columns.status]
+type = "status"
+
+[tables.users.columns.created_at]
+type = "timestamp"
+
+[tables.posts]
+comment = "Blog posts"
+pk = ["id"]
+
+[tables.posts.columns.id]
+type = "id"
+
+[tables.posts.columns.title]
+type = "short_text"
+
+[tables.posts.columns.author_id]
+type = "ref"
+
+[tables.posts.columns.published]
+type = "flag"
+
+[tables.posts.fks.author_fk]
+columns = ["author_id"]
+ref_table = "users"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.posts.indexes.idx_author]
+columns = ["author_id"]
