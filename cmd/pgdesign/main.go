@@ -7,6 +7,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/audit"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/format"
 	"github.com/smm-h/pgdesign/internal/generate"
@@ -60,8 +61,11 @@ func main() {
 		),
 	)
 
-	app.Command("diff", "Diff a schema file against a live database", notImplemented,
+	app.Command("diff", "Diff a schema file against a live database", handleDiff,
 		strictcli.WithArgs(strictcli.NewArg("file", "Path to schema file")),
+		strictcli.WithFlags(
+			strictcli.BoolFlag("json", "Output diff as JSON"),
+		),
 	)
 
 	migrate := app.Group("migrate", "Database migration commands")
@@ -334,6 +338,54 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 		fmt.Print(string(data))
 	}
 
+	return 0
+}
+
+func handleDiff(kwargs map[string]interface{}) int {
+	filePath := kwargs["file"].(string)
+	schema, exitCode := parseAndBuild(filePath)
+	if exitCode != 0 {
+		return exitCode
+	}
+
+	dbURL, _ := kwargs["db"].(string)
+	if dbURL == "" {
+		// No --db: just validate the TOML (parse+build already succeeded).
+		if !kwargs["quiet"].(bool) {
+			fmt.Println("Schema is valid. Use --db to diff against a live database.")
+		}
+		return 0
+	}
+
+	// Introspect the live database.
+	schemaNames := []string{"public"}
+	if schema.Name != "" && schema.Name != "public" {
+		schemaNames = []string{schema.Name}
+	}
+
+	actual, diags, err := introspect.Introspect(dbURL, schemaNames)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	if len(diags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+	}
+	if diagnostic.Diagnostics(diags).HasErrors() {
+		return 1
+	}
+
+	d := diff.Diff(schema, actual)
+
+	if kwargs["json"].(bool) {
+		fmt.Println(diff.FormatJSON(d))
+		return 0
+	}
+
+	fmt.Print(diff.FormatTerminal(d))
+	if d.IsEmpty() {
+		return 0
+	}
 	return 0
 }
 
