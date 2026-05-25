@@ -228,6 +228,7 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 		DefaultExpr:      resolved.DefaultExpr,
 		Generated:        resolved.Generated,
 		Stored:           resolved.Stored,
+		Identity:         resolved.Identity,
 		SemanticTypeName: rc.Type,
 	}
 

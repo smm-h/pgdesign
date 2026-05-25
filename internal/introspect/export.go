@@ -59,6 +59,9 @@ func Export(schema *model.Schema) ([]byte, error) {
 			if c.DefaultExpr != "" {
 				b.WriteString(fmt.Sprintf("default_expr = %s\n", quoteTOML(c.DefaultExpr)))
 			}
+			if c.Identity != "" {
+				b.WriteString(fmt.Sprintf("identity = %s\n", quoteTOML(c.Identity)))
+			}
 			if c.Generated != "" {
 				b.WriteString(fmt.Sprintf("generated = %s\n", quoteTOML(c.Generated)))
 				if c.Stored {

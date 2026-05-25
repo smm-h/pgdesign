@@ -231,7 +231,9 @@ func columnDef(col model.Column) string {
 		parts = append(parts, "NOT NULL")
 	}
 
-	if col.Generated != "" {
+	if col.Identity != "" {
+		parts = append(parts, fmt.Sprintf("GENERATED %s AS IDENTITY", col.Identity))
+	} else if col.Generated != "" {
 		parts = append(parts, fmt.Sprintf("GENERATED ALWAYS AS (%s)", col.Generated))
 		if col.Stored {
 			parts = append(parts, "STORED")

@@ -15,20 +15,21 @@ func TestBuiltinResolve(t *testing.T) {
 		defaultExpr string
 		check       string
 		generated   string
+		identity    string
 	}{
-		{"id", "uuid", true, "", "gen_random_uuid()", "", ""},
-		{"ref", "uuid", true, "", "", "", ""},
-		{"timestamp", "timestamptz", true, "", "now()", "", ""},
-		{"timestamp_optional", "timestamptz", false, "", "", "", ""},
-		{"money", "bigint", true, "0", "", "", ""},
-		{"slug", "text", true, "", "", "VALUE ~ '^[a-z0-9-]+$'", ""},
-		{"email", "text", true, "", "", "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'", ""},
-		{"short_text", "text", true, "", "", "LENGTH(VALUE) <= 255", ""},
-		{"json", "jsonb", true, "", "'{}'::jsonb", "", ""},
-		{"json_array", "jsonb", true, "", "'[]'::jsonb", "", ""},
-		{"counter", "bigint", true, "0", "", "", ""},
-		{"flag", "boolean", true, "false", "", "", ""},
-		{"auto_id", "bigint", true, "", "", "", "ALWAYS AS IDENTITY"},
+		{"id", "uuid", true, "", "gen_random_uuid()", "", "", ""},
+		{"ref", "uuid", true, "", "", "", "", ""},
+		{"timestamp", "timestamptz", true, "", "now()", "", "", ""},
+		{"timestamp_optional", "timestamptz", false, "", "", "", "", ""},
+		{"money", "bigint", true, "0", "", "", "", ""},
+		{"slug", "text", true, "", "", "VALUE ~ '^[a-z0-9-]+$'", "", ""},
+		{"email", "text", true, "", "", "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'", "", ""},
+		{"short_text", "text", true, "", "", "LENGTH(VALUE) <= 255", "", ""},
+		{"json", "jsonb", true, "", "'{}'::jsonb", "", "", ""},
+		{"json_array", "jsonb", true, "", "'[]'::jsonb", "", "", ""},
+		{"counter", "bigint", true, "0", "", "", "", ""},
+		{"flag", "boolean", true, "false", "", "", "", ""},
+		{"auto_id", "bigint", true, "", "", "", "", "ALWAYS"},
 	}
 
 	for _, tt := range tests {
@@ -54,6 +55,9 @@ func TestBuiltinResolve(t *testing.T) {
 			}
 			if td.Generated != tt.generated {
 				t.Errorf("Generated = %q, want %q", td.Generated, tt.generated)
+			}
+			if td.Identity != tt.identity {
+				t.Errorf("Identity = %q, want %q", td.Identity, tt.identity)
 			}
 		})
 	}
@@ -342,14 +346,17 @@ func TestResolveColumnUnknownType(t *testing.T) {
 	}
 }
 
-func TestResolveColumnGenerated(t *testing.T) {
+func TestResolveColumnIdentity(t *testing.T) {
 	r := NewBuiltinRegistry()
 
 	rc, err := r.ResolveColumn("auto_id", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("ResolveColumn error: %v", err)
 	}
-	if rc.Generated != "ALWAYS AS IDENTITY" {
-		t.Errorf("Generated = %q, want %q", rc.Generated, "ALWAYS AS IDENTITY")
+	if rc.Identity != "ALWAYS" {
+		t.Errorf("Identity = %q, want %q", rc.Identity, "ALWAYS")
+	}
+	if rc.Generated != "" {
+		t.Errorf("Generated = %q, want empty (identity columns use Identity field)", rc.Generated)
 	}
 }

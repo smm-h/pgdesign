@@ -94,6 +94,7 @@ type Column struct {
 	DefaultExpr      string
 	Generated        string
 	Stored           bool
+	Identity         string // "ALWAYS" or "BY DEFAULT" for identity columns
 	Comment          string
 	SemanticTypeName string
 }

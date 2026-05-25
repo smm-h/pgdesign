@@ -88,11 +88,11 @@ func NewBuiltinRegistry() *Registry {
 			Default:  "false",
 		},
 		{
-			Name:      "auto_id",
-			Kind:      KindScalar,
-			BaseType:  "bigint",
-			NotNull:   true,
-			Generated: "ALWAYS AS IDENTITY",
+			Name:     "auto_id",
+			Kind:     KindScalar,
+			BaseType: "bigint",
+			NotNull:  true,
+			Identity: "ALWAYS",
 		},
 	}
 

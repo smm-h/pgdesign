@@ -44,8 +44,9 @@ type TypeDef struct {
 	Unique      bool
 	Comment     string
 	EnumValues  []string // values for enum types
-	Generated   string   // generated expression (e.g., "ALWAYS AS IDENTITY")
+	Generated   string   // generated expression (e.g., "price * 0.2")
 	Stored      bool     // whether generated column is stored
+	Identity    string   // identity generation: "ALWAYS" or "BY DEFAULT"
 }
 
 // Registry holds named TypeDefs with thread-safe read access.
@@ -99,6 +100,9 @@ func typeDefsEqual(a, b *TypeDef) bool {
 		}
 	}
 	if a.Generated != b.Generated || a.Stored != b.Stored {
+		return false
+	}
+	if a.Identity != b.Identity {
 		return false
 	}
 	return true
@@ -344,6 +348,7 @@ type ResolvedColumn struct {
 	Check       string
 	Generated   string
 	Stored      bool
+	Identity    string
 }
 
 // ResolveColumn resolves a column's final attributes by looking up the type
@@ -362,6 +367,7 @@ func (r *Registry) ResolveColumn(typeName string, nullable *bool, defaultOverrid
 		Check:       td.Check,
 		Generated:   td.Generated,
 		Stored:      td.Stored,
+		Identity:    td.Identity,
 	}
 
 	// Column nullable overrides type NotNull
