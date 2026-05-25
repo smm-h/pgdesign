@@ -1,4 +1,18 @@
-{"commits":["9ef2b4bfa8a44bd53930343289b0013ed082063d"],"user_facing":true,"description":"**npm wrapper.** Install via `npm install pgspec`.","type":"feature"}
-{"commits":["a56966353c10312cd897df4e2b28672f3d4aa254"],"user_facing":true,"description":"**PyPI wrapper.** Install via `pip install pgspec`.","type":"feature"}
-{"commits":["bc71941106b4880b48ae7578f3b2ad94114a4937"],"user_facing":false}
-{"commits":["340e1e4b3beea8f3ee73fee43354e3b05407ba9b"],"user_facing":false}
+{"commits":["d0d97400c0edd6c272797a859744fa0c6c09bff7","66c740a123df7954f9b230a3ea894a3952e90718","4d3287bd432cdd49d3cc375ad5a46da2e145eec8","2cac5ae76ceb379c1281353270ce5cb6360df459","ae9cc14123b7162df2e5dd6d9251bf99f6cbc75e"],"user_facing":true,"description":"**Core schema compiler.** Parse TOML schema definitions, build resolved intermediate representation, and generate SQL DDL.","type":"feature"}
+{"commits":["26f92bd963fa95967714ad843746b96c88cefedc","390f16a276eb89109791f71715261938a3972e63"],"user_facing":true,"description":"**Schema validation and formatting.** Validate schemas for anti-patterns and format TOML files canonically.","type":"feature"}
+{"commits":["c1d60374a47102ded71d154d8c36b83367e379ac"],"user_facing":true,"description":"**Extension registry.** Validate PostgreSQL extension, opclass, and type references.","type":"feature"}
+{"commits":["6b8cda47e229dbefd483be62e3a3b596cad0fa33","e07f17ecdc8b1e5a81180203358f1d7ae36f91ab","2adabcd85dbd23c0ffe3e09f187166d7137db9c2","408ba958819b63ce58ea1e499fee3924d6cfab76"],"user_facing":true,"description":"**Normal form auditing.** Audit schemas for 1NF/2NF/3NF violations with functional dependency analysis and TANE-based discovery from live data.","type":"feature"}
+{"commits":["db66db2e76456e05396ef126f078ab7e4c76865b"],"user_facing":true,"description":"**Risk classification.** Classify migration operations by risk level for safety review.","type":"feature"}
+{"commits":["1bff5ddf583e636b2f57012747a881ca5cfe6245"],"user_facing":true,"description":"**Database introspection.** Introspect live PostgreSQL databases via pg_catalog.","type":"feature"}
+{"commits":["726e93f170807240bf2b5d33944c7af969ee874b"],"user_facing":true,"description":"**Schema diffing.** Diff schema files against live databases with risk-annotated output.","type":"feature"}
+{"commits":["4c3a32e365699d7e8f83b0caf133d11a51e0faf8","85dfba2b5b8f967531431669938dff6ec774925e"],"user_facing":true,"description":"**Migration system.** Generate, apply, and rollback migrations with safety linting and risk classification.","type":"feature"}
+{"commits":["dfd7b01381fdc685e7e6fac5d460300e2f12c56f"],"user_facing":true,"description":"**D2 diagrams.** Generate D2 diagram and SVG output for schema visualization.","type":"feature"}
+{"commits":["ce24ffc29631142f78c3011ba1be9dd77c0ad1c5","df4c2c5d945ffb3db3e4b896e1d20a876ce019d7","0c15ed173c790fd488b1ef38d64b6d8ca1726318"],"user_facing":true,"description":"**HTTP API server.** Serve schema introspection, validation, diffing, and visualization via HTTP.","type":"feature"}
+{"commits":["fc5ce5adffee2315daf62b7a43cb2ade21addb8e","1f2dd142699bd677602aee9628c8c8a8bca7a7a4","995ca13554e973123c32735bf23785b2d27948f2","6d12f51f7b60bf6eb08076b03c9da2d997592731"],"user_facing":false}
+{"commits":["05dbc2cf2ad4c3394611691dc48627e8f5e12263"],"user_facing":false}
+{"commits":["38a9a56c012585b0457f3674562db8ca68825638","7ce4f657388c5f2cbc648d26ba016e637630eb9e","fc77fc5d9f9604e533f9f615cbee3c130edc361c"],"user_facing":false}
+{"commits":["6c7885bebeae647bbaceff1324fdd978ca3f8ded","def1d85a47a389480ca35d3b664f956e95b89d38"],"user_facing":false}
+{"commits":["1bdd65daac69b562e8ba3073175c9ed3f48734e1"],"user_facing":false}
+{"commits":["c748197dffec523553beb9b6c9606dfc97d8aaad","96a350e4fd32be164118b452778c05be9f04f0bd","a8e295e8122ba4a7f2c42c17f3988a38cf13dd87"],"user_facing":false}
+{"commits":["96c550266cb80abf1b1c358cf907681836631c81","c72dcf5ee794b7d1248c0e7b76a49cf9065802b0","3fb4793c7a3c7d0c1de1e2dca41a15b4a2a4bce2"],"user_facing":false}
+{"commits":["6fcb60e12646fe02b3e2e582a91466b6faec64c5","359ccac3ca33f3d1986757d7a4ceaef04baa813e"],"user_facing":false}
