@@ -1,7 +1,0 @@
-{"commits":["702527505e8084c2b3bfa2ffb94fe0a4f402223d","a1224f72c5be27d2e564660d7fcd23f52c488318","53b5fcb55c321c6ef66076e985b84066becc8666","fff4b584cda0408cf5308d12ef327738666ca191"],"user_facing":true,"description":"**Multi-file schema support.** Parse multiple schema files or a directory. pgdesign.toml config loading. Cross-schema FK validation. CLI accepts variadic paths.","type":"feature"}
-{"commits":["6c5e4f3a13eace4681ab2b06a3910b47ef47e73f"],"user_facing":true,"description":"**Fix auto_id SQL generation.** Identity columns (GENERATED ALWAYS AS IDENTITY) no longer produce malformed DDL.","type":"fix"}
-{"commits":["d00d4b84195dfddd64f40c0ebc0b40af844f8b7c"],"user_facing":true,"description":"**Fix multi-schema SQL output.** Schema-qualified names (e.g., auth.users) now used correctly in all DDL statements.","type":"fix"}
-{"commits":["feaafab4c2393c0640f6a7669f07a9034a87c85f"],"user_facing":true,"description":"**Fix unique index generation.** Indexes with unique=true now emit CREATE UNIQUE INDEX.","type":"fix"}
-{"commits":["2f67bed8dd60ac7670a94c2d33e298deed150763"],"user_facing":false}
-{"commits":["c90a5c1fb81a47f067fc2b9937f9952c7da1d4da"],"user_facing":false}
-{"commits":["a79fdd2a55b76415cbe1d1b3565b5a555c5807ea"],"user_facing":false}
