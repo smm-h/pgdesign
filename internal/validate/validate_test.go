@@ -192,6 +192,82 @@ func TestW008_CircularFK(t *testing.T) {
 	}
 }
 
+func TestE204_CrossSchemaFK_Passes(t *testing.T) {
+	// When two schemas are merged, a cross-schema FK should resolve correctly.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:    "users",
+				Schema:  "auth",
+				Comment: "User accounts",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid"},
+					{Name: "created_at", PGType: "timestamptz"},
+				},
+			},
+			{
+				Name:    "players",
+				Schema:  "game",
+				Comment: "Game players",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid"},
+					{Name: "auth_id", PGType: "uuid"},
+					{Name: "created_at", PGType: "timestamptz"},
+				},
+				FKs: []model.FK{{
+					Name:       "fk_players_auth",
+					Columns:    []string{"auth_id"},
+					RefSchema:  "auth",
+					RefTable:   "users",
+					RefColumns: []string{"id"},
+					OnDelete:   "SET NULL",
+				}},
+			},
+		},
+	}
+
+	diags := Validate(schema, nil)
+	found := findByCode(diags, "E204")
+	if len(found) > 0 {
+		t.Fatalf("expected no E204 for valid cross-schema FK, got %v", found)
+	}
+}
+
+func TestE204_CrossSchemaFK_FailsWhenMissing(t *testing.T) {
+	// A cross-schema FK to a table not in the schema should still error.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:    "players",
+				Schema:  "game",
+				Comment: "Game players",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid"},
+					{Name: "auth_id", PGType: "uuid"},
+					{Name: "created_at", PGType: "timestamptz"},
+				},
+				FKs: []model.FK{{
+					Name:       "fk_players_auth",
+					Columns:    []string{"auth_id"},
+					RefSchema:  "auth",
+					RefTable:   "users",
+					RefColumns: []string{"id"},
+					OnDelete:   "SET NULL",
+				}},
+			},
+		},
+	}
+
+	diags := Validate(schema, nil)
+	found := findByCode(diags, "E204")
+	if len(found) == 0 {
+		t.Fatal("expected E204 for FK referencing non-existent cross-schema table")
+	}
+}
+
 func TestCleanSchema(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{

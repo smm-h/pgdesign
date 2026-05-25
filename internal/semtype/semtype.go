@@ -62,16 +62,46 @@ func NewRegistry() *Registry {
 }
 
 // Register adds a type definition to the registry.
-// Returns an error if a type with the same name already exists.
+// If a type with the same name already exists with an identical definition,
+// the registration is silently accepted (idempotent for multi-file schemas).
+// Returns an error if a type with the same name exists with a different definition.
 func (r *Registry) Register(td *TypeDef) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.types[td.Name]; exists {
-		return fmt.Errorf("type %q already registered", td.Name)
+	if existing, exists := r.types[td.Name]; exists {
+		if typeDefsEqual(existing, td) {
+			return nil
+		}
+		return fmt.Errorf("type %q already registered with a different definition", td.Name)
 	}
 	r.types[td.Name] = td
 	return nil
+}
+
+// typeDefsEqual returns true if two TypeDefs have equivalent definitions.
+func typeDefsEqual(a, b *TypeDef) bool {
+	if a.Kind != b.Kind || a.BaseType != b.BaseType || a.NotNull != b.NotNull {
+		return false
+	}
+	if a.Default != b.Default || a.DefaultExpr != b.DefaultExpr {
+		return false
+	}
+	if a.Check != b.Check || a.Unique != b.Unique {
+		return false
+	}
+	if len(a.EnumValues) != len(b.EnumValues) {
+		return false
+	}
+	for i := range a.EnumValues {
+		if a.EnumValues[i] != b.EnumValues[i] {
+			return false
+		}
+	}
+	if a.Generated != b.Generated || a.Stored != b.Stored {
+		return false
+	}
+	return true
 }
 
 // Resolve looks up a type by name.

@@ -73,8 +73,17 @@ func TestRegisterDuplicate(t *testing.T) {
 	if err := r.Register(td); err != nil {
 		t.Fatalf("first Register failed: %v", err)
 	}
-	if err := r.Register(td); err == nil {
-		t.Fatal("expected error for duplicate registration, got nil")
+
+	// Identical duplicate registration should succeed (idempotent).
+	td2 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: "text"}
+	if err := r.Register(td2); err != nil {
+		t.Fatalf("identical duplicate should succeed, got: %v", err)
+	}
+
+	// Conflicting duplicate should fail.
+	td3 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: "integer"}
+	if err := r.Register(td3); err == nil {
+		t.Fatal("expected error for conflicting duplicate registration, got nil")
 	}
 }
 

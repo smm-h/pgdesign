@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/audit"
+	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/discover"
@@ -32,8 +34,8 @@ func main() {
 	app.GlobalFlag(strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)))
 	app.GlobalFlag(strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"))
 
-	app.Command("generate", "Generate SQL from a pgdesign schema file", handleGenerate,
-		strictcli.WithArgs(strictcli.NewArg("file", "Path to schema file")),
+	app.Command("generate", "Generate SQL from schema file(s) or directory", handleGenerate,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all statements"),
 			strictcli.BoolFlag("no-comments", "Exclude COMMENT ON statements from output"),
@@ -41,12 +43,12 @@ func main() {
 		),
 	)
 
-	app.Command("validate", "Validate a pgdesign schema file", handleValidate,
-		strictcli.WithArgs(strictcli.NewArg("file", "Path to schema file")),
+	app.Command("validate", "Validate schema file(s) or directory", handleValidate,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 	)
 
-	app.Command("audit", "Audit a pgdesign schema file for issues", handleAudit,
-		strictcli.WithArgs(strictcli.NewArg("file", "Path to schema file")),
+	app.Command("audit", "Audit schema file(s) or directory for issues", handleAudit,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 	)
 
 	app.Command("fmt", "Format a pgdesign schema file or directory", handleFmt,
@@ -67,8 +69,8 @@ func main() {
 		),
 	)
 
-	app.Command("diff", "Diff a schema file against a live database", handleDiff,
-		strictcli.WithArgs(strictcli.NewArg("file", "Path to schema file")),
+	app.Command("diff", "Diff schema file(s) or directory against a live database", handleDiff,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("json", "Output diff as JSON"),
 		),
@@ -76,10 +78,10 @@ func main() {
 
 	mig := app.Group("migrate", "Database migration commands")
 	mig.Command("plan", "Plan migrations from schema changes", handleMigratePlan,
-		strictcli.WithArgs(strictcli.NewArg("file", "Path to schema file")),
+		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 	)
 	mig.Command("generate", "Generate migration files", handleMigrateGenerate,
-		strictcli.WithArgs(strictcli.NewArg("file", "Path to schema file")),
+		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.StringFlag("version", "Migration version (semver)", strictcli.Default(nil)),
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
@@ -112,63 +114,10 @@ func main() {
 }
 
 func handleGenerate(kwargs map[string]interface{}) int {
-	filePath := kwargs["file"].(string)
-
-	raw, parseDiags := parse.File(filePath)
-	if raw == nil {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(parseDiags, true))
-		return 1
-	}
-
-	reg := semtype.NewBuiltinRegistry()
-
-	// Load user-defined types from the schema into the registry.
-	var userTypes []semtype.UserTypeDef
-	for _, rt := range raw.Types {
-		ut := semtype.UserTypeDef{
-			Name:   rt.Name,
-			Kind:   rt.Kind,
-			Base:   rt.BaseType,
-			Values: rt.Values,
-		}
-		if rt.NotNull != nil {
-			ut.NotNull = rt.NotNull
-		}
-		if rt.Default != nil {
-			ut.Default = *rt.Default
-		}
-		if rt.DefaultExpr != nil {
-			ut.DefaultExpr = *rt.DefaultExpr
-		}
-		if rt.Check != nil {
-			ut.Check = *rt.Check
-		}
-		if rt.Unique != nil {
-			ut.Unique = *rt.Unique
-		}
-		if rt.Comment != nil {
-			ut.Comment = *rt.Comment
-		}
-		userTypes = append(userTypes, ut)
-	}
-	if len(userTypes) > 0 {
-		loadDiags := reg.LoadUserTypes(userTypes)
-		if loadDiags.HasErrors() {
-			fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(loadDiags, true))
-			return 1
-		}
-	}
-
-	schema, buildDiags := model.Build(raw, reg)
-	if buildDiags.HasErrors() {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(buildDiags, true))
-		return 1
-	}
-
-	// Print warnings to stderr but continue.
-	warnings := buildDiags.Warnings()
-	if len(warnings) > 0 {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(warnings, true))
+	paths := extractPaths(kwargs)
+	schema, exitCode := parseAndBuild(paths)
+	if exitCode != 0 {
+		return exitCode
 	}
 
 	opts := generate.Options{
@@ -184,8 +133,8 @@ func handleGenerate(kwargs map[string]interface{}) int {
 }
 
 func handleValidate(kwargs map[string]interface{}) int {
-	filePath := kwargs["file"].(string)
-	schema, exitCode := parseAndBuild(filePath)
+	paths := extractPaths(kwargs)
+	schema, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -208,8 +157,8 @@ func handleValidate(kwargs map[string]interface{}) int {
 }
 
 func handleAudit(kwargs map[string]interface{}) int {
-	filePath := kwargs["file"].(string)
-	schema, exitCode := parseAndBuild(filePath)
+	paths := extractPaths(kwargs)
+	schema, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -267,16 +216,95 @@ func handleAudit(kwargs map[string]interface{}) int {
 	return 0
 }
 
-// parseAndBuild is a shared helper for commands that need a resolved schema.
-func parseAndBuild(filePath string) (*model.Schema, int) {
-	raw, parseDiags := parse.File(filePath)
-	if raw == nil {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(parseDiags, true))
-		return nil, 1
+// extractPaths extracts the path(s) from kwargs. Handles the variadic "path"
+// arg which returns []interface{}.
+func extractPaths(kwargs map[string]interface{}) []string {
+	raw := kwargs["path"].([]interface{})
+	paths := make([]string, len(raw))
+	for i, v := range raw {
+		paths[i] = v.(string)
+	}
+	return paths
+}
+
+// resolveSchemaPaths resolves the given CLI paths into a list of .toml schema
+// file paths. Handles single files, multiple files, directories (with optional
+// pgdesign.toml config), and pgdesign.toml files directly.
+func resolveSchemaPaths(paths []string) ([]string, error) {
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("at least one path is required")
 	}
 
-	reg := semtype.NewBuiltinRegistry()
+	// Multiple paths: each must be a file.
+	if len(paths) > 1 {
+		for _, p := range paths {
+			info, err := os.Stat(p)
+			if err != nil {
+				return nil, fmt.Errorf("cannot stat %q: %w", p, err)
+			}
+			if info.IsDir() {
+				return nil, fmt.Errorf("when passing multiple paths, each must be a file, not a directory: %q", p)
+			}
+		}
+		return paths, nil
+	}
 
+	// Single path.
+	p := paths[0]
+	info, err := os.Stat(p)
+	if err != nil {
+		return nil, fmt.Errorf("cannot stat %q: %w", p, err)
+	}
+
+	if !info.IsDir() {
+		// Single file. Check if it's pgdesign.toml itself.
+		if filepath.Base(p) == "pgdesign.toml" {
+			return resolveFromConfig(p)
+		}
+		return []string{p}, nil
+	}
+
+	// Directory: look for pgdesign.toml.
+	configPath, hasConfig := config.FindConfig(p)
+	if hasConfig {
+		return resolveFromConfig(configPath)
+	}
+
+	// No config: find all .toml files in the directory (Dir handles exclusion).
+	entries, err := os.ReadDir(p)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read directory %q: %w", p, err)
+	}
+	var filePaths []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".toml") && name != "pgdesign.toml" {
+			filePaths = append(filePaths, filepath.Join(p, name))
+		}
+	}
+	if len(filePaths) == 0 {
+		return nil, fmt.Errorf("no .toml schema files found in %q", p)
+	}
+	return filePaths, nil
+}
+
+// resolveFromConfig loads pgdesign.toml and returns the resolved schema file paths.
+func resolveFromConfig(configPath string) ([]string, error) {
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(cfg.Project.Schemas) == 0 {
+		return nil, fmt.Errorf("pgdesign.toml lists no schemas")
+	}
+	return cfg.SchemaFiles(filepath.Dir(configPath)), nil
+}
+
+// collectUserTypes extracts UserTypeDefs from a RawSchema's Types.
+func collectUserTypes(raw *parse.RawSchema) []semtype.UserTypeDef {
 	var userTypes []semtype.UserTypeDef
 	for _, rt := range raw.Types {
 		ut := semtype.UserTypeDef{
@@ -305,15 +333,67 @@ func parseAndBuild(filePath string) (*model.Schema, int) {
 		}
 		userTypes = append(userTypes, ut)
 	}
-	if len(userTypes) > 0 {
-		loadDiags := reg.LoadUserTypes(userTypes)
-		if loadDiags.HasErrors() {
-			fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(loadDiags, true))
-			return nil, 1
+	return userTypes
+}
+
+// parseAndBuild is a shared helper for commands that need a resolved schema.
+// It accepts one or more paths (files or a directory) and returns the built schema.
+func parseAndBuild(paths []string) (*model.Schema, int) {
+	resolvedPaths, err := resolveSchemaPaths(paths)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return nil, 1
+	}
+
+	var raws []*parse.RawSchema
+	var parseDiags diagnostic.Diagnostics
+
+	if len(resolvedPaths) == 1 {
+		raw, diags := parse.File(resolvedPaths[0])
+		parseDiags = diags
+		if raw != nil {
+			raws = append(raws, raw)
+		}
+	} else {
+		schemas, diags := parse.Files(resolvedPaths)
+		parseDiags = diags
+		raws = schemas
+	}
+
+	if len(raws) == 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(parseDiags, true))
+		return nil, 1
+	}
+
+	// Print parse warnings/info but continue.
+	parseWarnings := parseDiags.Warnings()
+	if len(parseWarnings) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(parseWarnings, true))
+	}
+
+	reg := semtype.NewBuiltinRegistry()
+
+	// Load user-defined types from all schemas into the registry.
+	for _, raw := range raws {
+		userTypes := collectUserTypes(raw)
+		if len(userTypes) > 0 {
+			loadDiags := reg.LoadUserTypes(userTypes)
+			if loadDiags.HasErrors() {
+				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(loadDiags, true))
+				return nil, 1
+			}
 		}
 	}
 
-	schema, buildDiags := model.Build(raw, reg)
+	var schema *model.Schema
+	var buildDiags diagnostic.Diagnostics
+
+	if len(raws) == 1 {
+		schema, buildDiags = model.Build(raws[0], reg)
+	} else {
+		schema, buildDiags = model.BuildMulti(raws, reg)
+	}
+
 	if buildDiags.HasErrors() {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(buildDiags, true))
 		return nil, 1
@@ -328,26 +408,39 @@ func parseAndBuild(filePath string) (*model.Schema, int) {
 }
 
 func handleFmt(kwargs map[string]interface{}) int {
-	filePath := kwargs["path"].(string)
+	target := kwargs["path"].(string)
 
+	fmtConfig := &format.Config{
+		TableOrder:  kwargs["table_order"].(string),
+		ColumnOrder: kwargs["column_order"].(string),
+	}
+
+	info, err := os.Stat(target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: cannot stat %q: %v\n", target, err)
+		return 1
+	}
+
+	if info.IsDir() {
+		return fmtDir(target, fmtConfig, kwargs["check"].(bool))
+	}
+	return fmtFile(target, fmtConfig, kwargs["check"].(bool))
+}
+
+func fmtFile(filePath string, cfg *format.Config, checkOnly bool) int {
 	input, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: cannot read file: %v\n", err)
 		return 1
 	}
 
-	config := &format.Config{
-		TableOrder:  kwargs["table_order"].(string),
-		ColumnOrder: kwargs["column_order"].(string),
-	}
-
-	formatted, err := format.Format(input, config)
+	formatted, err := format.Format(input, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
 
-	if kwargs["check"].(bool) {
+	if checkOnly {
 		if bytes.Equal(input, formatted) {
 			return 0
 		}
@@ -360,6 +453,36 @@ func handleFmt(kwargs map[string]interface{}) int {
 		return 1
 	}
 	return 0
+}
+
+func fmtDir(dirPath string, cfg *format.Config, checkOnly bool) int {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: cannot read directory: %v\n", err)
+		return 1
+	}
+
+	exitCode := 0
+	found := false
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".toml") || name == "pgdesign.toml" {
+			continue
+		}
+		found = true
+		code := fmtFile(filepath.Join(dirPath, name), cfg, checkOnly)
+		if code != 0 {
+			exitCode = code
+		}
+	}
+	if !found {
+		fmt.Fprintf(os.Stderr, "error: no .toml schema files found in %q\n", dirPath)
+		return 1
+	}
+	return exitCode
 }
 
 func handleIntrospect(kwargs map[string]interface{}) int {
@@ -416,8 +539,8 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 }
 
 func handleDiff(kwargs map[string]interface{}) int {
-	filePath := kwargs["file"].(string)
-	schema, exitCode := parseAndBuild(filePath)
+	paths := extractPaths(kwargs)
+	schema, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -464,8 +587,8 @@ func handleDiff(kwargs map[string]interface{}) int {
 }
 
 func handleMigratePlan(kwargs map[string]interface{}) int {
-	filePath := kwargs["file"].(string)
-	schema, exitCode := parseAndBuild(filePath)
+	paths := extractPaths(kwargs)
+	schema, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -537,8 +660,8 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 }
 
 func handleMigrateGenerate(kwargs map[string]interface{}) int {
-	filePath := kwargs["file"].(string)
-	schema, exitCode := parseAndBuild(filePath)
+	paths := extractPaths(kwargs)
+	schema, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
