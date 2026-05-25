@@ -311,7 +311,7 @@ func TestDeterminism(t *testing.T) {
 func TestNotImplementedFormats(t *testing.T) {
 	schema := &model.Schema{Name: "test"}
 
-	for _, format := range []string{"json", "d2"} {
+	for _, format := range []string{"json"} {
 		opts := Options{Format: format}
 		out := Generate(schema, opts)
 		if out != "not implemented" {

@@ -13,7 +13,7 @@ import (
 type Options struct {
 	Idempotent      bool
 	IncludeComments bool
-	Format          string // "sql", "json", "d2"
+	Format          string // "sql", "json", "d2", "svg"
 	PGVersion       int
 }
 
@@ -23,6 +23,15 @@ func Generate(schema *model.Schema, opts Options) string {
 	switch strings.ToLower(opts.Format) {
 	case "sql", "":
 		return generateSQL(schema, opts)
+	case "d2":
+		return GenerateD2(schema)
+	case "svg":
+		d2Source := GenerateD2(schema)
+		svg, err := RenderSVG(d2Source)
+		if err != nil {
+			return "error: " + err.Error()
+		}
+		return string(svg)
 	default:
 		return "not implemented"
 	}
