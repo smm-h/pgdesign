@@ -1,7 +1,7 @@
 version: 2
 
 builds:
-  - main: .
+  - main: ./cmd/pgdesign
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -15,11 +15,13 @@ builds:
       - arm64
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: checksums.txt
