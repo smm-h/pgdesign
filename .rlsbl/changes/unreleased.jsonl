@@ -2,3 +2,4 @@
 {"commits":["6c5e4f3a13eace4681ab2b06a3910b47ef47e73f"],"user_facing":true,"description":"**Fix auto_id SQL generation.** Identity columns (GENERATED ALWAYS AS IDENTITY) no longer produce malformed DDL.","type":"fix"}
 {"commits":["d00d4b84195dfddd64f40c0ebc0b40af844f8b7c"],"user_facing":true,"description":"**Fix multi-schema SQL output.** Schema-qualified names (e.g., auth.users) now used correctly in all DDL statements.","type":"fix"}
 {"commits":["feaafab4c2393c0640f6a7669f07a9034a87c85f"],"user_facing":true,"description":"**Fix unique index generation.** Indexes with unique=true now emit CREATE UNIQUE INDEX.","type":"fix"}
+{"commits":["2f67bed8dd60ac7670a94c2d33e298deed150763"],"user_facing":false}
