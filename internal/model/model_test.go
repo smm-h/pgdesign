@@ -357,6 +357,212 @@ func TestTableByName(t *testing.T) {
 	}
 }
 
+func TestBuildMulti_CrossSchemaFK(t *testing.T) {
+	reg := testRegistry()
+
+	authRaw := &parse.RawSchema{
+		Meta: parse.RawMeta{
+			Version: 1,
+			Schema:  "auth",
+		},
+		Tables: []parse.RawTable{
+			{
+				Name:    "users",
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}, {Name: "email", Type: "short_text"}},
+			},
+		},
+	}
+
+	gameRaw := &parse.RawSchema{
+		Meta: parse.RawMeta{
+			Version: 1,
+			Schema:  "game",
+		},
+		Tables: []parse.RawTable{
+			{
+				Name:    "players",
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}, {Name: "auth_id", Type: "ref"}},
+				FKs: map[string]parse.RawFK{
+					"fk_players_auth": {
+						Columns:    []string{"auth_id"},
+						RefTable:   "auth.users",
+						RefColumns: []string{"id"},
+						OnDelete:   "SET NULL",
+					},
+				},
+			},
+		},
+	}
+
+	schema, diags := BuildMulti([]*parse.RawSchema{authRaw, gameRaw}, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	// Should have 2 tables.
+	if len(schema.Tables) != 2 {
+		t.Fatalf("expected 2 tables, got %d", len(schema.Tables))
+	}
+
+	// auth.users should come before game.players (topo order).
+	var usersIdx, playersIdx int
+	for i, tbl := range schema.Tables {
+		if tbl.Name == "users" && tbl.Schema == "auth" {
+			usersIdx = i
+		}
+		if tbl.Name == "players" && tbl.Schema == "game" {
+			playersIdx = i
+		}
+	}
+	if usersIdx >= playersIdx {
+		t.Errorf("auth.users (idx %d) should come before game.players (idx %d)", usersIdx, playersIdx)
+	}
+
+	// Players should have FK pointing to auth.users.
+	players := schema.TableByName("game", "players")
+	if players == nil {
+		t.Fatal("players table not found")
+	}
+	if len(players.FKs) != 1 {
+		t.Fatalf("expected 1 FK on players, got %d", len(players.FKs))
+	}
+	fk := players.FKs[0]
+	if fk.RefSchema != "auth" {
+		t.Errorf("FK ref schema = %q, want %q", fk.RefSchema, "auth")
+	}
+	if fk.RefTable != "users" {
+		t.Errorf("FK ref table = %q, want %q", fk.RefTable, "users")
+	}
+
+	// TableByName should find auth.users.
+	authUsers := schema.TableByName("auth", "users")
+	if authUsers == nil {
+		t.Error("expected to find auth.users in combined schema")
+	}
+}
+
+func TestBuildMulti_MergesExtensions(t *testing.T) {
+	reg := testRegistry()
+
+	raw1 := &parse.RawSchema{
+		Meta: parse.RawMeta{
+			Version:    1,
+			Schema:     "s1",
+			Extensions: []string{"pgcrypto", "uuid-ossp"},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name:    "t1",
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}},
+			},
+		},
+	}
+	raw2 := &parse.RawSchema{
+		Meta: parse.RawMeta{
+			Version:    1,
+			Schema:     "s2",
+			Extensions: []string{"pgcrypto", "pg_trgm"},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name:    "t2",
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}},
+			},
+		},
+	}
+
+	schema, diags := BuildMulti([]*parse.RawSchema{raw1, raw2}, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	// Extensions should be deduplicated.
+	expected := map[string]bool{"pgcrypto": true, "uuid-ossp": true, "pg_trgm": true}
+	if len(schema.Extensions) != 3 {
+		t.Fatalf("expected 3 extensions, got %d: %v", len(schema.Extensions), schema.Extensions)
+	}
+	for _, ext := range schema.Extensions {
+		if !expected[ext] {
+			t.Errorf("unexpected extension: %q", ext)
+		}
+	}
+}
+
+func TestBuildMulti_MergesEnums(t *testing.T) {
+	reg := testRegistry()
+
+	// Register enum types in the registry.
+	for _, name := range []string{"role", "status"} {
+		err := reg.Register(&semtype.TypeDef{
+			Name:       name,
+			Kind:       semtype.KindEnum,
+			BaseType:   name,
+			NotNull:    true,
+			EnumValues: []string{"a", "b"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	raw1 := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "s1"},
+		Types: []parse.RawType{
+			{Name: "role", Kind: "enum", Values: []string{"admin", "user"}},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name:    "t1",
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}, {Name: "role", Type: "role"}},
+			},
+		},
+	}
+	raw2 := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "s2"},
+		Types: []parse.RawType{
+			{Name: "status", Kind: "enum", Values: []string{"active", "inactive"}},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name:    "t2",
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}, {Name: "status", Type: "status"}},
+			},
+		},
+	}
+
+	schema, diags := BuildMulti([]*parse.RawSchema{raw1, raw2}, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schema.Enums) != 2 {
+		t.Fatalf("expected 2 enums, got %d", len(schema.Enums))
+	}
+}
+
+func TestBuildMulti_SingleSchema(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name:    "users",
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}},
+			},
+		},
+	}
+
+	schema, diags := BuildMulti([]*parse.RawSchema{raw}, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if schema.Name != "public" {
+		t.Errorf("expected single-schema name %q, got %q", "public", schema.Name)
+	}
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+}
+
 func TestEnumResolution(t *testing.T) {
 	reg := testRegistry()
 	// Register an enum type.

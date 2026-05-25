@@ -38,6 +38,55 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	return schema, diags
 }
 
+// BuildMulti constructs a resolved Schema from multiple raw schemas and a type
+// registry. Tables, enums, and extensions from all schemas are merged into one
+// Schema. Each table's Schema field is set from its source RawSchema's meta.schema.
+// The returned Schema.Name is empty (multi-schema has no single name).
+func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Diagnostics) {
+	if len(raws) == 1 {
+		return Build(raws[0], reg)
+	}
+
+	var diags diagnostic.Diagnostics
+
+	schema := &Schema{}
+
+	// Merge extensions (deduplicate).
+	extSeen := make(map[string]bool)
+	for _, raw := range raws {
+		for _, ext := range raw.Meta.Extensions {
+			if !extSeen[ext] {
+				extSeen[ext] = true
+				schema.Extensions = append(schema.Extensions, ext)
+			}
+		}
+		// Use the highest PG version across all schemas.
+		if raw.Meta.Version > schema.PGVersion {
+			schema.PGVersion = raw.Meta.Version
+		}
+	}
+
+	// Phase 1: resolve all schemas.
+	var allTables []Table
+	for _, raw := range raws {
+		tables, enums, resolveDiags := resolve(raw, reg)
+		diags = append(diags, resolveDiags...)
+		schema.Enums = append(schema.Enums, enums...)
+		allTables = append(allTables, tables...)
+	}
+
+	// Phase 2: order all tables together (topo sort sees cross-schema deps).
+	sorted, cycles := topoSort(allTables)
+	schema.Tables = sorted
+	schema.CycleGroups = cycles
+
+	// Phase 3: enrich.
+	enrichDiags := enrich(schema)
+	diags = append(diags, enrichDiags...)
+
+	return schema, diags
+}
+
 // resolve expands semantic types into PG types and builds model structs.
 func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, diagnostic.Diagnostics) {
 	var diags diagnostic.Diagnostics

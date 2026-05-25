@@ -1,13 +1,24 @@
 package model
 
+// qualifiedName returns "schema.table" for use as a unique key in topo sort.
+// Falls back to just the table name if schema is empty.
+func qualifiedName(schema, table string) string {
+	if schema == "" {
+		return table
+	}
+	return schema + "." + table
+}
+
 // topoSort performs topological sort on tables using Kahn's algorithm.
 // It uses FK references to build the dependency graph: if table A has an FK
 // referencing table B, then B must come before A.
+// Tables are identified by schema-qualified names to support multi-schema sorts.
 // Returns sorted tables and any cycle groups (sets of mutually-referencing tables).
 func topoSort(tables []Table) (sorted []Table, cycles [][]string) {
-	tableByName := make(map[string]*Table, len(tables))
+	tableByQName := make(map[string]*Table, len(tables))
 	for i := range tables {
-		tableByName[tables[i].Name] = &tables[i]
+		qn := qualifiedName(tables[i].Schema, tables[i].Name)
+		tableByQName[qn] = &tables[i]
 	}
 
 	// Build adjacency: inDegree counts how many FKs point into this table from others.
@@ -16,24 +27,33 @@ func topoSort(tables []Table) (sorted []Table, cycles [][]string) {
 	dependsOn := make(map[string][]string, len(tables))
 
 	for _, t := range tables {
-		if _, ok := inDegree[t.Name]; !ok {
-			inDegree[t.Name] = 0
+		qn := qualifiedName(t.Schema, t.Name)
+		if _, ok := inDegree[qn]; !ok {
+			inDegree[qn] = 0
 		}
 		for _, fk := range t.FKs {
+			refQN := qualifiedName(fk.RefSchema, fk.RefTable)
 			// Self-references don't create ordering constraints.
-			if fk.RefTable == t.Name {
+			if refQN == qn {
 				continue
 			}
-			dependsOn[t.Name] = append(dependsOn[t.Name], fk.RefTable)
-			inDegree[t.Name]++
+			// Only add dependency if the referenced table is in our set.
+			// Cross-schema FKs to external schemas (not in this build) are
+			// not ordering constraints.
+			if _, exists := tableByQName[refQN]; !exists {
+				continue
+			}
+			dependsOn[qn] = append(dependsOn[qn], refQN)
+			inDegree[qn]++
 		}
 	}
 
 	// Kahn's algorithm: start with zero-in-degree nodes.
 	var queue []string
 	for _, t := range tables {
-		if inDegree[t.Name] == 0 {
-			queue = append(queue, t.Name)
+		qn := qualifiedName(t.Schema, t.Name)
+		if inDegree[qn] == 0 {
+			queue = append(queue, qn)
 		}
 	}
 
@@ -42,24 +62,25 @@ func topoSort(tables []Table) (sorted []Table, cycles [][]string) {
 		name := queue[0]
 		queue = queue[1:]
 		visited[name] = true
-		if t, ok := tableByName[name]; ok {
+		if t, ok := tableByQName[name]; ok {
 			sorted = append(sorted, *t)
 		}
 
 		// For each table that depends on this one, decrement its in-degree.
 		for _, t := range tables {
-			if visited[t.Name] {
+			qn := qualifiedName(t.Schema, t.Name)
+			if visited[qn] {
 				continue
 			}
-			for _, dep := range dependsOn[t.Name] {
+			for _, dep := range dependsOn[qn] {
 				if dep == name {
-					inDegree[t.Name]--
+					inDegree[qn]--
 				}
 			}
-			if inDegree[t.Name] == 0 && !visited[t.Name] {
+			if inDegree[qn] == 0 && !visited[qn] {
 				// Check it's not already in the queue.
-				if !inQueue(queue, t.Name) {
-					queue = append(queue, t.Name)
+				if !inQueue(queue, qn) {
+					queue = append(queue, qn)
 				}
 			}
 		}
@@ -69,9 +90,10 @@ func topoSort(tables []Table) (sorted []Table, cycles [][]string) {
 	if len(sorted) < len(tables) {
 		var cycleGroup []string
 		for _, t := range tables {
-			if !visited[t.Name] {
+			qn := qualifiedName(t.Schema, t.Name)
+			if !visited[qn] {
 				cycleGroup = append(cycleGroup, t.Name)
-				sorted = append(sorted, *tableByName[t.Name])
+				sorted = append(sorted, *tableByQName[qn])
 			}
 		}
 		if len(cycleGroup) > 0 {
