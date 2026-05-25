@@ -2,17 +2,29 @@
 
 # Changelog
 
-## 0.2.1
+## 0.3.0
+
+### Features
+
+- **Multi-file schema support.** Parse multiple schema files or a directory. pgdesign.toml config loading. Cross-schema FK validation. CLI accepts variadic paths.
 
 ### Fixes
 
-- **Idempotent publish.** npm and PyPI publish steps no longer fail when a version is already published.
+- **Fix auto_id SQL generation.** Identity columns (GENERATED ALWAYS AS IDENTITY) no longer produce malformed DDL.
+- **Fix multi-schema SQL output.** Schema-qualified names (e.g., auth.users) now used correctly in all DDL statements.
+- **Fix unique index generation.** Indexes with unique=true now emit CREATE UNIQUE INDEX.
 
 ## 1.0.0
 
 ### Breaking
 
 - **Renamed from pgspec to pgdesign.**
+
+## 0.2.1
+
+### Fixes
+
+- **Idempotent publish.** npm and PyPI publish steps no longer fail when a version is already published.
 
 ## 0.2.0
 
