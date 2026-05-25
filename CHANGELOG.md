@@ -2,6 +2,18 @@
 
 # Changelog
 
+## 0.2.1
+
+### Fixes
+
+- **Idempotent publish.** npm and PyPI publish steps no longer fail when a version is already published.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.2.0
 
 ### Features
@@ -16,19 +28,6 @@
 - **Migration system.** Generate, apply, and rollback migrations with safety linting and risk classification.
 - **D2 diagrams.** Generate D2 diagram and SVG output for schema visualization.
 - **HTTP API server.** Serve schema introspection, validation, diffing, and visualization via HTTP.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
-
-## 0.2.0
-
-### Features
-
-- **npm wrapper.** Install via `npm install pgspec`.
-- **PyPI wrapper.** Install via `pip install pgspec`.
 
 ## 0.1.2
 
