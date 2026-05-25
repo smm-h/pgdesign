@@ -332,9 +332,14 @@ func CreateIndex(schemaName string, index *model.Index, tableName string, idempo
 		colExprs[i] = expr
 	}
 
+	unique := ""
+	if index.Unique {
+		unique = " UNIQUE"
+	}
+
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CREATE INDEX%s %s ON %s",
-		ifne, QuoteIdent(idxName), qualified))
+	sb.WriteString(fmt.Sprintf("CREATE%s INDEX%s %s ON %s",
+		unique, ifne, QuoteIdent(idxName), qualified))
 
 	// USING clause (only if not btree, since btree is the default).
 	method := strings.ToLower(index.Method)

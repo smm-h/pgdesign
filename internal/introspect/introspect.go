@@ -366,6 +366,7 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 		idx := model.Index{
 			Name:   name,
 			Method: method,
+			Unique: isUnique,
 		}
 
 		// Parse the index definition to extract columns, WHERE, INCLUDE, opclass.

@@ -117,6 +117,7 @@ type Index struct {
 	Opclass  string
 	Where    string
 	Include  []string
+	Unique   bool
 	IsAutoFK bool
 }
 

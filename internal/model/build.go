@@ -313,6 +313,9 @@ func resolveIndex(name string, rawIdx parse.RawIndex) Index {
 	if rawIdx.Where != nil {
 		idx.Where = *rawIdx.Where
 	}
+	if rawIdx.Unique != nil {
+		idx.Unique = *rawIdx.Unique
+	}
 	return idx
 }
 
