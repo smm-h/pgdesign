@@ -1,1 +1,3 @@
 {"commits":["99003fdefacd21910c67464879fb27f8b0b7775d"],"user_facing":false}
+{"commits":["99003fdefacd21910c67464879fb27f8b0b7775d"],"user_facing":false}
+{"commits":["fa5ee2b125a079df277c95a798dc01fa381b5c4a"],"user_facing":true,"description":"**Idempotent publish.** npm and PyPI publish steps no longer fail when a version is already published.","type":"fix"}
