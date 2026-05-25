@@ -1,0 +1,23 @@
+[meta]
+version = 1
+schema = "auth"
+extensions = ["pgcrypto"]
+
+[types.text_id]
+kind = "scalar"
+base_type = "text"
+comment = "Text primary key"
+
+[tables.users]
+comment = "Core user accounts"
+pk = ["id"]
+
+[tables.users.columns.id]
+type = "text_id"
+
+[tables.users.columns.email]
+type = "text"
+nullable = true
+
+[tables.users.columns.created_at]
+type = "timestamp"

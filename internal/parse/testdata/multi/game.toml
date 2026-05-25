@@ -1,0 +1,25 @@
+[meta]
+version = 1
+schema = "game"
+
+[tables.players]
+comment = "Game-layer player identity"
+
+[tables.players.columns.id]
+type = "id"
+
+[tables.players.columns.auth_id]
+type = "text"
+nullable = true
+
+[tables.players.columns.name]
+type = "text"
+
+[tables.players.columns.created_at]
+type = "timestamp"
+
+[tables.players.fks.fk_players_auth]
+columns = ["auth_id"]
+ref_table = "auth.users"
+ref_columns = ["id"]
+on_delete = "SET NULL"

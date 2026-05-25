@@ -289,6 +289,121 @@ func TestInvalidTOML(t *testing.T) {
 	}
 }
 
+func TestFiles(t *testing.T) {
+	paths := []string{
+		filepath.Join("testdata", "multi", "auth.toml"),
+		filepath.Join("testdata", "multi", "game.toml"),
+	}
+	schemas, diags := Files(paths)
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schemas) != 2 {
+		t.Fatalf("expected 2 schemas, got %d", len(schemas))
+	}
+
+	// First schema should be auth.
+	if schemas[0].Meta.Schema != "auth" {
+		t.Errorf("schemas[0].meta.schema = %q, want %q", schemas[0].Meta.Schema, "auth")
+	}
+	if len(schemas[0].Tables) != 1 {
+		t.Errorf("auth schema tables = %d, want 1", len(schemas[0].Tables))
+	}
+
+	// Second schema should be game.
+	if schemas[1].Meta.Schema != "game" {
+		t.Errorf("schemas[1].meta.schema = %q, want %q", schemas[1].Meta.Schema, "game")
+	}
+	if len(schemas[1].Tables) != 1 {
+		t.Errorf("game schema tables = %d, want 1", len(schemas[1].Tables))
+	}
+
+	// Game schema's players table should have a cross-schema FK.
+	players := schemas[1].Tables[0]
+	if players.Name != "players" {
+		t.Errorf("game table name = %q, want %q", players.Name, "players")
+	}
+	fk, ok := players.FKs["fk_players_auth"]
+	if !ok {
+		t.Fatal("expected FK fk_players_auth on players table")
+	}
+	if fk.RefTable != "auth.users" {
+		t.Errorf("fk.ref_table = %q, want %q", fk.RefTable, "auth.users")
+	}
+}
+
+func TestDir(t *testing.T) {
+	schemas, diags := Dir(filepath.Join("testdata", "multi"))
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schemas) != 2 {
+		t.Fatalf("expected 2 schemas, got %d", len(schemas))
+	}
+
+	// Schemas should be alphabetically ordered by filename (auth.toml, game.toml).
+	schemaNames := make([]string, len(schemas))
+	for i, s := range schemas {
+		schemaNames[i] = s.Meta.Schema
+	}
+	if schemaNames[0] != "auth" || schemaNames[1] != "game" {
+		t.Errorf("schema names = %v, want [auth game]", schemaNames)
+	}
+}
+
+func TestDirExcludesPgdesignToml(t *testing.T) {
+	// Create a temp dir with pgdesign.toml and a schema file.
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "pgdesign.toml"), []byte(`[project]
+schemas = ["s.toml"]
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "s.toml"), []byte(`[meta]
+version = 1
+schema = "test"
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	schemas, diags := Dir(tmpDir)
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schemas) != 1 {
+		t.Fatalf("expected 1 schema (pgdesign.toml excluded), got %d", len(schemas))
+	}
+	if schemas[0].Meta.Schema != "test" {
+		t.Errorf("schema name = %q, want %q", schemas[0].Meta.Schema, "test")
+	}
+}
+
+func TestFilesWithMissingFile(t *testing.T) {
+	paths := []string{
+		filepath.Join("testdata", "multi", "auth.toml"),
+		filepath.Join("testdata", "multi", "nonexistent.toml"),
+	}
+	schemas, diags := Files(paths)
+	// Should still return the valid schema.
+	if len(schemas) != 1 {
+		t.Fatalf("expected 1 schema (one file missing), got %d", len(schemas))
+	}
+	if schemas[0].Meta.Schema != "auth" {
+		t.Errorf("schema name = %q, want %q", schemas[0].Meta.Schema, "auth")
+	}
+	// Should have an error diagnostic for the missing file.
+	var hasError bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E001" {
+			hasError = true
+			break
+		}
+	}
+	if !hasError {
+		t.Error("expected E001 error for missing file")
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {

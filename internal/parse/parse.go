@@ -3,6 +3,8 @@ package parse
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 
@@ -58,6 +60,63 @@ func Bytes(data []byte) (*RawSchema, []diagnostic.Diagnostic) {
 	}
 	schema := p.walk()
 	return schema, p.diags
+}
+
+// Files parses multiple TOML schema files and returns all schemas with
+// aggregated diagnostics.
+func Files(paths []string) ([]*RawSchema, []diagnostic.Diagnostic) {
+	var schemas []*RawSchema
+	var allDiags []diagnostic.Diagnostic
+
+	for _, path := range paths {
+		schema, diags := File(path)
+		allDiags = append(allDiags, diags...)
+		if schema != nil {
+			schemas = append(schemas, schema)
+		}
+	}
+
+	return schemas, allDiags
+}
+
+// Dir finds all .toml schema files in a directory (excluding pgdesign.toml),
+// parses each, and returns all schemas with aggregated diagnostics.
+func Dir(dirPath string) ([]*RawSchema, []diagnostic.Diagnostic) {
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, []diagnostic.Diagnostic{{
+			Severity: diagnostic.Error,
+			Code:     "E001",
+			File:     dirPath,
+			Message:  fmt.Sprintf("cannot read directory: %v", err),
+		}}
+	}
+
+	var paths []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".toml") {
+			continue
+		}
+		if name == "pgdesign.toml" {
+			continue
+		}
+		paths = append(paths, filepath.Join(dirPath, name))
+	}
+
+	if len(paths) == 0 {
+		return nil, []diagnostic.Diagnostic{{
+			Severity: diagnostic.Error,
+			Code:     "E001",
+			File:     dirPath,
+			Message:  "no .toml schema files found in directory",
+		}}
+	}
+
+	return Files(paths)
 }
 
 // parser holds state during AST walking.
