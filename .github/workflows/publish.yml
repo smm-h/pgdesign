@@ -37,6 +37,7 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: pypi/dist/
+          skip-existing: true
 
   npm:
     runs-on: ubuntu-latest
@@ -46,6 +47,12 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-      - run: npm publish ./npm/
+      - run: |
+          npm publish ./npm/ 2>&1 && exit 0
+          if npm view pgdesign@$(node -p "require('./npm/package.json').version") version >/dev/null 2>&1; then
+            echo "Version already published to npm, skipping"
+            exit 0
+          fi
+          exit 1
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
