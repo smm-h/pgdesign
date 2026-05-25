@@ -38,6 +38,8 @@ func Closure(attrs []string, fds []FuncDep) []string {
 }
 
 // MinimalCover computes the minimal (canonical) cover of a set of functional dependencies.
+// Does not merge cyclic equivalences (e.g., A->B, B->A). This is a known limitation,
+// not a bug — the algorithm is correct for non-cyclic FD sets.
 func MinimalCover(fds []FuncDep) []FuncDep {
 	// Step 1: Decompose RHS — split each FD X→{A,B,C} into X→A, X→B, X→C
 	var decomposed []FuncDep
