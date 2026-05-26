@@ -87,8 +87,15 @@ func TestGolden(t *testing.T) {
 				}
 			}
 
-			// Build
+			// Build: load user-defined types from the schema before building.
 			reg := semtype.NewBuiltinRegistry()
+			userTypes := collectUserTypes(raw)
+			if len(userTypes) > 0 {
+				loadDiags := reg.LoadUserTypes(userTypes)
+				if loadDiags.HasErrors() {
+					t.Fatalf("user type errors: %v", loadDiags)
+				}
+			}
 			schema, buildDiags := model.Build(raw, reg)
 			if buildDiags.HasErrors() {
 				t.Fatalf("build errors: %v", buildDiags)
@@ -158,6 +165,39 @@ func TestGolden(t *testing.T) {
 			}
 		})
 	}
+}
+
+// collectUserTypes extracts UserTypeDefs from a RawSchema's Types.
+func collectUserTypes(raw *parse.RawSchema) []semtype.UserTypeDef {
+	var userTypes []semtype.UserTypeDef
+	for _, rt := range raw.Types {
+		ut := semtype.UserTypeDef{
+			Name:   rt.Name,
+			Kind:   rt.Kind,
+			Base:   rt.BaseType,
+			Values: rt.Values,
+		}
+		if rt.NotNull != nil {
+			ut.NotNull = rt.NotNull
+		}
+		if rt.Default != nil {
+			ut.Default = *rt.Default
+		}
+		if rt.DefaultExpr != nil {
+			ut.DefaultExpr = *rt.DefaultExpr
+		}
+		if rt.Check != nil {
+			ut.Check = *rt.Check
+		}
+		if rt.Unique != nil {
+			ut.Unique = *rt.Unique
+		}
+		if rt.Comment != nil {
+			ut.Comment = *rt.Comment
+		}
+		userTypes = append(userTypes, ut)
+	}
+	return userTypes
 }
 
 // itoa converts an int to a string without importing strconv.
