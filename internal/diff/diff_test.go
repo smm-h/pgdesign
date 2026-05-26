@@ -753,3 +753,80 @@ func TestOwnerChanged(t *testing.T) {
 		t.Errorf("expected [postgres, app_user], got %v", td.OwnerChanged)
 	}
 }
+
+func TestGeneratedChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Columns: []model.Column{
+				{Name: "total", PGType: "numeric", Generated: "STORED"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Columns: []model.Column{
+				{Name: "total", PGType: "numeric", Generated: ""},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	cc := d.TablesChanged[0].ColumnsChanged[0]
+	if cc.GeneratedChanged == nil {
+		t.Fatal("expected GeneratedChanged to be set")
+	}
+	if cc.GeneratedChanged[0] != "" || cc.GeneratedChanged[1] != "STORED" {
+		t.Errorf("expected ['', 'STORED'], got [%q, %q]", cc.GeneratedChanged[0], cc.GeneratedChanged[1])
+	}
+}
+
+func TestIdentityChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: "bigint", Identity: "BY DEFAULT"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: "bigint", Identity: "ALWAYS"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	cc := d.TablesChanged[0].ColumnsChanged[0]
+	if cc.IdentityChanged == nil {
+		t.Fatal("expected IdentityChanged to be set")
+	}
+	if cc.IdentityChanged[0] != "ALWAYS" || cc.IdentityChanged[1] != "BY DEFAULT" {
+		t.Errorf("expected ['ALWAYS', 'BY DEFAULT'], got [%q, %q]", cc.IdentityChanged[0], cc.IdentityChanged[1])
+	}
+}
+
+func TestGeneratedAndIdentityUnchanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: "bigint", Identity: "ALWAYS", Generated: "STORED"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: "bigint", Identity: "ALWAYS", Generated: "STORED"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff when generated and identity are unchanged, got: %s", d.Summary())
+	}
+}

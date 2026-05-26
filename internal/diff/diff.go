@@ -51,8 +51,10 @@ type ColumnChange struct {
 	TypeChanged     *[2]string          `json:"type_changed"`     // [old, new]
 	NullableChanged *[2]bool            `json:"nullable_changed"` // [old, new]
 	DefaultChanged  *[2]string          `json:"default_changed"`  // [old, new]
-	CommentChanged  *[2]string          `json:"comment_changed"`  // [old, new]
-	Risk            risk.Classification `json:"risk"`
+	CommentChanged   *[2]string          `json:"comment_changed"`   // [old, new]
+	GeneratedChanged *[2]string          `json:"generated_changed,omitempty"` // [old, new]
+	IdentityChanged  *[2]string          `json:"identity_changed,omitempty"`  // [old, new]
+	Risk             risk.Classification `json:"risk"`
 }
 
 // EnumDiff describes changes to an enum type.
@@ -295,6 +297,18 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 	// Comment comparison.
 	if desired.Comment != actual.Comment {
 		cc.CommentChanged = &[2]string{actual.Comment, desired.Comment}
+		changed = true
+	}
+
+	// Generated comparison.
+	if desired.Generated != actual.Generated {
+		cc.GeneratedChanged = &[2]string{actual.Generated, desired.Generated}
+		changed = true
+	}
+
+	// Identity comparison.
+	if desired.Identity != actual.Identity {
+		cc.IdentityChanged = &[2]string{actual.Identity, desired.Identity}
 		changed = true
 	}
 

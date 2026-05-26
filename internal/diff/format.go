@@ -162,6 +162,12 @@ func formatColumnChange(b *strings.Builder, cc *ColumnChange) {
 	if cc.CommentChanged != nil {
 		fmt.Fprintf(b, "    comment: %q -> %q\n", cc.CommentChanged[0], cc.CommentChanged[1])
 	}
+	if cc.GeneratedChanged != nil {
+		fmt.Fprintf(b, "    generated: %q -> %q\n", cc.GeneratedChanged[0], cc.GeneratedChanged[1])
+	}
+	if cc.IdentityChanged != nil {
+		fmt.Fprintf(b, "    identity: %q -> %q\n", cc.IdentityChanged[0], cc.IdentityChanged[1])
+	}
 }
 
 func nullStr(notNull bool) string {
