@@ -1,0 +1,15 @@
+[meta]
+version = 16
+schema = "public"
+
+[tables.users]
+comment = "User accounts"
+
+[tables.users.columns.id]
+type = "id"
+
+[tables.users.columns.email]
+type = "email"
+
+[tables.users.columns.created_at]
+type = "timestamp"
