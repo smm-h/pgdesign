@@ -607,6 +607,50 @@ func TestUniqueIndex(t *testing.T) {
 	}
 }
 
+func TestIdentityColumnPGVersionGate(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true, Identity: "ALWAYS"},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	// PGVersion 9: identity column should fall back to bigserial.
+	opts := Options{Format: "sql", PGVersion: 9}
+	out := Generate(schema, opts)
+
+	if !strings.Contains(out, "id bigserial NOT NULL") {
+		t.Errorf("PGVersion=9: expected bigserial fallback, got:\n%s", out)
+	}
+	if strings.Contains(out, "GENERATED") {
+		t.Errorf("PGVersion=9: should not contain GENERATED, got:\n%s", out)
+	}
+
+	// PGVersion 10: identity column should use GENERATED AS IDENTITY.
+	opts.PGVersion = 10
+	out = Generate(schema, opts)
+
+	if !strings.Contains(out, "GENERATED ALWAYS AS IDENTITY") {
+		t.Errorf("PGVersion=10: expected GENERATED ALWAYS AS IDENTITY, got:\n%s", out)
+	}
+
+	// PGVersion 0 (unspecified): should use GENERATED AS IDENTITY.
+	opts.PGVersion = 0
+	out = Generate(schema, opts)
+
+	if !strings.Contains(out, "GENERATED ALWAYS AS IDENTITY") {
+		t.Errorf("PGVersion=0: expected GENERATED ALWAYS AS IDENTITY, got:\n%s", out)
+	}
+}
+
 func TestGoldenFile(t *testing.T) {
 	inputPath := filepath.Join("testdata", "simple_input.toml")
 

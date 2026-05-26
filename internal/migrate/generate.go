@@ -109,6 +109,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			ctx := risk.OpContext{
 				IsNullable: !col.NotNull,
 				HasDefault: col.Default != "" || col.DefaultExpr != "",
+				PGVersion:  desired.PGVersion,
 			}
 			op := DDLOp{
 				Op:      "add_column",

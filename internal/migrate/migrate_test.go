@@ -124,6 +124,89 @@ func TestGenerateMigration_AddColumn(t *testing.T) {
 	}
 }
 
+func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
+	// When desired schema has PGVersion=11, add_column with NOT NULL + default
+	// should be safe (metadata-only on PG11+), so no risk diagnostic.
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 11,
+		Tables: []model.Table{
+			{
+				Name:   "players",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.players",
+				ColumnsAdded: []model.Column{
+					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+				},
+			},
+		},
+	}
+
+	_, diags := GenerateMigration(d, desired, "0.2.0")
+
+	// PG11 with constant default: should be safe, no risk diagnostics.
+	for _, diag := range diags {
+		if diag.Code == "MIGRATE_RISK" && strings.Contains(diag.Message, "add_column") {
+			t.Errorf("PGVersion=11: expected no risk diagnostic for add_column with default, got: %s", diag.Message)
+		}
+	}
+}
+
+func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
+	// When desired schema has PGVersion=9, add_column with NOT NULL + default
+	// should be dangerous (table rewrite on pre-PG11).
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 9,
+		Tables: []model.Table{
+			{
+				Name:   "players",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.players",
+				ColumnsAdded: []model.Column{
+					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+				},
+			},
+		},
+	}
+
+	_, diags := GenerateMigration(d, desired, "0.2.0")
+
+	// PG9 with constant default: should be dangerous, expect risk diagnostic.
+	hasDangerous := false
+	for _, diag := range diags {
+		if diag.Code == "MIGRATE_RISK" && strings.Contains(diag.Message, "add_column") {
+			hasDangerous = true
+			break
+		}
+	}
+	if !hasDangerous {
+		t.Error("PGVersion=9: expected dangerous risk diagnostic for add_column with NOT NULL default")
+	}
+}
+
 func TestGenerateMigration_DropTable(t *testing.T) {
 	desired := &model.Schema{Name: "game"}
 	d := &diff.SchemaDiff{
