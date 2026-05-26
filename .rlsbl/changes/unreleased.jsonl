@@ -1,0 +1,1 @@
+{"commits":["52f956a01c7e03606c3952c642a3c29b026163c0"],"user_facing":true,"description":"**Fix.** Schema-qualify enum types in DDL output \u2014 enum columns now correctly emit  instead of bare .","type":"fix"}
