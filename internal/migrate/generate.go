@@ -16,9 +16,15 @@ import (
 // from pg_stat_user_tables (nil when --db is not available or stats are
 // unavailable). largeFKThreshold is the row count above which E215 is emitted
 // for ADD CONSTRAINT without NOT VALID; pass 0 to use the default of 10000.
-func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string, tableStats TableStats, largeFKThreshold int64) (*Migration, []diagnostic.Diagnostic) {
+// expandContractThreshold is the row count above which set_not_null ops are
+// decomposed into a DML backfill step followed by set_not_null; pass 0 to use
+// the default of 10_000_000.
+func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string, tableStats TableStats, largeFKThreshold int64, expandContractThreshold int64) (*Migration, []diagnostic.Diagnostic) {
 	if largeFKThreshold <= 0 {
 		largeFKThreshold = 10_000
+	}
+	if expandContractThreshold <= 0 {
+		expandContractThreshold = 10_000_000
 	}
 	m := &Migration{
 		Version:     version,
@@ -159,10 +165,32 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				}
 				m.DDLOps = append(m.DDLOps, op)
 				diags = append(diags, classifyOp(op, risk.OpAlterColumnType, ctx)...)
+
+				// Type narrowing warning for large tables.
+				if ctx.EstimatedRows > expandContractThreshold && !diff.IsWidening(cc.TypeChanged[0], cc.TypeChanged[1]) {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Warning,
+						Code:       "EXPAND_CONTRACT_TYPE_NARROW",
+						Table:      td.Name,
+						Column:     cc.Name,
+						Message:    fmt.Sprintf("Type narrowing on %s.%s (%s -> %s) on table with %d rows may require expand-contract migration", td.Name, cc.Name, cc.TypeChanged[0], cc.TypeChanged[1], ctx.EstimatedRows),
+						Suggestion: "Consider an expand-contract approach: add new column, backfill, swap, drop old column",
+					})
+				}
 			}
 			if cc.NullableChanged != nil {
 				if cc.NullableChanged[1] {
 					// Becoming NOT NULL.
+					if ctx.EstimatedRows > expandContractThreshold {
+						// Decompose into backfill DML + set_not_null for large tables.
+						backfillSQL := buildBackfillSQL(td.Name, cc.Name, desired)
+						dmlOp := DMLOp{
+							Op:   "backfill",
+							SQL:  backfillSQL,
+							Down: &DownOp{Irreversible: true},
+						}
+						m.DMLOps = append(m.DMLOps, dmlOp)
+					}
 					op := DDLOp{
 						Op:     "set_not_null",
 						Table:  td.Name,
@@ -637,4 +665,56 @@ func partitionChildNameFromKey(parentQualified string, childKey string) string {
 		return schema + "." + childName
 	}
 	return childName
+}
+
+// buildBackfillSQL generates a DML statement to backfill NULL values for a
+// column that is transitioning to NOT NULL. It looks up the column's default
+// from the desired schema; if no default is found, it uses a type-appropriate
+// zero value.
+func buildBackfillSQL(tableName, colName string, desired *model.Schema) string {
+	defaultVal := "0" // fallback
+	table := findTable(desired, tableName)
+	if table != nil {
+		for _, col := range table.Columns {
+			if col.Name == colName {
+				if col.DefaultExpr != "" {
+					defaultVal = col.DefaultExpr
+				} else if col.Default != "" {
+					defaultVal = formatDefault(col.Default, col.PGType)
+				} else {
+					defaultVal = typeZeroValue(col.PGType)
+				}
+				break
+			}
+		}
+	}
+	return fmt.Sprintf("UPDATE %s SET %s = COALESCE(%s, %s) WHERE %s IS NULL",
+		quoteQualified(tableName),
+		quoteIdent(colName), quoteIdent(colName), defaultVal,
+		quoteIdent(colName))
+}
+
+// quoteIdent is a convenience alias for sql.QuoteIdent used in backfill SQL.
+func quoteIdent(name string) string {
+	// Reuse the sql_gen.go import path.
+	return quoteIdentSlice([]string{name})[0]
+}
+
+// typeZeroValue returns a safe zero-value literal for common PG types.
+func typeZeroValue(pgType string) string {
+	t := strings.ToLower(strings.TrimSpace(pgType))
+	switch {
+	case t == "boolean" || t == "bool":
+		return "false"
+	case t == "text" || strings.HasPrefix(t, "varchar") || strings.HasPrefix(t, "character") || t == "char" || t == "bpchar":
+		return "''"
+	case t == "uuid":
+		return "'00000000-0000-0000-0000-000000000000'"
+	case t == "jsonb" || t == "json":
+		return "'{}'"
+	case strings.Contains(t, "timestamp") || t == "date":
+		return "now()"
+	default:
+		return "0"
+	}
 }

@@ -845,7 +845,7 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 		statsConn.Close(ctx)
 	}
 
-	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold)
+	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold)
 
 	// Print the plan.
 	fmt.Println("Migration plan:")
@@ -956,7 +956,7 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 		statsConn.Close(ctx)
 	}
 
-	m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold)
+	m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold)
 
 	if len(migDiags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
