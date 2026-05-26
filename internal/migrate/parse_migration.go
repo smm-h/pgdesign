@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/BurntSushi/toml"
+	tomledit "github.com/smm-h/go-toml-edit"
 )
 
 // tomlMigration is the TOML-level representation of a migration file.
@@ -67,7 +67,7 @@ func ParseMigrationFile(path string) (*Migration, error) {
 // ParseMigration parses a TOML migration string.
 func ParseMigration(data string) (*Migration, error) {
 	var tm tomlMigration
-	if _, err := toml.Decode(data, &tm); err != nil {
+	if err := tomledit.Unmarshal([]byte(data), &tm); err != nil {
 		return nil, fmt.Errorf("parse migration TOML: %w", err)
 	}
 
