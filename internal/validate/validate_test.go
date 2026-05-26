@@ -863,6 +863,158 @@ func TestExtractColumnRefs(t *testing.T) {
 	}
 }
 
+func TestE215_InsertPolicyWithUsingOnly(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "messages",
+			Schema:    "public",
+			Comment:   "Messages table",
+			PK:        []string{"id"},
+			EnableRLS: true,
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "channel_id", PGType: "uuid"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Policies: []model.Policy{{
+				Name:      "insert_bad",
+				Operation: "INSERT",
+				Role:      "app",
+				Using:     "channel_id IS NOT NULL",
+				// No WithCheck -- INSERT should use with_check
+			}},
+		}},
+	}
+
+	diags := Validate(schema, nil)
+	found := findByCode(diags, "E215")
+	if len(found) == 0 {
+		t.Fatal("expected E215 for INSERT policy with using but no with_check")
+	}
+	if found[0].Table != "messages" {
+		t.Errorf("expected table 'messages', got %q", found[0].Table)
+	}
+}
+
+func TestE215_SelectPolicyWithWithCheck(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "messages",
+			Schema:    "public",
+			Comment:   "Messages table",
+			PK:        []string{"id"},
+			EnableRLS: true,
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "channel_id", PGType: "uuid"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Policies: []model.Policy{{
+				Name:      "select_bad",
+				Operation: "SELECT",
+				Role:      "app",
+				WithCheck: "channel_id IS NOT NULL",
+			}},
+		}},
+	}
+
+	diags := Validate(schema, nil)
+	found := findByCode(diags, "E215")
+	if len(found) == 0 {
+		t.Fatal("expected E215 for SELECT policy with with_check")
+	}
+}
+
+func TestE215_UpdatePolicyBoth_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "messages",
+			Schema:    "public",
+			Comment:   "Messages table",
+			PK:        []string{"id"},
+			EnableRLS: true,
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "channel_id", PGType: "uuid"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Policies: []model.Policy{{
+				Name:      "update_own",
+				Operation: "UPDATE",
+				Role:      "app",
+				Using:     "channel_id = current_setting('app.channel_id')::uuid",
+				WithCheck: "channel_id = current_setting('app.channel_id')::uuid",
+			}},
+		}},
+	}
+
+	diags := Validate(schema, nil)
+	found := findByCode(diags, "E215")
+	if len(found) > 0 {
+		t.Fatal("expected no E215 for UPDATE policy with both using and with_check")
+	}
+}
+
+func TestW009_PolicyErrorCodeNotSnakeCase(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "messages",
+			Schema:    "public",
+			Comment:   "Messages table",
+			PK:        []string{"id"},
+			EnableRLS: true,
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "channel_id", PGType: "uuid"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Policies: []model.Policy{{
+				Name:      "insert_own",
+				Operation: "INSERT",
+				Role:      "app",
+				WithCheck: "true",
+				ErrorCode: "ChatDisabled",
+			}},
+		}},
+	}
+
+	diags := Validate(schema, nil)
+	found := findByCode(diags, "W009")
+	if len(found) == 0 {
+		t.Fatal("expected W009 for non-snake_case error_code")
+	}
+}
+
+func TestW009_PolicyErrorCodeSnakeCase_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "messages",
+			Schema:    "public",
+			Comment:   "Messages table",
+			PK:        []string{"id"},
+			EnableRLS: true,
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "channel_id", PGType: "uuid"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Policies: []model.Policy{{
+				Name:      "insert_own",
+				Operation: "INSERT",
+				Role:      "app",
+				WithCheck: "true",
+				ErrorCode: "chat_disabled",
+			}},
+		}},
+	}
+
+	diags := Validate(schema, nil)
+	found := findByCode(diags, "W009")
+	if len(found) > 0 {
+		t.Fatal("expected no W009 for valid snake_case error_code")
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {

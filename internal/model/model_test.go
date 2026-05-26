@@ -606,6 +606,157 @@ func TestEnumResolution(t *testing.T) {
 	}
 }
 
+func TestBuild_PoliciesResolved(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name:    "messages",
+				PK:      []string{"id"},
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}, {Name: "channel_id", Type: "ref"}, {Name: "body", Type: "short_text"}},
+				Policies: map[string]parse.RawPolicy{
+					"select_own": {
+						For:   "SELECT",
+						To:    "game_app",
+						Using: "channel_id = current_setting('app.channel_id')::uuid",
+					},
+					"insert_own": {
+						For:          "INSERT",
+						To:           "game_app",
+						WithCheck:    "channel_id = current_setting('app.channel_id')::uuid",
+						ErrorCode:    "chat_disabled",
+						ErrorMessage: "Cannot send messages here",
+					},
+				},
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	msgs := schema.TableByName("public", "messages")
+	if msgs == nil {
+		t.Fatal("messages table not found")
+	}
+	if !msgs.EnableRLS {
+		t.Error("expected EnableRLS = true when policies exist")
+	}
+	if len(msgs.Policies) != 2 {
+		t.Fatalf("expected 2 policies, got %d", len(msgs.Policies))
+	}
+
+	// Find each policy by name.
+	policyMap := make(map[string]Policy)
+	for _, p := range msgs.Policies {
+		policyMap[p.Name] = p
+	}
+
+	sel, ok := policyMap["select_own"]
+	if !ok {
+		t.Fatal("missing policy 'select_own'")
+	}
+	if sel.Operation != "SELECT" {
+		t.Errorf("select_own.Operation = %q, want %q", sel.Operation, "SELECT")
+	}
+	if sel.Role != "game_app" {
+		t.Errorf("select_own.Role = %q, want %q", sel.Role, "game_app")
+	}
+	if sel.Using == "" {
+		t.Error("select_own.Using should not be empty")
+	}
+
+	ins, ok := policyMap["insert_own"]
+	if !ok {
+		t.Fatal("missing policy 'insert_own'")
+	}
+	if ins.Operation != "INSERT" {
+		t.Errorf("insert_own.Operation = %q, want %q", ins.Operation, "INSERT")
+	}
+	if ins.WithCheck == "" {
+		t.Error("insert_own.WithCheck should not be empty")
+	}
+	if ins.ErrorCode != "chat_disabled" {
+		t.Errorf("insert_own.ErrorCode = %q, want %q", ins.ErrorCode, "chat_disabled")
+	}
+	if ins.ErrorMessage != "Cannot send messages here" {
+		t.Errorf("insert_own.ErrorMessage = %q, want %q", ins.ErrorMessage, "Cannot send messages here")
+	}
+}
+
+func TestBuild_PolicyInvalidOperation(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name:    "items",
+				PK:      []string{"id"},
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}},
+				Policies: map[string]parse.RawPolicy{
+					"bad_policy": {
+						For:   "TRUNCATE",
+						Using: "true",
+					},
+				},
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	if !diags.HasErrors() {
+		t.Fatal("expected error for invalid policy operation")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E102" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected E102 diagnostic for invalid policy operation")
+	}
+}
+
+func TestBuild_PolicyMissingExpr(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name:    "items",
+				PK:      []string{"id"},
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}},
+				Policies: map[string]parse.RawPolicy{
+					"empty_policy": {
+						For: "SELECT",
+						// No using or with_check
+					},
+				},
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	if !diags.HasErrors() {
+		t.Fatal("expected error for policy missing both using and with_check")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E103" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected E103 diagnostic for policy missing expressions")
+	}
+}
+
 func TestResolveIndex_PlainColumns(t *testing.T) {
 	// Plain column names without direction: should produce nil Desc (all ASC).
 	raw := parse.RawIndex{

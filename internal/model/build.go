@@ -173,6 +173,21 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 		})
 	}
 
+	// Resolve policies.
+	for name, rawPol := range rt.Policies {
+		pol, polDiags := resolvePolicy(name, rawPol, rt.Name)
+		diags = append(diags, polDiags...)
+		t.Policies = append(t.Policies, pol)
+	}
+	// If any policies exist, enable RLS on the table.
+	if len(t.Policies) > 0 {
+		t.EnableRLS = true
+	}
+	// Explicit enable_rls from TOML takes precedence (allows RLS without policies).
+	if rt.EnableRLS {
+		t.EnableRLS = true
+	}
+
 	// Resolve partitioning.
 	if rt.Partitioning != nil {
 		t.Partitioning = resolvePartitioning(rt.Partitioning)
@@ -332,6 +347,53 @@ func resolveIndex(name string, rawIdx parse.RawIndex) Index {
 		idx.Unique = *rawIdx.Unique
 	}
 	return idx
+}
+
+// resolvePolicy converts a raw policy definition to a model Policy with validation.
+func resolvePolicy(name string, rawPol parse.RawPolicy, tableName string) (Policy, diagnostic.Diagnostics) {
+	var diags diagnostic.Diagnostics
+
+	pol := Policy{
+		Name:         name,
+		Operation:    strings.ToUpper(rawPol.For),
+		Role:         rawPol.To,
+		Using:        rawPol.Using,
+		WithCheck:    rawPol.WithCheck,
+		ErrorCode:    rawPol.ErrorCode,
+		ErrorMessage: rawPol.ErrorMessage,
+	}
+
+	// Validate operation.
+	validOps := map[string]bool{
+		"SELECT": true, "INSERT": true, "UPDATE": true, "DELETE": true, "ALL": true,
+	}
+	if pol.Operation == "" {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E102",
+			Table:    tableName,
+			Message:  fmt.Sprintf("policy %q missing required field \"for\"", name),
+		})
+	} else if !validOps[pol.Operation] {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E102",
+			Table:    tableName,
+			Message:  fmt.Sprintf("policy %q has invalid operation %q; must be SELECT, INSERT, UPDATE, DELETE, or ALL", name, pol.Operation),
+		})
+	}
+
+	// At least one of using or with_check must be set.
+	if pol.Using == "" && pol.WithCheck == "" {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E103",
+			Table:    tableName,
+			Message:  fmt.Sprintf("policy %q must have at least one of \"using\" or \"with_check\"", name),
+		})
+	}
+
+	return pol, diags
 }
 
 // parseIndexColumns splits raw column strings like "col DESC" into separate

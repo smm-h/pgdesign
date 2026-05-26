@@ -47,6 +47,8 @@ type Table struct {
 	Dependencies []fd.FuncDep       `json:"dependencies,omitempty"`
 	Maintenance  *MaintenanceConfig `json:"maintenance,omitempty"`
 	Owner        string             `json:"owner,omitempty"`
+	Policies     []Policy           `json:"policies,omitempty"`
+	EnableRLS    bool               `json:"enable_rls,omitempty"`
 
 	candidateKeys [][]string // cached result of CandidateKeys()
 }
@@ -139,6 +141,17 @@ type UniqueConstraint struct {
 type CheckConstraint struct {
 	Name string `json:"name"`
 	Expr string `json:"expr"`
+}
+
+// Policy represents a row-level security (RLS) policy.
+type Policy struct {
+	Name         string `json:"name"`
+	Operation    string `json:"operation"`               // SELECT, INSERT, UPDATE, DELETE, ALL
+	Role         string `json:"role,omitempty"`           // PG role the policy applies to (e.g., "game_app")
+	Using        string `json:"using,omitempty"`          // SQL expression for existing rows (SELECT/UPDATE/DELETE)
+	WithCheck    string `json:"with_check,omitempty"`     // SQL expression for new rows (INSERT/UPDATE)
+	ErrorCode    string `json:"error_code,omitempty"`     // Application-level error code (e.g., "chat_disabled")
+	ErrorMessage string `json:"error_message,omitempty"` // Human-readable error message
 }
 
 // Enum represents a resolved enum type.

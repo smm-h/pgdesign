@@ -69,6 +69,8 @@ func Validate(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
 		{"E212", checkFKMissingIndex},
 		{"E213", checkGeneratedColRefsGenerated},
 		{"E214", checkOpclassMissingExtension},
+		{"E215", checkPolicyExprMismatch},
+		{"W009", checkPolicyErrorCodeSnakeCase},
 		{"W001", checkGodTable},
 		{"W002", checkOrphanTable},
 		{"W003", checkBooleanStates},
@@ -529,6 +531,73 @@ func checkOpclassMissingExtension(schema *model.Schema, config *Config) []diagno
 						Suggestion: "Add \"" + reqExt + "\" to [meta].extensions",
 					})
 				}
+			}
+		}
+	}
+	return diags
+}
+
+// checkPolicyExprMismatch (E215): RLS policy uses wrong expression for its operation.
+// INSERT should use with_check (not using); SELECT/DELETE should use using (not with_check).
+// UPDATE and ALL can use both.
+func checkPolicyExprMismatch(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		for _, pol := range t.Policies {
+			switch pol.Operation {
+			case "INSERT":
+				if pol.Using != "" && pol.WithCheck == "" {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Error,
+						Code:       "E215",
+						Table:      t.Name,
+						Message:    fmt.Sprintf("policy %q with FOR INSERT should use \"with_check\", not \"using\"", pol.Name),
+						Suggestion: "INSERT policies filter new rows; use with_check instead of using",
+					})
+				}
+			case "SELECT":
+				if pol.WithCheck != "" {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Error,
+						Code:       "E215",
+						Table:      t.Name,
+						Message:    fmt.Sprintf("policy %q with FOR SELECT cannot use \"with_check\"", pol.Name),
+						Suggestion: "SELECT policies filter existing rows; use using instead of with_check",
+					})
+				}
+			case "DELETE":
+				if pol.WithCheck != "" {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Error,
+						Code:       "E215",
+						Table:      t.Name,
+						Message:    fmt.Sprintf("policy %q with FOR DELETE cannot use \"with_check\"", pol.Name),
+						Suggestion: "DELETE policies filter existing rows; use using instead of with_check",
+					})
+				}
+			// UPDATE and ALL can have both -- no check needed.
+			}
+		}
+	}
+	return diags
+}
+
+// checkPolicyErrorCodeSnakeCase (W009): RLS policy error_code should be snake_case.
+func checkPolicyErrorCodeSnakeCase(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		for _, pol := range t.Policies {
+			if pol.ErrorCode == "" {
+				continue
+			}
+			if !snakeCasePattern.MatchString(pol.ErrorCode) {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "W009",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("policy %q error_code %q is not snake_case", pol.Name, pol.ErrorCode),
+					Suggestion: "Use snake_case for error codes (e.g., \"chat_disabled\")",
+				})
 			}
 		}
 	}

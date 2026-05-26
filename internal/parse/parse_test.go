@@ -526,6 +526,113 @@ opclass = { name = "varchar_pattern_ops", code = "text_ops" }
 	}
 }
 
+func TestPolicies(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.messages]
+pk = ["id"]
+comment = "Messages table"
+enable_rls = true
+
+[tables.messages.columns.id]
+type = "id"
+
+[tables.messages.columns.channel_id]
+type = "ref"
+
+[tables.messages.columns.body]
+type = "text"
+
+[tables.messages.policies.select_own]
+for = "SELECT"
+to = "game_app"
+using = "channel_id = current_setting('app.channel_id')::uuid"
+
+[tables.messages.policies.insert_own]
+for = "INSERT"
+to = "game_app"
+with_check = "channel_id = current_setting('app.channel_id')::uuid"
+error_code = "chat_disabled"
+error_message = "You cannot send messages to this channel"
+
+[tables.messages.policies.update_own]
+for = "UPDATE"
+to = "game_app"
+using = "channel_id = current_setting('app.channel_id')::uuid"
+with_check = "channel_id = current_setting('app.channel_id')::uuid"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+	tbl := schema.Tables[0]
+
+	if !tbl.EnableRLS {
+		t.Error("expected EnableRLS = true")
+	}
+
+	if len(tbl.Policies) != 3 {
+		t.Fatalf("expected 3 policies, got %d", len(tbl.Policies))
+	}
+
+	// Check select_own policy.
+	sel, ok := tbl.Policies["select_own"]
+	if !ok {
+		t.Fatal("expected policy 'select_own'")
+	}
+	if sel.For != "SELECT" {
+		t.Errorf("select_own.For = %q, want %q", sel.For, "SELECT")
+	}
+	if sel.To != "game_app" {
+		t.Errorf("select_own.To = %q, want %q", sel.To, "game_app")
+	}
+	if sel.Using == "" {
+		t.Error("select_own.Using should not be empty")
+	}
+
+	// Check insert_own policy.
+	ins, ok := tbl.Policies["insert_own"]
+	if !ok {
+		t.Fatal("expected policy 'insert_own'")
+	}
+	if ins.For != "INSERT" {
+		t.Errorf("insert_own.For = %q, want %q", ins.For, "INSERT")
+	}
+	if ins.WithCheck == "" {
+		t.Error("insert_own.WithCheck should not be empty")
+	}
+	if ins.ErrorCode != "chat_disabled" {
+		t.Errorf("insert_own.ErrorCode = %q, want %q", ins.ErrorCode, "chat_disabled")
+	}
+	if ins.ErrorMessage != "You cannot send messages to this channel" {
+		t.Errorf("insert_own.ErrorMessage = %q, want %q", ins.ErrorMessage, "You cannot send messages to this channel")
+	}
+
+	// Check update_own policy.
+	upd, ok := tbl.Policies["update_own"]
+	if !ok {
+		t.Fatal("expected policy 'update_own'")
+	}
+	if upd.For != "UPDATE" {
+		t.Errorf("update_own.For = %q, want %q", upd.For, "UPDATE")
+	}
+	if upd.Using == "" {
+		t.Error("update_own.Using should not be empty")
+	}
+	if upd.WithCheck == "" {
+		t.Error("update_own.WithCheck should not be empty")
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {

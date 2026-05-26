@@ -337,18 +337,19 @@ func (p *parser) parseTables() []RawTable {
 
 func (p *parser) parseTable(name string) RawTable {
 	rt := RawTable{
-		Name:    name,
-		FKs:     make(map[string]RawFK),
-		Indexes: make(map[string]RawIndex),
-		Uniques: make(map[string]RawUnique),
-		Checks:  make(map[string]RawCheck),
+		Name:     name,
+		FKs:      make(map[string]RawFK),
+		Indexes:  make(map[string]RawIndex),
+		Uniques:  make(map[string]RawUnique),
+		Checks:   make(map[string]RawCheck),
+		Policies: make(map[string]RawPolicy),
 	}
 
 	// Find the [tables.<name>] table node for top-level keys
 	tableTbl := p.findTableByPath([]string{"tables", name})
 	if tableTbl != nil {
 		knownKeys := map[string]bool{
-			"comment": true, "pk": true,
+			"comment": true, "pk": true, "enable_rls": true,
 		}
 		for _, child := range tableTbl.Children {
 			kv, ok := child.(*tomledit.KeyValueNode)
@@ -359,8 +360,8 @@ func (p *parser) parseTable(name string) RawTable {
 			if !knownKeys[key] {
 				// Could be a dotted key for sub-sections; skip known sub-section prefixes
 				if key == "columns" || key == "fks" || key == "indexes" ||
-					key == "unique" || key == "checks" || key == "partitioning" ||
-					key == "dependencies" || key == "maintenance" {
+					key == "unique" || key == "checks" || key == "policies" ||
+					key == "partitioning" || key == "dependencies" || key == "maintenance" {
 					continue
 				}
 				p.warnf("W001", name, "", "unknown key in [tables.%s]: %q", name, key)
@@ -378,6 +379,12 @@ func (p *parser) parseTable(name string) RawTable {
 					rt.PK = v
 				} else {
 					p.errorf("E010", name, "", "[tables.%s].pk must be an array of strings", name)
+				}
+			case "enable_rls":
+				if v, ok := nodeBool(kv.Val); ok {
+					rt.EnableRLS = v
+				} else {
+					p.errorf("E010", name, "", "[tables.%s].enable_rls must be a boolean", name)
 				}
 			}
 		}
@@ -397,6 +404,9 @@ func (p *parser) parseTable(name string) RawTable {
 
 	// Parse checks
 	p.parseChecks(name, &rt)
+
+	// Parse policies
+	p.parsePolicies(name, &rt)
 
 	// Parse partitioning
 	p.parsePartitioning(name, &rt)
@@ -729,6 +739,84 @@ func (p *parser) parseCheck(tableName, chkName string, tbl *tomledit.TableNode) 
 	}
 
 	return chk
+}
+
+// parsePolicies extracts RLS policies from [tables.<name>.policies.*].
+func (p *parser) parsePolicies(tableName string, rt *RawTable) {
+	prefix := []string{"tables", tableName, "policies"}
+
+	for _, child := range p.doc.Children {
+		tbl, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl.KeyPath) == 4 && pathHasPrefix(tbl.KeyPath, prefix) {
+			polName := tbl.KeyPath[3]
+			pol := p.parsePolicy(tableName, polName, tbl)
+			rt.Policies[polName] = pol
+		}
+	}
+}
+
+func (p *parser) parsePolicy(tableName, polName string, tbl *tomledit.TableNode) RawPolicy {
+	pol := RawPolicy{Name: polName}
+
+	knownKeys := map[string]bool{
+		"for": true, "to": true, "using": true,
+		"with_check": true, "error_code": true, "error_message": true,
+	}
+
+	for _, child := range tbl.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		key := kv.Key.Parts[0]
+		if !knownKeys[key] {
+			p.warnf("W001", tableName, "", "unknown key in [tables.%s.policies.%s]: %q", tableName, polName, key)
+			continue
+		}
+		switch key {
+		case "for":
+			if v, ok := nodeString(kv.Val); ok {
+				pol.For = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].for must be a string", tableName, polName)
+			}
+		case "to":
+			if v, ok := nodeString(kv.Val); ok {
+				pol.To = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].to must be a string", tableName, polName)
+			}
+		case "using":
+			if v, ok := nodeString(kv.Val); ok {
+				pol.Using = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].using must be a string", tableName, polName)
+			}
+		case "with_check":
+			if v, ok := nodeString(kv.Val); ok {
+				pol.WithCheck = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].with_check must be a string", tableName, polName)
+			}
+		case "error_code":
+			if v, ok := nodeString(kv.Val); ok {
+				pol.ErrorCode = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].error_code must be a string", tableName, polName)
+			}
+		case "error_message":
+			if v, ok := nodeString(kv.Val); ok {
+				pol.ErrorMessage = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].error_message must be a string", tableName, polName)
+			}
+		}
+	}
+
+	return pol
 }
 
 // parsePartitioning extracts partitioning from [tables.<name>.partitioning].

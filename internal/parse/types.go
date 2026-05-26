@@ -41,6 +41,8 @@ type RawTable struct {
 	Indexes      map[string]RawIndex
 	Uniques      map[string]RawUnique
 	Checks       map[string]RawCheck
+	Policies     map[string]RawPolicy
+	EnableRLS    bool
 	Partitioning *RawPartitioning
 	Dependencies []RawDependency
 	Maintenance  *RawMaintenance
@@ -89,6 +91,17 @@ type RawUnique struct {
 type RawCheck struct {
 	Name string
 	Expr string
+}
+
+// RawPolicy holds a row-level security policy from [tables.*.policies.*].
+type RawPolicy struct {
+	Name         string
+	For          string // SELECT, INSERT, UPDATE, DELETE, ALL
+	To           string // role name
+	Using        string // SQL expr for existing rows
+	WithCheck    string // SQL expr for new rows
+	ErrorCode    string // application error code
+	ErrorMessage string // human-readable error message
 }
 
 // RawPartitioning holds partition configuration from [tables.*.partitioning].
