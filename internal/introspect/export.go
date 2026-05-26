@@ -93,8 +93,34 @@ func Export(schema *model.Schema) ([]byte, error) {
 			if idx.Method != "" && idx.Method != "btree" {
 				b.WriteString(fmt.Sprintf("method = %s\n", quoteTOML(idx.Method)))
 			}
-			if idx.Opclass != "" {
-				b.WriteString(fmt.Sprintf("opclass = %s\n", quoteTOML(idx.Opclass)))
+			if len(idx.Opclasses) > 0 {
+				// Check if all opclasses are the same -- use compact string form.
+				allSame := true
+				var singleVal string
+				for _, v := range idx.Opclasses {
+					if singleVal == "" {
+						singleVal = v
+					} else if v != singleVal {
+						allSame = false
+						break
+					}
+				}
+				if allSame && singleVal != "" {
+					b.WriteString(fmt.Sprintf("opclass = %s\n", quoteTOML(singleVal)))
+				} else {
+					b.WriteString("opclass = { ")
+					first := true
+					for _, col := range idx.Columns {
+						if oc, ok := idx.Opclasses[col]; ok {
+							if !first {
+								b.WriteString(", ")
+							}
+							b.WriteString(fmt.Sprintf("%s = %s", col, quoteTOML(oc)))
+							first = false
+						}
+					}
+					b.WriteString(" }\n")
+				}
 			}
 			if idx.Where != "" {
 				b.WriteString(fmt.Sprintf("where = %s\n", quoteTOML(idx.Where)))

@@ -374,7 +374,7 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 		idx.Columns = parsed.columns
 		idx.Where = parsed.where
 		idx.Include = parsed.include
-		idx.Opclass = parsed.opclass
+		idx.Opclasses = parsed.opclasses
 
 		// If the index is unique but not backed by a unique constraint,
 		// record it as a unique index (method is already set).
@@ -389,10 +389,10 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 
 // parsedIndex holds parsed components of a pg_get_indexdef() string.
 type parsedIndex struct {
-	columns []string
-	where   string
-	include []string
-	opclass string
+	columns   []string
+	where     string
+	include   []string
+	opclasses map[string]string
 }
 
 // indexDefPattern matches CREATE [UNIQUE] INDEX name ON [ONLY] schema.table USING method (columns) [INCLUDE (cols)] [WHERE expr]
@@ -408,9 +408,9 @@ func parseIndexDef(def string) parsedIndex {
 		return p
 	}
 
-	// Parse columns and detect opclass.
+	// Parse columns and detect per-column opclasses.
 	colStr := m[1]
-	p.columns, p.opclass = parseIndexColumns(colStr)
+	p.columns, p.opclasses = parseIndexColumns(colStr)
 
 	// INCLUDE columns.
 	if m[2] != "" {
@@ -426,11 +426,11 @@ func parseIndexDef(def string) parsedIndex {
 }
 
 // parseIndexColumns parses the column list from an index definition,
-// extracting opclass if present.
-func parseIndexColumns(colStr string) ([]string, string) {
+// extracting per-column opclasses if present.
+func parseIndexColumns(colStr string) ([]string, map[string]string) {
 	parts := splitAndTrim(colStr)
 	var columns []string
-	var opclass string
+	var opclasses map[string]string
 
 	for _, part := range parts {
 		// Column may have opclass suffix like "col varchar_pattern_ops"
@@ -439,8 +439,12 @@ func parseIndexColumns(colStr string) ([]string, string) {
 			// Check if the last token looks like an opclass (contains _ops).
 			last := tokens[len(tokens)-1]
 			if strings.Contains(last, "_ops") {
-				columns = append(columns, strings.Join(tokens[:len(tokens)-1], " "))
-				opclass = last
+				colName := strings.Join(tokens[:len(tokens)-1], " ")
+				columns = append(columns, colName)
+				if opclasses == nil {
+					opclasses = make(map[string]string)
+				}
+				opclasses[colName] = last
 			} else {
 				columns = append(columns, part)
 			}
@@ -449,7 +453,7 @@ func parseIndexColumns(colStr string) ([]string, string) {
 		}
 	}
 
-	return columns, opclass
+	return columns, opclasses
 }
 
 // splitAndTrim splits a comma-separated string and trims whitespace.

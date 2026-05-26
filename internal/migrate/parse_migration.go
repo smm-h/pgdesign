@@ -29,7 +29,7 @@ type tomlDDL struct {
 	OnDelete string      `toml:"on_delete,omitempty"`
 	Method   string      `toml:"method,omitempty"`
 	Where    string      `toml:"where,omitempty"`
-	Opclass  string      `toml:"opclass,omitempty"`
+	Opclass  interface{} `toml:"opclass,omitempty"`
 	Include  []string    `toml:"include,omitempty"`
 	Comment  string      `toml:"comment,omitempty"`
 	PK       []string    `toml:"pk,omitempty"`
@@ -112,13 +112,30 @@ func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 		OnDelete: td.OnDelete,
 		Method:   td.Method,
 		Where:    td.Where,
-		Opclass:  td.Opclass,
 		Include:  td.Include,
 		Comment:  td.Comment,
 		PK:       td.PK,
 		Values:   td.Values,
 		Schema:   td.Schema,
 		Expr:     td.Expr,
+	}
+	// Convert opclass: string becomes a map applied to all columns,
+	// map is copied directly.
+	switch v := td.Opclass.(type) {
+	case string:
+		if v != "" {
+			op.Opclasses = make(map[string]string, len(td.Columns))
+			for _, col := range td.Columns {
+				op.Opclasses[col] = v
+			}
+		}
+	case map[string]interface{}:
+		op.Opclasses = make(map[string]string, len(v))
+		for k, val := range v {
+			if s, ok := val.(string); ok {
+				op.Opclasses[k] = s
+			}
+		}
 	}
 	if td.Down != nil {
 		op.Down = convertTomlDown(td.Down)
@@ -218,8 +235,34 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	if op.Where != "" {
 		b.WriteString(fmt.Sprintf("where = %q\n", op.Where))
 	}
-	if op.Opclass != "" {
-		b.WriteString(fmt.Sprintf("opclass = %q\n", op.Opclass))
+	if len(op.Opclasses) > 0 {
+		// Check if all values are the same -- use compact string form.
+		allSame := true
+		var singleVal string
+		for _, v := range op.Opclasses {
+			if singleVal == "" {
+				singleVal = v
+			} else if v != singleVal {
+				allSame = false
+				break
+			}
+		}
+		if allSame && singleVal != "" {
+			b.WriteString(fmt.Sprintf("opclass = %q\n", singleVal))
+		} else {
+			b.WriteString("opclass = { ")
+			first := true
+			for _, col := range op.Columns {
+				if oc, ok := op.Opclasses[col]; ok {
+					if !first {
+						b.WriteString(", ")
+					}
+					b.WriteString(fmt.Sprintf("%s = %q", col, oc))
+					first = false
+				}
+			}
+			b.WriteString(" }\n")
+		}
 	}
 	if len(op.Include) > 0 {
 		b.WriteString(fmt.Sprintf("include = %s\n", formatStringSlice(op.Include)))

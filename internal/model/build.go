@@ -307,8 +307,18 @@ func resolveIndex(name string, rawIdx parse.RawIndex) Index {
 	if rawIdx.Method != nil {
 		idx.Method = *rawIdx.Method
 	}
-	if rawIdx.Opclass != nil {
-		idx.Opclass = *rawIdx.Opclass
+	if rawIdx.OpclassMap != nil {
+		// Per-column opclass map: copy directly.
+		idx.Opclasses = make(map[string]string, len(rawIdx.OpclassMap))
+		for k, v := range rawIdx.OpclassMap {
+			idx.Opclasses[k] = v
+		}
+	} else if rawIdx.Opclass != nil {
+		// Single opclass: expand to all columns.
+		idx.Opclasses = make(map[string]string, len(rawIdx.Columns))
+		for _, col := range rawIdx.Columns {
+			idx.Opclasses[col] = *rawIdx.Opclass
+		}
 	}
 	if rawIdx.Where != nil {
 		idx.Where = *rawIdx.Where

@@ -332,21 +332,30 @@ func checkOpclassMissingExtension(schema *model.Schema, config *Config) []diagno
 
 	for _, t := range schema.Tables {
 		for _, idx := range t.Indexes {
-			if idx.Opclass == "" {
+			if len(idx.Opclasses) == 0 {
 				continue
 			}
-			reqExt, found := config.ExtRegistry.RequiredExtension(idx.Opclass)
-			if !found {
-				continue
-			}
-			if !declaredExts[reqExt] {
-				diags = append(diags, diagnostic.Diagnostic{
-					Severity:   diagnostic.Error,
-					Code:       "E214",
-					Table:      t.Name,
-					Message:    "index " + idx.Name + " uses opclass " + idx.Opclass + " which requires extension " + reqExt,
-					Suggestion: "Add \"" + reqExt + "\" to [meta].extensions",
-				})
+			// Check each per-column opclass. Deduplicate to avoid
+			// reporting the same missing extension multiple times per index.
+			checked := make(map[string]bool)
+			for col, oc := range idx.Opclasses {
+				if checked[oc] {
+					continue
+				}
+				checked[oc] = true
+				reqExt, found := config.ExtRegistry.RequiredExtension(oc)
+				if !found {
+					continue
+				}
+				if !declaredExts[reqExt] {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Error,
+						Code:       "E214",
+						Table:      t.Name,
+						Message:    "index " + idx.Name + " uses opclass " + oc + " (on column " + col + ") which requires extension " + reqExt,
+						Suggestion: "Add \"" + reqExt + "\" to [meta].extensions",
+					})
+				}
 			}
 		}
 	}

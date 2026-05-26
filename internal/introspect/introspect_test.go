@@ -410,12 +410,12 @@ func TestExport(t *testing.T) {
 
 func TestParseIndexDef(t *testing.T) {
 	tests := []struct {
-		name    string
-		def     string
-		cols    []string
-		where   string
-		include []string
-		opclass string
+		name      string
+		def       string
+		cols      []string
+		where     string
+		include   []string
+		opclasses map[string]string
 	}{
 		{
 			name: "simple btree",
@@ -440,10 +440,10 @@ func TestParseIndexDef(t *testing.T) {
 			include: []string{"total", "created_at"},
 		},
 		{
-			name:    "with opclass",
-			def:     `CREATE INDEX idx_pattern ON myschema.users USING btree (email varchar_pattern_ops)`,
-			cols:    []string{"email"},
-			opclass: "varchar_pattern_ops",
+			name:      "with opclass",
+			def:       `CREATE INDEX idx_pattern ON myschema.users USING btree (email varchar_pattern_ops)`,
+			cols:      []string{"email"},
+			opclasses: map[string]string{"email": "varchar_pattern_ops"},
 		},
 	}
 
@@ -473,8 +473,13 @@ func TestParseIndexDef(t *testing.T) {
 				}
 			}
 
-			if p.opclass != tt.opclass {
-				t.Errorf("opclass = %q, want %q", p.opclass, tt.opclass)
+			if len(p.opclasses) != len(tt.opclasses) {
+				t.Fatalf("opclasses = %v, want %v", p.opclasses, tt.opclasses)
+			}
+			for k, v := range tt.opclasses {
+				if got, ok := p.opclasses[k]; !ok || got != v {
+					t.Errorf("opclasses[%q] = %q, want %q", k, got, v)
+				}
 			}
 		})
 	}

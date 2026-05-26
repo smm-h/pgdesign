@@ -165,12 +165,12 @@ func opDropFK(op DDLOp) string {
 
 func opCreateIndex(op DDLOp) string {
 	idx := &model.Index{
-		Name:    op.Name,
-		Columns: op.Columns,
-		Method:  op.Method,
-		Opclass: op.Opclass,
-		Where:   op.Where,
-		Include: op.Include,
+		Name:      op.Name,
+		Columns:   op.Columns,
+		Method:    op.Method,
+		Opclasses: op.Opclasses,
+		Where:     op.Where,
+		Include:   op.Include,
 	}
 	schema, tableName := splitQualifiedName(op.Table)
 	return sql.CreateIndex(schema, idx, tableName, false)
@@ -186,9 +186,9 @@ func opDropIndex(op DDLOp) string {
 
 func opCreateIndexConcurrently(op DDLOp) string {
 	colExprs := quoteIdentSlice(op.Columns)
-	for i := range colExprs {
-		if op.Opclass != "" {
-			colExprs[i] += " " + op.Opclass
+	for i, col := range op.Columns {
+		if oc, ok := op.Opclasses[col]; ok && oc != "" {
+			colExprs[i] += " " + oc
 		}
 	}
 

@@ -111,14 +111,14 @@ type FK struct {
 
 // Index represents a resolved index definition.
 type Index struct {
-	Name     string   `json:"name"`
-	Columns  []string `json:"columns"`
-	Method   string   `json:"method,omitempty"`
-	Opclass  string   `json:"opclass,omitempty"`
-	Where    string   `json:"where,omitempty"`
-	Include  []string `json:"include,omitempty"`
-	Unique   bool     `json:"unique"`
-	IsAutoFK bool     `json:"is_auto_fk"`
+	Name      string            `json:"name"`
+	Columns   []string          `json:"columns"`
+	Method    string            `json:"method,omitempty"`
+	Opclasses map[string]string `json:"opclasses,omitempty"`
+	Where     string            `json:"where,omitempty"`
+	Include   []string          `json:"include,omitempty"`
+	Unique    bool              `json:"unique"`
+	IsAutoFK  bool              `json:"is_auto_fk"`
 }
 
 // UniqueConstraint represents a unique constraint.

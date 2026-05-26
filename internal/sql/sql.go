@@ -308,7 +308,7 @@ func AlterTableAddCheck(schemaName, tableName string, ck *model.CheckConstraint)
 }
 
 // CreateIndex generates a CREATE INDEX statement.
-// Handles Method (default btree), Opclass, WHERE, and INCLUDE.
+// Handles Method (default btree), per-column Opclasses, WHERE, and INCLUDE.
 func CreateIndex(schemaName string, index *model.Index, tableName string, idempotent bool) string {
 	ifne := ""
 	if idempotent {
@@ -322,12 +322,12 @@ func CreateIndex(schemaName string, index *model.Index, tableName string, idempo
 
 	qualified := QualifiedName(schemaName, tableName)
 
-	// Build column list with optional opclass.
+	// Build column list with optional per-column opclass.
 	colExprs := make([]string, len(index.Columns))
 	for i, c := range index.Columns {
 		expr := QuoteIdent(c)
-		if index.Opclass != "" {
-			expr += " " + index.Opclass
+		if oc, ok := index.Opclasses[c]; ok && oc != "" {
+			expr += " " + oc
 		}
 		colExprs[i] = expr
 	}

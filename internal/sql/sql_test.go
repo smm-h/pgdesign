@@ -221,10 +221,10 @@ func TestCreateTable_IdentityByDefault(t *testing.T) {
 
 func TestCreateIndex(t *testing.T) {
 	index := &model.Index{
-		Name:    "idx_posts_author_active",
-		Columns: []string{"author_id"},
-		Opclass: "varchar_pattern_ops",
-		Where:   "active = true",
+		Name:      "idx_posts_author_active",
+		Columns:   []string{"author_id"},
+		Opclasses: map[string]string{"author_id": "varchar_pattern_ops"},
+		Where:     "active = true",
 	}
 
 	got := CreateIndex("blog", index, "posts", false)
@@ -242,10 +242,10 @@ func TestCreateIndex(t *testing.T) {
 
 func TestCreateIndex_GinMethod(t *testing.T) {
 	index := &model.Index{
-		Name:    "idx_docs_content",
-		Columns: []string{"content"},
-		Method:  "gin",
-		Opclass: "gin_trgm_ops",
+		Name:      "idx_docs_content",
+		Columns:   []string{"content"},
+		Method:    "gin",
+		Opclasses: map[string]string{"content": "gin_trgm_ops"},
 	}
 
 	got := CreateIndex("public", index, "docs", false)

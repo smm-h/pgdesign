@@ -69,13 +69,14 @@ type RawFK struct {
 
 // RawIndex holds an index definition from [tables.*.indexes.*].
 type RawIndex struct {
-	Name    string
-	Columns []string
-	Method  *string
-	Opclass *string
-	Where   *string
-	Include []string
-	Unique  *bool
+	Name       string
+	Columns    []string
+	Method     *string
+	Opclass    *string            // single opclass (applied to all columns)
+	OpclassMap map[string]string  // per-column opclass map
+	Where      *string
+	Include    []string
+	Unique     *bool
 }
 
 // RawUnique holds a unique constraint from [tables.*.unique.*].

@@ -26,10 +26,10 @@ type DDLOp struct {
 	RefTable string   // for FKs
 	RefCols  []string // for FKs
 	OnDelete string   // for FKs
-	Method   string   // for indexes
-	Where    string   // for partial indexes
-	Opclass  string
-	Include  []string
+	Method    string            // for indexes
+	Where     string            // for partial indexes
+	Opclasses map[string]string // per-column opclass
+	Include   []string
 	Comment  string   // for tables
 	PK       []string // for create_table
 	Values   []string // for create_enum, alter_enum_add_value

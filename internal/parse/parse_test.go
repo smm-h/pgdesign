@@ -404,6 +404,128 @@ func TestFilesWithMissingFile(t *testing.T) {
 	}
 }
 
+func TestOpclassSingleString(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.docs]
+pk = ["id"]
+
+[tables.docs.columns.id]
+type = "auto_id"
+
+[tables.docs.columns.content]
+type = "text"
+
+[tables.docs.indexes.idx_content]
+columns = ["content"]
+method = "gin"
+opclass = "gin_trgm_ops"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	idx := schema.Tables[0].Indexes["idx_content"]
+	if idx.Opclass == nil || *idx.Opclass != "gin_trgm_ops" {
+		t.Errorf("idx.Opclass = %v, want %q", idx.Opclass, "gin_trgm_ops")
+	}
+	if idx.OpclassMap != nil {
+		t.Errorf("idx.OpclassMap should be nil for single string, got %v", idx.OpclassMap)
+	}
+}
+
+func TestOpclassPerColumnMap(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.docs]
+pk = ["id"]
+
+[tables.docs.columns.id]
+type = "auto_id"
+
+[tables.docs.columns.title]
+type = "text"
+
+[tables.docs.columns.body]
+type = "text"
+
+[tables.docs.indexes.idx_search]
+columns = ["title", "body"]
+method = "gin"
+opclass = { title = "gin_trgm_ops", body = "gin_trgm_ops" }
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	idx := schema.Tables[0].Indexes["idx_search"]
+	if idx.Opclass != nil {
+		t.Errorf("idx.Opclass should be nil for map syntax, got %v", idx.Opclass)
+	}
+	if idx.OpclassMap == nil {
+		t.Fatal("idx.OpclassMap should not be nil")
+	}
+	if idx.OpclassMap["title"] != "gin_trgm_ops" {
+		t.Errorf("OpclassMap[title] = %q, want %q", idx.OpclassMap["title"], "gin_trgm_ops")
+	}
+	if idx.OpclassMap["body"] != "gin_trgm_ops" {
+		t.Errorf("OpclassMap[body] = %q, want %q", idx.OpclassMap["body"], "gin_trgm_ops")
+	}
+}
+
+func TestOpclassPerColumnMixed(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.docs]
+pk = ["id"]
+
+[tables.docs.columns.id]
+type = "auto_id"
+
+[tables.docs.columns.name]
+type = "text"
+
+[tables.docs.columns.code]
+type = "text"
+
+[tables.docs.indexes.idx_mixed]
+columns = ["name", "code"]
+opclass = { name = "varchar_pattern_ops", code = "text_ops" }
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	idx := schema.Tables[0].Indexes["idx_mixed"]
+	if idx.OpclassMap == nil {
+		t.Fatal("idx.OpclassMap should not be nil")
+	}
+	if idx.OpclassMap["name"] != "varchar_pattern_ops" {
+		t.Errorf("OpclassMap[name] = %q, want %q", idx.OpclassMap["name"], "varchar_pattern_ops")
+	}
+	if idx.OpclassMap["code"] != "text_ops" {
+		t.Errorf("OpclassMap[code] = %q, want %q", idx.OpclassMap["code"], "text_ops")
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {

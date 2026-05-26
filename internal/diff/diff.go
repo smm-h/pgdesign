@@ -501,9 +501,22 @@ func indexEqual(a, b *model.Index) bool {
 	return a.Name == b.Name &&
 		sliceEqual(a.Columns, b.Columns) &&
 		a.Method == b.Method &&
-		a.Opclass == b.Opclass &&
+		mapEqual(a.Opclasses, b.Opclasses) &&
 		a.Where == b.Where &&
 		sliceEqual(a.Include, b.Include)
+}
+
+// mapEqual returns true if two string maps are equal.
+func mapEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || v != bv {
+			return false
+		}
+	}
+	return true
 }
 
 // diffUniques matches unique constraints by name.

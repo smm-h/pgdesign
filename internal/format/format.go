@@ -313,6 +313,27 @@ func writeTable(doc *tomledit.DocumentNode, t *parse.RawTable, config *Config) {
 		}
 		if idx.Opclass != nil {
 			_ = doc.SetCreate(ipath+".opclass", *idx.Opclass)
+		} else if idx.OpclassMap != nil {
+			// Per-column opclass map: check if all values are the same
+			// for compact string form, otherwise write as inline table.
+			allSame := true
+			var singleVal string
+			for _, v := range idx.OpclassMap {
+				if singleVal == "" {
+					singleVal = v
+				} else if v != singleVal {
+					allSame = false
+					break
+				}
+			}
+			if allSame && singleVal != "" {
+				_ = doc.SetCreate(ipath+".opclass", singleVal)
+			} else {
+				// Write per-column entries as dotted keys under opclass.
+				for col, oc := range idx.OpclassMap {
+					_ = doc.SetCreate(ipath+".opclass."+col, oc)
+				}
+			}
 		}
 		if idx.Where != nil {
 			_ = doc.SetCreate(ipath+".where", *idx.Where)

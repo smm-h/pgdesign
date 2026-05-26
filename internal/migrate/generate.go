@@ -344,14 +344,14 @@ func makeFKOp(tableName string, fk model.FK) DDLOp {
 
 func makeIndexOp(tableName string, idx model.Index) DDLOp {
 	return DDLOp{
-		Op:      "create_index",
-		Table:   tableName,
-		Name:    idx.Name,
-		Columns: idx.Columns,
-		Method:  idx.Method,
-		Opclass: idx.Opclass,
-		Where:   idx.Where,
-		Include: idx.Include,
+		Op:        "create_index",
+		Table:     tableName,
+		Name:      idx.Name,
+		Columns:   idx.Columns,
+		Method:    idx.Method,
+		Opclasses: idx.Opclasses,
+		Where:     idx.Where,
+		Include:   idx.Include,
 		Down: &DownOp{
 			Ops: []DDLOp{{Op: "drop_index", Table: tableName, Name: idx.Name}},
 		},

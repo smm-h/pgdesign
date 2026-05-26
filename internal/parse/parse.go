@@ -620,8 +620,10 @@ func (p *parser) parseIndex(tableName, idxName string, tbl *tomledit.TableNode) 
 		case "opclass":
 			if v, ok := nodeString(kv.Val); ok {
 				idx.Opclass = &v
+			} else if m, ok := nodeStringMap(kv.Val); ok {
+				idx.OpclassMap = m
 			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].opclass must be a string", tableName, idxName)
+				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].opclass must be a string or inline table of strings", tableName, idxName)
 			}
 		case "where":
 			if v, ok := nodeString(kv.Val); ok {
@@ -985,6 +987,34 @@ func nodeStringSlice(n tomledit.Node) ([]string, bool) {
 			return nil, false
 		}
 		result = append(result, s.Val)
+	}
+	return result, true
+}
+
+// nodeStringMap extracts a map[string]string from an InlineTableNode
+// where all values are strings.
+func nodeStringMap(n tomledit.Node) (map[string]string, bool) {
+	if n == nil {
+		return nil, false
+	}
+	it, ok := n.(*tomledit.InlineTableNode)
+	if !ok {
+		return nil, false
+	}
+	result := make(map[string]string, len(it.Children))
+	for _, child := range it.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			return nil, false
+		}
+		if len(kv.Key.Parts) != 1 {
+			return nil, false
+		}
+		v, ok := nodeString(kv.Val)
+		if !ok {
+			return nil, false
+		}
+		result[kv.Key.Parts[0]] = v
 	}
 	return result, true
 }
