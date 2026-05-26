@@ -1,4 +1,8 @@
 {
+  "format-reference.md": {
+    "content": "93b55b6f5f71d8f1a3c8934d596fc51b91dcee38ab6e1efeaefa97c2a59f8d08",
+    "description": "5daf1a2751b1b7f0633aac2ecc8aae779ea8be77e2c84c8ab12f07c9358c3653"
+  },
   "gen-index.md": {
     "content": "c159f4a7b2ce85f946845197905ac3f56e760f2327bd74da9cbc3262a75cd9a4",
     "description": "bb3cd9d34f014c0674a9285c25ee14b5b4abc5cf941f0d83594c301405e8f3b6"
@@ -135,8 +139,24 @@
     "content": "45f883b8606b12c29fbee82a5bfb1393b132b8370a7ea8efeb44a59aa5acbca4",
     "description": "98aea7947c8176cfde2808eae5d1fb494100ae73393212638d9f05e1bd1948b9"
   },
+  "migration-guide.md": {
+    "content": "1c873893a1402ac77d99e528c86aba2598c848fede41585916a8da8dd22e4228",
+    "description": "1cd872821eb51f78e5246ac74f47ddd7e7544e15fad3f96e8c7568a413f8203f"
+  },
   "pgdesign.md": {
-    "content": "bf3968292f70ef058442af7b3da2368154becf0f942709e20a7f801f3552a530",
+    "content": "8dd24777708466be9a9faa2ca260dfcc23d5b219535f906f969280cb199728df",
     "description": "70e328e5e35e7945347291b0213b91300dce191bee1520f59baaa2928a8766c2"
+  },
+  "quickstart.md": {
+    "content": "957733d7b9eedf51ef9143ea0fb9794e6e3f8970cd38c1e884f3f13146a1be25",
+    "description": "4e8baab2f7f34464dd51949235b62295675b637526c093a64d4343c7d9ce453b"
+  },
+  "semantic-types.md": {
+    "content": "91484fe033645ad9cfa1dffbb6e6eb8cc6a788d9254045f64fdb010873713397",
+    "description": "7cb620ad1e5d4ad53db5ba841c23ad346679b5033ba86f6df285bdeb3da31e52"
+  },
+  "validation-rules.md": {
+    "content": "86c3b15908475649450892f7d44f156f05b79c5a23b6f3b92e7960fa61462fc5",
+    "description": "e02b52404d7322fb2128a5f48c462aa1ad2e732edef54e42d59c97a6389e3ff4"
   }
 }
