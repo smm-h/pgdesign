@@ -98,6 +98,7 @@ func main() {
 	mig.Command("apply", "Apply pending migrations", handleMigrateApply,
 		strictcli.WithFlags(
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+			strictcli.BoolFlag("dry-run", "Show SQL without executing"),
 		),
 	)
 	mig.Command("rollback", "Rollback the last migration", handleMigrateRollback,
@@ -998,7 +999,7 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 		dir = cfg.Project.MigrationsDir
 	}
 
-	lockTimeout := cfg.Migrate.LockTimeout
+	dryRun := kwargs["dry_run"].(bool)
 
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, dbURL)
@@ -1007,6 +1008,12 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 		return 1
 	}
 	defer conn.Close(ctx)
+
+	if dryRun {
+		return handleMigrateApplyDryRun(ctx, conn, dir, kwargs["quiet"].(bool))
+	}
+
+	lockTimeout := cfg.Migrate.LockTimeout
 
 	applied, err := migrate.Apply(ctx, conn, dir, lockTimeout)
 	if err != nil {
@@ -1030,6 +1037,89 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 			fmt.Printf("  - %s\n", v)
 		}
 	}
+	return 0
+}
+
+// handleMigrateApplyDryRun shows the SQL that would be executed without
+// actually applying any migrations.
+func handleMigrateApplyDryRun(ctx context.Context, conn *pgx.Conn, dir string, quiet bool) int {
+	if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
+	applied, err := migrate.AppliedVersions(ctx, conn)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	appliedSet := make(map[string]bool, len(applied))
+	for _, v := range applied {
+		appliedSet[v] = true
+	}
+
+	// Discover migration files.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: read migrations dir: %v\n", err)
+		return 1
+	}
+
+	type pendingMigration struct {
+		version string
+		path    string
+	}
+	var pending []pendingMigration
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".toml" {
+			continue
+		}
+		version := e.Name()[:len(e.Name())-5]
+		if appliedSet[version] {
+			continue
+		}
+		pending = append(pending, pendingMigration{
+			version: version,
+			path:    filepath.Join(dir, e.Name()),
+		})
+	}
+
+	if len(pending) == 0 {
+		if !quiet {
+			fmt.Println("No pending migrations.")
+		}
+		return 0
+	}
+
+	for i, pm := range pending {
+		m, err := migrate.ParseMigrationFile(pm.path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: parse %s: %v\n", pm.path, err)
+			return 1
+		}
+
+		if i > 0 {
+			fmt.Println()
+		}
+		fmt.Printf("-- Migration: %s\n", pm.version)
+		if m.Description != "" {
+			fmt.Printf("-- %s\n", m.Description)
+		}
+
+		for _, op := range m.DDLOps {
+			sqlStmt := migrate.OpToSQL(op)
+			if sqlStmt != "" {
+				fmt.Println(sqlStmt)
+			}
+		}
+
+		for _, op := range m.DMLOps {
+			if op.SQL != "" {
+				fmt.Println(op.SQL)
+			}
+		}
+	}
+
 	return 0
 }
 
