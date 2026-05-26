@@ -8,12 +8,12 @@ import (
 
 // Schema is the top-level resolved schema.
 type Schema struct {
-	Name        string
-	Extensions  []string
-	Enums       []Enum
-	Tables      []Table
-	CycleGroups [][]string
-	PGVersion   int
+	Name        string     `json:"name"`
+	Extensions  []string   `json:"extensions"`
+	Enums       []Enum     `json:"enums"`
+	Tables      []Table    `json:"tables"`
+	CycleGroups [][]string `json:"cycle_groups,omitempty"`
+	PGVersion   int        `json:"pg_version"`
 }
 
 // TableOrder returns tables in dependency order (topo-sorted).
@@ -34,19 +34,19 @@ func (s *Schema) TableByName(schema, name string) *Table {
 
 // Table represents a resolved table definition.
 type Table struct {
-	Name         string
-	Schema       string
-	Comment      string
-	Columns      []Column
-	PK           []string
-	FKs          []FK
-	Indexes      []Index
-	Uniques      []UniqueConstraint
-	Checks       []CheckConstraint
-	Partitioning *PartitionSpec
-	Dependencies []fd.FuncDep
-	Maintenance  *MaintenanceConfig
-	Owner        string
+	Name         string             `json:"name"`
+	Schema       string             `json:"schema"`
+	Comment      string             `json:"comment"`
+	Columns      []Column           `json:"columns"`
+	PK           []string           `json:"pk"`
+	FKs          []FK               `json:"fks"`
+	Indexes      []Index            `json:"indexes"`
+	Uniques      []UniqueConstraint `json:"uniques"`
+	Checks       []CheckConstraint  `json:"checks"`
+	Partitioning *PartitionSpec     `json:"partitioning,omitempty"`
+	Dependencies []fd.FuncDep       `json:"dependencies,omitempty"`
+	Maintenance  *MaintenanceConfig `json:"maintenance,omitempty"`
+	Owner        string             `json:"owner,omitempty"`
 }
 
 // HasIndexCovering returns true if any index's leading columns cover all of the
@@ -87,70 +87,70 @@ func (t *Table) CandidateKeys() [][]string {
 
 // Column represents a resolved column definition.
 type Column struct {
-	Name             string
-	PGType           string
-	NotNull          bool
-	Default          string
-	DefaultExpr      string
-	Generated        string
-	Stored           bool
-	Identity         string // "ALWAYS" or "BY DEFAULT" for identity columns
-	Comment          string
-	SemanticTypeName string
+	Name             string `json:"name"`
+	PGType           string `json:"pg_type"`
+	NotNull          bool   `json:"not_null"`
+	Default          string `json:"default"`
+	DefaultExpr      string `json:"default_expr,omitempty"`
+	Generated        string `json:"generated,omitempty"`
+	Stored           bool   `json:"stored,omitempty"`
+	Identity         string `json:"identity,omitempty"` // "ALWAYS" or "BY DEFAULT" for identity columns
+	Comment          string `json:"comment,omitempty"`
+	SemanticTypeName string `json:"semantic_type_name,omitempty"`
 }
 
 // FK represents a resolved foreign key constraint.
 type FK struct {
-	Name       string
-	Columns    []string
-	RefSchema  string
-	RefTable   string
-	RefColumns []string
-	OnDelete   string
+	Name       string   `json:"name"`
+	Columns    []string `json:"columns"`
+	RefSchema  string   `json:"ref_schema,omitempty"`
+	RefTable   string   `json:"ref_table"`
+	RefColumns []string `json:"ref_columns"`
+	OnDelete   string   `json:"on_delete"`
 }
 
 // Index represents a resolved index definition.
 type Index struct {
-	Name     string
-	Columns  []string
-	Method   string
-	Opclass  string
-	Where    string
-	Include  []string
-	Unique   bool
-	IsAutoFK bool
+	Name     string   `json:"name"`
+	Columns  []string `json:"columns"`
+	Method   string   `json:"method,omitempty"`
+	Opclass  string   `json:"opclass,omitempty"`
+	Where    string   `json:"where,omitempty"`
+	Include  []string `json:"include,omitempty"`
+	Unique   bool     `json:"unique"`
+	IsAutoFK bool     `json:"is_auto_fk"`
 }
 
 // UniqueConstraint represents a unique constraint.
 type UniqueConstraint struct {
-	Name    string
-	Columns []string
+	Name    string   `json:"name"`
+	Columns []string `json:"columns"`
 }
 
 // CheckConstraint represents a check constraint.
 type CheckConstraint struct {
-	Name string
-	Expr string
+	Name string `json:"name"`
+	Expr string `json:"expr"`
 }
 
 // Enum represents a resolved enum type.
 type Enum struct {
-	Schema  string
-	Name    string
-	Values  []string
-	Comment string
+	Schema  string   `json:"schema,omitempty"`
+	Name    string   `json:"name"`
+	Values  []string `json:"values"`
+	Comment string   `json:"comment,omitempty"`
 }
 
 // PartitionSpec represents partitioning configuration.
 type PartitionSpec struct {
-	Strategy string
-	Column   string
-	Children []PartitionSpec
+	Strategy string          `json:"strategy"`
+	Column   string          `json:"column"`
+	Children []PartitionSpec `json:"children"`
 }
 
 // MaintenanceConfig represents maintenance configuration for a table.
 type MaintenanceConfig struct {
-	Premake            int
-	Retention          string
-	RetentionKeepTable bool
+	Premake            int    `json:"premake"`
+	Retention          string `json:"retention"`
+	RetentionKeepTable bool   `json:"retention_keep_table"`
 }

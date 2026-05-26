@@ -14,66 +14,66 @@ import (
 
 // SchemaDiff describes the differences between a desired and actual schema.
 type SchemaDiff struct {
-	TablesAdded       []string
-	TablesRemoved     []string
-	TablesChanged     []TableDiff
-	EnumsAdded        []string
-	EnumsRemoved      []string
-	EnumsChanged      []EnumDiff
-	ExtensionsAdded   []string
-	ExtensionsRemoved []string
+	TablesAdded       []string    `json:"tables_added"`
+	TablesRemoved     []string    `json:"tables_removed"`
+	TablesChanged     []TableDiff `json:"tables_changed"`
+	EnumsAdded        []string    `json:"enums_added"`
+	EnumsRemoved      []string    `json:"enums_removed"`
+	EnumsChanged      []EnumDiff  `json:"enums_changed"`
+	ExtensionsAdded   []string    `json:"extensions_added"`
+	ExtensionsRemoved []string    `json:"extensions_removed"`
 }
 
 // TableDiff describes the differences within a single table.
 type TableDiff struct {
-	Name           string
-	ColumnsAdded   []model.Column
-	ColumnsRemoved []string
-	ColumnsChanged []ColumnChange
-	FKsAdded       []model.FK
-	FKsRemoved     []string
-	FKsChanged     []FKChange
-	IndexesAdded   []model.Index
-	IndexesRemoved []string
-	IndexesChanged []IndexChange
-	UniquesAdded   []model.UniqueConstraint
-	UniquesRemoved []string
-	ChecksAdded    []model.CheckConstraint
-	ChecksRemoved  []string
-	CommentChanged *[2]string   // [old, new]
-	PKChanged      *[2][]string // [old, new]
-	OwnerChanged   *[2]string
+	Name           string                   `json:"name"`
+	ColumnsAdded   []model.Column           `json:"columns_added"`
+	ColumnsRemoved []string                 `json:"columns_removed"`
+	ColumnsChanged []ColumnChange           `json:"columns_changed"`
+	FKsAdded       []model.FK               `json:"fks_added"`
+	FKsRemoved     []string                 `json:"fks_removed"`
+	FKsChanged     []FKChange               `json:"fks_changed"`
+	IndexesAdded   []model.Index            `json:"indexes_added"`
+	IndexesRemoved []string                 `json:"indexes_removed"`
+	IndexesChanged []IndexChange            `json:"indexes_changed"`
+	UniquesAdded   []model.UniqueConstraint `json:"uniques_added"`
+	UniquesRemoved []string                 `json:"uniques_removed"`
+	ChecksAdded    []model.CheckConstraint  `json:"checks_added"`
+	ChecksRemoved  []string                 `json:"checks_removed"`
+	CommentChanged *[2]string               `json:"comment_changed"` // [old, new]
+	PKChanged      *[2][]string             `json:"pk_changed"`      // [old, new]
+	OwnerChanged   *[2]string               `json:"owner_changed"`
 }
 
 // ColumnChange describes a change to a single column, with risk classification.
 type ColumnChange struct {
-	Name            string
-	TypeChanged     *[2]string // [old, new]
-	NullableChanged *[2]bool
-	DefaultChanged  *[2]string // [old, new]
-	CommentChanged  *[2]string // [old, new]
-	Risk            risk.Classification
+	Name            string              `json:"name"`
+	TypeChanged     *[2]string          `json:"type_changed"`     // [old, new]
+	NullableChanged *[2]bool            `json:"nullable_changed"` // [old, new]
+	DefaultChanged  *[2]string          `json:"default_changed"`  // [old, new]
+	CommentChanged  *[2]string          `json:"comment_changed"`  // [old, new]
+	Risk            risk.Classification `json:"risk"`
 }
 
 // EnumDiff describes changes to an enum type.
 type EnumDiff struct {
-	Name          string
-	ValuesAdded   []string
-	ValuesRemoved []string
+	Name          string   `json:"name"`
+	ValuesAdded   []string `json:"values_added"`
+	ValuesRemoved []string `json:"values_removed"`
 }
 
 // FKChange describes a changed foreign key constraint.
 type FKChange struct {
-	Name string
-	Old  model.FK
-	New  model.FK
+	Name string   `json:"name"`
+	Old  model.FK `json:"old"`
+	New  model.FK `json:"new"`
 }
 
 // IndexChange describes a changed index.
 type IndexChange struct {
-	Name string
-	Old  model.Index
-	New  model.Index
+	Name string      `json:"name"`
+	Old  model.Index `json:"old"`
+	New  model.Index `json:"new"`
 }
 
 // IsEmpty returns true if the diff contains no changes.
