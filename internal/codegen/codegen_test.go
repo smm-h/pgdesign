@@ -90,14 +90,17 @@ func TestFilterGeneratable(t *testing.T) {
 	}
 
 	result := FilterGeneratable(policies)
-	if len(result) != 2 {
-		t.Fatalf("expected 2 generatable policies, got %d", len(result))
+	if len(result) != 3 {
+		t.Fatalf("expected 3 generatable policies, got %d", len(result))
 	}
 	if result[0].PolicyName != "chat_requires_enabled" {
 		t.Errorf("expected chat_requires_enabled, got %s", result[0].PolicyName)
 	}
-	if result[1].PolicyName != "follow_requires_friends" {
-		t.Errorf("expected follow_requires_friends, got %s", result[1].PolicyName)
+	if result[1].PolicyName != "own_only" {
+		t.Errorf("expected own_only, got %s", result[1].PolicyName)
+	}
+	if result[2].PolicyName != "follow_requires_friends" {
+		t.Errorf("expected follow_requires_friends, got %s", result[2].PolicyName)
 	}
 }
 

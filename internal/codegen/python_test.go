@@ -178,6 +178,191 @@ func TestPythonGenerator_NoPolicies(t *testing.T) {
 	}
 }
 
+func TestParseOwnershipCheck(t *testing.T) {
+	tests := []struct {
+		name    string
+		expr    string
+		wantNil bool
+		wantCol string
+	}{
+		{
+			name:    "simple ownership",
+			expr:    "player_id::text = current_setting('app.player_id')",
+			wantCol: "player_id",
+		},
+		{
+			name:    "not ownership - has privacy ref",
+			expr:    "player_id::text = current_setting('app.player_id') AND EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = sender_id AND chat_enabled = true)",
+			wantNil: true,
+		},
+		{
+			name:    "no current_setting",
+			expr:    "player_id = some_other_func()",
+			wantNil: true,
+		},
+		{
+			name:    "true",
+			expr:    "true",
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseOwnershipCheck(tt.expr)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.column != tt.wantCol {
+				t.Errorf("column: expected %q, got %q", tt.wantCol, result.column)
+			}
+		})
+	}
+}
+
+func TestParseDualPrivacyCheck(t *testing.T) {
+	tests := []struct {
+		name       string
+		expr       string
+		wantNil    bool
+		wantFirst  privacyCheck
+		wantSecond privacyCheck
+	}{
+		{
+			name: "two privacy references",
+			expr: "EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = requester_id AND friends_enabled = true) AND EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = target_id AND friends_enabled = true)",
+			wantFirst: privacyCheck{
+				lookupColumn: "requester_id",
+				flagColumn:   "friends_enabled",
+			},
+			wantSecond: privacyCheck{
+				lookupColumn: "target_id",
+				flagColumn:   "friends_enabled",
+			},
+		},
+		{
+			name:    "single privacy reference",
+			expr:    "EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = sender_id AND chat_enabled = true)",
+			wantNil: true,
+		},
+		{
+			name:    "no privacy reference",
+			expr:    "player_id::text = current_setting('app.player_id')",
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseDualPrivacyCheck(tt.expr)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.first != tt.wantFirst {
+				t.Errorf("first: expected %+v, got %+v", tt.wantFirst, result.first)
+			}
+			if result.second != tt.wantSecond {
+				t.Errorf("second: expected %+v, got %+v", tt.wantSecond, result.second)
+			}
+		})
+	}
+}
+
+func TestPythonGenerator_OwnershipPattern(t *testing.T) {
+	schema := &model.Schema{
+		Name: "game",
+		Tables: []model.Table{
+			{
+				Name:   "notification",
+				Schema: "game",
+				Policies: []model.Policy{
+					{
+						Name:         "notification_own_only",
+						Operation:    "SELECT",
+						Using:        "player_id::text = current_setting('app.player_id')",
+						ErrorCode:    "not_owner",
+						ErrorMessage: "You can only access your own notifications",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &PythonGenerator{}
+	out, err := gen.Generate(schema)
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	result := string(out)
+
+	if !strings.Contains(result, "async def check_notification_own_only(conn, player_id: str, target_player_id: str) -> PolicyResult:") {
+		t.Error("missing ownership function signature")
+	}
+	if !strings.Contains(result, "if player_id != target_player_id:") {
+		t.Error("missing ownership comparison")
+	}
+	if !strings.Contains(result, `code="not_owner"`) {
+		t.Error("missing not_owner error code")
+	}
+	// Ownership validators do not query the database.
+	if strings.Contains(result, "fetchrow") {
+		t.Error("ownership validator should not query the database")
+	}
+}
+
+func TestPythonGenerator_DualPrivacyPattern(t *testing.T) {
+	schema := &model.Schema{
+		Name: "game",
+		Tables: []model.Table{
+			{
+				Name:   "friendships",
+				Schema: "game",
+				Policies: []model.Policy{
+					{
+						Name:         "friendship_requires_friends_enabled",
+						Operation:    "INSERT",
+						WithCheck:    "EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = requester_id AND friends_enabled = true) AND EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = target_id AND friends_enabled = true)",
+						ErrorCode:    "friends_disabled",
+						ErrorMessage: "Friend requests require friends_enabled",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &PythonGenerator{}
+	out, err := gen.Generate(schema)
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	result := string(out)
+
+	if !strings.Contains(result, "async def check_friendship_requires_friends_enabled(conn, requester_id: str, target_id: str) -> PolicyResult:") {
+		t.Error("missing dual-privacy function signature")
+	}
+	// Should query twice.
+	if strings.Count(result, "fetchrow") != 2 {
+		t.Errorf("expected 2 fetchrow calls, got %d", strings.Count(result, "fetchrow"))
+	}
+	if !strings.Contains(result, `code="friends_disabled"`) {
+		t.Error("missing friends_disabled error code")
+	}
+}
+
 func TestPythonGenerator_UnparsableExpression(t *testing.T) {
 	schema := &model.Schema{
 		Name: "game",

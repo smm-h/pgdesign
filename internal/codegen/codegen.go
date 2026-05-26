@@ -47,11 +47,15 @@ func ExtractPolicies(schema *model.Schema) []PolicyContext {
 	return contexts
 }
 
-// FilterGeneratable returns only policies that have an ErrorCode and reference
-// player_privacy_settings in their Using or WithCheck expression. These are the
-// social enforcement policies that benefit from pre-check validators. Policies
-// that are purely row-ownership checks (e.g. "player_id = current_setting(...)") or
-// system/read-all policies (using = "true") are skipped.
+// FilterGeneratable returns policies that have an ErrorCode and match one of the
+// supported codegen patterns:
+//
+//  1. Privacy check: expression references player_privacy_settings
+//  2. Ownership check: expression contains current_setting('app.player_id')
+//  3. Dual-player privacy check: expression has 2+ player_privacy_settings references
+//
+// Patterns are detected at generation time. This filter only checks whether a
+// policy has an error code and matches at least one pattern's surface signature.
 func FilterGeneratable(policies []PolicyContext) []PolicyContext {
 	var result []PolicyContext
 	for _, p := range policies {
@@ -59,10 +63,14 @@ func FilterGeneratable(policies []PolicyContext) []PolicyContext {
 			continue
 		}
 		expr := p.Using + " " + p.WithCheck
-		if !strings.Contains(expr, "player_privacy_settings") {
+		if strings.Contains(expr, "player_privacy_settings") {
+			result = append(result, p)
 			continue
 		}
-		result = append(result, p)
+		if strings.Contains(expr, "current_setting('app.player_id')") {
+			result = append(result, p)
+			continue
+		}
 	}
 	return result
 }

@@ -22,6 +22,20 @@ type privacyCheck struct {
 	flagColumn string
 }
 
+// ownershipCheck describes a parsed ownership comparison.
+type ownershipCheck struct {
+	// column is the column being compared (e.g. "player_id").
+	column string
+}
+
+// dualPrivacyCheck describes a policy that checks two players' privacy settings.
+type dualPrivacyCheck struct {
+	// first is the first player's lookup column and flag.
+	first privacyCheck
+	// second is the second player's lookup column and flag.
+	second privacyCheck
+}
+
 // parsePrivacyCheck extracts the privacy settings reference from a policy
 // expression. It looks for the pattern:
 //
@@ -44,6 +58,53 @@ func parsePrivacyCheck(expr string) *privacyCheck {
 	}
 }
 
+// parseOwnershipCheck detects the ownership pattern:
+//
+//	<column>::text = current_setting('app.player_id')
+//
+// This must be the ONLY substantive condition (no AND with privacy checks).
+// Returns nil if the expression doesn't match or contains other patterns.
+func parseOwnershipCheck(expr string) *ownershipCheck {
+	// Skip if expression also references player_privacy_settings -- those are
+	// privacy checks or dual-player checks, not pure ownership.
+	if strings.Contains(expr, "player_privacy_settings") {
+		return nil
+	}
+	re := regexp.MustCompile(
+		`([a-z_]+)::text\s*=\s*current_setting\('app\.player_id'\)`,
+	)
+	m := re.FindStringSubmatch(expr)
+	if m == nil {
+		return nil
+	}
+	return &ownershipCheck{
+		column: m[1],
+	}
+}
+
+// parseDualPrivacyCheck detects policies with two references to
+// player_privacy_settings, each checking a different player's setting.
+// Returns nil if fewer than two references are found.
+func parseDualPrivacyCheck(expr string) *dualPrivacyCheck {
+	re := regexp.MustCompile(
+		`player_privacy_settings\s+WHERE\s+player_id\s*=\s*(?:[a-z_]+\.)?([a-z_]+)\s+AND\s+([a-z_]+)\s*=\s*true`,
+	)
+	matches := re.FindAllStringSubmatch(expr, -1)
+	if len(matches) < 2 {
+		return nil
+	}
+	return &dualPrivacyCheck{
+		first: privacyCheck{
+			lookupColumn: matches[0][1],
+			flagColumn:   matches[0][2],
+		},
+		second: privacyCheck{
+			lookupColumn: matches[1][1],
+			flagColumn:   matches[1][2],
+		},
+	}
+}
+
 // Generate produces a Python file with async validator functions for all
 // eligible policies in the schema.
 func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, error) {
@@ -63,54 +124,121 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, error) {
 			expr = pol.Using
 		}
 
-		check := parsePrivacyCheck(expr)
-		if check == nil {
-			buf.WriteString(fmt.Sprintf(
-				"\n# Skipped %s: could not parse privacy check from expression\n",
-				pol.PolicyName,
-			))
-			continue
-		}
-
 		if i > 0 {
 			buf.WriteString("\n")
 		}
 
-		// Determine the function parameter name from the lookup column.
-		// If the lookup column is "player_id", the caller already has it.
-		// Otherwise, the lookup column IS the parameter (e.g. "sender_id", "followed_id").
-		paramName := check.lookupColumn
-
-		buf.WriteString(fmt.Sprintf(
-			"\nasync def check_%s(conn, %s: str) -> PolicyResult:\n",
-			pol.PolicyName, paramName,
-		))
-		buf.WriteString(fmt.Sprintf(
-			"    \"\"\"%s\"\"\"\n", pol.ErrorMessage,
-		))
-
-		// Generate the query. Use the schema name if present.
-		tableFQN := "player_privacy_settings"
-		if pol.SchemaName != "" {
-			tableFQN = pol.SchemaName + ".player_privacy_settings"
+		// Try patterns in order: dual-player first (most specific), then
+		// single privacy check, then ownership.
+		if dual := parseDualPrivacyCheck(expr); dual != nil {
+			generateDualPrivacyValidator(&buf, pol, dual)
+		} else if check := parsePrivacyCheck(expr); check != nil {
+			generatePrivacyValidator(&buf, pol, check)
+		} else if own := parseOwnershipCheck(expr); own != nil {
+			generateOwnershipValidator(&buf, pol, own)
+		} else {
+			buf.WriteString(fmt.Sprintf(
+				"\n# Skipped %s: could not parse expression into a known pattern\n",
+				pol.PolicyName,
+			))
 		}
-
-		buf.WriteString(fmt.Sprintf(
-			"    row = await conn.fetchrow(\n"+
-				"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
-				"        %s,\n"+
-				"    )\n",
-			check.flagColumn, tableFQN, paramName,
-		))
-		buf.WriteString(fmt.Sprintf(
-			"    if not row or not row[\"%s\"]:\n"+
-				"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
-				"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
-			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
-		))
 	}
 
 	return buf.Bytes(), nil
+}
+
+// generatePrivacyValidator writes a single-player privacy check validator.
+func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyCheck) {
+	paramName := check.lookupColumn
+
+	buf.WriteString(fmt.Sprintf(
+		"\nasync def check_%s(conn, %s: str) -> PolicyResult:\n",
+		pol.PolicyName, paramName,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    \"\"\"%s\"\"\"\n", pol.ErrorMessage,
+	))
+
+	tableFQN := "player_privacy_settings"
+	if pol.SchemaName != "" {
+		tableFQN = pol.SchemaName + ".player_privacy_settings"
+	}
+
+	buf.WriteString(fmt.Sprintf(
+		"    row = await conn.fetchrow(\n"+
+			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        %s,\n"+
+			"    )\n",
+		check.flagColumn, tableFQN, paramName,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    if not row or not row[\"%s\"]:\n"+
+			"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
+			"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
+		check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+	))
+}
+
+// generateOwnershipValidator writes a pure ID-comparison validator.
+func generateOwnershipValidator(buf *bytes.Buffer, pol PolicyContext, own *ownershipCheck) {
+	buf.WriteString(fmt.Sprintf(
+		"\nasync def check_%s(conn, %s: str, target_%s: str) -> PolicyResult:\n",
+		pol.PolicyName, own.column, own.column,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    \"\"\"%s\"\"\"\n", pol.ErrorMessage,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    if %s != target_%s:\n"+
+			"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
+			"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
+		own.column, own.column, pol.ErrorCode, pol.ErrorMessage,
+	))
+}
+
+// generateDualPrivacyValidator writes a validator that checks two players' settings.
+func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPrivacyCheck) {
+	buf.WriteString(fmt.Sprintf(
+		"\nasync def check_%s(conn, %s: str, %s: str) -> PolicyResult:\n",
+		pol.PolicyName, dual.first.lookupColumn, dual.second.lookupColumn,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    \"\"\"%s\"\"\"\n", pol.ErrorMessage,
+	))
+
+	tableFQN := "player_privacy_settings"
+	if pol.SchemaName != "" {
+		tableFQN = pol.SchemaName + ".player_privacy_settings"
+	}
+
+	// First player check.
+	buf.WriteString(fmt.Sprintf(
+		"    row = await conn.fetchrow(\n"+
+			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        %s,\n"+
+			"    )\n",
+		dual.first.flagColumn, tableFQN, dual.first.lookupColumn,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    if not row or not row[\"%s\"]:\n"+
+			"        return PolicyResult(ok=False, code=%q, message=%q)\n",
+		dual.first.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+	))
+
+	// Second player check.
+	buf.WriteString(fmt.Sprintf(
+		"    row = await conn.fetchrow(\n"+
+			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        %s,\n"+
+			"    )\n",
+		dual.second.flagColumn, tableFQN, dual.second.lookupColumn,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    if not row or not row[\"%s\"]:\n"+
+			"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
+			"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
+		dual.second.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+	))
 }
 
 // pythonHeader returns the standard header for generated Python files.
