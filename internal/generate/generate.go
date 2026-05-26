@@ -226,6 +226,31 @@ func generateSQL(schema *model.Schema, opts Options) string {
 		sections = append(sections, strings.Join(ownerStmts, "\n"))
 	}
 
+	// 12. ALTER TABLE ENABLE ROW LEVEL SECURITY
+	var enableRLSStmts []string
+	for i := range tables {
+		t := &tables[i]
+		if t.EnableRLS {
+			enableRLSStmts = append(enableRLSStmts, sql.AlterTableEnableRLS(t.Schema, t.Name))
+		}
+	}
+	if len(enableRLSStmts) > 0 {
+		sections = append(sections, strings.Join(enableRLSStmts, "\n"))
+	}
+
+	// 13. CREATE POLICY
+	var policyStmts []string
+	for i := range tables {
+		t := &tables[i]
+		policies := sortedPolicies(t.Policies)
+		for _, p := range policies {
+			policyStmts = append(policyStmts, sql.CreatePolicy(t.Schema, t.Name, p))
+		}
+	}
+	if len(policyStmts) > 0 {
+		sections = append(sections, strings.Join(policyStmts, "\n"))
+	}
+
 	return strings.Join(sections, "\n\n") + "\n"
 }
 
@@ -263,6 +288,16 @@ func sortedChecks(cks []model.CheckConstraint) []model.CheckConstraint {
 func sortedIndexes(idxs []model.Index) []model.Index {
 	result := make([]model.Index, len(idxs))
 	copy(result, idxs)
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+// sortedPolicies returns policies sorted alphabetically by name.
+func sortedPolicies(pols []model.Policy) []model.Policy {
+	result := make([]model.Policy, len(pols))
+	copy(result, pols)
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Name < result[j].Name
 	})

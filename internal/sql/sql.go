@@ -502,3 +502,38 @@ func AlterTableOwner(schemaName, tableName, owner string) string {
 	qualified := QualifiedName(schemaName, tableName)
 	return fmt.Sprintf("ALTER TABLE %s OWNER TO %s;", qualified, QuoteIdent(owner))
 }
+
+// AlterTableEnableRLS generates an ALTER TABLE ... ENABLE ROW LEVEL SECURITY statement.
+func AlterTableEnableRLS(schemaName, tableName string) string {
+	return fmt.Sprintf("ALTER TABLE %s ENABLE ROW LEVEL SECURITY;", QualifiedName(schemaName, tableName))
+}
+
+// CreatePolicy generates a CREATE POLICY statement for row-level security.
+// The FOR clause is omitted when operation is "ALL" (the PostgreSQL default).
+// The TO clause is omitted when role is empty (defaults to PUBLIC).
+// USING and WITH CHECK are wrapped in parentheses when present.
+func CreatePolicy(schemaName, tableName string, p model.Policy) string {
+	qualified := QualifiedName(schemaName, tableName)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("CREATE POLICY %s ON %s", QuoteIdent(p.Name), qualified))
+
+	if p.Operation != "" && strings.ToUpper(p.Operation) != "ALL" {
+		sb.WriteString(fmt.Sprintf(" FOR %s", strings.ToUpper(p.Operation)))
+	}
+
+	if p.Role != "" {
+		sb.WriteString(fmt.Sprintf(" TO %s", QuoteIdent(p.Role)))
+	}
+
+	if p.Using != "" {
+		sb.WriteString(fmt.Sprintf(" USING (%s)", p.Using))
+	}
+
+	if p.WithCheck != "" {
+		sb.WriteString(fmt.Sprintf(" WITH CHECK (%s)", p.WithCheck))
+	}
+
+	sb.WriteString(";")
+	return sb.String()
+}

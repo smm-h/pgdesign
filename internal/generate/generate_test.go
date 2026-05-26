@@ -863,6 +863,174 @@ func TestPartmanNotEmittedWithoutExtension(t *testing.T) {
 	}
 }
 
+func TestRLSPolicyGeneration(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "documents",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "owner_id", PGType: "uuid", NotNull: true},
+					{Name: "content", PGType: "text", NotNull: true},
+				},
+				PK:        []string{"id"},
+				EnableRLS: true,
+				Policies: []model.Policy{
+					{
+						Name:      "owners_select",
+						Operation: "SELECT",
+						Role:      "app_user",
+						Using:     "owner_id = current_user_id()",
+					},
+					{
+						Name:      "owners_insert",
+						Operation: "INSERT",
+						Role:      "app_user",
+						WithCheck: "owner_id = current_user_id()",
+					},
+					{
+						Name:      "owners_update",
+						Operation: "UPDATE",
+						Role:      "app_user",
+						Using:     "owner_id = current_user_id()",
+						WithCheck: "owner_id = current_user_id()",
+					},
+				},
+			},
+		},
+	}
+
+	opts := Options{IncludeComments: true, Format: "sql"}
+	out := Generate(schema, opts)
+
+	// ENABLE RLS must be present.
+	if !strings.Contains(out, "ALTER TABLE app.documents ENABLE ROW LEVEL SECURITY;") {
+		t.Errorf("expected ALTER TABLE ENABLE RLS, got:\n%s", out)
+	}
+
+	// CREATE POLICY statements.
+	if !strings.Contains(out, "CREATE POLICY owners_select ON app.documents FOR SELECT TO app_user USING (owner_id = current_user_id());") {
+		t.Errorf("expected SELECT policy, got:\n%s", out)
+	}
+	if !strings.Contains(out, "CREATE POLICY owners_insert ON app.documents FOR INSERT TO app_user WITH CHECK (owner_id = current_user_id());") {
+		t.Errorf("expected INSERT policy, got:\n%s", out)
+	}
+	if !strings.Contains(out, "CREATE POLICY owners_update ON app.documents FOR UPDATE TO app_user USING (owner_id = current_user_id()) WITH CHECK (owner_id = current_user_id());") {
+		t.Errorf("expected UPDATE policy, got:\n%s", out)
+	}
+
+	// ENABLE RLS must come before CREATE POLICY.
+	enablePos := strings.Index(out, "ENABLE ROW LEVEL SECURITY")
+	policyPos := strings.Index(out, "CREATE POLICY")
+	if enablePos < 0 || policyPos < 0 {
+		t.Fatalf("missing RLS statements in output:\n%s", out)
+	}
+	if enablePos > policyPos {
+		t.Errorf("ENABLE RLS should appear before CREATE POLICY, enable=%d policy=%d", enablePos, policyPos)
+	}
+}
+
+func TestRLSWithoutPolicies(t *testing.T) {
+	// enable_rls = true but no policies: should still emit ALTER TABLE ENABLE RLS.
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "secrets",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+				},
+				PK:        []string{"id"},
+				EnableRLS: true,
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := Generate(schema, opts)
+
+	if !strings.Contains(out, "ALTER TABLE app.secrets ENABLE ROW LEVEL SECURITY;") {
+		t.Errorf("expected ENABLE RLS even without policies, got:\n%s", out)
+	}
+	if strings.Contains(out, "CREATE POLICY") {
+		t.Errorf("should not contain CREATE POLICY when no policies defined, got:\n%s", out)
+	}
+}
+
+func TestNoPoliciesNoRLS(t *testing.T) {
+	// No policies, no enable_rls: no RLS statements at all.
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := Generate(schema, opts)
+
+	if strings.Contains(out, "ROW LEVEL SECURITY") {
+		t.Errorf("should not contain RLS statements, got:\n%s", out)
+	}
+	if strings.Contains(out, "CREATE POLICY") {
+		t.Errorf("should not contain CREATE POLICY, got:\n%s", out)
+	}
+}
+
+func TestRLSPolicyAllOperation(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "data",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "tenant_id", PGType: "uuid", NotNull: true},
+				},
+				PK:        []string{"id"},
+				EnableRLS: true,
+				Policies: []model.Policy{
+					{
+						Name:      "tenant_isolation",
+						Operation: "ALL",
+						Using:     "tenant_id = current_setting('app.tenant_id')::uuid",
+					},
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := Generate(schema, opts)
+
+	// ALL operation should not include FOR clause.
+	if strings.Contains(out, "FOR ALL") {
+		t.Errorf("should not contain FOR ALL, got:\n%s", out)
+	}
+	// Should not include TO clause when role is empty.
+	policyLine := ""
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "CREATE POLICY") {
+			policyLine = line
+			break
+		}
+	}
+	if strings.Contains(policyLine, " TO ") {
+		t.Errorf("should not contain TO clause when role is empty, got:\n%s", policyLine)
+	}
+}
+
 func TestGoldenFile(t *testing.T) {
 	inputPath := filepath.Join("testdata", "simple_input.toml")
 

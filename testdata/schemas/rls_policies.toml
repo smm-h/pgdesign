@@ -1,0 +1,41 @@
+[meta]
+version = 1
+schema = "secure"
+extensions = ["pgcrypto"]
+
+[tables.documents]
+comment = "User documents with row-level security"
+enable_rls = true
+
+[tables.documents.columns.id]
+type = "id"
+
+[tables.documents.columns.owner_id]
+type = "ref"
+
+[tables.documents.columns.title]
+type = "short_text"
+
+[tables.documents.columns.created_at]
+type = "timestamp"
+
+[tables.documents.policies.owners_read]
+for = "SELECT"
+to = "app_user"
+using = "owner_id = current_setting('app.user_id')::uuid"
+
+[tables.documents.policies.owners_insert]
+for = "INSERT"
+to = "app_user"
+with_check = "owner_id = current_setting('app.user_id')::uuid"
+
+[tables.documents.policies.owners_update]
+for = "UPDATE"
+to = "app_user"
+using = "owner_id = current_setting('app.user_id')::uuid"
+with_check = "owner_id = current_setting('app.user_id')::uuid"
+
+[tables.documents.policies.owners_delete]
+for = "DELETE"
+to = "app_user"
+using = "owner_id = current_setting('app.user_id')::uuid"

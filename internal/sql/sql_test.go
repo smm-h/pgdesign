@@ -776,6 +776,143 @@ func TestUpdatePartmanConfig_KeepTableFalse(t *testing.T) {
 	}
 }
 
+func TestAlterTableEnableRLS(t *testing.T) {
+	got := AlterTableEnableRLS("app", "documents")
+	expected := "ALTER TABLE app.documents ENABLE ROW LEVEL SECURITY;"
+	if got != expected {
+		t.Errorf("AlterTableEnableRLS = %q, want %q", got, expected)
+	}
+}
+
+func TestAlterTableEnableRLS_ReservedTableName(t *testing.T) {
+	got := AlterTableEnableRLS("public", "user")
+	expected := `ALTER TABLE public."user" ENABLE ROW LEVEL SECURITY;`
+	if got != expected {
+		t.Errorf("AlterTableEnableRLS = %q, want %q", got, expected)
+	}
+}
+
+func TestCreatePolicy_SelectUsingOnly(t *testing.T) {
+	p := model.Policy{
+		Name:      "users_see_own",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+	}
+
+	got := CreatePolicy("app", "documents", p)
+
+	if !strings.Contains(got, "CREATE POLICY users_see_own ON app.documents") {
+		t.Errorf("expected CREATE POLICY header, got:\n%s", got)
+	}
+	if !strings.Contains(got, "FOR SELECT") {
+		t.Errorf("expected FOR SELECT, got:\n%s", got)
+	}
+	if !strings.Contains(got, "TO app_user") {
+		t.Errorf("expected TO app_user, got:\n%s", got)
+	}
+	if !strings.Contains(got, "USING (user_id = current_user_id())") {
+		t.Errorf("expected USING clause, got:\n%s", got)
+	}
+	if strings.Contains(got, "WITH CHECK") {
+		t.Errorf("should not contain WITH CHECK, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_InsertWithCheckOnly(t *testing.T) {
+	p := model.Policy{
+		Name:      "users_insert_own",
+		Operation: "INSERT",
+		Role:      "app_user",
+		WithCheck: "user_id = current_user_id()",
+	}
+
+	got := CreatePolicy("app", "documents", p)
+
+	if !strings.Contains(got, "FOR INSERT") {
+		t.Errorf("expected FOR INSERT, got:\n%s", got)
+	}
+	if !strings.Contains(got, "WITH CHECK (user_id = current_user_id())") {
+		t.Errorf("expected WITH CHECK clause, got:\n%s", got)
+	}
+	if strings.Contains(got, "USING") {
+		t.Errorf("should not contain USING, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_UpdateBothClauses(t *testing.T) {
+	p := model.Policy{
+		Name:      "users_update_own",
+		Operation: "UPDATE",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+		WithCheck: "user_id = current_user_id()",
+	}
+
+	got := CreatePolicy("app", "documents", p)
+
+	if !strings.Contains(got, "FOR UPDATE") {
+		t.Errorf("expected FOR UPDATE, got:\n%s", got)
+	}
+	if !strings.Contains(got, "USING (user_id = current_user_id())") {
+		t.Errorf("expected USING clause, got:\n%s", got)
+	}
+	if !strings.Contains(got, "WITH CHECK (user_id = current_user_id())") {
+		t.Errorf("expected WITH CHECK clause, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_AllOmitsFOR(t *testing.T) {
+	p := model.Policy{
+		Name:      "users_all",
+		Operation: "ALL",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+	}
+
+	got := CreatePolicy("app", "documents", p)
+
+	if strings.Contains(got, "FOR ALL") {
+		t.Errorf("should not contain FOR ALL (ALL is the default), got:\n%s", got)
+	}
+	if strings.Contains(got, "FOR ") {
+		t.Errorf("should not contain any FOR clause, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_NoRole(t *testing.T) {
+	p := model.Policy{
+		Name:      "public_read",
+		Operation: "SELECT",
+		Using:     "published = true",
+	}
+
+	got := CreatePolicy("app", "articles", p)
+
+	if strings.Contains(got, " TO ") {
+		t.Errorf("should not contain TO clause when role is empty, got:\n%s", got)
+	}
+	if !strings.Contains(got, "USING (published = true)") {
+		t.Errorf("expected USING clause, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_SchemaQualified(t *testing.T) {
+	p := model.Policy{
+		Name:      "tenant_isolation",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "tenant_id = current_setting('app.tenant_id')::uuid",
+	}
+
+	got := CreatePolicy("multi_tenant", "orders", p)
+	expected := `CREATE POLICY tenant_isolation ON multi_tenant.orders FOR SELECT TO app_user USING (tenant_id = current_setting('app.tenant_id')::uuid);`
+
+	if got != expected {
+		t.Errorf("CreatePolicy =\n  got:  %s\n  want: %s", got, expected)
+	}
+}
+
 func TestAlterTableAddCheck_Idempotent(t *testing.T) {
 	ck := &model.CheckConstraint{
 		Name: "ck_orders_positive_amount",
