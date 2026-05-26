@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/smm-h/pgdesign/internal/audit"
 	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -25,6 +28,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/serve"
 	"github.com/smm-h/pgdesign/internal/validate"
 	"github.com/smm-h/strictcli/go/strictcli"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -49,6 +53,10 @@ func main() {
 
 	app.Command("audit", "Audit schema file(s) or directory for issues", handleAudit,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
+		strictcli.WithFlags(
+			strictcli.StringFlag("tables", "Limit FD discovery to specific tables", strictcli.Repeatable()),
+			strictcli.FloatFlag("approximate", "Approximate FD threshold (0.0 = exact only)", strictcli.Default(0.0)),
+		),
 	)
 
 	app.Command("fmt", "Format a pgdesign schema file or directory", handleFmt,
@@ -198,41 +206,131 @@ func handleAudit(kwargs map[string]interface{}) int {
 
 	// When --db is provided, discover FDs from live data for tables without declared FDs.
 	if dbURL, ok := kwargs["db"].(string); ok && dbURL != "" {
-		ctx := context.Background()
-		conn, err := pgx.Connect(ctx, dbURL)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: connect for FD discovery: %v\n", err)
-			return 1
+		approxThreshold := kwargs["approximate"].(float64)
+		opts := discover.Options{
+			ApproximateThreshold: approxThreshold,
 		}
-		defer conn.Close(ctx)
 
-		opts := discover.Options{}
+		// Collect --tables filter values.
+		var tableFilter map[string]bool
+		if raw, ok := kwargs["tables"].([]interface{}); ok && len(raw) > 0 {
+			tableFilter = make(map[string]bool, len(raw))
+			for _, v := range raw {
+				if s, ok := v.(string); ok {
+					tableFilter[s] = true
+				}
+			}
+		}
+
+		// Build list of table indices eligible for discovery.
+		var eligible []int
 		for i := range schema.Tables {
 			tbl := &schema.Tables[i]
 			if len(tbl.Dependencies) > 0 {
 				continue
 			}
-			schemaName := tbl.Schema
-			if schemaName == "" {
-				schemaName = "public"
-			}
-			fds, discDiags, err := discover.Discover(conn, schemaName, tbl.Name, opts)
-			allDiags = append(allDiags, discDiags...)
-			if err != nil {
-				allDiags = append(allDiags, diagnostic.Diagnostic{
-					Severity: diagnostic.Warning,
-					Table:    tbl.Name,
-					Message:  fmt.Sprintf("FD discovery failed: %v", err),
-				})
+			if tableFilter != nil && !tableFilter[tbl.Name] {
 				continue
 			}
-			if len(fds) > 0 {
-				tbl.Dependencies = fds
-				allDiags = append(allDiags, diagnostic.Diagnostic{
-					Severity: diagnostic.Info,
-					Table:    tbl.Name,
-					Message:  fmt.Sprintf("Discovered %d FD(s) from data sample.", len(fds)),
+			eligible = append(eligible, i)
+		}
+
+		if len(eligible) > 0 {
+			ctx := context.Background()
+
+			// Use a connection pool for parallel discovery. Each goroutine
+			// acquires its own connection since pgx.Conn is not concurrency-safe.
+			pool, err := pgxpool.New(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: connect for FD discovery: %v\n", err)
+				return 1
+			}
+			defer pool.Close()
+
+			// Per-table results collected under a mutex.
+			type tableResult struct {
+				tableIdx int
+				diags    []diagnostic.Diagnostic
+			}
+			var (
+				mu      sync.Mutex
+				results []tableResult
+			)
+
+			g, gctx := errgroup.WithContext(ctx)
+			g.SetLimit(runtime.GOMAXPROCS(0))
+
+			for _, idx := range eligible {
+				idx := idx
+				g.Go(func() error {
+					tbl := &schema.Tables[idx]
+					schemaName := tbl.Schema
+					if schemaName == "" {
+						schemaName = "public"
+					}
+
+					conn, err := pool.Acquire(gctx)
+					if err != nil {
+						mu.Lock()
+						results = append(results, tableResult{
+							tableIdx: idx,
+							diags: []diagnostic.Diagnostic{{
+								Severity: diagnostic.Warning,
+								Table:    tbl.Name,
+								Message:  fmt.Sprintf("FD discovery failed: %v", err),
+							}},
+						})
+						mu.Unlock()
+						return nil
+					}
+					defer conn.Release()
+
+					fds, discDiags, err := discover.Discover(conn.Conn(), schemaName, tbl.Name, opts)
+
+					var diags []diagnostic.Diagnostic
+					diags = append(diags, discDiags...)
+					if err != nil {
+						diags = append(diags, diagnostic.Diagnostic{
+							Severity: diagnostic.Warning,
+							Table:    tbl.Name,
+							Message:  fmt.Sprintf("FD discovery failed: %v", err),
+						})
+					} else if len(fds) > 0 {
+						diags = append(diags, diagnostic.Diagnostic{
+							Severity: diagnostic.Info,
+							Table:    tbl.Name,
+							Message:  fmt.Sprintf("Discovered %d FD(s) from data sample.", len(fds)),
+						})
+					}
+
+					mu.Lock()
+					results = append(results, tableResult{
+						tableIdx: idx,
+						diags:    diags,
+					})
+					// Write discovered FDs back to the table (safe: each goroutine
+					// writes to a distinct table index).
+					if err == nil && len(fds) > 0 {
+						schema.Tables[idx].Dependencies = fds
+					}
+					mu.Unlock()
+
+					return nil
 				})
+			}
+
+			// errgroup goroutines never return errors (handled inline), but
+			// Wait() still collects goroutine panics.
+			_ = g.Wait()
+
+			// Merge diagnostics in table order for deterministic output.
+			for _, idx := range eligible {
+				for _, r := range results {
+					if r.tableIdx == idx {
+						allDiags = append(allDiags, r.diags...)
+						break
+					}
+				}
 			}
 		}
 	}
