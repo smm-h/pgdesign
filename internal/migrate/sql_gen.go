@@ -79,7 +79,7 @@ func IsNonTransactional(op DDLOp) bool {
 func opCreateTable(op DDLOp) string {
 	if op.TableDef != nil {
 		schema, _ := splitQualifiedName(op.Table)
-		return sql.CreateTable(op.TableDef, schema, false)
+		return sql.CreateTable(op.TableDef, schema, false, 0)
 	}
 
 	// Fallback: generate from op fields (no full table def available).
@@ -173,7 +173,7 @@ func opCreateIndex(op DDLOp) string {
 		Include:   op.Include,
 	}
 	schema, tableName := splitQualifiedName(op.Table)
-	return sql.CreateIndex(schema, idx, tableName, false)
+	return sql.CreateIndex(schema, idx, tableName, false, false)
 }
 
 func opDropIndex(op DDLOp) string {
@@ -185,32 +185,16 @@ func opDropIndex(op DDLOp) string {
 }
 
 func opCreateIndexConcurrently(op DDLOp) string {
-	colExprs := quoteIdentSlice(op.Columns)
-	for i, col := range op.Columns {
-		if oc, ok := op.Opclasses[col]; ok && oc != "" {
-			colExprs[i] += " " + oc
-		}
+	idx := &model.Index{
+		Name:      op.Name,
+		Columns:   op.Columns,
+		Method:    op.Method,
+		Opclasses: op.Opclasses,
+		Where:     op.Where,
+		Include:   op.Include,
 	}
-
 	schema, tableName := splitQualifiedName(op.Table)
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CREATE INDEX CONCURRENTLY %s ON %s",
-		sql.QuoteIdent(op.Name), sql.QualifiedName(schema, tableName)))
-
-	if op.Method != "" && strings.ToLower(op.Method) != "btree" {
-		sb.WriteString(fmt.Sprintf(" USING %s", op.Method))
-	}
-
-	sb.WriteString(fmt.Sprintf(" (%s)", strings.Join(colExprs, ", ")))
-
-	if len(op.Include) > 0 {
-		sb.WriteString(fmt.Sprintf(" INCLUDE (%s)", strings.Join(quoteIdentSlice(op.Include), ", ")))
-	}
-	if op.Where != "" {
-		sb.WriteString(fmt.Sprintf(" WHERE %s", op.Where))
-	}
-	sb.WriteString(";")
-	return sb.String()
+	return sql.CreateIndex(schema, idx, tableName, false, true)
 }
 
 func opDropIndexConcurrently(op DDLOp) string {

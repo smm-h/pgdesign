@@ -180,7 +180,9 @@ func CreateEnum(schema, name string, values []string, idempotent bool) string {
 
 // CreateTable generates a CREATE TABLE statement with columns, inline PK, and
 // PARTITION BY. Foreign keys are NOT included (they use ALTER TABLE for cycle safety).
-func CreateTable(table *model.Table, schemaName string, idempotent bool) string {
+// pgVersion controls version-specific DDL: when > 0 and < 10, identity columns
+// fall back to bigserial. When 0 (unspecified) or >= 10, GENERATED AS IDENTITY is used.
+func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersion int) string {
 	ifne := ""
 	if idempotent {
 		ifne = " IF NOT EXISTS"
@@ -192,7 +194,7 @@ func CreateTable(table *model.Table, schemaName string, idempotent bool) string 
 
 	// Column definitions.
 	for _, col := range table.Columns {
-		lines = append(lines, "    "+columnDef(col))
+		lines = append(lines, "    "+columnDef(col, pgVersion))
 	}
 
 	// Inline PRIMARY KEY constraint.
@@ -223,7 +225,18 @@ func CreateTable(table *model.Table, schemaName string, idempotent bool) string 
 }
 
 // columnDef builds a single column definition line.
-func columnDef(col model.Column) string {
+// pgVersion controls version-specific DDL (0 means unspecified, treated as latest).
+func columnDef(col model.Column, pgVersion int) string {
+	// Pre-PG10 identity fallback: replace identity column with bigserial.
+	if col.Identity != "" && pgVersion > 0 && pgVersion < 10 {
+		var parts []string
+		parts = append(parts, QuoteIdent(col.Name), "bigserial")
+		if col.NotNull {
+			parts = append(parts, "NOT NULL")
+		}
+		return strings.Join(parts, " ")
+	}
+
 	var parts []string
 	parts = append(parts, QuoteIdent(col.Name), col.PGType)
 
@@ -248,7 +261,9 @@ func columnDef(col model.Column) string {
 }
 
 // AlterTableAddFK generates an ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY statement.
-func AlterTableAddFK(schemaName string, table *model.Table, fk *model.FK) string {
+// When idempotent is true, wraps the statement in a DO $$ block that checks
+// pg_constraint before adding.
+func AlterTableAddFK(schemaName string, table *model.Table, fk *model.FK, idempotent bool) string {
 	qualified := QualifiedName(schemaName, table.Name)
 	constraintName := fk.Name
 	if constraintName == "" {
@@ -275,11 +290,18 @@ func AlterTableAddFK(schemaName string, table *model.Table, fk *model.FK) string
 		stmt += " ON DELETE " + strings.ToUpper(fk.OnDelete)
 	}
 
-	return stmt + ";"
+	stmt += ";"
+
+	if idempotent {
+		return wrapIdempotentConstraint(constraintName, qualified, stmt)
+	}
+	return stmt
 }
 
 // AlterTableAddUnique generates an ALTER TABLE ... ADD CONSTRAINT ... UNIQUE statement.
-func AlterTableAddUnique(schemaName, tableName string, uq *model.UniqueConstraint) string {
+// When idempotent is true, wraps the statement in a DO $$ block that checks
+// pg_constraint before adding.
+func AlterTableAddUnique(schemaName, tableName string, uq *model.UniqueConstraint, idempotent bool) string {
 	qualified := QualifiedName(schemaName, tableName)
 	constraintName := uq.Name
 	if constraintName == "" {
@@ -291,28 +313,66 @@ func AlterTableAddUnique(schemaName, tableName string, uq *model.UniqueConstrain
 		quotedCols[i] = QuoteIdent(c)
 	}
 
-	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s UNIQUE (%s);",
+	stmt := fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s UNIQUE (%s);",
 		qualified, QuoteIdent(constraintName), strings.Join(quotedCols, ", "))
+
+	if idempotent {
+		return wrapIdempotentConstraint(constraintName, qualified, stmt)
+	}
+	return stmt
 }
 
 // AlterTableAddCheck generates an ALTER TABLE ... ADD CONSTRAINT ... CHECK statement.
-func AlterTableAddCheck(schemaName, tableName string, ck *model.CheckConstraint) string {
+// When idempotent is true, wraps the statement in a DO $$ block that checks
+// pg_constraint before adding.
+func AlterTableAddCheck(schemaName, tableName string, ck *model.CheckConstraint, idempotent bool) string {
 	qualified := QualifiedName(schemaName, tableName)
 	constraintName := ck.Name
 	if constraintName == "" {
 		constraintName = ConstraintName(tableName, "ck")
 	}
 
-	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s CHECK (%s);",
+	stmt := fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s CHECK (%s);",
 		qualified, QuoteIdent(constraintName), ck.Expr)
+
+	if idempotent {
+		return wrapIdempotentConstraint(constraintName, qualified, stmt)
+	}
+	return stmt
+}
+
+// wrapIdempotentConstraint wraps an ALTER TABLE ADD CONSTRAINT statement in a
+// DO $$ block that checks pg_constraint before executing, making it idempotent.
+func wrapIdempotentConstraint(constraintName, qualifiedTable, stmt string) string {
+	escapedName := strings.ReplaceAll(constraintName, "'", "''")
+	escapedTable := strings.ReplaceAll(qualifiedTable, "'", "''")
+	return fmt.Sprintf(`DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = '%s'
+    AND conrelid = '%s'::regclass
+  ) THEN
+    %s
+  END IF;
+END $$;`, escapedName, escapedTable, stmt)
 }
 
 // CreateIndex generates a CREATE INDEX statement.
-// Handles Method (default btree), per-column Opclasses, WHERE, and INCLUDE.
-func CreateIndex(schemaName string, index *model.Index, tableName string, idempotent bool) string {
+// Handles Method (default btree), per-column Opclasses, WHERE, INCLUDE, and
+// CONCURRENTLY. When concurrently is true, IF NOT EXISTS is omitted because
+// PostgreSQL does not support combining them reliably.
+func CreateIndex(schemaName string, index *model.Index, tableName string, idempotent bool, concurrently bool) string {
+	// CONCURRENTLY is incompatible with IF NOT EXISTS in some PG versions,
+	// so when both are requested, prefer CONCURRENTLY without IF NOT EXISTS.
 	ifne := ""
-	if idempotent {
+	if idempotent && !concurrently {
 		ifne = " IF NOT EXISTS"
+	}
+
+	conc := ""
+	if concurrently {
+		conc = " CONCURRENTLY"
 	}
 
 	idxName := index.Name
@@ -338,8 +398,8 @@ func CreateIndex(schemaName string, index *model.Index, tableName string, idempo
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CREATE%s INDEX%s %s ON %s",
-		unique, ifne, QuoteIdent(idxName), qualified))
+	sb.WriteString(fmt.Sprintf("CREATE%s INDEX%s%s %s ON %s",
+		unique, conc, ifne, QuoteIdent(idxName), qualified))
 
 	// USING clause (only if not btree, since btree is the default).
 	method := strings.ToLower(index.Method)

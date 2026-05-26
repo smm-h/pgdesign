@@ -101,7 +101,7 @@ func generateSQL(schema *model.Schema, opts Options) string {
 	if len(tables) > 0 {
 		var tableStmts []string
 		for i := range tables {
-			tableStmts = append(tableStmts, sql.CreateTable(&tables[i], tables[i].Schema, opts.Idempotent))
+			tableStmts = append(tableStmts, sql.CreateTable(&tables[i], tables[i].Schema, opts.Idempotent, opts.PGVersion))
 		}
 		sections = append(sections, strings.Join(tableStmts, "\n\n"))
 	}
