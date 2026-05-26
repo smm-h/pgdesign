@@ -117,3 +117,185 @@ schemas = ["schema.toml"]
 		t.Errorf("pg_version = %d, want 0 (zero value)", cfg.Database.PGVersion)
 	}
 }
+
+func TestLoadValidateSection(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[validate]
+disable = ["W001", "E201"]
+naming_pattern = "camelCase"
+max_columns = 50
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(cfg.Validate.Disable) != 2 {
+		t.Fatalf("expected 2 disabled rules, got %d", len(cfg.Validate.Disable))
+	}
+	if cfg.Validate.Disable[0] != "W001" {
+		t.Errorf("disable[0] = %q, want %q", cfg.Validate.Disable[0], "W001")
+	}
+	if cfg.Validate.Disable[1] != "E201" {
+		t.Errorf("disable[1] = %q, want %q", cfg.Validate.Disable[1], "E201")
+	}
+	if cfg.Validate.NamingPattern != "camelCase" {
+		t.Errorf("naming_pattern = %q, want %q", cfg.Validate.NamingPattern, "camelCase")
+	}
+	if cfg.Validate.MaxColumns != 50 {
+		t.Errorf("max_columns = %d, want %d", cfg.Validate.MaxColumns, 50)
+	}
+}
+
+func TestLoadMigrateSection(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[migrate]
+lock_timeout = "5s"
+auto_concurrent_threshold = 100000
+expand_contract_threshold = 1000000
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.Migrate.LockTimeout != "5s" {
+		t.Errorf("lock_timeout = %q, want %q", cfg.Migrate.LockTimeout, "5s")
+	}
+	if cfg.Migrate.AutoConcurrentThreshold != 100000 {
+		t.Errorf("auto_concurrent_threshold = %d, want %d", cfg.Migrate.AutoConcurrentThreshold, 100000)
+	}
+	if cfg.Migrate.ExpandContractThreshold != 1000000 {
+		t.Errorf("expand_contract_threshold = %d, want %d", cfg.Migrate.ExpandContractThreshold, 1000000)
+	}
+}
+
+func TestLoadExtensionsSection(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[[extensions]]
+name = "pgcrypto"
+types = ["uuid"]
+functions = ["gen_random_uuid"]
+
+[[extensions]]
+name = "btree_gin"
+opclasses = ["int4_ops"]
+index_methods = ["gin"]
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(cfg.Extensions) != 2 {
+		t.Fatalf("expected 2 extensions, got %d", len(cfg.Extensions))
+	}
+
+	ext0 := cfg.Extensions[0]
+	if ext0.Name != "pgcrypto" {
+		t.Errorf("extensions[0].name = %q, want %q", ext0.Name, "pgcrypto")
+	}
+	if len(ext0.Types) != 1 || ext0.Types[0] != "uuid" {
+		t.Errorf("extensions[0].types = %v, want [uuid]", ext0.Types)
+	}
+	if len(ext0.Functions) != 1 || ext0.Functions[0] != "gen_random_uuid" {
+		t.Errorf("extensions[0].functions = %v, want [gen_random_uuid]", ext0.Functions)
+	}
+
+	ext1 := cfg.Extensions[1]
+	if ext1.Name != "btree_gin" {
+		t.Errorf("extensions[1].name = %q, want %q", ext1.Name, "btree_gin")
+	}
+	if len(ext1.Opclasses) != 1 || ext1.Opclasses[0] != "int4_ops" {
+		t.Errorf("extensions[1].opclasses = %v, want [int4_ops]", ext1.Opclasses)
+	}
+	if len(ext1.IndexMethods) != 1 || ext1.IndexMethods[0] != "gin" {
+		t.Errorf("extensions[1].index_methods = %v, want [gin]", ext1.IndexMethods)
+	}
+}
+
+func TestLoadOrDefault_NoConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg, err := LoadOrDefault(tmpDir)
+	if err != nil {
+		t.Fatalf("LoadOrDefault failed: %v", err)
+	}
+	// Should return zero-valued config.
+	if len(cfg.Project.Schemas) != 0 {
+		t.Errorf("expected no schemas, got %d", len(cfg.Project.Schemas))
+	}
+	if cfg.Validate.MaxColumns != 0 {
+		t.Errorf("expected zero max_columns, got %d", cfg.Validate.MaxColumns)
+	}
+}
+
+func TestLoadOrDefault_WithConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[validate]
+max_columns = 42
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadOrDefault(tmpDir)
+	if err != nil {
+		t.Fatalf("LoadOrDefault failed: %v", err)
+	}
+	if cfg.Validate.MaxColumns != 42 {
+		t.Errorf("max_columns = %d, want %d", cfg.Validate.MaxColumns, 42)
+	}
+}
+
+func TestMergeValidateFlags(t *testing.T) {
+	cfg := &Config{
+		Validate: ValidateConfig{
+			NamingPattern: "snake_case",
+			MaxColumns:    30,
+		},
+	}
+
+	// Non-zero flags override.
+	cfg.MergeValidateFlags("camelCase", 50)
+	if cfg.Validate.NamingPattern != "camelCase" {
+		t.Errorf("naming_pattern = %q, want %q", cfg.Validate.NamingPattern, "camelCase")
+	}
+	if cfg.Validate.MaxColumns != 50 {
+		t.Errorf("max_columns = %d, want %d", cfg.Validate.MaxColumns, 50)
+	}
+
+	// Zero-value flags do not override.
+	cfg.MergeValidateFlags("", 0)
+	if cfg.Validate.NamingPattern != "camelCase" {
+		t.Errorf("naming_pattern should not change with empty flag, got %q", cfg.Validate.NamingPattern)
+	}
+	if cfg.Validate.MaxColumns != 50 {
+		t.Errorf("max_columns should not change with zero flag, got %d", cfg.Validate.MaxColumns)
+	}
+}
