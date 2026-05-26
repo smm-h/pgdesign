@@ -2,6 +2,7 @@ package format
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -571,5 +572,225 @@ on_delete = "CASCADE"
 	}
 	if titleIdx >= authorIdx {
 		t.Errorf("title (pos %d) should come before author_id (FK, pos %d)", titleIdx, authorIdx)
+	}
+}
+
+func TestCommentPreservation_LeadingCommentsOnSections(t *testing.T) {
+	input := []byte(`[meta]
+version = 1
+schema = "test"
+
+# This is the users table
+[tables.users]
+pk = ["id"]
+
+# The primary key
+[tables.users.columns.id]
+type = "id"
+`)
+	got, err := Format(input, nil)
+	if err != nil {
+		t.Fatalf("Format error: %v", err)
+	}
+
+	output := string(got)
+	if !strings.Contains(output, "# This is the users table") {
+		t.Errorf("leading comment on [tables.users] was lost.\nOutput:\n%s", output)
+	}
+	if !strings.Contains(output, "# The primary key") {
+		t.Errorf("leading comment on [tables.users.columns.id] was lost.\nOutput:\n%s", output)
+	}
+}
+
+func TestCommentPreservation_InlineComments(t *testing.T) {
+	input := []byte(`[meta]
+version = 1
+schema = "test"
+
+[tables.users]
+pk = ["id"]
+
+[tables.users.columns.id]
+type = "id"
+
+[tables.users.columns.email]
+type = "email" # must be unique
+`)
+	got, err := Format(input, nil)
+	if err != nil {
+		t.Fatalf("Format error: %v", err)
+	}
+
+	output := string(got)
+	if !strings.Contains(output, "# must be unique") {
+		t.Errorf("inline comment on email type was lost.\nOutput:\n%s", output)
+	}
+}
+
+func TestCommentPreservation_SectionReorderingKeepsComments(t *testing.T) {
+	// Comments should travel with their section during reordering.
+	input := []byte(`# Table section first (wrong order)
+[tables.posts]
+pk = ["id"]
+
+[tables.posts.columns.id]
+type = "id"
+
+# Type section
+[types.status]
+kind = "enum"
+values = ["active", "inactive"]
+
+# Meta section
+[meta]
+version = 1
+schema = "test"
+`)
+	got, err := Format(input, nil)
+	if err != nil {
+		t.Fatalf("Format error: %v", err)
+	}
+
+	output := string(got)
+
+	// After reordering: meta, types, tables.
+	// Comments should still be present and attached to the right sections.
+	if !strings.Contains(output, "# Meta section") {
+		t.Errorf("comment before [meta] was lost.\nOutput:\n%s", output)
+	}
+	if !strings.Contains(output, "# Type section") {
+		t.Errorf("comment before [types.status] was lost.\nOutput:\n%s", output)
+	}
+	if !strings.Contains(output, "# Table section first (wrong order)") {
+		t.Errorf("comment before [tables.posts] was lost.\nOutput:\n%s", output)
+	}
+
+	// Verify ordering: meta before types before tables.
+	metaIdx := strings.Index(output, "[meta]")
+	typesIdx := strings.Index(output, "[types.status]")
+	tablesIdx := strings.Index(output, "[tables.posts]")
+	if metaIdx >= typesIdx {
+		t.Errorf("[meta] should come before [types.status]")
+	}
+	if typesIdx >= tablesIdx {
+		t.Errorf("[types.status] should come before [tables.posts]")
+	}
+
+	// Verify comments are near their sections: "# Meta section" before [meta]
+	metaCommentIdx := strings.Index(output, "# Meta section")
+	if metaCommentIdx < 0 || metaCommentIdx >= metaIdx {
+		t.Errorf("# Meta section comment should appear before [meta]")
+	}
+
+	typeCommentIdx := strings.Index(output, "# Type section")
+	if typeCommentIdx < 0 || typeCommentIdx >= typesIdx {
+		t.Errorf("# Type section comment should appear before [types.status]")
+	}
+}
+
+func TestCommentPreservation_CanonicalOrderStillWorks(t *testing.T) {
+	// Verify that the canonical ordering still works correctly even with comments.
+	input := []byte(`[meta]
+version = 1
+schema = "test"
+
+# Posts table -- depends on users
+[tables.posts]
+pk = ["id"]
+
+# Post ID
+[tables.posts.columns.id]
+type = "id"
+
+# Author reference
+[tables.posts.columns.author_id]
+type = "ref"
+
+[tables.posts.fks.author_fk]
+columns = ["author_id"]
+ref_table = "users"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+# Users table -- referenced by posts
+[tables.users]
+pk = ["id"]
+
+[tables.users.columns.id]
+type = "id"
+`)
+	config := &Config{
+		TableOrder:  "dependency",
+		ColumnOrder: "pk_fk_alpha",
+	}
+	got, err := Format(input, config)
+	if err != nil {
+		t.Fatalf("Format error: %v", err)
+	}
+
+	output := string(got)
+
+	// users should come before posts (dependency order).
+	usersIdx := strings.Index(output, "[tables.users]")
+	postsIdx := strings.Index(output, "[tables.posts]")
+	if usersIdx < 0 || postsIdx < 0 {
+		t.Fatalf("missing table sections in output:\n%s", output)
+	}
+	if usersIdx >= postsIdx {
+		t.Errorf("users should come before posts in dependency order")
+	}
+
+	// Comments should be preserved.
+	if !strings.Contains(output, "# Posts table -- depends on users") {
+		t.Errorf("comment on posts table was lost.\nOutput:\n%s", output)
+	}
+	if !strings.Contains(output, "# Users table -- referenced by posts") {
+		t.Errorf("comment on users table was lost.\nOutput:\n%s", output)
+	}
+	if !strings.Contains(output, "# Post ID") {
+		t.Errorf("comment on post id column was lost.\nOutput:\n%s", output)
+	}
+	if !strings.Contains(output, "# Author reference") {
+		t.Errorf("comment on author_id column was lost.\nOutput:\n%s", output)
+	}
+}
+
+func TestCommentPreservation_Idempotence(t *testing.T) {
+	// Formatting a document with comments should be idempotent.
+	input := []byte(`# Schema metadata
+[meta]
+version = 1
+schema = "test"
+
+# User-defined types
+[types.status]
+kind = "enum"
+values = ["active", "inactive"]
+
+# Users table
+[tables.users]
+pk = ["id"]
+
+# The primary key
+[tables.users.columns.id]
+type = "id"
+
+[tables.users.columns.email]
+type = "email" # must be unique
+`)
+	config := DefaultConfig()
+
+	first, err := Format(input, config)
+	if err != nil {
+		t.Fatalf("Format error: %v", err)
+	}
+
+	second, err := Format(first, config)
+	if err != nil {
+		t.Fatalf("Format (2nd pass) error: %v", err)
+	}
+
+	if !bytes.Equal(first, second) {
+		t.Errorf("formatting with comments is not idempotent.\nFirst pass:\n%s\nSecond pass:\n%s", first, second)
 	}
 }

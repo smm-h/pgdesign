@@ -1,8 +1,7 @@
 // Package format implements canonical TOML formatting for pgdesign schema files.
-// It parses the input via internal/parse, determines canonical ordering, then
-// builds a fresh TOML document using go-toml-edit's API. This approach loses
-// comments (v1 limitation); a future version should do direct AST node
-// reordering to preserve them.
+// It parses the input via go-toml-edit to get a comment-preserving AST, then
+// reorders sections in-place according to canonical ordering. Comments attached
+// to sections and keys travel with them during reordering.
 package format
 
 import (
@@ -29,12 +28,20 @@ func DefaultConfig() *Config {
 }
 
 // Format parses input TOML bytes and returns the canonically formatted output.
+// Comments are preserved: leading comments and inline comments on sections and
+// keys travel with their associated node during reordering.
 func Format(input []byte, config *Config) ([]byte, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
 
-	// Parse into RawSchema for structural analysis.
+	// Parse into AST (preserves comments).
+	doc, err := tomledit.Parse(input)
+	if err != nil {
+		return nil, fmt.Errorf("TOML parse error: %v", err)
+	}
+
+	// Parse into RawSchema for structural analysis (topo sort, FK info, etc.).
 	raw, diags := parse.Bytes(input)
 	if raw == nil {
 		if len(diags) > 0 {
@@ -42,14 +49,14 @@ func Format(input []byte, config *Config) ([]byte, error) {
 		}
 		return nil, fmt.Errorf("failed to parse TOML")
 	}
-	_ = diags
 
 	// Determine canonical table order.
 	tableOrder := orderTables(raw, config.TableOrder)
 
-	// Build a new document in canonical order.
-	out := buildCanonical(raw, tableOrder, config)
-	return out.Format(), nil
+	// Reorder the AST in-place.
+	reorderDocument(doc, raw, tableOrder, config)
+
+	return doc.Format(), nil
 }
 
 // orderTables returns table names in canonical order.
@@ -146,248 +153,268 @@ func topoSortTables(tables []parse.RawTable) []string {
 	return result
 }
 
-// buildCanonical constructs a new TOML document in canonical order.
-func buildCanonical(raw *parse.RawSchema, tableOrder []string, config *Config) *tomledit.DocumentNode {
-	doc := newDoc()
+// sectionKind classifies a top-level AST node by which schema section it
+// belongs to: "meta", "types", "tables", or "other" (for top-level KVs,
+// comments, etc.).
+type sectionKind int
 
-	// 1. [meta] section
-	writeMeta(doc, raw)
+const (
+	kindOther  sectionKind = iota
+	kindMeta
+	kindTypes
+	kindTables
+)
 
-	// 2. [types.*] sections, alphabetically by name
-	writeTypes(doc, raw)
-
-	// 3. [tables.*] sections in canonical order
-	tableByName := make(map[string]*parse.RawTable, len(raw.Tables))
-	for i := range raw.Tables {
-		tableByName[raw.Tables[i].Name] = &raw.Tables[i]
+// classifyNode returns the section kind and (for tables) the table name.
+func classifyNode(node tomledit.Node) (kind sectionKind, tableName string) {
+	switch n := node.(type) {
+	case *tomledit.TableNode:
+		if len(n.KeyPath) >= 1 {
+			switch n.KeyPath[0] {
+			case "meta":
+				return kindMeta, ""
+			case "types":
+				return kindTypes, ""
+			case "tables":
+				if len(n.KeyPath) >= 2 {
+					return kindTables, n.KeyPath[1]
+				}
+				return kindTables, ""
+			}
+		}
+	case *tomledit.ArrayTableNode:
+		if len(n.KeyPath) >= 2 && n.KeyPath[0] == "tables" {
+			return kindTables, n.KeyPath[1]
+		}
 	}
-	for _, name := range tableOrder {
-		t := tableByName[name]
-		if t == nil {
+	return kindOther, ""
+}
+
+// typeName extracts the type name from a [types.X] table node.
+func typeName(node tomledit.Node) string {
+	if tbl, ok := node.(*tomledit.TableNode); ok {
+		if len(tbl.KeyPath) >= 2 && tbl.KeyPath[0] == "types" {
+			return tbl.KeyPath[1]
+		}
+	}
+	return ""
+}
+
+// tableSubSectionKind classifies a table's sub-section for ordering purposes.
+// Canonical order: table header, columns, fks, indexes, unique, checks,
+// partitioning, maintenance, dependencies.
+type tableSubSectionKind int
+
+const (
+	subHeader       tableSubSectionKind = iota // [tables.X] itself
+	subColumns                                  // [tables.X.columns.*]
+	subFKs                                      // [tables.X.fks.*]
+	subIndexes                                  // [tables.X.indexes.*]
+	subUnique                                   // [tables.X.unique.*]
+	subChecks                                   // [tables.X.checks.*]
+	subPartitioning                             // [tables.X.partitioning] and partitions
+	subMaintenance                              // [tables.X.maintenance]
+	subDependencies                             // [[tables.X.dependencies]]
+	subOther                                    // anything else
+)
+
+// classifyTableSub classifies a node that belongs to a specific table.
+func classifyTableSub(node tomledit.Node, tableName string) (tableSubSectionKind, string) {
+	switch n := node.(type) {
+	case *tomledit.TableNode:
+		if len(n.KeyPath) == 2 && n.KeyPath[0] == "tables" && n.KeyPath[1] == tableName {
+			return subHeader, ""
+		}
+		if len(n.KeyPath) >= 3 && n.KeyPath[0] == "tables" && n.KeyPath[1] == tableName {
+			subName := n.KeyPath[2]
+			switch subName {
+			case "columns":
+				name := ""
+				if len(n.KeyPath) >= 4 {
+					name = n.KeyPath[3]
+				}
+				return subColumns, name
+			case "fks":
+				name := ""
+				if len(n.KeyPath) >= 4 {
+					name = n.KeyPath[3]
+				}
+				return subFKs, name
+			case "indexes":
+				name := ""
+				if len(n.KeyPath) >= 4 {
+					name = n.KeyPath[3]
+				}
+				return subIndexes, name
+			case "unique":
+				name := ""
+				if len(n.KeyPath) >= 4 {
+					name = n.KeyPath[3]
+				}
+				return subUnique, name
+			case "checks":
+				name := ""
+				if len(n.KeyPath) >= 4 {
+					name = n.KeyPath[3]
+				}
+				return subChecks, name
+			case "partitioning":
+				return subPartitioning, ""
+			case "maintenance":
+				return subMaintenance, ""
+			}
+		}
+	case *tomledit.ArrayTableNode:
+		if len(n.KeyPath) >= 3 && n.KeyPath[0] == "tables" && n.KeyPath[1] == tableName {
+			subName := n.KeyPath[2]
+			switch subName {
+			case "dependencies":
+				return subDependencies, ""
+			case "partitioning":
+				// [[tables.X.partitioning.partitions]]
+				return subPartitioning, ""
+			}
+		}
+	}
+	return subOther, ""
+}
+
+// reorderDocument reorders the document's Children in canonical order:
+// 1. [meta]
+// 2. [types.*] alphabetically
+// 3. [tables.*] in the specified order, with sub-sections in canonical order
+func reorderDocument(doc *tomledit.DocumentNode, raw *parse.RawSchema, tableOrder []string, config *Config) {
+	// Partition children by section kind.
+	var others []tomledit.Node  // top-level KVs, comments before any section
+	var metaNodes []tomledit.Node
+	typeNodes := map[string][]tomledit.Node{} // keyed by type name
+	tableNodes := map[string][]tomledit.Node{} // keyed by table name
+
+	for _, child := range doc.Children {
+		kind, tName := classifyNode(child)
+		switch kind {
+		case kindMeta:
+			metaNodes = append(metaNodes, child)
+		case kindTypes:
+			name := typeName(child)
+			typeNodes[name] = append(typeNodes[name], child)
+		case kindTables:
+			tableNodes[tName] = append(tableNodes[tName], child)
+		default:
+			others = append(others, child)
+		}
+	}
+
+	// Collect type names and sort alphabetically.
+	var typeNames []string
+	for name := range typeNodes {
+		typeNames = append(typeNames, name)
+	}
+	sort.Strings(typeNames)
+
+	// Build raw table lookup for column ordering.
+	rawTableByName := make(map[string]*parse.RawTable, len(raw.Tables))
+	for i := range raw.Tables {
+		rawTableByName[raw.Tables[i].Name] = &raw.Tables[i]
+	}
+
+	// Reassemble children in canonical order.
+	var newChildren []tomledit.Node
+
+	// 1. "other" nodes (top-level comments, KVs) first -- typically none in pgdesign files.
+	newChildren = append(newChildren, others...)
+
+	// 2. [meta] section.
+	newChildren = append(newChildren, metaNodes...)
+
+	// 3. [types.*] alphabetically.
+	for _, name := range typeNames {
+		newChildren = append(newChildren, typeNodes[name]...)
+	}
+
+	// 4. [tables.*] in canonical order, with sub-sections reordered.
+	for _, tblName := range tableOrder {
+		nodes := tableNodes[tblName]
+		if len(nodes) == 0 {
 			continue
 		}
-		writeTable(doc, t, config)
+		reordered := reorderTableSections(nodes, tblName, rawTableByName[tblName], config)
+		newChildren = append(newChildren, reordered...)
 	}
 
-	return doc
+	// Post-process: reorder KVs within table header nodes (comment before pk).
+	reorderDocumentPostProcess(newChildren)
+
+	doc.Children = newChildren
 }
 
-// newDoc creates a fresh empty DocumentNode.
-func newDoc() *tomledit.DocumentNode {
-	doc, _ := tomledit.Parse([]byte(""))
-	return doc
+// reorderTableSections reorders the nodes belonging to a single table in
+// canonical sub-section order.
+func reorderTableSections(nodes []tomledit.Node, tableName string, rawTable *parse.RawTable, config *Config) []tomledit.Node {
+	// Classify each node.
+	type classified struct {
+		node tomledit.Node
+		kind tableSubSectionKind
+		name string // sub-item name (column name, fk name, etc.)
+	}
+
+	var items []classified
+	for _, n := range nodes {
+		kind, name := classifyTableSub(n, tableName)
+		items = append(items, classified{node: n, kind: kind, name: name})
+	}
+
+	// Build the canonical column order if we have raw table info.
+	var columnOrder []string
+	if rawTable != nil {
+		orderedCols := orderColumns(rawTable, config.ColumnOrder)
+		for _, col := range orderedCols {
+			columnOrder = append(columnOrder, col.Name)
+		}
+	}
+
+	// Sort items by canonical order.
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := items[i], items[j]
+
+		// Primary sort: sub-section kind.
+		if a.kind != b.kind {
+			return a.kind < b.kind
+		}
+
+		// Secondary sort within the same kind.
+		switch a.kind {
+		case subColumns:
+			// Sort by canonical column order.
+			ai := columnIndex(columnOrder, a.name)
+			bi := columnIndex(columnOrder, b.name)
+			return ai < bi
+		case subFKs, subIndexes, subUnique, subChecks:
+			// Sort alphabetically by name.
+			return a.name < b.name
+		case subDependencies:
+			// Preserve original order (stable sort handles this).
+			return false
+		}
+		return false
+	})
+
+	result := make([]tomledit.Node, len(items))
+	for i, item := range items {
+		result[i] = item.node
+	}
+	return result
 }
 
-// writeMeta writes the [meta] section to the document.
-func writeMeta(doc *tomledit.DocumentNode, raw *parse.RawSchema) {
-	if raw.Meta.Version == 0 && raw.Meta.Schema == "" && len(raw.Meta.Extensions) == 0 {
-		return
-	}
-	_ = doc.NewTable("meta")
-	if raw.Meta.Version != 0 {
-		_ = doc.SetCreate("meta.version", raw.Meta.Version)
-	}
-	if raw.Meta.Schema != "" {
-		_ = doc.SetCreate("meta.schema", raw.Meta.Schema)
-	}
-	if len(raw.Meta.Extensions) > 0 {
-		_ = doc.SetCreate("meta.extensions", raw.Meta.Extensions)
-	}
-}
-
-// writeTypes writes all [types.*] sections alphabetically.
-func writeTypes(doc *tomledit.DocumentNode, raw *parse.RawSchema) {
-	if len(raw.Types) == 0 {
-		return
-	}
-	sorted := make([]parse.RawType, len(raw.Types))
-	copy(sorted, raw.Types)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Name < sorted[j].Name
-	})
-	for _, rt := range sorted {
-		path := "types." + rt.Name
-		_ = doc.NewTable(path)
-		if rt.Kind != "" {
-			_ = doc.SetCreate(path+".kind", rt.Kind)
-		}
-		if rt.BaseType != "" {
-			_ = doc.SetCreate(path+".base_type", rt.BaseType)
-		}
-		if len(rt.Values) > 0 {
-			_ = doc.SetCreate(path+".values", rt.Values)
-		}
-		if rt.NotNull != nil {
-			_ = doc.SetCreate(path+".not_null", *rt.NotNull)
-		}
-		if rt.Default != nil {
-			_ = doc.SetCreate(path+".default", *rt.Default)
-		}
-		if rt.DefaultExpr != nil {
-			_ = doc.SetCreate(path+".default_expr", *rt.DefaultExpr)
-		}
-		if rt.Check != nil {
-			_ = doc.SetCreate(path+".check", *rt.Check)
-		}
-		if rt.Unique != nil {
-			_ = doc.SetCreate(path+".unique", *rt.Unique)
-		}
-		if rt.Comment != nil {
-			_ = doc.SetCreate(path+".comment", *rt.Comment)
+// columnIndex returns the position of a column name in the canonical order.
+// Returns a large number for unknown columns to push them to the end.
+func columnIndex(order []string, name string) int {
+	for i, n := range order {
+		if n == name {
+			return i
 		}
 	}
-}
-
-// writeTable writes a single table with all sub-sections in canonical order:
-// comment, pk, columns, fks, indexes, unique, checks, partitioning,
-// maintenance, dependencies
-func writeTable(doc *tomledit.DocumentNode, t *parse.RawTable, config *Config) {
-	tpath := "tables." + t.Name
-	_ = doc.NewTable(tpath)
-
-	// comment
-	if t.Comment != nil {
-		_ = doc.SetCreate(tpath+".comment", *t.Comment)
-	}
-
-	// pk
-	if len(t.PK) > 0 {
-		_ = doc.SetCreate(tpath+".pk", t.PK)
-	}
-
-	// columns in canonical order
-	columns := orderColumns(t, config.ColumnOrder)
-	for _, col := range columns {
-		cpath := tpath + ".columns." + col.Name
-		_ = doc.NewTable(cpath)
-		if col.Type != "" {
-			_ = doc.SetCreate(cpath+".type", col.Type)
-		}
-		if col.Nullable != nil {
-			_ = doc.SetCreate(cpath+".nullable", *col.Nullable)
-		}
-		if col.Default != nil {
-			_ = doc.SetCreate(cpath+".default", *col.Default)
-		}
-		if col.DefaultExpr != nil {
-			_ = doc.SetCreate(cpath+".default_expr", *col.DefaultExpr)
-		}
-		if col.Generated != nil {
-			_ = doc.SetCreate(cpath+".generated", *col.Generated)
-		}
-		if col.Stored != nil {
-			_ = doc.SetCreate(cpath+".stored", *col.Stored)
-		}
-		if col.Comment != nil {
-			_ = doc.SetCreate(cpath+".comment", *col.Comment)
-		}
-	}
-
-	// fks alphabetically
-	writeMapSorted(doc, tpath, "fks", t.FKs, func(name string, fk parse.RawFK) {
-		fkpath := tpath + ".fks." + name
-		_ = doc.NewTable(fkpath)
-		if len(fk.Columns) > 0 {
-			_ = doc.SetCreate(fkpath+".columns", fk.Columns)
-		}
-		if fk.RefTable != "" {
-			_ = doc.SetCreate(fkpath+".ref_table", fk.RefTable)
-		}
-		if len(fk.RefColumns) > 0 {
-			_ = doc.SetCreate(fkpath+".ref_columns", fk.RefColumns)
-		}
-		if fk.OnDelete != "" {
-			_ = doc.SetCreate(fkpath+".on_delete", fk.OnDelete)
-		}
-	})
-
-	// indexes alphabetically
-	writeMapSorted(doc, tpath, "indexes", t.Indexes, func(name string, idx parse.RawIndex) {
-		ipath := tpath + ".indexes." + name
-		_ = doc.NewTable(ipath)
-		if len(idx.Columns) > 0 {
-			_ = doc.SetCreate(ipath+".columns", idx.Columns)
-		}
-		if idx.Method != nil {
-			_ = doc.SetCreate(ipath+".method", *idx.Method)
-		}
-		if idx.Opclass != nil {
-			_ = doc.SetCreate(ipath+".opclass", *idx.Opclass)
-		} else if idx.OpclassMap != nil {
-			// Per-column opclass map: check if all values are the same
-			// for compact string form, otherwise write as inline table.
-			allSame := true
-			var singleVal string
-			for _, v := range idx.OpclassMap {
-				if singleVal == "" {
-					singleVal = v
-				} else if v != singleVal {
-					allSame = false
-					break
-				}
-			}
-			if allSame && singleVal != "" {
-				_ = doc.SetCreate(ipath+".opclass", singleVal)
-			} else {
-				// Write per-column entries as dotted keys under opclass.
-				for col, oc := range idx.OpclassMap {
-					_ = doc.SetCreate(ipath+".opclass."+col, oc)
-				}
-			}
-		}
-		if idx.Where != nil {
-			_ = doc.SetCreate(ipath+".where", *idx.Where)
-		}
-		if len(idx.Include) > 0 {
-			_ = doc.SetCreate(ipath+".include", idx.Include)
-		}
-		if idx.Unique != nil {
-			_ = doc.SetCreate(ipath+".unique", *idx.Unique)
-		}
-	})
-
-	// unique constraints alphabetically
-	writeMapSorted(doc, tpath, "unique", t.Uniques, func(name string, uq parse.RawUnique) {
-		upath := tpath + ".unique." + name
-		_ = doc.NewTable(upath)
-		if len(uq.Columns) > 0 {
-			_ = doc.SetCreate(upath+".columns", uq.Columns)
-		}
-	})
-
-	// checks alphabetically
-	writeMapSorted(doc, tpath, "checks", t.Checks, func(name string, chk parse.RawCheck) {
-		cpath := tpath + ".checks." + name
-		_ = doc.NewTable(cpath)
-		if chk.Expr != "" {
-			_ = doc.SetCreate(cpath+".expr", chk.Expr)
-		}
-	})
-
-	// partitioning
-	if t.Partitioning != nil {
-		writePartitioning(doc, tpath, t.Partitioning)
-	}
-
-	// maintenance
-	if t.Maintenance != nil {
-		writeMaintenance(doc, tpath, t.Maintenance)
-	}
-
-	// dependencies (preserved in declaration order per spec)
-	for _, dep := range t.Dependencies {
-		_ = doc.NewArrayTable(tpath + ".dependencies")
-		// Find the last array table entry and set values on it.
-		// Since NewArrayTable appends, we use SetCreate on the last entry.
-		idx := countArrayTableEntries(doc, tpath+".dependencies") - 1
-		depPath := tpath + ".dependencies[" + itoa(idx) + "]"
-		if len(dep.Determinant) > 0 {
-			_ = doc.SetCreate(depPath+".determinant", dep.Determinant)
-		}
-		if len(dep.Dependent) > 0 {
-			_ = doc.SetCreate(depPath+".dependent", dep.Dependent)
-		}
-	}
+	return len(order)
 }
 
 // orderColumns returns columns in the order specified by the column order config.
@@ -526,132 +553,54 @@ func buildFKColumnSet(t *parse.RawTable) map[string]bool {
 	return fkSet
 }
 
-// writePartitioning writes [tables.<name>.partitioning] and its sub-entries.
-func writePartitioning(doc *tomledit.DocumentNode, tpath string, part *parse.RawPartitioning) {
-	ppath := tpath + ".partitioning"
-	_ = doc.NewTable(ppath)
-	if part.Strategy != "" {
-		_ = doc.SetCreate(ppath+".strategy", part.Strategy)
-	}
-	if part.Column != "" {
-		_ = doc.SetCreate(ppath+".column", part.Column)
-	}
-	for _, sub := range part.Partitions {
-		_ = doc.NewArrayTable(ppath + ".partitions")
-		idx := countArrayTableEntries(doc, ppath+".partitions") - 1
-		subPath := ppath + ".partitions[" + itoa(idx) + "]"
-		if sub.Strategy != "" {
-			_ = doc.SetCreate(subPath+".strategy", sub.Strategy)
-		}
-		if sub.Column != "" {
-			_ = doc.SetCreate(subPath+".column", sub.Column)
-		}
-	}
-}
-
-// writeMaintenance writes [tables.<name>.maintenance].
-func writeMaintenance(doc *tomledit.DocumentNode, tpath string, m *parse.RawMaintenance) {
-	mpath := tpath + ".maintenance"
-	_ = doc.NewTable(mpath)
-	if m.Premake != nil {
-		_ = doc.SetCreate(mpath+".premake", *m.Premake)
-	}
-	if m.Retention != nil {
-		_ = doc.SetCreate(mpath+".retention", *m.Retention)
-	}
-	if m.RetentionKeepTable != nil {
-		_ = doc.SetCreate(mpath+".retention_keep_table", *m.RetentionKeepTable)
-	}
-}
-
-// writeMapSorted writes map entries sorted by key name.
-func writeMapSorted[V any](doc *tomledit.DocumentNode, tpath, section string, m map[string]V, writeFn func(name string, v V)) {
-	if len(m) == 0 {
+// reorderTableKVs reorders key-value pairs within a table header node to
+// ensure "comment" comes before "pk".
+func reorderTableKVs(node tomledit.Node) {
+	tbl, ok := node.(*tomledit.TableNode)
+	if !ok {
 		return
 	}
-	names := make([]string, 0, len(m))
-	for name := range m {
-		names = append(names, name)
+
+	// Separate KVs by key name for canonical ordering.
+	var commentKV, pkKV []tomledit.Node
+	var otherKVs []tomledit.Node
+
+	for _, child := range tbl.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			otherKVs = append(otherKVs, child)
+			continue
+		}
+		key := ""
+		if len(kv.Key.Parts) > 0 {
+			key = kv.Key.Parts[0]
+		}
+		switch key {
+		case "comment":
+			commentKV = append(commentKV, child)
+		case "pk":
+			pkKV = append(pkKV, child)
+		default:
+			otherKVs = append(otherKVs, child)
+		}
 	}
-	sort.Strings(names)
-	for _, name := range names {
-		writeFn(name, m[name])
-	}
+
+	// Reassemble: comment, pk, then everything else.
+	var newChildren []tomledit.Node
+	newChildren = append(newChildren, commentKV...)
+	newChildren = append(newChildren, pkKV...)
+	newChildren = append(newChildren, otherKVs...)
+	tbl.Children = newChildren
 }
 
-// countArrayTableEntries counts how many [[path]] entries exist in the document.
-func countArrayTableEntries(doc *tomledit.DocumentNode, path string) int {
-	// Parse the path to get the key path segments.
-	keyPath := splitDotPath(path)
-	count := 0
-	for _, child := range doc.Children {
-		if at, ok := child.(*tomledit.ArrayTableNode); ok {
-			if pathsEqual(at.KeyPath, keyPath) {
-				count++
+// reorderDocumentPostProcess reorders KVs within table header nodes after
+// the main section reordering.
+func reorderDocumentPostProcess(children []tomledit.Node) {
+	for _, child := range children {
+		if tbl, ok := child.(*tomledit.TableNode); ok {
+			if len(tbl.KeyPath) == 2 && tbl.KeyPath[0] == "tables" {
+				reorderTableKVs(tbl)
 			}
 		}
 	}
-	return count
-}
-
-// splitDotPath splits a dot-separated path into parts.
-func splitDotPath(path string) []string {
-	var parts []string
-	current := ""
-	for _, r := range path {
-		if r == '.' {
-			if current != "" {
-				parts = append(parts, current)
-			}
-			current = ""
-		} else if r == '[' {
-			// Stop at array index syntax.
-			if current != "" {
-				parts = append(parts, current)
-			}
-			break
-		} else {
-			current += string(r)
-		}
-	}
-	if current != "" {
-		parts = append(parts, current)
-	}
-	return parts
-}
-
-// pathsEqual returns true if two string slices are identical.
-func pathsEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// itoa converts an int to a string without importing strconv.
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	pos := len(buf)
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	for n > 0 {
-		pos--
-		buf[pos] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		pos--
-		buf[pos] = '-'
-	}
-	return string(buf[pos:])
 }
