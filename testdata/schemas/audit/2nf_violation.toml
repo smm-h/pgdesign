@@ -1,0 +1,26 @@
+[meta]
+version = 1
+schema = "test"
+
+# A table with a composite PK and a partial dependency: student_name depends
+# only on student_id, not the full PK (student_id, course_id).
+
+[tables.enrollments]
+comment = "Student course enrollments with a 2NF violation"
+pk = ["student_id", "course_id"]
+
+[tables.enrollments.columns.student_id]
+type = "ref"
+
+[tables.enrollments.columns.course_id]
+type = "ref"
+
+[tables.enrollments.columns.student_name]
+type = "short_text"
+
+[tables.enrollments.columns.grade]
+type = "short_text"
+
+[[tables.enrollments.dependencies]]
+determinant = ["student_id"]
+dependent = ["student_name"]

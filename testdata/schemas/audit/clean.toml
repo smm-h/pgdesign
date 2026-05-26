@@ -1,0 +1,19 @@
+[meta]
+version = 1
+schema = "test"
+
+[tables.orders]
+comment = "Orders with no NF violations"
+
+[tables.orders.columns.id]
+type = "id"
+
+[tables.orders.columns.total]
+type = "counter"
+
+[tables.orders.columns.created_at]
+type = "timestamp"
+
+[[tables.orders.dependencies]]
+determinant = ["id"]
+dependent = ["total", "created_at"]
