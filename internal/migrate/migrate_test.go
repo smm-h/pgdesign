@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/model"
 )
@@ -1071,4 +1072,176 @@ down = { op = "drop_table", table = "public.pgdesign_test_table2" }
 	// Clean up.
 	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_test_table2")
 	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_migrations")
+}
+
+func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
+	// set_not_null on a table with >1M rows should escalate from Caution to
+	// Dangerous (Error severity) via applyTableSizeEscalation.
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "players",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+			},
+		},
+	}
+
+	// NullableChanged: [old_not_null, new_not_null].
+	// {false, true} = was nullable, becoming NOT NULL = set_not_null.
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.players",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "name", NullableChanged: &[2]bool{false, true}},
+				},
+			},
+		},
+	}
+
+	stats := TableStats{"players": 2_000_000}
+	_, diags := GenerateMigration(d, desired, "0.7.0", stats, 0)
+
+	hasDangerous := false
+	for _, diag := range diags {
+		if diag.Code == "MIGRATE_RISK" && diag.Severity == diagnostic.Error &&
+			strings.Contains(diag.Message, "set_not_null") {
+			hasDangerous = true
+			break
+		}
+	}
+	if !hasDangerous {
+		t.Error("expected set_not_null on table with >1M rows to escalate to Dangerous (Error)")
+	}
+
+	// drop_not_null (becoming nullable) is Safe and should NOT escalate even
+	// with large tables.
+	d2 := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.players",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "name", NullableChanged: &[2]bool{true, false}},
+				},
+			},
+		},
+	}
+
+	_, diags2 := GenerateMigration(d2, desired, "0.7.1", stats, 0)
+
+	for _, diag := range diags2 {
+		if diag.Code == "MIGRATE_RISK" && diag.Severity == diagnostic.Error &&
+			strings.Contains(diag.Message, "drop_not_null") {
+			t.Error("drop_not_null should be Safe, not escalated to Dangerous")
+		}
+	}
+}
+
+func TestGenerateMigration_E215_AddFKLargeTable(t *testing.T) {
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "scores",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "player_id", PGType: "bigint", NotNull: true},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.scores",
+				FKsAdded: []model.FK{
+					{
+						Name:       "fk_scores_player",
+						Columns:    []string{"player_id"},
+						RefTable:   "players",
+						RefColumns: []string{"id"},
+					},
+				},
+			},
+		},
+	}
+
+	stats := TableStats{"scores": 50_000}
+	_, diags := GenerateMigration(d, desired, "0.8.0", stats, 10_000)
+
+	hasE215 := false
+	for _, diag := range diags {
+		if diag.Code == "E215" {
+			hasE215 = true
+			if !strings.Contains(diag.Message, "50000") {
+				t.Errorf("E215 message should mention row count, got: %s", diag.Message)
+			}
+			if !strings.Contains(diag.Message, "NOT VALID") {
+				t.Errorf("E215 message should mention NOT VALID, got: %s", diag.Message)
+			}
+			break
+		}
+	}
+	if !hasE215 {
+		t.Error("expected E215 diagnostic for add_fk on table with >10000 rows")
+	}
+}
+
+func TestGenerateMigration_NoStats_NoE215_NoEscalation(t *testing.T) {
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "scores",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "player_id", PGType: "bigint", NotNull: true},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.scores",
+				FKsAdded: []model.FK{
+					{
+						Name:       "fk_scores_player",
+						Columns:    []string{"player_id"},
+						RefTable:   "players",
+						RefColumns: []string{"id"},
+					},
+				},
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "player_id", NullableChanged: &[2]bool{true, true}},
+				},
+			},
+		},
+	}
+
+	// nil stats: no E215, no escalation.
+	_, diags := GenerateMigration(d, desired, "0.9.0", nil, 0)
+
+	for _, diag := range diags {
+		if diag.Code == "E215" {
+			t.Error("unexpected E215 when stats are nil")
+		}
+		// set_not_null is Caution but should NOT escalate without EstimatedRows.
+		if diag.Code == "MIGRATE_RISK" && diag.Severity == diagnostic.Error &&
+			strings.Contains(diag.Message, "set_not_null") {
+			t.Error("unexpected escalation to Error when stats are nil")
+		}
+	}
 }

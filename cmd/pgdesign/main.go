@@ -821,7 +821,30 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 		return 0
 	}
 
-	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0")
+	// Query table stats for row estimates.
+	var tableStats migrate.TableStats
+	statsConn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cannot connect for table stats: %v\n", err)
+	} else {
+		for _, sn := range schemaNames {
+			stats, err := migrate.QueryTableStats(ctx, statsConn, sn)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: cannot query table stats for %s: %v\n", sn, err)
+			} else {
+				if tableStats == nil {
+					tableStats = stats
+				} else {
+					for k, v := range stats {
+						tableStats[k] = v
+					}
+				}
+			}
+		}
+		statsConn.Close(ctx)
+	}
+
+	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold)
 
 	// Print the plan.
 	fmt.Println("Migration plan:")
@@ -909,7 +932,30 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 		return 0
 	}
 
-	m, migDiags := migrate.GenerateMigration(d, schema, version)
+	// Query table stats for row estimates.
+	var tableStats migrate.TableStats
+	statsConn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cannot connect for table stats: %v\n", err)
+	} else {
+		for _, sn := range schemaNames {
+			stats, err := migrate.QueryTableStats(ctx, statsConn, sn)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: cannot query table stats for %s: %v\n", sn, err)
+			} else {
+				if tableStats == nil {
+					tableStats = stats
+				} else {
+					for k, v := range stats {
+						tableStats[k] = v
+					}
+				}
+			}
+		}
+		statsConn.Close(ctx)
+	}
+
+	m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold)
 
 	if len(migDiags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
