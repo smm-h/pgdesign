@@ -1,6 +1,6 @@
 ---
 title: pgdesign
-description: "Package diagnostic provides shared error/warning types used by all compiler passes."
+description: "pgdesign is a PostgreSQL schema compiler that converts TOML schema definitions into SQL DDL with validation, auditing, and migration support."
 generated: true
 nav_group: "API Reference"
 nav_order: 1
