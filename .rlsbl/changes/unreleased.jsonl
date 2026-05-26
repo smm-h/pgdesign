@@ -1,1 +1,4 @@
-{"commits":["52f956a01c7e03606c3952c642a3c29b026163c0"],"user_facing":true,"description":"**Fix.** Schema-qualify enum types in DDL output \u2014 enum columns now correctly emit  instead of bare .","type":"fix"}
+{"commits":["52f956a01c7e03606c3952c642a3c29b026163c0"],"user_facing":true,"description":"**Fix.** Schema-qualify enum types in DDL output.","type":"fix"}
+{"commits":["3216093c15f4bec952b30fb334ab2ba3b51f0f97"],"user_facing":true,"description":"**New.** Support DESC sort order on index columns.","type":"feature"}
+{"commits":["7e4c269191da860e040eca5e5f095827f0d1dde6","3264a278ea4ba9f0eb34cc9daaff5272d35e9b41"],"user_facing":true,"description":"**New.** RLS policy support \u2014 define row-level security policies in TOML, generate ALTER TABLE ENABLE RLS and CREATE POLICY DDL.","type":"feature"}
+{"commits":["321cbf3e654f96b75e1b34415fc484dbce538fbf"],"user_facing":true,"description":"**New.** Code generation framework with Python validator backend \u2014 generate async policy check functions from TOML schema definitions.","type":"feature"}
