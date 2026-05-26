@@ -1,0 +1,35 @@
+[meta]
+version = 1
+schema = "test"
+
+[tables.users]
+comment = "User accounts"
+
+[tables.users.columns.id]
+type = "id"
+
+[tables.users.columns.name]
+type = "short_text"
+
+# Indexes before columns, FK table before parent table, pk before comment
+[tables.tasks]
+comment = "Tasks assigned to users"
+pk = ["id"]
+
+[tables.tasks.columns.id]
+type = "id"
+
+[tables.tasks.columns.user_id]
+type = "ref"
+
+[tables.tasks.columns.title]
+type = "short_text"
+
+[tables.tasks.fks.fk_tasks_user]
+columns = ["user_id"]
+ref_table = "users"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.tasks.indexes.idx_tasks_user]
+columns = ["user_id"]
