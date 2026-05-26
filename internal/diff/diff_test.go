@@ -1096,3 +1096,207 @@ func TestEnumFormatTerminalReordered(t *testing.T) {
 		t.Errorf("expected 'values reordered (dangerous)' in output, got:\n%s", out)
 	}
 }
+
+func TestPartitioningGained(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
+				Strategy: "range",
+				Column:   "created_at",
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	td := d.TablesChanged[0]
+	if td.PartitioningChanged == nil {
+		t.Fatal("expected PartitioningChanged to be set")
+	}
+	pd := td.PartitioningChanged
+	if pd.StrategyChanged == nil {
+		t.Fatal("expected StrategyChanged to be set")
+	}
+	if pd.StrategyChanged[0] != "" || pd.StrategyChanged[1] != "range" {
+		t.Errorf("expected ['', 'range'], got [%q, %q]", pd.StrategyChanged[0], pd.StrategyChanged[1])
+	}
+	if pd.KeyChanged == nil {
+		t.Fatal("expected KeyChanged to be set")
+	}
+	if pd.KeyChanged[0] != "" || pd.KeyChanged[1] != "created_at" {
+		t.Errorf("expected ['', 'created_at'], got [%q, %q]", pd.KeyChanged[0], pd.KeyChanged[1])
+	}
+}
+
+func TestPartitioningLost(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public"},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
+				Strategy: "range",
+				Column:   "created_at",
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	pd := d.TablesChanged[0].PartitioningChanged
+	if pd == nil {
+		t.Fatal("expected PartitioningChanged to be set")
+	}
+	if pd.StrategyChanged == nil {
+		t.Fatal("expected StrategyChanged to be set")
+	}
+	if pd.StrategyChanged[0] != "range" || pd.StrategyChanged[1] != "" {
+		t.Errorf("expected ['range', ''], got [%q, %q]", pd.StrategyChanged[0], pd.StrategyChanged[1])
+	}
+}
+
+func TestPartitioningStrategyChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
+				Strategy: "hash",
+				Column:   "id",
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
+				Strategy: "range",
+				Column:   "id",
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	pd := d.TablesChanged[0].PartitioningChanged
+	if pd == nil {
+		t.Fatal("expected PartitioningChanged to be set")
+	}
+	if pd.StrategyChanged == nil {
+		t.Fatal("expected StrategyChanged to be set")
+	}
+	if pd.StrategyChanged[0] != "range" || pd.StrategyChanged[1] != "hash" {
+		t.Errorf("expected ['range', 'hash'], got [%q, %q]", pd.StrategyChanged[0], pd.StrategyChanged[1])
+	}
+	// Key unchanged, so KeyChanged should be nil.
+	if pd.KeyChanged != nil {
+		t.Errorf("expected KeyChanged to be nil, got %v", pd.KeyChanged)
+	}
+}
+
+func TestPartitionChildrenAdded(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
+				Strategy: "range",
+				Column:   "created_at",
+				Children: []model.PartitionSpec{
+					{Strategy: "events_2024", Column: "2024-01-01"},
+					{Strategy: "events_2025", Column: "2025-01-01"},
+				},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
+				Strategy: "range",
+				Column:   "created_at",
+				Children: []model.PartitionSpec{
+					{Strategy: "events_2024", Column: "2024-01-01"},
+				},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	pd := d.TablesChanged[0].PartitioningChanged
+	if pd == nil {
+		t.Fatal("expected PartitioningChanged to be set")
+	}
+	// Strategy and key unchanged.
+	if pd.StrategyChanged != nil {
+		t.Errorf("expected StrategyChanged to be nil, got %v", pd.StrategyChanged)
+	}
+	if pd.KeyChanged != nil {
+		t.Errorf("expected KeyChanged to be nil, got %v", pd.KeyChanged)
+	}
+	if len(pd.ChildrenAdded) != 1 || pd.ChildrenAdded[0] != "events_2025:2025-01-01" {
+		t.Errorf("expected ['events_2025:2025-01-01'] added, got: %v", pd.ChildrenAdded)
+	}
+	if len(pd.ChildrenRemoved) != 0 {
+		t.Errorf("expected no children removed, got: %v", pd.ChildrenRemoved)
+	}
+}
+
+func TestPartitioningUnchanged(t *testing.T) {
+	spec := &model.PartitionSpec{
+		Strategy: "range",
+		Column:   "created_at",
+		Children: []model.PartitionSpec{
+			{Strategy: "events_2024", Column: "2024-01-01"},
+		},
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Partitioning: spec},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Partitioning: spec},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for identical partitioning, got: %s", d.Summary())
+	}
+}
+
+func TestPartitioningFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "events",
+				PartitioningChanged: &PartitionDiff{
+					StrategyChanged: &[2]string{"range", "hash"},
+					KeyChanged:      &[2]string{"created_at", "id"},
+					ChildrenAdded:   []string{"events_new"},
+					ChildrenRemoved: []string{"events_old"},
+				},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, `partitioning: "range"`) {
+		t.Errorf("expected strategy change in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `partition key: "created_at"`) {
+		t.Errorf("expected key change in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "+ partition: events_new") {
+		t.Errorf("expected child added in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "- partition: events_old") {
+		t.Errorf("expected child removed in output, got:\n%s", out)
+	}
+}
