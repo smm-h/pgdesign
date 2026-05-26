@@ -352,7 +352,7 @@ func classifyColumnChange(cc *ColumnChange, desired *model.Column) risk.Classifi
 	highest := risk.Classification{RiskLevel: risk.Safe}
 
 	if cc.TypeChanged != nil {
-		widening := isWidening(cc.TypeChanged[0], cc.TypeChanged[1])
+		widening := IsWidening(cc.TypeChanged[0], cc.TypeChanged[1])
 		c := risk.Classify(risk.OpAlterColumnType, risk.OpContext{
 			IsWidening: widening,
 		})
@@ -392,8 +392,8 @@ func classifyColumnChange(cc *ColumnChange, desired *model.Column) risk.Classifi
 	return highest
 }
 
-// isWidening returns true if oldType -> newType is a safe widening conversion.
-func isWidening(oldType, newType string) bool {
+// IsWidening returns true if oldType -> newType is a safe widening conversion.
+func IsWidening(oldType, newType string) bool {
 	old := strings.ToLower(strings.TrimSpace(oldType))
 	new_ := strings.ToLower(strings.TrimSpace(newType))
 

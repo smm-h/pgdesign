@@ -37,7 +37,7 @@ func TestGenerateMigration_AddTable(t *testing.T) {
 		TablesAdded: []string{"game.players"},
 	}
 
-	m, diags := GenerateMigration(d, desired, "0.1.0", nil, 0)
+	m, diags := GenerateMigration(d, desired, "0.1.0", nil, 0, 0)
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -100,7 +100,7 @@ func TestGenerateMigration_AddColumn(t *testing.T) {
 		},
 	}
 
-	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0)
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -154,7 +154,7 @@ func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
 		},
 	}
 
-	_, diags := GenerateMigration(d, desired, "0.2.0", nil, 0)
+	_, diags := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
 
 	// PG11 with constant default: should be safe, no risk diagnostics.
 	for _, diag := range diags {
@@ -193,7 +193,7 @@ func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
 		},
 	}
 
-	_, diags := GenerateMigration(d, desired, "0.2.0", nil, 0)
+	_, diags := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
 
 	// PG9 with constant default: should be dangerous, expect risk diagnostic.
 	hasDangerous := false
@@ -214,7 +214,7 @@ func TestGenerateMigration_DropTable(t *testing.T) {
 		TablesRemoved: []string{"game.old_table"},
 	}
 
-	m, diags := GenerateMigration(d, desired, "0.3.0", nil, 0)
+	m, diags := GenerateMigration(d, desired, "0.3.0", nil, 0, 0)
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -281,7 +281,7 @@ func TestGenerateMigration_PartitionChildAdded(t *testing.T) {
 		},
 	}
 
-	m, diags := GenerateMigration(d, desired, "0.4.0", nil, 0)
+	m, diags := GenerateMigration(d, desired, "0.4.0", nil, 0, 0)
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -352,7 +352,7 @@ func TestGenerateMigration_PartitionChildRemoved(t *testing.T) {
 		},
 	}
 
-	m, diags := GenerateMigration(d, desired, "0.5.0", nil, 0)
+	m, diags := GenerateMigration(d, desired, "0.5.0", nil, 0, 0)
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -411,7 +411,7 @@ func TestGenerateMigration_PartitionStrategyChanged(t *testing.T) {
 		},
 	}
 
-	_, diags := GenerateMigration(d, desired, "0.6.0", nil, 0)
+	_, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0)
 
 	// Should have a warning about strategy change.
 	hasWarning := false
@@ -1106,7 +1106,7 @@ func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
 	}
 
 	stats := TableStats{"players": 2_000_000}
-	_, diags := GenerateMigration(d, desired, "0.7.0", stats, 0)
+	_, diags := GenerateMigration(d, desired, "0.7.0", stats, 0, 0)
 
 	hasDangerous := false
 	for _, diag := range diags {
@@ -1133,7 +1133,7 @@ func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
 		},
 	}
 
-	_, diags2 := GenerateMigration(d2, desired, "0.7.1", stats, 0)
+	_, diags2 := GenerateMigration(d2, desired, "0.7.1", stats, 0, 0)
 
 	for _, diag := range diags2 {
 		if diag.Code == "MIGRATE_RISK" && diag.Severity == diagnostic.Error &&
@@ -1176,7 +1176,7 @@ func TestGenerateMigration_E215_AddFKLargeTable(t *testing.T) {
 	}
 
 	stats := TableStats{"scores": 50_000}
-	_, diags := GenerateMigration(d, desired, "0.8.0", stats, 10_000)
+	_, diags := GenerateMigration(d, desired, "0.8.0", stats, 10_000, 0)
 
 	hasE215 := false
 	for _, diag := range diags {
@@ -1232,7 +1232,7 @@ func TestGenerateMigration_NoStats_NoE215_NoEscalation(t *testing.T) {
 	}
 
 	// nil stats: no E215, no escalation.
-	_, diags := GenerateMigration(d, desired, "0.9.0", nil, 0)
+	_, diags := GenerateMigration(d, desired, "0.9.0", nil, 0, 0)
 
 	for _, diag := range diags {
 		if diag.Code == "E215" {
@@ -1243,5 +1243,169 @@ func TestGenerateMigration_NoStats_NoE215_NoEscalation(t *testing.T) {
 			strings.Contains(diag.Message, "set_not_null") {
 			t.Error("unexpected escalation to Error when stats are nil")
 		}
+	}
+}
+
+func TestGenerateMigration_ExpandContract_SetNotNull_LargeTable(t *testing.T) {
+	// set_not_null on a table with >10M rows should produce a DML backfill op
+	// followed by the set_not_null DDL op.
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "players",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true, Default: "'unknown'"},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.players",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "name", NullableChanged: &[2]bool{false, true}},
+				},
+			},
+		},
+	}
+
+	stats := TableStats{"players": 15_000_000}
+	m, _ := GenerateMigration(d, desired, "1.0.0", stats, 0, 0)
+
+	// Should have a backfill DML op.
+	if len(m.DMLOps) != 1 {
+		t.Fatalf("DML ops count = %d, want 1", len(m.DMLOps))
+	}
+	if m.DMLOps[0].Op != "backfill" {
+		t.Errorf("DML[0].Op = %q, want backfill", m.DMLOps[0].Op)
+	}
+	if !strings.Contains(m.DMLOps[0].SQL, "COALESCE") {
+		t.Errorf("backfill SQL should use COALESCE, got: %s", m.DMLOps[0].SQL)
+	}
+	if !strings.Contains(m.DMLOps[0].SQL, "IS NULL") {
+		t.Errorf("backfill SQL should contain IS NULL, got: %s", m.DMLOps[0].SQL)
+	}
+	if m.DMLOps[0].Down == nil || !m.DMLOps[0].Down.Irreversible {
+		t.Error("backfill DML should have irreversible down")
+	}
+
+	// Should still have the set_not_null DDL op.
+	hasSetNotNull := false
+	for _, op := range m.DDLOps {
+		if op.Op == "set_not_null" && op.Table == "game.players" && op.Column == "name" {
+			hasSetNotNull = true
+			break
+		}
+	}
+	if !hasSetNotNull {
+		t.Error("expected set_not_null DDL op to still be present")
+	}
+}
+
+func TestGenerateMigration_ExpandContract_SetNotNull_SmallTable(t *testing.T) {
+	// set_not_null on a table with <10M rows should NOT produce a DML backfill op.
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "players",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true, Default: "'unknown'"},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.players",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "name", NullableChanged: &[2]bool{false, true}},
+				},
+			},
+		},
+	}
+
+	stats := TableStats{"players": 5_000_000}
+	m, _ := GenerateMigration(d, desired, "1.1.0", stats, 0, 0)
+
+	// Should have NO DML ops.
+	if len(m.DMLOps) != 0 {
+		t.Errorf("DML ops count = %d, want 0 (table has <10M rows)", len(m.DMLOps))
+	}
+
+	// Should still have the set_not_null DDL op.
+	hasSetNotNull := false
+	for _, op := range m.DDLOps {
+		if op.Op == "set_not_null" && op.Column == "name" {
+			hasSetNotNull = true
+			break
+		}
+	}
+	if !hasSetNotNull {
+		t.Error("expected set_not_null DDL op")
+	}
+}
+
+func TestGenerateMigration_ExpandContract_TypeNarrow_LargeTable(t *testing.T) {
+	// Type narrowing (e.g., bigint -> integer) on a large table should emit
+	// an EXPAND_CONTRACT_TYPE_NARROW warning diagnostic.
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "players",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.players",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "id", TypeChanged: &[2]string{"bigint", "integer"}},
+				},
+			},
+		},
+	}
+
+	stats := TableStats{"players": 15_000_000}
+	_, diags := GenerateMigration(d, desired, "1.2.0", stats, 0, 0)
+
+	hasWarning := false
+	for _, diag := range diags {
+		if diag.Code == "EXPAND_CONTRACT_TYPE_NARROW" {
+			hasWarning = true
+			if diag.Severity != diagnostic.Warning {
+				t.Errorf("expected Warning severity, got %v", diag.Severity)
+			}
+			if !strings.Contains(diag.Message, "bigint") || !strings.Contains(diag.Message, "integer") {
+				t.Errorf("warning message should mention old and new types, got: %s", diag.Message)
+			}
+			if !strings.Contains(diag.Message, "expand-contract") {
+				t.Errorf("warning message should mention expand-contract, got: %s", diag.Message)
+			}
+			break
+		}
+	}
+	if !hasWarning {
+		t.Error("expected EXPAND_CONTRACT_TYPE_NARROW diagnostic for type narrowing on large table")
 	}
 }

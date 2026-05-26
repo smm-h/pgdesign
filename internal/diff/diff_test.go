@@ -501,9 +501,9 @@ func TestIsWidening(t *testing.T) {
 		{"integer", "text", false},
 	}
 	for _, tt := range tests {
-		got := isWidening(tt.old, tt.new)
+		got := IsWidening(tt.old, tt.new)
 		if got != tt.want {
-			t.Errorf("isWidening(%q, %q) = %v, want %v", tt.old, tt.new, got, tt.want)
+			t.Errorf("IsWidening(%q, %q) = %v, want %v", tt.old, tt.new, got, tt.want)
 		}
 	}
 }
