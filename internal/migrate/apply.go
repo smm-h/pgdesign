@@ -13,8 +13,9 @@ import (
 )
 
 // Apply discovers pending migrations in migrationsDir, applies them in semver
-// order, and returns the list of applied versions.
-func Apply(ctx context.Context, conn *pgx.Conn, migrationsDir string) ([]string, error) {
+// order, and returns the list of applied versions. lockTimeout sets the
+// PostgreSQL lock_timeout for each migration (e.g. "5s"); empty defaults to "5s".
+func Apply(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTimeout string) ([]string, error) {
 	if err := EnsureMigrationsTable(ctx, conn); err != nil {
 		return nil, err
 	}
@@ -59,7 +60,7 @@ func Apply(ctx context.Context, conn *pgx.Conn, migrationsDir string) ([]string,
 
 	var appliedVersions []string
 	for _, mf := range pending {
-		if err := applyOne(ctx, conn, mf); err != nil {
+		if err := applyOne(ctx, conn, mf, lockTimeout); err != nil {
 			return appliedVersions, fmt.Errorf("migration %s: %w", mf.version, err)
 		}
 		appliedVersions = append(appliedVersions, mf.version)
@@ -115,14 +116,17 @@ func discoverMigrations(dir string) ([]migrationFile, error) {
 
 // applyOne applies a single migration within a transaction, handling
 // non-transactional ops by committing/re-opening transactions as needed.
-func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile) error {
+func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout string) error {
 	m, err := ParseMigrationFile(mf.path)
 	if err != nil {
 		return fmt.Errorf("parse: %w", err)
 	}
 
 	// Set lock_timeout for this session.
-	if _, err := conn.Exec(ctx, "SET lock_timeout = '5s'"); err != nil {
+	if lockTimeout == "" {
+		lockTimeout = "5s"
+	}
+	if _, err := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = '%s'", lockTimeout)); err != nil {
 		return fmt.Errorf("set lock_timeout: %w", err)
 	}
 

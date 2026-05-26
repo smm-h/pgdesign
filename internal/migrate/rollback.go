@@ -9,8 +9,9 @@ import (
 )
 
 // Rollback rolls back the most recently applied migration.
-// Returns the version that was rolled back.
-func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string) (string, error) {
+// Returns the version that was rolled back. lockTimeout sets the PostgreSQL
+// lock_timeout (e.g. "5s"); empty defaults to "5s".
+func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTimeout string) (string, error) {
 	if err := EnsureMigrationsTable(ctx, conn); err != nil {
 		return "", err
 	}
@@ -48,7 +49,10 @@ func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string) (string
 	}
 
 	// Set lock_timeout.
-	if _, err := conn.Exec(ctx, "SET lock_timeout = '5s'"); err != nil {
+	if lockTimeout == "" {
+		lockTimeout = "5s"
+	}
+	if _, err := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = '%s'", lockTimeout)); err != nil {
 		return "", fmt.Errorf("set lock_timeout: %w", err)
 	}
 

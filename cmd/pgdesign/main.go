@@ -120,6 +120,9 @@ func handleGenerate(kwargs map[string]interface{}) int {
 		return exitCode
 	}
 
+	// Load config for PGVersion fallback.
+	cfg := loadProjectConfig(paths[0])
+
 	if kwargs["strict_nf"].(bool) {
 		diags := audit.Audit(schema)
 		diags = promoteNFViolations(diags)
@@ -132,11 +135,17 @@ func handleGenerate(kwargs map[string]interface{}) int {
 		}
 	}
 
+	// Use config PGVersion as fallback when schema doesn't specify one.
+	pgVersion := schema.PGVersion
+	if pgVersion == 0 && cfg.Database.PGVersion != 0 {
+		pgVersion = cfg.Database.PGVersion
+	}
+
 	opts := generate.Options{
 		Idempotent:      kwargs["idempotent"].(bool),
 		IncludeComments: !kwargs["no_comments"].(bool),
 		Format:          kwargs["format"].(string),
-		PGVersion:       schema.PGVersion,
+		PGVersion:       pgVersion,
 	}
 
 	out := generate.Generate(schema, opts)
@@ -250,6 +259,21 @@ func loadProjectConfig(path string) *config.Config {
 		return &config.Config{}
 	}
 	return cfg
+}
+
+// configSchemaNames derives PostgreSQL schema names from config.Project.Schemas
+// by stripping the .toml extension from each file basename. Returns nil if no
+// schemas are configured.
+func configSchemaNames(cfg *config.Config) []string {
+	if len(cfg.Project.Schemas) == 0 {
+		return nil
+	}
+	names := make([]string, len(cfg.Project.Schemas))
+	for i, s := range cfg.Project.Schemas {
+		base := filepath.Base(s)
+		names[i] = strings.TrimSuffix(base, ".toml")
+	}
+	return names
 }
 
 // extractPaths extracts the path(s) from kwargs. Handles the variadic "path"
@@ -446,9 +470,22 @@ func parseAndBuild(paths []string) (*model.Schema, int) {
 func handleFmt(kwargs map[string]interface{}) int {
 	target := kwargs["path"].(string)
 
+	// Load config for format defaults.
+	cfg := loadProjectConfig(target)
+
+	// CLI flags override config; config overrides strictcli defaults.
+	tableOrder := kwargs["table_order"].(string)
+	if tableOrder == "dependency" && cfg.Format.TableOrder != "" {
+		tableOrder = cfg.Format.TableOrder
+	}
+	columnOrder := kwargs["column_order"].(string)
+	if columnOrder == "pk_fk_alpha" && cfg.Format.ColumnOrder != "" {
+		columnOrder = cfg.Format.ColumnOrder
+	}
+
 	fmtConfig := &format.Config{
-		TableOrder:  kwargs["table_order"].(string),
-		ColumnOrder: kwargs["column_order"].(string),
+		TableOrder:  tableOrder,
+		ColumnOrder: columnOrder,
 	}
 
 	info, err := os.Stat(target)
@@ -528,6 +565,9 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 		return 1
 	}
 
+	// Load config for default schema names.
+	cfg := loadProjectConfig(".")
+
 	// Collect schema names from repeatable --schema flag.
 	var schemaNames []string
 	if raw, ok := kwargs["schema"].([]interface{}); ok {
@@ -536,6 +576,9 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 				schemaNames = append(schemaNames, s)
 			}
 		}
+	}
+	if len(schemaNames) == 0 {
+		schemaNames = configSchemaNames(cfg)
 	}
 	if len(schemaNames) == 0 {
 		schemaNames = []string{"public"}
@@ -581,6 +624,9 @@ func handleDiff(kwargs map[string]interface{}) int {
 		return exitCode
 	}
 
+	// Load config for default schema names.
+	cfg := loadProjectConfig(paths[0])
+
 	dbURL, _ := kwargs["db"].(string)
 	if dbURL == "" {
 		// No --db: just validate the TOML (parse+build already succeeded).
@@ -590,10 +636,13 @@ func handleDiff(kwargs map[string]interface{}) int {
 		return 0
 	}
 
-	// Introspect the live database.
+	// Introspect the live database. Use schema name from parsed schema first,
+	// then fall back to config-derived schema names, then "public".
 	schemaNames := []string{"public"}
 	if schema.Name != "" && schema.Name != "public" {
 		schemaNames = []string{schema.Name}
+	} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
+		schemaNames = cfgNames
 	}
 
 	actual, diags, err := introspect.Introspect(dbURL, schemaNames)
@@ -629,6 +678,9 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 		return exitCode
 	}
 
+	// Load config for schema name defaults.
+	cfg := loadProjectConfig(paths[0])
+
 	dbURL, _ := kwargs["db"].(string)
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate plan")
@@ -638,6 +690,8 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 	schemaNames := []string{"public"}
 	if schema.Name != "" && schema.Name != "public" {
 		schemaNames = []string{schema.Name}
+	} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
+		schemaNames = cfgNames
 	}
 
 	actual, diags, err := introspect.Introspect(dbURL, schemaNames)
@@ -702,6 +756,9 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 		return exitCode
 	}
 
+	// Load config for migrations dir and schema name defaults.
+	cfg := loadProjectConfig(paths[0])
+
 	dbURL, _ := kwargs["db"].(string)
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate generate")
@@ -715,10 +772,15 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 	}
 
 	dir := kwargs["dir"].(string)
+	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+		dir = cfg.Project.MigrationsDir
+	}
 
 	schemaNames := []string{"public"}
 	if schema.Name != "" && schema.Name != "public" {
 		schemaNames = []string{schema.Name}
+	} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
+		schemaNames = cfgNames
 	}
 
 	actual, diags, err := introspect.Introspect(dbURL, schemaNames)
@@ -774,7 +836,15 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 		return 1
 	}
 
+	// Load config for migrations dir and lock timeout.
+	cfg := loadProjectConfig(".")
+
 	dir := kwargs["dir"].(string)
+	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+		dir = cfg.Project.MigrationsDir
+	}
+
+	lockTimeout := cfg.Migrate.LockTimeout
 
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, dbURL)
@@ -784,7 +854,7 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 	}
 	defer conn.Close(ctx)
 
-	applied, err := migrate.Apply(ctx, conn, dir)
+	applied, err := migrate.Apply(ctx, conn, dir, lockTimeout)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		if len(applied) > 0 {
@@ -816,7 +886,15 @@ func handleMigrateRollback(kwargs map[string]interface{}) int {
 		return 1
 	}
 
+	// Load config for migrations dir and lock timeout.
+	cfg := loadProjectConfig(".")
+
 	dir := kwargs["dir"].(string)
+	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+		dir = cfg.Project.MigrationsDir
+	}
+
+	lockTimeout := cfg.Migrate.LockTimeout
 
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, dbURL)
@@ -826,7 +904,7 @@ func handleMigrateRollback(kwargs map[string]interface{}) int {
 	}
 	defer conn.Close(ctx)
 
-	version, err := migrate.Rollback(ctx, conn, dir)
+	version, err := migrate.Rollback(ctx, conn, dir, lockTimeout)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
@@ -845,7 +923,13 @@ func handleMigrateStatus(kwargs map[string]interface{}) int {
 		return 1
 	}
 
+	// Load config for migrations dir.
+	cfg := loadProjectConfig(".")
+
 	dir := kwargs["dir"].(string)
+	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+		dir = cfg.Project.MigrationsDir
+	}
 
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, dbURL)
@@ -929,6 +1013,9 @@ func handleServe(kwargs map[string]interface{}) int {
 		return 1
 	}
 
+	// Load config for default schema names.
+	cfg := loadProjectConfig(".")
+
 	port := kwargs["port"].(int)
 
 	// Collect schema names from repeatable --schema flag.
@@ -939,6 +1026,9 @@ func handleServe(kwargs map[string]interface{}) int {
 				schemaNames = append(schemaNames, s)
 			}
 		}
+	}
+	if len(schemaNames) == 0 {
+		schemaNames = configSchemaNames(cfg)
 	}
 	if len(schemaNames) == 0 {
 		schemaNames = []string{"public"}

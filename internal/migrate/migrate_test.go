@@ -768,7 +768,7 @@ down = { op = "drop_table", table = "public.pgdesign_test_table" }
 	}
 
 	// Apply.
-	applied, err := Apply(ctx, conn, dir)
+	applied, err := Apply(ctx, conn, dir, "")
 	if err != nil {
 		t.Fatalf("apply: %v", err)
 	}
@@ -789,7 +789,7 @@ down = { op = "drop_table", table = "public.pgdesign_test_table" }
 	}
 
 	// Rollback.
-	rolledBack, err := Rollback(ctx, conn, dir)
+	rolledBack, err := Rollback(ctx, conn, dir, "")
 	if err != nil {
 		t.Fatalf("rollback: %v", err)
 	}
@@ -833,7 +833,7 @@ down = { op = "drop_table", table = "public.pgdesign_test_table2" }
 	}
 
 	// Apply twice.
-	applied1, err := Apply(ctx, conn, dir)
+	applied1, err := Apply(ctx, conn, dir, "")
 	if err != nil {
 		t.Fatalf("apply 1: %v", err)
 	}
@@ -841,7 +841,7 @@ down = { op = "drop_table", table = "public.pgdesign_test_table2" }
 		t.Errorf("apply 1: applied = %v, want [0.1.0]", applied1)
 	}
 
-	applied2, err := Apply(ctx, conn, dir)
+	applied2, err := Apply(ctx, conn, dir, "")
 	if err != nil {
 		t.Fatalf("apply 2: %v", err)
 	}
