@@ -450,6 +450,7 @@ func TestParseIndexDef(t *testing.T) {
 		name      string
 		def       string
 		cols      []string
+		desc      []bool
 		where     string
 		include   []string
 		opclasses map[string]string
@@ -482,6 +483,24 @@ func TestParseIndexDef(t *testing.T) {
 			cols:      []string{"email"},
 			opclasses: map[string]string{"email": "varchar_pattern_ops"},
 		},
+		{
+			name: "one DESC column",
+			def:  `CREATE INDEX idx ON myschema.t USING btree (a, b DESC)`,
+			cols: []string{"a", "b"},
+			desc: []bool{false, true},
+		},
+		{
+			name: "all DESC",
+			def:  `CREATE INDEX idx ON myschema.t USING btree (a DESC, b DESC)`,
+			cols: []string{"a", "b"},
+			desc: []bool{true, true},
+		},
+		{
+			name: "explicit ASC",
+			def:  `CREATE INDEX idx ON myschema.t USING btree (a ASC)`,
+			cols: []string{"a"},
+			// All ASC => desc is nil.
+		},
 	}
 
 	for _, tt := range tests {
@@ -494,6 +513,15 @@ func TestParseIndexDef(t *testing.T) {
 			for i := range tt.cols {
 				if p.columns[i] != tt.cols[i] {
 					t.Errorf("columns[%d] = %q, want %q", i, p.columns[i], tt.cols[i])
+				}
+			}
+
+			if len(p.desc) != len(tt.desc) {
+				t.Fatalf("desc = %v, want %v", p.desc, tt.desc)
+			}
+			for i := range tt.desc {
+				if p.desc[i] != tt.desc[i] {
+					t.Errorf("desc[%d] = %v, want %v", i, p.desc[i], tt.desc[i])
 				}
 			}
 

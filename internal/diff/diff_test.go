@@ -1300,3 +1300,57 @@ func TestPartitioningFormatTerminal(t *testing.T) {
 		t.Errorf("expected child removed in output, got:\n%s", out)
 	}
 }
+
+func TestBoolSliceEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b []bool
+		want bool
+	}{
+		{
+			name: "nil vs nil",
+			a:    nil,
+			b:    nil,
+			want: true,
+		},
+		{
+			name: "nil vs all-false",
+			a:    nil,
+			b:    []bool{false, false},
+			want: true,
+		},
+		{
+			name: "identical with true",
+			a:    []bool{true, false},
+			b:    []bool{true, false},
+			want: true,
+		},
+		{
+			name: "different values",
+			a:    []bool{true},
+			b:    []bool{false},
+			want: false,
+		},
+		{
+			name: "true vs nil",
+			a:    []bool{true},
+			b:    nil,
+			want: false,
+		},
+		{
+			name: "different lengths trailing false",
+			a:    []bool{true},
+			b:    []bool{true, false, false},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := boolSliceEqual(tt.a, tt.b)
+			if got != tt.want {
+				t.Errorf("boolSliceEqual(%v, %v) = %v, want %v", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}
