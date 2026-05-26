@@ -120,6 +120,18 @@ func handleGenerate(kwargs map[string]interface{}) int {
 		return exitCode
 	}
 
+	if kwargs["strict_nf"].(bool) {
+		diags := audit.Audit(schema)
+		diags = promoteNFViolations(diags)
+		if len(diags) > 0 {
+			fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+		}
+		if diagnostic.Diagnostics(diags).HasErrors() {
+			fmt.Fprintln(os.Stderr, "error: --strict-nf: normal form violations found, refusing to generate DDL")
+			return 1
+		}
+	}
+
 	opts := generate.Options{
 		Idempotent:      kwargs["idempotent"].(bool),
 		IncludeComments: !kwargs["no_comments"].(bool),
@@ -211,6 +223,9 @@ func handleAudit(kwargs map[string]interface{}) int {
 	}
 
 	allDiags = append(allDiags, audit.Audit(schema)...)
+	if kwargs["strict_nf"].(bool) {
+		allDiags = promoteNFViolations(allDiags)
+	}
 	if len(allDiags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(allDiags, true))
 	}
@@ -945,6 +960,26 @@ func handleServe(kwargs map[string]interface{}) int {
 		return 1
 	}
 	return 0
+}
+
+// nfViolationCodes are the audit diagnostic codes for normal form violations.
+var nfViolationCodes = map[string]bool{
+	"W100": true, // 1NF
+	"W101": true, // 2NF
+	"W102": true, // 3NF
+}
+
+// promoteNFViolations returns a copy of diags where NF violation warnings
+// (codes W100, W101, W102) are promoted to Error severity.
+func promoteNFViolations(diags []diagnostic.Diagnostic) []diagnostic.Diagnostic {
+	result := make([]diagnostic.Diagnostic, len(diags))
+	copy(result, diags)
+	for i := range result {
+		if result[i].Severity == diagnostic.Warning && nfViolationCodes[result[i].Code] {
+			result[i].Severity = diagnostic.Error
+		}
+	}
+	return result
 }
 
 func notImplemented(_ map[string]interface{}) int {
