@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/smm-h/go-toml-edit v0.1.2
-	github.com/smm-h/strictcli/go v0.5.4
+	github.com/smm-h/strictcli/go v0.6.0
 	golang.org/x/sync v0.17.0
 	oss.terrastruct.com/d2 v0.7.1
 )
