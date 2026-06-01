@@ -1,7 +1,0 @@
-{"commits":["0e982cb7c491f8fe6a739127a67e7b528d7e3d07","fa5fdc9418e10864e74a8dc2a2f26893f2502a3f"],"user_facing":false}
-{"commits":["63485d18b0b4ceb178b4ade9945a38d6d97dd6fc","a3574f4934a6a0e85ccb2c3b11d2eab740ef83d6","d95165d3e6729ac8de7a25eb0745dd7c7d27c291"],"user_facing":false}
-{"commits":["8f7d3dd88428eb160d1d58cce7a65bf5ef7b9195"],"user_facing":false}
-{"commits":["977b2fb58486f68f4c686210568879f4655cb8af"],"user_facing":false}
-{"commits":["d48d00f146a0536b6636e372777559f4e1bd6763"],"user_facing":false}
-{"commits":["db35209a16a47be63d3ecfd9276ff6ac1be966bb"],"user_facing":true,"description":"**New feature.** SQL constants codegen for Python and Zig (`--mode constants`).","type":"feature"}
-{"commits":["51eb690ffed904a5f2233f4f279b6633e239854b"],"user_facing":false}
