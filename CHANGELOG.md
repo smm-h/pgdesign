@@ -2,6 +2,18 @@
 
 # Changelog
 
+## 0.5.0
+
+### Features
+
+- **New feature.** SQL constants codegen for Python and Zig (`--mode constants`).
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.4.0
 
 ### Features
@@ -27,12 +39,6 @@
 - **Fix.** Schema-qualify enum types in DDL output.
 - **Format comment preservation.** `pgdesign fmt` now preserves TOML comments when reordering sections.
 - **Fix.** Schema-qualify pg_partman and pg_cron function names. Expand btree_gin/btree_gist to full opclass lists.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.3.0
 
