@@ -126,7 +126,8 @@ func main() {
 	app.Command("codegen", "Generate application code from schema policies", handleCodegen,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.StringFlag("lang", "Target language", strictcli.Choices("python")),
+			strictcli.StringFlag("lang", "Target language", strictcli.Choices("python", "zig")),
+			strictcli.StringFlag("mode", "Codegen mode", strictcli.Default("validators"), strictcli.Choices("validators", "constants")),
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
 		),
 	)
@@ -1466,13 +1467,30 @@ func handleCodegen(kwargs map[string]interface{}) int {
 	}
 
 	lang := kwargs["lang"].(string)
+	mode := kwargs["mode"].(string)
 
 	var gen codegen.Generator
-	switch lang {
-	case "python":
-		gen = &codegen.PythonGenerator{}
+	switch mode {
+	case "validators":
+		switch lang {
+		case "python":
+			gen = &codegen.PythonGenerator{}
+		default:
+			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python, got %s\n", lang)
+			return 1
+		}
+	case "constants":
+		switch lang {
+		case "python":
+			gen = &codegen.PythonConstantsGenerator{}
+		case "zig":
+			gen = &codegen.ZigConstantsGenerator{}
+		default:
+			fmt.Fprintf(os.Stderr, "error: unsupported language for constants mode: %s\n", lang)
+			return 1
+		}
 	default:
-		fmt.Fprintf(os.Stderr, "error: unsupported language: %s\n", lang)
+		fmt.Fprintf(os.Stderr, "error: unsupported mode: %s\n", mode)
 		return 1
 	}
 
