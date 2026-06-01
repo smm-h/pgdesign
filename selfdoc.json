@@ -1,31 +1,15 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "base_url": "https://pgdesign.smmh.dev",
   "root_files": ["docs/_CLAUDE.md", "docs/_README.md"],
   "language": "go",
-  "source": [
-    "internal/config",
-    "internal/diagnostic",
-    "internal/semtype",
-    "internal/parse",
-    "internal/model",
-    "internal/fd",
-    "internal/format",
-    "internal/validate",
-    "internal/sql",
-    "internal/generate",
-    "internal/audit",
-    "internal/discover",
-    "internal/risk",
-    "internal/extregistry",
-    "internal/introspect",
-    "internal/diff",
-    "internal/migrate",
-    "internal/serve"
-  ],
+  "source": ["internal"],
+  "gen": {
+    "exclude": ["codegen", "test"]
+  },
   "docs": "docs/",
   "output": "docs/_build/",
-  "versions": [{"version": "0.3.0", "indexed": true}],
+  "versions": [{"version": "0.4.0", "indexed": true}],
   "locales": [{"code": "en", "label": "English", "default": true}],
   "deploy": {
     "provider": "cloudflare-pages",

@@ -10,4 +10,21 @@ order: 90
 
 # API Reference
 
-- [pgdesign](pgdesign.html)
+- [audit](audit.html)
+- [config](config.html)
+- [diagnostic](diagnostic.html)
+- [diff](diff.html)
+- [discover](discover.html)
+- [extregistry](extregistry.html)
+- [fd](fd.html)
+- [format](format.html)
+- [generate](generate.html)
+- [introspect](introspect.html)
+- [migrate](migrate.html)
+- [model](model.html)
+- [parse](parse.html)
+- [risk](risk.html)
+- [semtype](semtype.html)
+- [serve](serve.html)
+- [sql](sql.html)
+- [validate](validate.html)
