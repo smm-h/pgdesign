@@ -2,17 +2,23 @@
 
 # Changelog
 
-## 0.5.0
+## 0.6.0
 
 ### Features
 
-- **New feature.** SQL constants codegen for Python and Zig (`--mode constants`).
+- **New feature.** Per-column name constants in codegen output
 
 ## 1.0.0
 
 ### Breaking
 
 - **Renamed from pgspec to pgdesign.**
+
+## 0.5.0
+
+### Features
+
+- **New feature.** SQL constants codegen for Python and Zig (`--mode constants`).
 
 ## 0.4.0
 
