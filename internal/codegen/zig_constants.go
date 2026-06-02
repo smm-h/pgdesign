@@ -42,6 +42,12 @@ func (g *ZigConstantsGenerator) Generate(schema *model.Schema) ([]byte, error) {
 			cols[j] = fmt.Sprintf("%q", col.Name)
 		}
 		buf.WriteString(fmt.Sprintf("pub const %s_columns = [_][]const u8{ %s };\n", lower, strings.Join(cols, ", ")))
+
+		// Per-column constants: pub const session_col_id = "id";
+		for _, col := range tbl.Columns {
+			colLower := toLowerSnake(col.Name)
+			buf.WriteString(fmt.Sprintf("pub const %s_col_%s = %q;\n", lower, colLower, col.Name))
+		}
 	}
 
 	return buf.Bytes(), nil

@@ -85,6 +85,39 @@ func TestPythonConstantsGenerator(t *testing.T) {
 		t.Error("missing CHAT_MESSAGE_COLUMNS constant")
 	}
 
+	// Per-column constants for session.
+	if !strings.Contains(result, `SESSION_COL_ID = "id"`) {
+		t.Error("missing SESSION_COL_ID constant")
+	}
+	if !strings.Contains(result, `SESSION_COL_GAME_ID = "game_id"`) {
+		t.Error("missing SESSION_COL_GAME_ID constant")
+	}
+	if !strings.Contains(result, `SESSION_COL_STATUS = "status"`) {
+		t.Error("missing SESSION_COL_STATUS constant")
+	}
+	if !strings.Contains(result, `SESSION_COL_ROOM_CODE = "room_code"`) {
+		t.Error("missing SESSION_COL_ROOM_CODE constant")
+	}
+
+	// Per-column constants for player.
+	if !strings.Contains(result, `PLAYER_COL_ID = "id"`) {
+		t.Error("missing PLAYER_COL_ID constant")
+	}
+	if !strings.Contains(result, `PLAYER_COL_DISPLAY_NAME = "display_name"`) {
+		t.Error("missing PLAYER_COL_DISPLAY_NAME constant")
+	}
+	if !strings.Contains(result, `PLAYER_COL_CREATED_AT = "created_at"`) {
+		t.Error("missing PLAYER_COL_CREATED_AT constant")
+	}
+
+	// Per-column constants for chat_message.
+	if !strings.Contains(result, `CHAT_MESSAGE_COL_SENDER_ID = "sender_id"`) {
+		t.Error("missing CHAT_MESSAGE_COL_SENDER_ID constant")
+	}
+	if !strings.Contains(result, `CHAT_MESSAGE_COL_BODY = "body"`) {
+		t.Error("missing CHAT_MESSAGE_COL_BODY constant")
+	}
+
 	// All tables covered.
 	tableCount := strings.Count(result, "TABLE_")
 	if tableCount != 3 {
@@ -134,6 +167,39 @@ func TestZigConstantsGenerator(t *testing.T) {
 		t.Error("missing chat_message_columns constant")
 	}
 
+	// Per-column constants for session.
+	if !strings.Contains(result, `pub const session_col_id = "id";`) {
+		t.Error("missing session_col_id constant")
+	}
+	if !strings.Contains(result, `pub const session_col_game_id = "game_id";`) {
+		t.Error("missing session_col_game_id constant")
+	}
+	if !strings.Contains(result, `pub const session_col_status = "status";`) {
+		t.Error("missing session_col_status constant")
+	}
+	if !strings.Contains(result, `pub const session_col_room_code = "room_code";`) {
+		t.Error("missing session_col_room_code constant")
+	}
+
+	// Per-column constants for player.
+	if !strings.Contains(result, `pub const player_col_id = "id";`) {
+		t.Error("missing player_col_id constant")
+	}
+	if !strings.Contains(result, `pub const player_col_display_name = "display_name";`) {
+		t.Error("missing player_col_display_name constant")
+	}
+	if !strings.Contains(result, `pub const player_col_created_at = "created_at";`) {
+		t.Error("missing player_col_created_at constant")
+	}
+
+	// Per-column constants for chat_message.
+	if !strings.Contains(result, `pub const chat_message_col_sender_id = "sender_id";`) {
+		t.Error("missing chat_message_col_sender_id constant")
+	}
+	if !strings.Contains(result, `pub const chat_message_col_body = "body";`) {
+		t.Error("missing chat_message_col_body constant")
+	}
+
 	// All tables covered.
 	tableCount := strings.Count(result, "pub const table_")
 	if tableCount != 3 {
@@ -165,6 +231,10 @@ func TestPythonConstantsGenerator_NoSchema(t *testing.T) {
 	if !strings.Contains(result, `TABLE_ITEMS = "items"`) {
 		t.Error("missing TABLE_ITEMS constant without schema prefix")
 	}
+	// Per-column constant present.
+	if !strings.Contains(result, `ITEMS_COL_ID = "id"`) {
+		t.Error("missing ITEMS_COL_ID constant")
+	}
 	// No Schema: line in header.
 	if strings.Contains(result, "# Schema:") {
 		t.Error("should not have Schema header when schema name is empty")
@@ -193,6 +263,10 @@ func TestZigConstantsGenerator_NoSchema(t *testing.T) {
 
 	if !strings.Contains(result, `pub const table_items = "items";`) {
 		t.Error("missing table_items constant without schema prefix")
+	}
+	// Per-column constant present.
+	if !strings.Contains(result, `pub const items_col_id = "id";`) {
+		t.Error("missing items_col_id constant")
 	}
 	if strings.Contains(result, "// Schema:") {
 		t.Error("should not have Schema header when schema name is empty")

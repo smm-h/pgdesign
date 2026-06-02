@@ -42,6 +42,12 @@ func (g *PythonConstantsGenerator) Generate(schema *model.Schema) ([]byte, error
 			cols[j] = fmt.Sprintf("%q", col.Name)
 		}
 		buf.WriteString(fmt.Sprintf("%s_COLUMNS = [%s]\n", upper, strings.Join(cols, ", ")))
+
+		// Per-column constants: SESSION_COL_ID = "id", etc.
+		for _, col := range tbl.Columns {
+			colUpper := toUpperSnake(col.Name)
+			buf.WriteString(fmt.Sprintf("%s_COL_%s = %q\n", upper, colUpper, col.Name))
+		}
 	}
 
 	return buf.Bytes(), nil
