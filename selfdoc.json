@@ -5,9 +5,8 @@
     "docs/_CLAUDE.md",
     "docs/_README.md"
   ],
-  "language": "go",
   "source": [
-    "internal"
+    {"path": "internal", "language": "go"}
   ],
   "gen": {
     "exclude": [
