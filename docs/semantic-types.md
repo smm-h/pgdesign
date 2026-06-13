@@ -91,6 +91,25 @@ default = "medium"
 
 Enum types are NOT NULL by default. Override with `not_null = false`.
 
+### Array types
+
+Any column or custom type can be made into an array by setting `array = true`. The base type stays clean (e.g., `text`), and pgdesign appends `[]` in the generated DDL.
+
+```toml
+[tables.posts.columns.tags]
+type = "text"
+array = true
+# Result: text[] NOT NULL
+
+[tables.events.columns.attendees]
+type = "ref"
+array = true
+default = "{}"
+# Result: uuid[] NOT NULL DEFAULT '{}'
+```
+
+Array defaults use raw values: `default = "{}"` produces `DEFAULT '{}'` in the generated DDL.
+
 ## Type composition rules
 
 When a column uses a semantic type, the type provides base values and the column can override them.
@@ -143,7 +162,8 @@ default = "pending"
 | E106 | Unknown base type (not in allowlist) |
 | E107 | Base type references another user type (circular reference) |
 | E108 | Check expression missing VALUE placeholder |
-| E109 | Default value contains embedded SQL quotes |
+| E109 | Enum default value not in declared values |
+| E110 | Default value contains embedded SQL quotes |
 
 ## Default values
 
@@ -166,3 +186,13 @@ default_expr = "'{}'::jsonb"
 ```
 
 For example, given an enum with `values = ["created", "running", "done"]`, set the default as `default = "created"` -- the generated DDL will produce `DEFAULT 'created'` with proper quoting.
+
+For array columns, use raw array literal syntax for defaults:
+
+```toml
+[tables.posts.columns.tags]
+type = "text"
+array = true
+default = "{}"
+# Result: text[] NOT NULL DEFAULT '{}'
+```
