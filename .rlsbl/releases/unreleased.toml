@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "minor"
-# Short description of this release (required)
-description = "Array types, warning suppression, append-only tables, expression-driven codegen, JSONB shape validation, and serve API improvements. Breaking: enum defaults now use raw values."
-# Optional context explaining why these changes were made
-context = ""
-include = ["go", "npm", "pypi"]
-exclude = []
