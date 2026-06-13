@@ -994,6 +994,27 @@ func TestLiteralValue_EnumDefault_Correct(t *testing.T) {
 	}
 }
 
+func TestCreateDenyMutationFunction(t *testing.T) {
+	got := CreateDenyMutationFunction("app")
+	if !strings.Contains(got, "CREATE OR REPLACE FUNCTION app.pgdesign_deny_mutation()") {
+		t.Errorf("expected function creation, got:\n%s", got)
+	}
+	if !strings.Contains(got, "RAISE EXCEPTION") {
+		t.Errorf("expected RAISE EXCEPTION, got:\n%s", got)
+	}
+	if !strings.Contains(got, "LANGUAGE plpgsql") {
+		t.Errorf("expected plpgsql, got:\n%s", got)
+	}
+}
+
+func TestCreateAppendOnlyTrigger(t *testing.T) {
+	got := CreateAppendOnlyTrigger("app", "events")
+	want := "CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON app.events FOR EACH ROW EXECUTE FUNCTION app.pgdesign_deny_mutation();"
+	if got != want {
+		t.Errorf("CreateAppendOnlyTrigger = %q, want %q", got, want)
+	}
+}
+
 func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
 	// Wrong pattern: if someone writes default = "'created'" in TOML,
 	// the value reaching LiteralValue is "'created'" (with embedded single quotes).

@@ -545,3 +545,25 @@ func CreatePolicy(schemaName, tableName string, p model.Policy) string {
 	sb.WriteString(";")
 	return sb.String()
 }
+
+// CreateDenyMutationFunction generates a CREATE OR REPLACE FUNCTION statement
+// for the shared pgdesign_deny_mutation trigger function. This function raises
+// an exception when UPDATE or DELETE is attempted on an append-only table.
+func CreateDenyMutationFunction(schemaName string) string {
+	qualified := QualifiedName(schemaName, "pgdesign_deny_mutation")
+	return fmt.Sprintf(`CREATE OR REPLACE FUNCTION %s() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'table %% is append-only: UPDATE and DELETE are not allowed', TG_TABLE_NAME;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;`, qualified)
+}
+
+// CreateAppendOnlyTrigger generates a CREATE TRIGGER statement that fires
+// BEFORE UPDATE OR DELETE to enforce append-only behavior on a table.
+func CreateAppendOnlyTrigger(schemaName, tableName string) string {
+	qualifiedTable := QualifiedName(schemaName, tableName)
+	qualifiedFunc := QualifiedName(schemaName, "pgdesign_deny_mutation")
+	return fmt.Sprintf("CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
+		qualifiedTable, qualifiedFunc)
+}

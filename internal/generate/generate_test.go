@@ -1041,6 +1041,52 @@ func TestRLSPolicyAllOperation(t *testing.T) {
 	}
 }
 
+func TestAppendOnlyTrigger(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "payload", PGType: "jsonb", NotNull: true},
+				},
+				PK:         []string{"id"},
+				AppendOnly: true,
+			},
+			{
+				Name:   "users",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	// Shared function should appear once.
+	if !strings.Contains(out, "CREATE OR REPLACE FUNCTION app.pgdesign_deny_mutation()") {
+		t.Errorf("expected deny_mutation function, got:\n%s", out)
+	}
+
+	// Trigger on events table.
+	if !strings.Contains(out, "CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON app.events") {
+		t.Errorf("expected trigger on events, got:\n%s", out)
+	}
+
+	// No trigger on users table.
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "TRIGGER") && strings.Contains(line, "app.users") {
+			t.Errorf("unexpected trigger on users table")
+		}
+	}
+}
+
 func TestGoldenFile(t *testing.T) {
 	inputPath := filepath.Join("testdata", "simple_input.toml")
 

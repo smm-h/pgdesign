@@ -193,6 +193,38 @@ func generateSQL(schema *model.Schema, opts Options) string {
 		sections = append(sections, strings.Join(idxStmts, "\n"))
 	}
 
+	// 9b. Append-only triggers (shared function + per-table triggers)
+	{
+		// Collect schemas that have append-only tables.
+		appendOnlySchemas := make(map[string]bool)
+		for i := range tables {
+			if tables[i].AppendOnly {
+				appendOnlySchemas[tables[i].Schema] = true
+			}
+		}
+		if len(appendOnlySchemas) > 0 {
+			var triggerStmts []string
+			// Emit shared function once per schema.
+			// Sort schema names for deterministic output.
+			var schemaNames []string
+			for s := range appendOnlySchemas {
+				schemaNames = append(schemaNames, s)
+			}
+			sort.Strings(schemaNames)
+			for _, s := range schemaNames {
+				triggerStmts = append(triggerStmts, sql.CreateDenyMutationFunction(s))
+			}
+			// Emit per-table triggers.
+			for i := range tables {
+				t := &tables[i]
+				if t.AppendOnly {
+					triggerStmts = append(triggerStmts, sql.CreateAppendOnlyTrigger(t.Schema, t.Name))
+				}
+			}
+			sections = append(sections, strings.Join(triggerStmts, "\n"))
+		}
+	}
+
 	// 10. COMMENT ON TABLE + COMMENT ON COLUMN
 	if opts.IncludeComments {
 		var commentStmts []string
