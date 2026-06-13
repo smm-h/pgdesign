@@ -200,7 +200,7 @@ func handleValidate(kwargs map[string]interface{}) int {
 		ExtRegistry:   extReg,
 	}
 
-	diags := validate.Validate(schema, valCfg)
+	diags, _ := validate.Validate(schema, valCfg)
 	if len(diags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
 	}

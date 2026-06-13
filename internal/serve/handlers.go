@@ -297,7 +297,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 		ExtRegistry:   extregistry.NewBuiltinRegistry(),
 	}
 
-	valDiags := validate.Validate(schema, config)
+	valDiags, _ := validate.Validate(schema, config)
 	allDiags := append(diags, valDiags...)
 
 	writeJSON(w, http.StatusOK, map[string]any{

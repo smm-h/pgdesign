@@ -14,11 +14,18 @@ import (
 
 // Config controls which rules run and their parameters.
 type Config struct {
-	Disabled      []string             // codes to skip, e.g. ["W002", "W005"]
-	NamingPattern string               // "snake_case" (default)
-	MaxColumns    int                  // default 30
-	Extensions    []string             // declared extensions (from meta)
+	Disabled      []string              // codes to skip, e.g. ["W002", "W005"]
+	Suppress      map[string]string     // per-table/column suppression, key: "table.column.CODE" or "table.CODE", value: reason
+	NamingPattern string                // "snake_case" (default)
+	MaxColumns    int                   // default 30
+	Extensions    []string              // declared extensions (from meta)
 	ExtRegistry   *extregistry.Registry
+}
+
+// SuppressedDiagnostic pairs a diagnostic with the reason it was suppressed.
+type SuppressedDiagnostic struct {
+	diagnostic.Diagnostic
+	Reason string
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -29,8 +36,8 @@ func DefaultConfig() *Config {
 	}
 }
 
-// Validate runs all validation rules against the schema and returns diagnostics.
-func Validate(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+// Validate runs all validation rules against the schema and returns active and suppressed diagnostics.
+func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []SuppressedDiagnostic) {
 	if config == nil {
 		config = DefaultConfig()
 	}
@@ -88,7 +95,45 @@ func Validate(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
 		diags = append(diags, r.fn(schema, config)...)
 	}
 
-	return diags
+	// Post-emission suppression filter.
+	var active []diagnostic.Diagnostic
+	var suppressed []SuppressedDiagnostic
+	for _, d := range diags {
+		if d.Suppressed {
+			suppressed = append(suppressed, SuppressedDiagnostic{
+				Diagnostic: d,
+				Reason:     "programmatically suppressed",
+			})
+			continue
+		}
+		if config.Suppress != nil {
+			// Try table.column.CODE first (most specific).
+			if d.Table != "" && d.Column != "" {
+				key := d.Table + "." + d.Column + "." + d.Code
+				if reason, ok := config.Suppress[key]; ok {
+					suppressed = append(suppressed, SuppressedDiagnostic{
+						Diagnostic: d,
+						Reason:     reason,
+					})
+					continue
+				}
+			}
+			// Try table.CODE (less specific).
+			if d.Table != "" {
+				key := d.Table + "." + d.Code
+				if reason, ok := config.Suppress[key]; ok {
+					suppressed = append(suppressed, SuppressedDiagnostic{
+						Diagnostic: d,
+						Reason:     reason,
+					})
+					continue
+				}
+			}
+		}
+		active = append(active, d)
+	}
+
+	return active, suppressed
 }
 
 // --- Error rules ---

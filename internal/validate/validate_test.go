@@ -38,7 +38,7 @@ func TestE201_FKMissingOnDelete(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E201")
 	if len(found) == 0 {
 		t.Fatal("expected E201 for FK missing on_delete")
@@ -62,7 +62,7 @@ func TestE202_TableMissingComment(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E202")
 	if len(found) == 0 {
 		t.Fatal("expected E202 for table missing comment")
@@ -83,7 +83,7 @@ func TestE203_TableMissingPK(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E203")
 	if len(found) == 0 {
 		t.Fatal("expected E203 for table missing PK")
@@ -105,7 +105,7 @@ func TestE207_VarcharUsage(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E207")
 	if len(found) == 0 {
 		t.Fatal("expected E207 for varchar usage")
@@ -129,7 +129,7 @@ func TestE211_NamingViolation(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E211")
 	if len(found) == 0 {
 		t.Fatal("expected E211 for CamelCase table name")
@@ -153,7 +153,7 @@ func TestW001_GodTable(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W001")
 	if len(found) == 0 {
 		t.Fatal("expected W001 for god table (>30 columns)")
@@ -185,7 +185,7 @@ func TestW008_CircularFK(t *testing.T) {
 		},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W008")
 	if len(found) == 0 {
 		t.Fatal("expected W008 for circular FK")
@@ -228,7 +228,7 @@ func TestE204_CrossSchemaFK_Passes(t *testing.T) {
 		},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E204")
 	if len(found) > 0 {
 		t.Fatalf("expected no E204 for valid cross-schema FK, got %v", found)
@@ -261,7 +261,7 @@ func TestE204_CrossSchemaFK_FailsWhenMissing(t *testing.T) {
 		},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E204")
 	if len(found) == 0 {
 		t.Fatal("expected E204 for FK referencing non-existent cross-schema table")
@@ -308,7 +308,7 @@ func TestCleanSchema(t *testing.T) {
 		},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	errors := filterSeverity(diags, diagnostic.Error)
 	if len(errors) > 0 {
 		t.Fatalf("expected no errors for clean schema, got %d: %v", len(errors), errors)
@@ -330,7 +330,7 @@ func TestE200_MissingColumnType(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E200")
 	if len(found) == 0 {
 		t.Fatal("expected E200 for column missing type")
@@ -375,7 +375,7 @@ func TestE212_FKMissingIndex(t *testing.T) {
 		},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E212")
 	if len(found) == 0 {
 		t.Fatal("expected E212 for FK missing covering index")
@@ -423,7 +423,7 @@ func TestE212_FKWithIndex_NoDiag(t *testing.T) {
 		},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E212")
 	if len(found) > 0 {
 		t.Fatal("expected no E212 when FK has covering index")
@@ -447,7 +447,7 @@ func TestW003_BooleanStates(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W003")
 	if len(found) == 0 {
 		t.Fatal("expected W003 for 3+ boolean columns")
@@ -473,7 +473,7 @@ func TestW003_TwoBooleans_NoDiag(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W003")
 	if len(found) > 0 {
 		t.Fatal("expected no W003 for only 2 boolean columns")
@@ -495,7 +495,7 @@ func TestW004_JSONCouldBeTable(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W004")
 	if len(found) == 0 {
 		t.Fatal("expected W004 for plural jsonb column with array default")
@@ -520,7 +520,7 @@ func TestW004_NonPlural_NoDiag(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W004")
 	if len(found) > 0 {
 		t.Fatal("expected no W004 for non-plural jsonb column")
@@ -547,7 +547,7 @@ func TestW007_RedundantIndex(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W007")
 	if len(found) == 0 {
 		t.Fatal("expected W007 for redundant index (prefix of another with same method)")
@@ -577,7 +577,7 @@ func TestW007_DifferentMethod_NoDiag(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W007")
 	if len(found) > 0 {
 		t.Fatal("expected no W007 when index methods differ")
@@ -604,7 +604,7 @@ func TestDisabledRules(t *testing.T) {
 		MaxColumns:    30,
 	}
 
-	diags := Validate(schema, config)
+	diags, _ := Validate(schema, config)
 	found := findByCode(diags, "E202")
 	if len(found) > 0 {
 		t.Fatal("expected E202 to be suppressed when disabled")
@@ -650,7 +650,7 @@ func TestE204_RefColumnNotFound(t *testing.T) {
 		},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E204")
 	if len(found) == 0 {
 		t.Fatal("expected E204 for FK referencing nonexistent column in referenced table")
@@ -699,7 +699,7 @@ func TestE204_RefColumnExists_NoDiag(t *testing.T) {
 		},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E204")
 	if len(found) > 0 {
 		t.Fatalf("expected no E204 when FK references an existing column, got %v", found)
@@ -725,7 +725,7 @@ func TestE211_IndexNamingViolation(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E211")
 	if len(found) == 0 {
 		t.Fatal("expected E211 for non-snake_case index name")
@@ -761,7 +761,7 @@ func TestE213_GeneratedColRefsGenerated(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E213")
 	if len(found) == 0 {
 		t.Fatal("expected E213 for generated column referencing another generated column")
@@ -788,7 +788,7 @@ func TestE213_GeneratedColRefsRegular_NoDiag(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E213")
 	if len(found) > 0 {
 		t.Fatalf("expected no E213 when generated column only references regular columns, got %v", found)
@@ -814,7 +814,7 @@ func TestE213_GeneratedColWithFunctionCalls_NoDiag(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E213")
 	if len(found) > 0 {
 		t.Fatalf("expected no E213 when generated columns only reference regular columns, got %v", found)
@@ -886,7 +886,7 @@ func TestE215_InsertPolicyWithUsingOnly(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E215")
 	if len(found) == 0 {
 		t.Fatal("expected E215 for INSERT policy with using but no with_check")
@@ -918,7 +918,7 @@ func TestE215_SelectPolicyWithWithCheck(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E215")
 	if len(found) == 0 {
 		t.Fatal("expected E215 for SELECT policy with with_check")
@@ -948,7 +948,7 @@ func TestE215_UpdatePolicyBoth_NoDiag(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E215")
 	if len(found) > 0 {
 		t.Fatal("expected no E215 for UPDATE policy with both using and with_check")
@@ -978,7 +978,7 @@ func TestW009_PolicyErrorCodeNotSnakeCase(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W009")
 	if len(found) == 0 {
 		t.Fatal("expected W009 for non-snake_case error_code")
@@ -1008,7 +1008,7 @@ func TestW009_PolicyErrorCodeSnakeCase_NoDiag(t *testing.T) {
 		}},
 	}
 
-	diags := Validate(schema, nil)
+	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "W009")
 	if len(found) > 0 {
 		t.Fatal("expected no W009 for valid snake_case error_code")
