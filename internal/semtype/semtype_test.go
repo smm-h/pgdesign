@@ -415,3 +415,97 @@ func TestLoadUserEnumType_InvalidDefault_E109(t *testing.T) {
 		t.Error("expected diagnostic code E109 for invalid enum default")
 	}
 }
+
+func TestLoadUserEnumType_EmbeddedQuotes_E110(t *testing.T) {
+	r := NewBuiltinRegistry()
+	userTypes := []UserTypeDef{
+		{
+			Name:    "status",
+			Kind:    "enum",
+			Values:  []string{"created", "running"},
+			Default: "'created'",
+		},
+	}
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for embedded quotes in default, got none")
+	}
+	foundE110 := false
+	foundE109 := false
+	for _, d := range diags {
+		if d.Code == "E110" {
+			foundE110 = true
+		}
+		if d.Code == "E109" {
+			foundE109 = true
+		}
+	}
+	if !foundE110 {
+		t.Error("expected E110 for embedded SQL quotes in default")
+	}
+	if !foundE109 {
+		t.Error("expected E109 for invalid enum default (after stripping quotes, it matches, but the raw value doesn't)")
+	}
+}
+
+func TestLoadUserScalarType_EmbeddedQuotes_E110(t *testing.T) {
+	r := NewBuiltinRegistry()
+	userTypes := []UserTypeDef{
+		{
+			Name:    "json_data",
+			Kind:    "scalar",
+			Base:    "jsonb",
+			Default: "'{}'",
+		},
+	}
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for embedded quotes in default, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E110" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected E110 for embedded SQL quotes in scalar default")
+	}
+}
+
+func TestLoadUserScalarType_NoQuotes_NoE110(t *testing.T) {
+	r := NewBuiltinRegistry()
+	userTypes := []UserTypeDef{
+		{
+			Name:    "json_data",
+			Kind:    "scalar",
+			Base:    "jsonb",
+			Default: "{}",
+		},
+	}
+	diags := r.LoadUserTypes(userTypes)
+	for _, d := range diags {
+		if d.Code == "E110" {
+			t.Errorf("unexpected E110 for default without quotes: %s", d.Message)
+		}
+	}
+}
+
+func TestLoadUserScalarType_NumericDefault_NoE110(t *testing.T) {
+	r := NewBuiltinRegistry()
+	userTypes := []UserTypeDef{
+		{
+			Name:    "counter",
+			Kind:    "scalar",
+			Base:    "integer",
+			Default: "0",
+		},
+	}
+	diags := r.LoadUserTypes(userTypes)
+	for _, d := range diags {
+		if d.Code == "E110" {
+			t.Errorf("unexpected E110 for numeric default: %s", d.Message)
+		}
+	}
+}

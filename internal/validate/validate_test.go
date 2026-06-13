@@ -1235,6 +1235,45 @@ func TestAppendOnlyUpdatedAtWarning(t *testing.T) {
 	}
 }
 
+func TestE110_ColumnDefaultEmbeddedQuotes(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Schema:  "public",
+				Comment: "test table",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid"},
+					{Name: "status", PGType: "text", Default: "'pending'"},
+					{Name: "data", PGType: "jsonb", Default: "'{}'"},
+					{Name: "count", PGType: "integer", Default: "0"},
+					{Name: "name", PGType: "text", Default: "unknown"},
+				},
+			},
+		},
+	}
+	active, _ := Validate(schema, nil)
+	e110s := findByCode(active, "E110")
+	if len(e110s) != 2 {
+		t.Errorf("expected 2 E110 diagnostics, got %d", len(e110s))
+		for _, d := range e110s {
+			t.Logf("  E110: %s", d.Message)
+		}
+	}
+	// Check that the two are for "status" and "data" columns
+	cols := make(map[string]bool)
+	for _, d := range e110s {
+		cols[d.Column] = true
+	}
+	if !cols["status"] {
+		t.Error("expected E110 for column 'status'")
+	}
+	if !cols["data"] {
+		t.Error("expected E110 for column 'data'")
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {

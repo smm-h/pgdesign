@@ -241,6 +241,13 @@ func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
 		td.NotNull = *ut.NotNull
 	}
 	if ut.Default != "" {
+		if strings.HasPrefix(ut.Default, "'") && strings.HasSuffix(ut.Default, "'") {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E110",
+				Message:  fmt.Sprintf("type %q default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", ut.Name, ut.Default),
+			})
+		}
 		found := false
 		for _, v := range ut.Values {
 			if v == ut.Default {
@@ -318,6 +325,14 @@ func (r *Registry) loadScalarType(ut UserTypeDef) diagnostic.Diagnostics {
 			Message:  fmt.Sprintf("scalar type %q: check expression must contain VALUE placeholder", ut.Name),
 		})
 		return diags
+	}
+
+	if ut.Default != "" && strings.HasPrefix(ut.Default, "'") && strings.HasSuffix(ut.Default, "'") {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E110",
+			Message:  fmt.Sprintf("type %q default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", ut.Name, ut.Default),
+		})
 	}
 
 	td := &TypeDef{
