@@ -1,0 +1,49 @@
+projects: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  owner_id: uuid
+  name: text
+  description: text
+  created_at: timestamptz
+}
+tasks: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  project_id: uuid {constraint: foreign_key}
+  title: text
+  priority: priority
+  estimated_hours: bigint
+  hourly_rate: bigint
+  estimated_cost: bigint
+  created_at: timestamptz
+}
+audit_log: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  project_id: uuid {constraint: foreign_key}
+  actor_id: uuid
+  action: text
+  metadata: jsonb
+  created_at: timestamptz
+}
+events: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  project_id: uuid {constraint: foreign_key}
+  event_type: text
+  payload: jsonb
+  occurred_at: timestamptz {constraint: primary_key}
+}
+comments: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  task_id: uuid {constraint: foreign_key}
+  author_id: uuid
+  body: text
+  tags: text
+  created_at: timestamptz
+}
+tasks.project_id -> projects.id: CASCADE
+audit_log.project_id -> projects.id: CASCADE
+events.project_id -> projects.id: CASCADE
+comments.task_id -> tasks.id: CASCADE

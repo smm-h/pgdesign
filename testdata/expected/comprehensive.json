@@ -1,0 +1,512 @@
+{
+  "name": "app",
+  "extensions": [
+    "pgcrypto",
+    "pg_partman"
+  ],
+  "enums": [
+    {
+      "schema": "app",
+      "name": "priority",
+      "values": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "comment": "Task priority level"
+    }
+  ],
+  "tables": [
+    {
+      "name": "projects",
+      "schema": "app",
+      "comment": "Top-level projects with row-level security.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id"
+        },
+        {
+          "name": "owner_id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "comment": "User who owns this project",
+          "semantic_type_name": "ref"
+        },
+        {
+          "name": "name",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "short_text"
+        },
+        {
+          "name": "description",
+          "pg_type": "text",
+          "not_null": false,
+          "default": "",
+          "semantic_type_name": "short_text"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "timestamptz",
+          "not_null": true,
+          "default": "",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [],
+      "indexes": [],
+      "uniques": [],
+      "checks": [],
+      "policies": [
+        {
+          "name": "owner_delete",
+          "operation": "DELETE",
+          "role": "app_user",
+          "using": "owner_id = current_setting('app.user_id')::uuid"
+        },
+        {
+          "name": "owner_insert",
+          "operation": "INSERT",
+          "role": "app_user",
+          "with_check": "owner_id = current_setting('app.user_id')::uuid"
+        },
+        {
+          "name": "owner_select",
+          "operation": "SELECT",
+          "role": "app_user",
+          "using": "owner_id = current_setting('app.user_id')::uuid"
+        },
+        {
+          "name": "owner_update",
+          "operation": "UPDATE",
+          "role": "app_user",
+          "using": "owner_id = current_setting('app.user_id')::uuid",
+          "with_check": "owner_id = current_setting('app.user_id')::uuid"
+        }
+      ],
+      "enable_rls": true
+    },
+    {
+      "name": "tasks",
+      "schema": "app",
+      "comment": "Individual tasks within a project.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id"
+        },
+        {
+          "name": "project_id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "ref"
+        },
+        {
+          "name": "title",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "short_text"
+        },
+        {
+          "name": "priority",
+          "pg_type": "priority",
+          "not_null": true,
+          "default": "medium",
+          "semantic_type_name": "priority"
+        },
+        {
+          "name": "estimated_hours",
+          "pg_type": "bigint",
+          "not_null": true,
+          "default": "0",
+          "semantic_type_name": "counter"
+        },
+        {
+          "name": "hourly_rate",
+          "pg_type": "bigint",
+          "not_null": true,
+          "default": "0",
+          "semantic_type_name": "counter"
+        },
+        {
+          "name": "estimated_cost",
+          "pg_type": "bigint",
+          "not_null": true,
+          "default": "",
+          "generated": "estimated_hours * hourly_rate",
+          "stored": true,
+          "semantic_type_name": "duration"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "timestamptz",
+          "not_null": true,
+          "default": "",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_tasks_project",
+          "columns": [
+            "project_id"
+          ],
+          "ref_schema": "app",
+          "ref_table": "projects",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_tasks_project_id",
+          "columns": [
+            "project_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        },
+        {
+          "name": "idx_tasks_title",
+          "columns": [
+            "title"
+          ],
+          "opclasses": {
+            "title": "text_pattern_ops"
+          },
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_tasks_project_title",
+          "columns": [
+            "project_id",
+            "title"
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "name": "ck_tasks_positive_hours",
+          "expr": "estimated_hours \u003e= 0"
+        }
+      ]
+    },
+    {
+      "name": "audit_log",
+      "schema": "app",
+      "comment": "Immutable audit trail of project actions.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id"
+        },
+        {
+          "name": "project_id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "ref"
+        },
+        {
+          "name": "actor_id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "ref"
+        },
+        {
+          "name": "action",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "short_text"
+        },
+        {
+          "name": "metadata",
+          "pg_type": "jsonb",
+          "not_null": true,
+          "default": "",
+          "default_expr": "'{}'::jsonb",
+          "semantic_type_name": "json",
+          "json_schema": "comprehensive_shape.json"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "timestamptz",
+          "not_null": true,
+          "default": "",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_audit_log_project",
+          "columns": [
+            "project_id"
+          ],
+          "ref_schema": "app",
+          "ref_table": "projects",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_audit_log_project",
+          "columns": [
+            "project_id",
+            "created_at"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": [
+        {
+          "name": "ck_metadata_title_type",
+          "expr": "metadata ? 'title' AND jsonb_typeof(metadata-\u003e'title') = 'string'"
+        },
+        {
+          "name": "ck_metadata_value_type",
+          "expr": "metadata ? 'value' AND jsonb_typeof(metadata-\u003e'value') = 'number'"
+        }
+      ],
+      "append_only": true
+    },
+    {
+      "name": "events",
+      "schema": "app",
+      "comment": "Time-series project events, partitioned by quarter.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id"
+        },
+        {
+          "name": "project_id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "ref"
+        },
+        {
+          "name": "event_type",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "short_text"
+        },
+        {
+          "name": "payload",
+          "pg_type": "jsonb",
+          "not_null": true,
+          "default": "",
+          "default_expr": "'{}'::jsonb",
+          "semantic_type_name": "json"
+        },
+        {
+          "name": "occurred_at",
+          "pg_type": "timestamptz",
+          "not_null": true,
+          "default": "",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp"
+        }
+      ],
+      "pk": [
+        "id",
+        "occurred_at"
+      ],
+      "fks": [
+        {
+          "name": "fk_events_project",
+          "columns": [
+            "project_id"
+          ],
+          "ref_schema": "app",
+          "ref_table": "projects",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_events_project_time",
+          "columns": [
+            "project_id",
+            "occurred_at"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": [],
+      "partitioning": {
+        "strategy": "range",
+        "column": "occurred_at",
+        "children": [
+          {
+            "strategy": "",
+            "column": "",
+            "name": "events_2024_q1",
+            "bound": "FROM ('2024-01-01') TO ('2024-04-01')",
+            "children": null
+          },
+          {
+            "strategy": "",
+            "column": "",
+            "name": "events_2024_q2",
+            "bound": "FROM ('2024-04-01') TO ('2024-07-01')",
+            "children": null
+          }
+        ]
+      },
+      "maintenance": {
+        "premake": 3,
+        "retention": "90 days",
+        "retention_keep_table": false
+      }
+    },
+    {
+      "name": "comments",
+      "schema": "app",
+      "comment": "Comments on tasks with tagging support.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id"
+        },
+        {
+          "name": "task_id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "ref"
+        },
+        {
+          "name": "author_id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "ref"
+        },
+        {
+          "name": "body",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "short_text"
+        },
+        {
+          "name": "tags",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "short_text",
+          "array": true
+        },
+        {
+          "name": "created_at",
+          "pg_type": "timestamptz",
+          "not_null": true,
+          "default": "",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_comments_task",
+          "columns": [
+            "task_id"
+          ],
+          "ref_schema": "app",
+          "ref_table": "tasks",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_comments_task",
+          "columns": [
+            "task_id",
+            "created_at"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    }
+  ],
+  "pg_version": 16
+}

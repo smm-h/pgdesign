@@ -1,0 +1,224 @@
+# Comprehensive test schema exercising all pgdesign features.
+# Domain: project management platform.
+
+[meta]
+version = 16
+schema = "app"
+extensions = ["pgcrypto", "pg_partman"]
+
+# -- Custom types --
+
+[types.priority]
+kind = "enum"
+values = ["low", "medium", "high", "critical"]
+default = "medium"
+comment = "Task priority level"
+
+[types.duration]
+kind = "scalar"
+base_type = "bigint"
+comment = "Duration in minutes"
+
+# -- Projects --
+
+[tables.projects]
+comment = "Top-level projects with row-level security."
+enable_rls = true
+
+[tables.projects.columns.id]
+type = "id"
+
+[tables.projects.columns.owner_id]
+type = "ref"
+comment = "User who owns this project"
+
+[tables.projects.columns.name]
+type = "short_text"
+
+[tables.projects.columns.description]
+type = "short_text"
+nullable = true
+
+[tables.projects.columns.created_at]
+type = "timestamp"
+
+[tables.projects.policies.owner_select]
+for = "SELECT"
+to = "app_user"
+using = "owner_id = current_setting('app.user_id')::uuid"
+
+[tables.projects.policies.owner_insert]
+for = "INSERT"
+to = "app_user"
+with_check = "owner_id = current_setting('app.user_id')::uuid"
+
+[tables.projects.policies.owner_update]
+for = "UPDATE"
+to = "app_user"
+using = "owner_id = current_setting('app.user_id')::uuid"
+with_check = "owner_id = current_setting('app.user_id')::uuid"
+
+[tables.projects.policies.owner_delete]
+for = "DELETE"
+to = "app_user"
+using = "owner_id = current_setting('app.user_id')::uuid"
+
+# -- Tasks --
+
+[tables.tasks]
+comment = "Individual tasks within a project."
+
+[tables.tasks.columns.id]
+type = "id"
+
+[tables.tasks.columns.project_id]
+type = "ref"
+
+[tables.tasks.columns.title]
+type = "short_text"
+
+[tables.tasks.columns.priority]
+type = "priority"
+
+[tables.tasks.columns.estimated_hours]
+type = "counter"
+
+[tables.tasks.columns.hourly_rate]
+type = "counter"
+
+[tables.tasks.columns.estimated_cost]
+type = "duration"
+generated = "estimated_hours * hourly_rate"
+stored = true
+
+[tables.tasks.columns.created_at]
+type = "timestamp"
+
+[tables.tasks.fks.fk_tasks_project]
+columns = ["project_id"]
+ref_table = "projects"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.tasks.checks.ck_tasks_positive_hours]
+expr = "estimated_hours >= 0"
+
+[tables.tasks.unique.uq_tasks_project_title]
+columns = ["project_id", "title"]
+
+[tables.tasks.indexes.idx_tasks_title]
+columns = ["title"]
+opclass = { title = "text_pattern_ops" }
+
+# -- Comments --
+
+[tables.comments]
+comment = "Comments on tasks with tagging support."
+
+[tables.comments.columns.id]
+type = "id"
+
+[tables.comments.columns.task_id]
+type = "ref"
+
+[tables.comments.columns.author_id]
+type = "ref"
+
+[tables.comments.columns.body]
+type = "short_text"
+
+[tables.comments.columns.tags]
+type = "short_text"
+array = true
+
+[tables.comments.columns.created_at]
+type = "timestamp"
+
+[tables.comments.fks.fk_comments_task]
+columns = ["task_id"]
+ref_table = "tasks"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.comments.indexes.idx_comments_task]
+columns = ["task_id", "created_at DESC"]
+
+# -- Audit Log --
+
+[tables.audit_log]
+comment = "Immutable audit trail of project actions."
+append_only = true
+
+[tables.audit_log.columns.id]
+type = "id"
+
+[tables.audit_log.columns.project_id]
+type = "ref"
+
+[tables.audit_log.columns.actor_id]
+type = "ref"
+
+[tables.audit_log.columns.action]
+type = "short_text"
+
+[tables.audit_log.columns.metadata]
+type = "json"
+json_schema = "comprehensive_shape.json"
+
+[tables.audit_log.columns.created_at]
+type = "timestamp"
+
+[tables.audit_log.fks.fk_audit_log_project]
+columns = ["project_id"]
+ref_table = "projects"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.audit_log.indexes.idx_audit_log_project]
+columns = ["project_id", "created_at DESC"]
+
+# -- Events (partitioned) --
+
+[tables.events]
+comment = "Time-series project events, partitioned by quarter."
+pk = ["id", "occurred_at"]
+
+[tables.events.columns.id]
+type = "id"
+
+[tables.events.columns.project_id]
+type = "ref"
+
+[tables.events.columns.event_type]
+type = "short_text"
+
+[tables.events.columns.payload]
+type = "json"
+
+[tables.events.columns.occurred_at]
+type = "timestamp"
+
+[tables.events.fks.fk_events_project]
+columns = ["project_id"]
+ref_table = "projects"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.events.indexes.idx_events_project_time]
+columns = ["project_id", "occurred_at DESC"]
+
+[tables.events.partitioning]
+strategy = "range"
+column = "occurred_at"
+
+[[tables.events.partitioning.partitions]]
+name = "events_2024_q1"
+bound = "FROM ('2024-01-01') TO ('2024-04-01')"
+
+[[tables.events.partitioning.partitions]]
+name = "events_2024_q2"
+bound = "FROM ('2024-04-01') TO ('2024-07-01')"
+
+[tables.events.maintenance]
+premake = 3
+retention = "90 days"
