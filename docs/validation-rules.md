@@ -152,16 +152,36 @@ An index uses an operator class (e.g., `gin_trgm_ops`) that requires a PostgreSQ
 
 **Fix:** Add the extension to `extensions = ["pg_trgm"]` in the `[meta]` section.
 
-### E109: Default value contains embedded SQL quotes
+### E109: Enum default is not a declared value
 
-A `default` value contains embedded single quotes (e.g., `"'value'"`). The `default` field holds raw values -- pgdesign handles SQL quoting automatically during DDL generation.
+Enum defaults must match one of the values in the enum's values list. Use raw values (e.g., `"created"`) not SQL literals (`"'created'"`). See also E110.
+
+```toml
+# Wrong: "archived" is not in the values list
+[types.status]
+kind = "enum"
+values = ["created", "running", "done"]
+default = "archived"  # E109
+
+# Correct: default matches a declared value
+[types.status]
+kind = "enum"
+values = ["created", "running", "done"]
+default = "created"
+```
+
+**Fix:** Change the default to one of the declared enum values.
+
+### E110: Default value contains embedded SQL quotes
+
+Default values should be raw values -- pgdesign handles SQL quoting. Write `default = "created"` not `default = "'created'"`. This applies to all types (enums, scalars, arrays).
 
 ```toml
 # Wrong: embedded SQL quotes
 [types.status]
 kind = "enum"
 values = ["created", "running", "done"]
-default = "'created'"  # E109
+default = "'created'"  # E110
 
 # Correct: raw value
 [types.status]
@@ -174,13 +194,13 @@ This also applies to column-level defaults:
 
 ```toml
 # Wrong
-default = "'pending'"  # E109
+default = "'pending'"  # E110
 
 # Correct
 default = "pending"
 ```
 
-For SQL expressions, use `default_expr` instead of `default`.
+**Fix:** Remove the embedded single quotes. For SQL expressions, use `default_expr` instead of `default`.
 
 ### E215: RLS policy expression mismatch
 
@@ -247,6 +267,22 @@ Tables have circular foreign key references (A references B, B references A). pg
 
 An RLS policy's `error_code` field does not follow snake_case naming.
 
+### W010: Append-only table has mutable default column
+
+Tables with `append_only = true` should not have columns with mutable defaults (e.g., `updated_at` timestamp). Append-only tables are immutable after INSERT, so columns designed to track mutations are contradictory.
+
+```toml
+[tables.audit_log]
+comment = "Immutable audit trail"
+append_only = true
+
+[tables.audit_log.columns.updated_at]
+type = "timestamp"
+default_expr = "now()"  # W010: mutable default on append-only table
+```
+
+**Suggestion:** Remove mutable-default columns from append-only tables, or remove `append_only = true` if the table needs to support updates.
+
 ## Normal form audit warnings
 
 These are emitted by `pgdesign audit`, not `pgdesign validate`. They require functional dependencies to be declared on the table.
@@ -289,3 +325,13 @@ disable = ["W002", "W005", "W006"]
 ```
 
 This skips the disabled rules during `pgdesign validate`. The codes apply to the validation rules (E2xx, W00x). Audit warnings (W1xx) are controlled separately via `pgdesign audit`.
+
+## Codegen diagnostics
+
+Diagnostics emitted during code generation, not during validation.
+
+### C001: Unparseable policy expression
+
+The codegen validator generator could not parse an RLS policy expression into a supported pattern. The policy is skipped during code generation. This typically means the policy uses SQL constructs that the codegen pattern matcher does not yet support.
+
+**Fix:** Simplify the policy expression to use a supported pattern, or write the validator code manually.
