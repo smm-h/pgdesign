@@ -6,15 +6,28 @@
     "docs/_CLAUDE.md",
     "docs/_README.md"
   ],
+  "language": "go",
   "source": [
-    {"path": "internal", "language": "go"}
+    "internal/audit",
+    "internal/config",
+    "internal/diagnostic",
+    "internal/diff",
+    "internal/discover",
+    "internal/extregistry",
+    "internal/fd",
+    "internal/format",
+    "internal/generate",
+    "internal/introspect",
+    "internal/migrate",
+    "internal/model",
+    "internal/parse",
+    "internal/risk",
+    "internal/semtype",
+    "internal/serve",
+    "internal/sql",
+    "internal/sqlexpr",
+    "internal/validate"
   ],
-  "gen": {
-    "exclude": [
-      "codegen",
-      "test"
-    ]
-  },
   "docs": "docs/",
   "output": "docs/_build/",
   "versions": [
