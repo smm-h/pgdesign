@@ -1015,6 +1015,137 @@ func TestW009_PolicyErrorCodeSnakeCase_NoDiag(t *testing.T) {
 	}
 }
 
+func TestSuppressW004_ColumnLevel(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "users",
+			Schema:  "public",
+			Comment: "Users table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+		}},
+	}
+
+	cfg := &Config{
+		Suppress: map[string]string{
+			"users.tags.W004": "tags column is intentionally denormalized",
+		},
+	}
+
+	diags, suppressed := Validate(schema, cfg)
+	found := findByCode(diags, "W004")
+	if len(found) > 0 {
+		t.Fatal("expected W004 to be suppressed, but it appeared in active diagnostics")
+	}
+
+	// Verify it appears in suppressed list with the correct reason.
+	var foundSuppressed bool
+	for _, s := range suppressed {
+		if s.Code == "W004" && s.Table == "users" && s.Column == "tags" {
+			foundSuppressed = true
+			if s.Reason != "tags column is intentionally denormalized" {
+				t.Errorf("suppressed reason = %q, want %q", s.Reason, "tags column is intentionally denormalized")
+			}
+		}
+	}
+	if !foundSuppressed {
+		t.Fatal("expected W004 in suppressed diagnostics")
+	}
+}
+
+func TestSuppressW004_TableLevel(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "users",
+			Schema:  "public",
+			Comment: "Users table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+		}},
+	}
+
+	cfg := &Config{
+		Suppress: map[string]string{
+			"users.W004": "all jsonb columns on users are intentional",
+		},
+	}
+
+	diags, suppressed := Validate(schema, cfg)
+	found := findByCode(diags, "W004")
+	if len(found) > 0 {
+		t.Fatal("expected W004 to be suppressed via table-level key")
+	}
+
+	var foundSuppressed bool
+	for _, s := range suppressed {
+		if s.Code == "W004" {
+			foundSuppressed = true
+			if s.Reason != "all jsonb columns on users are intentional" {
+				t.Errorf("suppressed reason = %q, want %q", s.Reason, "all jsonb columns on users are intentional")
+			}
+		}
+	}
+	if !foundSuppressed {
+		t.Fatal("expected W004 in suppressed diagnostics with table-level suppression")
+	}
+}
+
+func TestSuppressW004_NoSuppression(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "users",
+			Schema:  "public",
+			Comment: "Users table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+		}},
+	}
+
+	diags, suppressed := Validate(schema, nil)
+	found := findByCode(diags, "W004")
+	if len(found) == 0 {
+		t.Fatal("expected W004 without suppression config")
+	}
+	if len(suppressed) > 0 {
+		t.Error("expected no suppressed diagnostics without suppression config")
+	}
+}
+
+func TestSuppressProgrammatic(t *testing.T) {
+	// The Suppressed field on diagnostic.Diagnostic is for future use
+	// (Phase 6.3 W004 auto-suppression for JSONB shapes). This test verifies
+	// the field exists and is usable in the SuppressedDiagnostic type.
+	sd := SuppressedDiagnostic{
+		Diagnostic: diagnostic.Diagnostic{
+			Severity:   diagnostic.Warning,
+			Code:       "W004",
+			Table:      "users",
+			Column:     "tags",
+			Message:    "test",
+			Suppressed: true,
+		},
+		Reason: "programmatically suppressed",
+	}
+	if !sd.Suppressed {
+		t.Error("expected Suppressed to be true")
+	}
+	if sd.Reason != "programmatically suppressed" {
+		t.Errorf("reason = %q, want %q", sd.Reason, "programmatically suppressed")
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {
