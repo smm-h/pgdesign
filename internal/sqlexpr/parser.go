@@ -1,0 +1,310 @@
+package sqlexpr
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+// Parse parses a SQL expression string into an AST.
+func Parse(input string) (Node, error) {
+	tokens, err := tokenize(input)
+	if err != nil {
+		return nil, err
+	}
+	p := &parser{tokens: tokens, pos: 0}
+	node, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+	if p.current().kind != tokenEOF {
+		tok := p.current()
+		return nil, fmt.Errorf("sqlexpr: unexpected token %q at position %d", tok.value, tok.pos)
+	}
+	return node, nil
+}
+
+type parser struct {
+	tokens []token
+	pos    int
+}
+
+func (p *parser) current() token {
+	if p.pos >= len(p.tokens) {
+		return token{kind: tokenEOF, pos: -1}
+	}
+	return p.tokens[p.pos]
+}
+
+func (p *parser) advance() token {
+	tok := p.current()
+	p.pos++
+	return tok
+}
+
+func (p *parser) expect(kind tokenKind) (token, error) {
+	tok := p.current()
+	if tok.kind != kind {
+		return tok, fmt.Errorf("sqlexpr: expected token kind %d but got %q at position %d", kind, tok.value, tok.pos)
+	}
+	p.pos++
+	return tok, nil
+}
+
+func (p *parser) isKeyword(kw string) bool {
+	tok := p.current()
+	return tok.kind == tokenIdent && strings.EqualFold(tok.value, kw)
+}
+
+func (p *parser) parseExpr() (Node, error) {
+	return p.parseOr()
+}
+
+func (p *parser) parseOr() (Node, error) {
+	left, err := p.parseAnd()
+	if err != nil {
+		return nil, err
+	}
+	for p.isKeyword("OR") {
+		p.advance()
+		right, err := p.parseAnd()
+		if err != nil {
+			return nil, err
+		}
+		left = &BinaryOp{Op: "OR", Left: left, Right: right}
+	}
+	return left, nil
+}
+
+func (p *parser) parseAnd() (Node, error) {
+	left, err := p.parseNot()
+	if err != nil {
+		return nil, err
+	}
+	for p.isKeyword("AND") {
+		p.advance()
+		right, err := p.parseNot()
+		if err != nil {
+			return nil, err
+		}
+		left = &BinaryOp{Op: "AND", Left: left, Right: right}
+	}
+	return left, nil
+}
+
+func (p *parser) parseNot() (Node, error) {
+	if p.isKeyword("NOT") {
+		p.advance()
+		operand, err := p.parseNot()
+		if err != nil {
+			return nil, err
+		}
+		return &UnaryOp{Op: "NOT", Operand: operand}, nil
+	}
+	return p.parseComparison()
+}
+
+func (p *parser) parseComparison() (Node, error) {
+	left, err := p.parseCast()
+	if err != nil {
+		return nil, err
+	}
+	tok := p.current()
+	if tok.kind == tokenEquals || tok.kind == tokenNotEquals {
+		op := p.advance()
+		right, err := p.parseCast()
+		if err != nil {
+			return nil, err
+		}
+		return &BinaryOp{Op: op.value, Left: left, Right: right}, nil
+	}
+	return left, nil
+}
+
+func (p *parser) parseCast() (Node, error) {
+	node, err := p.parsePrimary()
+	if err != nil {
+		return nil, err
+	}
+	for p.current().kind == tokenDoubleColon {
+		p.advance()
+		typeTok, err := p.expect(tokenIdent)
+		if err != nil {
+			return nil, fmt.Errorf("sqlexpr: expected type name after :: at position %d", p.current().pos)
+		}
+		node = &Cast{Expr: node, TypeName: typeTok.value}
+	}
+	return node, nil
+}
+
+func (p *parser) parsePrimary() (Node, error) {
+	tok := p.current()
+
+	switch tok.kind {
+	case tokenLParen:
+		p.advance()
+		inner, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		if _, err := p.expect(tokenRParen); err != nil {
+			return nil, fmt.Errorf("sqlexpr: unclosed parenthesis at position %d", tok.pos)
+		}
+		return &ParenExpr{Inner: inner}, nil
+
+	case tokenString:
+		p.advance()
+		return &StringLiteral{Value: tok.value}, nil
+
+	case tokenInt:
+		p.advance()
+		val, err := strconv.Atoi(tok.value)
+		if err != nil {
+			return nil, fmt.Errorf("sqlexpr: invalid integer %q at position %d", tok.value, tok.pos)
+		}
+		return &IntLiteral{Value: val}, nil
+
+	case tokenIdent:
+		lower := strings.ToLower(tok.value)
+
+		// boolean literals
+		if lower == "true" {
+			p.advance()
+			return &BoolLiteral{Value: true}, nil
+		}
+		if lower == "false" {
+			p.advance()
+			return &BoolLiteral{Value: false}, nil
+		}
+
+		// EXISTS
+		if lower == "exists" {
+			return p.parseExists()
+		}
+
+		// identifier: could be column ref, qualified name, or function call
+		return p.parseIdentExpr()
+
+	default:
+		return nil, fmt.Errorf("sqlexpr: unexpected token %q at position %d", tok.value, tok.pos)
+	}
+}
+
+func (p *parser) parseExists() (Node, error) {
+	p.advance() // consume EXISTS
+
+	if _, err := p.expect(tokenLParen); err != nil {
+		return nil, fmt.Errorf("sqlexpr: expected '(' after EXISTS at position %d", p.current().pos)
+	}
+
+	if !p.isKeyword("SELECT") {
+		return nil, fmt.Errorf("sqlexpr: expected SELECT after EXISTS( at position %d", p.current().pos)
+	}
+	p.advance() // consume SELECT
+
+	// parse column list
+	var columns []Node
+	for {
+		col, err := p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+		columns = append(columns, col)
+		if p.current().kind != tokenComma {
+			break
+		}
+		p.advance() // consume comma
+	}
+
+	// FROM
+	if !p.isKeyword("FROM") {
+		return nil, fmt.Errorf("sqlexpr: expected FROM in SELECT at position %d", p.current().pos)
+	}
+	p.advance()
+
+	// table reference (potentially qualified)
+	fromRef, err := p.parseTableRef()
+	if err != nil {
+		return nil, err
+	}
+
+	// WHERE (optional)
+	var where Node
+	if p.isKeyword("WHERE") {
+		p.advance()
+		where, err = p.parseExpr()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := p.expect(tokenRParen); err != nil {
+		return nil, fmt.Errorf("sqlexpr: unclosed EXISTS subquery at position %d", p.current().pos)
+	}
+
+	return &ExistsExpr{
+		Subquery: &SelectExpr{
+			Columns: columns,
+			From:    fromRef,
+			Where:   where,
+		},
+	}, nil
+}
+
+func (p *parser) parseTableRef() (*ColumnRef, error) {
+	nameTok, err := p.expect(tokenIdent)
+	if err != nil {
+		return nil, fmt.Errorf("sqlexpr: expected table name at position %d", p.current().pos)
+	}
+	parts := []string{nameTok.value}
+	for p.current().kind == tokenDot {
+		p.advance()
+		next, err := p.expect(tokenIdent)
+		if err != nil {
+			return nil, fmt.Errorf("sqlexpr: expected identifier after '.' at position %d", p.current().pos)
+		}
+		parts = append(parts, next.value)
+	}
+	return &ColumnRef{Parts: parts}, nil
+}
+
+func (p *parser) parseIdentExpr() (Node, error) {
+	first := p.advance() // consume the first identifier
+	parts := []string{first.value}
+
+	// consume qualified name: ident.ident.ident...
+	for p.current().kind == tokenDot {
+		p.advance() // consume dot
+		next, err := p.expect(tokenIdent)
+		if err != nil {
+			return nil, fmt.Errorf("sqlexpr: expected identifier after '.' at position %d", p.current().pos)
+		}
+		parts = append(parts, next.value)
+	}
+
+	// check for function call
+	if p.current().kind == tokenLParen {
+		p.advance() // consume (
+		name := strings.Join(parts, ".")
+		var args []Node
+		if p.current().kind != tokenRParen {
+			for {
+				arg, err := p.parseExpr()
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, arg)
+				if p.current().kind != tokenComma {
+					break
+				}
+				p.advance() // consume comma
+			}
+		}
+		if _, err := p.expect(tokenRParen); err != nil {
+			return nil, fmt.Errorf("sqlexpr: unclosed function call at position %d", p.current().pos)
+		}
+		return &FuncCall{Name: name, Args: args}, nil
+	}
+
+	return &ColumnRef{Parts: parts}, nil
+}
