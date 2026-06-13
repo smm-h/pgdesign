@@ -86,7 +86,7 @@ values = ["active", "inactive", "suspended"]
 [types.priority]
 kind = "enum"
 values = ["low", "medium", "high", "critical"]
-default = "'medium'"
+default = "medium"
 ```
 
 Enum types are NOT NULL by default. Override with `not_null = false`.
@@ -126,7 +126,7 @@ Overriding the default:
 ```toml
 [tables.orders.columns.status]
 type = "short_text"
-default = "'pending'"
+default = "pending"
 # Result: text NOT NULL DEFAULT 'pending' CHECK(LENGTH(status) <= 255)
 ```
 
@@ -143,3 +143,26 @@ default = "'pending'"
 | E106 | Unknown base type (not in allowlist) |
 | E107 | Base type references another user type (circular reference) |
 | E108 | Check expression missing VALUE placeholder |
+| E109 | Default value contains embedded SQL quotes |
+
+## Default values
+
+The `default` field holds raw values. pgdesign handles SQL quoting automatically when generating DDL. Do not embed SQL quotes in default values.
+
+```toml
+# Correct: raw value, pgdesign adds SQL quotes in generated DDL
+default = "created"
+
+# Wrong: embedded SQL quotes (triggers E109)
+default = "'created'"
+```
+
+For SQL expressions (function calls, casts, etc.), use `default_expr` instead:
+
+```toml
+# Correct: SQL expression via default_expr
+default_expr = "now()"
+default_expr = "'{}'::jsonb"
+```
+
+For example, given an enum with `values = ["created", "running", "done"]`, set the default as `default = "created"` -- the generated DDL will produce `DEFAULT 'created'` with proper quoting.

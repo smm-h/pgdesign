@@ -69,7 +69,7 @@ type = "text_nullable"
 
 [tables.users.columns.display_name]
 type = "text_field"
-default = "''"
+default = ""
 
 [tables.users.columns.email]
 type = "text_nullable"

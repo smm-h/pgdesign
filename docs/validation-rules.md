@@ -152,6 +152,36 @@ An index uses an operator class (e.g., `gin_trgm_ops`) that requires a PostgreSQ
 
 **Fix:** Add the extension to `extensions = ["pg_trgm"]` in the `[meta]` section.
 
+### E109: Default value contains embedded SQL quotes
+
+A `default` value contains embedded single quotes (e.g., `"'value'"`). The `default` field holds raw values -- pgdesign handles SQL quoting automatically during DDL generation.
+
+```toml
+# Wrong: embedded SQL quotes
+[types.status]
+kind = "enum"
+values = ["created", "running", "done"]
+default = "'created'"  # E109
+
+# Correct: raw value
+[types.status]
+kind = "enum"
+values = ["created", "running", "done"]
+default = "created"
+```
+
+This also applies to column-level defaults:
+
+```toml
+# Wrong
+default = "'pending'"  # E109
+
+# Correct
+default = "pending"
+```
+
+For SQL expressions, use `default_expr` instead of `default`.
+
 ### E215: RLS policy expression mismatch
 
 A row-level security policy uses the wrong expression type for its operation:

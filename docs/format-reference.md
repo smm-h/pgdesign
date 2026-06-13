@@ -41,7 +41,7 @@ values = ["active", "inactive", "suspended"]
 | `kind` | string | Must be `"enum"` |
 | `values` | array of strings | Enum values (at least one required) |
 | `not_null` | boolean | Override NOT NULL (default: true) |
-| `default` | string | Default value |
+| `default` | string | Raw default value (pgdesign handles SQL quoting) |
 | `comment` | string | Type description |
 
 ### Scalar types
@@ -59,8 +59,8 @@ comment = "Non-negative monetary amount in minor units"
 | `kind` | string | `"scalar"` (or omitted -- scalar is the default) |
 | `base_type` | string | PostgreSQL base type (required for scalars) |
 | `not_null` | boolean | Override NOT NULL (default: true) |
-| `default` | string | Literal default value |
-| `default_expr` | string | SQL expression default (e.g., `"now()"`) |
+| `default` | string | Raw default value (pgdesign handles SQL quoting) |
+| `default_expr` | string | SQL expression default, written as-is into DDL (e.g., `"now()"`) |
 | `check` | string | Check expression using `VALUE` placeholder |
 | `unique` | boolean | Whether columns of this type get a UNIQUE constraint |
 | `comment` | string | Type description |
@@ -108,8 +108,8 @@ default = "0"
 |-----|------|-------------|
 | `type` | string | Semantic type name (built-in or user-defined, required) |
 | `nullable` | boolean | Override the type's NOT NULL default |
-| `default` | string | Literal default value (overrides type default) |
-| `default_expr` | string | SQL expression default (overrides type default_expr) |
+| `default` | string | Raw default value -- pgdesign handles SQL quoting (overrides type default) |
+| `default_expr` | string | SQL expression default, written as-is into DDL (overrides type default_expr) |
 | `generated` | string | SQL expression for a generated column |
 | `stored` | boolean | Whether the generated column is stored (default: false) |
 | `comment` | string | Column description |
