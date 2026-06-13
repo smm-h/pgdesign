@@ -93,6 +93,7 @@ type = "timestamp"
 | `comment` | string | Table description (required -- E202 if missing) |
 | `pk` | array of strings | Primary key columns (auto-inferred if a column uses `id` or `auto_id` type) |
 | `enable_rls` | boolean | Enable row-level security on the table |
+| `append_only` | boolean | Generates a BEFORE UPDATE OR DELETE trigger that prevents mutations. Tables with `append_only` should not have mutable-default columns (W010) |
 
 ## Column properties
 
@@ -112,6 +113,8 @@ default = "0"
 | `default_expr` | string | SQL expression default, written as-is into DDL (overrides type default_expr) |
 | `generated` | string | SQL expression for a generated column |
 | `stored` | boolean | Whether the generated column is stored (default: false) |
+| `array` | boolean | Marks the column as a PostgreSQL array type. DDL appends `[]` to the base type (e.g., `array = true` on a `text` column produces `text[]`) |
+| `json_schema` | string | Path to a JSON Schema file (relative to the schema file). Generates CHECK constraints for top-level property validation (e.g., `json_schema = "schemas/address.json"`) |
 | `comment` | string | Column description |
 
 When both the type and the column define a default, the column-level value wins. Setting `nullable = true` on a column overrides the type's `not_null = true`.
@@ -330,3 +333,15 @@ expand_contract_threshold = 10000000
 name = "pg_trgm"
 opclasses = ["gin_trgm_ops", "gist_trgm_ops"]
 ```
+
+### [suppress]
+
+Suppress specific diagnostics on individual tables or columns. Each key is `"table.CODE"` or `"table.column.CODE"`, and the value is a mandatory reason string explaining why the suppression is justified.
+
+```toml
+[suppress]
+"products.metadata.W004" = "metadata is a free-form JSONB blob, not a normalizable array"
+"audit_log.W002" = "standalone audit table with no FK relationships by design"
+```
+
+Use the `--show-suppressed` flag with `pgdesign validate` to include suppressed diagnostics in the output (marked as suppressed with their reason).
