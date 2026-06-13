@@ -1,8 +1,0 @@
-# Version bump type: patch, minor, or major
-bump = "patch"
-# Short description of this release (required)
-description = "E110 validation rule, documentation updates, JSON output determinism fix, and expanded test coverage."
-# Optional context explaining why these changes were made
-context = ""
-include = ["go", "npm", "pypi"]
-exclude = []
