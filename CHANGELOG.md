@@ -2,17 +2,40 @@
 
 # Changelog
 
-## 0.6.0
+## 0.7.0
+
+Array types, warning suppression, append-only tables, expression-driven codegen, JSONB shape validation, and serve API improvements. Breaking: enum defaults now use raw values.
+
+### Breaking
+
+- **Breaking.** Enum defaults must be raw values (e.g., `"created"`), not SQL literals (`"'created'"`). New E109 diagnostic validates defaults against declared enum values.
 
 ### Features
 
-- **New feature.** Per-column name constants in codegen output
+- **New feature.** Array column support via `array = true` property. DDL generates `text[]`, introspection detects arrays, diff tracks array changes.
+- **New feature.** Per-table and per-column warning suppression via `[suppress]` section in pgdesign.toml with mandatory reason strings. `--show-suppressed` flag lists active suppressions.
+- **New feature.** Append-only tables via `append_only = true`. Generates BEFORE UPDATE OR DELETE trigger. Diff and migration support for trigger lifecycle.
+- **New feature.** Expression-driven RLS validator generation using SQL expression parser. Removes all domain-specific patterns. Zig validator support.
+- **New feature.** SQL expression parser (`internal/sqlexpr`) for RLS policy analysis with recursive descent parsing.
+- **New feature.** JSONB shape validation via `json_schema` column attribute. Generates portable CHECK constraints from JSON Schema files. Auto-suppresses W004 on shaped columns.
+- **New feature.** Per-version migration endpoint, cache hit ratio, unused index detection, and duplicate index detection in HTTP API.
+
+### Fixes
+
+- **Fix.** `generate` now returns proper errors instead of embedding error messages in output.
+- **Fix.** Codegen reports unparseable policy expressions as diagnostics instead of silently skipping them.
 
 ## 1.0.0
 
 ### Breaking
 
 - **Renamed from pgspec to pgdesign.**
+
+## 0.6.0
+
+### Features
+
+- **New feature.** Per-column name constants in codegen output
 
 ## 0.5.0
 
