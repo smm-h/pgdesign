@@ -46,9 +46,9 @@ func testSchema() *model.Schema {
 func TestPythonConstantsGenerator(t *testing.T) {
 	schema := testSchema()
 	gen := &PythonConstantsGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	result := string(out)
@@ -128,9 +128,9 @@ func TestPythonConstantsGenerator(t *testing.T) {
 func TestZigConstantsGenerator(t *testing.T) {
 	schema := testSchema()
 	gen := &ZigConstantsGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	result := string(out)
@@ -220,9 +220,9 @@ func TestPythonConstantsGenerator_NoSchema(t *testing.T) {
 	}
 
 	gen := &PythonConstantsGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	result := string(out)
@@ -254,9 +254,9 @@ func TestZigConstantsGenerator_NoSchema(t *testing.T) {
 	}
 
 	gen := &ZigConstantsGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	result := string(out)

@@ -6,13 +6,14 @@ package codegen
 import (
 	"strings"
 
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 )
 
 // Generator generates application code from a resolved schema.
 type Generator interface {
 	// Generate produces source code for all eligible policies in the schema.
-	Generate(schema *model.Schema) ([]byte, error)
+	Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic)
 }
 
 // PolicyContext holds the data needed to generate a validator for one policy.

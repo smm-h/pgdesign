@@ -1498,10 +1498,9 @@ func handleCodegen(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	out, err := gen.Generate(schema)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: codegen failed: %v\n", err)
-		return 1
+	out, diags := gen.Generate(schema)
+	for _, d := range diags {
+		fmt.Fprintf(os.Stderr, "%s: %s\n", d.Severity, d.Message)
 	}
 
 	if outputPath, ok := kwargs["output"].(string); ok && outputPath != "" {

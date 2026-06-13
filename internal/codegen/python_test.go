@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 )
 
@@ -106,9 +107,9 @@ func TestPythonGenerator_Generate(t *testing.T) {
 	}
 
 	gen := &PythonGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	result := string(out)
@@ -167,9 +168,9 @@ func TestPythonGenerator_NoPolicies(t *testing.T) {
 	}
 
 	gen := &PythonGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	result := string(out)
@@ -301,9 +302,9 @@ func TestPythonGenerator_OwnershipPattern(t *testing.T) {
 	}
 
 	gen := &PythonGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	result := string(out)
@@ -344,9 +345,9 @@ func TestPythonGenerator_DualPrivacyPattern(t *testing.T) {
 	}
 
 	gen := &PythonGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 
 	result := string(out)
@@ -384,13 +385,21 @@ func TestPythonGenerator_UnparsableExpression(t *testing.T) {
 	}
 
 	gen := &PythonGenerator{}
-	out, err := gen.Generate(schema)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
-	}
+	out, diags := gen.Generate(schema)
 
 	result := string(out)
 	if !strings.Contains(result, "Skipped exotic_policy") {
 		t.Error("expected skip comment for unparsable policy")
+	}
+
+	// Verify diagnostic was emitted.
+	if len(diags) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %d", len(diags))
+	}
+	if diags[0].Code != "C001" {
+		t.Errorf("expected code C001, got %s", diags[0].Code)
+	}
+	if diags[0].Severity != diagnostic.Warning {
+		t.Errorf("expected Warning severity, got %s", diags[0].Severity)
 	}
 }

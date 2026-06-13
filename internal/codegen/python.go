@@ -6,7 +6,17 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+)
+
+var (
+	rePrivacyCheck = regexp.MustCompile(
+		`player_privacy_settings\s+WHERE\s+player_id\s*=\s*(?:[a-z_]+\.)?([a-z_]+)\s+AND\s+([a-z_]+)\s*=\s*true`,
+	)
+	reOwnershipCheck = regexp.MustCompile(
+		`([a-z_]+)::text\s*=\s*current_setting\('app\.player_id'\)`,
+	)
 )
 
 // PythonGenerator generates Python async validator functions for RLS policies.
@@ -45,10 +55,7 @@ type dualPrivacyCheck struct {
 func parsePrivacyCheck(expr string) *privacyCheck {
 	// Match: player_id = <something> AND <flag_column> = true
 	// The <something> can be a bare column name, or a qualified name like game_comment.player_id.
-	re := regexp.MustCompile(
-		`player_privacy_settings\s+WHERE\s+player_id\s*=\s*(?:[a-z_]+\.)?([a-z_]+)\s+AND\s+([a-z_]+)\s*=\s*true`,
-	)
-	m := re.FindStringSubmatch(expr)
+	m := rePrivacyCheck.FindStringSubmatch(expr)
 	if m == nil {
 		return nil
 	}
@@ -70,10 +77,7 @@ func parseOwnershipCheck(expr string) *ownershipCheck {
 	if strings.Contains(expr, "player_privacy_settings") {
 		return nil
 	}
-	re := regexp.MustCompile(
-		`([a-z_]+)::text\s*=\s*current_setting\('app\.player_id'\)`,
-	)
-	m := re.FindStringSubmatch(expr)
+	m := reOwnershipCheck.FindStringSubmatch(expr)
 	if m == nil {
 		return nil
 	}
@@ -86,10 +90,7 @@ func parseOwnershipCheck(expr string) *ownershipCheck {
 // player_privacy_settings, each checking a different player's setting.
 // Returns nil if fewer than two references are found.
 func parseDualPrivacyCheck(expr string) *dualPrivacyCheck {
-	re := regexp.MustCompile(
-		`player_privacy_settings\s+WHERE\s+player_id\s*=\s*(?:[a-z_]+\.)?([a-z_]+)\s+AND\s+([a-z_]+)\s*=\s*true`,
-	)
-	matches := re.FindAllStringSubmatch(expr, -1)
+	matches := rePrivacyCheck.FindAllStringSubmatch(expr, -1)
 	if len(matches) < 2 {
 		return nil
 	}
@@ -107,7 +108,7 @@ func parseDualPrivacyCheck(expr string) *dualPrivacyCheck {
 
 // Generate produces a Python file with async validator functions for all
 // eligible policies in the schema.
-func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, error) {
+func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
 	all := ExtractPolicies(schema)
 	generatable := FilterGeneratable(all)
 
@@ -116,6 +117,7 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, error) {
 	}
 
 	var buf bytes.Buffer
+	var diags []diagnostic.Diagnostic
 	buf.WriteString(pythonHeader(schema.Name))
 
 	for i, pol := range generatable {
@@ -141,10 +143,16 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, error) {
 				"\n# Skipped %s: could not parse expression into a known pattern\n",
 				pol.PolicyName,
 			))
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Code:     "C001",
+				Table:    pol.TableName,
+				Message:  fmt.Sprintf("policy %q: could not parse expression into a known pattern", pol.PolicyName),
+			})
 		}
 	}
 
-	return buf.Bytes(), nil
+	return buf.Bytes(), diags
 }
 
 // generatePrivacyValidator writes a single-player privacy check validator.
