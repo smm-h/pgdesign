@@ -934,3 +934,24 @@ func TestAlterTableAddCheck_Idempotent(t *testing.T) {
 		t.Errorf("expected inner ALTER TABLE statement, got:\n%s", got)
 	}
 }
+
+func TestLiteralValue_EnumDefault_Correct(t *testing.T) {
+	// Correct flow: col.Default = "created", col.PGType = "status" (enum name)
+	// LiteralValue should produce 'created' (single-quoted, as enum literals are strings)
+	got := LiteralValue("created", "status")
+	want := "'created'"
+	if got != want {
+		t.Errorf("LiteralValue(%q, %q) = %q, want %q", "created", "status", got, want)
+	}
+}
+
+func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
+	// Wrong pattern: if someone writes default = "'created'" in TOML,
+	// the value reaching LiteralValue is "'created'" (with embedded single quotes).
+	// LiteralValue escapes the quotes: '''created''' -- this is bad SQL.
+	got := LiteralValue("'created'", "status")
+	want := "'''created'''"
+	if got != want {
+		t.Errorf("LiteralValue(%q, %q) = %q, want %q", "'created'", "status", got, want)
+	}
+}
