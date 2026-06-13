@@ -10,6 +10,7 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `generate` produces DDL and D2 diagram output
 - `audit` checks normal form compliance (1NF/2NF/3NF) using functional dependencies
 - `fd` provides functional dependency primitives (closure, minimal cover, candidate keys)
+- `sqlexpr` parses and walks SQL expressions; used by validate (E213) and codegen (expression-driven validators)
 - `codegen` generates type-safe application code (Python, Zig) from the model
 - `diff` compares two models or a model against a live database
 - `migrate` generates migrations with risk classification and safety linting
@@ -22,7 +23,7 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `format` handles output formatting
 - `extregistry` validates PostgreSQL extension references
 
-The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, and introspect -> serve.
+The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, and introspect -> serve.
 
 ## Key conventions
 
@@ -35,6 +36,11 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Non-transactional DDL: `CONCURRENTLY` and `ALTER TYPE ADD VALUE` operations execute outside transactions.
 - Advisory locks prevent concurrent migration execution.
 - RLS policies are defined per-table with USING/WITH CHECK expressions, error codes, and error messages.
+- Array columns use `array = true` modifier; DDL appends `[]` to the base type.
+- Warning suppression via `[suppress]` in pgdesign.toml with mandatory reason strings.
+- Append-only tables generate BEFORE UPDATE OR DELETE triggers via `append_only = true`.
+- JSONB shape validation via `json_schema` column attribute referencing an external JSON Schema file.
+- E109 validates enum defaults against declared values; E110 catches embedded SQL quotes in all defaults.
 
 ## Testing
 
