@@ -103,7 +103,10 @@ func TestGolden(t *testing.T) {
 
 			// Generate
 			opts := generate.Options{IncludeComments: true, Format: "sql"}
-			got := generate.Generate(schema, opts)
+			got, err := generate.Generate(schema, opts)
+			if err != nil {
+				t.Fatalf("generate error: %v", err)
+			}
 
 			// Update mode: overwrite the golden file and return.
 			if *update {

@@ -12,6 +12,16 @@ import (
 	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
+// mustGenerate calls Generate and fails the test on error.
+func mustGenerate(t *testing.T, schema *model.Schema, opts Options) string {
+	t.Helper()
+	out, err := Generate(schema, opts)
+	if err != nil {
+		t.Fatalf("Generate error: %v", err)
+	}
+	return out
+}
+
 func TestMinimalTable(t *testing.T) {
 	schema := &model.Schema{
 		Name: "app",
@@ -30,7 +40,7 @@ func TestMinimalTable(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "CREATE TABLE app.items (") {
 		t.Errorf("expected CREATE TABLE, got:\n%s", out)
@@ -84,7 +94,7 @@ func TestTwoTablesWithFK(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	// FK appears as ALTER TABLE, not inline
 	if !strings.Contains(out, "ALTER TABLE blog.posts ADD CONSTRAINT fk_posts_authors FOREIGN KEY (author_id) REFERENCES blog.authors (id) ON DELETE CASCADE;") {
@@ -122,7 +132,7 @@ func TestEnumGeneration(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "CREATE TYPE game.status AS ENUM ('active', 'banned', 'deleted');") {
 		t.Errorf("expected CREATE TYPE, got:\n%s", out)
@@ -166,7 +176,7 @@ func TestIndexGeneration(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "CREATE INDEX idx_events_kind ON app.events (kind);") {
 		t.Errorf("expected basic index, got:\n%s", out)
@@ -194,7 +204,7 @@ func TestCommentsIncluded(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "COMMENT ON TABLE app.users IS 'All registered users';") {
 		t.Errorf("expected table comment, got:\n%s", out)
@@ -221,7 +231,7 @@ func TestCommentsExcluded(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: false, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if strings.Contains(out, "COMMENT ON") {
 		t.Errorf("expected no comments with IncludeComments=false, got:\n%s", out)
@@ -251,7 +261,7 @@ func TestIdempotentMode(t *testing.T) {
 	}
 
 	opts := Options{Idempotent: true, IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	// All IF NOT EXISTS guards
 	if !strings.Contains(out, "CREATE SCHEMA IF NOT EXISTS") {
@@ -306,8 +316,8 @@ func TestDeterminism(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out1 := Generate(schema, opts)
-	out2 := Generate(schema, opts)
+	out1 := mustGenerate(t, schema, opts)
+	out2 := mustGenerate(t, schema, opts)
 
 	if out1 != out2 {
 		t.Errorf("Generate is not deterministic:\nfirst:\n%s\nsecond:\n%s", out1, out2)
@@ -350,7 +360,7 @@ func TestJSONFormat(t *testing.T) {
 	}
 
 	opts := Options{Format: "json"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	// Must be valid JSON.
 	var roundTripped model.Schema
@@ -419,7 +429,7 @@ func TestOwnerGeneration(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "ALTER TABLE app.items OWNER TO db_admin;") {
 		t.Errorf("expected OWNER TO, got:\n%s", out)
@@ -433,7 +443,7 @@ func TestSchemaAndExtensions(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "CREATE SCHEMA myapp;") {
 		t.Errorf("expected CREATE SCHEMA, got:\n%s", out)
@@ -462,7 +472,7 @@ func TestTrailingNewline(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.HasSuffix(out, "\n") {
 		t.Errorf("output should end with newline, got: %q", out[len(out)-10:])
@@ -522,7 +532,7 @@ func TestMultiSchemaQualifiedNames(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	// CREATE SCHEMA for both schemas.
 	if !strings.Contains(out, "CREATE SCHEMA auth;") {
@@ -606,7 +616,7 @@ func TestUniqueIndex(t *testing.T) {
 	}
 
 	opts := Options{Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "CREATE UNIQUE INDEX idx_pairs_ab ON app.pairs (a, b);") {
 		t.Errorf("expected CREATE UNIQUE INDEX for idx_pairs_ab, got:\n%s", out)
@@ -635,7 +645,7 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 
 	// PGVersion 9: identity column should fall back to bigserial.
 	opts := Options{Format: "sql", PGVersion: 9}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "id bigserial NOT NULL") {
 		t.Errorf("PGVersion=9: expected bigserial fallback, got:\n%s", out)
@@ -646,7 +656,7 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 
 	// PGVersion 10: identity column should use GENERATED AS IDENTITY.
 	opts.PGVersion = 10
-	out = Generate(schema, opts)
+	out = mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "GENERATED ALWAYS AS IDENTITY") {
 		t.Errorf("PGVersion=10: expected GENERATED ALWAYS AS IDENTITY, got:\n%s", out)
@@ -654,7 +664,7 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 
 	// PGVersion 0 (unspecified): should use GENERATED AS IDENTITY.
 	opts.PGVersion = 0
-	out = Generate(schema, opts)
+	out = mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "GENERATED ALWAYS AS IDENTITY") {
 		t.Errorf("PGVersion=0: expected GENERATED ALWAYS AS IDENTITY, got:\n%s", out)
@@ -692,7 +702,7 @@ func TestPartitionChildrenGeneration(t *testing.T) {
 	}
 
 	opts := Options{Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "PARTITION BY RANGE (created_at)") {
 		t.Errorf("expected PARTITION BY on parent table, got:\n%s", out)
@@ -755,7 +765,7 @@ func TestPartitionChildrenRecursive(t *testing.T) {
 	}
 
 	opts := Options{Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	// Parent partition.
 	if !strings.Contains(out, "CREATE TABLE app.events_2024 PARTITION OF app.events") {
@@ -797,7 +807,7 @@ func TestPartmanGeneration(t *testing.T) {
 	}
 
 	opts := Options{Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "partman.create_parent(") {
 		t.Errorf("expected partman.create_parent call, got:\n%s", out)
@@ -856,7 +866,7 @@ func TestPartmanNotEmittedWithoutExtension(t *testing.T) {
 	}
 
 	opts := Options{Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if strings.Contains(out, "partman") {
 		t.Errorf("should not contain partman SQL without pg_partman extension, got:\n%s", out)
@@ -903,7 +913,7 @@ func TestRLSPolicyGeneration(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	// ENABLE RLS must be present.
 	if !strings.Contains(out, "ALTER TABLE app.documents ENABLE ROW LEVEL SECURITY;") {
@@ -950,7 +960,7 @@ func TestRLSWithoutPolicies(t *testing.T) {
 	}
 
 	opts := Options{Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "ALTER TABLE app.secrets ENABLE ROW LEVEL SECURITY;") {
 		t.Errorf("expected ENABLE RLS even without policies, got:\n%s", out)
@@ -977,7 +987,7 @@ func TestNoPoliciesNoRLS(t *testing.T) {
 	}
 
 	opts := Options{Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if strings.Contains(out, "ROW LEVEL SECURITY") {
 		t.Errorf("should not contain RLS statements, got:\n%s", out)
@@ -1012,7 +1022,7 @@ func TestRLSPolicyAllOperation(t *testing.T) {
 	}
 
 	opts := Options{Format: "sql"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	// ALL operation should not include FOR clause.
 	if strings.Contains(out, "FOR ALL") {
@@ -1051,7 +1061,7 @@ func TestGoldenFile(t *testing.T) {
 	}
 
 	opts := Options{IncludeComments: true, Format: "sql"}
-	got := Generate(schema, opts)
+	got := mustGenerate(t, schema, opts)
 
 	expectedPath := filepath.Join("testdata", "simple_expected.sql")
 	expectedBytes, err := os.ReadFile(expectedPath)

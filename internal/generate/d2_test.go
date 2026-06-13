@@ -251,7 +251,7 @@ func TestGenerateD2ViaGenerate(t *testing.T) {
 	}
 
 	opts := Options{Format: "d2"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "shape: sql_table") {
 		t.Errorf("Generate with format=d2 should produce D2 output, got:\n%s", out)
@@ -305,7 +305,7 @@ func TestGenerateSVGFormat(t *testing.T) {
 	}
 
 	opts := Options{Format: "svg"}
-	out := Generate(schema, opts)
+	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "<svg") {
 		t.Errorf("Generate with format=svg should produce SVG output, got prefix:\n%s", out[:min(200, len(out))])

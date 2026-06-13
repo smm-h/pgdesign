@@ -3,6 +3,7 @@ package generate
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -19,34 +20,33 @@ type Options struct {
 }
 
 // Generate produces DDL output for the given schema according to opts.
-// Currently only Format="sql" is implemented; other formats return a placeholder.
-func Generate(schema *model.Schema, opts Options) string {
+func Generate(schema *model.Schema, opts Options) (string, error) {
 	switch strings.ToLower(opts.Format) {
 	case "sql", "":
-		return generateSQL(schema, opts)
+		return generateSQL(schema, opts), nil
 	case "d2":
-		return GenerateD2(schema)
+		return GenerateD2(schema), nil
 	case "json":
 		return generateJSON(schema)
 	case "svg":
 		d2Source := GenerateD2(schema)
 		svg, err := RenderSVG(d2Source)
 		if err != nil {
-			return "error: " + err.Error()
+			return "", fmt.Errorf("svg render: %w", err)
 		}
-		return string(svg)
+		return string(svg), nil
 	default:
-		return "not implemented"
+		return "", fmt.Errorf("unsupported format: %s", opts.Format)
 	}
 }
 
 // generateJSON produces pretty-printed JSON output of the full schema.
-func generateJSON(schema *model.Schema) string {
+func generateJSON(schema *model.Schema) (string, error) {
 	data, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
-		return "error: " + err.Error()
+		return "", fmt.Errorf("json marshal: %w", err)
 	}
-	return string(data)
+	return string(data), nil
 }
 
 func generateSQL(schema *model.Schema, opts Options) string {
