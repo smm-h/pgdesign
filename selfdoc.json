@@ -7,25 +7,82 @@
     "docs/_README.md"
   ],
   "source": [
-    {"path": "internal/audit", "language": "go"},
-    {"path": "internal/config", "language": "go"},
-    {"path": "internal/diagnostic", "language": "go"},
-    {"path": "internal/diff", "language": "go"},
-    {"path": "internal/discover", "language": "go"},
-    {"path": "internal/extregistry", "language": "go"},
-    {"path": "internal/fd", "language": "go"},
-    {"path": "internal/format", "language": "go"},
-    {"path": "internal/generate", "language": "go"},
-    {"path": "internal/introspect", "language": "go"},
-    {"path": "internal/migrate", "language": "go"},
-    {"path": "internal/model", "language": "go"},
-    {"path": "internal/parse", "language": "go"},
-    {"path": "internal/risk", "language": "go"},
-    {"path": "internal/semtype", "language": "go"},
-    {"path": "internal/serve", "language": "go"},
-    {"path": "internal/sql", "language": "go"},
-    {"path": "internal/sqlexpr", "language": "go"},
-    {"path": "internal/validate", "language": "go"}
+    {
+      "path": "internal/audit",
+      "language": "go"
+    },
+    {
+      "path": "internal/config",
+      "language": "go"
+    },
+    {
+      "path": "internal/diagnostic",
+      "language": "go"
+    },
+    {
+      "path": "internal/diff",
+      "language": "go"
+    },
+    {
+      "path": "internal/discover",
+      "language": "go"
+    },
+    {
+      "path": "internal/extregistry",
+      "language": "go"
+    },
+    {
+      "path": "internal/fd",
+      "language": "go"
+    },
+    {
+      "path": "internal/format",
+      "language": "go"
+    },
+    {
+      "path": "internal/generate",
+      "language": "go"
+    },
+    {
+      "path": "internal/introspect",
+      "language": "go"
+    },
+    {
+      "path": "internal/migrate",
+      "language": "go"
+    },
+    {
+      "path": "internal/model",
+      "language": "go"
+    },
+    {
+      "path": "internal/parse",
+      "language": "go"
+    },
+    {
+      "path": "internal/risk",
+      "language": "go"
+    },
+    {
+      "path": "internal/semtype",
+      "language": "go"
+    },
+    {
+      "path": "internal/serve",
+      "language": "go"
+    },
+    {
+      "path": "internal/sql",
+      "language": "go"
+    },
+    {
+      "path": "internal/sqlexpr",
+      "language": "go"
+    },
+    {
+      "path": "internal/validate",
+      "language": "go"
+    }
   ],
   "docs": "docs/",
   "output": "docs/_build/",
