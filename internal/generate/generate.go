@@ -42,7 +42,23 @@ func Generate(schema *model.Schema, opts Options) (string, error) {
 
 // generateJSON produces pretty-printed JSON output of the full schema.
 func generateJSON(schema *model.Schema) (string, error) {
-	data, err := json.MarshalIndent(schema, "", "  ")
+	// Deep-enough copy so sorting doesn't mutate the original.
+	s := *schema
+	s.Enums = make([]model.Enum, len(schema.Enums))
+	copy(s.Enums, schema.Enums)
+	sort.Slice(s.Enums, func(i, j int) bool {
+		return s.Enums[i].Name < s.Enums[j].Name
+	})
+	s.Tables = make([]model.Table, len(schema.Tables))
+	copy(s.Tables, schema.Tables)
+	for i := range s.Tables {
+		s.Tables[i].FKs = sortedFKs(s.Tables[i].FKs)
+		s.Tables[i].Indexes = sortedIndexes(s.Tables[i].Indexes)
+		s.Tables[i].Uniques = sortedUniques(s.Tables[i].Uniques)
+		s.Tables[i].Checks = sortedChecks(s.Tables[i].Checks)
+		s.Tables[i].Policies = sortedPolicies(s.Tables[i].Policies)
+	}
+	data, err := json.MarshalIndent(&s, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("json marshal: %w", err)
 	}
