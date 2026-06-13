@@ -216,3 +216,59 @@ pk = ["id"]
 		t.Fatal("expected non-empty diagnostics for invalid schema")
 	}
 }
+
+func TestFindDuplicateIndexes(t *testing.T) {
+	tests := []struct {
+		name    string
+		indexes []indexStat
+		want    int
+	}{
+		{
+			name:    "no indexes",
+			indexes: nil,
+			want:    0,
+		},
+		{
+			name: "no duplicates",
+			indexes: []indexStat{
+				{IndexName: "idx_a", Columns: []string{"x", "y"}},
+				{IndexName: "idx_b", Columns: []string{"z"}},
+			},
+			want: 0,
+		},
+		{
+			name: "prefix duplicate",
+			indexes: []indexStat{
+				{IndexName: "idx_a", Columns: []string{"x"}},
+				{IndexName: "idx_b", Columns: []string{"x", "y"}},
+			},
+			want: 1,
+		},
+		{
+			name: "exact same columns not duplicate",
+			indexes: []indexStat{
+				{IndexName: "idx_a", Columns: []string{"x", "y"}},
+				{IndexName: "idx_b", Columns: []string{"x", "y"}},
+			},
+			want: 0,
+		},
+		{
+			name: "multiple duplicates",
+			indexes: []indexStat{
+				{IndexName: "idx_a", Columns: []string{"x"}},
+				{IndexName: "idx_b", Columns: []string{"x", "y"}},
+				{IndexName: "idx_c", Columns: []string{"x", "y", "z"}},
+			},
+			want: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := findDuplicateIndexes(tt.indexes)
+			if len(got) != tt.want {
+				t.Errorf("findDuplicateIndexes() returned %d pairs, want %d", len(got), tt.want)
+			}
+		})
+	}
+}

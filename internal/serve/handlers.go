@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/smm-h/pgdesign/internal/audit"
@@ -211,7 +212,29 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	if stats == nil {
 		stats = []tableStat{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tables": stats})
+
+	var hitRatio *float64
+	err = s.pool.QueryRow(ctx,
+		`SELECT blks_hit::float / NULLIF(blks_hit + blks_read, 0) AS hit_ratio FROM pg_stat_database WHERE datname = current_database()`).Scan(&hitRatio)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("query hit ratio: %v", err))
+		return
+	}
+
+	resp := map[string]any{"tables": stats}
+	if hitRatio != nil {
+		resp["hit_ratio"] = *hitRatio
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// indexStat holds per-index statistics.
+type indexStat struct {
+	IndexName string   `json:"index_name"`
+	IdxScan   int64    `json:"idx_scan"`
+	SizeBytes int64    `json:"size_bytes"`
+	Unused    bool     `json:"unused"`
+	Columns   []string `json:"columns"`
 }
 
 // handleTableStats returns per-table stats including column info and index usage.
@@ -219,16 +242,19 @@ func (s *Server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	table := r.PathValue("table")
 
-	type indexStat struct {
-		IndexName string `json:"index_name"`
-		IdxScan   int64  `json:"idx_scan"`
-		SizeBytes int64  `json:"size_bytes"`
-	}
-
 	rows, err := s.pool.Query(ctx,
-		`SELECT indexrelname, idx_scan, pg_relation_size(indexrelid) as size_bytes
-		FROM pg_stat_user_indexes
-		WHERE schemaname||'.'||relname = $1`,
+		`SELECT
+			sui.indexrelname,
+			sui.idx_scan,
+			pg_relation_size(sui.indexrelid) as size_bytes,
+			array_to_string(ARRAY(
+				SELECT pg_get_indexdef(sui.indexrelid, k + 1, true)
+				FROM generate_subscripts(ix.indkey, 1) AS k
+				ORDER BY k
+			), ',') AS columns
+		FROM pg_stat_user_indexes sui
+		JOIN pg_index ix ON ix.indexrelid = sui.indexrelid
+		WHERE sui.schemaname||'.'||sui.relname = $1`,
 		table)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("query table stats: %v", err))
@@ -239,9 +265,14 @@ func (s *Server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 	var indexes []indexStat
 	for rows.Next() {
 		var idx indexStat
-		if err := rows.Scan(&idx.IndexName, &idx.IdxScan, &idx.SizeBytes); err != nil {
+		var cols string
+		if err := rows.Scan(&idx.IndexName, &idx.IdxScan, &idx.SizeBytes, &cols); err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("scan index row: %v", err))
 			return
+		}
+		idx.Unused = (idx.IdxScan == 0)
+		if cols != "" {
+			idx.Columns = strings.Split(cols, ",")
 		}
 		indexes = append(indexes, idx)
 	}
@@ -253,9 +284,14 @@ func (s *Server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 	if indexes == nil {
 		indexes = []indexStat{}
 	}
+	duplicates := findDuplicateIndexes(indexes)
+	if duplicates == nil {
+		duplicates = []duplicateIndexPair{}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"table":   table,
-		"indexes": indexes,
+		"table":      table,
+		"indexes":    indexes,
+		"duplicates": duplicates,
 	})
 }
 
@@ -465,6 +501,44 @@ func parseAndBuild(data []byte) (*model.Schema, []diagnostic.Diagnostic) {
 	}
 
 	return schema, allDiags
+}
+
+// duplicateIndexPair represents a pair of indexes where one is a leading prefix of the other.
+type duplicateIndexPair struct {
+	Redundant string `json:"redundant"`
+	CoveredBy string `json:"covered_by"`
+}
+
+// findDuplicateIndexes detects indexes where one's columns are a leading prefix of another's.
+func findDuplicateIndexes(indexes []indexStat) []duplicateIndexPair {
+	var pairs []duplicateIndexPair
+	for i, a := range indexes {
+		for j, b := range indexes {
+			if i == j {
+				continue
+			}
+			if isPrefix(a.Columns, b.Columns) && len(a.Columns) < len(b.Columns) {
+				pairs = append(pairs, duplicateIndexPair{
+					Redundant: a.IndexName,
+					CoveredBy: b.IndexName,
+				})
+			}
+		}
+	}
+	return pairs
+}
+
+// isPrefix returns true if a is a prefix of b.
+func isPrefix(a, b []string) bool {
+	if len(a) > len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // diagsToJSON converts diagnostics to a JSON-friendly slice of maps.
