@@ -61,6 +61,7 @@ type RawColumn struct {
 	Stored     *bool
 	Array      *bool
 	Comment    *string
+	JSONSchema *string
 }
 
 // RawFK holds a foreign key constraint from [tables.*.fks.*].

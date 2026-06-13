@@ -108,6 +108,7 @@ type Column struct {
 	Comment          string `json:"comment,omitempty"`
 	SemanticTypeName string `json:"semantic_type_name,omitempty"`
 	Array            bool   `json:"array,omitempty"`
+	JSONSchema       string `json:"json_schema,omitempty"`
 }
 
 // FK represents a resolved foreign key constraint.

@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -460,7 +461,7 @@ func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode)
 	knownKeys := map[string]bool{
 		"type": true, "nullable": true, "default": true,
 		"default_expr": true, "generated": true, "stored": true,
-		"array": true, "comment": true,
+		"array": true, "comment": true, "json_schema": true,
 	}
 
 	for _, child := range tbl.Children {
@@ -521,6 +522,27 @@ func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode)
 				col.Comment = &v
 			} else {
 				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].comment must be a string", tableName, colName)
+			}
+		case "json_schema":
+			if v, ok := nodeString(kv.Val); ok {
+				col.JSONSchema = &v
+			} else {
+				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].json_schema must be a string", tableName, colName)
+			}
+		}
+	}
+
+	// Validate json_schema file if specified.
+	if col.JSONSchema != nil && p.file != "<bytes>" {
+		schemaDir := filepath.Dir(p.file)
+		schemaPath := filepath.Join(schemaDir, *col.JSONSchema)
+		data, err := os.ReadFile(schemaPath)
+		if err != nil {
+			p.errorf("E012", tableName, colName, "json_schema file not found: %s", schemaPath)
+		} else {
+			var js interface{}
+			if jsonErr := json.Unmarshal(data, &js); jsonErr != nil {
+				p.errorf("E013", tableName, colName, "json_schema file is not valid JSON: %s", jsonErr.Error())
 			}
 		}
 	}

@@ -265,6 +265,10 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 		col.Comment = *rc.Comment
 	}
 
+	if rc.JSONSchema != nil {
+		col.JSONSchema = *rc.JSONSchema
+	}
+
 	return col, diags
 }
 

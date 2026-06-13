@@ -1,0 +1,14 @@
+[meta]
+version = 1
+schema = "shop"
+
+[tables.products]
+comment = "Product catalog"
+pk = ["id"]
+
+[tables.products.columns.id]
+type = "uuid"
+
+[tables.products.columns.metadata]
+type = "jsonb"
+json_schema = "test_schema.json"

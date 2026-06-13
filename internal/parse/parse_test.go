@@ -735,6 +735,136 @@ type = "text"
 	}
 }
 
+func TestJSONSchemaAttribute(t *testing.T) {
+	path := filepath.Join("testdata", "json_schema.toml")
+	schema, diags := File(path)
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("len(tables) = %d, want 1", len(schema.Tables))
+	}
+
+	products := schema.Tables[0]
+	if len(products.Columns) != 2 {
+		t.Fatalf("products columns = %d, want 2", len(products.Columns))
+	}
+
+	metadata := products.Columns[1]
+	if metadata.Name != "metadata" {
+		t.Fatalf("column[1].name = %q, want %q", metadata.Name, "metadata")
+	}
+	if metadata.JSONSchema == nil {
+		t.Fatal("expected json_schema to be set")
+	}
+	if *metadata.JSONSchema != "test_schema.json" {
+		t.Errorf("json_schema = %q, want %q", *metadata.JSONSchema, "test_schema.json")
+	}
+}
+
+func TestJSONSchemaFileMissing(t *testing.T) {
+	schema, diags := Bytes([]byte(`
+[meta]
+version = 1
+schema = "test"
+
+[tables.t]
+comment = "test"
+pk = ["id"]
+
+[tables.t.columns.id]
+type = "uuid"
+
+[tables.t.columns.data]
+type = "jsonb"
+json_schema = "nonexistent.json"
+`))
+	if schema == nil {
+		t.Fatal("expected schema")
+	}
+	// When parsing from bytes, json_schema file validation is skipped
+	// (no directory context to resolve relative paths).
+	// The value should still be stored.
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors from Bytes(): %v", diags)
+	}
+	col := schema.Tables[0].Columns[1]
+	if col.JSONSchema == nil {
+		t.Fatal("expected json_schema to be set even from Bytes()")
+	}
+}
+
+func TestJSONSchemaFileNotFound(t *testing.T) {
+	// Create a temp TOML file that references a nonexistent JSON schema
+	dir := t.TempDir()
+	tomlPath := filepath.Join(dir, "test.toml")
+	os.WriteFile(tomlPath, []byte(`
+[meta]
+version = 1
+schema = "test"
+
+[tables.t]
+comment = "test"
+pk = ["id"]
+
+[tables.t.columns.id]
+type = "uuid"
+
+[tables.t.columns.data]
+type = "jsonb"
+json_schema = "nonexistent.json"
+`), 0644)
+
+	_, diags := File(tomlPath)
+	found := false
+	for _, d := range diags {
+		if d.Code == "E012" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected E012 diagnostic for missing json_schema file")
+	}
+}
+
+func TestJSONSchemaFileInvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	// Write an invalid JSON file
+	os.WriteFile(filepath.Join(dir, "bad.json"), []byte(`{not valid json`), 0644)
+	tomlPath := filepath.Join(dir, "test.toml")
+	os.WriteFile(tomlPath, []byte(`
+[meta]
+version = 1
+schema = "test"
+
+[tables.t]
+comment = "test"
+pk = ["id"]
+
+[tables.t.columns.id]
+type = "uuid"
+
+[tables.t.columns.data]
+type = "jsonb"
+json_schema = "bad.json"
+`), 0644)
+
+	_, diags := File(tomlPath)
+	found := false
+	for _, d := range diags {
+		if d.Code == "E013" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected E013 diagnostic for invalid JSON in json_schema file")
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {
