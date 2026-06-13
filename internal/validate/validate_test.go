@@ -1274,6 +1274,76 @@ func TestE110_ColumnDefaultEmbeddedQuotes(t *testing.T) {
 	}
 }
 
+func TestSuppressionPipeline_Integration(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "items", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb", JSONSchema: "tags_schema.json"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+		}},
+	}
+
+	cfg := &Config{
+		Suppress: map[string]string{
+			"orders.items.W004": "intentional denormalization",
+		},
+	}
+
+	diags, suppressed := Validate(schema, cfg)
+
+	// W004 must not appear in active diagnostics.
+	w004Active := findByCode(diags, "W004")
+	if len(w004Active) > 0 {
+		t.Fatalf("expected no active W004 diagnostics, got %d", len(w004Active))
+	}
+
+	// W004 must appear exactly 2 times in suppressed list.
+	var w004Suppressed []SuppressedDiagnostic
+	for _, s := range suppressed {
+		if s.Code == "W004" {
+			w004Suppressed = append(w004Suppressed, s)
+		}
+	}
+	if len(w004Suppressed) != 2 {
+		t.Fatalf("expected 2 suppressed W004 diagnostics, got %d", len(w004Suppressed))
+	}
+
+	// Verify config-based suppression for "items".
+	var foundItems bool
+	for _, s := range w004Suppressed {
+		if s.Column == "items" {
+			foundItems = true
+			if s.Reason != "intentional denormalization" {
+				t.Errorf("items suppression reason = %q, want %q", s.Reason, "intentional denormalization")
+			}
+		}
+	}
+	if !foundItems {
+		t.Error("expected suppressed W004 for column 'items'")
+	}
+
+	// Verify programmatic suppression for "tags" (auto-suppressed via JSONSchema).
+	var foundTags bool
+	for _, s := range w004Suppressed {
+		if s.Column == "tags" {
+			foundTags = true
+			if s.Reason != "programmatically suppressed" {
+				t.Errorf("tags suppression reason = %q, want %q", s.Reason, "programmatically suppressed")
+			}
+		}
+	}
+	if !foundTags {
+		t.Error("expected suppressed W004 for column 'tags'")
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {
