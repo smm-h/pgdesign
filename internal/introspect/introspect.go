@@ -283,6 +283,11 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model
 		if comment != nil {
 			c.Comment = *comment
 		}
+		// Detect array types: format_type() returns "text[]", "integer[]", etc.
+		if strings.HasSuffix(c.PGType, "[]") {
+			c.Array = true
+			c.PGType = strings.TrimSuffix(c.PGType, "[]")
+		}
 		cols = append(cols, c)
 	}
 	return cols, rows.Err()

@@ -57,6 +57,7 @@ func TestMain(m *testing.M) {
 			email text NOT NULL,
 			status ` + testSchema + `.status NOT NULL DEFAULT 'active',
 			bio text,
+			tags text[] NOT NULL DEFAULT '{}',
 			created_at timestamptz NOT NULL DEFAULT now()
 		);
 		COMMENT ON TABLE ` + testSchema + `.users IS 'User accounts';
@@ -189,13 +190,13 @@ func TestIntrospectColumns(t *testing.T) {
 		t.Fatal("users table not found")
 	}
 
-	// Users should have 6 columns in attnum order.
-	if len(users.Columns) != 6 {
-		t.Fatalf("users columns = %d, want 6", len(users.Columns))
+	// Users should have 7 columns in attnum order.
+	if len(users.Columns) != 7 {
+		t.Fatalf("users columns = %d, want 7", len(users.Columns))
 	}
 
 	// Check column names in order.
-	expectedCols := []string{"id", "name", "email", "status", "bio", "created_at"}
+	expectedCols := []string{"id", "name", "email", "status", "bio", "tags", "created_at"}
 	for i, want := range expectedCols {
 		if users.Columns[i].Name != want {
 			t.Errorf("users.Columns[%d].Name = %q, want %q", i, users.Columns[i].Name, want)
@@ -220,8 +221,22 @@ func TestIntrospectColumns(t *testing.T) {
 		t.Error("bio.NotNull = true, want false")
 	}
 
+	// tags is an array column.
+	tagsCol := users.Columns[5]
+	if tagsCol.PGType != "text" {
+		t.Errorf("tags.PGType = %q, want %q", tagsCol.PGType, "text")
+	}
+	if !tagsCol.Array {
+		t.Error("tags.Array = false, want true")
+	}
+
+	// Non-array columns should have Array = false.
+	if nameCol.Array {
+		t.Error("name.Array = true, want false")
+	}
+
 	// created_at has a default.
-	createdCol := users.Columns[5]
+	createdCol := users.Columns[6]
 	if createdCol.DefaultExpr != "now()" {
 		t.Errorf("created_at.DefaultExpr = %q, want %q", createdCol.DefaultExpr, "now()")
 	}
