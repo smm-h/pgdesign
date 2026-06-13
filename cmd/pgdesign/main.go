@@ -1506,8 +1506,10 @@ func handleCodegen(kwargs map[string]interface{}) int {
 		switch lang {
 		case "python":
 			gen = &codegen.PythonGenerator{}
+		case "zig":
+			gen = &codegen.ZigValidatorGenerator{}
 		default:
-			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python, got %s\n", lang)
+			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python or zig, got %s\n", lang)
 			return 1
 		}
 	case "constants":
