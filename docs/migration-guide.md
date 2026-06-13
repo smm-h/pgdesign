@@ -237,6 +237,52 @@ A warning is emitted suggesting the expand-contract pattern:
 3. Swap columns (rename)
 4. Drop the old column
 
+## Append-only trigger migrations
+
+When a table's `append_only` attribute changes, pgdesign generates trigger-based migrations to enforce or remove immutability:
+
+**Enabling append-only (`false` to `true`):**
+1. Creates a shared `pgdesign_deny_mutation()` function if this is the first append-only table (the function raises an exception on UPDATE or DELETE attempts)
+2. Creates a per-table `BEFORE UPDATE OR DELETE` trigger that calls the shared function
+
+```sql
+-- Shared function (created once, reused across all append-only tables)
+CREATE OR REPLACE FUNCTION pgdesign_deny_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+  RAISE EXCEPTION 'mutations not allowed on append-only table %', TG_TABLE_NAME;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Per-table trigger
+CREATE TRIGGER trg_audit_log_deny_mutation
+  BEFORE UPDATE OR DELETE ON public.audit_log
+  FOR EACH ROW EXECUTE FUNCTION pgdesign_deny_mutation();
+```
+
+**Disabling append-only (`true` to `false`):**
+1. Drops the per-table trigger
+2. Drops the shared `pgdesign_deny_mutation()` function if no other append-only tables remain
+
+## Array type migrations
+
+Changing a column between scalar and array types (or vice versa) is treated as a type change by diff/migrate. For example, changing a column from `text` to `text[]` (by adding `array = true`) generates an `alter_column_type` migration operation:
+
+```toml
+[[ddl]]
+op = "alter_column_type"
+table = "public.posts"
+column = "tags"
+from = "text"
+to = "text[]"
+```
+
+## JSON Schema constraint migrations
+
+Adding a `json_schema` attribute to a JSONB column generates CHECK constraints based on the referenced JSON Schema's required properties. These constraints validate that the JSONB value contains the expected top-level keys.
+
+When the `json_schema` reference changes (pointing to a different schema file or the schema file is updated), pgdesign generates updated CHECK constraints -- dropping the old constraint and adding the new one.
+
 ## Dry-run mode
 
 Use `--dry-run` on `migrate apply` to see the SQL that would be executed without actually running it:
