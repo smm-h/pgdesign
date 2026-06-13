@@ -233,7 +233,11 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	// Pre-PG10 identity fallback: replace identity column with bigserial.
 	if col.Identity != "" && pgVersion > 0 && pgVersion < 10 {
 		var parts []string
-		parts = append(parts, QuoteIdent(col.Name), "bigserial")
+		pgType := "bigserial"
+		if col.Array {
+			pgType += "[]"
+		}
+		parts = append(parts, QuoteIdent(col.Name), pgType)
 		if col.NotNull {
 			parts = append(parts, "NOT NULL")
 		}
@@ -241,7 +245,11 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	}
 
 	var parts []string
-	parts = append(parts, QuoteIdent(col.Name), resolveColumnType(col.PGType, enums))
+	pgType := resolveColumnType(col.PGType, enums)
+	if col.Array {
+		pgType += "[]"
+	}
+	parts = append(parts, QuoteIdent(col.Name), pgType)
 
 	if col.NotNull {
 		parts = append(parts, "NOT NULL")

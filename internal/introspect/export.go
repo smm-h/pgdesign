@@ -108,6 +108,11 @@ func Export(schema *model.Schema) ([]byte, error) {
 					}
 				}
 			}
+			if c.Array {
+				if err := doc.SetCreate(colPath+".array", true); err != nil {
+					return nil, fmt.Errorf("set %s.array: %w", colPath, err)
+				}
+			}
 			if c.Comment != "" {
 				if err := doc.SetCreate(colPath+".comment", c.Comment); err != nil {
 					return nil, fmt.Errorf("set %s.comment: %w", colPath, err)

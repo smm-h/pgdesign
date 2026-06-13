@@ -382,6 +382,55 @@ func TestCreateTable_EnumColumnSchemaQualified(t *testing.T) {
 	}
 }
 
+func TestCreateTable_ArrayColumn(t *testing.T) {
+	table := &model.Table{
+		Name:   "posts",
+		Schema: "public",
+		Columns: []model.Column{
+			{Name: "id", PGType: "uuid", NotNull: true},
+			{Name: "tags", PGType: "text", NotNull: true, Array: true},
+			{Name: "scores", PGType: "integer", NotNull: false, Array: true},
+			{Name: "title", PGType: "text", NotNull: true},
+		},
+		PK: []string{"id"},
+	}
+
+	got := CreateTable(table, "public", false, 0, nil)
+
+	if !strings.Contains(got, "tags text[] NOT NULL") {
+		t.Errorf("expected tags text[] NOT NULL, got:\n%s", got)
+	}
+	if !strings.Contains(got, "scores integer[]") {
+		t.Errorf("expected scores integer[], got:\n%s", got)
+	}
+	// Non-array column should not have []
+	if !strings.Contains(got, "title text NOT NULL") {
+		t.Errorf("expected title text NOT NULL (no []), got:\n%s", got)
+	}
+}
+
+func TestCreateTable_ArrayColumnWithEnum(t *testing.T) {
+	enums := []model.Enum{
+		{Schema: "app", Name: "tag_type", Values: []string{"a", "b"}},
+	}
+	table := &model.Table{
+		Name:   "items",
+		Schema: "app",
+		Columns: []model.Column{
+			{Name: "id", PGType: "uuid", NotNull: true},
+			{Name: "tags", PGType: "tag_type", NotNull: true, Array: true},
+		},
+		PK: []string{"id"},
+	}
+
+	got := CreateTable(table, "app", false, 0, enums)
+
+	// Enum array: schema-qualified enum name + []
+	if !strings.Contains(got, "tags app.tag_type[] NOT NULL") {
+		t.Errorf("expected tags app.tag_type[] NOT NULL, got:\n%s", got)
+	}
+}
+
 func TestCreateTable_CrossSchemaEnum(t *testing.T) {
 	// Enum defined in a different schema than the table.
 	enums := []model.Enum{
