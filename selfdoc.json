@@ -1,5 +1,6 @@
 {
   "version": "0.6.0",
+  "version_source": "VERSION",
   "base_url": "https://pgdesign.smmh.dev",
   "root_files": [
     "docs/_CLAUDE.md",
