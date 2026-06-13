@@ -17,6 +17,7 @@ type Config struct {
 	Validate   ValidateConfig   `toml:"validate"`
 	Migrate    MigrateConfig    `toml:"migrate"`
 	Extensions []ExtensionConfig `toml:"extensions"`
+	Suppress   map[string]string `toml:"suppress"`
 }
 
 // ProjectConfig holds [project] section values.

@@ -299,3 +299,32 @@ func TestMergeValidateFlags(t *testing.T) {
 		t.Errorf("max_columns should not change with zero flag, got %d", cfg.Validate.MaxColumns)
 	}
 }
+
+func TestLoadSuppressSection(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[suppress]
+"users.tags.W004" = "tags column is intentionally denormalized"
+"audit_log.W001" = "audit tables are expected to be large"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(cfg.Suppress) != 2 {
+		t.Fatalf("expected 2 suppress entries, got %d", len(cfg.Suppress))
+	}
+	if v := cfg.Suppress["users.tags.W004"]; v != "tags column is intentionally denormalized" {
+		t.Errorf("suppress[users.tags.W004] = %q, want %q", v, "tags column is intentionally denormalized")
+	}
+	if v := cfg.Suppress["audit_log.W001"]; v != "audit tables are expected to be large" {
+		t.Errorf("suppress[audit_log.W001] = %q, want %q", v, "audit tables are expected to be large")
+	}
+}
