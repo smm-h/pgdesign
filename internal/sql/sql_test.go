@@ -1015,6 +1015,31 @@ func TestCreateAppendOnlyTrigger(t *testing.T) {
 	}
 }
 
+func TestLiteralValue_ArrayDefaults(t *testing.T) {
+	// Array defaults are always array literals (e.g., {}, {1,2,3}) which
+	// PostgreSQL expects as single-quoted strings regardless of element type.
+	tests := []struct {
+		value  string
+		pgType string
+		want   string
+	}{
+		// When the full array type is passed (text[]), non-numeric path quotes correctly.
+		{"{}", "text[]", "'{}'"},
+		// When the base type is passed for a non-numeric type, also quotes correctly.
+		{"{}", "text", "'{}'"},
+		// When the full array type is passed (integer[]), the [] suffix makes it
+		// non-numeric (isNumericType doesn't match "integer[]"), so it quotes correctly.
+		{"{1,2,3}", "integer[]", "'{1,2,3}'"},
+	}
+
+	for _, tt := range tests {
+		got := LiteralValue(tt.value, tt.pgType)
+		if got != tt.want {
+			t.Errorf("LiteralValue(%q, %q) = %q, want %q", tt.value, tt.pgType, got, tt.want)
+		}
+	}
+}
+
 func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
 	// Wrong pattern: if someone writes default = "'created'" in TOML,
 	// the value reaching LiteralValue is "'created'" (with embedded single quotes).
