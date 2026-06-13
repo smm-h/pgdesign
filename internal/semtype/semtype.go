@@ -235,6 +235,21 @@ func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
 		td.NotNull = *ut.NotNull
 	}
 	if ut.Default != "" {
+		found := false
+		for _, v := range ut.Values {
+			if v == ut.Default {
+				found = true
+				break
+			}
+		}
+		if !found {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E109",
+				Message:  fmt.Sprintf("enum type %q default %q is not a declared value (valid: %s)", ut.Name, ut.Default, strings.Join(ut.Values, ", ")),
+			})
+			return diags
+		}
 		td.Default = ut.Default
 	}
 

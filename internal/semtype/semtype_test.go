@@ -360,3 +360,58 @@ func TestResolveColumnIdentity(t *testing.T) {
 		t.Errorf("Generated = %q, want empty (identity columns use Identity field)", rc.Generated)
 	}
 }
+
+func TestLoadUserEnumType_ValidDefault(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:    "status",
+			Kind:    "enum",
+			Values:  []string{"created", "running", "done"},
+			Default: "created",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("status")
+	if err != nil {
+		t.Fatalf("Resolve(status) error: %v", err)
+	}
+	if td.Default != "created" {
+		t.Errorf("Default = %q, want %q", td.Default, "created")
+	}
+}
+
+func TestLoadUserEnumType_InvalidDefault_E109(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:    "status",
+			Kind:    "enum",
+			Values:  []string{"created", "running"},
+			Default: "'created'",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for invalid enum default, got none")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Code == "E109" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E109 for invalid enum default")
+	}
+}
