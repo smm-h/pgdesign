@@ -3,20 +3,11 @@ package codegen
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
-)
-
-var (
-	rePrivacyCheck = regexp.MustCompile(
-		`player_privacy_settings\s+WHERE\s+player_id\s*=\s*(?:[a-z_]+\.)?([a-z_]+)\s+AND\s+([a-z_]+)\s*=\s*true`,
-	)
-	reOwnershipCheck = regexp.MustCompile(
-		`([a-z_]+)::text\s*=\s*current_setting\('app\.player_id'\)`,
-	)
+	"github.com/smm-h/pgdesign/internal/sqlexpr"
 )
 
 // PythonGenerator generates Python async validator functions for RLS policies.
@@ -46,63 +37,175 @@ type dualPrivacyCheck struct {
 	second privacyCheck
 }
 
-// parsePrivacyCheck extracts the privacy settings reference from a policy
-// expression. It looks for the pattern:
-//
-//	EXISTS (SELECT 1 FROM <schema>.player_privacy_settings WHERE player_id = <col> AND <flag> = true)
-//
-// Returns nil if the expression doesn't match.
-func parsePrivacyCheck(expr string) *privacyCheck {
-	// Match: player_id = <something> AND <flag_column> = true
-	// The <something> can be a bare column name, or a qualified name like game_comment.player_id.
-	m := rePrivacyCheck.FindStringSubmatch(expr)
-	if m == nil {
-		return nil
-	}
-	return &privacyCheck{
-		lookupColumn: m[1],
-		flagColumn:   m[2],
+// unwrapCast returns the inner node if n is a Cast, otherwise returns n as-is.
+func unwrapCast(n sqlexpr.Node) sqlexpr.Node {
+	for {
+		c, ok := n.(*sqlexpr.Cast)
+		if !ok {
+			return n
+		}
+		n = c.Expr
 	}
 }
 
-// parseOwnershipCheck detects the ownership pattern:
-//
-//	<column>::text = current_setting('app.player_id')
-//
-// This must be the ONLY substantive condition (no AND with privacy checks).
-// Returns nil if the expression doesn't match or contains other patterns.
-func parseOwnershipCheck(expr string) *ownershipCheck {
-	// Skip if expression also references player_privacy_settings -- those are
-	// privacy checks or dual-player checks, not pure ownership.
-	if strings.Contains(expr, "player_privacy_settings") {
-		return nil
-	}
-	m := reOwnershipCheck.FindStringSubmatch(expr)
-	if m == nil {
-		return nil
-	}
-	return &ownershipCheck{
-		column: m[1],
+// unwrapParen returns the inner node if n is a ParenExpr, otherwise returns n as-is.
+func unwrapParen(n sqlexpr.Node) sqlexpr.Node {
+	for {
+		p, ok := n.(*sqlexpr.ParenExpr)
+		if !ok {
+			return n
+		}
+		n = p.Inner
 	}
 }
 
-// parseDualPrivacyCheck detects policies with two references to
-// player_privacy_settings, each checking a different player's setting.
-// Returns nil if fewer than two references are found.
-func parseDualPrivacyCheck(expr string) *dualPrivacyCheck {
-	matches := rePrivacyCheck.FindAllStringSubmatch(expr, -1)
-	if len(matches) < 2 {
+// detectOwnership walks the AST looking for a BinaryOp{Op: "="} where one side
+// (after unwrapping Cast) is a ColumnRef and the other side (after unwrapping
+// Cast) is a FuncCall named "current_setting".
+// Returns nil if the pattern is not found.
+func detectOwnership(node sqlexpr.Node) *ownershipCheck {
+	var result *ownershipCheck
+	sqlexpr.Walk(node, func(n sqlexpr.Node) bool {
+		if result != nil {
+			return false
+		}
+		bin, ok := n.(*sqlexpr.BinaryOp)
+		if !ok || bin.Op != "=" {
+			return true
+		}
+		left := unwrapCast(bin.Left)
+		right := unwrapCast(bin.Right)
+		// Try left=ColumnRef, right=FuncCall
+		if col, ok := left.(*sqlexpr.ColumnRef); ok {
+			if fc, ok := right.(*sqlexpr.FuncCall); ok && strings.EqualFold(fc.Name, "current_setting") {
+				result = &ownershipCheck{column: col.Parts[len(col.Parts)-1]}
+				return false
+			}
+		}
+		// Try right=ColumnRef, left=FuncCall
+		if col, ok := right.(*sqlexpr.ColumnRef); ok {
+			if fc, ok := left.(*sqlexpr.FuncCall); ok && strings.EqualFold(fc.Name, "current_setting") {
+				result = &ownershipCheck{column: col.Parts[len(col.Parts)-1]}
+				return false
+			}
+		}
+		return true
+	})
+	return result
+}
+
+// existsLookup describes a parsed EXISTS subquery that checks a flag in a lookup table.
+type existsLookup struct {
+	tableParts   []string // fully qualified table reference parts (e.g., ["game", "player_privacy_settings"])
+	joinColumn   string   // column in the lookup table used for the join (e.g., "player_id")
+	lookupColumn string   // column from the outer table (e.g., "sender_id")
+	flagColumn   string   // boolean flag column (e.g., "chat_enabled")
+}
+
+// detectAllExistsLookups walks the AST and collects all ExistsExpr nodes,
+// extracting the lookup table, join condition, and flag condition from each.
+// Returns nil if no EXISTS subqueries with the expected pattern are found.
+func detectAllExistsLookups(node sqlexpr.Node) []*existsLookup {
+	var results []*existsLookup
+	sqlexpr.Walk(node, func(n sqlexpr.Node) bool {
+		ex, ok := n.(*sqlexpr.ExistsExpr)
+		if !ok {
+			return true
+		}
+		sel := ex.Subquery
+		if sel == nil || sel.Where == nil {
+			return true
+		}
+		lookup := analyzeExistsWhere(sel)
+		if lookup != nil {
+			results = append(results, lookup)
+		}
+		return false // don't descend into subquery children
+	})
+	return results
+}
+
+// analyzeExistsWhere extracts join and flag info from a SelectExpr's WHERE clause.
+// Expected pattern: joinCol = outerCol AND flagCol = true
+func analyzeExistsWhere(sel *sqlexpr.SelectExpr) *existsLookup {
+	// Collect all equality comparisons from the WHERE clause
+	var eqs []*sqlexpr.BinaryOp
+	collectEquals(sel.Where, &eqs)
+
+	var joinCol, lookupCol, flagCol string
+	for _, eq := range eqs {
+		left := unwrapCast(unwrapParen(eq.Left))
+		right := unwrapCast(unwrapParen(eq.Right))
+
+		// Check for flag = true pattern
+		if leftCol, ok := left.(*sqlexpr.ColumnRef); ok {
+			if boolLit, ok := right.(*sqlexpr.BoolLiteral); ok && boolLit.Value {
+				flagCol = leftCol.Parts[len(leftCol.Parts)-1]
+				continue
+			}
+		}
+		if rightCol, ok := right.(*sqlexpr.ColumnRef); ok {
+			if boolLit, ok := left.(*sqlexpr.BoolLiteral); ok && boolLit.Value {
+				flagCol = rightCol.Parts[len(rightCol.Parts)-1]
+				continue
+			}
+		}
+
+		// Check for col = col pattern (join condition)
+		if leftCol, ok := left.(*sqlexpr.ColumnRef); ok {
+			if rightCol, ok := right.(*sqlexpr.ColumnRef); ok {
+				// The join column is the unqualified one or the one from the subquery table.
+				// The lookup column is the one referencing the outer table.
+				// Heuristic: if one is qualified (has 2+ parts), it's the outer column.
+				// If both are unqualified, the first (left) is the join column from the
+				// lookup table and the second (right) is the outer reference.
+				leftName := leftCol.Parts[len(leftCol.Parts)-1]
+				rightName := rightCol.Parts[len(rightCol.Parts)-1]
+				if len(rightCol.Parts) > 1 {
+					// Right is qualified (outer ref), left is join
+					joinCol = leftName
+					lookupCol = rightName
+				} else if len(leftCol.Parts) > 1 {
+					// Left is qualified (outer ref), right is join
+					lookupCol = leftName
+					joinCol = rightName
+				} else {
+					// Both unqualified: left = join (lookup table's column), right = outer
+					joinCol = leftName
+					lookupCol = rightName
+				}
+				continue
+			}
+		}
+	}
+
+	if joinCol == "" || lookupCol == "" || flagCol == "" {
 		return nil
 	}
-	return &dualPrivacyCheck{
-		first: privacyCheck{
-			lookupColumn: matches[0][1],
-			flagColumn:   matches[0][2],
-		},
-		second: privacyCheck{
-			lookupColumn: matches[1][1],
-			flagColumn:   matches[1][2],
-		},
+
+	return &existsLookup{
+		tableParts:   sel.From.Parts,
+		joinColumn:   joinCol,
+		lookupColumn: lookupCol,
+		flagColumn:   flagCol,
+	}
+}
+
+// collectEquals walks a WHERE clause tree and collects all BinaryOp{Op: "="} nodes,
+// descending through AND connectives.
+func collectEquals(node sqlexpr.Node, out *[]*sqlexpr.BinaryOp) {
+	node = unwrapParen(node)
+	bin, ok := node.(*sqlexpr.BinaryOp)
+	if !ok {
+		return
+	}
+	if strings.EqualFold(bin.Op, "AND") {
+		collectEquals(bin.Left, out)
+		collectEquals(bin.Right, out)
+		return
+	}
+	if bin.Op == "=" {
+		*out = append(*out, bin)
 	}
 }
 
@@ -110,14 +213,16 @@ func parseDualPrivacyCheck(expr string) *dualPrivacyCheck {
 // eligible policies in the schema.
 func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
 	all := ExtractPolicies(schema)
-	generatable := FilterGeneratable(all)
+	generatable, filterDiags := FilterGeneratable(all)
+
+	var diags []diagnostic.Diagnostic
+	diags = append(diags, filterDiags...)
 
 	if len(generatable) == 0 {
-		return []byte(pythonHeader(schema.Name) + "\n# No generatable policies found.\n"), nil
+		return []byte(pythonHeader(schema.Name) + "\n# No generatable policies found.\n"), diags
 	}
 
 	var buf bytes.Buffer
-	var diags []diagnostic.Diagnostic
 	buf.WriteString(pythonHeader(schema.Name))
 
 	for i, pol := range generatable {
@@ -130,13 +235,47 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 			buf.WriteString("\n")
 		}
 
-		// Try patterns in order: dual-player first (most specific), then
-		// single privacy check, then ownership.
-		if dual := parseDualPrivacyCheck(expr); dual != nil {
-			generateDualPrivacyValidator(&buf, pol, dual)
-		} else if check := parsePrivacyCheck(expr); check != nil {
-			generatePrivacyValidator(&buf, pol, check)
-		} else if own := parseOwnershipCheck(expr); own != nil {
+		ast, err := sqlexpr.Parse(expr)
+		if err != nil {
+			// Should not happen since FilterGeneratable already parsed successfully,
+			// but handle defensively.
+			buf.WriteString(fmt.Sprintf(
+				"\n# Skipped %s: could not parse expression\n",
+				pol.PolicyName,
+			))
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Code:     "C001",
+				Table:    pol.TableName,
+				Message:  fmt.Sprintf("policy %q: could not parse expression: %v", pol.PolicyName, err),
+			})
+			continue
+		}
+
+		existsLookups := detectAllExistsLookups(ast)
+
+		if len(existsLookups) >= 2 {
+			// Dual/multi exists-lookup pattern
+			dual := &dualPrivacyCheck{
+				first: privacyCheck{
+					lookupColumn: existsLookups[0].lookupColumn,
+					flagColumn:   existsLookups[0].flagColumn,
+				},
+				second: privacyCheck{
+					lookupColumn: existsLookups[1].lookupColumn,
+					flagColumn:   existsLookups[1].flagColumn,
+				},
+			}
+			// Use table from the first lookup for the FQN
+			generateDualPrivacyValidator(&buf, pol, dual, existsLookups[0].tableParts)
+		} else if len(existsLookups) == 1 {
+			// Single exists-lookup pattern
+			check := &privacyCheck{
+				lookupColumn: existsLookups[0].lookupColumn,
+				flagColumn:   existsLookups[0].flagColumn,
+			}
+			generatePrivacyValidator(&buf, pol, check, existsLookups[0].tableParts)
+		} else if own := detectOwnership(ast); own != nil {
 			generateOwnershipValidator(&buf, pol, own)
 		} else {
 			buf.WriteString(fmt.Sprintf(
@@ -156,7 +295,7 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 }
 
 // generatePrivacyValidator writes a single-player privacy check validator.
-func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyCheck) {
+func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyCheck, tableParts []string) {
 	paramName := check.lookupColumn
 
 	buf.WriteString(fmt.Sprintf(
@@ -167,10 +306,7 @@ func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *priva
 		"    \"\"\"%s\"\"\"\n", pol.ErrorMessage,
 	))
 
-	tableFQN := "player_privacy_settings"
-	if pol.SchemaName != "" {
-		tableFQN = pol.SchemaName + ".player_privacy_settings"
-	}
+	tableFQN := strings.Join(tableParts, ".")
 
 	buf.WriteString(fmt.Sprintf(
 		"    row = await conn.fetchrow(\n"+
@@ -205,7 +341,7 @@ func generateOwnershipValidator(buf *bytes.Buffer, pol PolicyContext, own *owner
 }
 
 // generateDualPrivacyValidator writes a validator that checks two players' settings.
-func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPrivacyCheck) {
+func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPrivacyCheck, tableParts []string) {
 	buf.WriteString(fmt.Sprintf(
 		"\nasync def check_%s(conn, %s: str, %s: str) -> PolicyResult:\n",
 		pol.PolicyName, dual.first.lookupColumn, dual.second.lookupColumn,
@@ -214,10 +350,7 @@ func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *du
 		"    \"\"\"%s\"\"\"\n", pol.ErrorMessage,
 	))
 
-	tableFQN := "player_privacy_settings"
-	if pol.SchemaName != "" {
-		tableFQN = pol.SchemaName + ".player_privacy_settings"
-	}
+	tableFQN := strings.Join(tableParts, ".")
 
 	// First player check.
 	buf.WriteString(fmt.Sprintf(

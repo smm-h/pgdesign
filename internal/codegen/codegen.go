@@ -4,10 +4,12 @@
 package codegen
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/sqlexpr"
 )
 
 // Generator generates application code from a resolved schema.
@@ -48,30 +50,75 @@ func ExtractPolicies(schema *model.Schema) []PolicyContext {
 	return contexts
 }
 
-// FilterGeneratable returns policies that have an ErrorCode and match one of the
-// supported codegen patterns:
+// FilterGeneratable returns policies that have an ErrorCode and whose expression
+// parses into an AST matching at least one supported codegen pattern:
 //
-//  1. Privacy check: expression references player_privacy_settings
-//  2. Ownership check: expression contains current_setting('app.player_id')
-//  3. Dual-player privacy check: expression has 2+ player_privacy_settings references
+//  1. Exists-lookup: an ExistsExpr node (privacy check pattern)
+//  2. Ownership: a BinaryOp{Op: "="} where one side (unwrapping Cast) is a
+//     FuncCall named "current_setting"
 //
-// Patterns are detected at generation time. This filter only checks whether a
-// policy has an error code and matches at least one pattern's surface signature.
-func FilterGeneratable(policies []PolicyContext) []PolicyContext {
+// Policies that lack an ErrorCode are silently skipped. Policies whose
+// expression cannot be parsed or does not match any pattern produce a C001
+// diagnostic and are excluded from the result.
+func FilterGeneratable(policies []PolicyContext) ([]PolicyContext, []diagnostic.Diagnostic) {
 	var result []PolicyContext
+	var diags []diagnostic.Diagnostic
 	for _, p := range policies {
 		if p.ErrorCode == "" {
 			continue
 		}
-		expr := p.Using + " " + p.WithCheck
-		if strings.Contains(expr, "player_privacy_settings") {
-			result = append(result, p)
+		expr := p.WithCheck
+		if expr == "" {
+			expr = p.Using
+		}
+
+		ast, err := sqlexpr.Parse(expr)
+		if err != nil {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Code:     "C001",
+				Table:    p.TableName,
+				Message:  fmt.Sprintf("policy %q: unparsable expression: %v", p.PolicyName, err),
+			})
 			continue
 		}
-		if strings.Contains(expr, "current_setting('app.player_id')") {
+
+		matched := false
+		sqlexpr.Walk(ast, func(n sqlexpr.Node) bool {
+			if matched {
+				return false
+			}
+			switch node := n.(type) {
+			case *sqlexpr.ExistsExpr:
+				matched = true
+				return false
+			case *sqlexpr.BinaryOp:
+				if node.Op == "=" {
+					left := unwrapCast(node.Left)
+					right := unwrapCast(node.Right)
+					if fc, ok := left.(*sqlexpr.FuncCall); ok && strings.EqualFold(fc.Name, "current_setting") {
+						matched = true
+						return false
+					}
+					if fc, ok := right.(*sqlexpr.FuncCall); ok && strings.EqualFold(fc.Name, "current_setting") {
+						matched = true
+						return false
+					}
+				}
+			}
+			return true
+		})
+
+		if matched {
 			result = append(result, p)
-			continue
+		} else {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Code:     "C001",
+				Table:    p.TableName,
+				Message:  fmt.Sprintf("policy %q: expression does not match any generatable pattern", p.PolicyName),
+			})
 		}
 	}
-	return result
+	return result, diags
 }

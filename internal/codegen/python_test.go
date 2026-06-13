@@ -6,9 +6,10 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/sqlexpr"
 )
 
-func TestParsePrivacyCheck(t *testing.T) {
+func TestDetectExistsLookup(t *testing.T) {
 	tests := []struct {
 		name     string
 		expr     string
@@ -48,21 +49,25 @@ func TestParsePrivacyCheck(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parsePrivacyCheck(tt.expr)
+			ast, err := sqlexpr.Parse(tt.expr)
+			if err != nil {
+				t.Fatalf("failed to parse expression: %v", err)
+			}
+			results := detectAllExistsLookups(ast)
 			if tt.wantNil {
-				if result != nil {
-					t.Errorf("expected nil, got %+v", result)
+				if len(results) != 0 {
+					t.Errorf("expected no results, got %d", len(results))
 				}
 				return
 			}
-			if result == nil {
-				t.Fatal("expected non-nil result")
+			if len(results) == 0 {
+				t.Fatal("expected at least one result")
 			}
-			if result.lookupColumn != tt.wantLook {
-				t.Errorf("lookupColumn: expected %q, got %q", tt.wantLook, result.lookupColumn)
+			if results[0].lookupColumn != tt.wantLook {
+				t.Errorf("lookupColumn: expected %q, got %q", tt.wantLook, results[0].lookupColumn)
 			}
-			if result.flagColumn != tt.wantFlag {
-				t.Errorf("flagColumn: expected %q, got %q", tt.wantFlag, result.flagColumn)
+			if results[0].flagColumn != tt.wantFlag {
+				t.Errorf("flagColumn: expected %q, got %q", tt.wantFlag, results[0].flagColumn)
 			}
 		})
 	}
@@ -179,7 +184,7 @@ func TestPythonGenerator_NoPolicies(t *testing.T) {
 	}
 }
 
-func TestParseOwnershipCheck(t *testing.T) {
+func TestDetectOwnership(t *testing.T) {
 	tests := []struct {
 		name    string
 		expr    string
@@ -192,9 +197,9 @@ func TestParseOwnershipCheck(t *testing.T) {
 			wantCol: "player_id",
 		},
 		{
-			name:    "not ownership - has privacy ref",
+			name:    "compound with privacy ref - still detects ownership",
 			expr:    "player_id::text = current_setting('app.player_id') AND EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = sender_id AND chat_enabled = true)",
-			wantNil: true,
+			wantCol: "player_id",
 		},
 		{
 			name:    "no current_setting",
@@ -210,7 +215,11 @@ func TestParseOwnershipCheck(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseOwnershipCheck(tt.expr)
+			ast, err := sqlexpr.Parse(tt.expr)
+			if err != nil {
+				t.Fatalf("failed to parse expression: %v", err)
+			}
+			result := detectOwnership(ast)
 			if tt.wantNil {
 				if result != nil {
 					t.Errorf("expected nil, got %+v", result)
@@ -227,17 +236,18 @@ func TestParseOwnershipCheck(t *testing.T) {
 	}
 }
 
-func TestParseDualPrivacyCheck(t *testing.T) {
+func TestDetectDualExistsLookup(t *testing.T) {
 	tests := []struct {
 		name       string
 		expr       string
-		wantNil    bool
+		wantCount  int // expected number of exists lookups (0 = none, 1 = single, 2+ = dual)
 		wantFirst  privacyCheck
 		wantSecond privacyCheck
 	}{
 		{
-			name: "two privacy references",
-			expr: "EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = requester_id AND friends_enabled = true) AND EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = target_id AND friends_enabled = true)",
+			name:      "two privacy references",
+			expr:      "EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = requester_id AND friends_enabled = true) AND EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = target_id AND friends_enabled = true)",
+			wantCount: 2,
 			wantFirst: privacyCheck{
 				lookupColumn: "requester_id",
 				flagColumn:   "friends_enabled",
@@ -248,34 +258,40 @@ func TestParseDualPrivacyCheck(t *testing.T) {
 			},
 		},
 		{
-			name:    "single privacy reference",
-			expr:    "EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = sender_id AND chat_enabled = true)",
-			wantNil: true,
+			name:      "single privacy reference",
+			expr:      "EXISTS (SELECT 1 FROM game.player_privacy_settings WHERE player_id = sender_id AND chat_enabled = true)",
+			wantCount: 1,
 		},
 		{
-			name:    "no privacy reference",
-			expr:    "player_id::text = current_setting('app.player_id')",
-			wantNil: true,
+			name:      "no privacy reference",
+			expr:      "player_id::text = current_setting('app.player_id')",
+			wantCount: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseDualPrivacyCheck(tt.expr)
-			if tt.wantNil {
-				if result != nil {
-					t.Errorf("expected nil, got %+v", result)
+			ast, err := sqlexpr.Parse(tt.expr)
+			if err != nil {
+				t.Fatalf("failed to parse expression: %v", err)
+			}
+			results := detectAllExistsLookups(ast)
+			if len(results) != tt.wantCount {
+				t.Fatalf("expected %d exists lookups, got %d", tt.wantCount, len(results))
+			}
+			if tt.wantCount >= 2 {
+				if results[0].lookupColumn != tt.wantFirst.lookupColumn {
+					t.Errorf("first lookupColumn: expected %q, got %q", tt.wantFirst.lookupColumn, results[0].lookupColumn)
 				}
-				return
-			}
-			if result == nil {
-				t.Fatal("expected non-nil result")
-			}
-			if result.first != tt.wantFirst {
-				t.Errorf("first: expected %+v, got %+v", tt.wantFirst, result.first)
-			}
-			if result.second != tt.wantSecond {
-				t.Errorf("second: expected %+v, got %+v", tt.wantSecond, result.second)
+				if results[0].flagColumn != tt.wantFirst.flagColumn {
+					t.Errorf("first flagColumn: expected %q, got %q", tt.wantFirst.flagColumn, results[0].flagColumn)
+				}
+				if results[1].lookupColumn != tt.wantSecond.lookupColumn {
+					t.Errorf("second lookupColumn: expected %q, got %q", tt.wantSecond.lookupColumn, results[1].lookupColumn)
+				}
+				if results[1].flagColumn != tt.wantSecond.flagColumn {
+					t.Errorf("second flagColumn: expected %q, got %q", tt.wantSecond.flagColumn, results[1].flagColumn)
+				}
 			}
 		})
 	}
@@ -388,11 +404,14 @@ func TestPythonGenerator_UnparsableExpression(t *testing.T) {
 	out, diags := gen.Generate(schema)
 
 	result := string(out)
-	if !strings.Contains(result, "Skipped exotic_policy") {
-		t.Error("expected skip comment for unparsable policy")
+	// The expression parses as a valid FuncCall but matches no generatable
+	// pattern, so FilterGeneratable excludes it. With no generatable policies,
+	// the output contains "No generatable policies found."
+	if !strings.Contains(result, "No generatable policies found") {
+		t.Error("expected 'No generatable policies found' message")
 	}
 
-	// Verify diagnostic was emitted.
+	// Verify diagnostic was emitted by FilterGeneratable.
 	if len(diags) != 1 {
 		t.Fatalf("expected 1 diagnostic, got %d", len(diags))
 	}

@@ -89,7 +89,10 @@ func TestFilterGeneratable(t *testing.T) {
 		},
 	}
 
-	result := FilterGeneratable(policies)
+	result, diags := FilterGeneratable(policies)
+	if len(diags) != 0 {
+		t.Fatalf("expected 0 diagnostics, got %d: %v", len(diags), diags)
+	}
 	if len(result) != 3 {
 		t.Fatalf("expected 3 generatable policies, got %d", len(result))
 	}
@@ -109,7 +112,7 @@ func TestFilterGeneratable_Empty(t *testing.T) {
 		{PolicyName: "read_all", Using: "true"},
 		{PolicyName: "own_only", Using: "player_id = current_setting('app.player_id')"},
 	}
-	result := FilterGeneratable(policies)
+	result, _ := FilterGeneratable(policies)
 	if len(result) != 0 {
 		t.Errorf("expected 0 generatable policies, got %d", len(result))
 	}
