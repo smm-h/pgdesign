@@ -1146,6 +1146,64 @@ func TestSuppressProgrammatic(t *testing.T) {
 	}
 }
 
+func TestW004_SuppressedWithJSONSchema(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "users",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "tags", PGType: "jsonb", NotNull: true, Default: "'[]'::jsonb", JSONSchema: "tags_schema.json"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	diags, suppressed := Validate(schema, nil)
+
+	// W004 should NOT appear in active diagnostics.
+	found := findByCode(diags, "W004")
+	if len(found) > 0 {
+		t.Fatal("expected W004 to be auto-suppressed when JSONSchema is set, but it appeared in active diagnostics")
+	}
+
+	// W004 should appear in suppressed diagnostics.
+	var foundSuppressed bool
+	for _, s := range suppressed {
+		if s.Code == "W004" && s.Table == "users" && s.Column == "tags" {
+			foundSuppressed = true
+			if s.Reason != "programmatically suppressed" {
+				t.Errorf("suppressed reason = %q, want %q", s.Reason, "programmatically suppressed")
+			}
+		}
+	}
+	if !foundSuppressed {
+		t.Fatal("expected W004 in suppressed diagnostics when JSONSchema is set")
+	}
+}
+
+func TestW004_NotSuppressedWithoutJSONSchema(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "users",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "tags", PGType: "jsonb", NotNull: true, Default: "'[]'::jsonb"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W004")
+	if len(found) == 0 {
+		t.Fatal("expected W004 to fire for plural jsonb column without JSONSchema")
+	}
+}
+
 func TestAppendOnlyUpdatedAtWarning(t *testing.T) {
 	schema := &model.Schema{
 		Name: "app",

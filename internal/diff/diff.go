@@ -56,8 +56,9 @@ type ColumnChange struct {
 	CommentChanged   *[2]string          `json:"comment_changed"`   // [old, new]
 	GeneratedChanged *[2]string          `json:"generated_changed,omitempty"` // [old, new]
 	IdentityChanged  *[2]string          `json:"identity_changed,omitempty"`  // [old, new]
-	ArrayChanged     *[2]bool            `json:"array_changed,omitempty"`
-	Risk             risk.Classification `json:"risk"`
+	ArrayChanged      *[2]bool            `json:"array_changed,omitempty"`
+	JSONSchemaChanged *[2]string          `json:"json_schema_changed,omitempty"`
+	Risk              risk.Classification `json:"risk"`
 }
 
 // EnumDiff describes changes to an enum type.
@@ -348,6 +349,12 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 	// Array comparison.
 	if desired.Array != actual.Array {
 		cc.ArrayChanged = &[2]bool{actual.Array, desired.Array}
+		changed = true
+	}
+
+	// JSONSchema comparison.
+	if desired.JSONSchema != actual.JSONSchema {
+		cc.JSONSchemaChanged = &[2]string{actual.JSONSchema, desired.JSONSchema}
 		changed = true
 	}
 

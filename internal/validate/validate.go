@@ -694,14 +694,18 @@ func checkJSONCouldBeTable(schema *model.Schema, _ *Config) []diagnostic.Diagnos
 				continue
 			}
 			if col.Default == "'[]'::jsonb" || strings.Contains(col.DefaultExpr, "[]") {
-				diags = append(diags, diagnostic.Diagnostic{
+				d := diagnostic.Diagnostic{
 					Severity:   diagnostic.Warning,
 					Code:       "W004",
 					Table:      t.Name,
 					Column:     col.Name,
 					Message:    "jsonb array column could be a separate table",
 					Suggestion: "Consider normalizing into a related table with a foreign key",
-				})
+				}
+				if col.JSONSchema != "" {
+					d.Suppressed = true
+				}
+				diags = append(diags, d)
 			}
 		}
 	}

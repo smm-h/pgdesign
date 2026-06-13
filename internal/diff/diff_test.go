@@ -1460,3 +1460,123 @@ func TestBoolSliceEqual(t *testing.T) {
 		})
 	}
 }
+
+func TestDiffColumnJSONSchema(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "new_schema.json"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	actual := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "old_schema.json"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+
+	tc := d.TablesChanged[0]
+	if len(tc.ColumnsChanged) != 1 {
+		t.Fatalf("expected 1 column changed, got %d", len(tc.ColumnsChanged))
+	}
+
+	cc := tc.ColumnsChanged[0]
+	if cc.JSONSchemaChanged == nil {
+		t.Fatal("expected JSONSchemaChanged to be set")
+	}
+	if cc.JSONSchemaChanged[0] != "old_schema.json" || cc.JSONSchemaChanged[1] != "new_schema.json" {
+		t.Errorf("JSONSchemaChanged = %v, want [old_schema.json, new_schema.json]", cc.JSONSchemaChanged)
+	}
+}
+
+func TestDiffColumnJSONSchemaAdded(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "schema.json"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	actual := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "data", PGType: "jsonb", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+
+	cc := d.TablesChanged[0].ColumnsChanged[0]
+	if cc.JSONSchemaChanged == nil {
+		t.Fatal("expected JSONSchemaChanged to be set when adding json_schema")
+	}
+	if cc.JSONSchemaChanged[0] != "" || cc.JSONSchemaChanged[1] != "schema.json" {
+		t.Errorf("JSONSchemaChanged = %v, want ['', schema.json]", cc.JSONSchemaChanged)
+	}
+}
+
+func TestDiffColumnJSONSchemaUnchanged(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "same.json"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	d := Diff(schema, schema)
+
+	if len(d.TablesChanged) != 0 {
+		t.Errorf("expected no table changes when json_schema is the same, got %d", len(d.TablesChanged))
+	}
+}
