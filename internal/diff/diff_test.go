@@ -1301,6 +1301,76 @@ func TestPartitioningFormatTerminal(t *testing.T) {
 	}
 }
 
+func TestArrayChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "posts", Schema: "public", Columns: []model.Column{
+				{Name: "tags", PGType: "text", Array: true},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "posts", Schema: "public", Columns: []model.Column{
+				{Name: "tags", PGType: "text", Array: false},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	cc := d.TablesChanged[0].ColumnsChanged[0]
+	if cc.ArrayChanged == nil {
+		t.Fatal("expected ArrayChanged to be set")
+	}
+	if cc.ArrayChanged[0] != false || cc.ArrayChanged[1] != true {
+		t.Errorf("expected [false, true], got [%v, %v]", cc.ArrayChanged[0], cc.ArrayChanged[1])
+	}
+}
+
+func TestArrayUnchanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "posts", Schema: "public", Columns: []model.Column{
+				{Name: "tags", PGType: "text", Array: true},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "posts", Schema: "public", Columns: []model.Column{
+				{Name: "tags", PGType: "text", Array: true},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff when array is unchanged, got: %s", d.Summary())
+	}
+}
+
+func TestArrayChangedFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "posts",
+				ColumnsChanged: []ColumnChange{
+					{
+						Name:         "tags",
+						ArrayChanged: &[2]bool{false, true},
+						Risk:         risk.Classification{RiskLevel: risk.Safe},
+					},
+				},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "array: false -> true") {
+		t.Errorf("expected array change in output, got:\n%s", out)
+	}
+}
+
 func TestBoolSliceEqual(t *testing.T) {
 	tests := []struct {
 		name string

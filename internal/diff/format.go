@@ -196,6 +196,16 @@ func formatColumnChange(b *strings.Builder, cc *ColumnChange) {
 	if cc.IdentityChanged != nil {
 		fmt.Fprintf(b, "    identity: %q -> %q\n", cc.IdentityChanged[0], cc.IdentityChanged[1])
 	}
+	if cc.ArrayChanged != nil {
+		fmt.Fprintf(b, "    array: %s -> %s\n", arrayStr(cc.ArrayChanged[0]), arrayStr(cc.ArrayChanged[1]))
+	}
+}
+
+func arrayStr(isArray bool) string {
+	if isArray {
+		return "true"
+	}
+	return "false"
 }
 
 func nullStr(notNull bool) string {

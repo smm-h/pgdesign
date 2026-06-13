@@ -55,6 +55,7 @@ type ColumnChange struct {
 	CommentChanged   *[2]string          `json:"comment_changed"`   // [old, new]
 	GeneratedChanged *[2]string          `json:"generated_changed,omitempty"` // [old, new]
 	IdentityChanged  *[2]string          `json:"identity_changed,omitempty"`  // [old, new]
+	ArrayChanged     *[2]bool            `json:"array_changed,omitempty"`
 	Risk             risk.Classification `json:"risk"`
 }
 
@@ -334,6 +335,12 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 	// Identity comparison.
 	if desired.Identity != actual.Identity {
 		cc.IdentityChanged = &[2]string{actual.Identity, desired.Identity}
+		changed = true
+	}
+
+	// Array comparison.
+	if desired.Array != actual.Array {
+		cc.ArrayChanged = &[2]bool{actual.Array, desired.Array}
 		changed = true
 	}
 
