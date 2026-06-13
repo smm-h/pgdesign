@@ -10,6 +10,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/sqlexpr"
 )
 
 // Config controls which rules run and their parameters.
@@ -441,63 +442,23 @@ func checkFKMissingIndex(schema *model.Schema, _ *Config) []diagnostic.Diagnosti
 	return diags
 }
 
-// sqlKeywords is the set of SQL keywords to exclude when extracting column identifiers.
-var sqlKeywords = map[string]bool{
-	"select": true, "from": true, "where": true, "and": true, "or": true,
-	"not": true, "null": true, "true": true, "false": true, "case": true,
-	"when": true, "then": true, "else": true, "end": true, "as": true,
-	"in": true, "is": true, "like": true, "ilike": true, "between": true,
-	"cast": true, "coalesce": true, "nullif": true, "exists": true,
-	"any": true, "all": true, "some": true, "distinct": true,
-	"asc": true, "desc": true, "limit": true, "offset": true,
-	"union": true, "intersect": true, "except": true,
-	"having": true, "group": true, "by": true, "order": true,
-	"inner": true, "outer": true, "left": true, "right": true,
-	"join": true, "on": true, "using": true, "natural": true,
-	"cross": true, "full": true, "with": true, "recursive": true,
-	"insert": true, "into": true, "update": true, "delete": true,
-	"set": true, "values": true, "returning": true,
-	"create": true, "alter": true, "drop": true, "table": true,
-	"index": true, "view": true, "type": true, "stored": true,
-}
-
-// identPattern matches SQL identifiers (letters, digits, underscores, starting with letter or underscore).
-var identPattern = regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`)
-
-// stringLiteralPattern matches single-quoted SQL string literals (including escaped quotes).
-var stringLiteralPattern = regexp.MustCompile(`'[^']*'`)
-
-// extractColumnRefs extracts potential column name references from a SQL expression.
-// It finds all identifier tokens, then filters out SQL keywords and function calls
-// (identifiers immediately followed by an open parenthesis).
+// extractColumnRefs extracts column name references from a SQL expression.
+// It parses the expression into an AST, then walks it collecting bare column names.
+// Qualified names (table.column) are returned as the final part only, since this
+// function is used for checking generated column references within the same table.
 func extractColumnRefs(expr string) []string {
-	// Replace string literals with spaces to avoid extracting identifiers from them.
-	cleaned := stringLiteralPattern.ReplaceAllStringFunc(expr, func(s string) string {
-		return strings.Repeat(" ", len(s))
-	})
-
-	// Find all identifier matches with their positions.
-	matches := identPattern.FindAllStringIndex(cleaned, -1)
-	var refs []string
-	for _, loc := range matches {
-		token := cleaned[loc[0]:loc[1]]
-		tokenLower := strings.ToLower(token)
-
-		// Skip SQL keywords.
-		if sqlKeywords[tokenLower] {
-			continue
-		}
-
-		// Skip function names: identifier immediately followed by '('.
-		rest := cleaned[loc[1]:]
-		trimmed := strings.TrimLeft(rest, " \t")
-		if len(trimmed) > 0 && trimmed[0] == '(' {
-			continue
-		}
-
-		refs = append(refs, tokenLower)
+	node, err := sqlexpr.Parse(expr)
+	if err != nil {
+		return nil
 	}
-	return refs
+	refs := sqlexpr.CollectColumnRefs(node)
+	var names []string
+	for _, ref := range refs {
+		// Use the last part (column name) for bare and qualified refs.
+		name := strings.ToLower(ref.Parts[len(ref.Parts)-1])
+		names = append(names, name)
+	}
+	return names
 }
 
 // checkGeneratedColRefsGenerated (E213): generated column expression references another generated column.
