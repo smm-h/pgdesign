@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 0.7.1
+
+E110 validation rule, documentation updates, JSON output determinism fix, and expanded test coverage.
+
+### Features
+
+- **New rule.** E110 catches embedded SQL quotes in default values across all types (enums, scalars, arrays). Use raw values instead of SQL literals.
+- **Documentation.** Updated format reference, validation rules, semantic types, migration guide, and CLAUDE.md for all v0.7.0 features.
+
+### Fixes
+
+- **Fix.** JSON output format now produces deterministic output by sorting model collections before marshaling.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.7.0
 
 Array types, warning suppression, append-only tables, expression-driven codegen, JSONB shape validation, and serve API improvements. Breaking: enum defaults now use raw values.
@@ -24,12 +43,6 @@ Array types, warning suppression, append-only tables, expression-driven codegen,
 
 - **Fix.** `generate` now returns proper errors instead of embedding error messages in output.
 - **Fix.** Codegen reports unparseable policy expressions as diagnostics instead of silently skipping them.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.6.0
 
