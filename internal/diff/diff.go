@@ -44,6 +44,7 @@ type TableDiff struct {
 	PKChanged           *[2][]string             `json:"pk_changed"`                     // [old, new]
 	OwnerChanged        *[2]string               `json:"owner_changed"`
 	PartitioningChanged *PartitionDiff           `json:"partitioning_changed,omitempty"`
+	AppendOnlyChanged   *[2]bool                 `json:"append_only_changed,omitempty"`
 }
 
 // ColumnChange describes a change to a single column, with risk classification.
@@ -239,6 +240,11 @@ func diffTable(desired, actual *model.Table) TableDiff {
 	// Partitioning
 	diffPartitioning(&td, desired, actual)
 
+	// AppendOnly
+	if desired.AppendOnly != actual.AppendOnly {
+		td.AppendOnlyChanged = &[2]bool{actual.AppendOnly, desired.AppendOnly}
+	}
+
 	return td
 }
 
@@ -259,7 +265,8 @@ func isTableDiffEmpty(td *TableDiff) bool {
 		td.CommentChanged == nil &&
 		td.PKChanged == nil &&
 		td.OwnerChanged == nil &&
-		td.PartitioningChanged == nil
+		td.PartitioningChanged == nil &&
+		td.AppendOnlyChanged == nil
 }
 
 // diffColumns matches columns by name and classifies changes with risk.

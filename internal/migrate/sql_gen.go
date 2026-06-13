@@ -63,6 +63,14 @@ func OpToSQL(op DDLOp) string {
 		return opDropEnum(op)
 	case "set_owner":
 		return opSetOwner(op)
+	case "create_function":
+		return opCreateFunction(op)
+	case "drop_function":
+		return opDropFunction(op)
+	case "create_trigger":
+		return opCreateTrigger(op)
+	case "drop_trigger":
+		return opDropTrigger(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -275,6 +283,28 @@ func opDropEnum(op DDLOp) string {
 func opSetOwner(op DDLOp) string {
 	return fmt.Sprintf("ALTER TABLE %s OWNER TO %s;",
 		quoteQualified(op.Table), sql.QuoteIdent(op.Name))
+}
+
+func opCreateFunction(op DDLOp) string {
+	schema, _ := splitQualifiedName(op.Table)
+	return sql.CreateDenyMutationFunction(schema)
+}
+
+func opDropFunction(op DDLOp) string {
+	schema, _ := splitQualifiedName(op.Table)
+	qualified := sql.QualifiedName(schema, "pgdesign_deny_mutation")
+	return fmt.Sprintf("DROP FUNCTION IF EXISTS %s();", qualified)
+}
+
+func opCreateTrigger(op DDLOp) string {
+	schema, tableName := splitQualifiedName(op.Table)
+	return sql.CreateAppendOnlyTrigger(schema, tableName)
+}
+
+func opDropTrigger(op DDLOp) string {
+	schema, tableName := splitQualifiedName(op.Table)
+	qualifiedTable := sql.QualifiedName(schema, tableName)
+	return fmt.Sprintf("DROP TRIGGER IF EXISTS %s ON %s;", sql.QuoteIdent(op.Name), qualifiedTable)
 }
 
 // splitQualifiedName splits "schema.table" into ("schema", "table").

@@ -1146,6 +1146,37 @@ func TestSuppressProgrammatic(t *testing.T) {
 	}
 }
 
+func TestAppendOnlyUpdatedAtWarning(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:    "events",
+				Schema:  "app",
+				Comment: "Event log",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "updated_at", PGType: "timestamptz", NotNull: true, SemanticTypeName: "timestamp"},
+				},
+				PK:         []string{"id"},
+				AppendOnly: true,
+			},
+		},
+	}
+
+	diags, _ := Validate(schema, DefaultConfig())
+	found := false
+	for _, d := range diags {
+		if d.Code == "W010" && d.Table == "events" && d.Column == "updated_at" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected W010 warning for append-only table with updated_at column")
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {

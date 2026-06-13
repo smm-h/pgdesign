@@ -170,6 +170,19 @@ func formatTableDiff(b *strings.Builder, td *TableDiff) {
 			fmt.Fprintf(b, "  %s- partition: %s%s\n", colorRed, name, colorReset)
 		}
 	}
+
+	// AppendOnly
+	if td.AppendOnlyChanged != nil {
+		old := "false"
+		new_ := "false"
+		if td.AppendOnlyChanged[0] {
+			old = "true"
+		}
+		if td.AppendOnlyChanged[1] {
+			new_ = "true"
+		}
+		fmt.Fprintf(b, "  %s~ append_only: %s -> %s%s\n", colorYellow, old, new_, colorReset)
+	}
 }
 
 func formatColumnChange(b *strings.Builder, cc *ColumnChange) {

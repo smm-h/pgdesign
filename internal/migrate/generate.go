@@ -396,6 +396,64 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				diags = append(diags, classifyOp(op, risk.OpDropTable, ctx)...)
 			}
 		}
+
+		// AppendOnly changes.
+		if td.AppendOnlyChanged != nil {
+			if td.AppendOnlyChanged[1] {
+				// false -> true: add shared function (if needed) + trigger.
+				op := DDLOp{
+					Op:    "create_function",
+					Table: td.Name,
+					Name:  "pgdesign_deny_mutation",
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "drop_function", Table: td.Name, Name: "pgdesign_deny_mutation"}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				triggerOp := DDLOp{
+					Op:    "create_trigger",
+					Table: td.Name,
+					Name:  "deny_mutation",
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "drop_trigger", Table: td.Name, Name: "deny_mutation"}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, triggerOp)
+			} else {
+				// true -> false: drop trigger, possibly drop shared function.
+				triggerOp := DDLOp{
+					Op:    "drop_trigger",
+					Table: td.Name,
+					Name:  "deny_mutation",
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "create_trigger", Table: td.Name, Name: "deny_mutation"}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, triggerOp)
+				// Check if any other table in the desired schema still has append_only.
+				// If not, drop the shared function.
+				otherAppendOnly := false
+				if desired != nil {
+					for _, t := range desired.Tables {
+						if t.AppendOnly && migrateTableKey(t) != td.Name {
+							otherAppendOnly = true
+							break
+						}
+					}
+				}
+				if !otherAppendOnly {
+					op := DDLOp{
+						Op:    "drop_function",
+						Table: td.Name,
+						Name:  "pgdesign_deny_mutation",
+						Down: &DownOp{
+							Ops: []DDLOp{{Op: "create_function", Table: td.Name, Name: "pgdesign_deny_mutation"}},
+						},
+					}
+					m.DDLOps = append(m.DDLOps, op)
+				}
+			}
+		}
 	}
 
 	// Phase 3: Drops (enums last, tables before enums).
@@ -546,6 +604,13 @@ func findTable(schema *model.Schema, qualifiedName string) *model.Table {
 	}
 	// Also try with empty schema (for "public" tables stored without schema).
 	return schema.TableByName("", qualifiedName)
+}
+
+func migrateTableKey(t model.Table) string {
+	if t.Schema == "" || t.Schema == "public" {
+		return t.Name
+	}
+	return t.Schema + "." + t.Name
 }
 
 func enumKey(e model.Enum) string {

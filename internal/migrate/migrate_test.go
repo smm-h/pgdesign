@@ -1074,6 +1074,61 @@ down = { op = "drop_table", table = "public.pgdesign_test_table2" }
 	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_migrations")
 }
 
+func TestAppendOnlyMigration(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:       "events",
+				Schema:     "app",
+				Columns:    []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:         []string{"id"},
+				AppendOnly: true,
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name:              "app.events",
+				AppendOnlyChanged: &[2]bool{false, true},
+			},
+		},
+	}
+
+	m, diags := GenerateMigration(d, desired, "001", nil, 0, 0)
+	_ = diags
+
+	// Should have create_function and create_trigger ops.
+	foundFunc := false
+	foundTrigger := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_function" && op.Name == "pgdesign_deny_mutation" {
+			foundFunc = true
+		}
+		if op.Op == "create_trigger" && op.Name == "deny_mutation" {
+			foundTrigger = true
+		}
+	}
+	if !foundFunc {
+		t.Error("expected create_function op for pgdesign_deny_mutation")
+	}
+	if !foundTrigger {
+		t.Error("expected create_trigger op for deny_mutation")
+	}
+
+	// Test SQL generation for the ops.
+	for _, op := range m.DDLOps {
+		sqlStr := OpToSQL(op)
+		if sqlStr == "" {
+			t.Errorf("OpToSQL returned empty for op %q", op.Op)
+		}
+		if strings.HasPrefix(sqlStr, "-- unknown op:") {
+			t.Errorf("OpToSQL returned unknown for op %q: %s", op.Op, sqlStr)
+		}
+	}
+}
+
 func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
 	// set_not_null on a table with >1M rows should escalate from Caution to
 	// Dangerous (Error severity) via applyTableSizeEscalation.

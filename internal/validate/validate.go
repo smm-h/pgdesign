@@ -87,6 +87,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W006", checkPreferText},
 		{"W007", checkRedundantIndex},
 		{"W008", checkCircularFK},
+		{"W010", checkAppendOnlyUpdatedAt},
 	}
 
 	for _, r := range rules {
@@ -794,6 +795,29 @@ func checkCircularFK(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 			Code:     "W008",
 			Message:  "circular FK dependency: " + strings.Join(group, " -> "),
 		})
+	}
+	return diags
+}
+
+// checkAppendOnlyUpdatedAt (W010): append-only table has a column suggesting mutability.
+func checkAppendOnlyUpdatedAt(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if !t.AppendOnly {
+			continue
+		}
+		for _, col := range t.Columns {
+			if col.SemanticTypeName == "timestamp" && strings.Contains(col.Name, "updated") {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "W010",
+					Table:      t.Name,
+					Column:     col.Name,
+					Message:    fmt.Sprintf("append-only table %q has column %q suggesting mutability", t.Name, col.Name),
+					Suggestion: "Append-only tables cannot be updated; consider removing this column",
+				})
+			}
+		}
 	}
 	return diags
 }

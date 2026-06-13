@@ -1371,6 +1371,42 @@ func TestArrayChangedFormatTerminal(t *testing.T) {
 	}
 }
 
+func TestAppendOnlyChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:       "events",
+				Schema:     "app",
+				Columns:    []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:         []string{"id"},
+				AppendOnly: true,
+			},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:    "events",
+				Schema:  "app",
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:      []string{"id"},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 changed table, got %d", len(d.TablesChanged))
+	}
+	td := d.TablesChanged[0]
+	if td.AppendOnlyChanged == nil {
+		t.Fatal("expected AppendOnlyChanged to be set")
+	}
+	if td.AppendOnlyChanged[0] != false || td.AppendOnlyChanged[1] != true {
+		t.Errorf("AppendOnlyChanged = %v, want [false, true]", td.AppendOnlyChanged)
+	}
+}
+
 func TestBoolSliceEqual(t *testing.T) {
 	tests := []struct {
 		name string
