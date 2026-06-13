@@ -47,6 +47,7 @@ type RawTable struct {
 	Partitioning *RawPartitioning
 	Dependencies []RawDependency
 	Maintenance  *RawMaintenance
+	AppendOnly   *bool
 }
 
 // RawColumn holds a column definition from [tables.*.columns.*].

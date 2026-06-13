@@ -699,6 +699,42 @@ type = "integer"
 	}
 }
 
+func TestAppendOnly(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.events]
+pk = ["id"]
+comment = "Append-only event log"
+append_only = true
+
+[tables.events.columns.id]
+type = "auto_id"
+
+[tables.events.columns.payload]
+type = "text"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+	tbl := schema.Tables[0]
+	if tbl.AppendOnly == nil {
+		t.Fatal("expected AppendOnly to be non-nil")
+	}
+	if !*tbl.AppendOnly {
+		t.Error("expected AppendOnly = true")
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {

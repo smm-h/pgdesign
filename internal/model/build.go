@@ -188,6 +188,11 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 		t.EnableRLS = true
 	}
 
+	// Resolve append-only.
+	if rt.AppendOnly != nil && *rt.AppendOnly {
+		t.AppendOnly = true
+	}
+
 	// Resolve partitioning.
 	if rt.Partitioning != nil {
 		t.Partitioning = resolvePartitioning(rt.Partitioning)

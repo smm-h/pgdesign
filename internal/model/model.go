@@ -49,6 +49,7 @@ type Table struct {
 	Owner        string             `json:"owner,omitempty"`
 	Policies     []Policy           `json:"policies,omitempty"`
 	EnableRLS    bool               `json:"enable_rls,omitempty"`
+	AppendOnly   bool               `json:"append_only,omitempty"`
 
 	candidateKeys [][]string // cached result of CandidateKeys()
 }
