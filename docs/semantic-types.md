@@ -173,7 +173,7 @@ The `default` field holds raw values. pgdesign handles SQL quoting automatically
 # Correct: raw value, pgdesign adds SQL quotes in generated DDL
 default = "created"
 
-# Wrong: embedded SQL quotes (triggers E109)
+# Wrong: embedded SQL quotes (triggers E110)
 default = "'created'"
 ```
 
