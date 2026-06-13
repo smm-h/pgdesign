@@ -10,6 +10,7 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `generate` produces DDL and D2 diagram output
 - `audit` checks normal form compliance (1NF/2NF/3NF) using functional dependencies
 - `fd` provides functional dependency primitives (closure, minimal cover, candidate keys)
+- `codegen` generates type-safe application code (Python, Zig) from the model
 - `diff` compares two models or a model against a live database
 - `migrate` generates migrations with risk classification and safety linting
 - `introspect` reads a live database via pg_catalog into a model
@@ -21,7 +22,7 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `format` handles output formatting
 - `extregistry` validates PostgreSQL extension references
 
-The dependency flow is: parse -> model -> validate/generate/audit/diff -> migrate, and introspect -> serve.
+The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, and introspect -> serve.
 
 ## Key conventions
 
@@ -33,6 +34,7 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff -> migrat
 - Cycle-safe DDL: circular FK references are created without the FK, then ALTERed to add constraints.
 - Non-transactional DDL: `CONCURRENTLY` and `ALTER TYPE ADD VALUE` operations execute outside transactions.
 - Advisory locks prevent concurrent migration execution.
+- RLS policies are defined per-table with USING/WITH CHECK expressions, error codes, and error messages.
 
 ## Testing
 
