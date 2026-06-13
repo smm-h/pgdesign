@@ -42,6 +42,7 @@ type Diagnostic struct {
 	Column     string
 	Message    string
 	Suggestion string
+	Suppressed bool // set by rules to programmatically suppress this diagnostic
 }
 
 // Diagnostics is a collection of diagnostics with convenience methods.
