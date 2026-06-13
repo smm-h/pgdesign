@@ -543,6 +543,8 @@ func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode)
 			var js interface{}
 			if jsonErr := json.Unmarshal(data, &js); jsonErr != nil {
 				p.errorf("E013", tableName, colName, "json_schema file is not valid JSON: %s", jsonErr.Error())
+			} else {
+				col.JSONSchemaContent = data
 			}
 		}
 	}

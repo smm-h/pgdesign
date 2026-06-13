@@ -1120,3 +1120,74 @@ func TestGoldenFile(t *testing.T) {
 		t.Errorf("golden file mismatch.\n--- got ---\n%s\n--- expected ---\n%s", got, expected)
 	}
 }
+
+func TestJSONSchemaCheckConstraints(t *testing.T) {
+	schema := &model.Schema{
+		Name: "shop",
+		Tables: []model.Table{
+			{
+				Name:    "products",
+				Schema:  "shop",
+				Comment: "Product catalog",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "metadata", PGType: "jsonb", NotNull: true, JSONSchema: "test_schema.json"},
+				},
+				PK: []string{"id"},
+				Checks: []model.CheckConstraint{
+					{Name: "ck_metadata_title_type", Expr: "metadata ? 'title' AND jsonb_typeof(metadata->'title') = 'string'"},
+					{Name: "ck_metadata_price_type", Expr: "metadata ? 'price' AND jsonb_typeof(metadata->'price') = 'number'"},
+				},
+			},
+		},
+	}
+
+	opts := Options{IncludeComments: true, Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "ck_metadata_title_type") {
+		t.Errorf("expected CHECK for title type, got:\n%s", out)
+	}
+	if !strings.Contains(out, "metadata ? 'title' AND jsonb_typeof(metadata->'title') = 'string'") {
+		t.Errorf("expected jsonb_typeof check for title, got:\n%s", out)
+	}
+	if !strings.Contains(out, "ck_metadata_price_type") {
+		t.Errorf("expected CHECK for price type, got:\n%s", out)
+	}
+	if !strings.Contains(out, "metadata ? 'price' AND jsonb_typeof(metadata->'price') = 'number'") {
+		t.Errorf("expected jsonb_typeof check for price, got:\n%s", out)
+	}
+}
+
+func TestJSONSchemaEndToEnd(t *testing.T) {
+	inputPath := filepath.Join("testdata", "json_schema.toml")
+
+	raw, diags := parse.File(inputPath)
+	if raw == nil {
+		t.Fatalf("parse failed: %v", diags)
+	}
+	for _, d := range diags {
+		if d.Severity == 0 {
+			t.Fatalf("parse error: %s", d.Message)
+		}
+	}
+
+	reg := semtype.NewBuiltinRegistry()
+	built, buildDiags := model.Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("build errors: %v", buildDiags)
+	}
+
+	opts := Options{IncludeComments: true, Format: "sql"}
+	out := mustGenerate(t, built, opts)
+
+	if !strings.Contains(out, "ck_metadata_title_type") {
+		t.Errorf("expected CHECK for title, got:\n%s", out)
+	}
+	if !strings.Contains(out, "ck_metadata_price_type") {
+		t.Errorf("expected CHECK for price, got:\n%s", out)
+	}
+	if !strings.Contains(out, "jsonb_typeof") {
+		t.Errorf("expected jsonb_typeof in output, got:\n%s", out)
+	}
+}

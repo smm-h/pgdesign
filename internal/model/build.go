@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -171,6 +172,25 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 			Name: name,
 			Expr: rawCheck.Expr,
 		})
+	}
+
+	// Generate CHECK constraints from json_schema column attributes.
+	for _, col := range t.Columns {
+		if col.JSONSchema == "" {
+			continue
+		}
+		var content []byte
+		for _, rc := range rt.Columns {
+			if rc.Name == col.Name && rc.JSONSchemaContent != nil {
+				content = rc.JSONSchemaContent
+				break
+			}
+		}
+		if content == nil {
+			continue
+		}
+		checks := jsonSchemaToChecks(col.Name, content)
+		t.Checks = append(t.Checks, checks...)
 	}
 
 	// Resolve policies.
@@ -485,4 +505,74 @@ func enrich(schema *Schema) diagnostic.Diagnostics {
 	}
 
 	return diags
+}
+
+// jsonSchemaToChecks generates CHECK constraints from a JSON Schema definition.
+// It supports a limited subset: top-level "required" and "properties" with "type" declarations.
+// For each required property with a declared type, it generates a CHECK that verifies
+// the key exists and has the correct jsonb_typeof value.
+//
+// JSON Schema type mapping to PostgreSQL jsonb_typeof:
+//   - "string"  -> "string"
+//   - "number"  -> "number"
+//   - "integer" -> "number" (PostgreSQL doesn't distinguish)
+//   - "boolean" -> "boolean"
+//   - "object"  -> "object"
+//   - "array"   -> "array"
+func jsonSchemaToChecks(colName string, content []byte) []CheckConstraint {
+	var schema struct {
+		Required   []string                          `json:"required"`
+		Properties map[string]map[string]interface{} `json:"properties"`
+	}
+	if err := json.Unmarshal(content, &schema); err != nil {
+		return nil
+	}
+
+	typeMap := map[string]string{
+		"string":  "string",
+		"number":  "number",
+		"integer": "number",
+		"boolean": "boolean",
+		"object":  "object",
+		"array":   "array",
+	}
+
+	var checks []CheckConstraint
+
+	for _, propName := range schema.Required {
+		propDef, ok := schema.Properties[propName]
+		if !ok {
+			checks = append(checks, CheckConstraint{
+				Name: fmt.Sprintf("ck_%s_%s_exists", colName, propName),
+				Expr: fmt.Sprintf("%s ? '%s'", colName, propName),
+			})
+			continue
+		}
+
+		typeVal, ok := propDef["type"]
+		if !ok {
+			checks = append(checks, CheckConstraint{
+				Name: fmt.Sprintf("ck_%s_%s_exists", colName, propName),
+				Expr: fmt.Sprintf("%s ? '%s'", colName, propName),
+			})
+			continue
+		}
+
+		typeStr, ok := typeVal.(string)
+		if !ok {
+			continue
+		}
+
+		pgType, ok := typeMap[typeStr]
+		if !ok {
+			continue
+		}
+
+		checks = append(checks, CheckConstraint{
+			Name: fmt.Sprintf("ck_%s_%s_type", colName, propName),
+			Expr: fmt.Sprintf("%s ? '%s' AND jsonb_typeof(%s->'%s') = '%s'", colName, propName, colName, propName, pgType),
+		})
+	}
+
+	return checks
 }
