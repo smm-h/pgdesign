@@ -50,6 +50,9 @@ func main() {
 
 	app.Command("validate", "Validate schema file(s) or directory", handleValidate,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
+		strictcli.WithFlags(
+			strictcli.BoolFlag("show-suppressed", "Show suppressed diagnostics with their reasons"),
+		),
 	)
 
 	app.Command("audit", "Audit schema file(s) or directory for issues", handleAudit,
@@ -196,14 +199,35 @@ func handleValidate(kwargs map[string]interface{}) int {
 		NamingPattern: cfg.Validate.NamingPattern,
 		MaxColumns:    cfg.Validate.MaxColumns,
 		Disabled:      cfg.Validate.Disable,
+		Suppress:      cfg.Suppress,
 		Extensions:    schema.Extensions,
 		ExtRegistry:   extReg,
 	}
 
-	diags, _ := validate.Validate(schema, valCfg)
+	diags, suppressed := validate.Validate(schema, valCfg)
 	if len(diags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
 	}
+
+	showSuppressed := kwargs["show_suppressed"].(bool)
+	if showSuppressed && len(suppressed) > 0 {
+		fmt.Fprintln(os.Stderr, "\nSuppressed diagnostics:")
+		for _, s := range suppressed {
+			fmt.Fprintf(os.Stderr, "  %s[%s]: %s\n", s.Severity.String(), s.Code, s.Message)
+			location := ""
+			if s.Table != "" {
+				location = s.Table
+			}
+			if s.Column != "" {
+				location += ":" + s.Column
+			}
+			if location != "" {
+				fmt.Fprintf(os.Stderr, "    --> %s\n", location)
+			}
+			fmt.Fprintf(os.Stderr, "    reason: %s\n", s.Reason)
+		}
+	}
+
 	if diagnostic.Diagnostics(diags).HasErrors() {
 		return 1
 	}
