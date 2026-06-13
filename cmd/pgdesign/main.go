@@ -1298,7 +1298,7 @@ func handleServe(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	// Load config for default schema names.
+	// Load config for default schema names and migrations dir.
 	cfg := loadProjectConfig(".")
 
 	port := kwargs["port"].(int)
@@ -1319,7 +1319,12 @@ func handleServe(kwargs map[string]interface{}) int {
 		schemaNames = []string{"public"}
 	}
 
-	srv, err := serve.New(dbURL, schemaNames)
+	migrationsDir := "migrations"
+	if cfg.Project.MigrationsDir != "" {
+		migrationsDir = cfg.Project.MigrationsDir
+	}
+
+	srv, err := serve.New(dbURL, schemaNames, migrationsDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1

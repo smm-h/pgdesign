@@ -2,9 +2,12 @@ package serve
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/smm-h/pgdesign/internal/audit"
@@ -14,6 +17,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/introspect"
+	"github.com/smm-h/pgdesign/internal/migrate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -143,6 +147,25 @@ func (s *Server) handleMigrations(w http.ResponseWriter, r *http.Request) {
 		migrations = []migration{}
 	}
 	writeJSON(w, http.StatusOK, migrations)
+}
+
+// handleMigrationVersion reads and parses a specific migration file by version.
+func (s *Server) handleMigrationVersion(w http.ResponseWriter, r *http.Request) {
+	version := r.PathValue("version")
+	path := filepath.Join(s.migrationsDir, version+".toml")
+
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("migration %q not found", version))
+		return
+	}
+
+	m, err := migrate.ParseMigrationFile(path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("parse migration: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, m)
 }
 
 // handleStats returns database statistics for all tables in the configured schemas.

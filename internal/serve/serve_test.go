@@ -28,7 +28,7 @@ func setupServer(t *testing.T) *Server {
 		return nil
 	}
 	t.Cleanup(func() { pool.Close() })
-	return NewFromPool(pool, []string{"public"})
+	return NewFromPool(pool, []string{"public"}, "")
 }
 
 func TestMain(m *testing.M) {

@@ -12,13 +12,14 @@ import (
 
 // Server is the HTTP API server for pgdesign.
 type Server struct {
-	pool    *pgxpool.Pool
-	schemas []string
-	mux     *http.ServeMux
+	pool          *pgxpool.Pool
+	schemas       []string
+	migrationsDir string
+	mux           *http.ServeMux
 }
 
 // New creates a new Server with a pgxpool connection and sets up routes.
-func New(connStr string, schemas []string) (*Server, error) {
+func New(connStr string, schemas []string, migrationsDir string) (*Server, error) {
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
@@ -36,23 +37,25 @@ func New(connStr string, schemas []string) (*Server, error) {
 	}
 
 	s := &Server{
-		pool:    pool,
-		schemas: schemas,
-		mux:     http.NewServeMux(),
+		pool:          pool,
+		schemas:       schemas,
+		migrationsDir: migrationsDir,
+		mux:           http.NewServeMux(),
 	}
 	s.routes()
 	return s, nil
 }
 
 // NewFromPool creates a Server from an existing pgxpool.Pool (useful for tests).
-func NewFromPool(pool *pgxpool.Pool, schemas []string) *Server {
+func NewFromPool(pool *pgxpool.Pool, schemas []string, migrationsDir string) *Server {
 	if len(schemas) == 0 {
 		schemas = []string{"public"}
 	}
 	s := &Server{
-		pool:    pool,
-		schemas: schemas,
-		mux:     http.NewServeMux(),
+		pool:          pool,
+		schemas:       schemas,
+		migrationsDir: migrationsDir,
+		mux:           http.NewServeMux(),
 	}
 	s.routes()
 	return s
@@ -64,6 +67,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/schema/d2", s.handleSchemaD2)
 	s.mux.HandleFunc("GET /api/schema/svg", s.handleSchemaSVG)
 	s.mux.HandleFunc("GET /api/migrations", s.handleMigrations)
+	s.mux.HandleFunc("GET /api/migrations/{version}", s.handleMigrationVersion)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
 	s.mux.HandleFunc("GET /api/stats/{table}", s.handleTableStats)
 	s.mux.HandleFunc("GET /api/extensions", s.handleExtensions)
