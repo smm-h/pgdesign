@@ -633,6 +633,72 @@ with_check = "channel_id = current_setting('app.channel_id')::uuid"
 	}
 }
 
+func TestArrayColumn(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[types.tags]
+kind = "scalar"
+base_type = "text"
+array = true
+
+[tables.posts]
+pk = ["id"]
+comment = "Posts table"
+
+[tables.posts.columns.id]
+type = "auto_id"
+
+[tables.posts.columns.tags]
+type = "text"
+array = true
+
+[tables.posts.columns.scores]
+type = "integer"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	// Type-level array
+	if len(schema.Types) != 1 {
+		t.Fatalf("expected 1 type, got %d", len(schema.Types))
+	}
+	tagsType := schema.Types[0]
+	if tagsType.Array == nil || !*tagsType.Array {
+		t.Errorf("expected type tags.array = true, got %v", tagsType.Array)
+	}
+
+	// Column-level array
+	posts := schema.Tables[0]
+	var tagsCol, scoresCol *RawColumn
+	for i := range posts.Columns {
+		switch posts.Columns[i].Name {
+		case "tags":
+			tagsCol = &posts.Columns[i]
+		case "scores":
+			scoresCol = &posts.Columns[i]
+		}
+	}
+	if tagsCol == nil {
+		t.Fatal("expected tags column")
+	}
+	if tagsCol.Array == nil || !*tagsCol.Array {
+		t.Errorf("expected tags column array = true, got %v", tagsCol.Array)
+	}
+	if scoresCol == nil {
+		t.Fatal("expected scores column")
+	}
+	if scoresCol.Array != nil {
+		t.Errorf("expected scores column array = nil, got %v", scoresCol.Array)
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {

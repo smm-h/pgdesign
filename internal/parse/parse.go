@@ -231,7 +231,7 @@ func (p *parser) parseType(name string, tbl *tomledit.TableNode) RawType {
 	knownKeys := map[string]bool{
 		"kind": true, "base_type": true, "values": true,
 		"not_null": true, "default": true, "default_expr": true,
-		"check": true, "unique": true, "comment": true,
+		"check": true, "unique": true, "array": true, "comment": true,
 	}
 
 	for _, child := range tbl.Children {
@@ -292,6 +292,12 @@ func (p *parser) parseType(name string, tbl *tomledit.TableNode) RawType {
 				rt.Unique = &v
 			} else {
 				p.errorf("E010", "", "", "[types.%s].unique must be a boolean", name)
+			}
+		case "array":
+			if v, ok := nodeBool(kv.Val); ok {
+				rt.Array = &v
+			} else {
+				p.errorf("E010", "", "", "[types.%s].array must be a boolean", name)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
@@ -447,7 +453,8 @@ func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode)
 
 	knownKeys := map[string]bool{
 		"type": true, "nullable": true, "default": true,
-		"default_expr": true, "generated": true, "stored": true, "comment": true,
+		"default_expr": true, "generated": true, "stored": true,
+		"array": true, "comment": true,
 	}
 
 	for _, child := range tbl.Children {
@@ -496,6 +503,12 @@ func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode)
 				col.Stored = &v
 			} else {
 				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].stored must be a boolean", tableName, colName)
+			}
+		case "array":
+			if v, ok := nodeBool(kv.Val); ok {
+				col.Array = &v
+			} else {
+				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].array must be a boolean", tableName, colName)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {

@@ -28,6 +28,7 @@ type RawType struct {
 	DefaultExpr *string
 	Check      *string
 	Unique     *bool
+	Array      *bool
 	Comment    *string
 }
 
@@ -57,6 +58,7 @@ type RawColumn struct {
 	DefaultExpr *string
 	Generated  *string
 	Stored     *bool
+	Array      *bool
 	Comment    *string
 }
 

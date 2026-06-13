@@ -270,7 +270,7 @@ func TestResolveColumnOverrideNullable(t *testing.T) {
 
 	// id type is NOT NULL by default
 	nullable := true
-	rc, err := r.ResolveColumn("id", &nullable, nil, nil)
+	rc, err := r.ResolveColumn("id", &nullable, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("ResolveColumn error: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestResolveColumnOverrideDefault(t *testing.T) {
 
 	// money type has Default="0"
 	newDefault := "100"
-	rc, err := r.ResolveColumn("money", nil, &newDefault, nil)
+	rc, err := r.ResolveColumn("money", nil, &newDefault, nil, nil)
 	if err != nil {
 		t.Fatalf("ResolveColumn error: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestResolveColumnOverrideDefaultExpr(t *testing.T) {
 
 	// counter type has Default="0", override with expression
 	newExpr := "nextval('my_seq')"
-	rc, err := r.ResolveColumn("counter", nil, nil, &newExpr)
+	rc, err := r.ResolveColumn("counter", nil, nil, &newExpr, nil)
 	if err != nil {
 		t.Fatalf("ResolveColumn error: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestResolveColumnOverrideDefaultExpr(t *testing.T) {
 func TestResolveColumnNoOverrides(t *testing.T) {
 	r := NewBuiltinRegistry()
 
-	rc, err := r.ResolveColumn("slug", nil, nil, nil)
+	rc, err := r.ResolveColumn("slug", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("ResolveColumn error: %v", err)
 	}
@@ -340,7 +340,7 @@ func TestResolveColumnNoOverrides(t *testing.T) {
 func TestResolveColumnUnknownType(t *testing.T) {
 	r := NewBuiltinRegistry()
 
-	_, err := r.ResolveColumn("nonexistent", nil, nil, nil)
+	_, err := r.ResolveColumn("nonexistent", nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected error for unknown type, got nil")
 	}
@@ -349,7 +349,7 @@ func TestResolveColumnUnknownType(t *testing.T) {
 func TestResolveColumnIdentity(t *testing.T) {
 	r := NewBuiltinRegistry()
 
-	rc, err := r.ResolveColumn("auto_id", nil, nil, nil)
+	rc, err := r.ResolveColumn("auto_id", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("ResolveColumn error: %v", err)
 	}

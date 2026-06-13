@@ -47,6 +47,7 @@ type TypeDef struct {
 	Generated   string   // generated expression (e.g., "price * 0.2")
 	Stored      bool     // whether generated column is stored
 	Identity    string   // identity generation: "ALWAYS" or "BY DEFAULT"
+	Array       bool
 }
 
 // Registry holds named TypeDefs with thread-safe read access.
@@ -105,6 +106,9 @@ func typeDefsEqual(a, b *TypeDef) bool {
 	if a.Identity != b.Identity {
 		return false
 	}
+	if a.Array != b.Array {
+		return false
+	}
 	return true
 }
 
@@ -132,6 +136,7 @@ type UserTypeDef struct {
 	DefaultExpr string
 	Check       string
 	Unique      bool
+	Array       bool
 	Comment     string
 }
 
@@ -228,6 +233,7 @@ func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
 		BaseType:   ut.Name, // enums use their own name as PG type
 		NotNull:    true,
 		EnumValues: ut.Values,
+		Array:      ut.Array,
 		Comment:    ut.Comment,
 	}
 
@@ -323,6 +329,7 @@ func (r *Registry) loadScalarType(ut UserTypeDef) diagnostic.Diagnostics {
 		DefaultExpr: ut.DefaultExpr,
 		Check:       ut.Check,
 		Unique:      ut.Unique,
+		Array:       ut.Array,
 		Comment:     ut.Comment,
 	}
 
@@ -364,11 +371,12 @@ type ResolvedColumn struct {
 	Generated   string
 	Stored      bool
 	Identity    string
+	Array       bool
 }
 
 // ResolveColumn resolves a column's final attributes by looking up the type
 // and applying column-level overrides.
-func (r *Registry) ResolveColumn(typeName string, nullable *bool, defaultOverride *string, defaultExprOverride *string) (*ResolvedColumn, error) {
+func (r *Registry) ResolveColumn(typeName string, nullable *bool, defaultOverride *string, defaultExprOverride *string, array *bool) (*ResolvedColumn, error) {
 	td, err := r.Resolve(typeName)
 	if err != nil {
 		return nil, err
@@ -383,6 +391,7 @@ func (r *Registry) ResolveColumn(typeName string, nullable *bool, defaultOverrid
 		Generated:   td.Generated,
 		Stored:      td.Stored,
 		Identity:    td.Identity,
+		Array:       td.Array,
 	}
 
 	// Column nullable overrides type NotNull
@@ -400,6 +409,11 @@ func (r *Registry) ResolveColumn(typeName string, nullable *bool, defaultOverrid
 	if defaultExprOverride != nil {
 		rc.DefaultExpr = *defaultExprOverride
 		rc.Default = "" // expression default takes precedence
+	}
+
+	// Column array overrides type array
+	if array != nil {
+		rc.Array = *array
 	}
 
 	return rc, nil

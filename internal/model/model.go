@@ -106,6 +106,7 @@ type Column struct {
 	Identity         string `json:"identity,omitempty"` // "ALWAYS" or "BY DEFAULT" for identity columns
 	Comment          string `json:"comment,omitempty"`
 	SemanticTypeName string `json:"semantic_type_name,omitempty"`
+	Array            bool   `json:"array,omitempty"`
 }
 
 // FK represents a resolved foreign key constraint.

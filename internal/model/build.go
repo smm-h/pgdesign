@@ -223,7 +223,7 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) (*Column, diagnostic.Diagnostics) {
 	var diags diagnostic.Diagnostics
 
-	resolved, err := reg.ResolveColumn(rc.Type, rc.Nullable, rc.Default, rc.DefaultExpr)
+	resolved, err := reg.ResolveColumn(rc.Type, rc.Nullable, rc.Default, rc.DefaultExpr, rc.Array)
 	if err != nil {
 		diags = append(diags, diagnostic.Diagnostic{
 			Severity: diagnostic.Error,
@@ -245,6 +245,7 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 		Stored:           resolved.Stored,
 		Identity:         resolved.Identity,
 		SemanticTypeName: rc.Type,
+		Array:            resolved.Array,
 	}
 
 	// Apply column-level generated override.

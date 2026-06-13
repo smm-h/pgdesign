@@ -531,6 +531,9 @@ func collectUserTypes(raw *parse.RawSchema) []semtype.UserTypeDef {
 		if rt.Unique != nil {
 			ut.Unique = *rt.Unique
 		}
+		if rt.Array != nil {
+			ut.Array = *rt.Array
+		}
 		if rt.Comment != nil {
 			ut.Comment = *rt.Comment
 		}
