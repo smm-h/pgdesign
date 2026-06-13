@@ -27,4 +27,5 @@ order: 90
 - [internal/semtype](internal-semtype.html)
 - [internal/serve](internal-serve.html)
 - [internal/sql](internal-sql.html)
+- [internal/sqlexpr](internal-sqlexpr.html)
 - [internal/validate](internal-validate.html)
