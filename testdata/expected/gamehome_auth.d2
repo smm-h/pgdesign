@@ -1,0 +1,90 @@
+users: {
+  shape: sql_table
+  id: text {constraint: primary_key}
+  username: text
+  display_name: text
+  email: text
+  email_verified: boolean
+  created_at: float8
+  updated_at: float8
+}
+magic_links: {
+  shape: sql_table
+  token: text {constraint: primary_key}
+  email: text
+  expires_at: float8
+  used: boolean
+}
+credentials: {
+  shape: sql_table
+  user_id: text {constraint: primary_key}
+  password_hash: text
+  created_at: float8
+  updated_at: float8
+}
+sessions: {
+  shape: sql_table
+  id: text {constraint: primary_key}
+  user_id: text {constraint: foreign_key}
+  created_at: float8
+  last_active: float8
+  expires_at: float8
+  ip: text
+  user_agent: text
+}
+provider_links: {
+  shape: sql_table
+  user_id: text {constraint: foreign_key}
+  provider: text {constraint: primary_key}
+  provider_sub: text {constraint: primary_key}
+  provider_email: text
+  linked_at: float8
+}
+email_verifications: {
+  shape: sql_table
+  token: text {constraint: primary_key}
+  user_id: text {constraint: foreign_key}
+  email: text
+  expires_at: float8
+  used: boolean
+}
+password_resets: {
+  shape: sql_table
+  token: text {constraint: primary_key}
+  user_id: text {constraint: foreign_key}
+  expires_at: float8
+  used: boolean
+}
+totp_secrets: {
+  shape: sql_table
+  user_id: text {constraint: primary_key}
+  secret: text
+  verified: boolean
+  created_at: float8
+}
+recovery_codes: {
+  shape: sql_table
+  id: bigint {constraint: primary_key}
+  user_id: text {constraint: foreign_key}
+  code_hash: text
+  used: boolean
+}
+webauthn_credentials: {
+  shape: sql_table
+  id: text {constraint: primary_key}
+  user_id: text {constraint: foreign_key}
+  public_key: bytea
+  attestation_type: text
+  transport: text
+  sign_count: integer
+  created_at: float8
+  last_used: float8
+}
+credentials.user_id -> users.id: CASCADE
+sessions.user_id -> users.id: CASCADE
+provider_links.user_id -> users.id: CASCADE
+email_verifications.user_id -> users.id: CASCADE
+password_resets.user_id -> users.id: CASCADE
+totp_secrets.user_id -> users.id: CASCADE
+recovery_codes.user_id -> users.id: CASCADE
+webauthn_credentials.user_id -> users.id: CASCADE

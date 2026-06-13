@@ -1,0 +1,45 @@
+{
+  "name": "public",
+  "extensions": null,
+  "enums": [],
+  "tables": [
+    {
+      "name": "users",
+      "schema": "public",
+      "comment": "User accounts",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id"
+        },
+        {
+          "name": "email",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "email"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "timestamptz",
+          "not_null": true,
+          "default": "",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [],
+      "indexes": [],
+      "uniques": [],
+      "checks": []
+    }
+  ],
+  "pg_version": 16
+}

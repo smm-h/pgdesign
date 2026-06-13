@@ -1,0 +1,732 @@
+{
+  "name": "auth",
+  "extensions": [
+    "pgcrypto"
+  ],
+  "enums": [],
+  "tables": [
+    {
+      "name": "users",
+      "schema": "auth",
+      "comment": "Core user accounts. All authentication methods link back here.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "comment": "Opaque user identifier",
+          "semantic_type_name": "text_id"
+        },
+        {
+          "name": "username",
+          "pg_type": "text",
+          "not_null": false,
+          "default": "",
+          "semantic_type_name": "text_nullable"
+        },
+        {
+          "name": "display_name",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "email",
+          "pg_type": "text",
+          "not_null": false,
+          "default": "",
+          "semantic_type_name": "text_nullable"
+        },
+        {
+          "name": "email_verified",
+          "pg_type": "boolean",
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "updated_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [],
+      "indexes": [
+        {
+          "name": "idx_users_email",
+          "columns": [
+            "email"
+          ],
+          "where": "email IS NOT NULL",
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_users_username",
+          "columns": [
+            "username"
+          ],
+          "where": "username IS NOT NULL",
+          "unique": true,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "magic_links",
+      "schema": "auth",
+      "comment": "Passwordless login tokens sent via email.",
+      "columns": [
+        {
+          "name": "token",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_id"
+        },
+        {
+          "name": "email",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "expires_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "used",
+          "pg_type": "boolean",
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag"
+        }
+      ],
+      "pk": [
+        "token"
+      ],
+      "fks": [],
+      "indexes": [
+        {
+          "name": "idx_magic_links_email",
+          "columns": [
+            "email"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "credentials",
+      "schema": "auth",
+      "comment": "Password credentials. One row per user with a password.",
+      "columns": [
+        {
+          "name": "user_id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_ref"
+        },
+        {
+          "name": "password_hash",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "updated_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        }
+      ],
+      "pk": [
+        "user_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_credentials_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_credentials_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "sessions",
+      "schema": "auth",
+      "comment": "Active login sessions with expiry and device metadata.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "comment": "Session token",
+          "semantic_type_name": "text_id"
+        },
+        {
+          "name": "user_id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_ref"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "last_active",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "expires_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "ip",
+          "pg_type": "text",
+          "not_null": false,
+          "default": "",
+          "semantic_type_name": "text_nullable"
+        },
+        {
+          "name": "user_agent",
+          "pg_type": "text",
+          "not_null": false,
+          "default": "",
+          "semantic_type_name": "text_nullable"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_sessions_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_sessions_expires_at",
+          "columns": [
+            "expires_at"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_sessions_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "provider_links",
+      "schema": "auth",
+      "comment": "OAuth/OIDC provider links. Composite PK on (provider, provider_sub) to prevent duplicates.",
+      "columns": [
+        {
+          "name": "user_id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_ref"
+        },
+        {
+          "name": "provider",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "provider_sub",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "provider_email",
+          "pg_type": "text",
+          "not_null": false,
+          "default": "",
+          "semantic_type_name": "text_nullable"
+        },
+        {
+          "name": "linked_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        }
+      ],
+      "pk": [
+        "provider",
+        "provider_sub"
+      ],
+      "fks": [
+        {
+          "name": "fk_provider_links_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_provider_links_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "email_verifications",
+      "schema": "auth",
+      "comment": "Pending email verification tokens with expiry.",
+      "columns": [
+        {
+          "name": "token",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_id"
+        },
+        {
+          "name": "user_id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_ref"
+        },
+        {
+          "name": "email",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "expires_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "used",
+          "pg_type": "boolean",
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag"
+        }
+      ],
+      "pk": [
+        "token"
+      ],
+      "fks": [
+        {
+          "name": "fk_email_verifications_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_email_verifications_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "password_resets",
+      "schema": "auth",
+      "comment": "Password reset tokens with expiry.",
+      "columns": [
+        {
+          "name": "token",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_id"
+        },
+        {
+          "name": "user_id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_ref"
+        },
+        {
+          "name": "expires_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "used",
+          "pg_type": "boolean",
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag"
+        }
+      ],
+      "pk": [
+        "token"
+      ],
+      "fks": [
+        {
+          "name": "fk_password_resets_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_password_resets_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "totp_secrets",
+      "schema": "auth",
+      "comment": "TOTP (authenticator app) secrets for two-factor authentication.",
+      "columns": [
+        {
+          "name": "user_id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_ref"
+        },
+        {
+          "name": "secret",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "verified",
+          "pg_type": "boolean",
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        }
+      ],
+      "pk": [
+        "user_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_totp_secrets_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_totp_secrets_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "recovery_codes",
+      "schema": "auth",
+      "comment": "One-time-use backup codes for MFA recovery.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "bigint",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "bigint_id"
+        },
+        {
+          "name": "user_id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_ref"
+        },
+        {
+          "name": "code_hash",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "used",
+          "pg_type": "boolean",
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_recovery_codes_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_recovery_codes_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    },
+    {
+      "name": "webauthn_credentials",
+      "schema": "auth",
+      "comment": "FIDO2/WebAuthn passkey credentials.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "comment": "Credential ID from the authenticator",
+          "semantic_type_name": "text_id"
+        },
+        {
+          "name": "user_id",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_ref"
+        },
+        {
+          "name": "public_key",
+          "pg_type": "bytea",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "binary"
+        },
+        {
+          "name": "attestation_type",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "text_field"
+        },
+        {
+          "name": "transport",
+          "pg_type": "text",
+          "not_null": false,
+          "default": "",
+          "semantic_type_name": "text_nullable"
+        },
+        {
+          "name": "sign_count",
+          "pg_type": "integer",
+          "not_null": true,
+          "default": "0",
+          "semantic_type_name": "int"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "float8",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "epoch"
+        },
+        {
+          "name": "last_used",
+          "pg_type": "float8",
+          "not_null": false,
+          "default": "",
+          "semantic_type_name": "epoch_nullable"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_webauthn_credentials_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_webauthn_credentials_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    }
+  ],
+  "pg_version": 1
+}

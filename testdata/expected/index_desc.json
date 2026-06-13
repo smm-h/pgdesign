@@ -1,0 +1,85 @@
+{
+  "name": "chat",
+  "extensions": null,
+  "enums": [],
+  "tables": [
+    {
+      "name": "messages",
+      "schema": "chat",
+      "comment": "Chat messages",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id"
+        },
+        {
+          "name": "channel",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "short_text"
+        },
+        {
+          "name": "sent_at",
+          "pg_type": "timestamptz",
+          "not_null": true,
+          "default": "",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp"
+        },
+        {
+          "name": "score",
+          "pg_type": "bigint",
+          "not_null": true,
+          "default": "0",
+          "semantic_type_name": "counter"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [],
+      "indexes": [
+        {
+          "name": "idx_messages_channel_sent",
+          "columns": [
+            "channel",
+            "sent_at"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_messages_plain",
+          "columns": [
+            "channel"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_messages_score",
+          "columns": [
+            "score"
+          ],
+          "desc": [
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": [],
+      "checks": []
+    }
+  ],
+  "pg_version": 16
+}

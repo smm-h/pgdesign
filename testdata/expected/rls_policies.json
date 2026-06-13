@@ -1,0 +1,82 @@
+{
+  "name": "secure",
+  "extensions": [
+    "pgcrypto"
+  ],
+  "enums": [],
+  "tables": [
+    {
+      "name": "documents",
+      "schema": "secure",
+      "comment": "User documents with row-level security",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id"
+        },
+        {
+          "name": "owner_id",
+          "pg_type": "uuid",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "ref"
+        },
+        {
+          "name": "title",
+          "pg_type": "text",
+          "not_null": true,
+          "default": "",
+          "semantic_type_name": "short_text"
+        },
+        {
+          "name": "created_at",
+          "pg_type": "timestamptz",
+          "not_null": true,
+          "default": "",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [],
+      "indexes": [],
+      "uniques": [],
+      "checks": [],
+      "policies": [
+        {
+          "name": "owners_delete",
+          "operation": "DELETE",
+          "role": "app_user",
+          "using": "owner_id = current_setting('app.user_id')::uuid"
+        },
+        {
+          "name": "owners_insert",
+          "operation": "INSERT",
+          "role": "app_user",
+          "with_check": "owner_id = current_setting('app.user_id')::uuid"
+        },
+        {
+          "name": "owners_read",
+          "operation": "SELECT",
+          "role": "app_user",
+          "using": "owner_id = current_setting('app.user_id')::uuid"
+        },
+        {
+          "name": "owners_update",
+          "operation": "UPDATE",
+          "role": "app_user",
+          "using": "owner_id = current_setting('app.user_id')::uuid",
+          "with_check": "owner_id = current_setting('app.user_id')::uuid"
+        }
+      ],
+      "enable_rls": true
+    }
+  ],
+  "pg_version": 1
+}

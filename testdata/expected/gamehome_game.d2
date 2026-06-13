@@ -1,0 +1,337 @@
+players: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  auth_id: text {constraint: foreign_key}
+  name: text
+  display_name: text
+  is_anonymous: boolean
+  created_at: timestamptz
+  is_ai: boolean
+  ai_model: text
+}
+server_registry: {
+  shape: sql_table
+  id: text {constraint: primary_key}
+  host: text
+  port: integer
+  version: text
+  server_type: server_type
+  status: server_status
+  max_sessions: integer
+  active_sessions: integer
+  last_heartbeat: timestamptz
+  registered_at: timestamptz
+}
+experiment: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  name: text
+  description: text
+  variants: jsonb
+  status: experiment_status
+  allocation_pct: integer
+  created_at: timestamptz
+}
+achievement_def: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  name: text
+  description: text
+  icon: text
+  criteria: jsonb
+  created_at: timestamptz
+}
+friendships: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  player_a: uuid {constraint: foreign_key}
+  player_b: uuid {constraint: foreign_key}
+  status: friendship_status
+  initiated_by: uuid {constraint: foreign_key}
+  created_at: timestamptz
+  updated_at: timestamptz
+}
+game_catalog: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  title: text
+  description: text
+  tags: jsonb
+  creator: uuid {constraint: foreign_key}
+  ai_generated: boolean
+  created_at: timestamptz
+  generation_model: text
+  generation_prompt: text
+}
+chat_messages: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  sender_id: uuid {constraint: foreign_key}
+  channel: text
+  body: text
+  metadata: jsonb
+  sent_at: timestamptz {constraint: primary_key}
+}
+player_privacy_settings: {
+  shape: sql_table
+  player_id: uuid {constraint: primary_key}
+  public_profile: boolean
+  chat_enabled: boolean
+  friends_enabled: boolean
+  leaderboard_visible: boolean
+  updated_at: timestamptz
+}
+player_age_verification: {
+  shape: sql_table
+  player_id: uuid {constraint: primary_key}
+  birth_date: date
+  is_minor: boolean
+  parental_consent_required: boolean
+  parental_consent_given: boolean
+  parent_email: text
+  consent_token: text
+  consent_token_expires_at: timestamptz
+  consent_given_at: timestamptz
+  created_at: timestamptz
+}
+player_profile: {
+  shape: sql_table
+  player_id: uuid {constraint: primary_key}
+  bio: text
+  avatar_url: text
+  status_text: text
+  level: integer
+  xp: bigint
+}
+player_setting: {
+  shape: sql_table
+  player_id: uuid {constraint: primary_key}
+  key: text {constraint: primary_key}
+  value: text
+}
+follow: {
+  shape: sql_table
+  follower_id: uuid {constraint: primary_key}
+  followed_id: uuid {constraint: primary_key}
+  created_at: timestamptz
+}
+report: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  reporter_id: uuid {constraint: foreign_key}
+  target_type: report_target_type
+  target_id: uuid
+  reason: text
+  status: report_status
+  created_at: timestamptz
+}
+currency_balance: {
+  shape: sql_table
+  player_id: uuid {constraint: primary_key}
+  balance: bigint
+  updated_at: timestamptz
+}
+currency_transaction: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  player_id: uuid {constraint: foreign_key}
+  amount: bigint
+  type: currency_transaction_type
+  reason: text
+  reference_type: text
+  reference_id: uuid
+  created_at: timestamptz
+}
+notification: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  player_id: uuid {constraint: foreign_key}
+  type: notification_type
+  title: text
+  body: text
+  data: jsonb
+  read: boolean
+  created_at: timestamptz
+}
+api_keys: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  player_id: uuid {constraint: foreign_key}
+  key_hash: text
+  name: text
+  scopes: jsonb
+  created_at: timestamptz
+  last_used_at: timestamptz
+  revoked_at: timestamptz
+}
+experiment_assignment: {
+  shape: sql_table
+  experiment_id: uuid {constraint: primary_key}
+  player_id: uuid {constraint: primary_key}
+  variant: text
+  assigned_at: timestamptz
+}
+platform_leaderboards: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  game_id: uuid {constraint: foreign_key}
+  player_id: uuid {constraint: foreign_key}
+  score: bigint
+  metadata: jsonb
+  achieved_at: timestamptz
+}
+game_version: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  game_id: uuid {constraint: foreign_key}
+  version_number: text
+  bundle_path: text
+  bundle_size: bigint
+  changelog: text
+  created_at: timestamptz
+}
+game_fork: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  parent_game_id: uuid {constraint: foreign_key}
+  child_game_id: uuid {constraint: foreign_key}
+  forked_by: uuid {constraint: foreign_key}
+  created_at: timestamptz
+}
+game_like: {
+  shape: sql_table
+  player_id: uuid {constraint: primary_key}
+  game_id: uuid {constraint: primary_key}
+  created_at: timestamptz
+}
+game_comment: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  game_id: uuid {constraint: foreign_key}
+  player_id: uuid {constraint: foreign_key}
+  body: text
+  created_at: timestamptz
+}
+generation_job: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  requested_by: uuid {constraint: foreign_key}
+  game_id: uuid {constraint: foreign_key}
+  prompt: text
+  status: generation_status
+  model: text
+  cost_cents: integer
+  progress: integer
+  error_message: text
+  created_at: timestamptz
+  completed_at: timestamptz
+}
+session: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  game_id: uuid {constraint: foreign_key}
+  status: session_status
+  room_code: text
+  max_players: integer
+  config: jsonb
+  result: jsonb
+  created_at: timestamptz
+  started_at: timestamptz
+  ended_at: timestamptz
+  server_id: text {constraint: foreign_key}
+}
+achievement: {
+  shape: sql_table
+  player_id: uuid {constraint: primary_key}
+  achievement_def_id: uuid {constraint: primary_key}
+  game_id: uuid {constraint: foreign_key}
+  earned_at: timestamptz
+}
+moderation_action: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  report_id: uuid {constraint: foreign_key}
+  action_type: moderation_action_type
+  moderator_note: text
+  acted_at: timestamptz
+}
+game_play: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  game_id: uuid {constraint: foreign_key}
+  player_id: uuid {constraint: foreign_key}
+  version_id: uuid {constraint: foreign_key}
+  duration_seconds: integer
+  completed: boolean
+  score: bigint
+  created_at: timestamptz
+}
+session_participant: {
+  shape: sql_table
+  session_id: uuid {constraint: primary_key}
+  player_id: uuid {constraint: primary_key}
+  role: session_role
+  joined_at: timestamptz
+}
+action_log: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  session_id: uuid {constraint: foreign_key}
+  player_id: uuid {constraint: foreign_key}
+  action: jsonb
+  sequence_num: bigint
+  created_at: timestamptz
+}
+state_snapshot: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  session_id: uuid {constraint: foreign_key}
+  state: jsonb
+  action_sequence_num: bigint
+  created_at: timestamptz
+}
+players.auth_id -> users.id: SET NULL
+friendships.initiated_by -> players.id: CASCADE
+friendships.player_a -> players.id: CASCADE
+friendships.player_b -> players.id: CASCADE
+game_catalog.creator -> players.id: SET NULL
+chat_messages.sender_id -> players.id: CASCADE
+player_privacy_settings.player_id -> players.id: CASCADE
+player_age_verification.player_id -> players.id: CASCADE
+player_profile.player_id -> players.id: CASCADE
+player_setting.player_id -> players.id: CASCADE
+follow.followed_id -> players.id: CASCADE
+follow.follower_id -> players.id: CASCADE
+report.reporter_id -> players.id: CASCADE
+currency_balance.player_id -> players.id: CASCADE
+currency_transaction.player_id -> players.id: CASCADE
+notification.player_id -> players.id: CASCADE
+api_keys.player_id -> players.id: CASCADE
+experiment_assignment.experiment_id -> experiment.id: CASCADE
+experiment_assignment.player_id -> players.id: CASCADE
+platform_leaderboards.game_id -> game_catalog.id: CASCADE
+platform_leaderboards.player_id -> players.id: CASCADE
+game_version.game_id -> game_catalog.id: CASCADE
+game_fork.child_game_id -> game_catalog.id: CASCADE
+game_fork.parent_game_id -> game_catalog.id: CASCADE
+game_fork.forked_by -> players.id: CASCADE
+game_like.game_id -> game_catalog.id: CASCADE
+game_like.player_id -> players.id: CASCADE
+game_comment.game_id -> game_catalog.id: CASCADE
+game_comment.player_id -> players.id: CASCADE
+generation_job.game_id -> game_catalog.id: SET NULL
+generation_job.requested_by -> players.id: CASCADE
+session.game_id -> game_catalog.id: CASCADE
+session.server_id -> server_registry.id: SET NULL
+achievement.achievement_def_id -> achievement_def.id: CASCADE
+achievement.game_id -> game_catalog.id: SET NULL
+achievement.player_id -> players.id: CASCADE
+moderation_action.report_id -> report.id: CASCADE
+game_play.game_id -> game_catalog.id: CASCADE
+game_play.player_id -> players.id: CASCADE
+game_play.version_id -> game_version.id: SET NULL
+session_participant.player_id -> players.id: CASCADE
+session_participant.session_id -> session.id: CASCADE
+action_log.player_id -> players.id: CASCADE
+action_log.session_id -> session.id: CASCADE
+state_snapshot.session_id -> session.id: CASCADE
