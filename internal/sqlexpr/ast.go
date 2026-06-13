@@ -89,3 +89,17 @@ type ParenExpr struct {
 }
 
 func (n *ParenExpr) nodeType() string { return "ParenExpr" }
+
+// CaseExpr is a CASE WHEN ... THEN ... [ELSE ...] END expression.
+type CaseExpr struct {
+	Whens []WhenClause
+	Else  Node // nil if no ELSE
+}
+
+// WhenClause is a WHEN condition THEN result pair.
+type WhenClause struct {
+	Condition Node
+	Result    Node
+}
+
+func (n *CaseExpr) nodeType() string { return "CaseExpr" }

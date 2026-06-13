@@ -105,18 +105,66 @@ func (p *parser) parseNot() (Node, error) {
 }
 
 func (p *parser) parseComparison() (Node, error) {
-	left, err := p.parseCast()
+	left, err := p.parseConcat()
 	if err != nil {
 		return nil, err
 	}
 	tok := p.current()
 	if tok.kind == tokenEquals || tok.kind == tokenNotEquals {
 		op := p.advance()
-		right, err := p.parseCast()
+		right, err := p.parseConcat()
 		if err != nil {
 			return nil, err
 		}
 		return &BinaryOp{Op: op.value, Left: left, Right: right}, nil
+	}
+	return left, nil
+}
+
+func (p *parser) parseConcat() (Node, error) {
+	left, err := p.parseAddSub()
+	if err != nil {
+		return nil, err
+	}
+	for p.current().kind == tokenPipe {
+		p.advance()
+		right, err := p.parseAddSub()
+		if err != nil {
+			return nil, err
+		}
+		left = &BinaryOp{Op: "||", Left: left, Right: right}
+	}
+	return left, nil
+}
+
+func (p *parser) parseAddSub() (Node, error) {
+	left, err := p.parseMulDiv()
+	if err != nil {
+		return nil, err
+	}
+	for p.current().kind == tokenPlus || p.current().kind == tokenMinus {
+		op := p.advance()
+		right, err := p.parseMulDiv()
+		if err != nil {
+			return nil, err
+		}
+		left = &BinaryOp{Op: op.value, Left: left, Right: right}
+	}
+	return left, nil
+}
+
+func (p *parser) parseMulDiv() (Node, error) {
+	left, err := p.parseCast()
+	if err != nil {
+		return nil, err
+	}
+	for p.current().kind == tokenStar {
+		p.advance()
+		right, err := p.parseCast()
+		if err != nil {
+			return nil, err
+		}
+		left = &BinaryOp{Op: "*", Left: left, Right: right}
 	}
 	return left, nil
 }
@@ -164,6 +212,14 @@ func (p *parser) parsePrimary() (Node, error) {
 		}
 		return &IntLiteral{Value: val}, nil
 
+	case tokenMinus:
+		p.advance()
+		operand, err := p.parsePrimary()
+		if err != nil {
+			return nil, err
+		}
+		return &UnaryOp{Op: "-", Operand: operand}, nil
+
 	case tokenIdent:
 		lower := strings.ToLower(tok.value)
 
@@ -180,6 +236,11 @@ func (p *parser) parsePrimary() (Node, error) {
 		// EXISTS
 		if lower == "exists" {
 			return p.parseExists()
+		}
+
+		// CASE
+		if lower == "case" {
+			return p.parseCaseExpr()
 		}
 
 		// identifier: could be column ref, qualified name, or function call
@@ -249,6 +310,45 @@ func (p *parser) parseExists() (Node, error) {
 			Where:   where,
 		},
 	}, nil
+}
+
+func (p *parser) parseCaseExpr() (Node, error) {
+	p.advance() // consume CASE
+
+	var whens []WhenClause
+	for p.isKeyword("WHEN") {
+		p.advance() // consume WHEN
+		condition, err := p.parseOr()
+		if err != nil {
+			return nil, err
+		}
+		if !p.isKeyword("THEN") {
+			return nil, fmt.Errorf("sqlexpr: expected THEN in CASE expression at position %d", p.current().pos)
+		}
+		p.advance() // consume THEN
+		result, err := p.parseOr()
+		if err != nil {
+			return nil, err
+		}
+		whens = append(whens, WhenClause{Condition: condition, Result: result})
+	}
+
+	var elseNode Node
+	if p.isKeyword("ELSE") {
+		p.advance() // consume ELSE
+		var err error
+		elseNode, err = p.parseOr()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !p.isKeyword("END") {
+		return nil, fmt.Errorf("sqlexpr: expected END in CASE expression at position %d", p.current().pos)
+	}
+	p.advance() // consume END
+
+	return &CaseExpr{Whens: whens, Else: elseNode}, nil
 }
 
 func (p *parser) parseTableRef() (*ColumnRef, error) {

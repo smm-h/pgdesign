@@ -19,6 +19,10 @@ const (
 	tokenEquals
 	tokenNotEquals
 	tokenComma
+	tokenPipe
+	tokenStar
+	tokenPlus
+	tokenMinus
 	tokenEOF
 )
 
@@ -74,6 +78,22 @@ func tokenize(input string) ([]token, error) {
 		case runes[i] == '<' && i+1 < len(runes) && runes[i+1] == '>':
 			tokens = append(tokens, token{kind: tokenNotEquals, value: "<>", pos: pos})
 			i += 2
+
+		case runes[i] == '|' && i+1 < len(runes) && runes[i+1] == '|':
+			tokens = append(tokens, token{kind: tokenPipe, value: "||", pos: pos})
+			i += 2
+
+		case runes[i] == '*':
+			tokens = append(tokens, token{kind: tokenStar, value: "*", pos: pos})
+			i++
+
+		case runes[i] == '+':
+			tokens = append(tokens, token{kind: tokenPlus, value: "+", pos: pos})
+			i++
+
+		case runes[i] == '-':
+			tokens = append(tokens, token{kind: tokenMinus, value: "-", pos: pos})
+			i++
 
 		case runes[i] == '\'':
 			// single-quoted string

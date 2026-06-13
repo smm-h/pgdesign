@@ -38,6 +38,14 @@ func Walk(node Node, fn func(Node) bool) {
 		}
 	case *ParenExpr:
 		Walk(n.Inner, fn)
+	case *CaseExpr:
+		for _, w := range n.Whens {
+			Walk(w.Condition, fn)
+			Walk(w.Result, fn)
+		}
+		if n.Else != nil {
+			Walk(n.Else, fn)
+		}
 	}
 }
 

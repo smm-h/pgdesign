@@ -126,6 +126,18 @@ func assertExistsExpr(t *testing.T, node Node) *ExistsExpr {
 	return ee
 }
 
+func assertCaseExpr(t *testing.T, node Node, whenCount int) *CaseExpr {
+	t.Helper()
+	ce, ok := node.(*CaseExpr)
+	if !ok {
+		t.Fatalf("expected *CaseExpr, got %T", node)
+	}
+	if len(ce.Whens) != whenCount {
+		t.Fatalf("expected %d WHEN clauses, got %d", whenCount, len(ce.Whens))
+	}
+	return ce
+}
+
 func TestParseLiterals(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
 		node, err := Parse("true")
@@ -467,6 +479,121 @@ func TestParseErrors(t *testing.T) {
 		_, err := Parse("'hello")
 		if err == nil {
 			t.Fatal("expected error for unclosed string literal")
+		}
+	})
+}
+
+func TestParseConcat(t *testing.T) {
+	t.Run("double_pipe", func(t *testing.T) {
+		// first_name || ' ' || last_name => ||( ||(first_name, ' '), last_name )
+		node, err := Parse("first_name || ' ' || last_name")
+		if err != nil {
+			t.Fatal(err)
+		}
+		outer := assertBinaryOp(t, node, "||")
+		inner := assertBinaryOp(t, outer.Left, "||")
+		assertColumnRef(t, inner.Left, "first_name")
+		assertStringLiteral(t, inner.Right, " ")
+		assertColumnRef(t, outer.Right, "last_name")
+
+		refs := CollectColumnRefs(node)
+		if len(refs) != 2 {
+			t.Fatalf("expected 2 column refs, got %d", len(refs))
+		}
+		if refs[0].Parts[0] != "first_name" {
+			t.Fatalf("expected first_name, got %v", refs[0].Parts)
+		}
+		if refs[1].Parts[0] != "last_name" {
+			t.Fatalf("expected last_name, got %v", refs[1].Parts)
+		}
+	})
+}
+
+func TestParseArithmetic(t *testing.T) {
+	t.Run("multiply", func(t *testing.T) {
+		node, err := Parse("price * quantity")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "*")
+		assertColumnRef(t, bo.Left, "price")
+		assertColumnRef(t, bo.Right, "quantity")
+	})
+
+	t.Run("addition", func(t *testing.T) {
+		node, err := Parse("price + tax")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "+")
+		assertColumnRef(t, bo.Left, "price")
+		assertColumnRef(t, bo.Right, "tax")
+	})
+
+	t.Run("mul_binds_tighter_than_add", func(t *testing.T) {
+		// a * b + c => +(*(a, b), c)
+		node, err := Parse("a * b + c")
+		if err != nil {
+			t.Fatal(err)
+		}
+		add := assertBinaryOp(t, node, "+")
+		mul := assertBinaryOp(t, add.Left, "*")
+		assertColumnRef(t, mul.Left, "a")
+		assertColumnRef(t, mul.Right, "b")
+		assertColumnRef(t, add.Right, "c")
+
+		refs := CollectColumnRefs(node)
+		if len(refs) != 3 {
+			t.Fatalf("expected 3 column refs, got %d", len(refs))
+		}
+		if refs[0].Parts[0] != "a" || refs[1].Parts[0] != "b" || refs[2].Parts[0] != "c" {
+			t.Fatalf("expected [a, b, c], got %v", refs)
+		}
+	})
+}
+
+func TestParseCaseExpr(t *testing.T) {
+	t.Run("simple_case", func(t *testing.T) {
+		node, err := Parse("CASE WHEN status = 'active' THEN 1 ELSE 0 END")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ce := assertCaseExpr(t, node, 1)
+		cond := assertBinaryOp(t, ce.Whens[0].Condition, "=")
+		assertColumnRef(t, cond.Left, "status")
+		assertStringLiteral(t, cond.Right, "active")
+		assertIntLiteral(t, ce.Whens[0].Result, 1)
+		assertIntLiteral(t, ce.Else, 0)
+
+		refs := CollectColumnRefs(node)
+		if len(refs) != 1 {
+			t.Fatalf("expected 1 column ref, got %d", len(refs))
+		}
+		if refs[0].Parts[0] != "status" {
+			t.Fatalf("expected status, got %v", refs[0].Parts)
+		}
+	})
+}
+
+func TestParseCoalesce(t *testing.T) {
+	t.Run("coalesce", func(t *testing.T) {
+		node, err := Parse("COALESCE(nickname, first_name)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		fc := assertFuncCall(t, node, "COALESCE", 2)
+		assertColumnRef(t, fc.Args[0], "nickname")
+		assertColumnRef(t, fc.Args[1], "first_name")
+
+		refs := CollectColumnRefs(node)
+		if len(refs) != 2 {
+			t.Fatalf("expected 2 column refs, got %d", len(refs))
+		}
+		if refs[0].Parts[0] != "nickname" {
+			t.Fatalf("expected nickname, got %v", refs[0].Parts)
+		}
+		if refs[1].Parts[0] != "first_name" {
+			t.Fatalf("expected first_name, got %v", refs[1].Parts)
 		}
 	})
 }
