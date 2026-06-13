@@ -170,7 +170,11 @@ func handleGenerate(kwargs map[string]interface{}) int {
 		PGVersion:       pgVersion,
 	}
 
-	out := generate.Generate(schema, opts)
+	out, err := generate.Generate(schema, opts)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "generate: %v\n", err)
+		return 1
+	}
 	fmt.Print(out)
 	return 0
 }
@@ -1515,7 +1519,3 @@ func handleCodegen(kwargs map[string]interface{}) int {
 	return 0
 }
 
-func notImplemented(_ map[string]interface{}) int {
-	fmt.Println("not implemented")
-	return 0
-}
