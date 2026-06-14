@@ -430,6 +430,74 @@ func TestPythonGenerator_NonGamehomeNaming(t *testing.T) {
 	}
 }
 
+func TestPythonGenerator_OrCompound_OwnershipOrExists(t *testing.T) {
+	// OR-compound policy: ownership OR exists-lookup.
+	// "Show message if you own it OR the author's profile is public."
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "messages",
+				Schema: "app",
+				Policies: []model.Policy{
+					{
+						Name:         "message_owner_or_public",
+						Operation:    "SELECT",
+						Using:        "author_id::text = current_setting('app.user_id') OR EXISTS (SELECT 1 FROM app.user_settings WHERE user_id = messages.author_id AND public_profile = true)",
+						ErrorCode:    "MSG002",
+						ErrorMessage: "message access denied",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &PythonGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// The validator must handle BOTH branches of the OR.
+	// It should check ownership first (cheap), then fall back to exists-lookup.
+
+	// Must have the ownership comparison (author_id == target_author_id).
+	if !strings.Contains(result, "target_author_id") {
+		t.Error("missing target_author_id parameter for ownership check")
+	}
+	if !strings.Contains(result, "if author_id == target_author_id") {
+		t.Error("missing ownership comparison 'if author_id == target_author_id'")
+	}
+
+	// Must have the exists-lookup query.
+	if !strings.Contains(result, "SELECT public_profile FROM app.user_settings WHERE user_id = $1") {
+		t.Error("missing exists-lookup query for public_profile")
+	}
+
+	// Both branches must be present in a single function.
+	fnCount := strings.Count(result, "async def check_message_owner_or_public")
+	if fnCount != 1 {
+		t.Errorf("expected exactly 1 function, got %d", fnCount)
+	}
+
+	// The validator must return ok=True when the ownership check passes (short-circuit).
+	if !strings.Contains(result, `return PolicyResult(ok=True`) {
+		t.Error("missing early return for ownership match")
+	}
+
+	// The validator must also query the database for the exists-lookup fallback.
+	if !strings.Contains(result, "fetchrow") {
+		t.Error("missing fetchrow call for exists-lookup fallback")
+	}
+
+	// Must have the error code for when NEITHER branch passes.
+	if !strings.Contains(result, `code="MSG002"`) {
+		t.Error("missing MSG002 error code")
+	}
+}
+
 func TestPythonGenerator_UnparsableExpression(t *testing.T) {
 	schema := &model.Schema{
 		Name: "game",
