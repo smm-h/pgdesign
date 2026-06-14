@@ -98,6 +98,28 @@ func (g *TSConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnos
 	})
 }
 
+// JavaConstantsGenerator generates Java constants for table and column names.
+type JavaConstantsGenerator struct{}
+
+// Generate produces a Java file with table name and column name constants
+// for every table in the schema.
+func (g *JavaConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
+	return generateConstants(schema, ConstantsLang{
+		CommentPrefix: "// ",
+		TableConstFmt: func(name, fqn string) string {
+			return fmt.Sprintf("public static final String TABLE_%s = %q;\n", name, fqn)
+		},
+		ColumnsConstFmt: func(name, joined string) string {
+			return fmt.Sprintf("public static final String[] %s_COLUMNS = {%s};\n", name, joined)
+		},
+		ColConstFmt: func(tableName, colName, rawColName string) string {
+			return fmt.Sprintf("public static final String %s_COL_%s = %q;\n", tableName, colName, rawColName)
+		},
+		CaseFn:   strings.ToUpper,
+		RegenCmd: "pgdesign codegen --lang java --mode constants <schema-files>",
+	})
+}
+
 // GoConstantsGenerator generates Go constants for table and column names.
 type GoConstantsGenerator struct{}
 
