@@ -597,6 +597,49 @@ func TestPythonGenerator_UnparsableExpression(t *testing.T) {
 	}
 }
 
+func TestPythonGenerator_LeftSideCurrentSetting(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "posts",
+				Schema: "app",
+				Policies: []model.Policy{
+					{
+						Name:         "post_own_only",
+						Operation:    "SELECT",
+						Using:        "current_setting('app.user_id')::text = author_id",
+						ErrorCode:    "POST001",
+						ErrorMessage: "you can only view your own posts",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &PythonGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	if !strings.Contains(result, "async def check_post_own_only(conn, author_id: str, target_author_id: str) -> PolicyResult:") {
+		t.Error("missing ownership function signature")
+	}
+	if !strings.Contains(result, "if author_id != target_author_id:") {
+		t.Error("missing ownership comparison")
+	}
+	if !strings.Contains(result, `code="POST001"`) {
+		t.Error("missing POST001 error code")
+	}
+	// Ownership validators do not query the database.
+	if strings.Contains(result, "fetchrow") {
+		t.Error("ownership validator should not query the database")
+	}
+}
+
 func TestPythonGenerator_NotExistsPattern(t *testing.T) {
 	// RED test: NOT EXISTS should invert the privacy check logic.
 	// Currently, detectAllExistsLookups finds the ExistsExpr inside the

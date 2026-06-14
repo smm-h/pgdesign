@@ -381,6 +381,49 @@ func TestZigValidatorGenerator_OrCompound_OwnershipOrExists(t *testing.T) {
 	}
 }
 
+func TestZigValidatorGenerator_LeftSideCurrentSetting(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "posts",
+				Schema: "app",
+				Policies: []model.Policy{
+					{
+						Name:         "post_own_only",
+						Operation:    "SELECT",
+						Using:        "current_setting('app.user_id')::text = author_id",
+						ErrorCode:    "POST001",
+						ErrorMessage: "you can only view your own posts",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &ZigValidatorGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	if !strings.Contains(result, "pub fn check_post_own_only(author_id: []const u8, target_author_id: []const u8) PolicyResult {") {
+		t.Error("missing ownership function signature")
+	}
+	if !strings.Contains(result, "std.mem.eql(u8, author_id, target_author_id)") {
+		t.Error("missing ownership comparison")
+	}
+	if !strings.Contains(result, `.code = "POST001"`) {
+		t.Error("missing POST001 error code")
+	}
+	// Ownership validators do not take a connection parameter.
+	if strings.Contains(result, "conn: *pg.Conn") {
+		t.Error("ownership validator should not take a connection parameter")
+	}
+}
+
 func TestZigValidatorGenerator_UnparsableExpression(t *testing.T) {
 	schema := &model.Schema{
 		Name: "game",
