@@ -68,17 +68,19 @@ func (g *ZigValidatorGenerator) Generate(schema *model.Schema) ([]byte, []diagno
 		if len(existsLookups) >= 2 {
 			dual := &dualPrivacyCheck{
 				first: privacyCheck{
+					tableParts:   existsLookups[0].tableParts,
 					joinColumn:   existsLookups[0].joinColumn,
 					lookupColumn: existsLookups[0].lookupColumn,
 					flagColumn:   existsLookups[0].flagColumn,
 				},
 				second: privacyCheck{
+					tableParts:   existsLookups[1].tableParts,
 					joinColumn:   existsLookups[1].joinColumn,
 					lookupColumn: existsLookups[1].lookupColumn,
 					flagColumn:   existsLookups[1].flagColumn,
 				},
 			}
-			zigDualPrivacyValidator(&buf, pol, dual, existsLookups[0].tableParts)
+			zigDualPrivacyValidator(&buf, pol, dual)
 		} else if len(existsLookups) == 1 {
 			check := &privacyCheck{
 				joinColumn:   existsLookups[0].joinColumn,
@@ -191,8 +193,9 @@ func zigOrOwnershipExistsValidator(buf *bytes.Buffer, pol PolicyContext, orComp 
 }
 
 // zigDualPrivacyValidator writes a validator that checks two players' settings in Zig.
-func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPrivacyCheck, tableParts []string) {
-	tableFQN := strings.Join(tableParts, ".")
+func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPrivacyCheck) {
+	firstTableFQN := strings.Join(dual.first.tableParts, ".")
+	secondTableFQN := strings.Join(dual.second.tableParts, ".")
 
 	buf.WriteString(fmt.Sprintf(
 		"\n/// %s\n"+
@@ -208,7 +211,7 @@ func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPri
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		dual.first.flagColumn, tableFQN, dual.first.joinColumn, dual.first.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
+		dual.first.flagColumn, firstTableFQN, dual.first.joinColumn, dual.first.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if (!row1.get(bool, %q)) {\n"+
@@ -225,7 +228,7 @@ func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPri
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		dual.second.flagColumn, tableFQN, dual.second.joinColumn, dual.second.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
+		dual.second.flagColumn, secondTableFQN, dual.second.joinColumn, dual.second.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if (!row2.get(bool, %q)) {\n"+

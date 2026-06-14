@@ -8,6 +8,9 @@ import (
 
 // privacyCheck describes a parsed reference to player_privacy_settings.
 type privacyCheck struct {
+	// tableParts is the fully qualified table reference parts
+	// (e.g., ["game", "player_privacy_settings"]).
+	tableParts []string
 	// joinColumn is the column in the lookup table used for the join
 	// (e.g. "player_id", "user_id").
 	joinColumn string

@@ -69,18 +69,19 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 			// Dual/multi exists-lookup pattern
 			dual := &dualPrivacyCheck{
 				first: privacyCheck{
+					tableParts:   existsLookups[0].tableParts,
 					joinColumn:   existsLookups[0].joinColumn,
 					lookupColumn: existsLookups[0].lookupColumn,
 					flagColumn:   existsLookups[0].flagColumn,
 				},
 				second: privacyCheck{
+					tableParts:   existsLookups[1].tableParts,
 					joinColumn:   existsLookups[1].joinColumn,
 					lookupColumn: existsLookups[1].lookupColumn,
 					flagColumn:   existsLookups[1].flagColumn,
 				},
 			}
-			// Use table from the first lookup for the FQN
-			generateDualPrivacyValidator(&buf, pol, dual, existsLookups[0].tableParts)
+			generateDualPrivacyValidator(&buf, pol, dual)
 		} else if len(existsLookups) == 1 {
 			// Single exists-lookup pattern
 			check := &privacyCheck{
@@ -191,7 +192,7 @@ func generateOrOwnershipExistsValidator(buf *bytes.Buffer, pol PolicyContext, or
 }
 
 // generateDualPrivacyValidator writes a validator that checks two players' settings.
-func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPrivacyCheck, tableParts []string) {
+func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPrivacyCheck) {
 	buf.WriteString(fmt.Sprintf(
 		"\nasync def check_%s(conn, %s: str, %s: str) -> PolicyResult:\n",
 		pol.PolicyName, dual.first.lookupColumn, dual.second.lookupColumn,
@@ -200,7 +201,8 @@ func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *du
 		"    \"\"\"%s\"\"\"\n", pol.ErrorMessage,
 	))
 
-	tableFQN := strings.Join(tableParts, ".")
+	firstTableFQN := strings.Join(dual.first.tableParts, ".")
+	secondTableFQN := strings.Join(dual.second.tableParts, ".")
 
 	// First player check.
 	buf.WriteString(fmt.Sprintf(
@@ -208,7 +210,7 @@ func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *du
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        %s,\n"+
 			"    )\n",
-		dual.first.flagColumn, tableFQN, dual.first.joinColumn, dual.first.lookupColumn,
+		dual.first.flagColumn, firstTableFQN, dual.first.joinColumn, dual.first.lookupColumn,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if not row or not row[\"%s\"]:\n"+
@@ -222,7 +224,7 @@ func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *du
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        %s,\n"+
 			"    )\n",
-		dual.second.flagColumn, tableFQN, dual.second.joinColumn, dual.second.lookupColumn,
+		dual.second.flagColumn, secondTableFQN, dual.second.joinColumn, dual.second.lookupColumn,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if not row or not row[\"%s\"]:\n"+
