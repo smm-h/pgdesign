@@ -132,6 +132,13 @@ func main() {
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
 		),
 	)
+	mig.Command("squash", "Squash a range of migrations into one", handleMigrateSquash,
+		strictcli.WithFlags(
+			strictcli.StringFlag("from", "Start version (inclusive)"),
+			strictcli.StringFlag("to", "End version (inclusive)"),
+			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+		),
+	)
 
 	app.Command("serve", "Start the pgdesign HTTP API server", handleServe,
 		strictcli.WithFlags(

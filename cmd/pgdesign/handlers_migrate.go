@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/jackc/pgx/v5"
@@ -483,4 +484,73 @@ func opSummary(op migrate.DDLOp) string {
 		target = op.Name
 	}
 	return target
+}
+
+func handleMigrateSquash(kwargs map[string]interface{}) int {
+	cfg := loadProjectConfig(".")
+
+	dir := kwargs["dir"].(string)
+	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+		dir = cfg.Project.MigrationsDir
+	}
+
+	from, _ := kwargs["from"].(string)
+	if from == "" {
+		fmt.Fprintln(os.Stderr, "error: --from is required")
+		return 1
+	}
+	to, _ := kwargs["to"].(string)
+	if to == "" {
+		fmt.Fprintln(os.Stderr, "error: --to is required")
+		return 1
+	}
+
+	result, err := migrate.SquashMigrations(dir, from, to)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
+	// Write squashed migration to a temp file first, since the output path
+	// ({to}.toml) is one of the original files being archived.
+	outputPath := migrate.OutputPath(dir, to)
+	tmpPath := outputPath + ".squash-tmp"
+	if err := migrate.WriteMigrationFile(tmpPath, result.Squashed); err != nil {
+		fmt.Fprintf(os.Stderr, "error: write squashed migration: %v\n", err)
+		return 1
+	}
+
+	// Archive original migration files with saferm.
+	args := []string{"delete", "--description", fmt.Sprintf("Squashed into %s (from %s to %s)", to, from, to)}
+	args = append(args, result.OriginalPaths...)
+	cmd := exec.Command("saferm", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		// Clean up temp file on failure.
+		os.Remove(tmpPath)
+		fmt.Fprintf(os.Stderr, "error: archive originals: %v\n", err)
+		return 1
+	}
+
+	// Move temp file to final output path.
+	if err := os.Rename(tmpPath, outputPath); err != nil {
+		fmt.Fprintf(os.Stderr, "error: rename squashed migration: %v\n", err)
+		return 1
+	}
+
+	if !kwargs["quiet"].(bool) {
+		fmt.Printf("Squashed %d migrations into %s\n", result.OriginalCount, outputPath)
+		fmt.Printf("  Description: %s\n", result.Squashed.Description)
+		fmt.Printf("  DDL ops: %d\n", len(result.Squashed.DDLOps))
+		fmt.Printf("  DML ops: %d\n", len(result.Squashed.DMLOps))
+		if result.CancelledPairs > 0 {
+			fmt.Printf("  Cancelled inverse pairs: %d\n", result.CancelledPairs)
+		}
+		if result.MergedOps > 0 {
+			fmt.Printf("  Merged ops: %d\n", result.MergedOps)
+		}
+	}
+
+	return 0
 }
