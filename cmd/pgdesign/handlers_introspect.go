@@ -68,92 +68,86 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 		fmt.Print(string(data))
 	}
 
-	return 0
-}
-
-func handleExtensionDiscover(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: --db is required for extension discover")
-		return 1
-	}
-
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
-		return 1
-	}
-	defer conn.Close(ctx)
-
-	// Query installed extensions, excluding plpgsql (always present).
-	rows, err := conn.Query(ctx,
-		"SELECT extname FROM pg_extension WHERE extname != 'plpgsql' ORDER BY extname")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: query extensions: %v\n", err)
-		return 1
-	}
-	defer rows.Close()
-
-	var extNames []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			fmt.Fprintf(os.Stderr, "error: scan extension: %v\n", err)
-			return 1
-		}
-		extNames = append(extNames, name)
-	}
-	if err := rows.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: iterate extensions: %v\n", err)
-		return 1
-	}
-
-	if len(extNames) == 0 {
-		if !kwargs["quiet"].(bool) {
-			fmt.Println("# No extensions found (excluding plpgsql).")
-		}
-		return 0
-	}
-
-	for i, extName := range extNames {
-		types, err := queryExtensionDeps(ctx, conn, extName,
-			"SELECT t.typname FROM pg_type t JOIN pg_depend d ON d.objid = t.oid "+
-				"WHERE d.refobjid = (SELECT oid FROM pg_extension WHERE extname = $1) AND d.deptype = 'e' ORDER BY t.typname")
+	// Extension discovery (--extensions flag)
+	if kwargs["extensions"].(bool) {
+		conn, err := pgx.Connect(ctx, dbURL)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: query types for %s: %v\n", extName, err)
+			fmt.Fprintf(os.Stderr, "error: connect for extension discovery: %v\n", err)
 			return 1
 		}
+		defer conn.Close(ctx)
 
-		functions, err := queryExtensionDeps(ctx, conn, extName,
-			"SELECT p.proname FROM pg_proc p JOIN pg_depend d ON d.objid = p.oid "+
-				"WHERE d.refobjid = (SELECT oid FROM pg_extension WHERE extname = $1) AND d.deptype = 'e' ORDER BY p.proname")
+		// Query installed extensions, excluding plpgsql (always present).
+		rows, err := conn.Query(ctx,
+			"SELECT extname FROM pg_extension WHERE extname != 'plpgsql' ORDER BY extname")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: query functions for %s: %v\n", extName, err)
+			fmt.Fprintf(os.Stderr, "error: query extensions: %v\n", err)
+			return 1
+		}
+		defer rows.Close()
+
+		var extNames []string
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				fmt.Fprintf(os.Stderr, "error: scan extension: %v\n", err)
+				return 1
+			}
+			extNames = append(extNames, name)
+		}
+		if err := rows.Err(); err != nil {
+			fmt.Fprintf(os.Stderr, "error: iterate extensions: %v\n", err)
 			return 1
 		}
 
-		opclasses, err := queryExtensionDeps(ctx, conn, extName,
-			"SELECT o.opcname FROM pg_opclass o JOIN pg_depend d ON d.objid = o.oid "+
-				"WHERE d.refobjid = (SELECT oid FROM pg_extension WHERE extname = $1) AND d.deptype = 'e' ORDER BY o.opcname")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: query opclasses for %s: %v\n", extName, err)
-			return 1
+		if len(extNames) == 0 {
+			if !kwargs["quiet"].(bool) {
+				fmt.Fprintln(os.Stderr, "# No extensions found (excluding plpgsql).")
+			}
+			return 0
 		}
 
-		if i > 0 {
-			fmt.Println()
-		}
-		fmt.Println("[[extensions]]")
-		fmt.Printf("name = %q\n", extName)
-		if len(types) > 0 {
-			fmt.Printf("types = [%s]\n", quotedList(types))
-		}
-		if len(opclasses) > 0 {
-			fmt.Printf("opclasses = [%s]\n", quotedList(opclasses))
-		}
-		if len(functions) > 0 {
-			fmt.Printf("functions = [%s]\n", quotedList(functions))
+		fmt.Println() // separator between introspect output and extensions
+
+		for i, extName := range extNames {
+			types, err := queryExtensionDeps(ctx, conn, extName,
+				"SELECT t.typname FROM pg_type t JOIN pg_depend d ON d.objid = t.oid "+
+					"WHERE d.refobjid = (SELECT oid FROM pg_extension WHERE extname = $1) AND d.deptype = 'e' ORDER BY t.typname")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: query types for %s: %v\n", extName, err)
+				return 1
+			}
+
+			functions, err := queryExtensionDeps(ctx, conn, extName,
+				"SELECT p.proname FROM pg_proc p JOIN pg_depend d ON d.objid = p.oid "+
+					"WHERE d.refobjid = (SELECT oid FROM pg_extension WHERE extname = $1) AND d.deptype = 'e' ORDER BY p.proname")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: query functions for %s: %v\n", extName, err)
+				return 1
+			}
+
+			opclasses, err := queryExtensionDeps(ctx, conn, extName,
+				"SELECT o.opcname FROM pg_opclass o JOIN pg_depend d ON d.objid = o.oid "+
+					"WHERE d.refobjid = (SELECT oid FROM pg_extension WHERE extname = $1) AND d.deptype = 'e' ORDER BY o.opcname")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: query opclasses for %s: %v\n", extName, err)
+				return 1
+			}
+
+			if i > 0 {
+				fmt.Println()
+			}
+			fmt.Println("[[extensions]]")
+			fmt.Printf("name = %q\n", extName)
+			if len(types) > 0 {
+				fmt.Printf("types = [%s]\n", quotedList(types))
+			}
+			if len(opclasses) > 0 {
+				fmt.Printf("opclasses = [%s]\n", quotedList(opclasses))
+			}
+			if len(functions) > 0 {
+				fmt.Printf("functions = [%s]\n", quotedList(functions))
+			}
 		}
 	}
 

@@ -83,6 +83,7 @@ func main() {
 			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.StringFlag("schema", "Schema name to introspect", strictcli.Repeatable()),
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
+			strictcli.BoolFlag("extensions", "Discover extension types, functions, and opclasses"),
 		),
 	)
 
@@ -164,13 +165,6 @@ func main() {
 			strictcli.IntFlag("port", "HTTP port to listen on", strictcli.Default(8080)),
 			strictcli.StringFlag("schema", "Schema name to serve", strictcli.Repeatable()),
 			strictcli.IntFlag("timeout", "Request timeout in seconds", strictcli.Default(30)),
-		),
-	)
-
-	ext := app.Group("extension", "Extension management commands")
-	ext.Command("discover", "Discover extensions from a live database", handleExtensionDiscover,
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 		),
 	)
 
