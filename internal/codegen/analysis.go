@@ -17,9 +17,9 @@ type privacyCheck struct {
 	// lookupColumn is the column in the policy table whose value is used to
 	// look up the privacy row (e.g. "sender_id", "followed_id", "player_id").
 	lookupColumn string
-	// flagColumn is the boolean column checked in player_privacy_settings
-	// (e.g. "chat_enabled", "friends_enabled").
-	flagColumn string
+	// flagColumns are the boolean columns checked in player_privacy_settings
+	// (e.g. ["chat_enabled"], ["chat_enabled", "notifications_enabled"]).
+	flagColumns []string
 }
 
 // ownershipCheck describes a parsed ownership comparison.
@@ -41,7 +41,7 @@ type existsLookup struct {
 	tableParts   []string // fully qualified table reference parts (e.g., ["game", "player_privacy_settings"])
 	joinColumn   string   // column in the lookup table used for the join (e.g., "player_id")
 	lookupColumn string   // column from the outer table (e.g., "sender_id")
-	flagColumn   string   // boolean flag column (e.g., "chat_enabled")
+	flagColumns  []string // boolean flag columns (e.g., ["chat_enabled"])
 	negated      bool     // true for NOT EXISTS
 }
 
@@ -183,7 +183,8 @@ func analyzeExistsWhere(sel *sqlexpr.SelectExpr) *existsLookup {
 	var eqs []*sqlexpr.BinaryOp
 	collectEquals(sel.Where, &eqs)
 
-	var joinCol, lookupCol, flagCol string
+	var joinCol, lookupCol string
+	var flagCols []string
 	for _, eq := range eqs {
 		left := unwrapCast(unwrapParen(eq.Left))
 		right := unwrapCast(unwrapParen(eq.Right))
@@ -191,13 +192,13 @@ func analyzeExistsWhere(sel *sqlexpr.SelectExpr) *existsLookup {
 		// Check for flag = true pattern
 		if leftCol, ok := left.(*sqlexpr.ColumnRef); ok {
 			if boolLit, ok := right.(*sqlexpr.BoolLiteral); ok && boolLit.Value {
-				flagCol = leftCol.Parts[len(leftCol.Parts)-1]
+				flagCols = append(flagCols, leftCol.Parts[len(leftCol.Parts)-1])
 				continue
 			}
 		}
 		if rightCol, ok := right.(*sqlexpr.ColumnRef); ok {
 			if boolLit, ok := left.(*sqlexpr.BoolLiteral); ok && boolLit.Value {
-				flagCol = rightCol.Parts[len(rightCol.Parts)-1]
+				flagCols = append(flagCols, rightCol.Parts[len(rightCol.Parts)-1])
 				continue
 			}
 		}
@@ -230,7 +231,7 @@ func analyzeExistsWhere(sel *sqlexpr.SelectExpr) *existsLookup {
 		}
 	}
 
-	if joinCol == "" || lookupCol == "" || flagCol == "" {
+	if joinCol == "" || lookupCol == "" || len(flagCols) == 0 {
 		return nil
 	}
 
@@ -238,7 +239,7 @@ func analyzeExistsWhere(sel *sqlexpr.SelectExpr) *existsLookup {
 		tableParts:   sel.From.Parts,
 		joinColumn:   joinCol,
 		lookupColumn: lookupCol,
-		flagColumn:   flagCol,
+		flagColumns:  flagCols,
 	}
 }
 

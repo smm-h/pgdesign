@@ -66,8 +66,8 @@ func TestDetectExistsLookup(t *testing.T) {
 			if results[0].lookupColumn != tt.wantLook {
 				t.Errorf("lookupColumn: expected %q, got %q", tt.wantLook, results[0].lookupColumn)
 			}
-			if results[0].flagColumn != tt.wantFlag {
-				t.Errorf("flagColumn: expected %q, got %q", tt.wantFlag, results[0].flagColumn)
+			if len(results[0].flagColumns) != 1 || results[0].flagColumns[0] != tt.wantFlag {
+				t.Errorf("flagColumns: expected [%q], got %v", tt.wantFlag, results[0].flagColumns)
 			}
 		})
 	}
@@ -250,11 +250,11 @@ func TestDetectDualExistsLookup(t *testing.T) {
 			wantCount: 2,
 			wantFirst: privacyCheck{
 				lookupColumn: "requester_id",
-				flagColumn:   "friends_enabled",
+				flagColumns:  []string{"friends_enabled"},
 			},
 			wantSecond: privacyCheck{
 				lookupColumn: "target_id",
-				flagColumn:   "friends_enabled",
+				flagColumns:  []string{"friends_enabled"},
 			},
 		},
 		{
@@ -283,14 +283,14 @@ func TestDetectDualExistsLookup(t *testing.T) {
 				if results[0].lookupColumn != tt.wantFirst.lookupColumn {
 					t.Errorf("first lookupColumn: expected %q, got %q", tt.wantFirst.lookupColumn, results[0].lookupColumn)
 				}
-				if results[0].flagColumn != tt.wantFirst.flagColumn {
-					t.Errorf("first flagColumn: expected %q, got %q", tt.wantFirst.flagColumn, results[0].flagColumn)
+				if len(results[0].flagColumns) != len(tt.wantFirst.flagColumns) || results[0].flagColumns[0] != tt.wantFirst.flagColumns[0] {
+					t.Errorf("first flagColumns: expected %v, got %v", tt.wantFirst.flagColumns, results[0].flagColumns)
 				}
 				if results[1].lookupColumn != tt.wantSecond.lookupColumn {
 					t.Errorf("second lookupColumn: expected %q, got %q", tt.wantSecond.lookupColumn, results[1].lookupColumn)
 				}
-				if results[1].flagColumn != tt.wantSecond.flagColumn {
-					t.Errorf("second flagColumn: expected %q, got %q", tt.wantSecond.flagColumn, results[1].flagColumn)
+				if len(results[1].flagColumns) != len(tt.wantSecond.flagColumns) || results[1].flagColumns[0] != tt.wantSecond.flagColumns[0] {
+					t.Errorf("second flagColumns: expected %v, got %v", tt.wantSecond.flagColumns, results[1].flagColumns)
 				}
 			}
 		})

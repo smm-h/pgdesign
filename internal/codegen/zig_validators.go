@@ -71,13 +71,13 @@ func (g *ZigValidatorGenerator) Generate(schema *model.Schema) ([]byte, []diagno
 					tableParts:   existsLookups[0].tableParts,
 					joinColumn:   existsLookups[0].joinColumn,
 					lookupColumn: existsLookups[0].lookupColumn,
-					flagColumn:   existsLookups[0].flagColumn,
+					flagColumns:  existsLookups[0].flagColumns,
 				},
 				second: privacyCheck{
 					tableParts:   existsLookups[1].tableParts,
 					joinColumn:   existsLookups[1].joinColumn,
 					lookupColumn: existsLookups[1].lookupColumn,
-					flagColumn:   existsLookups[1].flagColumn,
+					flagColumns:  existsLookups[1].flagColumns,
 				},
 			}
 			zigDualPrivacyValidator(&buf, pol, dual)
@@ -85,7 +85,7 @@ func (g *ZigValidatorGenerator) Generate(schema *model.Schema) ([]byte, []diagno
 			check := &privacyCheck{
 				joinColumn:   existsLookups[0].joinColumn,
 				lookupColumn: existsLookups[0].lookupColumn,
-				flagColumn:   existsLookups[0].flagColumn,
+				flagColumns:  existsLookups[0].flagColumns,
 			}
 			zigPrivacyValidator(&buf, pol, check, existsLookups[0].tableParts, existsLookups[0].negated)
 		} else if own := detectOwnership(ast); own != nil {
@@ -136,6 +136,7 @@ func zigPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyChe
 			"pub fn check_%s(conn: *pg.Conn, %s: []const u8) !PolicyResult {\n",
 		pol.ErrorMessage, pol.PolicyName, paramName,
 	))
+	selectCols := strings.Join(check.flagColumns, ", ")
 	buf.WriteString(fmt.Sprintf(
 		"    const row = conn.queryRow(\n"+
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
@@ -143,25 +144,37 @@ func zigPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyChe
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		check.flagColumn, tableFQN, check.joinColumn, paramName, pol.ErrorCode, pol.ErrorMessage,
+		selectCols, tableFQN, check.joinColumn, paramName, pol.ErrorCode, pol.ErrorMessage,
 	))
 	if negated {
+		// NOT EXISTS: fail when ALL flags are set
+		var parts []string
+		for _, flag := range check.flagColumns {
+			parts = append(parts, fmt.Sprintf("row.get(bool, %q)", flag))
+		}
+		cond := strings.Join(parts, " and ")
 		buf.WriteString(fmt.Sprintf(
-			"    if (row.get(bool, %q)) {\n"+
+			"    if (%s) {\n"+
 				"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 				"    }\n"+
 				"    return .{ .ok = true };\n"+
 				"}\n",
-			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+			cond, pol.ErrorCode, pol.ErrorMessage,
 		))
 	} else {
+		// EXISTS: fail when ANY flag is missing
+		var parts []string
+		for _, flag := range check.flagColumns {
+			parts = append(parts, fmt.Sprintf("!row.get(bool, %q)", flag))
+		}
+		cond := strings.Join(parts, " or ")
 		buf.WriteString(fmt.Sprintf(
-			"    if (!row.get(bool, %q)) {\n"+
+			"    if (%s) {\n"+
 				"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 				"    }\n"+
 				"    return .{ .ok = true };\n"+
 				"}\n",
-			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+			cond, pol.ErrorCode, pol.ErrorMessage,
 		))
 	}
 }
@@ -186,6 +199,7 @@ func zigOrOwnershipExistsValidator(buf *bytes.Buffer, pol PolicyContext, orComp 
 		col, col,
 	))
 	// Exists-lookup fallback.
+	selectCols := strings.Join(orComp.existsLookup.flagColumns, ", ")
 	buf.WriteString(fmt.Sprintf(
 		"    const row = conn.queryRow(\n"+
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
@@ -193,15 +207,20 @@ func zigOrOwnershipExistsValidator(buf *bytes.Buffer, pol PolicyContext, orComp 
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		orComp.existsLookup.flagColumn, tableFQN, orComp.existsLookup.joinColumn, col, pol.ErrorCode, pol.ErrorMessage,
+		selectCols, tableFQN, orComp.existsLookup.joinColumn, col, pol.ErrorCode, pol.ErrorMessage,
 	))
+	var flagParts []string
+	for _, flag := range orComp.existsLookup.flagColumns {
+		flagParts = append(flagParts, fmt.Sprintf("row.get(bool, %q)", flag))
+	}
+	flagCond := strings.Join(flagParts, " and ")
 	buf.WriteString(fmt.Sprintf(
-		"    if (row.get(bool, %q)) {\n"+
+		"    if (%s) {\n"+
 			"        return .{ .ok = true };\n"+
 			"    }\n"+
 			"    return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"}\n",
-		orComp.existsLookup.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		flagCond, pol.ErrorCode, pol.ErrorMessage,
 	))
 }
 
@@ -217,6 +236,7 @@ func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPri
 	))
 
 	// First player check.
+	firstSelectCols := strings.Join(dual.first.flagColumns, ", ")
 	buf.WriteString(fmt.Sprintf(
 		"    const row1 = conn.queryRow(\n"+
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
@@ -224,16 +244,22 @@ func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPri
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		dual.first.flagColumn, firstTableFQN, dual.first.joinColumn, dual.first.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
+		firstSelectCols, firstTableFQN, dual.first.joinColumn, dual.first.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
 	))
+	var firstParts []string
+	for _, flag := range dual.first.flagColumns {
+		firstParts = append(firstParts, fmt.Sprintf("!row1.get(bool, %q)", flag))
+	}
+	firstCond := strings.Join(firstParts, " or ")
 	buf.WriteString(fmt.Sprintf(
-		"    if (!row1.get(bool, %q)) {\n"+
+		"    if (%s) {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    }\n",
-		dual.first.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		firstCond, pol.ErrorCode, pol.ErrorMessage,
 	))
 
 	// Second player check.
+	secondSelectCols := strings.Join(dual.second.flagColumns, ", ")
 	buf.WriteString(fmt.Sprintf(
 		"    const row2 = conn.queryRow(\n"+
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
@@ -241,15 +267,20 @@ func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPri
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		dual.second.flagColumn, secondTableFQN, dual.second.joinColumn, dual.second.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
+		secondSelectCols, secondTableFQN, dual.second.joinColumn, dual.second.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
 	))
+	var secondParts []string
+	for _, flag := range dual.second.flagColumns {
+		secondParts = append(secondParts, fmt.Sprintf("!row2.get(bool, %q)", flag))
+	}
+	secondCond := strings.Join(secondParts, " or ")
 	buf.WriteString(fmt.Sprintf(
-		"    if (!row2.get(bool, %q)) {\n"+
+		"    if (%s) {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    }\n"+
 			"    return .{ .ok = true };\n"+
 			"}\n",
-		dual.second.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		secondCond, pol.ErrorCode, pol.ErrorMessage,
 	))
 }
 

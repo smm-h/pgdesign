@@ -72,13 +72,13 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 					tableParts:   existsLookups[0].tableParts,
 					joinColumn:   existsLookups[0].joinColumn,
 					lookupColumn: existsLookups[0].lookupColumn,
-					flagColumn:   existsLookups[0].flagColumn,
+					flagColumns:  existsLookups[0].flagColumns,
 				},
 				second: privacyCheck{
 					tableParts:   existsLookups[1].tableParts,
 					joinColumn:   existsLookups[1].joinColumn,
 					lookupColumn: existsLookups[1].lookupColumn,
-					flagColumn:   existsLookups[1].flagColumn,
+					flagColumns:  existsLookups[1].flagColumns,
 				},
 			}
 			generateDualPrivacyValidator(&buf, pol, dual)
@@ -87,7 +87,7 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 			check := &privacyCheck{
 				joinColumn:   existsLookups[0].joinColumn,
 				lookupColumn: existsLookups[0].lookupColumn,
-				flagColumn:   existsLookups[0].flagColumn,
+				flagColumns:  existsLookups[0].flagColumns,
 			}
 			generatePrivacyValidator(&buf, pol, check, existsLookups[0].tableParts, existsLookups[0].negated)
 		} else if own := detectOwnership(ast); own != nil {
@@ -124,27 +124,40 @@ func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *priva
 	))
 
 	tableFQN := strings.Join(tableParts, ".")
+	selectCols := strings.Join(check.flagColumns, ", ")
 
 	buf.WriteString(fmt.Sprintf(
 		"    row = await conn.fetchrow(\n"+
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        %s,\n"+
 			"    )\n",
-		check.flagColumn, tableFQN, check.joinColumn, paramName,
+		selectCols, tableFQN, check.joinColumn, paramName,
 	))
 	if negated {
+		// NOT EXISTS: fail when ALL flags are set
+		var parts []string
+		for _, flag := range check.flagColumns {
+			parts = append(parts, fmt.Sprintf("row[\"%s\"]", flag))
+		}
+		cond := "row and " + strings.Join(parts, " and ")
 		buf.WriteString(fmt.Sprintf(
-			"    if row and row[\"%s\"]:\n"+
+			"    if %s:\n"+
 				"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
 				"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
-			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+			cond, pol.ErrorCode, pol.ErrorMessage,
 		))
 	} else {
+		// EXISTS: fail when ANY flag is missing
+		var parts []string
+		for _, flag := range check.flagColumns {
+			parts = append(parts, fmt.Sprintf("not row[\"%s\"]", flag))
+		}
+		cond := "not row or " + strings.Join(parts, " or ")
 		buf.WriteString(fmt.Sprintf(
-			"    if not row or not row[\"%s\"]:\n"+
+			"    if %s:\n"+
 				"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
 				"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
-			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+			cond, pol.ErrorCode, pol.ErrorMessage,
 		))
 	}
 }
@@ -187,18 +200,24 @@ func generateOrOwnershipExistsValidator(buf *bytes.Buffer, pol PolicyContext, or
 		col, col,
 	))
 	// Exists-lookup fallback.
+	selectCols := strings.Join(orComp.existsLookup.flagColumns, ", ")
 	buf.WriteString(fmt.Sprintf(
 		"    row = await conn.fetchrow(\n"+
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        target_%s,\n"+
 			"    )\n",
-		orComp.existsLookup.flagColumn, tableFQN, orComp.existsLookup.joinColumn, col,
+		selectCols, tableFQN, orComp.existsLookup.joinColumn, col,
 	))
+	var flagParts []string
+	for _, flag := range orComp.existsLookup.flagColumns {
+		flagParts = append(flagParts, fmt.Sprintf("row[\"%s\"]", flag))
+	}
+	flagCond := "row and " + strings.Join(flagParts, " and ")
 	buf.WriteString(fmt.Sprintf(
-		"    if row and row[\"%s\"]:\n"+
+		"    if %s:\n"+
 			"        return PolicyResult(ok=True, code=\"\", message=\"\")\n"+
 			"    return PolicyResult(ok=False, code=%q, message=%q)\n",
-		orComp.existsLookup.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		flagCond, pol.ErrorCode, pol.ErrorMessage,
 	))
 }
 
@@ -216,32 +235,44 @@ func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *du
 	secondTableFQN := strings.Join(dual.second.tableParts, ".")
 
 	// First player check.
+	firstSelectCols := strings.Join(dual.first.flagColumns, ", ")
 	buf.WriteString(fmt.Sprintf(
 		"    row = await conn.fetchrow(\n"+
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        %s,\n"+
 			"    )\n",
-		dual.first.flagColumn, firstTableFQN, dual.first.joinColumn, dual.first.lookupColumn,
+		firstSelectCols, firstTableFQN, dual.first.joinColumn, dual.first.lookupColumn,
 	))
+	var firstParts []string
+	for _, flag := range dual.first.flagColumns {
+		firstParts = append(firstParts, fmt.Sprintf("not row[\"%s\"]", flag))
+	}
+	firstCond := "not row or " + strings.Join(firstParts, " or ")
 	buf.WriteString(fmt.Sprintf(
-		"    if not row or not row[\"%s\"]:\n"+
+		"    if %s:\n"+
 			"        return PolicyResult(ok=False, code=%q, message=%q)\n",
-		dual.first.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		firstCond, pol.ErrorCode, pol.ErrorMessage,
 	))
 
 	// Second player check.
+	secondSelectCols := strings.Join(dual.second.flagColumns, ", ")
 	buf.WriteString(fmt.Sprintf(
 		"    row = await conn.fetchrow(\n"+
 			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        %s,\n"+
 			"    )\n",
-		dual.second.flagColumn, secondTableFQN, dual.second.joinColumn, dual.second.lookupColumn,
+		secondSelectCols, secondTableFQN, dual.second.joinColumn, dual.second.lookupColumn,
 	))
+	var secondParts []string
+	for _, flag := range dual.second.flagColumns {
+		secondParts = append(secondParts, fmt.Sprintf("not row[\"%s\"]", flag))
+	}
+	secondCond := "not row or " + strings.Join(secondParts, " or ")
 	buf.WriteString(fmt.Sprintf(
-		"    if not row or not row[\"%s\"]:\n"+
+		"    if %s:\n"+
 			"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
 			"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
-		dual.second.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		secondCond, pol.ErrorCode, pol.ErrorMessage,
 	))
 }
 
