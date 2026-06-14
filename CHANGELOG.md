@@ -2,6 +2,22 @@
 
 # Changelog
 
+## 0.7.2
+
+Bug fixes for array defaults, empty-string defaults, and codegen column names.
+
+### Fixes
+
+- **Fix.** Array columns with numeric base types (e.g., `integer[]`) now correctly produce quoted defaults (`DEFAULT '{}'`) instead of bare `DEFAULT {}`.
+- **Fix.** Empty-string defaults (`default = ""`) now correctly produce `DEFAULT ''` in DDL instead of being silently dropped.
+- **Fix.** Codegen validators now use the correct column name from RLS policy expressions instead of hardcoding `player_id`.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.7.1
 
 E110 validation rule, documentation updates, JSON output determinism fix, and expanded test coverage.
@@ -14,12 +30,6 @@ E110 validation rule, documentation updates, JSON output determinism fix, and ex
 ### Fixes
 
 - **Fix.** JSON output format now produces deterministic output by sorting model collections before marshaling.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.7.0
 
