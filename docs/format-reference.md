@@ -355,3 +355,44 @@ Suppress specific diagnostics on individual tables or columns. Each key is `"tab
 ```
 
 Use the `--show-suppressed` flag with `pgdesign validate` to include suppressed diagnostics in the output (marked as suppressed with their reason).
+
+## [output.*]
+
+Build output targets define what `pgdesign build` generates. Each output is a named section under `[output]`.
+
+```toml
+[output.ddl]
+format = "sql"
+path = "out/schema.sql"
+idempotent = true
+comments = true
+
+[output.diagram]
+format = "d2"
+path = "out/schema.d2"
+
+[output.docs]
+format = "doc"
+path = "out/schema.md"
+
+[output.api_types]
+format = "codegen"
+path = "out/types.ts"
+lang = "ts"
+mode = "validators"
+
+[output.snapshot]
+format = "json"
+path = "out/schema.json"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `format` | string | Output format: `sql`, `d2`, `json`, `svg`, `doc`, or `codegen` |
+| `path` | string | Output file path relative to project root (required) |
+| `lang` | string | Target language for codegen: `go`, `ts`, `java`, `kotlin`, `python`, `zig` (required when format is `codegen`) |
+| `mode` | string | Codegen mode: `validators` or `constants` (required when format is `codegen`) |
+| `idempotent` | boolean | For `sql` format: add `IF NOT EXISTS` guards |
+| `comments` | boolean | For `sql` format: include `COMMENT ON` statements (default: true) |
+
+Running `pgdesign build` generates all configured outputs. Use `--dry-run` to preview what would be generated without writing files.
