@@ -419,6 +419,228 @@ pool_min_conns = 10
 	}
 }
 
+func TestLoadOutputSection(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.ddl]
+format = "sql"
+path = "schema/generated.sql"
+idempotent = true
+comments = false
+
+[output.diagram]
+format = "d2"
+path = "schema/schema.d2"
+
+[output.constants_python]
+format = "codegen"
+path = "src/constants.py"
+lang = "python"
+mode = "constants"
+
+[output.validators_python]
+format = "codegen"
+path = "src/validators.py"
+lang = "python"
+mode = "validators"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if len(cfg.Output) != 4 {
+		t.Fatalf("expected 4 output targets, got %d", len(cfg.Output))
+	}
+
+	ddl := cfg.Output["ddl"]
+	if ddl.Format != "sql" {
+		t.Errorf("ddl.format = %q, want %q", ddl.Format, "sql")
+	}
+	if ddl.Path != "schema/generated.sql" {
+		t.Errorf("ddl.path = %q, want %q", ddl.Path, "schema/generated.sql")
+	}
+	if !ddl.Idempotent {
+		t.Error("ddl.idempotent = false, want true")
+	}
+	if ddl.Comments == nil || *ddl.Comments != false {
+		t.Errorf("ddl.comments = %v, want false", ddl.Comments)
+	}
+
+	diagram := cfg.Output["diagram"]
+	if diagram.Format != "d2" {
+		t.Errorf("diagram.format = %q, want %q", diagram.Format, "d2")
+	}
+	if diagram.Comments != nil {
+		t.Errorf("diagram.comments = %v, want nil (unset)", diagram.Comments)
+	}
+
+	cp := cfg.Output["constants_python"]
+	if cp.Format != "codegen" {
+		t.Errorf("constants_python.format = %q, want %q", cp.Format, "codegen")
+	}
+	if cp.Lang != "python" {
+		t.Errorf("constants_python.lang = %q, want %q", cp.Lang, "python")
+	}
+	if cp.Mode != "constants" {
+		t.Errorf("constants_python.mode = %q, want %q", cp.Mode, "constants")
+	}
+
+	vp := cfg.Output["validators_python"]
+	if vp.Mode != "validators" {
+		t.Errorf("validators_python.mode = %q, want %q", vp.Mode, "validators")
+	}
+}
+
+func TestLoadOutput_MissingPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.bad]
+format = "sql"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for missing path")
+	}
+	if !strings.Contains(err.Error(), "output.bad: path is required") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "output.bad: path is required")
+	}
+}
+
+func TestLoadOutput_InvalidFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.bad]
+format = "yaml"
+path = "out.yaml"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for invalid format")
+	}
+	if !strings.Contains(err.Error(), "invalid format") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "invalid format")
+	}
+}
+
+func TestLoadOutput_CodegenWithoutLang(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.bad]
+format = "codegen"
+path = "out.py"
+mode = "constants"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for codegen without lang")
+	}
+	if !strings.Contains(err.Error(), "lang is required when format is codegen") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "lang is required when format is codegen")
+	}
+}
+
+func TestLoadOutput_CodegenWithoutMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.bad]
+format = "codegen"
+path = "out.py"
+lang = "python"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for codegen without mode")
+	}
+	if !strings.Contains(err.Error(), "mode is required when format is codegen") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "mode is required when format is codegen")
+	}
+}
+
+func TestLoadOutput_InvalidLang(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.bad]
+format = "codegen"
+path = "out.rs"
+lang = "rust"
+mode = "constants"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for invalid lang")
+	}
+	if !strings.Contains(err.Error(), "invalid lang") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "invalid lang")
+	}
+}
+
+func TestLoadOutput_InvalidMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.bad]
+format = "codegen"
+path = "out.py"
+lang = "python"
+mode = "classes"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for invalid mode")
+	}
+	if !strings.Contains(err.Error(), "invalid mode") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "invalid mode")
+	}
+}
+
 func TestLoadSuppressSection(t *testing.T) {
 	tmpDir := t.TempDir()
 	content := `[project]

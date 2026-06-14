@@ -12,14 +12,16 @@ import (
 
 // Config represents the parsed pgdesign.toml project configuration.
 type Config struct {
-	Project    ProjectConfig    `toml:"project"`
-	Database   DatabaseConfig   `toml:"database"`
-	Format     FormatConfig     `toml:"format"`
-	Validate   ValidateConfig   `toml:"validate"`
-	Migrate    MigrateConfig    `toml:"migrate"`
-	Extensions []ExtensionConfig `toml:"extensions"`
-	Suppress   map[string]string `toml:"suppress"`
+	Project    ProjectConfig           `toml:"project"`
+	Database   DatabaseConfig          `toml:"database"`
+	Format     FormatConfig            `toml:"format"`
+	Validate   ValidateConfig          `toml:"validate"`
+	Migrate    MigrateConfig           `toml:"migrate"`
+	Extensions []ExtensionConfig       `toml:"extensions"`
+	Suppress   map[string]string       `toml:"suppress"`
+	Output     map[string]OutputConfig `toml:"-"`
 }
+
 
 // ProjectConfig holds [project] section values.
 type ProjectConfig struct {
@@ -54,6 +56,16 @@ type MigrateConfig struct {
 	ExpandContractThreshold int64  `toml:"expand_contract_threshold"`
 }
 
+// OutputConfig holds an [output.<name>] section describing a build output target.
+type OutputConfig struct {
+	Format     string `toml:"format"`     // sql, d2, json, svg, doc, codegen
+	Path       string `toml:"path"`       // relative to project root
+	Lang       string `toml:"lang"`       // for codegen: python, zig, go, ts, java, kotlin
+	Mode       string `toml:"mode"`       // for codegen: validators, constants
+	Idempotent bool   `toml:"idempotent"` // for sql: add IF NOT EXISTS
+	Comments   *bool  `toml:"comments"`   // for sql: include COMMENT ON (default true)
+}
+
 // ExtensionConfig holds [[extensions]] array-of-tables entries.
 type ExtensionConfig struct {
 	Name         string   `toml:"name"`
@@ -76,7 +88,77 @@ func (c *Config) Check() error {
 	if c.Database.PoolMinConns > 0 && c.Database.PoolMaxConns > 0 && c.Database.PoolMinConns > c.Database.PoolMaxConns {
 		errs = append(errs, fmt.Errorf("pool_min_conns cannot exceed pool_max_conns"))
 	}
+
+	validFormats := map[string]bool{
+		"sql": true, "d2": true, "json": true, "svg": true, "doc": true, "codegen": true,
+	}
+	validLangs := map[string]bool{
+		"python": true, "zig": true, "go": true, "ts": true, "java": true, "kotlin": true,
+	}
+	validModes := map[string]bool{
+		"validators": true, "constants": true,
+	}
+	for name, out := range c.Output {
+		if out.Path == "" {
+			errs = append(errs, fmt.Errorf("output.%s: path is required", name))
+		}
+		if !validFormats[out.Format] {
+			errs = append(errs, fmt.Errorf("output.%s: invalid format %q (must be one of: sql, d2, json, svg, doc, codegen)", name, out.Format))
+		}
+		if out.Format == "codegen" {
+			if out.Lang == "" {
+				errs = append(errs, fmt.Errorf("output.%s: lang is required when format is codegen", name))
+			}
+			if out.Mode == "" {
+				errs = append(errs, fmt.Errorf("output.%s: mode is required when format is codegen", name))
+			}
+		}
+		if out.Lang != "" && !validLangs[out.Lang] {
+			errs = append(errs, fmt.Errorf("output.%s: invalid lang %q (must be one of: python, zig, go, ts, java, kotlin)", name, out.Lang))
+		}
+		if out.Mode != "" && !validModes[out.Mode] {
+			errs = append(errs, fmt.Errorf("output.%s: invalid mode %q (must be one of: validators, constants)", name, out.Mode))
+		}
+	}
+
 	return errors.Join(errs...)
+}
+
+// decodeOutput converts a raw map[string]any (from TOML decoding) into a typed
+// map[string]OutputConfig. Each value is expected to be a map[string]any
+// representing the fields of an OutputConfig.
+func decodeOutput(raw map[string]any) (map[string]OutputConfig, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]OutputConfig, len(raw))
+	for name, v := range raw {
+		m, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("output.%s: expected table, got %T", name, v)
+		}
+		var oc OutputConfig
+		if s, ok := m["format"].(string); ok {
+			oc.Format = s
+		}
+		if s, ok := m["path"].(string); ok {
+			oc.Path = s
+		}
+		if s, ok := m["lang"].(string); ok {
+			oc.Lang = s
+		}
+		if s, ok := m["mode"].(string); ok {
+			oc.Mode = s
+		}
+		if b, ok := m["idempotent"].(bool); ok {
+			oc.Idempotent = b
+		}
+		if b, ok := m["comments"].(bool); ok {
+			oc.Comments = &b
+		}
+		out[name] = oc
+	}
+	return out, nil
 }
 
 // Load reads and parses a pgdesign.toml file at the given path.
@@ -89,6 +171,23 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err := tomledit.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("cannot parse config: %w", err)
+	}
+
+	// go-toml-edit cannot decode map[string]Struct from nested table syntax
+	// ([output.<name>]) into a struct field. Work around this by doing a
+	// second decode into map[string]any and extracting the output section.
+	var raw map[string]any
+	if err := tomledit.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("cannot parse config: %w", err)
+	}
+	if rawOutput, ok := raw["output"]; ok {
+		if outputMap, ok := rawOutput.(map[string]any); ok {
+			output, err := decodeOutput(outputMap)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse config: %w", err)
+			}
+			cfg.Output = output
+		}
 	}
 
 	if err := cfg.Check(); err != nil {
