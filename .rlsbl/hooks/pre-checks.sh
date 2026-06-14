@@ -4,4 +4,7 @@ set -euo pipefail
 # Use it for setup tasks: starting services, setting env vars, etc.
 # Built-in checks run after this hook. Custom validation goes in pre-release.sh.
 
-pgdesign build --no-commit
+# Only run build if the project has a pgdesign.toml config.
+if [ -f pgdesign.toml ]; then
+  pgdesign build --no-commit
+fi
