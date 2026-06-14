@@ -265,7 +265,7 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	} else if col.DefaultExpr != "" {
 		parts = append(parts, "DEFAULT "+ExprValue(col.DefaultExpr))
 	} else if col.Default != "" {
-		parts = append(parts, "DEFAULT "+LiteralValue(col.Default, col.PGType))
+		parts = append(parts, "DEFAULT "+LiteralValue(col.Default, pgType))
 	}
 
 	return strings.Join(parts, " ")

@@ -1048,10 +1048,9 @@ func TestIsNumericType_ArraySuffix(t *testing.T) {
 	}
 }
 
-func TestColumnDef_ArrayIntegerDefault_BareEmptyArray(t *testing.T) {
-	// BUG: columnDef passes col.PGType ("integer") to LiteralValue instead of
-	// the local pgType ("integer[]"). Since isNumericType("integer") is true,
-	// {} is emitted bare instead of single-quoted.
+func TestColumnDef_ArrayIntegerDefault_QuotedEmptyArray(t *testing.T) {
+	// Regression test: columnDef must pass the resolved pgType (with "[]" suffix)
+	// to LiteralValue, so array literals like {} are single-quoted.
 	table := &model.Table{
 		Name:   "results",
 		Schema: "public",
@@ -1064,10 +1063,13 @@ func TestColumnDef_ArrayIntegerDefault_BareEmptyArray(t *testing.T) {
 
 	got := CreateTable(table, "public", false, 0, nil)
 
-	// BUG PROOF: The buggy code produces bare DEFAULT {} (wrong SQL).
-	// After the fix, this assertion will be updated to expect DEFAULT '{}'.
-	if !strings.Contains(got, "DEFAULT {}") {
-		t.Errorf("expected buggy bare DEFAULT {} (proving the bug), got:\n%s", got)
+	// Fixed: LiteralValue now receives "integer[]" (not "integer"),
+	// so array literals are correctly single-quoted.
+	if !strings.Contains(got, "DEFAULT '{}'") {
+		t.Errorf("expected quoted DEFAULT '{}', got:\n%s", got)
+	}
+	if strings.Contains(got, "DEFAULT {}") && !strings.Contains(got, "DEFAULT '{}'") {
+		t.Errorf("bare DEFAULT {} without quotes is the known bug, got:\n%s", got)
 	}
 }
 
