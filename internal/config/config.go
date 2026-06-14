@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,7 +29,9 @@ type ProjectConfig struct {
 
 // DatabaseConfig holds [database] section values.
 type DatabaseConfig struct {
-	PGVersion int `toml:"pg_version"`
+	PGVersion    int   `toml:"pg_version"`
+	PoolMaxConns int32 `toml:"pool_max_conns"`
+	PoolMinConns int32 `toml:"pool_min_conns"`
 }
 
 // FormatConfig holds [format] section values.
@@ -60,6 +63,22 @@ type ExtensionConfig struct {
 	IndexMethods []string `toml:"index_methods"`
 }
 
+// Check checks the Config for semantic errors that TOML parsing alone
+// cannot catch (e.g., cross-field constraints).
+func (c *Config) Check() error {
+	var errs []error
+	if c.Database.PoolMaxConns < 0 {
+		errs = append(errs, fmt.Errorf("pool_max_conns must be non-negative"))
+	}
+	if c.Database.PoolMinConns < 0 {
+		errs = append(errs, fmt.Errorf("pool_min_conns must be non-negative"))
+	}
+	if c.Database.PoolMinConns > 0 && c.Database.PoolMaxConns > 0 && c.Database.PoolMinConns > c.Database.PoolMaxConns {
+		errs = append(errs, fmt.Errorf("pool_min_conns cannot exceed pool_max_conns"))
+	}
+	return errors.Join(errs...)
+}
+
 // Load reads and parses a pgdesign.toml file at the given path.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -70,6 +89,10 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err := tomledit.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("cannot parse config: %w", err)
+	}
+
+	if err := cfg.Check(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
 	return &cfg, nil

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -297,6 +298,124 @@ func TestMergeValidateFlags(t *testing.T) {
 	}
 	if cfg.Validate.MaxColumns != 50 {
 		t.Errorf("max_columns should not change with zero flag, got %d", cfg.Validate.MaxColumns)
+	}
+}
+
+func TestLoadPoolConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[database]
+pool_max_conns = 25
+pool_min_conns = 5
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.Database.PoolMaxConns != 25 {
+		t.Errorf("pool_max_conns = %d, want 25", cfg.Database.PoolMaxConns)
+	}
+	if cfg.Database.PoolMinConns != 5 {
+		t.Errorf("pool_min_conns = %d, want 5", cfg.Database.PoolMinConns)
+	}
+}
+
+func TestLoadPoolConfig_Absent(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[database]
+pg_version = 16
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if cfg.Database.PoolMaxConns != 0 {
+		t.Errorf("pool_max_conns = %d, want 0 (zero value)", cfg.Database.PoolMaxConns)
+	}
+	if cfg.Database.PoolMinConns != 0 {
+		t.Errorf("pool_min_conns = %d, want 0 (zero value)", cfg.Database.PoolMinConns)
+	}
+}
+
+func TestLoadPoolConfig_NegativeMaxConns(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[database]
+pool_max_conns = -1
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for negative pool_max_conns")
+	}
+	if !strings.Contains(err.Error(), "pool_max_conns must be non-negative") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "pool_max_conns must be non-negative")
+	}
+}
+
+func TestLoadPoolConfig_NegativeMinConns(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[database]
+pool_min_conns = -5
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for negative pool_min_conns")
+	}
+	if !strings.Contains(err.Error(), "pool_min_conns must be non-negative") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "pool_min_conns must be non-negative")
+	}
+}
+
+func TestLoadPoolConfig_MinExceedsMax(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[database]
+pool_max_conns = 5
+pool_min_conns = 10
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error when pool_min_conns > pool_max_conns")
+	}
+	if !strings.Contains(err.Error(), "pool_min_conns cannot exceed pool_max_conns") {
+		t.Errorf("error = %q, want to contain %q", err.Error(), "pool_min_conns cannot exceed pool_max_conns")
 	}
 }
 
