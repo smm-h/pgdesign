@@ -239,7 +239,9 @@ func analyzeCoverage(schema *model.Schema) []diagnostic.Diagnostic {
 				if !isFilter {
 					continue
 				}
-				suggested := append(fk.Columns, col.Name)
+				suggested := make([]string, len(fk.Columns)+1)
+				copy(suggested, fk.Columns)
+				suggested[len(fk.Columns)] = col.Name
 				if !table.HasIndexCovering(suggested) {
 					diags = append(diags, diagnostic.Diagnostic{
 						Severity: diagnostic.Info,
