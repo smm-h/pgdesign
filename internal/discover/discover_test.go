@@ -13,7 +13,7 @@ import (
 )
 
 const testConnStr = "postgres:///pgdesign_test"
-const testSchema = "pgdesign_test"
+const testSchema = "pgdesign_discover_test"
 
 // canSetup connects to the test database and verifies we can create schemas.
 func canSetup() *pgx.Conn {
@@ -22,12 +22,12 @@ func canSetup() *pgx.Conn {
 	if err != nil {
 		return nil
 	}
-	_, err = conn.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS pgdesign_probe_test")
+	_, err = conn.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS pgdesign_discover_probe_test")
 	if err != nil {
 		conn.Close(ctx)
 		return nil
 	}
-	conn.Exec(ctx, "DROP SCHEMA IF EXISTS pgdesign_probe_test")
+	conn.Exec(ctx, "DROP SCHEMA IF EXISTS pgdesign_discover_probe_test")
 	return conn
 }
 
@@ -83,8 +83,7 @@ func TestMain(m *testing.M) {
 	// Teardown.
 	conn2, err := pgx.Connect(ctx, testConnStr)
 	if err == nil {
-		conn2.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".fd_test CASCADE")
-		conn2.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".wide_test CASCADE")
+		conn2.Exec(ctx, "DROP SCHEMA IF EXISTS "+testSchema+" CASCADE")
 		conn2.Close(ctx)
 	}
 
