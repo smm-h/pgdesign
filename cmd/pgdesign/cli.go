@@ -39,7 +39,7 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all statements"),
 			strictcli.BoolFlag("no-comments", "Exclude COMMENT ON statements from output"),
-			strictcli.StringFlag("format", "Output format", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg")),
+			strictcli.StringFlag("format", "Output format", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg", "doc")),
 			strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"),
 		),
 	)

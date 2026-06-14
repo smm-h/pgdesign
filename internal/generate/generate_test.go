@@ -1223,3 +1223,205 @@ func TestJSONSchemaEndToEnd(t *testing.T) {
 		t.Errorf("expected jsonb_typeof in output, got:\n%s", out)
 	}
 }
+
+func TestDocFormat(t *testing.T) {
+	schema := &model.Schema{
+		Name: "myapp",
+		Enums: []model.Enum{
+			{Schema: "myapp", Name: "status", Values: []string{"active", "inactive", "banned"}, Comment: "User account status"},
+		},
+		Tables: []model.Table{
+			{
+				Name:    "users",
+				Schema:  "myapp",
+				Comment: "All registered users",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "name", PGType: "text", NotNull: true, Comment: "Full name"},
+					{Name: "email", PGType: "text", NotNull: true},
+					{Name: "status", PGType: "status", NotNull: true, Default: model.StrPtr("active")},
+				},
+				PK: []string{"id"},
+				Indexes: []model.Index{
+					{Name: "idx_users_email", Columns: []string{"email"}, Unique: true},
+					{Name: "idx_users_name", Columns: []string{"name"}, Method: "btree"},
+				},
+				Uniques: []model.UniqueConstraint{
+					{Name: "uq_users_email", Columns: []string{"email"}},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "ck_users_email", Expr: "email LIKE '%@%'"},
+				},
+				EnableRLS: true,
+				Policies: []model.Policy{
+					{
+						Name:      "users_select",
+						Operation: "SELECT",
+						Role:      "app_user",
+						Using:     "id = current_user_id()",
+					},
+				},
+			},
+			{
+				Name:    "posts",
+				Schema:  "myapp",
+				Comment: "User blog posts",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "user_id", PGType: "uuid", NotNull: true},
+					{Name: "title", PGType: "text", NotNull: true},
+					{Name: "body", PGType: "text", NotNull: false},
+					{Name: "created_at", PGType: "timestamptz", NotNull: true, DefaultExpr: "now()"},
+				},
+				PK: []string{"id"},
+				FKs: []model.FK{
+					{
+						Name:       "fk_posts_users",
+						Columns:    []string{"user_id"},
+						RefSchema:  "myapp",
+						RefTable:   "users",
+						RefColumns: []string{"id"},
+						OnDelete:   "CASCADE",
+					},
+				},
+				Indexes: []model.Index{
+					{Name: "idx_posts_user_id", Columns: []string{"user_id"}},
+					{Name: "idx_posts_created", Columns: []string{"created_at"}, Where: "body IS NOT NULL"},
+				},
+				Partitioning: &model.PartitionSpec{
+					Strategy: "range",
+					Column:   "created_at",
+				},
+				AppendOnly: true,
+			},
+		},
+	}
+
+	opts := Options{Format: "doc"}
+	out := mustGenerate(t, schema, opts)
+
+	// Schema heading
+	if !strings.Contains(out, "# Schema: myapp") {
+		t.Errorf("expected schema heading, got:\n%s", out)
+	}
+
+	// Enum section
+	if !strings.Contains(out, "## Enums") {
+		t.Errorf("expected Enums section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "### status") {
+		t.Errorf("expected status enum heading, got:\n%s", out)
+	}
+	if !strings.Contains(out, "`active`") {
+		t.Errorf("expected enum value active, got:\n%s", out)
+	}
+	if !strings.Contains(out, "`inactive`") {
+		t.Errorf("expected enum value inactive, got:\n%s", out)
+	}
+	if !strings.Contains(out, "User account status") {
+		t.Errorf("expected enum comment, got:\n%s", out)
+	}
+
+	// Table headings
+	if !strings.Contains(out, "## users") {
+		t.Errorf("expected users table heading, got:\n%s", out)
+	}
+	if !strings.Contains(out, "## posts") {
+		t.Errorf("expected posts table heading, got:\n%s", out)
+	}
+
+	// Table comments
+	if !strings.Contains(out, "All registered users") {
+		t.Errorf("expected users table comment, got:\n%s", out)
+	}
+
+	// Column table headers
+	if !strings.Contains(out, "| Column | Type | Nullable | Default | Comment |") {
+		t.Errorf("expected column table header, got:\n%s", out)
+	}
+
+	// Specific columns
+	if !strings.Contains(out, "| id | uuid | NOT NULL | gen_random_uuid() |") {
+		t.Errorf("expected id column, got:\n%s", out)
+	}
+	if !strings.Contains(out, "| name | text | NOT NULL |") {
+		t.Errorf("expected name column, got:\n%s", out)
+	}
+	if !strings.Contains(out, "| body | text | nullable |") {
+		t.Errorf("expected body column as nullable, got:\n%s", out)
+	}
+	// Column with Default (not DefaultExpr)
+	if !strings.Contains(out, "| status | status | NOT NULL | active |") {
+		t.Errorf("expected status column with default, got:\n%s", out)
+	}
+
+	// Primary Key
+	if !strings.Contains(out, "**Primary Key:** id") {
+		t.Errorf("expected primary key section, got:\n%s", out)
+	}
+
+	// Foreign Keys
+	if !strings.Contains(out, "**Foreign Keys:**") {
+		t.Errorf("expected FK section, got:\n%s", out)
+	}
+	// FK within same schema should omit schema prefix
+	if !strings.Contains(out, "user_id -> users.id (ON DELETE CASCADE)") {
+		t.Errorf("expected FK arrow notation, got:\n%s", out)
+	}
+
+	// Indexes
+	if !strings.Contains(out, "**Indexes:**") {
+		t.Errorf("expected indexes section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "idx_users_email") {
+		t.Errorf("expected idx_users_email, got:\n%s", out)
+	}
+	if !strings.Contains(out, "idx_posts_created") {
+		t.Errorf("expected idx_posts_created, got:\n%s", out)
+	}
+	if !strings.Contains(out, "WHERE body IS NOT NULL") {
+		t.Errorf("expected WHERE clause on index, got:\n%s", out)
+	}
+
+	// Unique constraints
+	if !strings.Contains(out, "**Unique Constraints:**") {
+		t.Errorf("expected unique constraints section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "uq_users_email") {
+		t.Errorf("expected uq_users_email, got:\n%s", out)
+	}
+
+	// Check constraints
+	if !strings.Contains(out, "**Check Constraints:**") {
+		t.Errorf("expected check constraints section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "ck_users_email: email LIKE '%@%'") {
+		t.Errorf("expected check constraint expression, got:\n%s", out)
+	}
+
+	// Policies
+	if !strings.Contains(out, "**Policies:**") {
+		t.Errorf("expected policies section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "users_select") {
+		t.Errorf("expected users_select policy, got:\n%s", out)
+	}
+	if !strings.Contains(out, "TO app_user") {
+		t.Errorf("expected policy role, got:\n%s", out)
+	}
+
+	// Partitioning
+	if !strings.Contains(out, "**Partitioning:** range on created_at") {
+		t.Errorf("expected partitioning info, got:\n%s", out)
+	}
+
+	// RLS
+	if !strings.Contains(out, "**Row Level Security:** enabled") {
+		t.Errorf("expected RLS mention, got:\n%s", out)
+	}
+
+	// Append Only
+	if !strings.Contains(out, "**Append Only:** yes") {
+		t.Errorf("expected append-only mention, got:\n%s", out)
+	}
+}

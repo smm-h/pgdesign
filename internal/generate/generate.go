@@ -15,7 +15,7 @@ import (
 type Options struct {
 	Idempotent      bool
 	IncludeComments bool
-	Format          string // "sql", "json", "d2", "svg"
+	Format          string // "sql", "json", "d2", "svg", "doc"
 	PGVersion       int
 }
 
@@ -35,6 +35,8 @@ func Generate(schema *model.Schema, opts Options) (string, error) {
 			return "", fmt.Errorf("svg render: %w", err)
 		}
 		return string(svg), nil
+	case "doc":
+		return generateDoc(schema), nil
 	default:
 		return "", fmt.Errorf("unsupported format: %s", opts.Format)
 	}
