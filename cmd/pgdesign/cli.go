@@ -154,6 +154,7 @@ func main() {
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
 			strictcli.BoolFlag("apply", "Insert directly into database"),
 			strictcli.StringFlag("db", "PostgreSQL connection URL (required with --apply)", strictcli.Default(nil)),
+			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable(), strictcli.Default(nil)),
 		),
 	)
 
