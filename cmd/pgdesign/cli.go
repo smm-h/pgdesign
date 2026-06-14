@@ -157,6 +157,13 @@ func main() {
 		),
 	)
 
+	app.Command("build", "Generate all configured outputs", handleBuild,
+		strictcli.WithFlags(
+			strictcli.BoolFlag("dry-run", "Show what would be generated without writing"),
+			strictcli.BoolFlag("no-commit", "Skip auto-commit of generated files"),
+		),
+	)
+
 	app.Run()
 }
 
