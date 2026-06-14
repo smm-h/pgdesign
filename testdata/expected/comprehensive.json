@@ -27,7 +27,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -35,7 +34,6 @@
           "name": "owner_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "comment": "User who owns this project",
           "semantic_type_name": "ref"
         },
@@ -43,21 +41,18 @@
           "name": "name",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "short_text"
         },
         {
           "name": "description",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "short_text"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -107,7 +102,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -115,14 +109,12 @@
           "name": "project_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "title",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "short_text"
         },
         {
@@ -150,7 +142,6 @@
           "name": "estimated_cost",
           "pg_type": "bigint",
           "not_null": true,
-          "default": "",
           "generated": "estimated_hours * hourly_rate",
           "stored": true,
           "semantic_type_name": "duration"
@@ -159,7 +150,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -228,7 +218,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -236,28 +225,24 @@
           "name": "project_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "actor_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "action",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "short_text"
         },
         {
           "name": "metadata",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'{}'::jsonb",
           "semantic_type_name": "json",
           "json_schema": "comprehensive_shape.json"
@@ -266,7 +251,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -325,7 +309,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -333,21 +316,18 @@
           "name": "project_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "event_type",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "short_text"
         },
         {
           "name": "payload",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'{}'::jsonb",
           "semantic_type_name": "json"
         },
@@ -355,7 +335,6 @@
           "name": "occurred_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -430,7 +409,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -438,28 +416,24 @@
           "name": "task_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "author_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "body",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "short_text"
         },
         {
           "name": "tags",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "short_text",
           "array": true
         },
@@ -467,7 +441,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }

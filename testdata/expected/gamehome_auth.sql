@@ -5,7 +5,7 @@ CREATE EXTENSION pgcrypto;
 CREATE TABLE auth.users (
     id text NOT NULL,
     username text,
-    display_name text NOT NULL,
+    display_name text NOT NULL DEFAULT '',
     email text,
     email_verified boolean NOT NULL DEFAULT false,
     created_at float8 NOT NULL,

@@ -14,7 +14,6 @@
           "name": "id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "comment": "Opaque user identifier",
           "semantic_type_name": "text_id"
         },
@@ -22,7 +21,6 @@
           "name": "username",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_nullable"
         },
         {
@@ -36,7 +34,6 @@
           "name": "email",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_nullable"
         },
         {
@@ -50,14 +47,12 @@
           "name": "created_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
           "name": "updated_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         }
       ],
@@ -97,21 +92,18 @@
           "name": "token",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_id"
         },
         {
           "name": "email",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "expires_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
@@ -148,28 +140,24 @@
           "name": "user_id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_ref"
         },
         {
           "name": "password_hash",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "created_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
           "name": "updated_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         }
       ],
@@ -213,7 +201,6 @@
           "name": "id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "comment": "Session token",
           "semantic_type_name": "text_id"
         },
@@ -221,42 +208,36 @@
           "name": "user_id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_ref"
         },
         {
           "name": "created_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
           "name": "last_active",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
           "name": "expires_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
           "name": "ip",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_nullable"
         },
         {
           "name": "user_agent",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_nullable"
         }
       ],
@@ -307,35 +288,30 @@
           "name": "user_id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_ref"
         },
         {
           "name": "provider",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "provider_sub",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "provider_email",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_nullable"
         },
         {
           "name": "linked_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         }
       ],
@@ -379,28 +355,24 @@
           "name": "token",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_id"
         },
         {
           "name": "user_id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_ref"
         },
         {
           "name": "email",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "expires_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
@@ -450,21 +422,18 @@
           "name": "token",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_id"
         },
         {
           "name": "user_id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_ref"
         },
         {
           "name": "expires_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
@@ -514,14 +483,12 @@
           "name": "user_id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_ref"
         },
         {
           "name": "secret",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
@@ -535,7 +502,6 @@
           "name": "created_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         }
       ],
@@ -579,21 +545,18 @@
           "name": "id",
           "pg_type": "bigint",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "bigint_id"
         },
         {
           "name": "user_id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_ref"
         },
         {
           "name": "code_hash",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
@@ -643,7 +606,6 @@
           "name": "id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "comment": "Credential ID from the authenticator",
           "semantic_type_name": "text_id"
         },
@@ -651,28 +613,24 @@
           "name": "user_id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_ref"
         },
         {
           "name": "public_key",
           "pg_type": "bytea",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "binary"
         },
         {
           "name": "attestation_type",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "transport",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_nullable"
         },
         {
@@ -686,14 +644,12 @@
           "name": "created_at",
           "pg_type": "float8",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "epoch"
         },
         {
           "name": "last_used",
           "pg_type": "float8",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "epoch_nullable"
         }
       ],

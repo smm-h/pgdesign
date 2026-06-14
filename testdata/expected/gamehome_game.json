@@ -145,7 +145,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -153,7 +152,6 @@
           "name": "auth_id",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "comment": "FK to auth.users; NULL for anonymous players",
           "semantic_type_name": "text_ref"
         },
@@ -161,14 +159,12 @@
           "name": "name",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "display_name",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
@@ -182,7 +178,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         },
@@ -198,7 +193,6 @@
           "name": "ai_model",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "comment": "AI model identifier (e.g. claude-opus-4-6). NULL for human players.",
           "semantic_type_name": "text_field"
         }
@@ -271,7 +265,6 @@
           "name": "id",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "comment": "Human-readable server identifier (e.g. python-1, zig-1)",
           "semantic_type_name": "text_field"
         },
@@ -279,7 +272,6 @@
           "name": "host",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "comment": "Hostname or IP address",
           "semantic_type_name": "text_field"
         },
@@ -287,14 +279,12 @@
           "name": "port",
           "pg_type": "integer",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "int"
         },
         {
           "name": "version",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "comment": "Server version string",
           "semantic_type_name": "text_field"
         },
@@ -302,21 +292,18 @@
           "name": "server_type",
           "pg_type": "server_type",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "server_type"
         },
         {
           "name": "status",
           "pg_type": "server_status",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "server_status"
         },
         {
           "name": "max_sessions",
           "pg_type": "integer",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "int"
         },
         {
@@ -330,14 +317,12 @@
           "name": "last_heartbeat",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "timestamp_no_default"
         },
         {
           "name": "registered_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -376,7 +361,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -384,21 +368,18 @@
           "name": "name",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "description",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "variants",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'{}'::jsonb",
           "comment": "JSON array of variant definitions",
           "semantic_type_name": "json"
@@ -407,7 +388,6 @@
           "name": "status",
           "pg_type": "experiment_status",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "experiment_status"
         },
         {
@@ -422,7 +402,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -451,7 +430,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -459,28 +437,24 @@
           "name": "name",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "description",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "icon",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "criteria",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'{}'::jsonb",
           "comment": "JSON object describing the unlock criteria",
           "semantic_type_name": "json"
@@ -489,7 +463,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -518,7 +491,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -526,35 +498,30 @@
           "name": "player_a",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "player_b",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "status",
           "pg_type": "friendship_status",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "friendship_status"
         },
         {
           "name": "initiated_by",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         },
@@ -562,7 +529,6 @@
           "name": "updated_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -657,7 +623,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -665,21 +630,18 @@
           "name": "title",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "description",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "tags",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'[]'::jsonb",
           "semantic_type_name": "json_array"
         },
@@ -687,7 +649,6 @@
           "name": "creator",
           "pg_type": "uuid",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
@@ -701,7 +662,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         },
@@ -709,7 +669,6 @@
           "name": "generation_model",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "comment": "AI model that generated this game. NULL for human-created. Disclosed per EU AI Act Art. 50.",
           "semantic_type_name": "text_field"
         },
@@ -717,7 +676,6 @@
           "name": "generation_prompt",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "comment": "Original prompt used to generate this game. Stored for transparency.",
           "semantic_type_name": "text_field"
         }
@@ -787,7 +745,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -795,35 +752,30 @@
           "name": "sender_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "channel",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "body",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "metadata",
           "pg_type": "jsonb",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "jsonb_nullable"
         },
         {
           "name": "sent_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -896,7 +848,6 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
@@ -931,7 +882,6 @@
           "name": "updated_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -976,14 +926,12 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "birth_date",
           "pg_type": "date",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "date_field"
         },
         {
@@ -1012,35 +960,30 @@
           "name": "parent_email",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "consent_token",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "consent_token_expires_at",
           "pg_type": "timestamptz",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "timestamp_optional"
         },
         {
           "name": "consent_given_at",
           "pg_type": "timestamptz",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "timestamp_optional"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -1094,28 +1037,24 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "bio",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "avatar_url",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "status_text",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
@@ -1173,21 +1112,18 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "key",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "value",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         }
       ],
@@ -1232,21 +1168,18 @@
           "name": "follower_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "followed_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -1317,7 +1250,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -1325,21 +1257,18 @@
           "name": "reporter_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "target_type",
           "pg_type": "report_target_type",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "report_target_type"
         },
         {
           "name": "target_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "comment": "UUID of the reported entity",
           "semantic_type_name": "ref"
         },
@@ -1347,21 +1276,18 @@
           "name": "reason",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "status",
           "pg_type": "report_status",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "report_status"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -1422,7 +1348,6 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
@@ -1436,7 +1361,6 @@
           "name": "updated_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -1481,7 +1405,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -1489,7 +1412,6 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
@@ -1504,21 +1426,18 @@
           "name": "type",
           "pg_type": "currency_transaction_type",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "currency_transaction_type"
         },
         {
           "name": "reason",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "reference_type",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "comment": "Entity type that triggered the transaction (e.g. game_play, achievement)",
           "semantic_type_name": "text_field"
         },
@@ -1526,7 +1445,6 @@
           "name": "reference_id",
           "pg_type": "uuid",
           "not_null": false,
-          "default": "",
           "comment": "UUID of the triggering entity",
           "semantic_type_name": "ref"
         },
@@ -1534,7 +1452,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -1587,7 +1504,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -1595,35 +1511,30 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "type",
           "pg_type": "notification_type",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "notification_type"
         },
         {
           "name": "title",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "body",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "data",
           "pg_type": "jsonb",
           "not_null": false,
-          "default": "",
           "comment": "Arbitrary payload (e.g. friend request ID, game ID)",
           "semantic_type_name": "jsonb_nullable"
         },
@@ -1638,7 +1549,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -1693,7 +1603,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -1701,28 +1610,24 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "key_hash",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "name",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "scopes",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'{}'::jsonb",
           "semantic_type_name": "json"
         },
@@ -1730,7 +1635,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         },
@@ -1738,14 +1642,12 @@
           "name": "last_used_at",
           "pg_type": "timestamptz",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "timestamp_optional"
         },
         {
           "name": "revoked_at",
           "pg_type": "timestamptz",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "timestamp_optional"
         }
       ],
@@ -1796,28 +1698,24 @@
           "name": "experiment_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "variant",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "assigned_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -1884,7 +1782,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -1892,14 +1789,12 @@
           "name": "game_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
@@ -1913,14 +1808,12 @@
           "name": "metadata",
           "pg_type": "jsonb",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "jsonb_nullable"
         },
         {
           "name": "achieved_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -2000,7 +1893,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -2008,21 +1900,18 @@
           "name": "game_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "version_number",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "bundle_path",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
@@ -2037,14 +1926,12 @@
           "name": "changelog",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -2089,7 +1976,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -2097,28 +1983,24 @@
           "name": "parent_game_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "child_game_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "forked_by",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -2203,21 +2085,18 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "game_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -2283,7 +2162,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -2291,28 +2169,24 @@
           "name": "game_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "body",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -2377,7 +2251,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -2385,14 +2258,12 @@
           "name": "requested_by",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "game_id",
           "pg_type": "uuid",
           "not_null": false,
-          "default": "",
           "comment": "Set after game is created",
           "semantic_type_name": "ref"
         },
@@ -2400,21 +2271,18 @@
           "name": "prompt",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "status",
           "pg_type": "generation_status",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "generation_status"
         },
         {
           "name": "model",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
@@ -2436,14 +2304,12 @@
           "name": "error_message",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         },
@@ -2451,7 +2317,6 @@
           "name": "completed_at",
           "pg_type": "timestamptz",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "timestamp_optional"
         }
       ],
@@ -2524,7 +2389,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -2532,35 +2396,30 @@
           "name": "game_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "status",
           "pg_type": "session_status",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "session_status"
         },
         {
           "name": "room_code",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "max_players",
           "pg_type": "integer",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "int"
         },
         {
           "name": "config",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'{}'::jsonb",
           "comment": "Game-specific configuration for this session",
           "semantic_type_name": "json"
@@ -2569,7 +2428,6 @@
           "name": "result",
           "pg_type": "jsonb",
           "not_null": false,
-          "default": "",
           "comment": "Game result data set when session ends",
           "semantic_type_name": "jsonb_nullable"
         },
@@ -2577,7 +2435,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         },
@@ -2585,21 +2442,18 @@
           "name": "started_at",
           "pg_type": "timestamptz",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "timestamp_optional"
         },
         {
           "name": "ended_at",
           "pg_type": "timestamptz",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "timestamp_optional"
         },
         {
           "name": "server_id",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "comment": "ID of the server hosting this session. NULL for sessions created before fleet routing.",
           "semantic_type_name": "text_field"
         }
@@ -2679,21 +2533,18 @@
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "achievement_def_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "game_id",
           "pg_type": "uuid",
           "not_null": false,
-          "default": "",
           "comment": "Game that triggered the unlock, if applicable",
           "semantic_type_name": "ref"
         },
@@ -2701,7 +2552,6 @@
           "name": "earned_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -2789,7 +2639,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -2797,28 +2646,24 @@
           "name": "report_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "action_type",
           "pg_type": "moderation_action_type",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "moderation_action_type"
         },
         {
           "name": "moderator_note",
           "pg_type": "text",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "text_field"
         },
         {
           "name": "acted_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -2862,7 +2707,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -2870,28 +2714,24 @@
           "name": "game_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "version_id",
           "pg_type": "uuid",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "duration_seconds",
           "pg_type": "integer",
           "not_null": false,
-          "default": "",
           "semantic_type_name": "int"
         },
         {
@@ -2912,7 +2752,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -2999,28 +2838,24 @@
           "name": "session_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "role",
           "pg_type": "session_role",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "session_role"
         },
         {
           "name": "joined_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -3087,7 +2922,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -3095,21 +2929,18 @@
           "name": "session_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "player_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "action",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'{}'::jsonb",
           "semantic_type_name": "json"
         },
@@ -3124,7 +2955,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
@@ -3189,7 +3019,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -3197,14 +3026,12 @@
           "name": "session_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "state",
           "pg_type": "jsonb",
           "not_null": true,
-          "default": "",
           "default_expr": "'{}'::jsonb",
           "semantic_type_name": "json"
         },
@@ -3219,7 +3046,6 @@
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }

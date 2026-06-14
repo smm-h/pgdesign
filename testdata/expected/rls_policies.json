@@ -14,7 +14,6 @@
           "name": "id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
@@ -22,21 +21,18 @@
           "name": "owner_id",
           "pg_type": "uuid",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "ref"
         },
         {
           "name": "title",
           "pg_type": "text",
           "not_null": true,
-          "default": "",
           "semantic_type_name": "short_text"
         },
         {
           "name": "created_at",
           "pg_type": "timestamptz",
           "not_null": true,
-          "default": "",
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         }
