@@ -2,3 +2,4 @@
 {"commits":["5bcb1e2e6c729340b4cbb35a52ef688a16da0201","8feaca32a3ef18fb65707e9cb038f74fb86b7bd8"],"user_facing":true,"description":"**Fix.** Empty-string defaults (`default = \"\"`) now correctly produce `DEFAULT ''` in DDL instead of being silently dropped.","type":"fix"}
 {"commits":["dfc54c3453bb581032db2d49f141b094a6166e5e","f729779d42563475b2feaa5cded96ef31dc717b8"],"user_facing":true,"description":"**Fix.** Codegen validators now use the correct column name from RLS policy expressions instead of hardcoding `player_id`.","type":"fix"}
 {"commits":["dad48cef5d5e982d1023db0635e73f38112fccd1","2b72c960546e2b084e9d23e22a5c0f465c936715","8ae8f347c9b8c5cad4789299c5e644d0084e43d4","4bdec21cb90f49f60b3925a56965713a8778376b"],"user_facing":false}
+{"commits":["0fda66bfee942522c202e66ee8dce1cbedd19a23"],"user_facing":false}
