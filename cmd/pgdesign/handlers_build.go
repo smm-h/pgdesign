@@ -189,9 +189,12 @@ func selectCodegenGenerator(outputName, lang, mode string) (codegen.Generator, b
 			return &codegen.ZigValidatorGenerator{}, true
 		case "go":
 			return &codegen.GoValidatorGenerator{}, true
-		case "ts", "java", "kotlin":
-			fmt.Fprintf(os.Stderr, "build: output %q: codegen lang %q is not yet implemented\n", outputName, lang)
-			return nil, false
+		case "ts":
+			return &codegen.TSValidatorGenerator{}, true
+		case "java":
+			return &codegen.JavaValidatorGenerator{}, true
+		case "kotlin":
+			return &codegen.KotlinValidatorGenerator{}, true
 		default:
 			fmt.Fprintf(os.Stderr, "build: output %q: unsupported codegen lang %q\n", outputName, lang)
 			return nil, false
@@ -204,9 +207,12 @@ func selectCodegenGenerator(outputName, lang, mode string) (codegen.Generator, b
 			return &codegen.ZigConstantsGenerator{}, true
 		case "go":
 			return &codegen.GoConstantsGenerator{}, true
-		case "ts", "java", "kotlin":
-			fmt.Fprintf(os.Stderr, "build: output %q: codegen lang %q is not yet implemented\n", outputName, lang)
-			return nil, false
+		case "ts":
+			return &codegen.TSConstantsGenerator{}, true
+		case "java":
+			return &codegen.JavaConstantsGenerator{}, true
+		case "kotlin":
+			return &codegen.KotlinConstantsGenerator{}, true
 		default:
 			fmt.Fprintf(os.Stderr, "build: output %q: unsupported codegen lang %q\n", outputName, lang)
 			return nil, false

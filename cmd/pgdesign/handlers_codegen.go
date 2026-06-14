@@ -27,8 +27,14 @@ func handleCodegen(kwargs map[string]interface{}) int {
 			gen = &codegen.ZigValidatorGenerator{}
 		case "go":
 			gen = &codegen.GoValidatorGenerator{}
+		case "ts":
+			gen = &codegen.TSValidatorGenerator{}
+		case "java":
+			gen = &codegen.JavaValidatorGenerator{}
+		case "kotlin":
+			gen = &codegen.KotlinValidatorGenerator{}
 		default:
-			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python, zig, or go, got %s\n", lang)
+			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python, zig, go, ts, java, or kotlin, got %s\n", lang)
 			return 1
 		}
 	case "constants":
@@ -39,6 +45,12 @@ func handleCodegen(kwargs map[string]interface{}) int {
 			gen = &codegen.ZigConstantsGenerator{}
 		case "go":
 			gen = &codegen.GoConstantsGenerator{}
+		case "ts":
+			gen = &codegen.TSConstantsGenerator{}
+		case "java":
+			gen = &codegen.JavaConstantsGenerator{}
+		case "kotlin":
+			gen = &codegen.KotlinConstantsGenerator{}
 		default:
 			fmt.Fprintf(os.Stderr, "error: unsupported language for constants mode: %s\n", lang)
 			return 1
