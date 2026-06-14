@@ -1159,6 +1159,38 @@ func TestJSONSchemaCheckConstraints(t *testing.T) {
 	}
 }
 
+func TestGenerate_UnsupportedFormat(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{Format: "invalid_format"}
+	out, err := Generate(schema, opts)
+
+	if err == nil {
+		t.Fatal("expected error for unsupported format, got nil")
+	}
+	if out != "" {
+		t.Errorf("expected empty output for unsupported format, got: %q", out)
+	}
+	if !strings.Contains(err.Error(), "invalid_format") {
+		t.Errorf("expected error to mention the format name, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "unsupported") {
+		t.Errorf("expected error to mention 'unsupported', got: %v", err)
+	}
+}
+
 func TestJSONSchemaEndToEnd(t *testing.T) {
 	inputPath := filepath.Join("testdata", "json_schema.toml")
 
