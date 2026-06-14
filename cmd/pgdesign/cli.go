@@ -147,6 +147,16 @@ func main() {
 		),
 	)
 
+	app.Command("seed", "Generate type-aware test data", handleSeed,
+		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) or directory", strictcli.Variadic())),
+		strictcli.WithFlags(
+			strictcli.IntFlag("rows", "Rows per table", strictcli.Default(10)),
+			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
+			strictcli.BoolFlag("apply", "Insert directly into database"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL (required with --apply)", strictcli.Default(nil)),
+		),
+	)
+
 	app.Command("serve", "Start the pgdesign HTTP API server", handleServe,
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL"),
