@@ -315,6 +315,8 @@ migrations_dir = "migrations"
 
 [database]
 pg_version = 16
+pool_max_conns = 25
+pool_min_conns = 5
 
 [format]
 table_order = "dependency"
@@ -333,6 +335,14 @@ expand_contract_threshold = 10000000
 name = "pg_trgm"
 opclasses = ["gin_trgm_ops", "gist_trgm_ops"]
 ```
+
+### [database]
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `pg_version` | integer | PostgreSQL major version for version-aware DDL generation |
+| `pool_max_conns` | integer | Maximum connections in the pgxpool. When absent, pgxpool uses its built-in defaults (max connections = number of CPUs) |
+| `pool_min_conns` | integer | Minimum connections in the pgxpool. When absent, pgxpool uses its built-in default (min connections = 0) |
 
 ### [suppress]
 
