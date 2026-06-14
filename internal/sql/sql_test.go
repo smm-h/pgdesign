@@ -1040,6 +1040,37 @@ func TestLiteralValue_ArrayDefaults(t *testing.T) {
 	}
 }
 
+func TestIsNumericType_ArraySuffix(t *testing.T) {
+	// "integer[]" must NOT be considered numeric -- it's an array type,
+	// and array literals like {} need single-quoting.
+	if isNumericType("integer[]") {
+		t.Errorf("isNumericType(%q) = true, want false", "integer[]")
+	}
+}
+
+func TestColumnDef_ArrayIntegerDefault_BareEmptyArray(t *testing.T) {
+	// BUG: columnDef passes col.PGType ("integer") to LiteralValue instead of
+	// the local pgType ("integer[]"). Since isNumericType("integer") is true,
+	// {} is emitted bare instead of single-quoted.
+	table := &model.Table{
+		Name:   "results",
+		Schema: "public",
+		Columns: []model.Column{
+			{Name: "id", PGType: "uuid", NotNull: true},
+			{Name: "scores", PGType: "integer", NotNull: true, Array: true, Default: "{}"},
+		},
+		PK: []string{"id"},
+	}
+
+	got := CreateTable(table, "public", false, 0, nil)
+
+	// BUG PROOF: The buggy code produces bare DEFAULT {} (wrong SQL).
+	// After the fix, this assertion will be updated to expect DEFAULT '{}'.
+	if !strings.Contains(got, "DEFAULT {}") {
+		t.Errorf("expected buggy bare DEFAULT {} (proving the bug), got:\n%s", got)
+	}
+}
+
 func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
 	// Wrong pattern: if someone writes default = "'created'" in TOML,
 	// the value reaching LiteralValue is "'created'" (with embedded single quotes).
