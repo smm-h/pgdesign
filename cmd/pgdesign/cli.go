@@ -166,6 +166,15 @@ func main() {
 		),
 	)
 
+	app.Command("stats", "Database statistics and health analysis", handleStats,
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
+			strictcli.BoolFlag("json", "Output as JSON"),
+			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable()),
+		),
+		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) for cross-reference", strictcli.Variadic(), strictcli.ArgRequired(false))),
+	)
+
 	app.Run()
 }
 
