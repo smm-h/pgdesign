@@ -19,8 +19,6 @@ func main() {
 	app := strictcli.NewApp("pgdesign", Version, "PostgreSQL schema compiler")
 
 	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output"))
-	app.GlobalFlag(strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)))
-	app.GlobalFlag(strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"))
 
 	app.Command("generate", "Generate SQL from schema file(s) or directory", handleGenerate,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
@@ -28,6 +26,7 @@ func main() {
 			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all statements"),
 			strictcli.BoolFlag("no-comments", "Exclude COMMENT ON statements from output"),
 			strictcli.StringFlag("format", "Output format", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg")),
+			strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"),
 		),
 	)
 
@@ -35,6 +34,10 @@ func main() {
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("show-suppressed", "Show suppressed diagnostics with their reasons"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)),
+			strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"),
+			strictcli.BoolFlag("json", "Output as JSON"),
+			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable()),
 		),
 	)
 
@@ -43,6 +46,10 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.StringFlag("tables", "Limit FD discovery to specific tables", strictcli.Repeatable()),
 			strictcli.FloatFlag("approximate", "Approximate FD threshold (0.0 = exact only)", strictcli.Default(0.0)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)),
+			strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"),
+			strictcli.BoolFlag("json", "Output as JSON"),
+			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable()),
 		),
 	)
 
@@ -59,6 +66,7 @@ func main() {
 
 	app.Command("introspect", "Introspect a live PostgreSQL database", handleIntrospect,
 		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.StringFlag("schema", "Schema name to introspect", strictcli.Repeatable()),
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
 		),
@@ -68,50 +76,67 @@ func main() {
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("json", "Output diff as JSON"),
+			strictcli.StringFlag("live", "PostgreSQL connection URL for live comparison", strictcli.Default(nil)),
 		),
 	)
 
 	mig := app.Group("migrate", "Database migration commands")
 	mig.Command("plan", "Plan migrations from schema changes", handleMigratePlan,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
+			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+		),
 	)
 	mig.Command("generate", "Generate migration files", handleMigrateGenerate,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.StringFlag("version", "Migration version (semver)", strictcli.Default(nil)),
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
 		),
 	)
 	mig.Command("apply", "Apply pending migrations", handleMigrateApply,
 		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
 			strictcli.BoolFlag("dry-run", "Show SQL without executing"),
+			strictcli.IntFlag("timeout", "Lock timeout in seconds", strictcli.Default(30)),
 		),
 	)
 	mig.Command("rollback", "Rollback the last migration", handleMigrateRollback,
 		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
 		),
 	)
 	mig.Command("status", "Show migration status", handleMigrateStatus,
 		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
 		),
 	)
 
 	app.Command("serve", "Start the pgdesign HTTP API server", handleServe,
 		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.IntFlag("port", "HTTP port to listen on", strictcli.Default(8080)),
 			strictcli.StringFlag("schema", "Schema name to serve", strictcli.Repeatable()),
+			strictcli.IntFlag("timeout", "Request timeout in seconds", strictcli.Default(30)),
 		),
 	)
 
 	ext := app.Group("extension", "Extension management commands")
-	ext.Command("discover", "Discover extensions from a live database", handleExtensionDiscover)
+	ext.Command("discover", "Discover extensions from a live database", handleExtensionDiscover,
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
+		),
+	)
 
 	app.Command("codegen", "Generate application code from schema policies", handleCodegen,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)),
 			strictcli.StringFlag("lang", "Target language", strictcli.Choices("python", "zig")),
 			strictcli.StringFlag("mode", "Codegen mode", strictcli.Default("validators"), strictcli.Choices("validators", "constants")),
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),

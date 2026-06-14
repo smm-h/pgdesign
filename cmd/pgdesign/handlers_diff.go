@@ -20,13 +20,10 @@ func handleDiff(kwargs map[string]interface{}) int {
 	// Load config for default schema names.
 	cfg := loadProjectConfig(paths[0])
 
-	dbURL, _ := kwargs["db"].(string)
+	dbURL, _ := kwargs["live"].(string)
 	if dbURL == "" {
-		// No --db: just validate the TOML (parse+build already succeeded).
-		if !kwargs["quiet"].(bool) {
-			fmt.Println("Schema is valid. Use --db to diff against a live database.")
-		}
-		return 0
+		fmt.Fprintln(os.Stderr, "error: specify --live <url> for DB comparison or --against <path> for TOML comparison")
+		return 1
 	}
 
 	// Introspect the live database. Use schema name from parsed schema first,
