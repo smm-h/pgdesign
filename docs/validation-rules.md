@@ -335,3 +335,27 @@ Diagnostics emitted during code generation, not during validation.
 The codegen validator generator could not parse an RLS policy expression into a supported pattern. The policy is skipped during code generation. This typically means the policy uses SQL constructs that the codegen pattern matcher does not yet support.
 
 **Fix:** Simplify the policy expression to use a supported pattern, or write the validator code manually.
+
+## Coverage checks
+
+Coverage checks analyze constraint completeness and schema coverage. They are run by `pgdesign check` (registered as the `coverage` check) and report diagnostic codes C100-C104.
+
+### C100: Table without check constraints
+
+A table with more than 2 columns and no check constraints may be missing domain validation. Tables with `append_only = true` are exempt (their mutation constraints come from triggers, not checks).
+
+### C101: FK columns without covering index
+
+Foreign key columns have no covering index. Without an index, cascaded deletes and joins perform full table scans. This overlaps with E212 from the validator but is checked independently in the coverage analysis.
+
+### C102: Unused enum type
+
+An enum type is defined in the schema but not referenced by any column. This may indicate dead code or a type that was defined but never wired up.
+
+### C103: Orphan table
+
+A table with more than 2 columns has no foreign key relationships at all -- it neither references nor is referenced by any other table. Similar to W002 from the validator but checked independently in coverage analysis.
+
+### C104: Missing index for FK join pattern
+
+Suggests composite indexes for common join-and-filter patterns. When a foreign key references a table that has filter-like columns (`status`, `type`, `kind`, `category`, or columns ending in `_at` or `_date`), a composite index on `(fk_columns, filter_column)` can improve join performance. This is an informational suggestion (Info severity), not a warning.
