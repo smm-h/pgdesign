@@ -1,0 +1,736 @@
+{
+  "checks": {
+    "coverage": {
+      "depends_on": [
+        "validation"
+      ],
+      "fast": true,
+      "needs_network": false,
+      "pure": true,
+      "severity": "warn",
+      "tags": [
+        "coverage"
+      ]
+    },
+    "nf": {
+      "depends_on": [],
+      "fast": false,
+      "needs_network": true,
+      "pure": false,
+      "severity": "warn",
+      "tags": [
+        "nf"
+      ]
+    },
+    "validation": {
+      "depends_on": [],
+      "fast": true,
+      "needs_network": false,
+      "pure": true,
+      "severity": "error",
+      "tags": [
+        "validation"
+      ]
+    }
+  },
+  "commands": {
+    "audit": {
+      "args": [
+        {
+          "help": "Path(s) to schema file(s) or directory",
+          "name": "path",
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "default": [],
+          "help": "Limit FD discovery to specific tables",
+          "name": "tables",
+          "repeatable": true,
+          "type": "str"
+        },
+        {
+          "default": 0,
+          "help": "Approximate FD threshold (0.0 = exact only)",
+          "name": "approximate",
+          "type": "float"
+        },
+        {
+          "help": "PostgreSQL connection URL",
+          "name": "db",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Enable strict normal form checking",
+          "name": "strict-nf",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Output as JSON",
+          "name": "json",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": [],
+          "help": "Schema name",
+          "name": "schema",
+          "repeatable": true,
+          "type": "str"
+        }
+      ],
+      "help": "Audit schema file(s) or directory for issues",
+      "name": "audit"
+    },
+    "build": {
+      "flags": [
+        {
+          "default": false,
+          "help": "Show what would be generated without writing",
+          "name": "dry-run",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Skip auto-commit of generated files",
+          "name": "no-commit",
+          "negatable": true,
+          "type": "bool"
+        }
+      ],
+      "help": "Generate all configured outputs",
+      "name": "build"
+    },
+    "check": {
+      "flags": [
+        {
+          "default": false,
+          "help": "Run all checks",
+          "name": "all",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Tag DSL expression",
+          "name": "tag",
+          "type": "str"
+        },
+        {
+          "default": "",
+          "help": "Glob pattern for check names",
+          "name": "name",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "List checks and tags",
+          "name": "list",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "JSON output",
+          "name": "json",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Warnings do not cause failure",
+          "name": "ignore-warnings",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Show all details",
+          "name": "verbose",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Show plan without executing",
+          "name": "dry-run",
+          "negatable": true,
+          "type": "bool"
+        }
+      ],
+      "help": "Run project checks",
+      "name": "check"
+    },
+    "codegen": {
+      "args": [
+        {
+          "help": "Path(s) to schema file(s) or directory",
+          "name": "path",
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "help": "PostgreSQL connection URL",
+          "name": "db",
+          "type": "str"
+        },
+        {
+          "choices": [
+            "python",
+            "zig",
+            "go",
+            "ts",
+            "java",
+            "kotlin"
+          ],
+          "help": "Target language",
+          "name": "lang",
+          "type": "str"
+        },
+        {
+          "choices": [
+            "validators",
+            "constants"
+          ],
+          "default": "validators",
+          "help": "Codegen mode",
+          "name": "mode",
+          "type": "str"
+        },
+        {
+          "help": "Output file path (default: stdout)",
+          "name": "output",
+          "type": "str"
+        }
+      ],
+      "help": "Generate application code from schema policies",
+      "name": "codegen"
+    },
+    "diff": {
+      "args": [
+        {
+          "help": "Path(s) to schema file(s) or directory",
+          "name": "path",
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "default": false,
+          "help": "Output diff as JSON",
+          "name": "json",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "help": "PostgreSQL connection URL for live comparison",
+          "name": "live",
+          "type": "str"
+        },
+        {
+          "help": "TOML schema file or directory to compare against",
+          "name": "against",
+          "type": "str"
+        },
+        {
+          "help": "Git ref to compare against (e.g., main, HEAD~1)",
+          "name": "base",
+          "type": "str"
+        }
+      ],
+      "help": "Diff schema file(s) or directory against a target",
+      "name": "diff"
+    },
+    "fmt": {
+      "args": [
+        {
+          "help": "Path to file or directory",
+          "name": "path"
+        }
+      ],
+      "flags": [
+        {
+          "default": false,
+          "help": "Check if file is already formatted (exit 1 if not)",
+          "name": "check",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "choices": [
+            "dependency",
+            "alphabetical"
+          ],
+          "default": "dependency",
+          "help": "Table ordering: dependency or alphabetical",
+          "name": "table-order",
+          "type": "str"
+        },
+        {
+          "choices": [
+            "pk_fk_alpha",
+            "alphabetical",
+            "fk_last",
+            "preserve"
+          ],
+          "default": "pk_fk_alpha",
+          "help": "Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve",
+          "name": "column-order",
+          "type": "str"
+        }
+      ],
+      "help": "Format a pgdesign schema file or directory",
+      "name": "fmt"
+    },
+    "generate": {
+      "args": [
+        {
+          "help": "Path(s) to schema file(s) or directory",
+          "name": "path",
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "default": false,
+          "help": "Add IF NOT EXISTS guards to all statements",
+          "name": "idempotent",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Exclude COMMENT ON statements from output",
+          "name": "no-comments",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "choices": [
+            "sql",
+            "json",
+            "d2",
+            "svg",
+            "doc"
+          ],
+          "default": "sql",
+          "help": "Output format",
+          "name": "format",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Enable strict normal form checking",
+          "name": "strict-nf",
+          "negatable": true,
+          "type": "bool"
+        }
+      ],
+      "help": "Generate SQL from schema file(s) or directory",
+      "name": "generate"
+    },
+    "introspect": {
+      "flags": [
+        {
+          "help": "PostgreSQL connection URL",
+          "name": "db",
+          "type": "str"
+        },
+        {
+          "default": [],
+          "help": "Schema name to introspect",
+          "name": "schema",
+          "repeatable": true,
+          "type": "str"
+        },
+        {
+          "help": "Output file path (default: stdout)",
+          "name": "output",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Discover extension types, functions, and opclasses",
+          "name": "extensions",
+          "negatable": true,
+          "type": "bool"
+        }
+      ],
+      "help": "Introspect a live PostgreSQL database",
+      "name": "introspect"
+    },
+    "seed": {
+      "args": [
+        {
+          "help": "Schema file(s) or directory",
+          "name": "path",
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "default": 10,
+          "help": "Rows per table",
+          "name": "rows",
+          "type": "int"
+        },
+        {
+          "help": "Output file path (default: stdout)",
+          "name": "output",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Insert directly into database",
+          "name": "apply",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "help": "PostgreSQL connection URL (required with --apply)",
+          "name": "db",
+          "type": "str"
+        },
+        {
+          "help": "Schema name",
+          "name": "schema",
+          "repeatable": true,
+          "type": "str"
+        }
+      ],
+      "help": "Generate type-aware test data",
+      "name": "seed"
+    },
+    "serve": {
+      "flags": [
+        {
+          "help": "PostgreSQL connection URL",
+          "name": "db",
+          "type": "str"
+        },
+        {
+          "default": 8080,
+          "help": "HTTP port to listen on",
+          "name": "port",
+          "type": "int"
+        },
+        {
+          "default": [],
+          "help": "Schema name to serve",
+          "name": "schema",
+          "repeatable": true,
+          "type": "str"
+        },
+        {
+          "default": 30,
+          "help": "Request timeout in seconds",
+          "name": "timeout",
+          "type": "int"
+        }
+      ],
+      "help": "Start the pgdesign HTTP API server",
+      "name": "serve"
+    },
+    "stats": {
+      "args": [
+        {
+          "help": "Schema file(s) for cross-reference",
+          "name": "path",
+          "required": false,
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "help": "PostgreSQL connection URL",
+          "name": "db",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Output as JSON",
+          "name": "json",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": [],
+          "help": "Schema name",
+          "name": "schema",
+          "repeatable": true,
+          "type": "str"
+        }
+      ],
+      "help": "Database statistics and health analysis",
+      "name": "stats"
+    },
+    "validate": {
+      "args": [
+        {
+          "help": "Path(s) to schema file(s) or directory",
+          "name": "path",
+          "variadic": true
+        }
+      ],
+      "flags": [
+        {
+          "default": false,
+          "help": "Show suppressed diagnostics with their reasons",
+          "name": "show-suppressed",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "help": "PostgreSQL connection URL",
+          "name": "db",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Enable strict normal form checking",
+          "name": "strict-nf",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Output as JSON",
+          "name": "json",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "default": [],
+          "help": "Schema name",
+          "name": "schema",
+          "repeatable": true,
+          "type": "str"
+        }
+      ],
+      "help": "Validate schema file(s) or directory",
+      "name": "validate"
+    }
+  },
+  "defaults": {
+    "app": {
+      "commands": {},
+      "config": false,
+      "deprecated": {},
+      "env_prefix": null,
+      "global_flags": [],
+      "groups": {}
+    },
+    "arg": {
+      "required": true,
+      "variadic": false
+    },
+    "command": {
+      "args": [],
+      "flags": [],
+      "passthrough": false
+    },
+    "flag": {
+      "choices": null,
+      "default": null,
+      "env": null,
+      "hidden": false,
+      "negatable": null,
+      "repeatable": false,
+      "short": null
+    },
+    "group": {
+      "commands": {},
+      "deprecated": {},
+      "groups": {}
+    }
+  },
+  "global_flags": [
+    {
+      "default": false,
+      "help": "Suppress non-error output",
+      "name": "quiet",
+      "negatable": true,
+      "type": "bool"
+    }
+  ],
+  "groups": {
+    "migrate": {
+      "commands": {
+        "apply": {
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "default": "migrations",
+              "help": "Migrations directory",
+              "name": "dir",
+              "type": "str"
+            },
+            {
+              "default": false,
+              "help": "Show SQL without executing",
+              "name": "dry-run",
+              "negatable": true,
+              "type": "bool"
+            },
+            {
+              "default": 30,
+              "help": "Lock timeout in seconds",
+              "name": "timeout",
+              "type": "int"
+            }
+          ],
+          "help": "Apply pending migrations",
+          "name": "apply"
+        },
+        "generate": {
+          "args": [
+            {
+              "help": "Path(s) to schema file(s) or directory",
+              "name": "path",
+              "variadic": true
+            }
+          ],
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "help": "Migration version (semver)",
+              "name": "version",
+              "type": "str"
+            },
+            {
+              "default": "migrations",
+              "help": "Migrations directory",
+              "name": "dir",
+              "type": "str"
+            }
+          ],
+          "help": "Generate migration files",
+          "name": "generate"
+        },
+        "plan": {
+          "args": [
+            {
+              "help": "Path(s) to schema file(s) or directory",
+              "name": "path",
+              "variadic": true
+            }
+          ],
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "default": "migrations",
+              "help": "Migrations directory",
+              "name": "dir",
+              "type": "str"
+            }
+          ],
+          "help": "Plan migrations from schema changes",
+          "name": "plan"
+        },
+        "rollback": {
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "default": "migrations",
+              "help": "Migrations directory",
+              "name": "dir",
+              "type": "str"
+            }
+          ],
+          "help": "Rollback the last migration",
+          "name": "rollback"
+        },
+        "squash": {
+          "flags": [
+            {
+              "help": "Start version (inclusive)",
+              "name": "from",
+              "type": "str"
+            },
+            {
+              "help": "End version (inclusive)",
+              "name": "to",
+              "type": "str"
+            },
+            {
+              "default": "migrations",
+              "help": "Migrations directory",
+              "name": "dir",
+              "type": "str"
+            }
+          ],
+          "help": "Squash a range of migrations into one",
+          "name": "squash"
+        },
+        "status": {
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "default": "migrations",
+              "help": "Migrations directory",
+              "name": "dir",
+              "type": "str"
+            }
+          ],
+          "help": "Show migration status",
+          "name": "status"
+        },
+        "test": {
+          "flags": [
+            {
+              "help": "Staging database connection URL",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "default": "migrations",
+              "help": "Migrations directory",
+              "name": "dir",
+              "type": "str"
+            },
+            {
+              "default": 60,
+              "help": "Timeout in seconds",
+              "name": "timeout",
+              "type": "int"
+            }
+          ],
+          "help": "Test migrations against a staging database",
+          "name": "test"
+        }
+      },
+      "help": "Database migration commands",
+      "name": "migrate"
+    }
+  },
+  "help": "PostgreSQL schema compiler",
+  "name": "pgdesign",
+  "project_id": "github.com/smm-h/pgdesign",
+  "version": "0.8.1-0.20260614210652-f18c84e8ef93+dirty"
+}
