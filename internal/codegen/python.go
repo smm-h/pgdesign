@@ -89,7 +89,7 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 				lookupColumn: existsLookups[0].lookupColumn,
 				flagColumn:   existsLookups[0].flagColumn,
 			}
-			generatePrivacyValidator(&buf, pol, check, existsLookups[0].tableParts)
+			generatePrivacyValidator(&buf, pol, check, existsLookups[0].tableParts, existsLookups[0].negated)
 		} else if own := detectOwnership(ast); own != nil {
 			generateOwnershipValidator(&buf, pol, own)
 		} else {
@@ -110,7 +110,9 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 }
 
 // generatePrivacyValidator writes a single-player privacy check validator.
-func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyCheck, tableParts []string) {
+// When negated is true (NOT EXISTS), the logic is inverted: the policy fails
+// when the flag IS set, rather than when it is not set.
+func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyCheck, tableParts []string, negated bool) {
 	paramName := check.lookupColumn
 
 	buf.WriteString(fmt.Sprintf(
@@ -130,12 +132,21 @@ func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *priva
 			"    )\n",
 		check.flagColumn, tableFQN, check.joinColumn, paramName,
 	))
-	buf.WriteString(fmt.Sprintf(
-		"    if not row or not row[\"%s\"]:\n"+
-			"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
-			"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
-		check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
-	))
+	if negated {
+		buf.WriteString(fmt.Sprintf(
+			"    if row and row[\"%s\"]:\n"+
+				"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
+				"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
+			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		))
+	} else {
+		buf.WriteString(fmt.Sprintf(
+			"    if not row or not row[\"%s\"]:\n"+
+				"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
+				"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
+			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		))
+	}
 }
 
 // generateOwnershipValidator writes a pure ID-comparison validator.

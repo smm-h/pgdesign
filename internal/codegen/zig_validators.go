@@ -87,7 +87,7 @@ func (g *ZigValidatorGenerator) Generate(schema *model.Schema) ([]byte, []diagno
 				lookupColumn: existsLookups[0].lookupColumn,
 				flagColumn:   existsLookups[0].flagColumn,
 			}
-			zigPrivacyValidator(&buf, pol, check, existsLookups[0].tableParts)
+			zigPrivacyValidator(&buf, pol, check, existsLookups[0].tableParts, existsLookups[0].negated)
 		} else if own := detectOwnership(ast); own != nil {
 			zigOwnershipValidator(&buf, pol, own)
 		} else {
@@ -125,7 +125,9 @@ func zigOwnershipValidator(buf *bytes.Buffer, pol PolicyContext, own *ownershipC
 }
 
 // zigPrivacyValidator writes a single-player privacy check validator in Zig.
-func zigPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyCheck, tableParts []string) {
+// When negated is true (NOT EXISTS), the logic is inverted: the policy fails
+// when the flag IS set, rather than when it is not set.
+func zigPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyCheck, tableParts []string, negated bool) {
 	paramName := check.lookupColumn
 	tableFQN := strings.Join(tableParts, ".")
 
@@ -143,14 +145,25 @@ func zigPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyChe
 			"    };\n",
 		check.flagColumn, tableFQN, check.joinColumn, paramName, pol.ErrorCode, pol.ErrorMessage,
 	))
-	buf.WriteString(fmt.Sprintf(
-		"    if (!row.get(bool, %q)) {\n"+
-			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
-			"    }\n"+
-			"    return .{ .ok = true };\n"+
-			"}\n",
-		check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
-	))
+	if negated {
+		buf.WriteString(fmt.Sprintf(
+			"    if (row.get(bool, %q)) {\n"+
+				"        return .{ .ok = false, .code = %q, .message = %q };\n"+
+				"    }\n"+
+				"    return .{ .ok = true };\n"+
+				"}\n",
+			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		))
+	} else {
+		buf.WriteString(fmt.Sprintf(
+			"    if (!row.get(bool, %q)) {\n"+
+				"        return .{ .ok = false, .code = %q, .message = %q };\n"+
+				"    }\n"+
+				"    return .{ .ok = true };\n"+
+				"}\n",
+			check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+		))
+	}
 }
 
 // zigOrOwnershipExistsValidator writes a validator for ownership OR exists-lookup in Zig.

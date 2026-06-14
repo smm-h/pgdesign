@@ -42,6 +42,7 @@ type existsLookup struct {
 	joinColumn   string   // column in the lookup table used for the join (e.g., "player_id")
 	lookupColumn string   // column from the outer table (e.g., "sender_id")
 	flagColumn   string   // boolean flag column (e.g., "chat_enabled")
+	negated      bool     // true for NOT EXISTS
 }
 
 // orCompound describes a top-level OR expression with ownership on one side
@@ -137,10 +138,27 @@ func detectOwnership(node sqlexpr.Node) *ownershipCheck {
 
 // detectAllExistsLookups walks the AST and collects all ExistsExpr nodes,
 // extracting the lookup table, join condition, and flag condition from each.
+// Also detects NOT EXISTS (UnaryOp{Op:"NOT", Operand: ExistsExpr}) and marks
+// those lookups as negated.
 // Returns nil if no EXISTS subqueries with the expected pattern are found.
 func detectAllExistsLookups(node sqlexpr.Node) []*existsLookup {
 	var results []*existsLookup
 	sqlexpr.Walk(node, func(n sqlexpr.Node) bool {
+		// Check for NOT EXISTS: UnaryOp{Op:"NOT", Operand: ExistsExpr}
+		if unary, ok := n.(*sqlexpr.UnaryOp); ok && strings.EqualFold(unary.Op, "NOT") {
+			if ex, ok := unary.Operand.(*sqlexpr.ExistsExpr); ok {
+				sel := ex.Subquery
+				if sel != nil && sel.Where != nil {
+					lookup := analyzeExistsWhere(sel)
+					if lookup != nil {
+						lookup.negated = true
+						results = append(results, lookup)
+					}
+				}
+				return false // don't descend further
+			}
+		}
+		// Check for plain EXISTS
 		ex, ok := n.(*sqlexpr.ExistsExpr)
 		if !ok {
 			return true
