@@ -56,6 +56,13 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 			continue
 		}
 
+		// Check for OR-compound first (before individual pattern detection),
+		// since individual detectors would partially match an OR compound.
+		if orComp := detectOrCompound(ast); orComp != nil {
+			generateOrOwnershipExistsValidator(&buf, pol, orComp)
+			continue
+		}
+
 		existsLookups := detectAllExistsLookups(ast)
 
 		if len(existsLookups) >= 2 {
@@ -144,6 +151,42 @@ func generateOwnershipValidator(buf *bytes.Buffer, pol PolicyContext, own *owner
 			"        return PolicyResult(ok=False, code=%q, message=%q)\n"+
 			"    return PolicyResult(ok=True, code=\"\", message=\"\")\n",
 		own.column, own.column, pol.ErrorCode, pol.ErrorMessage,
+	))
+}
+
+// generateOrOwnershipExistsValidator writes a validator for ownership OR exists-lookup.
+// Returns ok=True if the ownership check passes (short-circuit) or if the
+// exists-lookup check passes. Returns failure only when neither branch passes.
+func generateOrOwnershipExistsValidator(buf *bytes.Buffer, pol PolicyContext, orComp *orCompound) {
+	col := orComp.ownership.column
+	tableFQN := strings.Join(orComp.existsLookup.tableParts, ".")
+
+	buf.WriteString(fmt.Sprintf(
+		"\nasync def check_%s(conn, %s: str, target_%s: str) -> PolicyResult:\n",
+		pol.PolicyName, col, col,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    \"\"\"%s\"\"\"\n", pol.ErrorMessage,
+	))
+	// Ownership check (cheap, no DB query).
+	buf.WriteString(fmt.Sprintf(
+		"    if %s == target_%s:\n"+
+			"        return PolicyResult(ok=True, code=\"\", message=\"\")\n",
+		col, col,
+	))
+	// Exists-lookup fallback.
+	buf.WriteString(fmt.Sprintf(
+		"    row = await conn.fetchrow(\n"+
+			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
+			"        target_%s,\n"+
+			"    )\n",
+		orComp.existsLookup.flagColumn, tableFQN, orComp.existsLookup.joinColumn, col,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    if row and row[\"%s\"]:\n"+
+			"        return PolicyResult(ok=True, code=\"\", message=\"\")\n"+
+			"    return PolicyResult(ok=False, code=%q, message=%q)\n",
+		orComp.existsLookup.flagColumn, pol.ErrorCode, pol.ErrorMessage,
 	))
 }
 

@@ -41,6 +41,40 @@ type existsLookup struct {
 	flagColumn   string   // boolean flag column (e.g., "chat_enabled")
 }
 
+// orCompound describes a top-level OR expression with ownership on one side
+// and an exists-lookup on the other. Semantics: return true if EITHER passes.
+type orCompound struct {
+	ownership   *ownershipCheck
+	existsLookup *existsLookup
+}
+
+// detectOrCompound checks whether the top-level node is a BinaryOp with OR
+// where one side is an ownership check and the other is an exists-lookup.
+// Returns nil if the pattern is not found.
+func detectOrCompound(node sqlexpr.Node) *orCompound {
+	node = unwrapParen(node)
+	bin, ok := node.(*sqlexpr.BinaryOp)
+	if !ok || !strings.EqualFold(bin.Op, "OR") {
+		return nil
+	}
+
+	// Try left=ownership, right=exists
+	own := detectOwnership(bin.Left)
+	lookups := detectAllExistsLookups(bin.Right)
+	if own != nil && len(lookups) == 1 {
+		return &orCompound{ownership: own, existsLookup: lookups[0]}
+	}
+
+	// Try left=exists, right=ownership
+	lookups = detectAllExistsLookups(bin.Left)
+	own = detectOwnership(bin.Right)
+	if own != nil && len(lookups) == 1 {
+		return &orCompound{ownership: own, existsLookup: lookups[0]}
+	}
+
+	return nil
+}
+
 // unwrapCast returns the inner node if n is a Cast, otherwise returns n as-is.
 func unwrapCast(n sqlexpr.Node) sqlexpr.Node {
 	for {

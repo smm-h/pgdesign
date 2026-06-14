@@ -56,6 +56,13 @@ func (g *ZigValidatorGenerator) Generate(schema *model.Schema) ([]byte, []diagno
 			continue
 		}
 
+		// Check for OR-compound first (before individual pattern detection),
+		// since individual detectors would partially match an OR compound.
+		if orComp := detectOrCompound(ast); orComp != nil {
+			zigOrOwnershipExistsValidator(&buf, pol, orComp)
+			continue
+		}
+
 		existsLookups := detectAllExistsLookups(ast)
 
 		if len(existsLookups) >= 2 {
@@ -141,6 +148,45 @@ func zigPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyChe
 			"    return .{ .ok = true };\n"+
 			"}\n",
 		check.flagColumn, pol.ErrorCode, pol.ErrorMessage,
+	))
+}
+
+// zigOrOwnershipExistsValidator writes a validator for ownership OR exists-lookup in Zig.
+// Returns ok=true if the ownership check passes (short-circuit) or if the
+// exists-lookup check passes. Returns failure only when neither branch passes.
+func zigOrOwnershipExistsValidator(buf *bytes.Buffer, pol PolicyContext, orComp *orCompound) {
+	col := orComp.ownership.column
+	tableFQN := strings.Join(orComp.existsLookup.tableParts, ".")
+
+	buf.WriteString(fmt.Sprintf(
+		"\n/// %s\n"+
+			"pub fn check_%s(conn: *pg.Conn, %s: []const u8, target_%s: []const u8) !PolicyResult {\n",
+		pol.ErrorMessage, pol.PolicyName, col, col,
+	))
+	// Ownership check (cheap, no DB query).
+	buf.WriteString(fmt.Sprintf(
+		"    if (std.mem.eql(u8, %s, target_%s)) {\n"+
+			"        return .{ .ok = true };\n"+
+			"    }\n",
+		col, col,
+	))
+	// Exists-lookup fallback.
+	buf.WriteString(fmt.Sprintf(
+		"    const row = conn.queryRow(\n"+
+			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
+			"        .{target_%s},\n"+
+			"    ) catch {\n"+
+			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
+			"    };\n",
+		orComp.existsLookup.flagColumn, tableFQN, orComp.existsLookup.joinColumn, col, pol.ErrorCode, pol.ErrorMessage,
+	))
+	buf.WriteString(fmt.Sprintf(
+		"    if (row.get(bool, %q)) {\n"+
+			"        return .{ .ok = true };\n"+
+			"    }\n"+
+			"    return .{ .ok = false, .code = %q, .message = %q };\n"+
+			"}\n",
+		orComp.existsLookup.flagColumn, pol.ErrorCode, pol.ErrorMessage,
 	))
 }
 
