@@ -4,3 +4,4 @@
 {"commits":["fbafe9d703eae34f4f1d0806c75da34591e1bbe8","92d6eecb98a871aa34b26b6fe366bc0ad1e655c4"],"user_facing":true,"description":"**New feature.** Codegen validators now support NOT EXISTS patterns with inverted logic.","type":"feature"}
 {"commits":["c149ad188e9313377d0a1c03cee8124bf9fcecb9","0c5216b8ea35c5e3c572a46f8b0783606410aa34"],"user_facing":true,"description":"**Fix.** Codegen validators now check all flag columns when an EXISTS subquery has multiple flag conditions.","type":"fix"}
 {"commits":["7294db4836850c0a42f3b46eef6d5ce5f9647b8e","41caa2f55d55513af40691717e3de418b88b2761","59bd74d28884bc481a8fbae9f23691fedf4742d2"],"user_facing":false}
+{"commits":["6e4bef7862b687bc5dd49ec35916cb88f390cb24"],"user_facing":false}
