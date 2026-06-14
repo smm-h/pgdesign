@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -553,4 +555,202 @@ func handleMigrateSquash(kwargs map[string]interface{}) int {
 	}
 
 	return 0
+}
+
+func handleMigrateTest(kwargs map[string]interface{}) int {
+	dbURL, _ := kwargs["db"].(string)
+	if dbURL == "" {
+		fmt.Fprintln(os.Stderr, "error: --db is required for migrate test")
+		return 1
+	}
+
+	cfg := loadProjectConfig(".")
+
+	dir := kwargs["dir"].(string)
+	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+		dir = cfg.Project.MigrationsDir
+	}
+
+	timeout := kwargs["timeout"].(int)
+	quiet := kwargs["quiet"].(bool)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	conn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+		return 1
+	}
+	defer conn.Close(ctx)
+
+	if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
+	applied, err := migrate.AppliedVersions(ctx, conn)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	appliedSet := make(map[string]bool, len(applied))
+	for _, v := range applied {
+		appliedSet[v] = true
+	}
+
+	// Discover migration files.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: read migrations dir: %v\n", err)
+		return 1
+	}
+
+	type pendingMigration struct {
+		version string
+		path    string
+	}
+	var pending []pendingMigration
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".toml" {
+			continue
+		}
+		version := e.Name()[:len(e.Name())-5]
+		if appliedSet[version] {
+			continue
+		}
+		pending = append(pending, pendingMigration{
+			version: version,
+			path:    filepath.Join(dir, e.Name()),
+		})
+	}
+
+	if len(pending) == 0 {
+		if !quiet {
+			fmt.Println("No pending migrations to test.")
+		}
+		return 0
+	}
+
+	if !quiet {
+		fmt.Printf("Testing %d pending migration(s)...\n", len(pending))
+	}
+
+	totalStart := time.Now()
+
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: begin transaction: %v\n", err)
+		return 1
+	}
+	defer tx.Rollback(ctx)
+
+	failed := false
+	skippedNonTx := 0
+
+	for _, pm := range pending {
+		start := time.Now()
+
+		m, err := migrate.ParseMigrationFile(pm.path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  [fail] %s: parse error: %v\n", pm.version, err)
+			failed = true
+			break
+		}
+
+		migFailed := false
+		for _, op := range m.DDLOps {
+			if migrate.IsNonTransactional(op) {
+				skippedNonTx++
+				if !quiet {
+					fmt.Printf("  [skip] Non-transactional op (would run outside transaction): %s\n", op.Op)
+				}
+				continue
+			}
+
+			sqlStmt := migrate.OpToSQL(op)
+			if sqlStmt == "" {
+				continue
+			}
+
+			for _, stmt := range splitStmts(sqlStmt) {
+				if _, err := tx.Exec(ctx, stmt); err != nil {
+					fmt.Fprintf(os.Stderr, "  [fail] %s: %v\n    SQL: %s\n", pm.version, err, stmt)
+					migFailed = true
+					break
+				}
+			}
+			if migFailed {
+				break
+			}
+		}
+
+		if !migFailed {
+			for _, op := range m.DMLOps {
+				if op.SQL == "" {
+					continue
+				}
+				if _, err := tx.Exec(ctx, op.SQL); err != nil {
+					fmt.Fprintf(os.Stderr, "  [fail] %s: DML error: %v\n    SQL: %s\n", pm.version, err, op.SQL)
+					migFailed = true
+					break
+				}
+			}
+		}
+
+		elapsed := time.Since(start)
+
+		if migFailed {
+			failed = true
+			break
+		}
+
+		if !quiet {
+			fmt.Printf("  [pass] %s (%s)\n", pm.version, elapsed.Round(time.Millisecond))
+		}
+	}
+
+	// Roll back explicitly (deferred rollback also covers this).
+	tx.Rollback(ctx)
+
+	totalElapsed := time.Since(totalStart)
+
+	if !quiet {
+		fmt.Println()
+		if failed {
+			fmt.Println("Result: FAIL")
+		} else {
+			fmt.Println("Result: PASS")
+		}
+		fmt.Printf("Migrations tested: %d\n", len(pending))
+		fmt.Printf("Total time: %s\n", totalElapsed.Round(time.Millisecond))
+		if skippedNonTx > 0 {
+			fmt.Printf("Skipped non-transactional ops: %d\n", skippedNonTx)
+		}
+	}
+
+	if failed {
+		return 1
+	}
+	return 0
+}
+
+// splitStmts splits a multi-statement SQL string (separated by ";\n") into
+// individual statements. Mirrors the logic in migrate.splitStatements.
+func splitStmts(sql string) []string {
+	var stmts []string
+	for _, s := range strings.Split(sql, ";\n") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if !strings.HasSuffix(s, ";") {
+			s += ";"
+		}
+		stmts = append(stmts, s)
+	}
+	if len(stmts) == 0 && strings.TrimSpace(sql) != "" {
+		return []string{strings.TrimSpace(sql)}
+	}
+	return stmts
 }

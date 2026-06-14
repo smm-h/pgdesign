@@ -139,6 +139,13 @@ func main() {
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
 		),
 	)
+	mig.Command("test", "Test migrations against a staging database", handleMigrateTest,
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "Staging database connection URL"),
+			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+			strictcli.IntFlag("timeout", "Timeout in seconds", strictcli.Default(60)),
+		),
+	)
 
 	app.Command("serve", "Start the pgdesign HTTP API server", handleServe,
 		strictcli.WithFlags(
