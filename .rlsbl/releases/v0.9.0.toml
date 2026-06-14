@@ -1,0 +1,8 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "CLI overhaul with build, check, stats, seed, codegen for 6 languages, TOML diff, doc format, migration squash and test."
+# Optional context explaining why these changes were made
+context = ""
+include = ["go", "npm", "pypi"]
+exclude = []
