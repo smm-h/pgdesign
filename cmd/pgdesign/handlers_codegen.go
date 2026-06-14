@@ -25,6 +25,8 @@ func handleCodegen(kwargs map[string]interface{}) int {
 			gen = &codegen.PythonGenerator{}
 		case "zig":
 			gen = &codegen.ZigValidatorGenerator{}
+		case "go":
+			gen = &codegen.GoValidatorGenerator{}
 		default:
 			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python or zig, got %s\n", lang)
 			return 1
@@ -35,6 +37,8 @@ func handleCodegen(kwargs map[string]interface{}) int {
 			gen = &codegen.PythonConstantsGenerator{}
 		case "zig":
 			gen = &codegen.ZigConstantsGenerator{}
+		case "go":
+			gen = &codegen.GoConstantsGenerator{}
 		default:
 			fmt.Fprintf(os.Stderr, "error: unsupported language for constants mode: %s\n", lang)
 			return 1

@@ -151,7 +151,7 @@ func main() {
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)),
-			strictcli.StringFlag("lang", "Target language", strictcli.Choices("python", "zig")),
+			strictcli.StringFlag("lang", "Target language", strictcli.Choices("python", "zig", "go")),
 			strictcli.StringFlag("mode", "Codegen mode", strictcli.Default("validators"), strictcli.Choices("validators", "constants")),
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
 		),
