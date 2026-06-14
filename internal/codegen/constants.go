@@ -76,6 +76,28 @@ func toPascalCase(s string) string {
 	return strings.Join(parts, "")
 }
 
+// TSConstantsGenerator generates TypeScript constants for table and column names.
+type TSConstantsGenerator struct{}
+
+// Generate produces a TypeScript file with table name and column name constants
+// for every table in the schema.
+func (g *TSConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
+	return generateConstants(schema, ConstantsLang{
+		CommentPrefix: "// ",
+		TableConstFmt: func(name, fqn string) string {
+			return fmt.Sprintf("export const TABLE_%s = %q\n", name, fqn)
+		},
+		ColumnsConstFmt: func(name, joined string) string {
+			return fmt.Sprintf("export const %s_COLUMNS = [%s] as const\n", name, joined)
+		},
+		ColConstFmt: func(tableName, colName, rawColName string) string {
+			return fmt.Sprintf("export const %s_COL_%s = %q\n", tableName, colName, rawColName)
+		},
+		CaseFn:   strings.ToUpper,
+		RegenCmd: "pgdesign codegen --lang ts --mode constants <schema-files>",
+	})
+}
+
 // GoConstantsGenerator generates Go constants for table and column names.
 type GoConstantsGenerator struct{}
 
