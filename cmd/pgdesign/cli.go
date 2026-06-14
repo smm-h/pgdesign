@@ -16,7 +16,21 @@ import (
 )
 
 func main() {
-	app := strictcli.NewApp("pgdesign", Version, "PostgreSQL schema compiler")
+	app := strictcli.NewApp("pgdesign", Version, "PostgreSQL schema compiler",
+		strictcli.WithChecks(".strictcli/checks.toml"),
+	)
+
+	app.SetCheckContext(func() strictcli.CheckContext {
+		cwd, err := os.Getwd()
+		if err != nil {
+			cwd = "."
+		}
+		return &pgdesignCheckContext{root: cwd}
+	})
+
+	app.RegisterCheck("validation", checkValidation)
+	app.RegisterCheck("nf", checkNF)
+	app.RegisterCheck("coverage", checkCoverage)
 
 	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output"))
 
