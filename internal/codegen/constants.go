@@ -64,6 +64,40 @@ func (g *ZigConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagno
 	})
 }
 
+// toPascalCase converts a snake_case string to PascalCase.
+// For example: "users" -> "Users", "created_at" -> "CreatedAt".
+func toPascalCase(s string) string {
+	parts := strings.Split(s, "_")
+	for i, p := range parts {
+		if len(p) > 0 {
+			parts[i] = strings.ToUpper(p[:1]) + p[1:]
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+// GoConstantsGenerator generates Go constants for table and column names.
+type GoConstantsGenerator struct{}
+
+// Generate produces a Go file with table name and column name constants
+// for every table in the schema.
+func (g *GoConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
+	return generateConstants(schema, ConstantsLang{
+		CommentPrefix: "// ",
+		TableConstFmt: func(name, fqn string) string {
+			return fmt.Sprintf("const Table%s = %q\n", name, fqn)
+		},
+		ColumnsConstFmt: func(name, joined string) string {
+			return fmt.Sprintf("var %sColumns = []string{%s}\n", name, joined)
+		},
+		ColConstFmt: func(tableName, colName, rawColName string) string {
+			return fmt.Sprintf("const %sCol%s = %q\n", tableName, colName, rawColName)
+		},
+		CaseFn:   toPascalCase,
+		RegenCmd: "pgdesign codegen --lang go --mode constants <schema-files>",
+	})
+}
+
 // generateConstants produces constants output for any language using the
 // provided ConstantsLang formatting rules.
 func generateConstants(schema *model.Schema, lang ConstantsLang) ([]byte, []diagnostic.Diagnostic) {
