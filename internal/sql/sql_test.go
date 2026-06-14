@@ -58,7 +58,7 @@ func TestLiteralValue(t *testing.T) {
 		{"hello", "text", "'hello'"},
 		{"42", "integer", "42"},
 		{"true", "boolean", "true"},
-		{"", "text", "NULL"},
+		{"", "text", "''"},
 		{"it's", "text", "'it''s'"},
 		{"3.14", "numeric", "3.14"},
 		{"100", "bigint", "100"},
@@ -1056,7 +1056,7 @@ func TestColumnDef_ArrayIntegerDefault_QuotedEmptyArray(t *testing.T) {
 		Schema: "public",
 		Columns: []model.Column{
 			{Name: "id", PGType: "uuid", NotNull: true},
-			{Name: "scores", PGType: "integer", NotNull: true, Array: true, Default: "{}"},
+			{Name: "scores", PGType: "integer", NotNull: true, Array: true, Default: model.StrPtr("{}")},
 		},
 		PK: []string{"id"},
 	}

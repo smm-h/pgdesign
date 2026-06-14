@@ -133,7 +133,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		for _, col := range td.ColumnsAdded {
 			colCtx := ctx
 			colCtx.IsNullable = !col.NotNull
-			colCtx.HasDefault = col.Default != "" || col.DefaultExpr != ""
+			colCtx.HasDefault = col.Default != nil || col.DefaultExpr != ""
 			op := DDLOp{
 				Op:      "add_column",
 				Table:   td.Name,
@@ -144,8 +144,8 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 					Ops: []DDLOp{{Op: "drop_column", Table: td.Name, Column: col.Name}},
 				},
 			}
-			if col.Default != "" {
-				op.Default = col.Default
+			if col.Default != nil {
+				op.Default = *col.Default
 			} else if col.DefaultExpr != "" {
 				op.Default = col.DefaultExpr
 			}
@@ -744,8 +744,8 @@ func buildBackfillSQL(tableName, colName string, desired *model.Schema) string {
 			if col.Name == colName {
 				if col.DefaultExpr != "" {
 					defaultVal = col.DefaultExpr
-				} else if col.Default != "" {
-					defaultVal = formatDefault(col.Default, col.PGType)
+				} else if col.Default != nil {
+					defaultVal = formatDefault(*col.Default, col.PGType)
 				} else {
 					defaultVal = typeZeroValue(col.PGType)
 				}

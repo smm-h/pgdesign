@@ -11,25 +11,25 @@ func TestBuiltinResolve(t *testing.T) {
 		name        string
 		pgType      string
 		notNull     bool
-		defaultVal  string
+		defaultVal  *string
 		defaultExpr string
 		check       string
 		generated   string
 		identity    string
 	}{
-		{"id", "uuid", true, "", "gen_random_uuid()", "", "", ""},
-		{"ref", "uuid", true, "", "", "", "", ""},
-		{"timestamp", "timestamptz", true, "", "now()", "", "", ""},
-		{"timestamp_optional", "timestamptz", false, "", "", "", "", ""},
-		{"money", "bigint", true, "0", "", "", "", ""},
-		{"slug", "text", true, "", "", "VALUE ~ '^[a-z0-9-]+$'", "", ""},
-		{"email", "text", true, "", "", "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'", "", ""},
-		{"short_text", "text", true, "", "", "LENGTH(VALUE) <= 255", "", ""},
-		{"json", "jsonb", true, "", "'{}'::jsonb", "", "", ""},
-		{"json_array", "jsonb", true, "", "'[]'::jsonb", "", "", ""},
-		{"counter", "bigint", true, "0", "", "", "", ""},
-		{"flag", "boolean", true, "false", "", "", "", ""},
-		{"auto_id", "bigint", true, "", "", "", "", "ALWAYS"},
+		{"id", "uuid", true, nil, "gen_random_uuid()", "", "", ""},
+		{"ref", "uuid", true, nil, "", "", "", ""},
+		{"timestamp", "timestamptz", true, nil, "now()", "", "", ""},
+		{"timestamp_optional", "timestamptz", false, nil, "", "", "", ""},
+		{"money", "bigint", true, strPtr("0"), "", "", "", ""},
+		{"slug", "text", true, nil, "", "VALUE ~ '^[a-z0-9-]+$'", "", ""},
+		{"email", "text", true, nil, "", "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'", "", ""},
+		{"short_text", "text", true, nil, "", "LENGTH(VALUE) <= 255", "", ""},
+		{"json", "jsonb", true, nil, "'{}'::jsonb", "", "", ""},
+		{"json_array", "jsonb", true, nil, "'[]'::jsonb", "", "", ""},
+		{"counter", "bigint", true, strPtr("0"), "", "", "", ""},
+		{"flag", "boolean", true, strPtr("false"), "", "", "", ""},
+		{"auto_id", "bigint", true, nil, "", "", "", "ALWAYS"},
 	}
 
 	for _, tt := range tests {
@@ -44,8 +44,8 @@ func TestBuiltinResolve(t *testing.T) {
 			if td.NotNull != tt.notNull {
 				t.Errorf("NotNull = %v, want %v", td.NotNull, tt.notNull)
 			}
-			if td.Default != tt.defaultVal {
-				t.Errorf("Default = %q, want %q", td.Default, tt.defaultVal)
+			if !strPtrEqual(td.Default, tt.defaultVal) {
+				t.Errorf("Default = %v, want %v", td.Default, tt.defaultVal)
 			}
 			if td.DefaultExpr != tt.defaultExpr {
 				t.Errorf("DefaultExpr = %q, want %q", td.DefaultExpr, tt.defaultExpr)
@@ -294,8 +294,12 @@ func TestResolveColumnOverrideDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveColumn error: %v", err)
 	}
-	if rc.Default != "100" {
-		t.Errorf("Default = %q, want %q", rc.Default, "100")
+	if rc.Default == nil || *rc.Default != "100" {
+		got := "<nil>"
+		if rc.Default != nil {
+			got = *rc.Default
+		}
+		t.Errorf("Default = %q, want %q", got, "100")
 	}
 	if rc.DefaultExpr != "" {
 		t.Errorf("DefaultExpr = %q, want empty (literal default takes precedence)", rc.DefaultExpr)
@@ -314,8 +318,8 @@ func TestResolveColumnOverrideDefaultExpr(t *testing.T) {
 	if rc.DefaultExpr != "nextval('my_seq')" {
 		t.Errorf("DefaultExpr = %q, want %q", rc.DefaultExpr, "nextval('my_seq')")
 	}
-	if rc.Default != "" {
-		t.Errorf("Default = %q, want empty (expr default takes precedence)", rc.Default)
+	if rc.Default != nil {
+		t.Errorf("Default = %q, want nil (expr default takes precedence)", *rc.Default)
 	}
 }
 
@@ -369,7 +373,7 @@ func TestLoadUserEnumType_ValidDefault(t *testing.T) {
 			Name:    "status",
 			Kind:    "enum",
 			Values:  []string{"created", "running", "done"},
-			Default: "created",
+			Default: strPtr("created"),
 		},
 	}
 
@@ -382,8 +386,12 @@ func TestLoadUserEnumType_ValidDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve(status) error: %v", err)
 	}
-	if td.Default != "created" {
-		t.Errorf("Default = %q, want %q", td.Default, "created")
+	if td.Default == nil || *td.Default != "created" {
+		got := "<nil>"
+		if td.Default != nil {
+			got = *td.Default
+		}
+		t.Errorf("Default = %q, want %q", got, "created")
 	}
 }
 
@@ -395,7 +403,7 @@ func TestLoadUserEnumType_InvalidDefault_E109(t *testing.T) {
 			Name:    "status",
 			Kind:    "enum",
 			Values:  []string{"created", "running"},
-			Default: "'created'",
+			Default: strPtr("'created'"),
 		},
 	}
 
@@ -423,7 +431,7 @@ func TestLoadUserEnumType_EmbeddedQuotes_E110(t *testing.T) {
 			Name:    "status",
 			Kind:    "enum",
 			Values:  []string{"created", "running"},
-			Default: "'created'",
+			Default: strPtr("'created'"),
 		},
 	}
 	diags := r.LoadUserTypes(userTypes)
@@ -455,7 +463,7 @@ func TestLoadUserScalarType_EmbeddedQuotes_E110(t *testing.T) {
 			Name:    "json_data",
 			Kind:    "scalar",
 			Base:    "jsonb",
-			Default: "'{}'",
+			Default: strPtr("'{}'"),
 		},
 	}
 	diags := r.LoadUserTypes(userTypes)
@@ -481,7 +489,7 @@ func TestLoadUserScalarType_NoQuotes_NoE110(t *testing.T) {
 			Name:    "json_data",
 			Kind:    "scalar",
 			Base:    "jsonb",
-			Default: "{}",
+			Default: strPtr("{}"),
 		},
 	}
 	diags := r.LoadUserTypes(userTypes)
@@ -499,7 +507,7 @@ func TestLoadUserScalarType_NumericDefault_NoE110(t *testing.T) {
 			Name:    "counter",
 			Kind:    "scalar",
 			Base:    "integer",
-			Default: "0",
+			Default: strPtr("0"),
 		},
 	}
 	diags := r.LoadUserTypes(userTypes)

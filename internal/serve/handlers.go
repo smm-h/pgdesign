@@ -467,7 +467,8 @@ func parseAndBuild(data []byte) (*model.Schema, []diagnostic.Diagnostic) {
 			ut.NotNull = rt.NotNull
 		}
 		if rt.Default != nil {
-			ut.Default = *rt.Default
+			v := *rt.Default
+			ut.Default = &v
 		}
 		if rt.DefaultExpr != nil {
 			ut.DefaultExpr = *rt.DefaultExpr

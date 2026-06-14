@@ -83,8 +83,8 @@ func Export(schema *model.Schema) ([]byte, error) {
 					return nil, fmt.Errorf("set %s.nullable: %w", colPath, err)
 				}
 			}
-			if c.Default != "" {
-				if err := doc.SetCreate(colPath+".default", c.Default); err != nil {
+			if c.Default != nil {
+				if err := doc.SetCreate(colPath+".default", *c.Default); err != nil {
 					return nil, fmt.Errorf("set %s.default: %w", colPath, err)
 				}
 			}

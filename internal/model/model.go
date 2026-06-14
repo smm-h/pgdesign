@@ -100,7 +100,7 @@ type Column struct {
 	Name             string `json:"name"`
 	PGType           string `json:"pg_type"`
 	NotNull          bool   `json:"not_null"`
-	Default          string `json:"default"`
+	Default          *string `json:"default,omitempty"`
 	DefaultExpr      string `json:"default_expr,omitempty"`
 	Generated        string `json:"generated,omitempty"`
 	Stored           bool   `json:"stored,omitempty"`
@@ -179,4 +179,10 @@ type MaintenanceConfig struct {
 	Premake            int    `json:"premake"`
 	Retention          string `json:"retention"`
 	RetentionKeepTable bool   `json:"retention_keep_table"`
+}
+
+// StrPtr returns a pointer to the given string. Used for constructing
+// struct literals with *string fields.
+func StrPtr(s string) *string {
+	return &s
 }

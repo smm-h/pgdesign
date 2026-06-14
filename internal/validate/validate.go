@@ -166,13 +166,13 @@ func checkColumnDefaultQuotes(schema *model.Schema, _ *Config) []diagnostic.Diag
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
 		for _, col := range t.Columns {
-			if len(col.Default) >= 2 && strings.HasPrefix(col.Default, "'") && strings.HasSuffix(col.Default, "'") {
+			if col.Default != nil && len(*col.Default) >= 2 && strings.HasPrefix(*col.Default, "'") && strings.HasSuffix(*col.Default, "'") {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
 					Code:       "E110",
 					Table:      t.Name,
 					Column:     col.Name,
-					Message:    fmt.Sprintf("default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", col.Default),
+					Message:    fmt.Sprintf("default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", *col.Default),
 					Suggestion: "Remove the surrounding single quotes from the default value",
 				})
 			}
@@ -714,7 +714,7 @@ func checkJSONCouldBeTable(schema *model.Schema, _ *Config) []diagnostic.Diagnos
 			if !strings.HasSuffix(col.Name, "s") {
 				continue
 			}
-			if col.Default == "'[]'::jsonb" || strings.Contains(col.DefaultExpr, "[]") {
+			if (col.Default != nil && *col.Default == "'[]'::jsonb") || strings.Contains(col.DefaultExpr, "[]") {
 				d := diagnostic.Diagnostic{
 					Severity:   diagnostic.Warning,
 					Code:       "W004",

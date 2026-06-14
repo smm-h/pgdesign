@@ -489,7 +489,7 @@ func TestW004_JSONCouldBeTable(t *testing.T) {
 			PK:      []string{"id"},
 			Columns: []model.Column{
 				{Name: "id", PGType: "uuid"},
-				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
 				{Name: "created_at", PGType: "timestamptz"},
 			},
 		}},
@@ -514,7 +514,7 @@ func TestW004_NonPlural_NoDiag(t *testing.T) {
 			PK:      []string{"id"},
 			Columns: []model.Column{
 				{Name: "id", PGType: "uuid"},
-				{Name: "metadata", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "metadata", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
 				{Name: "created_at", PGType: "timestamptz"},
 			},
 		}},
@@ -1024,7 +1024,7 @@ func TestSuppressW004_ColumnLevel(t *testing.T) {
 			PK:      []string{"id"},
 			Columns: []model.Column{
 				{Name: "id", PGType: "uuid"},
-				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
 				{Name: "created_at", PGType: "timestamptz"},
 			},
 		}},
@@ -1066,7 +1066,7 @@ func TestSuppressW004_TableLevel(t *testing.T) {
 			PK:      []string{"id"},
 			Columns: []model.Column{
 				{Name: "id", PGType: "uuid"},
-				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
 				{Name: "created_at", PGType: "timestamptz"},
 			},
 		}},
@@ -1107,7 +1107,7 @@ func TestSuppressW004_NoSuppression(t *testing.T) {
 			PK:      []string{"id"},
 			Columns: []model.Column{
 				{Name: "id", PGType: "uuid"},
-				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
 				{Name: "created_at", PGType: "timestamptz"},
 			},
 		}},
@@ -1153,7 +1153,7 @@ func TestW004_SuppressedWithJSONSchema(t *testing.T) {
 				Name: "users",
 				Columns: []model.Column{
 					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "tags", PGType: "jsonb", NotNull: true, Default: "'[]'::jsonb", JSONSchema: "tags_schema.json"},
+					{Name: "tags", PGType: "jsonb", NotNull: true, Default: model.StrPtr("'[]'::jsonb"), JSONSchema: "tags_schema.json"},
 				},
 				PK: []string{"id"},
 			},
@@ -1190,7 +1190,7 @@ func TestW004_NotSuppressedWithoutJSONSchema(t *testing.T) {
 				Name: "users",
 				Columns: []model.Column{
 					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "tags", PGType: "jsonb", NotNull: true, Default: "'[]'::jsonb"},
+					{Name: "tags", PGType: "jsonb", NotNull: true, Default: model.StrPtr("'[]'::jsonb")},
 				},
 				PK: []string{"id"},
 			},
@@ -1245,10 +1245,10 @@ func TestE110_ColumnDefaultEmbeddedQuotes(t *testing.T) {
 				PK:      []string{"id"},
 				Columns: []model.Column{
 					{Name: "id", PGType: "uuid"},
-					{Name: "status", PGType: "text", Default: "'pending'"},
-					{Name: "data", PGType: "jsonb", Default: "'{}'"},
-					{Name: "count", PGType: "integer", Default: "0"},
-					{Name: "name", PGType: "text", Default: "unknown"},
+					{Name: "status", PGType: "text", Default: model.StrPtr("'pending'")},
+					{Name: "data", PGType: "jsonb", Default: model.StrPtr("'{}'")},
+					{Name: "count", PGType: "integer", Default: model.StrPtr("0")},
+					{Name: "name", PGType: "text", Default: model.StrPtr("unknown")},
 				},
 			},
 		},
@@ -1283,8 +1283,8 @@ func TestSuppressionPipeline_Integration(t *testing.T) {
 			PK:      []string{"id"},
 			Columns: []model.Column{
 				{Name: "id", PGType: "uuid"},
-				{Name: "items", PGType: "jsonb", Default: "'[]'::jsonb"},
-				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb", JSONSchema: "tags_schema.json"},
+				{Name: "items", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
+				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb"), JSONSchema: "tags_schema.json"},
 				{Name: "created_at", PGType: "timestamptz"},
 			},
 		}},

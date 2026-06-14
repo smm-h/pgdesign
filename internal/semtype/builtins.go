@@ -36,7 +36,7 @@ func NewBuiltinRegistry() *Registry {
 			Kind:     KindScalar,
 			BaseType: "bigint",
 			NotNull:  true,
-			Default:  "0",
+			Default:  strPtr("0"),
 		},
 		{
 			Name:     "slug",
@@ -78,14 +78,14 @@ func NewBuiltinRegistry() *Registry {
 			Kind:     KindScalar,
 			BaseType: "bigint",
 			NotNull:  true,
-			Default:  "0",
+			Default:  strPtr("0"),
 		},
 		{
 			Name:     "flag",
 			Kind:     KindScalar,
 			BaseType: "boolean",
 			NotNull:  true,
-			Default:  "false",
+			Default:  strPtr("false"),
 		},
 		{
 			Name:     "auto_id",

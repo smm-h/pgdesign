@@ -410,14 +410,14 @@ func TestDefaultChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "status", PGType: "text", Default: "active"},
+				{Name: "status", PGType: "text", Default: model.StrPtr("active")},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "status", PGType: "text", Default: "inactive"},
+				{Name: "status", PGType: "text", Default: model.StrPtr("inactive")},
 			}},
 		},
 	}

@@ -38,7 +38,7 @@ type TypeDef struct {
 	Kind        Kind
 	BaseType    string   // PG type (e.g., "uuid", "text", "bigint")
 	NotNull     bool
-	Default     string   // literal default value
+	Default     *string  // literal default value
 	DefaultExpr string   // SQL expression default (e.g., "gen_random_uuid()")
 	Check       string   // check constraint expression (VALUE placeholder)
 	Unique      bool
@@ -86,7 +86,7 @@ func typeDefsEqual(a, b *TypeDef) bool {
 	if a.Kind != b.Kind || a.BaseType != b.BaseType || a.NotNull != b.NotNull {
 		return false
 	}
-	if a.Default != b.Default || a.DefaultExpr != b.DefaultExpr {
+	if !strPtrEqual(a.Default, b.Default) || a.DefaultExpr != b.DefaultExpr {
 		return false
 	}
 	if a.Check != b.Check || a.Unique != b.Unique {
@@ -112,6 +112,20 @@ func typeDefsEqual(a, b *TypeDef) bool {
 	return true
 }
 
+func strPtrEqual(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
 // Resolve looks up a type by name.
 // Returns an error if the type is not found.
 func (r *Registry) Resolve(name string) (*TypeDef, error) {
@@ -132,7 +146,7 @@ type UserTypeDef struct {
 	Base        string // PG base type (for scalars)
 	Values      []string // enum values
 	NotNull     *bool
-	Default     string
+	Default     *string
 	DefaultExpr string
 	Check       string
 	Unique      bool
@@ -240,17 +254,17 @@ func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
 	if ut.NotNull != nil {
 		td.NotNull = *ut.NotNull
 	}
-	if ut.Default != "" {
-		if strings.HasPrefix(ut.Default, "'") && strings.HasSuffix(ut.Default, "'") {
+	if ut.Default != nil {
+		if strings.HasPrefix(*ut.Default, "'") && strings.HasSuffix(*ut.Default, "'") {
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity: diagnostic.Error,
 				Code:     "E110",
-				Message:  fmt.Sprintf("type %q default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", ut.Name, ut.Default),
+				Message:  fmt.Sprintf("type %q default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", ut.Name, *ut.Default),
 			})
 		}
 		found := false
 		for _, v := range ut.Values {
-			if v == ut.Default {
+			if v == *ut.Default {
 				found = true
 				break
 			}
@@ -259,7 +273,7 @@ func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity: diagnostic.Error,
 				Code:     "E109",
-				Message:  fmt.Sprintf("enum type %q default %q is not a declared value (valid: %s)", ut.Name, ut.Default, strings.Join(ut.Values, ", ")),
+				Message:  fmt.Sprintf("enum type %q default %q is not a declared value (valid: %s)", ut.Name, *ut.Default, strings.Join(ut.Values, ", ")),
 			})
 			return diags
 		}
@@ -327,11 +341,11 @@ func (r *Registry) loadScalarType(ut UserTypeDef) diagnostic.Diagnostics {
 		return diags
 	}
 
-	if ut.Default != "" && strings.HasPrefix(ut.Default, "'") && strings.HasSuffix(ut.Default, "'") {
+	if ut.Default != nil && strings.HasPrefix(*ut.Default, "'") && strings.HasSuffix(*ut.Default, "'") {
 		diags = append(diags, diagnostic.Diagnostic{
 			Severity: diagnostic.Error,
 			Code:     "E110",
-			Message:  fmt.Sprintf("type %q default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", ut.Name, ut.Default),
+			Message:  fmt.Sprintf("type %q default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", ut.Name, *ut.Default),
 		})
 	}
 
@@ -380,7 +394,7 @@ func parseKind(s string) Kind {
 type ResolvedColumn struct {
 	PGType      string
 	NotNull     bool
-	Default     string
+	Default     *string
 	DefaultExpr string
 	Check       string
 	Generated   string
@@ -416,14 +430,15 @@ func (r *Registry) ResolveColumn(typeName string, nullable *bool, defaultOverrid
 
 	// Column default overrides type default
 	if defaultOverride != nil {
-		rc.Default = *defaultOverride
+		v := *defaultOverride
+		rc.Default = &v
 		rc.DefaultExpr = "" // literal default takes precedence
 	}
 
 	// Column default_expr overrides type default_expr
 	if defaultExprOverride != nil {
 		rc.DefaultExpr = *defaultExprOverride
-		rc.Default = "" // expression default takes precedence
+		rc.Default = nil // expression default takes precedence
 	}
 
 	// Column array overrides type array

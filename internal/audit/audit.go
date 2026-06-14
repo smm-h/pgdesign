@@ -61,7 +61,7 @@ func check1NF(tbl *model.Table) []diagnostic.Diagnostic {
 			strings.Contains(name, "items") ||
 			strings.Contains(name, "tags") ||
 			strings.Contains(name, "values")
-		hasArrayDefault := col.Default == "'[]'::jsonb"
+		hasArrayDefault := col.Default != nil && *col.Default == "'[]'::jsonb"
 
 		if isRepeating || hasArrayDefault {
 			diags = append(diags, diagnostic.Diagnostic{

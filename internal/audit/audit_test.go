@@ -63,7 +63,7 @@ func TestAudit_1NF_JsonbRepeatingGroup(t *testing.T) {
 			Name: "posts",
 			Columns: []model.Column{
 				{Name: "id", PGType: "bigint"},
-				{Name: "tags", PGType: "jsonb", Default: "'[]'::jsonb"},
+				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
 			},
 			PK: []string{"id"},
 			Dependencies: []fd.FuncDep{

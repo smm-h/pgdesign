@@ -83,7 +83,7 @@ func TestGenerateMigration_AddColumn(t *testing.T) {
 				Schema: "game",
 				Columns: []model.Column{
 					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -94,7 +94,7 @@ func TestGenerateMigration_AddColumn(t *testing.T) {
 			{
 				Name: "game.players",
 				ColumnsAdded: []model.Column{
-					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -137,7 +137,7 @@ func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
 				Schema: "game",
 				Columns: []model.Column{
 					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -148,7 +148,7 @@ func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
 			{
 				Name: "game.players",
 				ColumnsAdded: []model.Column{
-					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -176,7 +176,7 @@ func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
 				Schema: "game",
 				Columns: []model.Column{
 					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -187,7 +187,7 @@ func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
 			{
 				Name: "game.players",
 				ColumnsAdded: []model.Column{
-					{Name: "level", PGType: "integer", NotNull: true, Default: "1"},
+					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -1313,7 +1313,7 @@ func TestGenerateMigration_ExpandContract_SetNotNull_LargeTable(t *testing.T) {
 				Schema: "game",
 				Columns: []model.Column{
 					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true, Default: "'unknown'"},
+					{Name: "name", PGType: "text", NotNull: true, Default: model.StrPtr("'unknown'")},
 				},
 			},
 		},
@@ -1374,7 +1374,7 @@ func TestGenerateMigration_ExpandContract_SetNotNull_SmallTable(t *testing.T) {
 				Schema: "game",
 				Columns: []model.Column{
 					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true, Default: "'unknown'"},
+					{Name: "name", PGType: "text", NotNull: true, Default: model.StrPtr("'unknown'")},
 				},
 			},
 		},

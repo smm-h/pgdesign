@@ -475,11 +475,14 @@ func normalizeType(t string) string {
 
 // normalizeDefault returns a normalized default value for comparison.
 // DefaultExpr takes precedence over Default (literal).
-func normalizeDefault(literal, expr string) string {
+func normalizeDefault(literal *string, expr string) string {
 	if expr != "" {
 		return strings.ToLower(strings.TrimSpace(expr))
 	}
-	return strings.ToLower(strings.TrimSpace(literal))
+	if literal != nil {
+		return strings.ToLower(strings.TrimSpace(*literal))
+	}
+	return ""
 }
 
 // diffFKs matches foreign keys by name.
