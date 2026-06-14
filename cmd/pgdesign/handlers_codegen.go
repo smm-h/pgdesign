@@ -28,7 +28,7 @@ func handleCodegen(kwargs map[string]interface{}) int {
 		case "go":
 			gen = &codegen.GoValidatorGenerator{}
 		default:
-			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python or zig, got %s\n", lang)
+			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python, zig, or go, got %s\n", lang)
 			return 1
 		}
 	case "constants":
