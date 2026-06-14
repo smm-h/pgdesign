@@ -1,0 +1,8 @@
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Bug fixes for array defaults, empty-string defaults, and codegen column names."
+# Optional context explaining why these changes were made
+context = ""
+include = ["go", "npm", "pypi"]
+exclude = []
