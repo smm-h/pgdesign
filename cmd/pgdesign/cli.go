@@ -86,11 +86,13 @@ func main() {
 		),
 	)
 
-	app.Command("diff", "Diff schema file(s) or directory against a live database", handleDiff,
+	app.Command("diff", "Diff schema file(s) or directory against a target", handleDiff,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("json", "Output diff as JSON"),
 			strictcli.StringFlag("live", "PostgreSQL connection URL for live comparison", strictcli.Default(nil)),
+			strictcli.StringFlag("against", "TOML schema file or directory to compare against", strictcli.Default(nil)),
+			strictcli.StringFlag("base", "Git ref to compare against (e.g., main, HEAD~1)", strictcli.Default(nil)),
 		),
 	)
 

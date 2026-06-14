@@ -1,13 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
+	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/introspect"
+	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/parse"
+	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 func handleDiff(kwargs map[string]interface{}) int {
@@ -17,17 +25,71 @@ func handleDiff(kwargs map[string]interface{}) int {
 		return exitCode
 	}
 
-	// Load config for default schema names.
-	cfg := loadProjectConfig(paths[0])
+	// Determine which mode we're in. Exactly one of --live, --against, --base.
+	liveURL, _ := kwargs["live"].(string)
+	againstPath, _ := kwargs["against"].(string)
+	baseRef, _ := kwargs["base"].(string)
 
-	dbURL, _ := kwargs["live"].(string)
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: specify --live <url> for DB comparison or --against <path> for TOML comparison")
+	modeCount := 0
+	if liveURL != "" {
+		modeCount++
+	}
+	if againstPath != "" {
+		modeCount++
+	}
+	if baseRef != "" {
+		modeCount++
+	}
+
+	if modeCount == 0 {
+		fmt.Fprintln(os.Stderr, "error: specify one of --live <url>, --against <path>, or --base <ref>")
+		return 1
+	}
+	if modeCount > 1 {
+		fmt.Fprintln(os.Stderr, "error: --live, --against, and --base are mutually exclusive")
 		return 1
 	}
 
-	// Introspect the live database. Use schema name from parsed schema first,
-	// then fall back to config-derived schema names, then "public".
+	var actual *model.Schema
+
+	switch {
+	case liveURL != "":
+		var code int
+		actual, code = diffLive(paths, schema, liveURL)
+		if code != 0 {
+			return code
+		}
+
+	case againstPath != "":
+		var code int
+		actual, code = diffAgainst(againstPath)
+		if code != 0 {
+			return code
+		}
+
+	case baseRef != "":
+		var code int
+		actual, code = diffBase(paths, baseRef)
+		if code != 0 {
+			return code
+		}
+	}
+
+	d := diff.Diff(schema, actual)
+
+	if kwargs["json"].(bool) {
+		fmt.Println(diff.FormatJSON(d))
+		return 0
+	}
+
+	fmt.Print(diff.FormatTerminal(d))
+	return 0
+}
+
+// diffLive introspects a live database and returns the "actual" schema.
+func diffLive(paths []string, schema *model.Schema, dbURL string) (*model.Schema, int) {
+	cfg := loadProjectConfig(paths[0])
+
 	schemaNames := []string{"public"}
 	if schema.Name != "" && schema.Name != "public" {
 		schemaNames = []string{schema.Name}
@@ -39,25 +101,167 @@ func handleDiff(kwargs map[string]interface{}) int {
 	actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
+		return nil, 1
 	}
 	if len(diags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
 	}
 	if diagnostic.Diagnostics(diags).HasErrors() {
-		return 1
+		return nil, 1
 	}
 
-	d := diff.Diff(schema, actual)
+	return actual, 0
+}
 
-	if kwargs["json"].(bool) {
-		fmt.Println(diff.FormatJSON(d))
-		return 0
+// diffAgainst parses a TOML schema from the --against path and returns the "actual" schema.
+func diffAgainst(againstPath string) (*model.Schema, int) {
+	return parseAndBuild([]string{againstPath})
+}
+
+// diffBase extracts schema files from a git ref and returns the parsed/built "actual" schema.
+func diffBase(paths []string, ref string) (*model.Schema, int) {
+	if _, err := exec.LookPath("git"); err != nil {
+		fmt.Fprintln(os.Stderr, "error: git is not available")
+		return nil, 1
 	}
 
-	fmt.Print(diff.FormatTerminal(d))
-	if d.IsEmpty() {
-		return 0
+	repoRoot, err := gitRepoRoot()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return nil, 1
 	}
-	return 0
+
+	// Resolve the paths to determine what schema files we need from the ref.
+	resolvedPaths, err := resolveSchemaPaths(paths)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return nil, 1
+	}
+
+	// Try to get pgdesign.toml from the ref to discover schema files.
+	schemaDir := filepath.Dir(resolvedPaths[0])
+	configRelPath, err := filepath.Rel(repoRoot, filepath.Join(schemaDir, "pgdesign.toml"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: cannot compute relative path: %v\n", err)
+		return nil, 1
+	}
+
+	configBytes, configErr := gitShow(ref, configRelPath)
+
+	var filesToExtract []string
+
+	if configErr == nil {
+		// pgdesign.toml exists at this ref -- parse it to find schema files.
+		extractPaths, err := parseSchemasFromConfigBytes(configBytes, schemaDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: parsing pgdesign.toml from %s: %v\n", ref, err)
+			return nil, 1
+		}
+		filesToExtract = extractPaths
+	} else {
+		// No pgdesign.toml at this ref -- use the same file paths as the working tree.
+		filesToExtract = resolvedPaths
+	}
+
+	// Extract and parse each schema file from the git ref.
+	var raws []*parse.RawSchema
+	var allDiags diagnostic.Diagnostics
+
+	for _, filePath := range filesToExtract {
+		relPath, err := filepath.Rel(repoRoot, filePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: cannot compute relative path for %s: %v\n", filePath, err)
+			return nil, 1
+		}
+
+		data, err := gitShow(ref, relPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: cannot extract %s from %s: %v\n", relPath, ref, err)
+			return nil, 1
+		}
+
+		raw, diags := parse.Bytes(data)
+		allDiags = append(allDiags, diags...)
+		if raw != nil {
+			raws = append(raws, raw)
+		}
+	}
+
+	if len(raws) == 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(allDiags, true))
+		return nil, 1
+	}
+
+	parseWarnings := allDiags.Warnings()
+	if len(parseWarnings) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(parseWarnings, true))
+	}
+
+	reg := semtype.NewBuiltinRegistry()
+	for _, raw := range raws {
+		userTypes := collectUserTypes(raw)
+		if len(userTypes) > 0 {
+			loadDiags := reg.LoadUserTypes(userTypes)
+			if loadDiags.HasErrors() {
+				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(loadDiags, true))
+				return nil, 1
+			}
+		}
+	}
+
+	var schema *model.Schema
+	var buildDiags diagnostic.Diagnostics
+
+	if len(raws) == 1 {
+		schema, buildDiags = model.Build(raws[0], reg)
+	} else {
+		schema, buildDiags = model.BuildMulti(raws, reg)
+	}
+
+	if buildDiags.HasErrors() {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(buildDiags, true))
+		return nil, 1
+	}
+
+	warnings := buildDiags.Warnings()
+	if len(warnings) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(warnings, true))
+	}
+
+	return schema, 0
+}
+
+// gitRepoRoot returns the root directory of the current git repository.
+func gitRepoRoot() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("not in a git repository: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// gitShow extracts a file from a git ref using "git show ref:path".
+func gitShow(ref, path string) ([]byte, error) {
+	cmd := exec.Command("git", "show", ref+":"+path)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%s (%s)", strings.TrimSpace(stderr.String()), err)
+	}
+	return stdout.Bytes(), nil
+}
+
+// parseSchemasFromConfigBytes extracts the project.schemas list from pgdesign.toml
+// bytes and resolves the paths relative to schemaDir.
+func parseSchemasFromConfigBytes(data []byte, schemaDir string) ([]string, error) {
+	cfg, err := config.LoadBytes(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(cfg.Project.Schemas) == 0 {
+		return nil, fmt.Errorf("pgdesign.toml at this ref has no project.schemas entries")
+	}
+	return cfg.SchemaFiles(schemaDir), nil
 }
