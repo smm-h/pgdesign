@@ -1,6 +1,6 @@
 {
   "name": "pgdesign",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "PostgreSQL schema compiler with strict enforcement, NF auditing, and declarative migrations",
   "license": "MIT",
   "repository": {

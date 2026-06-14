@@ -2,6 +2,34 @@
 
 # Changelog
 
+## 0.9.0
+
+CLI overhaul with build, check, stats, seed, codegen for 6 languages, TOML diff, doc format, migration squash and test.
+
+### Breaking
+
+- **Breaking.** Removed `extension` command group. Extension discovery moved to `pgdesign introspect --extensions`. `--db` and `--strict-nf` moved from global to per-command flags. `diff --db` renamed to `diff --live`.
+
+### Features
+
+- **New feature.** `pgdesign check` command using strictcli check system. Tags: `validation` (schema rules), `nf` (normal form audit), `coverage` (constraint completeness). Replaces `validate` and `audit` for config-driven analysis.
+- **New feature.** `pgdesign build` command for config-driven batch generation. Reads `[output]` section from pgdesign.toml, generates SQL/D2/JSON/doc/codegen outputs to declared paths. Auto-commits. Integrates with rlsbl release.
+- **New feature.** Coverage analysis via `pgdesign check --tag coverage`. Detects: tables without check constraints (C100), FK columns without indexes (C101), unused enum types (C102), orphan tables (C103), missing FK join indexes (C104).
+- **New feature.** Go code generation for constants and RLS policy validators.
+- **New feature.** TypeScript, Java, and Kotlin code generation for constants and RLS policy validators.
+- **New feature.** `pgdesign diff --against <path>` for comparing two TOML schemas. `pgdesign diff --base <git-ref>` for comparing against a git branch or commit.
+- **New feature.** `pgdesign generate --format doc` produces a Markdown data dictionary with table descriptions, column details, and relationships.
+- **New feature.** `pgdesign stats --db <url>` reports unused indexes, vacuum candidates, cache hit ratio, and duplicate indexes.
+- **New feature.** `pgdesign migrate squash --from <ver> --to <ver>` collapses a range of migrations into one, canceling inverse operations.
+- **New feature.** `pgdesign migrate test --db <staging-url>` applies migrations against a staging database in a transaction, validates, then rolls back.
+- **New feature.** `pgdesign seed` generates type-aware test data respecting FK ordering, constraints, and semantic types.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.8.0
 
 Pool configuration, OR-compound and NOT EXISTS codegen support, multi-table and multi-flag fixes.
@@ -16,12 +44,6 @@ Pool configuration, OR-compound and NOT EXISTS codegen support, multi-table and 
 - **Fix.** Codegen validators now correctly handle OR-compound RLS policies (e.g., ownership OR privacy lookup).
 - **Fix.** Codegen validators now correctly reference each table when a policy has multiple EXISTS subqueries against different tables.
 - **Fix.** Codegen validators now check all flag columns when an EXISTS subquery has multiple flag conditions.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.7.2
 
