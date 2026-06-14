@@ -157,6 +157,5 @@ func generateDoc(schema *model.Schema) string {
 		}
 	}
 
-	b.WriteString("")
 	return b.String()
 }
