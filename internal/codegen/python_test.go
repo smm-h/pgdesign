@@ -705,3 +705,55 @@ func TestPythonGenerator_NotExistsPattern(t *testing.T) {
 		t.Error("missing MSG004 error code")
 	}
 }
+
+func TestPythonGenerator_MultipleFlagColumns(t *testing.T) {
+	// RED test: EXISTS subquery with two flag conditions should check both flags.
+	// Currently, analyzeExistsWhere uses a single `var flagCol string` that gets
+	// overwritten by the loop, so only the last flag column is retained.
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "messages",
+				Schema: "app",
+				Policies: []model.Policy{
+					{
+						Name:         "message_multi_flag",
+						Operation:    "INSERT",
+						WithCheck:    "EXISTS (SELECT 1 FROM app.user_settings WHERE user_id = author_id AND chat_enabled = true AND notifications_enabled = true)",
+						ErrorCode:    "MSG005",
+						ErrorMessage: "both chat and notifications must be enabled",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &PythonGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// Function must exist.
+	if !strings.Contains(result, "async def check_message_multi_flag(conn, author_id: str) -> PolicyResult:") {
+		t.Error("missing function signature for check_message_multi_flag")
+	}
+
+	// Must SELECT both flags in the query.
+	if !strings.Contains(result, "SELECT chat_enabled, notifications_enabled FROM app.user_settings WHERE user_id = $1") {
+		t.Error("missing multi-flag query: expected 'SELECT chat_enabled, notifications_enabled FROM app.user_settings WHERE user_id = $1'")
+	}
+
+	// Must check BOTH flags in the condition (normal EXISTS logic).
+	if !strings.Contains(result, `if not row or not row["chat_enabled"] or not row["notifications_enabled"]:`) {
+		t.Error("missing multi-flag condition: expected both chat_enabled and notifications_enabled to be checked")
+	}
+
+	// Error code must be present.
+	if !strings.Contains(result, `code="MSG005"`) {
+		t.Error("missing MSG005 error code")
+	}
+}
