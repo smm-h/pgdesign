@@ -178,6 +178,45 @@ Show which migrations have been applied:
 pgdesign migrate status --db "postgres://user:pass@localhost/mydb"
 ```
 
+### migrate squash
+
+Squash a range of migrations into a single consolidated migration:
+
+```
+pgdesign migrate squash --from 0.1.0 --to 0.5.0
+```
+
+| Flag | Description |
+|------|-------------|
+| `--from` | Start version (inclusive) |
+| `--to` | End version (inclusive) |
+| `--dir` | Migrations directory (default: `migrations/`) |
+
+The squash command reads all migrations in the specified range, merges their DDL and DML operations into a single migration file, eliminates redundant operations (e.g., a column added then dropped), and writes the result. The squashed migration replaces the individual files.
+
+Squashing is useful for reducing migration count in long-lived projects. Only squash migrations that have already been applied to all environments -- squashing unapplied migrations changes their checksums.
+
+### migrate test
+
+Test migrations against a staging database to verify they apply and roll back cleanly:
+
+```
+pgdesign migrate test --db "postgres://user:pass@localhost/staging"
+```
+
+| Flag | Description |
+|------|-------------|
+| `--db` | Staging database connection URL |
+| `--dir` | Migrations directory (default: `migrations/`) |
+| `--timeout` | Timeout in seconds (default: 60) |
+
+The test command applies all pending migrations to the staging database, then rolls them back, verifying that:
+1. All migrations apply without errors
+2. All reversible migrations roll back cleanly
+3. The database returns to its original state after rollback
+
+Use a dedicated staging database for migration testing -- the test modifies and restores the schema. Irreversible operations (marked `irreversible = true` in the migration) are reported but do not fail the test.
+
 ## Safety linting and risk classification
 
 Every DDL operation is classified by risk level:
