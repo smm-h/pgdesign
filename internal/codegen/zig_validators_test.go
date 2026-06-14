@@ -423,3 +423,69 @@ func TestZigValidatorGenerator_UnparsableExpression(t *testing.T) {
 		t.Errorf("expected Warning severity, got %s", diags[0].Severity)
 	}
 }
+
+func TestZigValidatorGenerator_NotExistsPattern(t *testing.T) {
+	// RED test: NOT EXISTS should invert the privacy check logic.
+	// Currently, detectAllExistsLookups finds the ExistsExpr inside the
+	// UnaryOp{Op:"NOT"} wrapper but does not propagate the negation.
+	// The generator produces normal (non-inverted) logic instead of inverted logic.
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "messages",
+				Schema: "app",
+				Policies: []model.Policy{
+					{
+						Name:         "message_not_blocked",
+						Operation:    "SELECT",
+						Using:        "NOT EXISTS (SELECT 1 FROM app.blocked_users WHERE user_id = author_id AND is_blocked = true)",
+						ErrorCode:    "MSG004",
+						ErrorMessage: "message blocked",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &ZigValidatorGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// Function must exist.
+	if !strings.Contains(result, "pub fn check_message_not_blocked(conn: *pg.Conn, author_id: []const u8) !PolicyResult {") {
+		t.Error("missing function signature for check_message_not_blocked")
+	}
+
+	// Must query the blocked_users table.
+	if !strings.Contains(result, "app.blocked_users") {
+		t.Error("missing blocked_users table in query")
+	}
+	if !strings.Contains(result, "WHERE user_id = $1") {
+		t.Error("missing WHERE user_id = $1 in query")
+	}
+
+	// Must reference the is_blocked flag.
+	if !strings.Contains(result, "is_blocked") {
+		t.Error("missing is_blocked flag reference")
+	}
+
+	// NOT EXISTS inverts the logic: return FAILURE when the row exists and flag is true.
+	// Normal EXISTS: "if (!row.get(bool, "is_blocked"))" -> failure
+	// NOT EXISTS:    "if (row.get(bool, "is_blocked"))"  -> failure (no negation)
+	if !strings.Contains(result, `if (row.get(bool, "is_blocked"))`) {
+		t.Error("missing inverted logic: expected 'if (row.get(bool, \"is_blocked\"))' for NOT EXISTS pattern")
+	}
+	if strings.Contains(result, `if (!row.get(bool, "is_blocked"))`) {
+		t.Error("generated normal EXISTS logic instead of inverted NOT EXISTS logic")
+	}
+
+	// Error code must be present.
+	if !strings.Contains(result, `.code = "MSG004"`) {
+		t.Error("missing MSG004 error code")
+	}
+}
