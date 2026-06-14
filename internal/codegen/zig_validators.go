@@ -61,10 +61,12 @@ func (g *ZigValidatorGenerator) Generate(schema *model.Schema) ([]byte, []diagno
 		if len(existsLookups) >= 2 {
 			dual := &dualPrivacyCheck{
 				first: privacyCheck{
+					joinColumn:   existsLookups[0].joinColumn,
 					lookupColumn: existsLookups[0].lookupColumn,
 					flagColumn:   existsLookups[0].flagColumn,
 				},
 				second: privacyCheck{
+					joinColumn:   existsLookups[1].joinColumn,
 					lookupColumn: existsLookups[1].lookupColumn,
 					flagColumn:   existsLookups[1].flagColumn,
 				},
@@ -72,6 +74,7 @@ func (g *ZigValidatorGenerator) Generate(schema *model.Schema) ([]byte, []diagno
 			zigDualPrivacyValidator(&buf, pol, dual, existsLookups[0].tableParts)
 		} else if len(existsLookups) == 1 {
 			check := &privacyCheck{
+				joinColumn:   existsLookups[0].joinColumn,
 				lookupColumn: existsLookups[0].lookupColumn,
 				flagColumn:   existsLookups[0].flagColumn,
 			}
@@ -124,12 +127,12 @@ func zigPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *privacyChe
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    const row = conn.queryRow(\n"+
-			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        .{%s},\n"+
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		check.flagColumn, tableFQN, paramName, pol.ErrorCode, pol.ErrorMessage,
+		check.flagColumn, tableFQN, check.joinColumn, paramName, pol.ErrorCode, pol.ErrorMessage,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if (!row.get(bool, %q)) {\n"+
@@ -154,12 +157,12 @@ func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPri
 	// First player check.
 	buf.WriteString(fmt.Sprintf(
 		"    const row1 = conn.queryRow(\n"+
-			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        .{%s},\n"+
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		dual.first.flagColumn, tableFQN, dual.first.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
+		dual.first.flagColumn, tableFQN, dual.first.joinColumn, dual.first.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if (!row1.get(bool, %q)) {\n"+
@@ -171,12 +174,12 @@ func zigDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *dualPri
 	// Second player check.
 	buf.WriteString(fmt.Sprintf(
 		"    const row2 = conn.queryRow(\n"+
-			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        .{%s},\n"+
 			"    ) catch {\n"+
 			"        return .{ .ok = false, .code = %q, .message = %q };\n"+
 			"    };\n",
-		dual.second.flagColumn, tableFQN, dual.second.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
+		dual.second.flagColumn, tableFQN, dual.second.joinColumn, dual.second.lookupColumn, pol.ErrorCode, pol.ErrorMessage,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if (!row2.get(bool, %q)) {\n"+

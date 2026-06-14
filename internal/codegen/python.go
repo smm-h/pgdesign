@@ -62,10 +62,12 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 			// Dual/multi exists-lookup pattern
 			dual := &dualPrivacyCheck{
 				first: privacyCheck{
+					joinColumn:   existsLookups[0].joinColumn,
 					lookupColumn: existsLookups[0].lookupColumn,
 					flagColumn:   existsLookups[0].flagColumn,
 				},
 				second: privacyCheck{
+					joinColumn:   existsLookups[1].joinColumn,
 					lookupColumn: existsLookups[1].lookupColumn,
 					flagColumn:   existsLookups[1].flagColumn,
 				},
@@ -75,6 +77,7 @@ func (g *PythonGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 		} else if len(existsLookups) == 1 {
 			// Single exists-lookup pattern
 			check := &privacyCheck{
+				joinColumn:   existsLookups[0].joinColumn,
 				lookupColumn: existsLookups[0].lookupColumn,
 				flagColumn:   existsLookups[0].flagColumn,
 			}
@@ -114,10 +117,10 @@ func generatePrivacyValidator(buf *bytes.Buffer, pol PolicyContext, check *priva
 
 	buf.WriteString(fmt.Sprintf(
 		"    row = await conn.fetchrow(\n"+
-			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        %s,\n"+
 			"    )\n",
-		check.flagColumn, tableFQN, paramName,
+		check.flagColumn, tableFQN, check.joinColumn, paramName,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if not row or not row[\"%s\"]:\n"+
@@ -159,10 +162,10 @@ func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *du
 	// First player check.
 	buf.WriteString(fmt.Sprintf(
 		"    row = await conn.fetchrow(\n"+
-			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        %s,\n"+
 			"    )\n",
-		dual.first.flagColumn, tableFQN, dual.first.lookupColumn,
+		dual.first.flagColumn, tableFQN, dual.first.joinColumn, dual.first.lookupColumn,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if not row or not row[\"%s\"]:\n"+
@@ -173,10 +176,10 @@ func generateDualPrivacyValidator(buf *bytes.Buffer, pol PolicyContext, dual *du
 	// Second player check.
 	buf.WriteString(fmt.Sprintf(
 		"    row = await conn.fetchrow(\n"+
-			"        \"SELECT %s FROM %s WHERE player_id = $1\",\n"+
+			"        \"SELECT %s FROM %s WHERE %s = $1\",\n"+
 			"        %s,\n"+
 			"    )\n",
-		dual.second.flagColumn, tableFQN, dual.second.lookupColumn,
+		dual.second.flagColumn, tableFQN, dual.second.joinColumn, dual.second.lookupColumn,
 	))
 	buf.WriteString(fmt.Sprintf(
 		"    if not row or not row[\"%s\"]:\n"+

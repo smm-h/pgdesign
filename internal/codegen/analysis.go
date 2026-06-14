@@ -8,6 +8,9 @@ import (
 
 // privacyCheck describes a parsed reference to player_privacy_settings.
 type privacyCheck struct {
+	// joinColumn is the column in the lookup table used for the join
+	// (e.g. "player_id", "user_id").
+	joinColumn string
 	// lookupColumn is the column in the policy table whose value is used to
 	// look up the privacy row (e.g. "sender_id", "followed_id", "player_id").
 	lookupColumn string
