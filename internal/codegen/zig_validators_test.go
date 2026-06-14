@@ -205,6 +205,62 @@ func TestZigValidatorGenerator_DualPrivacyPattern(t *testing.T) {
 	}
 }
 
+func TestZigValidatorGenerator_DualPrivacyDifferentTables(t *testing.T) {
+	// RED test: dual EXISTS referencing DIFFERENT tables exposes the bug where
+	// the second query reuses the first lookup's tableParts instead of its own.
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "messages",
+				Schema: "app",
+				Policies: []model.Policy{
+					{
+						Name:         "message_dual_privacy",
+						Operation:    "SELECT",
+						Using:        "EXISTS (SELECT 1 FROM app.user_settings WHERE user_id = author_id AND notifications_enabled = true) AND EXISTS (SELECT 1 FROM app.channel_settings WHERE channel_id = messages.channel_id AND is_public = true)",
+						ErrorCode:    "MSG003",
+						ErrorMessage: "message access requires both user and channel settings",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &ZigValidatorGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// First lookup's table must be present.
+	if !strings.Contains(result, "user_settings") {
+		t.Error("expected 'user_settings' (first lookup table) in generated output")
+	}
+	// Second lookup's table must be present (bug: reuses first table).
+	if !strings.Contains(result, "channel_settings") {
+		t.Error("expected 'channel_settings' (second lookup table) in generated output")
+	}
+	// First lookup's join column.
+	if !strings.Contains(result, "WHERE user_id = $1") {
+		t.Error("expected 'WHERE user_id = $1' for first lookup")
+	}
+	// Second lookup's join column.
+	if !strings.Contains(result, "WHERE channel_id = $1") {
+		t.Error("expected 'WHERE channel_id = $1' for second lookup")
+	}
+	// Should query twice.
+	if strings.Count(result, "queryRow") != 2 {
+		t.Errorf("expected 2 queryRow calls, got %d", strings.Count(result, "queryRow"))
+	}
+	// Error code must be present.
+	if !strings.Contains(result, `.code = "MSG003"`) {
+		t.Error("missing MSG003 error code")
+	}
+}
+
 func TestZigValidatorGenerator_NonGamehomeNaming(t *testing.T) {
 	// RED test: uses non-gamehome naming to expose the hardcoded "player_id" bug.
 	// The generators should use the joinColumn from the AST ("user_id"), not
