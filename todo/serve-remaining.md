@@ -1,16 +1,18 @@
 # Remaining HTTP API server items
 
-Split from serve-gaps.md after implemented items were completed.
+Split from the previous serve-remaining.md after deferring D2 color coding.
 
-## Missing features
+## SVG caching
 
-- D2 diagram color coding by schema health (green/yellow/red)
-- SVG caching with invalidation on schema change (currently regenerated every request)
-- Connection pool size configuration (relies on pgx defaults)
+SVG caching with invalidation on schema change (currently regenerated every request). Ships with web UI phase.
+
+## Connection pool configuration
+
+Connection pool size configuration (relies on pgx defaults). Implemented in v0.7.x; move to .done/ at release.
 
 ## Web UI
 
-Architecture and technology decisions deferred. No embed directives, no web/ directory.
+Architecture and technology decisions deferred. No embed directives, no web/ directory. Primary active item.
 
 ## Effort
 
