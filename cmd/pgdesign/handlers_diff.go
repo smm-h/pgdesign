@@ -138,6 +138,16 @@ func diffBase(paths []string, ref string) (*model.Schema, int) {
 		return nil, 1
 	}
 
+	// Make all resolved paths absolute so filepath.Rel against repoRoot works.
+	for i, p := range resolvedPaths {
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: cannot resolve absolute path for %s: %v\n", p, err)
+			return nil, 1
+		}
+		resolvedPaths[i] = abs
+	}
+
 	// Try to get pgdesign.toml from the ref to discover schema files.
 	schemaDir := filepath.Dir(resolvedPaths[0])
 	configRelPath, err := filepath.Rel(repoRoot, filepath.Join(schemaDir, "pgdesign.toml"))
