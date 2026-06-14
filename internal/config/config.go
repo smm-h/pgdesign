@@ -31,9 +31,10 @@ type ProjectConfig struct {
 
 // DatabaseConfig holds [database] section values.
 type DatabaseConfig struct {
-	PGVersion    int   `toml:"pg_version"`
-	PoolMaxConns int32 `toml:"pool_max_conns"`
-	PoolMinConns int32 `toml:"pool_min_conns"`
+	URL          string `toml:"url"`
+	PGVersion    int    `toml:"pg_version"`
+	PoolMaxConns int32  `toml:"pool_max_conns"`
+	PoolMinConns int32  `toml:"pool_min_conns"`
 }
 
 // FormatConfig holds [format] section values.
