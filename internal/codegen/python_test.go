@@ -380,6 +380,56 @@ func TestPythonGenerator_DualPrivacyPattern(t *testing.T) {
 	}
 }
 
+func TestPythonGenerator_NonGamehomeNaming(t *testing.T) {
+	// RED test: uses non-gamehome naming to expose the hardcoded "player_id" bug.
+	// The generators should use the joinColumn from the AST ("user_id"), not
+	// a hardcoded "player_id".
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "messages",
+				Schema: "app",
+				Policies: []model.Policy{
+					{
+						Name:         "message_privacy",
+						Operation:    "SELECT",
+						Using:        "author_id::text = current_setting('app.user_id') AND EXISTS (SELECT 1 FROM app.user_settings WHERE user_id = messages.author_id AND notifications_enabled = true)",
+						ErrorCode:    "MSG001",
+						ErrorMessage: "message access denied",
+					},
+				},
+			},
+		},
+	}
+
+	gen := &PythonGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// The generated query must reference the actual lookup table, not a
+	// hardcoded gamehome table.
+	if !strings.Contains(result, "user_settings") {
+		t.Error("expected 'user_settings' in generated output, got hardcoded table name instead")
+	}
+	if strings.Contains(result, "player_privacy_settings") {
+		t.Error("generated output contains hardcoded 'player_privacy_settings' instead of 'user_settings'")
+	}
+
+	// The WHERE clause must use the joinColumn from the AST ("user_id"), not
+	// a hardcoded "player_id".
+	if !strings.Contains(result, "WHERE user_id = $1") {
+		t.Error("expected 'WHERE user_id = $1' in generated query, got hardcoded 'WHERE player_id = $1' instead")
+	}
+	if strings.Contains(result, "WHERE player_id = $1") {
+		t.Error("generated query contains hardcoded 'WHERE player_id = $1' instead of 'WHERE user_id = $1'")
+	}
+}
+
 func TestPythonGenerator_UnparsableExpression(t *testing.T) {
 	schema := &model.Schema{
 		Name: "game",
