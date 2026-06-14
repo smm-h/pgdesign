@@ -277,6 +277,8 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model
 		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment); err != nil {
 			return nil, err
 		}
+		// All defaults are stored in DefaultExpr via pg_get_expr, not in Default.
+		// Default is only set from TOML schema definitions, not introspection.
 		if defaultExpr != nil {
 			c.DefaultExpr = *defaultExpr
 		}
