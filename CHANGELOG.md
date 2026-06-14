@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 0.8.0
+
+Pool configuration, OR-compound and NOT EXISTS codegen support, multi-table and multi-flag fixes.
+
+### Features
+
+- **New feature.** Connection pool configuration via `pool_max_conns` and `pool_min_conns` in pgdesign.toml `[database]` section.
+- **New feature.** Codegen validators now support NOT EXISTS patterns with inverted logic.
+
+### Fixes
+
+- **Fix.** Codegen validators now correctly handle OR-compound RLS policies (e.g., ownership OR privacy lookup).
+- **Fix.** Codegen validators now correctly reference each table when a policy has multiple EXISTS subqueries against different tables.
+- **Fix.** Codegen validators now check all flag columns when an EXISTS subquery has multiple flag conditions.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.7.2
 
 Bug fixes for array defaults, empty-string defaults, and codegen column names.
@@ -11,12 +32,6 @@ Bug fixes for array defaults, empty-string defaults, and codegen column names.
 - **Fix.** Array columns with numeric base types (e.g., `integer[]`) now correctly produce quoted defaults (`DEFAULT '{}'`) instead of bare `DEFAULT {}`.
 - **Fix.** Empty-string defaults (`default = ""`) now correctly produce `DEFAULT ''` in DDL instead of being silently dropped.
 - **Fix.** Codegen validators now use the correct column name from RLS policy expressions instead of hardcoding `player_id`.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.7.1
 

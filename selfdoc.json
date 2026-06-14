@@ -1,5 +1,5 @@
 {
-  "version": "0.7.2",
+  "version": "0.8.0",
   "version_source": "VERSION",
   "base_url": "https://pgdesign.smmh.dev",
   "root_files": [
@@ -88,7 +88,7 @@
   "output": "docs/_build/",
   "versions": [
     {
-      "version": "0.7.2",
+      "version": "0.8.0",
       "indexed": true
     }
   ],
