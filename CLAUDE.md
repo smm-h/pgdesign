@@ -12,11 +12,13 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `generate` produces DDL and D2 diagram output
 - `audit` checks normal form compliance (1NF/2NF/3NF) using functional dependencies
 - `fd` provides functional dependency primitives (closure, minimal cover, candidate keys)
+- `discover` discovers functional dependencies from live data using the TANE algorithm
 - `sqlexpr` parses and walks SQL expressions; used by validate (E213) and codegen (expression-driven validators)
-- `codegen` generates type-safe application code (Python, Zig) from the model
+- `codegen` generates type-safe application code (Go, TS, Java, Kotlin, Python, Zig) from the model
 - `diff` compares two models or a model against a live database
 - `migrate` generates migrations with risk classification and safety linting
 - `introspect` reads a live database via pg_catalog into a model
+- `seed` generates type-aware test data for schema tables
 - `serve` exposes the HTTP API and web UI
 - `diagnostic` provides error/warning/hint reporting used across all packages
 - `semtype` defines the semantic type system (builtins + user-defined enums)
@@ -24,8 +26,9 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `sql` contains SQL formatting utilities
 - `format` handles output formatting
 - `extregistry` validates PostgreSQL extension references
+- `config` handles project configuration loading from pgdesign.toml
 
-The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, and introspect -> serve.
+The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, discover -> audit/check, seed -> generate, and introspect -> serve.
 
 ## Key conventions
 
@@ -43,6 +46,13 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Append-only tables generate BEFORE UPDATE OR DELETE triggers via `append_only = true`.
 - JSONB shape validation via `json_schema` column attribute referencing an external JSON Schema file.
 - E109 validates enum defaults against declared values; E110 catches embedded SQL quotes in all defaults.
+- `build` command reads `[output]` config sections from pgdesign.toml and generates all configured outputs (SQL, D2, JSON, SVG, doc, codegen).
+- `check` command runs registered checks (validation, NF audit, coverage) via strictcli's check framework.
+- `stats` command analyzes live database health: table sizes, index usage, bloat, duplicate indexes.
+- `seed` command generates type-aware test data respecting FK dependencies and semantic types.
+- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Two modes: validators, constants.
+- Diff supports three modes: `--live` (against database), `--against` (against another TOML), `--base` (against git ref).
+- `doc` output format generates human-readable schema documentation.
 
 ## Testing
 
@@ -56,6 +66,9 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Commands registered via `app.Command(name, desc, handler, strictcli.WithArgs(...), strictcli.WithFlags(...))`
 - Handler signature: `func(kwargs map[string]interface{}) int` (returns exit code)
 - Global flags: `quiet`, `db` (PostgreSQL connection string), `strict-nf`
+- Commands: `generate`, `validate`, `audit`, `fmt`, `introspect`, `diff`, `seed`, `serve`, `codegen`, `build`, `stats`
+- Command groups: `migrate` (`plan`, `generate`, `apply`, `rollback`, `status`, `squash`, `test`)
+- `introspect --extensions` discovers extension types, functions, and opclasses from a live database
 
 ## Dependencies
 

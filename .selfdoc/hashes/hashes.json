@@ -3,6 +3,62 @@
     "content": "9887a3459e7c08e015c65b4fee688fec35bf92727ff9848706cb0e83e2a1bd81",
     "description": "52f7978f3267738413d75bdd2080187e98ae42774da52ed2402c2bd8feb464cd"
   },
+  "en/cli-audit.md": {
+    "content": "9e5174c938fce1fcdebface94e2c5ca97ddbadfe9c0113a59e6afb617b88e281",
+    "description": "ca78accb66d4929831aa69e854f83831207422e8050ac2ff83a9abafed8f5c76"
+  },
+  "en/cli-build.md": {
+    "content": "645fbd5487554cebcba4bbe34c2ffbdc87ebe2aecc11431896f7e82baa81e0a5",
+    "description": "0133c2b98efb5e8f65c3e8b2bef097d1d0b4db29c70ea6c468cab465c3fb4e9c"
+  },
+  "en/cli-check.md": {
+    "content": "09a7a8fc0209ff602bfc6ab2207c09e1198ce0ffdedec704ff9502c297738d3b",
+    "description": "7c143825d7237386d808148d73eff604ed5ccd56be6fc4eaf43a600624b0b570"
+  },
+  "en/cli-codegen.md": {
+    "content": "2b9ec3f04c16e17bec6e0e71d16b05e25f0ef82cadfeb44aac6f77a9add81a4c",
+    "description": "ccf4a4dcb0bdf0b46fe7643fd4a233bf3d166c3aeba746379ddd18cbe7098d35"
+  },
+  "en/cli-diff.md": {
+    "content": "5ebc0769f696dee52fd863df6b7a4edd06435d2b85b1978a6592ad89d4c2cd24",
+    "description": "3aecb4b5e2f48bcafa2b7604bcf419b6fef4fd1a18b51a17d1424e1d30d125ba"
+  },
+  "en/cli-extension.md": {
+    "content": "1faab8192050b454b5e06eca5e0eff53cfe0ec55cf6d3660aa5f2445c1866024",
+    "description": "9aff6c50ac5370b6bb6f8a04b6a7defe3b46a0093b26f30feae69f947577cec5"
+  },
+  "en/cli-fmt.md": {
+    "content": "b1c77fd4795a23f09d96a0d7767f19653a70955d64b53bd8bb1eacb0ed141d6e",
+    "description": "728524897810bc2a0a4224cbe25940509c8e57ba5529b357437f179721005bc7"
+  },
+  "en/cli-generate.md": {
+    "content": "fed38a40560cd05f4295306f729cd85f054d6039ff9c4b4f2f74c357e125dc36",
+    "description": "b30465bb7c233a09ba7403c9aa115660f78db3e181c8ab9ff658e021329aebd0"
+  },
+  "en/cli-index.md": {
+    "content": "b30ac3d25f0e4a560febe7ffc1243eb4c5d34f817cd7373b6561c538a62eb626",
+    "description": "21ea011b2e49377a6fb312d304039b369ad173fc2c521da6668369e573bff900"
+  },
+  "en/cli-introspect.md": {
+    "content": "5c23cdd2b6ada787963e5e5c8bb2a0d0618c41c31166c412407ccce84f847723",
+    "description": "1a99db90102a65a1567c98b6eeba97192156325e57b3434abb2be322416ab779"
+  },
+  "en/cli-migrate.md": {
+    "content": "312e11b7216f8447585bbfdd528f945fbb8aa28259e1a6efdb583d994373d699",
+    "description": "1a3026fbd049706b0487173a0dfe7740951aa2e722e32d9fab0258136c7c3071"
+  },
+  "en/cli-serve.md": {
+    "content": "5e925c0d78ccbc3be2ec2adbd5b63a95f5cf88340ce80fb1064ca7f2df51d46e",
+    "description": "007685a9cd505c33e46fbbeab176ef640dc2960afc324a10f3aab514f3663cc3"
+  },
+  "en/cli-stats.md": {
+    "content": "28dd46b6ab1904460ea84b70411e2ffd07cb61af3d49a1f1ed25855ae58e09a5",
+    "description": "83a3ccfe151098c7422a467282ed1543f4e1f7657b55644c74661159e94c1750"
+  },
+  "en/cli-validate.md": {
+    "content": "be71d78be11e3e6279b1a616206189a025b086d9c6bd00ebc11228ee5d7fe5bb",
+    "description": "b265212714ed700abc0874f6ead8f1f676292da68495d8ea457b4291ee1734c4"
+  },
   "en/config.md": {
     "content": "6d2bdcd4408020606897d6faaf9cd3dffd82d2dd8167878793d7d39b7d1b4a5e",
     "description": "23e527dcd5e6ba0dc596763ed7fddbc7561341ec7d8152b3284b71222c43f9a0"
@@ -28,7 +84,7 @@
     "description": "9d26683f2d81501be2fcfa9cbfc9ecacaa5886ad3314d98ce71d94b3e98b1ebd"
   },
   "en/format-reference.md": {
-    "content": "7db6a6875da63a95fe7ef84245e6c0db420c886890726ec52d19f1db9e5ce9a7",
+    "content": "47f7d036b75f58a3b0710d6389d5f74642260076f67d8b58846f317ac93cc15b",
     "description": "5daf1a2751b1b7f0633aac2ecc8aae779ea8be77e2c84c8ab12f07c9358c3653"
   },
   "en/format.md": {
@@ -45,88 +101,71 @@
   },
   "en/internal-audit.md": {
     "content": "058d7f86fe5d70ebc24049a6bf1f9d898bb0788a70ce6c1624d7afb037865fbe",
-    "description": "52f7978f3267738413d75bdd2080187e98ae42774da52ed2402c2bd8feb464cd",
-    "source_docstring": "d2bffc86961c7b5114af3d3eb5aa58d687b5f0074394924f3f4a0a582531d2d0"
+    "description": "52f7978f3267738413d75bdd2080187e98ae42774da52ed2402c2bd8feb464cd"
   },
   "en/internal-config.md": {
-    "content": "102f11381f8dfc25cb8d606a0dfab977aafc3fc3f5fc08fa27c287818ffa1b7d",
-    "description": "23e527dcd5e6ba0dc596763ed7fddbc7561341ec7d8152b3284b71222c43f9a0",
-    "source_docstring": "23e527dcd5e6ba0dc596763ed7fddbc7561341ec7d8152b3284b71222c43f9a0"
+    "content": "22af75015f107bf2f57fd3783ef1009a06073b410ce6621eef6496d341cb857f",
+    "description": "23e527dcd5e6ba0dc596763ed7fddbc7561341ec7d8152b3284b71222c43f9a0"
   },
   "en/internal-diagnostic.md": {
     "content": "d0e7c699489599eb5409468b4d552c19c5e8652f4b49b247958f18615adeb8b0",
-    "description": "70e328e5e35e7945347291b0213b91300dce191bee1520f59baaa2928a8766c2",
-    "source_docstring": "70e328e5e35e7945347291b0213b91300dce191bee1520f59baaa2928a8766c2"
+    "description": "70e328e5e35e7945347291b0213b91300dce191bee1520f59baaa2928a8766c2"
   },
   "en/internal-diff.md": {
     "content": "1dedbfe3c33d2706a444395762f1ef4f6b04d97e0cb7f7eb37f14c7a19fbae91",
-    "description": "b9894b2c5b3bb4ed40960d5b19ea87cb7480d7e78b1b32c2fcdfc66c2e23d077",
-    "source_docstring": "7ba3b809f2cddc15d163a61f98967e0ce32b9d98bcbc276b7f2bc5ee26da34d2"
+    "description": "b9894b2c5b3bb4ed40960d5b19ea87cb7480d7e78b1b32c2fcdfc66c2e23d077"
   },
   "en/internal-discover.md": {
     "content": "b31ebab1b47367a15827f929b9c6db5771e7e7d853fa82ac929325fed874c506",
-    "description": "4ba6f82e2dde056c09fbe3b353c9038d4ed2df48700b5fdcbdc08feb553046ee",
-    "source_docstring": "69f8ccbc41619463a2b32d46ab3cec0cb484e9abf3b85cb288b77b024876f0b3"
+    "description": "4ba6f82e2dde056c09fbe3b353c9038d4ed2df48700b5fdcbdc08feb553046ee"
   },
   "en/internal-extregistry.md": {
     "content": "559eedb2163eed95ea0edd9feba6bf8af6c556270bf531dd122391255290e8de",
-    "description": "f01a240604c59f200dea541eb47a33533564f7c96b83d650217858d4cf9390b5",
-    "source_docstring": "e3bfa4fb72aaa580a30c65738454c13c0531ec9aa810bab7e1069b7f1a8dded0"
+    "description": "f01a240604c59f200dea541eb47a33533564f7c96b83d650217858d4cf9390b5"
   },
   "en/internal-fd.md": {
     "content": "3e15253f90e841c9ef3f323c2551e7f424ff0f089735ccafbcde177d343b5850",
-    "description": "9d26683f2d81501be2fcfa9cbfc9ecacaa5886ad3314d98ce71d94b3e98b1ebd",
-    "source_docstring": "9d26683f2d81501be2fcfa9cbfc9ecacaa5886ad3314d98ce71d94b3e98b1ebd"
+    "description": "9d26683f2d81501be2fcfa9cbfc9ecacaa5886ad3314d98ce71d94b3e98b1ebd"
   },
   "en/internal-format.md": {
     "content": "a459ea83984edb996f91c42d2c101a499cb386e5d22d7f5c01f0ccc96b3b9f51",
-    "description": "628a0e8017b4d8d6832a311c56c0c57bd8470a1bbb63490d008fe2415b209fed",
-    "source_docstring": "f59ce4a812aa4cef974ab6f57f8c5da49a5e60dad81d97c9b910d4561bc18429"
+    "description": "628a0e8017b4d8d6832a311c56c0c57bd8470a1bbb63490d008fe2415b209fed"
   },
   "en/internal-generate.md": {
     "content": "2cbfca37e0d221af734be81b121ce4024bd3e583985744c106d55952a201bd29",
-    "description": "87c5994a672cffd7aff21c955d4154587f8bcdb0a31fcaafce135519413fa59a",
-    "source_docstring": "87c5994a672cffd7aff21c955d4154587f8bcdb0a31fcaafce135519413fa59a"
+    "description": "87c5994a672cffd7aff21c955d4154587f8bcdb0a31fcaafce135519413fa59a"
   },
   "en/internal-introspect.md": {
     "content": "ae09c7bbc7e48abf4deed5c6a822af17c807b7686e1b483265064dc1112e17ec",
-    "description": "a6ecca6d13ab8f3fdfa1bc5a650e96e14991798f5070e2da1a0eb323961b6c49",
-    "source_docstring": "5d9bfd78c37fc35265a7ccded7cc160141d6263c0965f511740447c1c22c39ce"
+    "description": "a6ecca6d13ab8f3fdfa1bc5a650e96e14991798f5070e2da1a0eb323961b6c49"
   },
   "en/internal-migrate.md": {
-    "content": "55a6306b976341d3b77020e17005504b591df187ebe563cba7e0f7c93a5fe242",
-    "description": "9cd5ba76ebc3f1be28a3edee710cdd7a1bb0ff00ad73d61ae11be8a825c1f7b7",
-    "source_docstring": "9cd5ba76ebc3f1be28a3edee710cdd7a1bb0ff00ad73d61ae11be8a825c1f7b7"
+    "content": "e5dc501b374e0625fb90472452743d21bf2f4a3be2c8c45186053c1e97308d98",
+    "description": "9cd5ba76ebc3f1be28a3edee710cdd7a1bb0ff00ad73d61ae11be8a825c1f7b7"
   },
   "en/internal-model.md": {
     "content": "5f1f614d7bdf6e82a08552ec647c7e22e1e97fcdb49aff05e42e8a3d9208555d",
-    "description": "d5b67ac1c763f9c95a625373380026c03c0aca2361130620abdb35e6913dc696",
-    "source_docstring": "c7a9317aa12e8a048f7e4437a1aa4a4d6d5bda3d1ac36de6162d41680652b945"
+    "description": "d5b67ac1c763f9c95a625373380026c03c0aca2361130620abdb35e6913dc696"
   },
   "en/internal-parse.md": {
     "content": "89ac1b9048d321aee025ab68cfdeee8db25c23038cd38fad6d77878a6ebdcfec",
-    "description": "4de711af2dd21104c6386b62ca2a1fdd9b8951a89a3ae5d89479795a2f9bd167",
-    "source_docstring": "4dd24a33ec6a3d4081953bb978c4ebedd054be4a5fe01929b16fb5c66452b7d4"
+    "description": "4de711af2dd21104c6386b62ca2a1fdd9b8951a89a3ae5d89479795a2f9bd167"
   },
   "en/internal-risk.md": {
     "content": "8ccdd5b8d43ef40280a14ca298f6aa625389ebac6caaa97a8d78a1e81530fc95",
-    "description": "b38d8b91c14cc23905fc6105c9056c6be73554f5b02d9506e4ac7df4f030f343",
-    "source_docstring": "ba3fda99b56af423cddbfc669bfe7b7401ad4d57c8b72628b6e5d9880fffbfd1"
+    "description": "b38d8b91c14cc23905fc6105c9056c6be73554f5b02d9506e4ac7df4f030f343"
   },
   "en/internal-semtype.md": {
     "content": "6acbefe5c12d8843fbd55350724efd0c03d6ce6eb81261fe8ad2bf2f5ac2126c",
-    "description": "04e6d108a40dee07091148d1992705b83076278239a242c59e74d4761d081e3b",
-    "source_docstring": "2a207bd7e93a2ee09e6f51f2782e5d800a087a485160b0206052189ecfe0cdf5"
+    "description": "04e6d108a40dee07091148d1992705b83076278239a242c59e74d4761d081e3b"
   },
   "en/internal-serve.md": {
     "content": "3247c0d675c8cbb63b9873c5f4cd5cd138e4e6953f6ffe571792aa3b215baed7",
-    "description": "f20beccd5622251d4a7ea0b7fac5d2df9a46afdc595b6905e09e972aaa469346",
-    "source_docstring": "79e52e74c9df7ac53f8a3afe77ec3f102fabb81bfccc28f238707d8d023cfc18"
+    "description": "f20beccd5622251d4a7ea0b7fac5d2df9a46afdc595b6905e09e972aaa469346"
   },
   "en/internal-sql.md": {
     "content": "0716d2f4625cd68602d82f210967ee1b30fa25afdb39e6c2dd238971e35c21c4",
-    "description": "360b66c1ee2cd8e98be1e9e04c585845851ab199828fa8337e3add2c1b0c1e81",
-    "source_docstring": "e10fb764c5b1874d5481906ab2b5230fa620c1a421a5b5e1f553726d7da0feb8"
+    "description": "360b66c1ee2cd8e98be1e9e04c585845851ab199828fa8337e3add2c1b0c1e81"
   },
   "en/internal-sqlexpr.md": {
     "content": "838772d13244043c6a69757a06b139922cf9b9aad218b642e586cd36f88135d1",
@@ -134,8 +173,7 @@
   },
   "en/internal-validate.md": {
     "content": "ab32898d75f0e34312b17c6f4c5a1caa2629ddd68aef799e7aacc9ddc8cf3f1f",
-    "description": "31f4db2666a46525d34dc6c0412b2153f917d0a51159a2431cadd5b41a27c6e3",
-    "source_docstring": "4748f49074c4f34a5f6282d9fad7bc95568cfb6fee855c130fd616b71bdf2f6c"
+    "description": "31f4db2666a46525d34dc6c0412b2153f917d0a51159a2431cadd5b41a27c6e3"
   },
   "en/introspect.md": {
     "content": "48603ed55c27baa9e8d6f75b78b2730e967e08aed805b93a70e54453fe472a4c",
@@ -146,7 +184,7 @@
     "description": "9cd5ba76ebc3f1be28a3edee710cdd7a1bb0ff00ad73d61ae11be8a825c1f7b7"
   },
   "en/migration-guide.md": {
-    "content": "6f81c5da5c8a5c5cebc330005657bc4d9d034594e9978a4b661c7260b2847510",
+    "content": "aab009e3503efc6d815bd94c96e76de12f7c2efa8634d001f6bd6434402d53d1",
     "description": "1cd872821eb51f78e5246ac74f47ddd7e7544e15fad3f96e8c7568a413f8203f"
   },
   "en/model.md": {
@@ -190,7 +228,7 @@
     "description": "31f4db2666a46525d34dc6c0412b2153f917d0a51159a2431cadd5b41a27c6e3"
   },
   "en/validation-rules.md": {
-    "content": "1efe9a26570e75a670985f70ba969316a57148c623d91702b8a87c989bdfe4b9",
+    "content": "b82af0070b1ba73f974600d8c4560fd0c36748820d61b77bbffa9da18fdf8562",
     "description": "e02b52404d7322fb2128a5f48c462aa1ad2e732edef54e42d59c97a6389e3ff4"
   },
   "format-reference.md": {
