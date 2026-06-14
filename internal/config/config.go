@@ -168,7 +168,11 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot read config: %w", err)
 	}
+	return LoadBytes(data)
+}
 
+// LoadBytes parses config from in-memory bytes.
+func LoadBytes(data []byte) (*Config, error) {
 	var cfg Config
 	if err := tomledit.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("cannot parse config: %w", err)
