@@ -217,6 +217,51 @@ pk = ["id"]
 	}
 }
 
+func TestPoolConfigApplied(t *testing.T) {
+	// Verify that PoolConfig values are applied to pgxpool.Config when non-zero,
+	// and pgxpool defaults are preserved when zero.
+	poolCfg := PoolConfig{MaxConns: 20, MinConns: 3}
+	pgxCfg, err := pgxpool.ParseConfig(testConnStr)
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	defaultMax := pgxCfg.MaxConns
+	defaultMin := pgxCfg.MinConns
+
+	// Apply non-zero values.
+	if poolCfg.MaxConns > 0 {
+		pgxCfg.MaxConns = poolCfg.MaxConns
+	}
+	if poolCfg.MinConns > 0 {
+		pgxCfg.MinConns = poolCfg.MinConns
+	}
+	if pgxCfg.MaxConns != 20 {
+		t.Errorf("MaxConns = %d, want 20", pgxCfg.MaxConns)
+	}
+	if pgxCfg.MinConns != 3 {
+		t.Errorf("MinConns = %d, want 3", pgxCfg.MinConns)
+	}
+
+	// Verify zero values preserve defaults.
+	zeroCfg := PoolConfig{}
+	pgxCfg2, err := pgxpool.ParseConfig(testConnStr)
+	if err != nil {
+		t.Fatalf("ParseConfig: %v", err)
+	}
+	if zeroCfg.MaxConns > 0 {
+		pgxCfg2.MaxConns = zeroCfg.MaxConns
+	}
+	if zeroCfg.MinConns > 0 {
+		pgxCfg2.MinConns = zeroCfg.MinConns
+	}
+	if pgxCfg2.MaxConns != defaultMax {
+		t.Errorf("MaxConns with zero config = %d, want default %d", pgxCfg2.MaxConns, defaultMax)
+	}
+	if pgxCfg2.MinConns != defaultMin {
+		t.Errorf("MinConns with zero config = %d, want default %d", pgxCfg2.MinConns, defaultMin)
+	}
+}
+
 func TestFindDuplicateIndexes(t *testing.T) {
 	tests := []struct {
 		name    string

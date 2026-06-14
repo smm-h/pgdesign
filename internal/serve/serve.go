@@ -10,6 +10,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// PoolConfig holds connection pool tuning parameters.
+// Zero values mean pgxpool uses its built-in defaults.
+type PoolConfig struct {
+	MaxConns int32
+	MinConns int32
+}
+
 // Server is the HTTP API server for pgdesign.
 type Server struct {
 	pool          *pgxpool.Pool
@@ -19,9 +26,22 @@ type Server struct {
 }
 
 // New creates a new Server with a pgxpool connection and sets up routes.
-func New(connStr string, schemas []string, migrationsDir string) (*Server, error) {
+// Pool parameters in poolCfg override pgxpool defaults when non-zero.
+func New(connStr string, schemas []string, migrationsDir string, poolCfg PoolConfig) (*Server, error) {
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, connStr)
+
+	pgxCfg, err := pgxpool.ParseConfig(connStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse connection config: %w", err)
+	}
+	if poolCfg.MaxConns > 0 {
+		pgxCfg.MaxConns = poolCfg.MaxConns
+	}
+	if poolCfg.MinConns > 0 {
+		pgxCfg.MinConns = poolCfg.MinConns
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, pgxCfg)
 	if err != nil {
 		return nil, fmt.Errorf("create connection pool: %w", err)
 	}

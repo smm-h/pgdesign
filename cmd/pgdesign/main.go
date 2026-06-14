@@ -279,7 +279,19 @@ func handleAudit(kwargs map[string]interface{}) int {
 
 			// Use a connection pool for parallel discovery. Each goroutine
 			// acquires its own connection since pgx.Conn is not concurrency-safe.
-			pool, err := pgxpool.New(ctx, dbURL)
+			cfg := loadProjectConfig(paths[0])
+			poolCfg, parseErr := pgxpool.ParseConfig(dbURL)
+			if parseErr != nil {
+				fmt.Fprintf(os.Stderr, "error: parse connection config: %v\n", parseErr)
+				return 1
+			}
+			if cfg.Database.PoolMaxConns > 0 {
+				poolCfg.MaxConns = cfg.Database.PoolMaxConns
+			}
+			if cfg.Database.PoolMinConns > 0 {
+				poolCfg.MinConns = cfg.Database.PoolMinConns
+			}
+			pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: connect for FD discovery: %v\n", err)
 				return 1
@@ -1325,7 +1337,11 @@ func handleServe(kwargs map[string]interface{}) int {
 		migrationsDir = cfg.Project.MigrationsDir
 	}
 
-	srv, err := serve.New(dbURL, schemaNames, migrationsDir)
+	poolCfg := serve.PoolConfig{
+		MaxConns: cfg.Database.PoolMaxConns,
+		MinConns: cfg.Database.PoolMinConns,
+	}
+	srv, err := serve.New(dbURL, schemaNames, migrationsDir, poolCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
