@@ -36,16 +36,20 @@
     "description": "b30465bb7c233a09ba7403c9aa115660f78db3e181c8ab9ff658e021329aebd0"
   },
   "en/cli-index.md": {
-    "content": "b30ac3d25f0e4a560febe7ffc1243eb4c5d34f817cd7373b6561c538a62eb626",
+    "content": "a4383fa9ff79e16b3d4084f699c511cb691a007dc4747c151d573ffac3e718bc",
     "description": "21ea011b2e49377a6fb312d304039b369ad173fc2c521da6668369e573bff900"
   },
   "en/cli-introspect.md": {
-    "content": "5c23cdd2b6ada787963e5e5c8bb2a0d0618c41c31166c412407ccce84f847723",
+    "content": "0139a64bbe47a1c8c595ace09f38689c10b4902979ff0c77c755db5a494f0d93",
     "description": "1a99db90102a65a1567c98b6eeba97192156325e57b3434abb2be322416ab779"
   },
   "en/cli-migrate.md": {
     "content": "312e11b7216f8447585bbfdd528f945fbb8aa28259e1a6efdb583d994373d699",
     "description": "1a3026fbd049706b0487173a0dfe7740951aa2e722e32d9fab0258136c7c3071"
+  },
+  "en/cli-seed.md": {
+    "content": "423bf74a455eb66ae7de01fa1d5cf5c3c5c2e0b92f2bec425d8c162db41f3df3",
+    "description": "4936f84bc75be5be3f5ccdd8bebbd4e9db29f7a8c827e60219a6c1a8a0824917"
   },
   "en/cli-serve.md": {
     "content": "5e925c0d78ccbc3be2ec2adbd5b63a95f5cf88340ce80fb1064ca7f2df51d46e",

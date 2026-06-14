@@ -12,7 +12,7 @@ order: 91
 
 PostgreSQL schema compiler
 
-Version: 0.8.1-0.20260614202453-cc272f69597d+dirty
+Version: 0.8.1-0.20260614210652-f18c84e8ef93+dirty
 
 ## Commands
 
@@ -24,11 +24,11 @@ Version: 0.8.1-0.20260614202453-cc272f69597d+dirty
 - [fmt](cli-fmt.html) -- Format a pgdesign schema file or directory
 - [generate](cli-generate.html) -- Generate SQL from schema file(s) or directory
 - [introspect](cli-introspect.html) -- Introspect a live PostgreSQL database
+- [seed](cli-seed.html) -- Generate type-aware test data
 - [serve](cli-serve.html) -- Start the pgdesign HTTP API server
 - [stats](cli-stats.html) -- Database statistics and health analysis
 - [validate](cli-validate.html) -- Validate schema file(s) or directory
 
 ## Command Groups
 
-- [extension](cli-extension.html) -- Extension management commands
 - [migrate](cli-migrate.html) -- Database migration commands
