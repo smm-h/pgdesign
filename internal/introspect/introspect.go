@@ -67,6 +67,16 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		schema.Tables = append(schema.Tables, tables...)
 	}
 
+	// Extract views from all requested schemas (after tables, since
+	// DependsOn resolution needs the table list).
+	for _, sn := range schemaNames {
+		views, err := queryViews(ctx, conn, sn, schema.Tables)
+		if err != nil {
+			return nil, nil, fmt.Errorf("views for schema %q: %w", sn, err)
+		}
+		schema.Views = append(schema.Views, views...)
+	}
+
 	return schema, diags, nil
 }
 
@@ -731,4 +741,58 @@ func queryPartitionChildren(ctx context.Context, conn *pgx.Conn, parentOID uint3
 	}
 
 	return children, nil
+}
+
+// viewTableNamePattern matches a table name surrounded by word boundaries
+// (whitespace, punctuation, or string edges). Built per table name in
+// queryViews because the name is interpolated into the pattern.
+func viewTableNamePattern(tableName string) *regexp.Regexp {
+	return regexp.MustCompile(`(?i)(?:^|[^a-z0-9_])` + regexp.QuoteMeta(tableName) + `(?:$|[^a-z0-9_])`)
+}
+
+// queryViews returns views defined in the given schema. The tables slice is
+// used to resolve DependsOn by scanning view definitions for table name
+// references.
+func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string, tables []model.Table) ([]model.View, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT v.viewname, pg_get_viewdef(c.oid, true), d.description
+		FROM pg_views v
+		JOIN pg_class c ON c.relname = v.viewname
+		JOIN pg_namespace n ON c.relnamespace = n.oid AND n.nspname = v.schemaname
+		LEFT JOIN pg_description d ON d.objoid = c.oid AND d.objsubid = 0
+		WHERE v.schemaname = $1
+		ORDER BY v.viewname
+	`, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var views []model.View
+	for rows.Next() {
+		var name, definition string
+		var comment *string
+		if err := rows.Scan(&name, &definition, &comment); err != nil {
+			return nil, err
+		}
+
+		v := model.View{
+			Name:   name,
+			Schema: schemaName,
+			Query:  strings.TrimSpace(definition),
+		}
+		if comment != nil {
+			v.Comment = *comment
+		}
+
+		// Resolve DependsOn by scanning the view definition for table names.
+		for _, t := range tables {
+			if viewTableNamePattern(t.Name).MatchString(v.Query) {
+				v.DependsOn = append(v.DependsOn, t.Name)
+			}
+		}
+
+		views = append(views, v)
+	}
+	return views, rows.Err()
 }

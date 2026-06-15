@@ -157,5 +157,24 @@ func generateDoc(schema *model.Schema) string {
 		}
 	}
 
+	// Views section
+	for _, v := range schema.Views {
+		fmt.Fprintf(&b, "\n## %s\n", v.Name)
+
+		if v.Comment != "" {
+			fmt.Fprintf(&b, "\n%s\n", v.Comment)
+		}
+
+		b.WriteString("\n### Query\n")
+		fmt.Fprintf(&b, "\n```sql\n%s\n```\n", v.Query)
+
+		if len(v.DependsOn) > 0 {
+			b.WriteString("\n### Dependencies\n\n")
+			for _, dep := range v.DependsOn {
+				fmt.Fprintf(&b, "- %s\n", dep)
+			}
+		}
+	}
+
 	return b.String()
 }

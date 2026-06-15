@@ -1426,6 +1426,82 @@ func TestDocFormat(t *testing.T) {
 	}
 }
 
+func TestGenerateDoc_Views(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+		Views: []model.View{
+			{
+				Name:      "active_users",
+				Schema:    "app",
+				Query:     "SELECT id, name FROM users WHERE active = true",
+				Comment:   "Users who are currently active",
+				DependsOn: []string{"users"},
+			},
+			{
+				Name:   "all_names",
+				Schema: "app",
+				Query:  "SELECT name FROM users",
+			},
+		},
+	}
+
+	opts := Options{Format: "doc"}
+	out := mustGenerate(t, schema, opts)
+
+	// View name heading exists.
+	if !strings.Contains(out, "## active_users") {
+		t.Errorf("expected active_users heading, got:\n%s", out)
+	}
+	if !strings.Contains(out, "## all_names") {
+		t.Errorf("expected all_names heading, got:\n%s", out)
+	}
+
+	// Comment appears.
+	if !strings.Contains(out, "Users who are currently active") {
+		t.Errorf("expected view comment, got:\n%s", out)
+	}
+
+	// Query code block exists.
+	if !strings.Contains(out, "```sql\nSELECT id, name FROM users WHERE active = true\n```") {
+		t.Errorf("expected query code block, got:\n%s", out)
+	}
+
+	// Dependencies listed.
+	if !strings.Contains(out, "### Dependencies") {
+		t.Errorf("expected Dependencies section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "- users") {
+		t.Errorf("expected users dependency, got:\n%s", out)
+	}
+
+	// View with no comment should not have a bare comment paragraph.
+	// View with no dependencies should not have Dependencies section for it.
+	allNamesIdx := strings.Index(out, "## all_names")
+	if allNamesIdx < 0 {
+		t.Fatal("all_names heading not found")
+	}
+	allNamesSection := out[allNamesIdx:]
+	// Find the next heading or end of string.
+	nextHeading := strings.Index(allNamesSection[1:], "\n## ")
+	if nextHeading >= 0 {
+		allNamesSection = allNamesSection[:nextHeading+1]
+	}
+	if strings.Contains(allNamesSection, "### Dependencies") {
+		t.Errorf("all_names should not have Dependencies section (no depends_on), got:\n%s", allNamesSection)
+	}
+}
+
 func TestGenerate_Views(t *testing.T) {
 	schema := &model.Schema{
 		Name: "app",

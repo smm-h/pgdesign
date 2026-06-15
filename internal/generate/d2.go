@@ -37,6 +37,18 @@ func GenerateD2(schema *model.Schema) string {
 		}
 	}
 
+	// Render views as rectangle shapes.
+	for _, v := range schema.Views {
+		sections = append(sections, renderD2View(&v))
+	}
+
+	// Render view dependency edges.
+	for _, v := range schema.Views {
+		for _, dep := range v.DependsOn {
+			sections = append(sections, fmt.Sprintf("%s -> %s", v.Name, dep))
+		}
+	}
+
 	return strings.Join(sections, "\n") + "\n"
 }
 
@@ -99,6 +111,18 @@ func renderD2Edge(t *model.Table, fk *model.FK) string {
 	}
 
 	return fmt.Sprintf("%s.%s -> %s.%s: %s", t.Name, srcCols, fk.RefTable, refCols, label)
+}
+
+// renderD2View produces a D2 rectangle block for a view.
+func renderD2View(v *model.View) string {
+	var b strings.Builder
+	b.WriteString(v.Name)
+	b.WriteString(": {\n")
+	b.WriteString("  shape: rectangle\n")
+	fmt.Fprintf(&b, "  label: \"<<view>>\\n%s\"\n", v.Name)
+	b.WriteString("  style.fill: \"#e8f4fd\"\n")
+	b.WriteString("}")
+	return b.String()
 }
 
 // RenderSVG compiles D2 source text and renders it to SVG bytes.

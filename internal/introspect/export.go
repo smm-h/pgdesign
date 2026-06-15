@@ -196,6 +196,27 @@ func Export(schema *model.Schema) ([]byte, error) {
 		}
 	}
 
+	// [views.*]
+	for _, v := range schema.Views {
+		vPath := "views." + v.Name
+		if err := doc.NewTable(vPath); err != nil {
+			return nil, fmt.Errorf("create view %s: %w", v.Name, err)
+		}
+		if err := doc.SetCreate(vPath+".query", v.Query); err != nil {
+			return nil, fmt.Errorf("set %s.query: %w", vPath, err)
+		}
+		if v.Comment != "" {
+			if err := doc.SetCreate(vPath+".comment", v.Comment); err != nil {
+				return nil, fmt.Errorf("set %s.comment: %w", vPath, err)
+			}
+		}
+		if len(v.DependsOn) > 0 {
+			if err := doc.SetCreate(vPath+".depends_on", toAnySlice(v.DependsOn)); err != nil {
+				return nil, fmt.Errorf("set %s.depends_on: %w", vPath, err)
+			}
+		}
+	}
+
 	return doc.Format(), nil
 }
 

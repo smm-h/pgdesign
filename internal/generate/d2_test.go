@@ -289,6 +289,54 @@ posts.author_id -> users.id: CASCADE
 	}
 }
 
+func TestGenerateD2_Views(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "active", PGType: "boolean", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+		Views: []model.View{
+			{
+				Name:      "active_users",
+				Schema:    "app",
+				Query:     "SELECT id, name FROM users WHERE active = true",
+				Comment:   "Active users only",
+				DependsOn: []string{"users"},
+			},
+		},
+	}
+
+	out := GenerateD2(schema)
+
+	// View shape must be a rectangle, not sql_table.
+	if !strings.Contains(out, "active_users: {") {
+		t.Errorf("expected active_users view shape, got:\n%s", out)
+	}
+	if !strings.Contains(out, "shape: rectangle") {
+		t.Errorf("expected rectangle shape for view, got:\n%s", out)
+	}
+	if !strings.Contains(out, `label: "<<view>>\nactive_users"`) {
+		t.Errorf("expected view label, got:\n%s", out)
+	}
+	if !strings.Contains(out, `style.fill: "#e8f4fd"`) {
+		t.Errorf("expected view fill style, got:\n%s", out)
+	}
+
+	// Edge from view to dependency table.
+	if !strings.Contains(out, "active_users -> users") {
+		t.Errorf("expected edge from view to dependency table, got:\n%s", out)
+	}
+}
+
 func TestGenerateSVGFormat(t *testing.T) {
 	schema := &model.Schema{
 		Name: "test",
