@@ -250,6 +250,53 @@ func TestPgvectorBuiltin(t *testing.T) {
 	}
 }
 
+func TestValidIndexParams_Btree(t *testing.T) {
+	r := NewBuiltinRegistry()
+	params, ok := r.ValidIndexParams("btree")
+	if !ok {
+		t.Fatal("expected btree to have valid params")
+	}
+	found := false
+	for _, p := range params {
+		if p == "fillfactor" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected fillfactor in btree params, got %v", params)
+	}
+}
+
+func TestValidIndexParams_Hnsw(t *testing.T) {
+	r := NewBuiltinRegistry()
+	params, ok := r.ValidIndexParams("hnsw")
+	if !ok {
+		t.Fatal("expected hnsw to have valid params")
+	}
+	foundM := false
+	foundEf := false
+	for _, p := range params {
+		if p == "m" {
+			foundM = true
+		}
+		if p == "ef_construction" {
+			foundEf = true
+		}
+	}
+	if !foundM || !foundEf {
+		t.Errorf("expected m and ef_construction in hnsw params, got %v", params)
+	}
+}
+
+func TestValidIndexParams_Unknown(t *testing.T) {
+	r := NewBuiltinRegistry()
+	_, ok := r.ValidIndexParams("nonexistent")
+	if ok {
+		t.Fatal("expected unknown method to return false")
+	}
+}
+
 func TestLoadUserExtensions_IndexMethods(t *testing.T) {
 	r := NewBuiltinRegistry()
 	r.LoadUserExtensions([]UserExtension{

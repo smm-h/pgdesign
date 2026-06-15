@@ -4,6 +4,18 @@ package extregistry
 func NewBuiltinRegistry() *Registry {
 	r := NewRegistry()
 
+	// Core PostgreSQL built-in index methods and their storage parameters.
+	r.Register(&Extension{
+		Name: "core",
+		IndexParams: map[string][]string{
+			"btree": {"fillfactor", "deduplicate_items"},
+			"gin":   {"fastupdate", "gin_pending_list_limit"},
+			"gist":  {"fillfactor", "buffering"},
+			"brin":  {"pages_per_range", "autosummarize"},
+			"hash":  {"fillfactor"},
+		},
+	})
+
 	r.Register(&Extension{
 		Name:      "pgcrypto",
 		Functions: []string{"gen_random_uuid", "crypt", "digest"},
@@ -101,6 +113,10 @@ func NewBuiltinRegistry() *Registry {
 		},
 		Functions:    []string{"l2_distance", "inner_product", "cosine_distance", "l1_distance"},
 		IndexMethods: []string{"hnsw", "ivfflat"},
+		IndexParams: map[string][]string{
+			"hnsw":    {"m", "ef_construction"},
+			"ivfflat": {"lists"},
+		},
 	})
 
 	return r

@@ -10,25 +10,28 @@ type Extension struct {
 	Opclasses    []string
 	Functions    []string
 	IndexMethods []string
+	IndexParams  map[string][]string // index method -> valid parameter names
 }
 
 // Registry holds extensions and reverse-lookup maps.
 type Registry struct {
-	extensions map[string]*Extension
-	opclassMap map[string]string // opclass name -> extension name
-	typeMap    map[string]string // type name -> extension name
-	funcMap        map[string]string // function name -> extension name
-	indexMethodMap map[string]string // index method name -> extension name
+	extensions     map[string]*Extension
+	opclassMap     map[string]string   // opclass name -> extension name
+	typeMap        map[string]string   // type name -> extension name
+	funcMap        map[string]string   // function name -> extension name
+	indexMethodMap map[string]string   // index method name -> extension name
+	indexParamMap  map[string][]string // method name -> valid param names (aggregated from all extensions)
 }
 
 // NewRegistry creates an empty registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		extensions: make(map[string]*Extension),
-		opclassMap: make(map[string]string),
-		typeMap:    make(map[string]string),
+		extensions:     make(map[string]*Extension),
+		opclassMap:     make(map[string]string),
+		typeMap:        make(map[string]string),
 		funcMap:        make(map[string]string),
 		indexMethodMap: make(map[string]string),
+		indexParamMap:  make(map[string][]string),
 	}
 }
 
@@ -46,6 +49,9 @@ func (r *Registry) Register(ext *Extension) {
 	}
 	for _, m := range ext.IndexMethods {
 		r.indexMethodMap[m] = ext.Name
+	}
+	for method, params := range ext.IndexParams {
+		r.indexParamMap[method] = append(r.indexParamMap[method], params...)
 	}
 }
 
@@ -73,6 +79,13 @@ func (r *Registry) RequiredExtensionForMethod(method string) (string, bool) {
 	return name, ok
 }
 
+// ValidIndexParams returns the valid WITH parameter names for an index method.
+// Returns (nil, false) if the method is not registered.
+func (r *Registry) ValidIndexParams(method string) ([]string, bool) {
+	params, ok := r.indexParamMap[method]
+	return params, ok
+}
+
 // UserExtension represents a user-defined extension from pgdesign.toml config.
 type UserExtension struct {
 	Name         string
@@ -80,6 +93,7 @@ type UserExtension struct {
 	Opclasses    []string
 	Functions    []string
 	IndexMethods []string
+	IndexParams  map[string][]string
 }
 
 // LoadUserExtensions adds user-defined extensions to the registry.
@@ -91,6 +105,7 @@ func (r *Registry) LoadUserExtensions(exts []UserExtension) {
 			Opclasses:    exts[i].Opclasses,
 			Functions:    exts[i].Functions,
 			IndexMethods: exts[i].IndexMethods,
+			IndexParams:  exts[i].IndexParams,
 		})
 	}
 }
