@@ -41,7 +41,8 @@ type DDLOp struct {
 	TableDef          *model.Table          // full table def for create_table (not serialized)
 	PartitionChildSpec *model.PartitionSpec // child spec for create_partition (not serialized)
 	ParentTable       string               // parent table for create_partition
-	ViewDef           *model.View          // full view def for create_view/drop_view (not serialized)
+	ViewDef              *model.View              // full view def for create_view/drop_view (not serialized)
+	MaterializedViewDef  *model.MaterializedView  // full matview def for create/drop materialized view (not serialized)
 
 	Down *DownOp
 }

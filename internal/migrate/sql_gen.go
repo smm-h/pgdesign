@@ -80,6 +80,12 @@ func OpToSQL(op DDLOp) string {
 		return opDropView(op)
 	case "create_or_replace_view":
 		return opCreateOrReplaceView(op)
+	case "create_materialized_view":
+		return opCreateMaterializedView(op)
+	case "drop_materialized_view":
+		return opDropMaterializedView(op)
+	case "refresh_materialized_view":
+		return opRefreshMaterializedView(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -353,6 +359,24 @@ func opCreateOrReplaceView(op DDLOp) string {
 		return sql.CreateView(schema, op.ViewDef, true)
 	}
 	return fmt.Sprintf("-- create_or_replace_view: missing view definition for %s", op.Name)
+}
+
+func opCreateMaterializedView(op DDLOp) string {
+	if op.MaterializedViewDef != nil {
+		schema, _ := splitQualifiedName(op.Name)
+		return sql.CreateMaterializedView(schema, op.MaterializedViewDef)
+	}
+	return fmt.Sprintf("-- create_materialized_view: missing materialized view definition for %s", op.Name)
+}
+
+func opDropMaterializedView(op DDLOp) string {
+	schema, name := splitQualifiedName(op.Name)
+	return sql.DropMaterializedView(schema, name, false)
+}
+
+func opRefreshMaterializedView(op DDLOp) string {
+	schema, name := splitQualifiedName(op.Name)
+	return sql.RefreshMaterializedView(schema, name, false)
 }
 
 // splitQualifiedName splits "schema.table" into ("schema", "table").
