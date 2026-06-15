@@ -209,6 +209,27 @@ A row-level security policy uses the wrong expression type for its operation:
 - SELECT and DELETE policies cannot use `with_check`
 - UPDATE and ALL can use both
 
+### E216: Index WITH parameter not valid for method
+
+An index uses a `with` storage parameter that is not valid for the specified index method. Each index method supports a specific set of parameters:
+
+- **btree**: `fillfactor`, `deduplicate_items`
+- **hash**: `fillfactor`
+- **gin**: `fastupdate`, `gin_pending_list_limit`
+- **gist**: `fillfactor`, `buffering`
+- **brin**: `pages_per_range`, `autosummarize`
+- **hnsw** (pgvector): `m`, `ef_construction`
+- **ivfflat** (pgvector): `lists`
+
+```toml
+[tables.items.indexes.idx_items_embedding]
+columns = ["embedding"]
+method = "hnsw"
+with = { fillfactor = "90" }  # E216: fillfactor is not valid for hnsw
+```
+
+**Fix:** Use only parameters valid for the index method. Consult the PostgreSQL or extension documentation for supported parameters.
+
 ## Warning rules
 
 Warnings highlight potential design issues but do not block DDL generation.
