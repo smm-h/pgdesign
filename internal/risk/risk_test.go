@@ -70,6 +70,39 @@ func TestAddColumnNotNullWithDefaultPrePG11(t *testing.T) {
 	}
 }
 
+func TestAddColumnRiskMatrix(t *testing.T) {
+	tests := []struct {
+		name       string
+		isNullable bool
+		hasDefault bool
+		pgVersion  int
+		wantRisk   RiskLevel
+	}{
+		{"nullable_no_default_pgv0", true, false, 0, Safe},
+		{"nullable_with_default_pgv0", true, true, 0, Safe},
+		{"nullable_no_default_pgv17", true, false, 17, Safe},
+		{"not_null_with_default_pgv0", false, true, 0, Dangerous},
+		{"not_null_with_default_pgv10", false, true, 10, Dangerous},
+		{"not_null_with_default_pgv11", false, true, 11, Safe},
+		{"not_null_with_default_pgv17", false, true, 17, Safe},
+		{"not_null_no_default_pgv0", false, false, 0, Dangerous},
+		{"not_null_no_default_pgv17", false, false, 17, Dangerous},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := Classify(OpAddColumn, OpContext{
+				IsNullable: tt.isNullable,
+				HasDefault: tt.hasDefault,
+				PGVersion:  tt.pgVersion,
+			})
+			if c.RiskLevel != tt.wantRisk {
+				t.Errorf("got %s, want %s", c.RiskLevel, tt.wantRisk)
+			}
+		})
+	}
+}
+
 func TestCreateIndex(t *testing.T) {
 	c := Classify(OpCreateIndex, OpContext{})
 	if c.RiskLevel != Caution {
