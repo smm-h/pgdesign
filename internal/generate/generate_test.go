@@ -1605,3 +1605,101 @@ func TestGenerate_ViewsNoComments(t *testing.T) {
 		t.Errorf("should not contain view comments when IncludeComments=false, got:\n%s", out)
 	}
 }
+
+func TestGenerateSQL_MaterializedView(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "app",
+				Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				WithData: true,
+				Comment:  "Monthly order statistics",
+			},
+		},
+	}
+
+	opts := Options{IncludeComments: true, Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "CREATE MATERIALIZED VIEW app.monthly_stats AS") {
+		t.Errorf("expected CREATE MATERIALIZED VIEW, got:\n%s", out)
+	}
+	if !strings.Contains(out, "WITH DATA;") {
+		t.Errorf("expected WITH DATA clause, got:\n%s", out)
+	}
+	if !strings.Contains(out, "date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1") {
+		t.Errorf("expected query text in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "COMMENT ON MATERIALIZED VIEW app.monthly_stats IS 'Monthly order statistics';") {
+		t.Errorf("expected COMMENT ON MATERIALIZED VIEW, got:\n%s", out)
+	}
+
+	tableIdx := strings.Index(out, "CREATE TABLE")
+	matviewIdx := strings.Index(out, "CREATE MATERIALIZED VIEW")
+	if tableIdx == -1 || matviewIdx == -1 {
+		t.Fatalf("expected both CREATE TABLE and CREATE MATERIALIZED VIEW in output, got:\n%s", out)
+	}
+	if matviewIdx <= tableIdx {
+		t.Errorf("materialized view should appear after tables, table at %d, matview at %d", tableIdx, matviewIdx)
+	}
+}
+
+func TestGenerateSQL_MaterializedViewWithIndex(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "app",
+				Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				WithData: true,
+				Indexes: []model.Index{
+					{Name: "idx_monthly_stats_month", Columns: []string{"month"}, Unique: false},
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "CREATE MATERIALIZED VIEW app.monthly_stats AS") {
+		t.Errorf("expected CREATE MATERIALIZED VIEW, got:\n%s", out)
+	}
+	if !strings.Contains(out, "CREATE INDEX idx_monthly_stats_month ON app.monthly_stats") {
+		t.Errorf("expected CREATE INDEX on materialized view, got:\n%s", out)
+	}
+
+	matviewIdx := strings.Index(out, "CREATE MATERIALIZED VIEW")
+	indexIdx := strings.Index(out, "CREATE INDEX idx_monthly_stats_month")
+	if matviewIdx == -1 || indexIdx == -1 {
+		t.Fatalf("expected both CREATE MATERIALIZED VIEW and CREATE INDEX in output, got:\n%s", out)
+	}
+	if indexIdx <= matviewIdx {
+		t.Errorf("CREATE INDEX should appear after CREATE MATERIALIZED VIEW, matview at %d, index at %d", matviewIdx, indexIdx)
+	}
+}
