@@ -176,5 +176,43 @@ func generateDoc(schema *model.Schema) string {
 		}
 	}
 
+	// Materialized Views section
+	for _, mv := range schema.MaterializedViews {
+		fmt.Fprintf(&b, "\n## %s (materialized view)\n", mv.Name)
+
+		if mv.Comment != "" {
+			fmt.Fprintf(&b, "\n%s\n", mv.Comment)
+		}
+
+		b.WriteString("\n### Query\n")
+		fmt.Fprintf(&b, "\n```sql\n%s\n```\n", mv.Query)
+
+		if !mv.WithData {
+			b.WriteString("\n**WITH NO DATA** (not populated on creation)\n")
+		}
+
+		if len(mv.Indexes) > 0 {
+			b.WriteString("\n### Indexes\n\n")
+			for _, idx := range mv.Indexes {
+				method := idx.Method
+				if method == "" {
+					method = "btree"
+				}
+				unique := ""
+				if idx.Unique {
+					unique = "UNIQUE "
+				}
+				fmt.Fprintf(&b, "- %s: %s%s(%s)\n", idx.Name, unique, method, strings.Join(idx.Columns, ", "))
+			}
+		}
+
+		if len(mv.DependsOn) > 0 {
+			b.WriteString("\n### Dependencies\n\n")
+			for _, dep := range mv.DependsOn {
+				fmt.Fprintf(&b, "- %s\n", dep)
+			}
+		}
+	}
+
 	return b.String()
 }

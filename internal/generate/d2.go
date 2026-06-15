@@ -49,6 +49,18 @@ func GenerateD2(schema *model.Schema) string {
 		}
 	}
 
+	// Render materialized views as rectangle shapes (distinct from regular views).
+	for _, mv := range schema.MaterializedViews {
+		sections = append(sections, renderD2MaterializedView(&mv))
+	}
+
+	// Render materialized view dependency edges.
+	for _, mv := range schema.MaterializedViews {
+		for _, dep := range mv.DependsOn {
+			sections = append(sections, fmt.Sprintf("%s -> %s", mv.Name, dep))
+		}
+	}
+
 	return strings.Join(sections, "\n") + "\n"
 }
 
@@ -121,6 +133,18 @@ func renderD2View(v *model.View) string {
 	b.WriteString("  shape: rectangle\n")
 	fmt.Fprintf(&b, "  label: \"<<view>>\\n%s\"\n", v.Name)
 	b.WriteString("  style.fill: \"#e8f4fd\"\n")
+	b.WriteString("}")
+	return b.String()
+}
+
+// renderD2MaterializedView produces a D2 rectangle block for a materialized view.
+func renderD2MaterializedView(mv *model.MaterializedView) string {
+	var b strings.Builder
+	b.WriteString(mv.Name)
+	b.WriteString(": {\n")
+	b.WriteString("  shape: rectangle\n")
+	fmt.Fprintf(&b, "  label: \"<<materialized view>>\\n%s\"\n", mv.Name)
+	b.WriteString("  style.fill: \"#d4edda\"\n")
 	b.WriteString("}")
 	return b.String()
 }
