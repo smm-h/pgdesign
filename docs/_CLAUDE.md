@@ -5,7 +5,7 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 ## Package dependency order
 
 - `parse` parses TOML schemas (uses go-toml-edit for comment preservation)
-- `model` builds the resolved intermediate representation; `Schema.Build()` resolves types and dependencies
+- `model` builds the resolved intermediate representation (tables, views, materialized views); `Schema.Build()` resolves types and dependencies
 - `validate` validates the model and detects anti-patterns
 - `generate` produces DDL and D2 diagram output
 - `audit` checks normal form compliance (1NF/2NF/3NF) using functional dependencies
@@ -26,7 +26,7 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `extregistry` validates PostgreSQL extension references
 - `config` handles project configuration loading from pgdesign.toml
 
-The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, discover -> audit/check, seed -> generate, and introspect -> serve.
+The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, discover -> audit/check, seed -> generate, introspect -> serve. Views depend on tables; materialized views depend on tables and views.
 
 ## Key conventions
 
@@ -48,9 +48,14 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - `check` command runs registered checks (validation, NF audit, coverage) via strictcli's check framework.
 - `stats` command analyzes live database health: table sizes, index usage, bloat, duplicate indexes.
 - `seed` command generates type-aware test data respecting FK dependencies and semantic types.
-- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Two modes: validators, constants.
+- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Three modes: validators, constants, types (Go only).
 - Diff supports three modes: `--live` (against database), `--against` (against another TOML), `--base` (against git ref).
 - `doc` output format generates human-readable schema documentation.
+- Extension-provided types (e.g., `vector` from pgvector) become valid base types when declared via `[[extensions]]` in pgdesign.toml. Undeclared extension types remain hard errors.
+- Index definitions support `with = { key = "value" }` for PostgreSQL storage parameters (e.g., HNSW `m`, `ef_construction`). E216 validates parameters against index method.
+- Views are defined under `[views.*]` with `query`, optional `comment`, and optional `depends_on` for dependency ordering.
+- Materialized views are defined under `[materialized_views.*]` with `query`, optional `comment`, `with_data`, and nested `[materialized_views.*.indexes.*]`.
+- Codegen supports `--mode types` (Go only) for generating Go type definitions from the schema, in addition to `validators` and `constants`.
 
 ## Testing
 
