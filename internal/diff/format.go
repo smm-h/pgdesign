@@ -73,6 +73,25 @@ func FormatTerminal(d *SchemaDiff) string {
 		formatTableDiff(&b, &td)
 	}
 
+	// Views
+	for _, name := range d.ViewsAdded {
+		fmt.Fprintf(&b, "%s+ view %s%s\n", colorGreen, name, colorReset)
+	}
+	for _, name := range d.ViewsRemoved {
+		fmt.Fprintf(&b, "%s- view %s%s\n", colorRed, name, colorReset)
+	}
+	for _, vd := range d.ViewsChanged {
+		fmt.Fprintf(&b, "%s~ view %s%s\n", colorYellow, vd.Name, colorReset)
+		if vd.QueryChanged != nil {
+			fmt.Fprintf(&b, "  query:\n")
+			fmt.Fprintf(&b, "    %s- %s%s\n", colorRed, vd.QueryChanged[0], colorReset)
+			fmt.Fprintf(&b, "    %s+ %s%s\n", colorGreen, vd.QueryChanged[1], colorReset)
+		}
+		if vd.CommentChanged != nil {
+			fmt.Fprintf(&b, "  %s~ comment: %q -> %q%s\n", colorYellow, vd.CommentChanged[0], vd.CommentChanged[1], colorReset)
+		}
+	}
+
 	return b.String()
 }
 

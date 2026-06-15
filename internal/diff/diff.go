@@ -22,6 +22,9 @@ type SchemaDiff struct {
 	EnumsChanged      []EnumDiff  `json:"enums_changed"`
 	ExtensionsAdded   []string    `json:"extensions_added"`
 	ExtensionsRemoved []string    `json:"extensions_removed"`
+	ViewsAdded        []string    `json:"views_added,omitempty"`
+	ViewsRemoved      []string    `json:"views_removed,omitempty"`
+	ViewsChanged      []ViewDiff  `json:"views_changed,omitempty"`
 }
 
 // TableDiff describes the differences within a single table.
@@ -80,6 +83,13 @@ type EnumValueInsert struct {
 	After string `json:"after"` // the existing value it should go after
 }
 
+// ViewDiff describes changes to a view.
+type ViewDiff struct {
+	Name           string     `json:"name"`
+	QueryChanged   *[2]string `json:"query_changed,omitempty"`
+	CommentChanged *[2]string `json:"comment_changed,omitempty"`
+}
+
 // FKChange describes a changed foreign key constraint.
 type FKChange struct {
 	Name string   `json:"name"`
@@ -111,7 +121,10 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.EnumsRemoved) == 0 &&
 		len(d.EnumsChanged) == 0 &&
 		len(d.ExtensionsAdded) == 0 &&
-		len(d.ExtensionsRemoved) == 0
+		len(d.ExtensionsRemoved) == 0 &&
+		len(d.ViewsAdded) == 0 &&
+		len(d.ViewsRemoved) == 0 &&
+		len(d.ViewsChanged) == 0
 }
 
 // Summary returns a human-readable summary of the diff.
@@ -155,6 +168,15 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.ExtensionsRemoved); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d extension(s) removed", n))
 	}
+	if n := len(d.ViewsAdded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d view(s) added", n))
+	}
+	if n := len(d.ViewsRemoved); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d view(s) removed", n))
+	}
+	if n := len(d.ViewsChanged); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d view(s) changed", n))
+	}
 
 	return strings.Join(parts, ", ")
 }
@@ -168,6 +190,7 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 	diffTables(d, desired, actual)
 	diffEnums(d, desired, actual)
 	diffExtensions(d, desired, actual)
+	diffViews(d, desired, actual)
 
 	return d
 }
@@ -894,6 +917,68 @@ func enumReordered(desired, actual []string) bool {
 func diffExtensions(d *SchemaDiff, desired, actual *model.Schema) {
 	d.ExtensionsAdded = stringDiff(desired.Extensions, actual.Extensions)
 	d.ExtensionsRemoved = stringDiff(actual.Extensions, desired.Extensions)
+}
+
+// diffViews matches views by schema-qualified name.
+func diffViews(d *SchemaDiff, desired, actual *model.Schema) {
+	actualByKey := make(map[string]*model.View, len(actual.Views))
+	for i := range actual.Views {
+		v := &actual.Views[i]
+		actualByKey[viewKey(v)] = v
+	}
+
+	desiredKeys := make(map[string]bool, len(desired.Views))
+	for i := range desired.Views {
+		dv := &desired.Views[i]
+		key := viewKey(dv)
+		desiredKeys[key] = true
+
+		av, found := actualByKey[key]
+		if !found {
+			d.ViewsAdded = append(d.ViewsAdded, key)
+			continue
+		}
+
+		vd := diffView(dv, av)
+		if vd != nil {
+			d.ViewsChanged = append(d.ViewsChanged, *vd)
+		}
+	}
+
+	for _, av := range actual.Views {
+		key := viewKey(&av)
+		if !desiredKeys[key] {
+			d.ViewsRemoved = append(d.ViewsRemoved, key)
+		}
+	}
+}
+
+func viewKey(v *model.View) string {
+	if v.Schema == "" || v.Schema == "public" {
+		return v.Name
+	}
+	return v.Schema + "." + v.Name
+}
+
+// diffView compares two matched views and returns nil if identical.
+func diffView(desired, actual *model.View) *ViewDiff {
+	vd := &ViewDiff{Name: viewKey(desired)}
+	changed := false
+
+	if desired.Query != actual.Query {
+		vd.QueryChanged = &[2]string{actual.Query, desired.Query}
+		changed = true
+	}
+
+	if desired.Comment != actual.Comment {
+		vd.CommentChanged = &[2]string{actual.Comment, desired.Comment}
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return vd
 }
 
 // stringDiff returns elements in a that are not in b.
