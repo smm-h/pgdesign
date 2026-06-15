@@ -217,6 +217,68 @@ func Export(schema *model.Schema) ([]byte, error) {
 		}
 	}
 
+	// [materialized_views.*]
+	for _, mv := range schema.MaterializedViews {
+		mvPath := "materialized_views." + mv.Name
+		if err := doc.NewTable(mvPath); err != nil {
+			return nil, fmt.Errorf("create materialized view %s: %w", mv.Name, err)
+		}
+		if err := doc.SetCreate(mvPath+".query", mv.Query); err != nil {
+			return nil, fmt.Errorf("set %s.query: %w", mvPath, err)
+		}
+		if mv.Comment != "" {
+			if err := doc.SetCreate(mvPath+".comment", mv.Comment); err != nil {
+				return nil, fmt.Errorf("set %s.comment: %w", mvPath, err)
+			}
+		}
+		if !mv.WithData {
+			if err := doc.SetCreate(mvPath+".with_data", false); err != nil {
+				return nil, fmt.Errorf("set %s.with_data: %w", mvPath, err)
+			}
+		}
+		if len(mv.DependsOn) > 0 {
+			if err := doc.SetCreate(mvPath+".depends_on", toAnySlice(mv.DependsOn)); err != nil {
+				return nil, fmt.Errorf("set %s.depends_on: %w", mvPath, err)
+			}
+		}
+		// Indexes
+		for _, idx := range mv.Indexes {
+			idxPath := mvPath + ".indexes." + idx.Name
+			if err := doc.NewTable(idxPath); err != nil {
+				return nil, fmt.Errorf("create index %s: %w", idxPath, err)
+			}
+			colsWithDir := indexColumnsWithDir(idx.Columns, idx.Desc)
+			if err := doc.SetCreate(idxPath+".columns", toAnySlice(colsWithDir)); err != nil {
+				return nil, fmt.Errorf("set %s.columns: %w", idxPath, err)
+			}
+			if idx.Method != "" && idx.Method != "btree" {
+				if err := doc.SetCreate(idxPath+".method", idx.Method); err != nil {
+					return nil, fmt.Errorf("set %s.method: %w", idxPath, err)
+				}
+			}
+			if len(idx.Opclasses) > 0 {
+				if err := setOpclass(doc, idxPath, idx); err != nil {
+					return nil, fmt.Errorf("set %s.opclass: %w", idxPath, err)
+				}
+			}
+			if idx.Where != "" {
+				if err := doc.SetCreate(idxPath+".where", idx.Where); err != nil {
+					return nil, fmt.Errorf("set %s.where: %w", idxPath, err)
+				}
+			}
+			if len(idx.Include) > 0 {
+				if err := doc.SetCreate(idxPath+".include", toAnySlice(idx.Include)); err != nil {
+					return nil, fmt.Errorf("set %s.include: %w", idxPath, err)
+				}
+			}
+			if idx.Unique {
+				if err := doc.SetCreate(idxPath+".unique", true); err != nil {
+					return nil, fmt.Errorf("set %s.unique: %w", idxPath, err)
+				}
+			}
+		}
+	}
+
 	return doc.Format(), nil
 }
 
