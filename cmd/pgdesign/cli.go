@@ -390,6 +390,12 @@ func parseAndBuild(paths []string) (*model.Schema, int) {
 
 	reg := semtype.NewBuiltinRegistry()
 
+	// Register extension-provided types so they pass the base type allowlist.
+	cfg := loadProjectConfig(resolvedPaths[0])
+	for _, ext := range cfg.Extensions {
+		reg.AddExtensionTypes(ext.Types)
+	}
+
 	// Load user-defined types from all schemas into the registry.
 	for _, raw := range raws {
 		userTypes := collectUserTypes(raw)

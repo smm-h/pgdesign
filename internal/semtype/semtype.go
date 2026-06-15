@@ -52,14 +52,30 @@ type TypeDef struct {
 
 // Registry holds named TypeDefs with thread-safe read access.
 type Registry struct {
-	mu    sync.RWMutex
-	types map[string]*TypeDef
+	mu             sync.RWMutex
+	types          map[string]*TypeDef
+	extensionTypes map[string]bool
 }
 
 // NewRegistry creates an empty Registry.
 func NewRegistry() *Registry {
 	return &Registry{
 		types: make(map[string]*TypeDef),
+	}
+}
+
+// AddExtensionTypes registers extension-provided type names as valid base types
+// for scalar definitions. This allows extensions like pgvector to provide types
+// (e.g., "vector") that pass the allowlist check without mutating global state.
+func (r *Registry) AddExtensionTypes(typeNames []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.extensionTypes == nil {
+		r.extensionTypes = make(map[string]bool, len(typeNames))
+	}
+	for _, name := range typeNames {
+		r.extensionTypes[name] = true
 	}
 }
 
@@ -308,11 +324,11 @@ func (r *Registry) loadScalarType(ut UserTypeDef) diagnostic.Diagnostics {
 	if idx := strings.IndexByte(baseForCheck, '('); idx != -1 {
 		baseForCheck = baseForCheck[:idx]
 	}
-	if !pgTypeAllowlist[baseForCheck] {
+	if !pgTypeAllowlist[baseForCheck] && !r.extensionTypes[baseForCheck] {
 		diags = append(diags, diagnostic.Diagnostic{
-			Severity: diagnostic.Error,
-			Code:     "E106",
-			Message:  fmt.Sprintf("scalar type %q: unknown base type %q", ut.Name, ut.Base),
+			Severity:   diagnostic.Error,
+			Code:       "E106",
+			Message:    fmt.Sprintf("scalar type %q: unknown base type %q", ut.Name, ut.Base),
 			Suggestion: "base must be a valid PostgreSQL type",
 		})
 		return diags

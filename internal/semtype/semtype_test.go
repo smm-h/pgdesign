@@ -517,3 +517,87 @@ func TestLoadUserScalarType_NumericDefault_NoE110(t *testing.T) {
 		}
 	}
 }
+
+func TestExtensionType_Accepted(t *testing.T) {
+	r := NewBuiltinRegistry()
+	r.AddExtensionTypes([]string{"vector"})
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "embedding",
+			Kind: "scalar",
+			Base: "vector(384)",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("expected no errors with extension type, got: %v", diags)
+	}
+
+	td, err := r.Resolve("embedding")
+	if err != nil {
+		t.Fatalf("Resolve(embedding) error: %v", err)
+	}
+	if td.BaseType != "vector(384)" {
+		t.Errorf("BaseType = %q, want %q", td.BaseType, "vector(384)")
+	}
+}
+
+func TestExtensionType_MissingExtension_E106(t *testing.T) {
+	r := NewBuiltinRegistry()
+	// No AddExtensionTypes call -- "vector" is not registered.
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "embedding",
+			Kind: "scalar",
+			Base: "vector(384)",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected E106 for unregistered extension type, got none")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Code == "E106" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E106 for unregistered extension type")
+	}
+}
+
+func TestExtensionType_UnknownStillRejected(t *testing.T) {
+	r := NewBuiltinRegistry()
+	r.AddExtensionTypes([]string{"vector"})
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "bad",
+			Kind: "scalar",
+			Base: "unknown",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected E106 for truly unknown type, got none")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Code == "E106" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E106 for truly unknown base type")
+	}
+}
