@@ -79,6 +79,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"E213", checkGeneratedColRefsGenerated},
 		{"E214", checkOpclassMissingExtension},
 		{"E216", checkIndexWithParams},
+		{"E218", checkVirtualRequiresPG18},
 		{"E215", checkPolicyExprMismatch},
 		{"W009", checkPolicyErrorCodeSnakeCase},
 		{"W001", checkGodTable},
@@ -648,6 +649,40 @@ func checkPolicyExprMismatch(schema *model.Schema, _ *Config) []diagnostic.Diagn
 					})
 				}
 			// UPDATE and ALL can have both -- no check needed.
+			}
+		}
+	}
+	return diags
+}
+
+// checkVirtualRequiresPG18 flags generated columns with stored=false when the
+// target PG version does not support VIRTUAL generated columns (requires PG 18+).
+func checkVirtualRequiresPG18(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		for _, c := range t.Columns {
+			if c.Generated == "" || c.Stored {
+				continue
+			}
+			// stored=false with a generated expression means VIRTUAL.
+			if schema.PGVersion > 0 && schema.PGVersion < 18 {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E218",
+					Table:      t.Name,
+					Column:     c.Name,
+					Message:    fmt.Sprintf("VIRTUAL generated column %q requires PostgreSQL 18+, but target version is %d", c.Name, schema.PGVersion),
+					Suggestion: "Set stored = true, or configure pg_version >= 18 in pgdesign.toml",
+				})
+			} else if schema.PGVersion == 0 {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "E218",
+					Table:      t.Name,
+					Column:     c.Name,
+					Message:    fmt.Sprintf("VIRTUAL generated column %q requires PostgreSQL 18+; target version is not configured", c.Name),
+					Suggestion: "Set pg_version in [meta] to confirm PG 18+ support, or set stored = true",
+				})
 			}
 		}
 	}
