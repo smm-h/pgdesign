@@ -109,8 +109,12 @@ func (p *parser) parseComparison() (Node, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	tok := p.current()
-	if tok.kind == tokenEquals || tok.kind == tokenNotEquals {
+
+	// Standard operator comparisons: =, !=, <>, <, >, <=, >=
+	switch tok.kind {
+	case tokenEquals, tokenNotEquals, tokenLess, tokenGreater, tokenLessEqual, tokenGreaterEqual:
 		op := p.advance()
 		right, err := p.parseConcat()
 		if err != nil {
@@ -118,7 +122,147 @@ func (p *parser) parseComparison() (Node, error) {
 		}
 		return &BinaryOp{Op: op.value, Left: left, Right: right}, nil
 	}
+
+	// IS NULL / IS NOT NULL / IS DISTINCT FROM
+	if p.isKeyword("IS") {
+		p.advance()
+		if p.isKeyword("NOT") {
+			p.advance()
+			if p.isKeyword("NULL") {
+				p.advance()
+				return &UnaryOp{Op: "IS NOT NULL", Operand: left}, nil
+			}
+			return nil, fmt.Errorf("sqlexpr: expected NULL after IS NOT at position %d", p.current().pos)
+		}
+		if p.isKeyword("NULL") {
+			p.advance()
+			return &UnaryOp{Op: "IS NULL", Operand: left}, nil
+		}
+		if p.isKeyword("DISTINCT") {
+			p.advance()
+			if !p.isKeyword("FROM") {
+				return nil, fmt.Errorf("sqlexpr: expected FROM after IS DISTINCT at position %d", p.current().pos)
+			}
+			p.advance()
+			right, err := p.parseConcat()
+			if err != nil {
+				return nil, err
+			}
+			return &BinaryOp{Op: "IS DISTINCT FROM", Left: left, Right: right}, nil
+		}
+		return nil, fmt.Errorf("sqlexpr: expected NULL, NOT NULL, or DISTINCT FROM after IS at position %d", p.current().pos)
+	}
+
+	// NOT IN / NOT LIKE / NOT ILIKE (must check before bare IN/LIKE/ILIKE since NOT comes first)
+	if p.isKeyword("NOT") {
+		if p.pos+1 < len(p.tokens) {
+			next := p.tokens[p.pos+1]
+			if next.kind == tokenIdent {
+				nextLower := strings.ToLower(next.value)
+				if nextLower == "in" {
+					p.advance() // consume NOT
+					p.advance() // consume IN
+					args, err := p.parseParenList()
+					if err != nil {
+						return nil, err
+					}
+					return &BinaryOp{Op: "NOT IN", Left: left, Right: &FuncCall{Name: "NOT IN", Args: args}}, nil
+				}
+				if nextLower == "like" {
+					p.advance() // consume NOT
+					p.advance() // consume LIKE
+					right, err := p.parseConcat()
+					if err != nil {
+						return nil, err
+					}
+					return &BinaryOp{Op: "NOT LIKE", Left: left, Right: right}, nil
+				}
+				if nextLower == "ilike" {
+					p.advance() // consume NOT
+					p.advance() // consume ILIKE
+					right, err := p.parseConcat()
+					if err != nil {
+						return nil, err
+					}
+					return &BinaryOp{Op: "NOT ILIKE", Left: left, Right: right}, nil
+				}
+			}
+		}
+		// NOT without IN/LIKE/ILIKE -- not a comparison keyword, fall through
+	}
+
+	// IN (...)
+	if p.isKeyword("IN") {
+		p.advance()
+		args, err := p.parseParenList()
+		if err != nil {
+			return nil, err
+		}
+		return &BinaryOp{Op: "IN", Left: left, Right: &FuncCall{Name: "IN", Args: args}}, nil
+	}
+
+	// BETWEEN x AND y
+	if p.isKeyword("BETWEEN") {
+		p.advance()
+		lo, err := p.parseConcat()
+		if err != nil {
+			return nil, err
+		}
+		if !p.isKeyword("AND") {
+			return nil, fmt.Errorf("sqlexpr: expected AND in BETWEEN expression at position %d", p.current().pos)
+		}
+		p.advance()
+		hi, err := p.parseConcat()
+		if err != nil {
+			return nil, err
+		}
+		return &BinaryOp{Op: "BETWEEN", Left: left, Right: &BinaryOp{Op: "AND", Left: lo, Right: hi}}, nil
+	}
+
+	// LIKE / ILIKE
+	if p.isKeyword("LIKE") {
+		p.advance()
+		right, err := p.parseConcat()
+		if err != nil {
+			return nil, err
+		}
+		return &BinaryOp{Op: "LIKE", Left: left, Right: right}, nil
+	}
+	if p.isKeyword("ILIKE") {
+		p.advance()
+		right, err := p.parseConcat()
+		if err != nil {
+			return nil, err
+		}
+		return &BinaryOp{Op: "ILIKE", Left: left, Right: right}, nil
+	}
+
 	return left, nil
+}
+
+// parseParenList parses a parenthesized comma-separated list of expressions.
+func (p *parser) parseParenList() ([]Node, error) {
+	if _, err := p.expect(tokenLParen); err != nil {
+		return nil, fmt.Errorf("sqlexpr: expected '(' at position %d", p.current().pos)
+	}
+	var items []Node
+	if p.current().kind != tokenRParen {
+		for {
+			item, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+			if p.current().kind != tokenComma {
+				break
+			}
+			p.advance()
+		}
+	}
+	if _, err := p.expect(tokenRParen); err != nil {
+		return nil, fmt.Errorf("sqlexpr: unclosed parenthesized list at position %d", p.current().pos)
+	}
+	return items, nil
 }
 
 func (p *parser) parseConcat() (Node, error) {
