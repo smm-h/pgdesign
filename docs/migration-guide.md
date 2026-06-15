@@ -81,6 +81,17 @@ down = { irreversible = true }
 | `drop_enum` | Drop an enum type |
 | `alter_enum_add_value` | Add a value to an enum type |
 | `create_partition` | Create a partition child table |
+| `create_view` | Create a view |
+| `drop_view` | Drop a view |
+| `create_or_replace_view` | Create or replace a view |
+| `create_materialized_view` | Create a materialized view |
+| `drop_materialized_view` | Drop a materialized view |
+| `refresh_materialized_view` | Refresh a materialized view |
+| `alter_index_set` | Alter index storage parameters |
+| `create_function` | Create a function |
+| `drop_function` | Drop a function |
+| `create_trigger` | Create a trigger |
+| `drop_trigger` | Drop a trigger |
 
 ### DML operations
 
@@ -321,6 +332,55 @@ to = "text[]"
 Adding a `json_schema` attribute to a JSONB column generates CHECK constraints based on the referenced JSON Schema's required properties. These constraints validate that the JSONB value contains the expected top-level keys.
 
 When the `json_schema` reference changes (pointing to a different schema file or the schema file is updated), pgdesign generates updated CHECK constraints -- dropping the old constraint and adding the new one.
+
+## View migrations
+
+pgdesign generates view migrations when diffing detects view changes:
+
+**Adding a view:** Generates `CREATE VIEW` with the full query definition.
+
+**Removing a view:** Generates `DROP VIEW`.
+
+**Changing a view:** Generates `CREATE OR REPLACE VIEW` with the updated query. PostgreSQL's `CREATE OR REPLACE VIEW` updates the view definition in place without dropping dependent objects, as long as the column list remains compatible.
+
+Views are ordered after table operations in the migration file to ensure referenced tables exist.
+
+## Materialized view migrations
+
+Materialized views cannot be altered in place -- any change requires a full rebuild:
+
+**Adding a materialized view:** Generates `CREATE MATERIALIZED VIEW` followed by `CREATE INDEX` for any defined indexes.
+
+**Removing a materialized view:** Generates `DROP MATERIALIZED VIEW`.
+
+**Changing a materialized view:** Generates `DROP MATERIALIZED VIEW` followed by `CREATE MATERIALIZED VIEW` and re-creation of all indexes. This applies when the query or `WITH DATA` setting changes. Unlike regular views, materialized views do not support `CREATE OR REPLACE`.
+
+**Index-only changes on materialized views:** When the query and `WITH DATA` setting are unchanged but indexes differ, index additions, removals, or modifications are handled individually (the materialized view itself is not rebuilt).
+
+Materialized views are ordered after regular views in the migration file.
+
+## Index WITH parameter migrations
+
+When index storage parameters (the `with` field) change between schema versions, pgdesign treats it as an index change and generates `DROP INDEX` followed by `CREATE INDEX` with the new parameters. This applies regardless of the index method (btree, hash, gin, gist, brin, hnsw, ivfflat, etc.).
+
+```toml
+# Changing HNSW parameters triggers drop + recreate
+[[ddl]]
+op = "drop_index"
+table = "public.items"
+name = "idx_items_embedding"
+
+[[ddl]]
+op = "create_index"
+table = "public.items"
+name = "idx_items_embedding"
+columns = ["embedding"]
+method = "hnsw"
+opclass = "vector_cosine_ops"
+with = { m = "16", ef_construction = "200" }
+```
+
+The `alter_index_set` op type is available for manually authored migrations that want to use `ALTER INDEX ... SET (key = value)` to update built-in index parameters in place without rebuilding, but the automatic migration generator always uses the drop+create approach for consistency.
 
 ## Dry-run mode
 
