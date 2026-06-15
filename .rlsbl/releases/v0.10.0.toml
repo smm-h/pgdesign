@@ -1,0 +1,12 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Extension types, views, materialized views, index WITH parameters, codegen types mode"
+# Optional context explaining why these changes were made
+context = """
+Adds extension-provided types as valid scalar base types (e.g., pgvector's vector type), \
+views and materialized views across the full pipeline (parse, model, SQL, diff, migrate, \
+introspect, diagram, docs), index WITH storage parameters with E216 validation, \
+codegen --mode types for Go, pgvector as a built-in extension, and array migration generation fix."""
+include = ["go", "npm", "pypi"]
+exclude = []
