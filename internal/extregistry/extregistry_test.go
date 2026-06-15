@@ -192,6 +192,64 @@ func TestRequiredExtensionForMethod_Unknown(t *testing.T) {
 	}
 }
 
+func TestPgvectorBuiltin(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// Types
+	for _, typ := range []string{"vector", "halfvec", "sparsevec"} {
+		ext, ok := r.RequiredExtensionForType(typ)
+		if !ok {
+			t.Errorf("type %s not found", typ)
+			continue
+		}
+		if ext != "pgvector" {
+			t.Errorf("type %s: expected pgvector, got %s", typ, ext)
+		}
+	}
+
+	// Opclasses
+	opclasses := []string{
+		"vector_l2_ops", "vector_ip_ops", "vector_cosine_ops", "vector_l1_ops",
+		"halfvec_l2_ops", "halfvec_ip_ops", "halfvec_cosine_ops",
+		"sparsevec_l2_ops", "sparsevec_ip_ops", "sparsevec_cosine_ops",
+		"bit_hamming_ops", "bit_jaccard_ops",
+	}
+	for _, oc := range opclasses {
+		ext, ok := r.RequiredExtension(oc)
+		if !ok {
+			t.Errorf("opclass %s not found", oc)
+			continue
+		}
+		if ext != "pgvector" {
+			t.Errorf("opclass %s: expected pgvector, got %s", oc, ext)
+		}
+	}
+
+	// Functions
+	for _, fn := range []string{"l2_distance", "inner_product", "cosine_distance", "l1_distance"} {
+		ext, ok := r.RequiredExtensionForFunction(fn)
+		if !ok {
+			t.Errorf("function %s not found", fn)
+			continue
+		}
+		if ext != "pgvector" {
+			t.Errorf("function %s: expected pgvector, got %s", fn, ext)
+		}
+	}
+
+	// Index methods
+	for _, m := range []string{"hnsw", "ivfflat"} {
+		ext, ok := r.RequiredExtensionForMethod(m)
+		if !ok {
+			t.Errorf("index method %s not found", m)
+			continue
+		}
+		if ext != "pgvector" {
+			t.Errorf("index method %s: expected pgvector, got %s", m, ext)
+		}
+	}
+}
+
 func TestLoadUserExtensions_IndexMethods(t *testing.T) {
 	r := NewBuiltinRegistry()
 	r.LoadUserExtensions([]UserExtension{
