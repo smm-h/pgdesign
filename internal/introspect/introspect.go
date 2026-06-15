@@ -59,7 +59,7 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 
 	// Extract tables from all requested schemas.
 	for _, sn := range schemaNames {
-		tables, tableDiags, err := queryTables(ctx, conn, sn)
+		tables, tableDiags, err := queryTables(ctx, conn, sn, pgVersion)
 		if err != nil {
 			return nil, nil, fmt.Errorf("tables for schema %q: %w", sn, err)
 		}
@@ -168,7 +168,7 @@ func queryEnums(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model
 }
 
 // queryTables returns all tables (regular + partitioned) in the given schema.
-func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.Table, []diagnostic.Diagnostic, error) {
+func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersion int) ([]model.Table, []diagnostic.Diagnostic, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT c.oid, c.relname, c.relkind::text, d.description
 		FROM pg_class c
@@ -216,7 +216,7 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string) ([]mode
 		}
 
 		// Columns
-		cols, err := queryColumns(ctx, conn, ti.oid)
+		cols, err := queryColumns(ctx, conn, ti.oid, pgVersion)
 		if err != nil {
 			return nil, nil, fmt.Errorf("columns for %s.%s: %w", schemaName, ti.name, err)
 		}
@@ -260,7 +260,7 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string) ([]mode
 
 		// Partition metadata (only for partitioned tables).
 		if ti.relkind == "p" {
-			ps, err := queryPartitionSpec(ctx, conn, ti.oid, t.Columns)
+			ps, err := queryPartitionSpec(ctx, conn, ti.oid, t.Columns, pgVersion)
 			if err != nil {
 				return nil, nil, fmt.Errorf("partitioning for %s.%s: %w", schemaName, ti.name, err)
 			}
@@ -274,17 +274,32 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string) ([]mode
 }
 
 // queryColumns returns columns for a table OID.
-func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model.Column, error) {
-	rows, err := conn.Query(ctx, `
-		SELECT a.attname, format_type(a.atttypid, a.atttypmod) as type,
-		       a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid) as default_expr,
-		       d.description
-		FROM pg_attribute a
-		LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
-		LEFT JOIN pg_description d ON d.objoid = a.attrelid AND d.objsubid = a.attnum
-		WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
-		ORDER BY a.attnum
-	`, tableOID)
+func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersion int) ([]model.Column, error) {
+	// PG 12+ has attgenerated; older versions don't.
+	var query string
+	if pgVersion >= 12 {
+		query = `
+			SELECT a.attname, format_type(a.atttypid, a.atttypmod) as type,
+			       a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid) as default_expr,
+			       d.description, a.attgenerated::text
+			FROM pg_attribute a
+			LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
+			LEFT JOIN pg_description d ON d.objoid = a.attrelid AND d.objsubid = a.attnum
+			WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
+			ORDER BY a.attnum`
+	} else {
+		query = `
+			SELECT a.attname, format_type(a.atttypid, a.atttypmod) as type,
+			       a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid) as default_expr,
+			       d.description, '' as attgenerated
+			FROM pg_attribute a
+			LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
+			LEFT JOIN pg_description d ON d.objoid = a.attrelid AND d.objsubid = a.attnum
+			WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
+			ORDER BY a.attnum`
+	}
+
+	rows, err := conn.Query(ctx, query, tableOID)
 	if err != nil {
 		return nil, err
 	}
@@ -295,9 +310,27 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model
 		var c model.Column
 		var defaultExpr *string
 		var comment *string
-		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment); err != nil {
+		var attgenerated string
+		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment, &attgenerated); err != nil {
 			return nil, err
 		}
+
+		// Map attgenerated: 's' = stored, 'v' = virtual, '' = not generated.
+		switch attgenerated {
+		case "s":
+			if defaultExpr != nil {
+				c.Generated = *defaultExpr
+				defaultExpr = nil // Don't also set it as DefaultExpr.
+			}
+			c.Stored = true
+		case "v":
+			if defaultExpr != nil {
+				c.Generated = *defaultExpr
+				defaultExpr = nil
+			}
+			c.Stored = false
+		}
+
 		// All defaults are stored in DefaultExpr via pg_get_expr, not in Default.
 		// Default is only set from TOML schema definitions, not introspection.
 		if defaultExpr != nil {
@@ -630,7 +663,7 @@ func mapPartStrategy(code string) string {
 
 // queryPartitionSpec queries partition metadata for a partitioned table and
 // returns a fully populated PartitionSpec including recursive children.
-func queryPartitionSpec(ctx context.Context, conn *pgx.Conn, tableOID uint32, columns []model.Column) (*model.PartitionSpec, error) {
+func queryPartitionSpec(ctx context.Context, conn *pgx.Conn, tableOID uint32, columns []model.Column, pgVersion int) (*model.PartitionSpec, error) {
 	// Query partition strategy and key column attribute numbers.
 	var stratCode string
 	var partAttrs []int32
@@ -652,7 +685,7 @@ func queryPartitionSpec(ctx context.Context, conn *pgx.Conn, tableOID uint32, co
 	}
 
 	// Query child partitions.
-	children, err := queryPartitionChildren(ctx, conn, tableOID)
+	children, err := queryPartitionChildren(ctx, conn, tableOID, pgVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -688,7 +721,7 @@ func resolvePartColumn(attNums []int32, columns []model.Column) string {
 
 // queryPartitionChildren returns child partitions for a parent OID,
 // recursing into sub-partitioned children.
-func queryPartitionChildren(ctx context.Context, conn *pgx.Conn, parentOID uint32) ([]model.PartitionSpec, error) {
+func queryPartitionChildren(ctx context.Context, conn *pgx.Conn, parentOID uint32, pgVersion int) ([]model.PartitionSpec, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT c.oid, c.relname, c.relkind::text,
 		       pg_get_expr(c.relpartbound, c.oid) as bound_expr
@@ -736,11 +769,11 @@ func queryPartitionChildren(ctx context.Context, conn *pgx.Conn, parentOID uint3
 		// If the child is itself partitioned, recurse to get its sub-partitions.
 		if ci.relkind == "p" {
 			// Query child's columns for resolving its own partition key.
-			childCols, err := queryColumns(ctx, conn, ci.oid)
+			childCols, err := queryColumns(ctx, conn, ci.oid, pgVersion)
 			if err != nil {
 				return nil, fmt.Errorf("columns for child %s: %w", ci.name, err)
 			}
-			subSpec, err := queryPartitionSpec(ctx, conn, ci.oid, childCols)
+			subSpec, err := queryPartitionSpec(ctx, conn, ci.oid, childCols, pgVersion)
 			if err != nil {
 				return nil, fmt.Errorf("sub-partition for %s: %w", ci.name, err)
 			}
