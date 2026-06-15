@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -47,6 +48,8 @@ func OpToSQL(op DDLOp) string {
 		return opCreateIndexConcurrently(op)
 	case "drop_index_concurrently":
 		return opDropIndexConcurrently(op)
+	case "alter_index_set":
+		return opAlterIndexSet(op)
 	case "add_unique":
 		return opAddUnique(op)
 	case "drop_unique":
@@ -191,6 +194,7 @@ func opCreateIndex(op DDLOp) string {
 		Opclasses: op.Opclasses,
 		Where:     op.Where,
 		Include:   op.Include,
+		With:      op.With,
 	}
 	schema, tableName := splitQualifiedName(op.Table)
 	return sql.CreateIndex(schema, idx, tableName, false, false)
@@ -213,6 +217,7 @@ func opCreateIndexConcurrently(op DDLOp) string {
 		Opclasses: op.Opclasses,
 		Where:     op.Where,
 		Include:   op.Include,
+		With:      op.With,
 	}
 	schema, tableName := splitQualifiedName(op.Table)
 	return sql.CreateIndex(schema, idx, tableName, false, true)
@@ -224,6 +229,22 @@ func opDropIndexConcurrently(op DDLOp) string {
 		return fmt.Sprintf("DROP INDEX CONCURRENTLY %s.%s;", sql.QuoteIdent(schema), sql.QuoteIdent(op.Name))
 	}
 	return fmt.Sprintf("DROP INDEX CONCURRENTLY %s;", sql.QuoteIdent(op.Name))
+}
+
+func opAlterIndexSet(op DDLOp) string {
+	schema, _ := splitQualifiedName(op.Table)
+	var parts []string
+	for k, v := range op.With {
+		parts = append(parts, fmt.Sprintf("%s = %s", k, v))
+	}
+	sort.Strings(parts)
+	idxName := op.Name
+	if schema != "" {
+		idxName = fmt.Sprintf("%s.%s", sql.QuoteIdent(schema), sql.QuoteIdent(op.Name))
+	} else {
+		idxName = sql.QuoteIdent(op.Name)
+	}
+	return fmt.Sprintf("ALTER INDEX %s SET (%s);", idxName, strings.Join(parts, ", "))
 }
 
 func opAddUnique(op DDLOp) string {
