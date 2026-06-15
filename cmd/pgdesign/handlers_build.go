@@ -57,10 +57,7 @@ func handleBuild(kwargs map[string]interface{}) int {
 		return exitCode
 	}
 
-	pgVersion := schema.PGVersion
-	if pgVersion == 0 && cfg.Database.PGVersion != 0 {
-		pgVersion = cfg.Database.PGVersion
-	}
+	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
 
 	// Sort output names for deterministic ordering.
 	names := make([]string, 0, len(cfg.Output))

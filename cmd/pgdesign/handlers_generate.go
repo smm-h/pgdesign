@@ -31,11 +31,7 @@ func handleGenerate(kwargs map[string]interface{}) int {
 		}
 	}
 
-	// Use config PGVersion as fallback when schema doesn't specify one.
-	pgVersion := schema.PGVersion
-	if pgVersion == 0 && cfg.Database.PGVersion != 0 {
-		pgVersion = cfg.Database.PGVersion
-	}
+	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
 
 	opts := generate.Options{
 		Idempotent:      kwargs["idempotent"].(bool),
