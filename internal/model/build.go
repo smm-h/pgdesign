@@ -26,6 +26,7 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	tables, enums, resolveDiags := resolve(raw, reg)
 	diags = append(diags, resolveDiags...)
 	schema.Enums = enums
+	schema.Views = resolveViews(raw)
 
 	// Phase 2: order
 	sorted, cycles := topoSort(tables)
@@ -74,6 +75,7 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 		diags = append(diags, resolveDiags...)
 		schema.Enums = append(schema.Enums, enums...)
 		allTables = append(allTables, tables...)
+		schema.Views = append(schema.Views, resolveViews(raw)...)
 	}
 
 	// Phase 2: order all tables together (topo sort sees cross-schema deps).
@@ -119,6 +121,30 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, diag
 	}
 
 	return tables, enums, diags
+}
+
+// resolveViews converts raw views into model Views.
+func resolveViews(raw *parse.RawSchema) []View {
+	var views []View
+	for _, rv := range raw.Views {
+		v := resolveView(rv, raw.Meta.Schema)
+		views = append(views, v)
+	}
+	return views
+}
+
+// resolveView converts a single raw view into a model View.
+func resolveView(rv parse.RawView, schemaName string) View {
+	v := View{
+		Name:      rv.Name,
+		Schema:    schemaName,
+		Query:     rv.Query,
+		DependsOn: rv.DependsOn,
+	}
+	if rv.Comment != nil {
+		v.Comment = *rv.Comment
+	}
+	return v
 }
 
 // resolveTable resolves a single raw table into a model Table.

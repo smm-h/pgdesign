@@ -164,6 +164,57 @@ func TestBuild_AppendOnlyPropagation(t *testing.T) {
 	}
 }
 
+func TestBuild_ViewResolution(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	comment := "Active users only"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "users",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "active", Type: "flag"},
+				},
+			},
+		},
+		Views: []parse.RawView{
+			{
+				Name:      "active_users",
+				Query:     "SELECT id FROM users WHERE active",
+				Comment:   &comment,
+				DependsOn: []string{"users"},
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Views) != 1 {
+		t.Fatalf("expected 1 view, got %d", len(schema.Views))
+	}
+
+	v := schema.Views[0]
+	if v.Name != "active_users" {
+		t.Errorf("view name = %q, want %q", v.Name, "active_users")
+	}
+	if v.Schema != "public" {
+		t.Errorf("view schema = %q, want %q", v.Schema, "public")
+	}
+	if v.Query != "SELECT id FROM users WHERE active" {
+		t.Errorf("view query = %q, want %q", v.Query, "SELECT id FROM users WHERE active")
+	}
+	if v.Comment != "Active users only" {
+		t.Errorf("view comment = %q, want %q", v.Comment, "Active users only")
+	}
+	if len(v.DependsOn) != 1 || v.DependsOn[0] != "users" {
+		t.Errorf("view depends_on = %v, want [users]", v.DependsOn)
+	}
+}
+
 func TestBuild_JSONSchemaPropagation(t *testing.T) {
 	reg := semtype.NewBuiltinRegistry()
 	schemaFile := "schema.json"

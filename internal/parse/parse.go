@@ -154,6 +154,7 @@ func (p *parser) walk() *RawSchema {
 	schema.Meta = p.parseMeta()
 	schema.Types = p.parseTypes()
 	schema.Tables = p.parseTables()
+	schema.Views = p.parseViews()
 	return schema
 }
 
@@ -340,6 +341,72 @@ func (p *parser) parseTables() []RawTable {
 	}
 
 	return tables
+}
+
+// parseViews extracts all [views.*] sections in source order.
+func (p *parser) parseViews() []RawView {
+	var views []RawView
+
+	for _, child := range p.doc.Children {
+		tbl, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl.KeyPath) == 2 && tbl.KeyPath[0] == "views" {
+			viewName := tbl.KeyPath[1]
+			rv := p.parseView(viewName, tbl)
+			views = append(views, rv)
+		}
+	}
+
+	return views
+}
+
+func (p *parser) parseView(name string, tbl *tomledit.TableNode) RawView {
+	rv := RawView{Name: name}
+
+	knownKeys := map[string]bool{
+		"query": true, "comment": true, "depends_on": true,
+	}
+
+	for _, child := range tbl.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		key := kv.Key.Parts[0]
+		if !knownKeys[key] {
+			p.warnf("W001", "", "", "unknown key in [views.%s]: %q", name, key)
+			continue
+		}
+		switch key {
+		case "query":
+			if v, ok := nodeString(kv.Val); ok {
+				rv.Query = v
+			} else {
+				p.errorf("E010", "", "", "[views.%s].query must be a string", name)
+			}
+		case "comment":
+			if v, ok := nodeString(kv.Val); ok {
+				rv.Comment = &v
+			} else {
+				p.errorf("E010", "", "", "[views.%s].comment must be a string", name)
+			}
+		case "depends_on":
+			if v, ok := nodeStringSlice(kv.Val); ok {
+				rv.DependsOn = v
+			} else {
+				p.errorf("E010", "", "", "[views.%s].depends_on must be an array of strings", name)
+			}
+		}
+	}
+
+	// query is required
+	if rv.Query == "" {
+		p.errorf("E011", "", "", "view %q is missing required field \"query\"", name)
+	}
+
+	return rv
 }
 
 func (p *parser) parseTable(name string) RawTable {

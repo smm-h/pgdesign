@@ -8,6 +8,7 @@ type RawSchema struct {
 	Meta   RawMeta
 	Types  []RawType
 	Tables []RawTable
+	Views  []RawView
 }
 
 // RawMeta holds the [meta] section values.
@@ -30,6 +31,14 @@ type RawType struct {
 	Unique     *bool
 	Array      *bool
 	Comment    *string
+}
+
+// RawView holds a view definition from [views.*].
+type RawView struct {
+	Name      string
+	Query     string
+	Comment   *string
+	DependsOn []string
 }
 
 // RawTable holds a table definition from [tables.*].

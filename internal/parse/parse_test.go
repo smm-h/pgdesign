@@ -904,6 +904,104 @@ with = { m = "16", ef_construction = "200" }
 	}
 }
 
+func TestViewParsing(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.users]
+pk = ["id"]
+comment = "Users"
+
+[tables.users.columns.id]
+type = "auto_id"
+
+[tables.users.columns.active]
+type = "boolean"
+
+[views.active_users]
+query = "SELECT id FROM users WHERE active"
+comment = "Active users only"
+depends_on = ["users"]
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Views) != 1 {
+		t.Fatalf("expected 1 view, got %d", len(schema.Views))
+	}
+
+	v := schema.Views[0]
+	if v.Name != "active_users" {
+		t.Errorf("view name = %q, want %q", v.Name, "active_users")
+	}
+	if v.Query != "SELECT id FROM users WHERE active" {
+		t.Errorf("view query = %q, want %q", v.Query, "SELECT id FROM users WHERE active")
+	}
+	if v.Comment == nil || *v.Comment != "Active users only" {
+		t.Errorf("view comment = %v, want %q", v.Comment, "Active users only")
+	}
+	if len(v.DependsOn) != 1 || v.DependsOn[0] != "users" {
+		t.Errorf("view depends_on = %v, want [users]", v.DependsOn)
+	}
+}
+
+func TestViewMissingQuery(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[views.broken]
+comment = "No query"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+
+	var hasError bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E011" {
+			hasError = true
+			break
+		}
+	}
+	if !hasError {
+		t.Error("expected E011 error for missing query field")
+	}
+}
+
+func TestViewUnknownKey(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[views.v]
+query = "SELECT 1"
+unknown_field = "oops"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+
+	var hasWarning bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Warning && d.Code == "W001" {
+			hasWarning = true
+			break
+		}
+	}
+	if !hasWarning {
+		t.Error("expected W001 warning for unknown key in view")
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {

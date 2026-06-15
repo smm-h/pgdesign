@@ -12,8 +12,18 @@ type Schema struct {
 	Extensions  []string   `json:"extensions"`
 	Enums       []Enum     `json:"enums"`
 	Tables      []Table    `json:"tables"`
+	Views       []View     `json:"views,omitempty"`
 	CycleGroups [][]string `json:"cycle_groups,omitempty"`
 	PGVersion   int        `json:"pg_version"`
+}
+
+// View represents a resolved view definition.
+type View struct {
+	Name      string   `json:"name"`
+	Schema    string   `json:"schema,omitempty"`
+	Query     string   `json:"query"`
+	Comment   string   `json:"comment,omitempty"`
+	DependsOn []string `json:"depends_on,omitempty"`
 }
 
 // TableOrder returns tables in dependency order (topo-sorted).
