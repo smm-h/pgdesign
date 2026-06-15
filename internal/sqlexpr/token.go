@@ -23,6 +23,10 @@ const (
 	tokenStar
 	tokenPlus
 	tokenMinus
+	tokenLess
+	tokenGreater
+	tokenLessEqual
+	tokenGreaterEqual
 	tokenEOF
 )
 
@@ -75,9 +79,26 @@ func tokenize(input string) ([]token, error) {
 			tokens = append(tokens, token{kind: tokenNotEquals, value: "!=", pos: pos})
 			i += 2
 
-		case runes[i] == '<' && i+1 < len(runes) && runes[i+1] == '>':
-			tokens = append(tokens, token{kind: tokenNotEquals, value: "<>", pos: pos})
-			i += 2
+		case runes[i] == '<':
+			if i+1 < len(runes) && runes[i+1] == '>' {
+				tokens = append(tokens, token{kind: tokenNotEquals, value: "<>", pos: pos})
+				i += 2
+			} else if i+1 < len(runes) && runes[i+1] == '=' {
+				tokens = append(tokens, token{kind: tokenLessEqual, value: "<=", pos: pos})
+				i += 2
+			} else {
+				tokens = append(tokens, token{kind: tokenLess, value: "<", pos: pos})
+				i++
+			}
+
+		case runes[i] == '>':
+			if i+1 < len(runes) && runes[i+1] == '=' {
+				tokens = append(tokens, token{kind: tokenGreaterEqual, value: ">=", pos: pos})
+				i += 2
+			} else {
+				tokens = append(tokens, token{kind: tokenGreater, value: ">", pos: pos})
+				i++
+			}
 
 		case runes[i] == '|' && i+1 < len(runes) && runes[i+1] == '|':
 			tokens = append(tokens, token{kind: tokenPipe, value: "||", pos: pos})
