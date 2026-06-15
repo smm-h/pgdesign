@@ -123,8 +123,12 @@ func handleBuild(kwargs map[string]interface{}) int {
 			content = []byte(result)
 
 		case "doc":
-			fmt.Fprintf(os.Stderr, "build: output %q: format \"doc\" not yet implemented, skipping\n", name)
-			continue
+			result, err := generate.Generate(schema, generate.Options{Format: "doc"})
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "build: output %q: %v\n", name, err)
+				return 1
+			}
+			content = []byte(result)
 
 		case "codegen":
 			gen, ok := selectCodegenGenerator(name, out.Lang, out.Mode)
