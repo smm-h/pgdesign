@@ -258,6 +258,15 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 		parts = append(parts, fmt.Sprintf("GENERATED ALWAYS AS (%s)", col.Generated))
 		if col.Stored {
 			parts = append(parts, "STORED")
+		} else if pgVersion >= 18 {
+			parts = append(parts, "VIRTUAL")
+		} else if pgVersion > 0 {
+			// Pre-PG18: VIRTUAL not supported. Defensively emit STORED
+			// (validate should have caught this via E218).
+			parts = append(parts, "STORED")
+		} else {
+			// pgVersion == 0 (unspecified): respect explicit user choice.
+			parts = append(parts, "VIRTUAL")
 		}
 	} else if col.DefaultExpr != "" {
 		parts = append(parts, "DEFAULT "+ExprValue(col.DefaultExpr))
