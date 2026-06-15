@@ -2,6 +2,40 @@
 
 # Changelog
 
+## 0.10.0
+
+Extension types, views, materialized views, index WITH parameters, codegen types mode
+
+<details>
+<summary>Context</summary>
+
+Adds extension-provided types as valid scalar base types (e.g., pgvector's vector type), views and materialized views across the full pipeline (parse, model, SQL, diff, migrate, introspect, diagram, docs), index WITH storage parameters with E216 validation, codegen --mode types for Go, pgvector as a built-in extension, and array migration generation fix.
+
+</details>
+
+### Features
+
+- **Extension types as base types.** Extension-provided types (e.g., `vector` from pgvector) declared via `[[extensions]]` in pgdesign.toml are now valid base types for scalar definitions.
+- **pgvector builtin extension.** pgvector is now a built-in extension with types, operator classes, functions, and index methods pre-registered.
+- **Index WITH storage parameters.** Index definitions now support `with = { key = "value" }` for PostgreSQL storage parameters (e.g., HNSW `m`, `ef_construction`). E216 validates parameters against the index method.
+- **Index WITH introspection and migration.** Introspect reads `reloptions` from `pg_class` to round-trip WITH parameters. Migration files preserve WITH fields through parse and write.
+- **Views.** New `[views.*]` schema section with query, comment, and depends_on. Full pipeline: parse, model, SQL generation, diff, migration (CREATE/DROP/CREATE OR REPLACE VIEW), introspect, D2 diagram, and doc output.
+- **Materialized views.** New `[materialized_views.*]` schema section with query, comment, with_data, depends_on, and nested indexes. DDL generation includes `CREATE MATERIALIZED VIEW`, `DROP MATERIALIZED VIEW`, and `REFRESH MATERIALIZED VIEW`.
+- **Materialized view diff, migration, and introspection.** Diff detects materialized view additions, removals, and query changes. Migration generates DROP+CREATE for changes (no ALTER support). Introspect reads from `pg_matviews`. D2 and doc output include materialized views.
+- **Materialized view TOML export.** Introspect exports materialized views to TOML format for round-tripping.
+- **Codegen `--mode types` (Go).** New codegen mode generates Go type definitions from the schema, including struct types with JSON tags and enum type constants.
+
+### Fixes
+
+- **Array migration generation.** Diff-detected `ArrayChanged` now correctly generates `alter_column_type` migration operations (e.g., `text` to `text[]`).
+- **IndexMethods wiring.** Extension `IndexMethods` field is now propagated through the registry and used for validation. Fixed field alignment in Registry struct.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.9.0
 
 CLI overhaul with build, check, stats, seed, codegen for 6 languages, TOML diff, doc format, migration squash and test.
@@ -23,12 +57,6 @@ CLI overhaul with build, check, stats, seed, codegen for 6 languages, TOML diff,
 - **New feature.** `pgdesign migrate squash --from <ver> --to <ver>` collapses a range of migrations into one, canceling inverse operations.
 - **New feature.** `pgdesign migrate test --db <staging-url>` applies migrations against a staging database in a transaction, validates, then rolls back.
 - **New feature.** `pgdesign seed` generates type-aware test data respecting FK ordering, constraints, and semantic types.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.8.0
 
