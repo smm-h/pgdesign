@@ -17,7 +17,7 @@ type Registry struct {
 	extensions map[string]*Extension
 	opclassMap map[string]string // opclass name -> extension name
 	typeMap    map[string]string // type name -> extension name
-	funcMap       map[string]string // function name -> extension name
+	funcMap        map[string]string // function name -> extension name
 	indexMethodMap map[string]string // index method name -> extension name
 }
 
@@ -27,7 +27,7 @@ func NewRegistry() *Registry {
 		extensions: make(map[string]*Extension),
 		opclassMap: make(map[string]string),
 		typeMap:    make(map[string]string),
-		funcMap:       make(map[string]string),
+		funcMap:        make(map[string]string),
 		indexMethodMap: make(map[string]string),
 	}
 }
