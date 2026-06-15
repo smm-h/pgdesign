@@ -301,6 +301,30 @@ func generateSQL(schema *model.Schema, opts Options) string {
 		sections = append(sections, strings.Join(policyStmts, "\n"))
 	}
 
+	// 14. CREATE VIEW (topologically sorted by DependsOn)
+	if len(schema.Views) > 0 {
+		sorted, err := topoSortViews(schema.Views)
+		if err != nil {
+			// Cycle in view dependencies -- emit in original order with a comment.
+			sorted = schema.Views
+		}
+		var viewStmts []string
+		schemaName := schema.Name
+		for i := range sorted {
+			v := &sorted[i]
+			if v.Schema != "" {
+				schemaName = v.Schema
+			}
+			viewStmts = append(viewStmts, sql.CreateView(schemaName, v, opts.Idempotent))
+			if v.Comment != "" && opts.IncludeComments {
+				viewStmts = append(viewStmts, sql.CommentOn("VIEW", sql.QualifiedName(schemaName, v.Name), v.Comment))
+			}
+		}
+		if len(viewStmts) > 0 {
+			sections = append(sections, strings.Join(viewStmts, "\n"))
+		}
+	}
+
 	return strings.Join(sections, "\n\n") + "\n"
 }
 
@@ -376,4 +400,53 @@ func hasExtension(schema *model.Schema, name string) bool {
 		}
 	}
 	return false
+}
+
+// topoSortViews sorts views by DependsOn using Kahn's algorithm.
+// Views that depend on other views come after their dependencies.
+// Returns an error if a cycle is detected.
+func topoSortViews(views []model.View) ([]model.View, error) {
+	nameToIdx := make(map[string]int, len(views))
+	for i, v := range views {
+		nameToIdx[v.Name] = i
+	}
+
+	// Build in-degree counts and adjacency list.
+	inDegree := make([]int, len(views))
+	// dependents[i] = list of view indices that depend on views[i].
+	dependents := make([][]int, len(views))
+	for i, v := range views {
+		for _, dep := range v.DependsOn {
+			if depIdx, ok := nameToIdx[dep]; ok {
+				inDegree[i]++
+				dependents[depIdx] = append(dependents[depIdx], i)
+			}
+		}
+	}
+
+	// Kahn's algorithm: start with views that have no dependencies.
+	var queue []int
+	for i, deg := range inDegree {
+		if deg == 0 {
+			queue = append(queue, i)
+		}
+	}
+
+	var sorted []model.View
+	for len(queue) > 0 {
+		idx := queue[0]
+		queue = queue[1:]
+		sorted = append(sorted, views[idx])
+		for _, depIdx := range dependents[idx] {
+			inDegree[depIdx]--
+			if inDegree[depIdx] == 0 {
+				queue = append(queue, depIdx)
+			}
+		}
+	}
+
+	if len(sorted) != len(views) {
+		return nil, fmt.Errorf("cycle detected in view dependencies")
+	}
+	return sorted, nil
 }

@@ -1425,3 +1425,107 @@ func TestDocFormat(t *testing.T) {
 		t.Errorf("expected append-only mention, got:\n%s", out)
 	}
 }
+
+func TestGenerate_Views(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "active", PGType: "boolean", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+		Views: []model.View{
+			{
+				Name:    "user_stats",
+				Schema:  "app",
+				Query:   "SELECT count(*) AS total FROM active_users",
+				Comment: "Aggregate user statistics",
+				DependsOn: []string{"active_users"},
+			},
+			{
+				Name:    "active_users",
+				Schema:  "app",
+				Query:   "SELECT id, name FROM users WHERE active = true",
+				Comment: "Users who are currently active",
+			},
+		},
+	}
+
+	opts := Options{IncludeComments: true, Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	// Views must appear after tables.
+	tablePos := strings.Index(out, "CREATE TABLE app.users")
+	viewPos := strings.Index(out, "CREATE VIEW")
+	if tablePos < 0 {
+		t.Fatalf("missing CREATE TABLE in output:\n%s", out)
+	}
+	if viewPos < 0 {
+		t.Fatalf("missing CREATE VIEW in output:\n%s", out)
+	}
+	if tablePos > viewPos {
+		t.Errorf("tables should appear before views, table=%d view=%d", tablePos, viewPos)
+	}
+
+	// View ordering must respect DependsOn: active_users before user_stats.
+	activePos := strings.Index(out, "CREATE VIEW app.active_users AS")
+	statsPos := strings.Index(out, "CREATE VIEW app.user_stats AS")
+	if activePos < 0 {
+		t.Fatalf("missing active_users view in output:\n%s", out)
+	}
+	if statsPos < 0 {
+		t.Fatalf("missing user_stats view in output:\n%s", out)
+	}
+	if activePos > statsPos {
+		t.Errorf("active_users should appear before user_stats (dependency order), active=%d stats=%d", activePos, statsPos)
+	}
+
+	// Comments are emitted.
+	if !strings.Contains(out, "COMMENT ON VIEW app.active_users IS 'Users who are currently active';") {
+		t.Errorf("expected comment on active_users view, got:\n%s", out)
+	}
+	if !strings.Contains(out, "COMMENT ON VIEW app.user_stats IS 'Aggregate user statistics';") {
+		t.Errorf("expected comment on user_stats view, got:\n%s", out)
+	}
+}
+
+func TestGenerate_ViewsNoComments(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+		Views: []model.View{
+			{
+				Name:    "all_items",
+				Schema:  "app",
+				Query:   "SELECT id FROM items",
+				Comment: "Should not appear",
+			},
+		},
+	}
+
+	opts := Options{IncludeComments: false, Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "CREATE VIEW app.all_items AS") {
+		t.Errorf("expected CREATE VIEW, got:\n%s", out)
+	}
+	if strings.Contains(out, "COMMENT ON VIEW") {
+		t.Errorf("should not contain view comments when IncludeComments=false, got:\n%s", out)
+	}
+}

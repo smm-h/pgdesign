@@ -1117,6 +1117,51 @@ func TestCreateIndex_WithParamsAndWhere(t *testing.T) {
 	}
 }
 
+func TestCreateView(t *testing.T) {
+	view := &model.View{
+		Name:  "active_users",
+		Query: "SELECT id, name FROM users WHERE active = true",
+	}
+
+	// Basic CREATE VIEW (not idempotent).
+	got := CreateView("app", view, false)
+	if !strings.Contains(got, "CREATE VIEW app.active_users AS") {
+		t.Errorf("expected CREATE VIEW, got:\n%s", got)
+	}
+	if !strings.Contains(got, "SELECT id, name FROM users WHERE active = true") {
+		t.Errorf("expected query in output, got:\n%s", got)
+	}
+	if strings.Contains(got, "OR REPLACE") {
+		t.Errorf("should not contain OR REPLACE when idempotent=false, got:\n%s", got)
+	}
+
+	// CREATE OR REPLACE VIEW (idempotent).
+	got = CreateView("app", view, true)
+	if !strings.Contains(got, "CREATE OR REPLACE VIEW app.active_users AS") {
+		t.Errorf("expected CREATE OR REPLACE VIEW, got:\n%s", got)
+	}
+
+	// With schema name requiring quoting.
+	got = CreateView("schema", view, false)
+	if !strings.Contains(got, `CREATE VIEW "schema".active_users AS`) {
+		t.Errorf("expected quoted schema name, got:\n%s", got)
+	}
+}
+
+func TestDropView(t *testing.T) {
+	// Basic DROP VIEW (not idempotent).
+	got := DropView("app", "active_users", false)
+	if got != "DROP VIEW app.active_users;\n" {
+		t.Errorf("DropView = %q, want %q", got, "DROP VIEW app.active_users;\n")
+	}
+
+	// DROP VIEW IF EXISTS (idempotent).
+	got = DropView("app", "active_users", true)
+	if got != "DROP VIEW IF EXISTS app.active_users;\n" {
+		t.Errorf("DropView idempotent = %q, want %q", got, "DROP VIEW IF EXISTS app.active_users;\n")
+	}
+}
+
 func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
 	// Wrong pattern: if someone writes default = "'created'" in TOML,
 	// the value reaching LiteralValue is "'created'" (with embedded single quotes).

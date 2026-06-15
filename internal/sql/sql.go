@@ -557,6 +557,32 @@ func CreatePolicy(schemaName, tableName string, p model.Policy) string {
 	return sb.String()
 }
 
+// CreateView generates a CREATE VIEW statement.
+// When idempotent is true, uses CREATE OR REPLACE VIEW instead of CREATE VIEW.
+func CreateView(schemaName string, view *model.View, idempotent bool) string {
+	qualified := QualifiedName(schemaName, view.Name)
+	var sb strings.Builder
+	if idempotent {
+		sb.WriteString(fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n", qualified))
+	} else {
+		sb.WriteString(fmt.Sprintf("CREATE VIEW %s AS\n", qualified))
+	}
+	sb.WriteString(view.Query)
+	sb.WriteString(";\n")
+	return sb.String()
+}
+
+// DropView generates a DROP VIEW statement.
+// When idempotent is true, includes IF EXISTS.
+func DropView(schemaName, viewName string, idempotent bool) string {
+	qualified := QualifiedName(schemaName, viewName)
+	ifExists := ""
+	if idempotent {
+		ifExists = " IF EXISTS"
+	}
+	return fmt.Sprintf("DROP VIEW%s %s;\n", ifExists, qualified)
+}
+
 // CreateDenyMutationFunction generates a CREATE OR REPLACE FUNCTION statement
 // for the shared pgdesign_deny_mutation trigger function. This function raises
 // an exception when UPDATE or DELETE is attempted on an append-only table.
