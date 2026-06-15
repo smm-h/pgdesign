@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 )
 
@@ -1341,6 +1342,63 @@ func TestSuppressionPipeline_Integration(t *testing.T) {
 	}
 	if !foundTags {
 		t.Error("expected suppressed W004 for column 'tags'")
+	}
+}
+
+func TestE216_InvalidWithParam(t *testing.T) {
+	reg := extregistry.NewBuiltinRegistry()
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "t",
+			Schema:  "public",
+			Comment: "test",
+			PK:      []string{"id"},
+			Columns: []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Indexes: []model.Index{{
+				Name:    "idx_t_id",
+				Columns: []string{"id"},
+				Method:  "btree",
+				With:    map[string]string{"invalid_param": "100"},
+			}},
+		}},
+	}
+	diags, _ := Validate(schema, &Config{
+		ExtRegistry: reg,
+		Disabled:    []string{"E202", "W002", "W005"},
+	})
+	found := findByCode(diags, "E216")
+	if len(found) == 0 {
+		t.Fatal("expected E216 diagnostic for invalid btree WITH param")
+	}
+}
+
+func TestE216_ValidHnswParams_NoDiag(t *testing.T) {
+	reg := extregistry.NewBuiltinRegistry()
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "t",
+			Schema:  "public",
+			Comment: "test",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "embedding", PGType: "vector(384)", NotNull: true},
+			},
+			Indexes: []model.Index{{
+				Name:    "idx_t_embedding",
+				Columns: []string{"embedding"},
+				Method:  "hnsw",
+				With:    map[string]string{"m": "16", "ef_construction": "200"},
+			}},
+		}},
+	}
+	diags, _ := Validate(schema, &Config{
+		ExtRegistry: reg,
+		Disabled:    []string{"E202", "W002", "W005"},
+	})
+	found := findByCode(diags, "E216")
+	if len(found) != 0 {
+		t.Fatalf("unexpected E216 diagnostic: %s", found[0].Message)
 	}
 }
 

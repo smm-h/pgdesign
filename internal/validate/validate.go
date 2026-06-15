@@ -78,6 +78,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"E212", checkFKMissingIndex},
 		{"E213", checkGeneratedColRefsGenerated},
 		{"E214", checkOpclassMissingExtension},
+		{"E216", checkIndexWithParams},
 		{"E215", checkPolicyExprMismatch},
 		{"W009", checkPolicyErrorCodeSnakeCase},
 		{"W001", checkGodTable},
@@ -557,6 +558,49 @@ func checkOpclassMissingExtension(schema *model.Schema, config *Config) []diagno
 						Table:      t.Name,
 						Message:    "index " + idx.Name + " uses opclass " + oc + " (on column " + col + ") which requires extension " + reqExt,
 						Suggestion: "Add \"" + reqExt + "\" to [meta].extensions",
+					})
+				}
+			}
+		}
+	}
+	return diags
+}
+
+// checkIndexWithParams (E216): index WITH parameter is not valid for the index method.
+func checkIndexWithParams(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	if config.ExtRegistry == nil {
+		return nil
+	}
+
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		for _, idx := range t.Indexes {
+			if len(idx.With) == 0 {
+				continue
+			}
+			method := idx.Method
+			if method == "" {
+				method = "btree"
+			}
+			validParams, ok := config.ExtRegistry.ValidIndexParams(method)
+			if !ok {
+				continue
+			}
+			for key := range idx.With {
+				valid := false
+				for _, vp := range validParams {
+					if key == vp {
+						valid = true
+						break
+					}
+				}
+				if !valid {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Error,
+						Code:       "E216",
+						Table:      t.Name,
+						Message:    fmt.Sprintf("index %s has invalid WITH parameter %q for method %s", idx.Name, key, method),
+						Suggestion: fmt.Sprintf("Valid parameters for %s: %s", method, strings.Join(validParams, ", ")),
 					})
 				}
 			}
