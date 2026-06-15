@@ -711,3 +711,26 @@ func TestIntrospectRegularTableNoPartitioning(t *testing.T) {
 		t.Errorf("users.Partitioning = %v, want nil (regular table)", users.Partitioning)
 	}
 }
+
+func TestParseReloptions(t *testing.T) {
+	tests := []struct {
+		input []string
+		want  map[string]string
+	}{
+		{nil, nil},
+		{[]string{"m=16", "ef_construction=200"}, map[string]string{"m": "16", "ef_construction": "200"}},
+		{[]string{"fillfactor=90"}, map[string]string{"fillfactor": "90"}},
+	}
+	for _, tt := range tests {
+		got := parseReloptions(tt.input)
+		if len(got) != len(tt.want) {
+			t.Errorf("parseReloptions(%v) = %v, want %v", tt.input, got, tt.want)
+			continue
+		}
+		for k, v := range tt.want {
+			if got[k] != v {
+				t.Errorf("parseReloptions(%v)[%q] = %q, want %q", tt.input, k, got[k], v)
+			}
+		}
+	}
+}
