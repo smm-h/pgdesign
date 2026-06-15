@@ -142,6 +142,30 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		// CREATE VIEW is safe (no data risk).
 	}
 
+	// Materialized views added.
+	for _, mvName := range d.MaterializedViewsAdded {
+		mv := findMaterializedView(desired, mvName)
+		schema, _ := splitQualifiedName(mvName)
+		op := DDLOp{
+			Op:                  "create_materialized_view",
+			Name:                mvName,
+			Schema:              schema,
+			MaterializedViewDef: mv,
+			Down: &DownOp{
+				Ops: []DDLOp{{Op: "drop_materialized_view", Name: mvName}},
+			},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+
+		// Create indexes on the materialized view.
+		if mv != nil {
+			for _, idx := range mv.Indexes {
+				idxOp := makeIndexOp(mvName, idx)
+				m.DDLOps = append(m.DDLOps, idxOp)
+			}
+		}
+	}
+
 	// Phase 2: Table changes (add columns, alter columns, add constraints).
 	for _, td := range d.TablesChanged {
 		ctx := tableCtx(td.Name)
@@ -548,6 +572,63 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		// are tracked in the diff but don't generate DDL.
 	}
 
+	// Materialized view changes.
+	for _, mvd := range d.MaterializedViewsChanged {
+		if mvd.QueryChanged != nil || mvd.WithDataChanged != nil {
+			// Query or WITH DATA changed: must DROP + CREATE (no ALTER for matviews).
+			mv := findMaterializedView(desired, mvd.Name)
+			op := DDLOp{
+				Op:   "drop_materialized_view",
+				Name: mvd.Name,
+				Down: &DownOp{Irreversible: true},
+			}
+			m.DDLOps = append(m.DDLOps, op)
+			op = DDLOp{
+				Op:                  "create_materialized_view",
+				Name:                mvd.Name,
+				MaterializedViewDef: mv,
+				Down: &DownOp{
+					Ops: []DDLOp{{Op: "drop_materialized_view", Name: mvd.Name}},
+				},
+			}
+			m.DDLOps = append(m.DDLOps, op)
+
+			// Recreate all indexes after recreating the matview.
+			if mv != nil {
+				for _, idx := range mv.Indexes {
+					idxOp := makeIndexOp(mvd.Name, idx)
+					m.DDLOps = append(m.DDLOps, idxOp)
+				}
+			}
+		} else {
+			// Only index changes (query/with_data unchanged).
+			for _, idx := range mvd.IndexesAdded {
+				idxOp := makeIndexOp(mvd.Name, idx)
+				m.DDLOps = append(m.DDLOps, idxOp)
+			}
+			for _, idxName := range mvd.IndexesRemoved {
+				op := DDLOp{
+					Op:    "drop_index",
+					Table: mvd.Name,
+					Name:  idxName,
+					Down:  &DownOp{Irreversible: true},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+			}
+			for _, ic := range mvd.IndexesChanged {
+				// Drop old + create new index.
+				m.DDLOps = append(m.DDLOps, DDLOp{
+					Op:    "drop_index",
+					Table: mvd.Name,
+					Name:  ic.Name,
+					Down:  &DownOp{Irreversible: true},
+				})
+				idxOp := makeIndexOp(mvd.Name, ic.New)
+				m.DDLOps = append(m.DDLOps, idxOp)
+			}
+		}
+	}
+
 	// Phase 3: Drops (enums last, tables before enums).
 	for _, tableName := range d.TablesRemoved {
 		ctx := tableCtx(tableName)
@@ -566,6 +647,16 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		op := DDLOp{
 			Op:   "drop_view",
 			Name: viewName,
+			Down: &DownOp{Irreversible: true},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+	}
+
+	// Drop materialized views.
+	for _, mvName := range d.MaterializedViewsRemoved {
+		op := DDLOp{
+			Op:   "drop_materialized_view",
+			Name: mvName,
 			Down: &DownOp{Irreversible: true},
 		}
 		m.DDLOps = append(m.DDLOps, op)
@@ -725,6 +816,21 @@ func findView(schema *model.Schema, qualifiedName string) *model.View {
 	return nil
 }
 
+func findMaterializedView(schema *model.Schema, qualifiedName string) *model.MaterializedView {
+	s, name := splitQualifiedName(qualifiedName)
+	for i := range schema.MaterializedViews {
+		mv := &schema.MaterializedViews[i]
+		mvSchema := mv.Schema
+		if mvSchema == "" {
+			mvSchema = "public"
+		}
+		if mvSchema == s && mv.Name == name {
+			return mv
+		}
+	}
+	return nil
+}
+
 func viewKey(v model.View) string {
 	if v.Schema == "" || v.Schema == "public" {
 		return v.Name
@@ -806,6 +912,19 @@ func generateDescription(d *diff.SchemaDiff) string {
 			names[i] = vd.Name
 		}
 		parts = append(parts, fmt.Sprintf("Alter view %s", strings.Join(names, ", ")))
+	}
+	if len(d.MaterializedViewsAdded) > 0 {
+		parts = append(parts, fmt.Sprintf("Add materialized view %s", strings.Join(d.MaterializedViewsAdded, ", ")))
+	}
+	if len(d.MaterializedViewsRemoved) > 0 {
+		parts = append(parts, fmt.Sprintf("Drop materialized view %s", strings.Join(d.MaterializedViewsRemoved, ", ")))
+	}
+	if len(d.MaterializedViewsChanged) > 0 {
+		names := make([]string, len(d.MaterializedViewsChanged))
+		for i, mvd := range d.MaterializedViewsChanged {
+			names[i] = mvd.Name
+		}
+		parts = append(parts, fmt.Sprintf("Alter materialized view %s", strings.Join(names, ", ")))
 	}
 	if len(parts) == 0 {
 		return "Schema migration"
