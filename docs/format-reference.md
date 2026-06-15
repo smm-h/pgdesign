@@ -67,6 +67,8 @@ comment = "Non-negative monetary amount in minor units"
 
 Allowed base types: `bigint`, `boolean`, `bytea`, `char`, `citext`, `date`, `float4`, `float8`, `inet`, `integer`, `interval`, `json`, `jsonb`, `macaddr`, `numeric`, `oid`, `real`, `serial`, `bigserial`, `smallint`, `smallserial`, `text`, `time`, `timetz`, `timestamp`, `timestamptz`, `tsquery`, `tsvector`, `uuid`, `varchar`, `xml`.
 
+Extension-provided types are also valid as base types when declared via `[[extensions]]` in pgdesign.toml. For example, declaring `types = ["vector", "halfvec"]` on a pgvector extension makes `vector(384)` a valid base type for scalar definitions.
+
 ## [tables.*]
 
 Each table is defined under `[tables.<table_name>]`.
@@ -186,6 +188,7 @@ include = ["status", "total"]
 | `where` | string | Partial index predicate |
 | `include` | array of strings | Covering index columns (INCLUDE clause) |
 | `unique` | boolean | Create a unique index |
+| `with` | map | Storage parameters as key-value pairs (e.g., `with = { m = "16", ef_construction = "200" }`) |
 
 Per-column opclass map:
 
@@ -197,6 +200,16 @@ opclass = { title = "gin_trgm_ops", body = "gin_trgm_ops" }
 ```
 
 Using an opclass that requires an undeclared extension triggers E214.
+
+```toml
+[tables.items.indexes.idx_items_embedding_hnsw]
+columns = ["embedding"]
+method = "hnsw"
+opclass = "vector_cosine_ops"
+with = { m = "16", ef_construction = "200" }
+```
+
+Valid WITH parameters depend on the index method. E216 is raised when a parameter is not valid for the specified method. Built-in methods (btree, hash, gin, gist, brin) and extension methods (hnsw, ivfflat) each have their own set of valid parameters.
 
 ## Unique constraints
 
@@ -304,6 +317,59 @@ retention_keep_table = true
 | `retention` | string | Retention period (e.g., `"90d"`, `"1y"`) |
 | `retention_keep_table` | boolean | Keep expired partition tables instead of dropping |
 
+## [views.*]
+
+Views are defined under `[views.<view_name>]`.
+
+```toml
+[views.active_users]
+comment = "Users with active accounts"
+query = """
+SELECT id, email, created_at
+FROM users
+WHERE status = 'active'
+"""
+depends_on = ["users"]
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `query` | string | SQL SELECT statement (required) |
+| `comment` | string | View description |
+| `depends_on` | array of strings | Tables or views this view depends on (for ordering) |
+
+Views are emitted after tables in DDL output. The `depends_on` field controls ordering when views reference other views.
+
+## [materialized_views.*]
+
+Materialized views are defined under `[materialized_views.<view_name>]`.
+
+```toml
+[materialized_views.user_stats]
+comment = "Pre-computed user statistics"
+query = """
+SELECT u.id, COUNT(p.id) AS post_count
+FROM users u
+LEFT JOIN posts p ON p.author_id = u.id
+GROUP BY u.id
+"""
+with_data = true
+depends_on = ["users", "posts"]
+
+[materialized_views.user_stats.indexes.idx_user_stats_id]
+columns = ["id"]
+unique = true
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `query` | string | SQL SELECT statement (required) |
+| `comment` | string | View description |
+| `with_data` | boolean | Populate data on creation (default: true) |
+| `depends_on` | array of strings | Tables or views this view depends on (for ordering) |
+
+Materialized views support nested index definitions using the same syntax as table indexes. Indexes on materialized views are required for `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
+
 ## Project configuration (pgdesign.toml)
 
 Project-level settings live in `pgdesign.toml` (separate from schema files).
@@ -332,9 +398,18 @@ lock_timeout = "5s"
 expand_contract_threshold = 10000000
 
 [[extensions]]
-name = "pg_trgm"
-opclasses = ["gin_trgm_ops", "gist_trgm_ops"]
+name = "pgvector"
+types = ["vector", "halfvec", "sparsevec"]
+opclasses = ["vector_cosine_ops", "vector_l2_ops", "vector_ip_ops"]
+index_methods = ["hnsw", "ivfflat"]
 ```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `name` | string | Extension name (required) |
+| `types` | array of strings | Types provided by the extension (become valid base types for scalars) |
+| `opclasses` | array of strings | Operator classes provided by the extension |
+| `index_methods` | array of strings | Index methods provided by the extension (e.g., hnsw, ivfflat) |
 
 ### [database]
 
@@ -391,7 +466,7 @@ path = "out/schema.json"
 | `format` | string | Output format: `sql`, `d2`, `json`, `svg`, `doc`, or `codegen` |
 | `path` | string | Output file path relative to project root (required) |
 | `lang` | string | Target language for codegen: `go`, `ts`, `java`, `kotlin`, `python`, `zig` (required when format is `codegen`) |
-| `mode` | string | Codegen mode: `validators` or `constants` (required when format is `codegen`) |
+| `mode` | string | Codegen mode: `validators`, `constants`, or `types` (Go only) (required when format is `codegen`) |
 | `idempotent` | boolean | For `sql` format: add `IF NOT EXISTS` guards |
 | `comments` | boolean | For `sql` format: include `COMMENT ON` statements (default: true) |
 
