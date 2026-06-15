@@ -335,6 +335,14 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 		col.Stored = *rc.Stored
 	}
 
+	// Default: generated columns are STORED unless explicitly set otherwise.
+	// PostgreSQL < 18 only supports STORED; PG 18+ defaults to VIRTUAL when
+	// the storage keyword is omitted. We make the model explicit so downstream
+	// code never has to guess.
+	if col.Generated != "" && rc.Stored == nil {
+		col.Stored = true
+	}
+
 	if rc.Comment != nil {
 		col.Comment = *rc.Comment
 	}
