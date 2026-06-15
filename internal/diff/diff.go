@@ -567,7 +567,8 @@ func indexEqual(a, b *model.Index) bool {
 		a.Method == b.Method &&
 		mapEqual(a.Opclasses, b.Opclasses) &&
 		a.Where == b.Where &&
-		sliceEqual(a.Include, b.Include)
+		sliceEqual(a.Include, b.Include) &&
+		mapEqual(a.With, b.With)
 }
 
 // boolSliceEqual returns true if two bool slices represent the same sort

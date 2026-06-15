@@ -319,6 +319,25 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			diags = append(diags, classifyOp(op, risk.OpDropIndex, ctx)...)
 		}
 
+		// Changed indexes: drop old + create new.
+		for _, ic := range td.IndexesChanged {
+			dropOp := DDLOp{
+				Op:    "drop_index",
+				Table: td.Name,
+				Name:  ic.Old.Name,
+			}
+			m.DDLOps = append(m.DDLOps, dropOp)
+			diags = append(diags, classifyOp(dropOp, risk.OpDropIndex, ctx)...)
+
+			createOp := makeIndexOp(td.Name, ic.New)
+			m.DDLOps = append(m.DDLOps, createOp)
+			opType := risk.OpCreateIndex
+			if strings.Contains(createOp.Op, "concurrently") {
+				opType = risk.OpCreateIndexConcurrently
+			}
+			diags = append(diags, classifyOp(createOp, opType, ctx)...)
+		}
+
 		// Added uniques.
 		for _, uq := range td.UniquesAdded {
 			uqOp := makeUniqueOp(td.Name, uq)
@@ -538,6 +557,7 @@ func makeIndexOp(tableName string, idx model.Index) DDLOp {
 		Opclasses: idx.Opclasses,
 		Where:     idx.Where,
 		Include:   idx.Include,
+		With:      idx.With,
 		Down: &DownOp{
 			Ops: []DDLOp{{Op: "drop_index", Table: tableName, Name: idx.Name}},
 		},

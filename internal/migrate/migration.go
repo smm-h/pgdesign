@@ -31,6 +31,7 @@ type DDLOp struct {
 	Opclasses map[string]string // per-column opclass
 	Desc      []bool            // per-column DESC (parallel to Columns)
 	Include   []string
+	With      map[string]string // index storage parameters (WITH clause)
 	Comment  string   // for tables
 	PK       []string // for create_table
 	Values   []string // for create_enum, alter_enum_add_value
