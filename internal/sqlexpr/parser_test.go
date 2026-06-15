@@ -597,3 +597,357 @@ func TestParseCoalesce(t *testing.T) {
 		}
 	})
 }
+
+func assertFloatLiteral(t *testing.T, node Node, value float64) {
+	t.Helper()
+	fl, ok := node.(*FloatLiteral)
+	if !ok {
+		t.Fatalf("expected *FloatLiteral, got %T", node)
+	}
+	if fl.Value != value {
+		t.Fatalf("expected %f, got %f", value, fl.Value)
+	}
+}
+
+func assertNullLiteral(t *testing.T, node Node) {
+	t.Helper()
+	_, ok := node.(*NullLiteral)
+	if !ok {
+		t.Fatalf("expected *NullLiteral, got %T", node)
+	}
+}
+
+func TestParseNullLiteral(t *testing.T) {
+	t.Run("bare_null", func(t *testing.T) {
+		node, err := Parse("NULL")
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertNullLiteral(t, node)
+	})
+
+	t.Run("null_case_insensitive", func(t *testing.T) {
+		node, err := Parse("null")
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertNullLiteral(t, node)
+	})
+
+	t.Run("coalesce_with_null", func(t *testing.T) {
+		node, err := Parse("COALESCE(x, NULL)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		fc := assertFuncCall(t, node, "COALESCE", 2)
+		assertColumnRef(t, fc.Args[0], "x")
+		assertNullLiteral(t, fc.Args[1])
+	})
+
+	t.Run("null_in_comparison", func(t *testing.T) {
+		// Note: "x = NULL" is valid SQL syntax (though semantically wrong)
+		node, err := Parse("x = NULL")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "=")
+		assertColumnRef(t, bo.Left, "x")
+		assertNullLiteral(t, bo.Right)
+	})
+}
+
+func TestParseFloatLiteral(t *testing.T) {
+	t.Run("simple_float", func(t *testing.T) {
+		node, err := Parse("3.14")
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertFloatLiteral(t, node, 3.14)
+	})
+
+	t.Run("float_in_comparison", func(t *testing.T) {
+		node, err := Parse("val >= 3.14")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, ">=")
+		assertColumnRef(t, bo.Left, "val")
+		assertFloatLiteral(t, bo.Right, 3.14)
+	})
+}
+
+func TestParseComparisonOperators(t *testing.T) {
+	t.Run("less_than", func(t *testing.T) {
+		node, err := Parse("a < b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "<")
+		assertColumnRef(t, bo.Left, "a")
+		assertColumnRef(t, bo.Right, "b")
+	})
+
+	t.Run("greater_than", func(t *testing.T) {
+		node, err := Parse("a > b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, ">")
+		assertColumnRef(t, bo.Left, "a")
+		assertColumnRef(t, bo.Right, "b")
+	})
+
+	t.Run("less_equal", func(t *testing.T) {
+		node, err := Parse("a <= b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "<=")
+		assertColumnRef(t, bo.Left, "a")
+		assertColumnRef(t, bo.Right, "b")
+	})
+
+	t.Run("greater_equal", func(t *testing.T) {
+		node, err := Parse("a >= b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, ">=")
+		assertColumnRef(t, bo.Left, "a")
+		assertColumnRef(t, bo.Right, "b")
+	})
+}
+
+func TestParseDivisionModulo(t *testing.T) {
+	t.Run("division", func(t *testing.T) {
+		node, err := Parse("a / b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "/")
+		assertColumnRef(t, bo.Left, "a")
+		assertColumnRef(t, bo.Right, "b")
+	})
+
+	t.Run("modulo", func(t *testing.T) {
+		node, err := Parse("a % b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "%")
+		assertColumnRef(t, bo.Left, "a")
+		assertColumnRef(t, bo.Right, "b")
+	})
+
+	t.Run("left_associative_chain", func(t *testing.T) {
+		// a * b / c % d => %(/(*(a, b), c), d)
+		node, err := Parse("a * b / c % d")
+		if err != nil {
+			t.Fatal(err)
+		}
+		mod := assertBinaryOp(t, node, "%")
+		div := assertBinaryOp(t, mod.Left, "/")
+		mul := assertBinaryOp(t, div.Left, "*")
+		assertColumnRef(t, mul.Left, "a")
+		assertColumnRef(t, mul.Right, "b")
+		assertColumnRef(t, div.Right, "c")
+		assertColumnRef(t, mod.Right, "d")
+	})
+}
+
+func TestParseIsNull(t *testing.T) {
+	t.Run("is_null", func(t *testing.T) {
+		node, err := Parse("x IS NULL")
+		if err != nil {
+			t.Fatal(err)
+		}
+		uo := assertUnaryOp(t, node, "IS NULL")
+		assertColumnRef(t, uo.Operand, "x")
+	})
+
+	t.Run("is_not_null", func(t *testing.T) {
+		node, err := Parse("x IS NOT NULL")
+		if err != nil {
+			t.Fatal(err)
+		}
+		uo := assertUnaryOp(t, node, "IS NOT NULL")
+		assertColumnRef(t, uo.Operand, "x")
+	})
+
+	t.Run("is_null_and_is_not_null", func(t *testing.T) {
+		// x IS NOT NULL AND y IS NULL => AND(IS NOT NULL(x), IS NULL(y))
+		node, err := Parse("x IS NOT NULL AND y IS NULL")
+		if err != nil {
+			t.Fatal(err)
+		}
+		and := assertBinaryOp(t, node, "AND")
+		left := assertUnaryOp(t, and.Left, "IS NOT NULL")
+		assertColumnRef(t, left.Operand, "x")
+		right := assertUnaryOp(t, and.Right, "IS NULL")
+		assertColumnRef(t, right.Operand, "y")
+	})
+
+	t.Run("is_without_null_errors", func(t *testing.T) {
+		_, err := Parse("x IS foo")
+		if err == nil {
+			t.Fatal("expected error for IS without NULL")
+		}
+	})
+}
+
+func TestParseIn(t *testing.T) {
+	t.Run("in_list", func(t *testing.T) {
+		node, err := Parse("x IN (1, 2, 3)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "IN")
+		assertColumnRef(t, bo.Left, "x")
+		fc, ok := bo.Right.(*FuncCall)
+		if !ok {
+			t.Fatalf("expected *FuncCall for IN list, got %T", bo.Right)
+		}
+		if len(fc.Args) != 3 {
+			t.Fatalf("expected 3 items in IN list, got %d", len(fc.Args))
+		}
+		assertIntLiteral(t, fc.Args[0], 1)
+		assertIntLiteral(t, fc.Args[1], 2)
+		assertIntLiteral(t, fc.Args[2], 3)
+	})
+
+	t.Run("not_in_list", func(t *testing.T) {
+		node, err := Parse("x NOT IN (1, 2, 3)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "NOT IN")
+		assertColumnRef(t, bo.Left, "x")
+		fc, ok := bo.Right.(*FuncCall)
+		if !ok {
+			t.Fatalf("expected *FuncCall for NOT IN list, got %T", bo.Right)
+		}
+		if len(fc.Args) != 3 {
+			t.Fatalf("expected 3 items in NOT IN list, got %d", len(fc.Args))
+		}
+	})
+
+	t.Run("in_without_parens_errors", func(t *testing.T) {
+		_, err := Parse("x IN 1, 2, 3")
+		if err == nil {
+			t.Fatal("expected error for IN without parens")
+		}
+	})
+}
+
+func TestParseBetween(t *testing.T) {
+	t.Run("simple_between", func(t *testing.T) {
+		node, err := Parse("x BETWEEN 1 AND 10")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "BETWEEN")
+		assertColumnRef(t, bo.Left, "x")
+		andRange := assertBinaryOp(t, bo.Right, "AND")
+		assertIntLiteral(t, andRange.Left, 1)
+		assertIntLiteral(t, andRange.Right, 10)
+	})
+
+	t.Run("between_and_disambiguation", func(t *testing.T) {
+		// x BETWEEN 1 AND 10 AND y = 5
+		// Should parse as: AND(BETWEEN(x, AND(1, 10)), =(y, 5))
+		// The AND inside BETWEEN binds to BETWEEN, the second AND is boolean
+		node, err := Parse("x BETWEEN 1 AND 10 AND y = 5")
+		if err != nil {
+			t.Fatal(err)
+		}
+		and := assertBinaryOp(t, node, "AND")
+
+		// Left: x BETWEEN 1 AND 10
+		between := assertBinaryOp(t, and.Left, "BETWEEN")
+		assertColumnRef(t, between.Left, "x")
+		andRange := assertBinaryOp(t, between.Right, "AND")
+		assertIntLiteral(t, andRange.Left, 1)
+		assertIntLiteral(t, andRange.Right, 10)
+
+		// Right: y = 5
+		eq := assertBinaryOp(t, and.Right, "=")
+		assertColumnRef(t, eq.Left, "y")
+		assertIntLiteral(t, eq.Right, 5)
+	})
+
+	t.Run("between_without_and_errors", func(t *testing.T) {
+		_, err := Parse("x BETWEEN 1 OR 10")
+		if err == nil {
+			t.Fatal("expected error for BETWEEN without AND")
+		}
+	})
+}
+
+func TestParseLike(t *testing.T) {
+	t.Run("like", func(t *testing.T) {
+		node, err := Parse("name LIKE '%foo%'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "LIKE")
+		assertColumnRef(t, bo.Left, "name")
+		assertStringLiteral(t, bo.Right, "%foo%")
+	})
+
+	t.Run("ilike", func(t *testing.T) {
+		node, err := Parse("name ILIKE '%foo%'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "ILIKE")
+		assertColumnRef(t, bo.Left, "name")
+		assertStringLiteral(t, bo.Right, "%foo%")
+	})
+
+	t.Run("not_like", func(t *testing.T) {
+		node, err := Parse("name NOT LIKE '%bar%'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "NOT LIKE")
+		assertColumnRef(t, bo.Left, "name")
+		assertStringLiteral(t, bo.Right, "%bar%")
+	})
+
+	t.Run("not_ilike", func(t *testing.T) {
+		node, err := Parse("name NOT ILIKE '%bar%'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "NOT ILIKE")
+		assertColumnRef(t, bo.Left, "name")
+		assertStringLiteral(t, bo.Right, "%bar%")
+	})
+
+	t.Run("like_and_comparison_combined", func(t *testing.T) {
+		// name LIKE '%foo%' AND val >= 3.14
+		node, err := Parse("name LIKE '%foo%' AND val >= 3.14")
+		if err != nil {
+			t.Fatal(err)
+		}
+		and := assertBinaryOp(t, node, "AND")
+		like := assertBinaryOp(t, and.Left, "LIKE")
+		assertColumnRef(t, like.Left, "name")
+		assertStringLiteral(t, like.Right, "%foo%")
+		gte := assertBinaryOp(t, and.Right, ">=")
+		assertColumnRef(t, gte.Left, "val")
+		assertFloatLiteral(t, gte.Right, 3.14)
+	})
+}
+
+func TestParseIsDistinctFrom(t *testing.T) {
+	t.Run("is_distinct_from", func(t *testing.T) {
+		node, err := Parse("a IS DISTINCT FROM b")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "IS DISTINCT FROM")
+		assertColumnRef(t, bo.Left, "a")
+		assertColumnRef(t, bo.Right, "b")
+	})
+}
