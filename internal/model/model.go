@@ -12,8 +12,9 @@ type Schema struct {
 	Extensions  []string   `json:"extensions"`
 	Enums       []Enum     `json:"enums"`
 	Tables      []Table    `json:"tables"`
-	Views       []View     `json:"views,omitempty"`
-	CycleGroups [][]string `json:"cycle_groups,omitempty"`
+	Views              []View              `json:"views,omitempty"`
+	MaterializedViews  []MaterializedView  `json:"materialized_views,omitempty"`
+	CycleGroups        [][]string          `json:"cycle_groups,omitempty"`
 	PGVersion   int        `json:"pg_version"`
 }
 
@@ -24,6 +25,17 @@ type View struct {
 	Query     string   `json:"query"`
 	Comment   string   `json:"comment,omitempty"`
 	DependsOn []string `json:"depends_on,omitempty"`
+}
+
+// MaterializedView represents a resolved materialized view definition.
+type MaterializedView struct {
+	Name      string  `json:"name"`
+	Schema    string  `json:"schema,omitempty"`
+	Query     string  `json:"query"`
+	Comment   string  `json:"comment,omitempty"`
+	DependsOn []string `json:"depends_on,omitempty"`
+	WithData  bool    `json:"with_data"`
+	Indexes   []Index `json:"indexes,omitempty"`
 }
 
 // TableOrder returns tables in dependency order (topo-sorted).
