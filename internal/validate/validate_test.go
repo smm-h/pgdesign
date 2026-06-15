@@ -1402,6 +1402,117 @@ func TestE216_ValidHnswParams_NoDiag(t *testing.T) {
 	}
 }
 
+func TestE218_VirtualRequiresPG18_Error(t *testing.T) {
+	schema := &model.Schema{
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Schema:  "public",
+				Comment: "Order records",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "val", PGType: "integer", NotNull: true},
+					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+				},
+			},
+		},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E218")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 E218 diagnostic, got %d: %v", len(found), found)
+	}
+	if found[0].Severity != diagnostic.Error {
+		t.Errorf("E218 severity = %v, want Error", found[0].Severity)
+	}
+	if found[0].Column != "computed" {
+		t.Errorf("E218 column = %q, want %q", found[0].Column, "computed")
+	}
+}
+
+func TestE218_VirtualRequiresPG18_Warning(t *testing.T) {
+	schema := &model.Schema{
+		PGVersion: 0, // unset
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Schema:  "public",
+				Comment: "Order records",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "val", PGType: "integer", NotNull: true},
+					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+				},
+			},
+		},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E218")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 E218 diagnostic, got %d: %v", len(found), found)
+	}
+	if found[0].Severity != diagnostic.Warning {
+		t.Errorf("E218 severity = %v, want Warning", found[0].Severity)
+	}
+}
+
+func TestE218_VirtualRequiresPG18_NoDiag(t *testing.T) {
+	// PG 18+ should not trigger E218.
+	schema := &model.Schema{
+		PGVersion: 18,
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Schema:  "public",
+				Comment: "Order records",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "val", PGType: "integer", NotNull: true},
+					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+				},
+			},
+		},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E218")
+	if len(found) != 0 {
+		t.Errorf("expected no E218 on PG18, got %d: %v", len(found), found)
+	}
+}
+
+func TestE218_StoredGenerated_NoDiag(t *testing.T) {
+	// Stored generated columns should never trigger E218, regardless of PG version.
+	schema := &model.Schema{
+		PGVersion: 12,
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Schema:  "public",
+				Comment: "Order records",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "val", PGType: "integer", NotNull: true},
+					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: true},
+				},
+			},
+		},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E218")
+	if len(found) != 0 {
+		t.Errorf("expected no E218 for stored generated column, got %d: %v", len(found), found)
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {

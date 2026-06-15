@@ -1948,3 +1948,93 @@ func TestDiff_MaterializedViewNoChange(t *testing.T) {
 		t.Errorf("expected empty diff for identical materialized views, got: %s", d.Summary())
 	}
 }
+
+func TestDiff_StoredToVirtualTransition(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: true},
+				},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff for STORED->VIRTUAL transition")
+	}
+
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+
+	tc := d.TablesChanged[0]
+	if len(tc.ColumnsChanged) != 1 {
+		t.Fatalf("expected 1 column changed, got %d", len(tc.ColumnsChanged))
+	}
+
+	cc := tc.ColumnsChanged[0]
+	if cc.Name != "computed" {
+		t.Errorf("changed column name = %q, want %q", cc.Name, "computed")
+	}
+	if cc.StoredChanged == nil {
+		t.Fatal("StoredChanged is nil, expected [true, false]")
+	}
+	if cc.StoredChanged[0] != true || cc.StoredChanged[1] != false {
+		t.Errorf("StoredChanged = %v, want [true, false]", cc.StoredChanged)
+	}
+	// Generated should NOT be flagged as changed (same expression).
+	if cc.GeneratedChanged != nil {
+		t.Errorf("GeneratedChanged should be nil (same expression), got %v", cc.GeneratedChanged)
+	}
+}
+
+func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
+	// If columns are not generated, StoredChanged should not fire
+	// even if Stored differs (it's meaningless for non-generated columns).
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "t",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "val", PGType: "integer", NotNull: true, Stored: false},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "t",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "val", PGType: "integer", NotNull: true, Stored: true},
+				},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for non-generated columns with different Stored, got: %+v", d)
+	}
+}
