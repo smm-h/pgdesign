@@ -325,6 +325,34 @@ func generateSQL(schema *model.Schema, opts Options) string {
 		}
 	}
 
+	// 15. CREATE MATERIALIZED VIEW (topologically sorted by DependsOn)
+	if len(schema.MaterializedViews) > 0 {
+		sorted, err := topoSortMaterializedViews(schema.MaterializedViews)
+		if err != nil {
+			// Cycle in materialized view dependencies -- emit in original order.
+			sorted = schema.MaterializedViews
+		}
+		var mvStmts []string
+		schemaName := schema.Name
+		for i := range sorted {
+			mv := &sorted[i]
+			if mv.Schema != "" {
+				schemaName = mv.Schema
+			}
+			mvStmts = append(mvStmts, sql.CreateMaterializedView(schemaName, mv))
+			if mv.Comment != "" && opts.IncludeComments {
+				mvStmts = append(mvStmts, sql.CommentOn("MATERIALIZED VIEW", sql.QualifiedName(schemaName, mv.Name), mv.Comment))
+			}
+			for j := range mv.Indexes {
+				idx := &mv.Indexes[j]
+				mvStmts = append(mvStmts, sql.CreateIndex(schemaName, idx, mv.Name, opts.Idempotent, false))
+			}
+		}
+		if len(mvStmts) > 0 {
+			sections = append(sections, strings.Join(mvStmts, "\n"))
+		}
+	}
+
 	return strings.Join(sections, "\n\n") + "\n"
 }
 
@@ -447,6 +475,55 @@ func topoSortViews(views []model.View) ([]model.View, error) {
 
 	if len(sorted) != len(views) {
 		return nil, fmt.Errorf("cycle detected in view dependencies")
+	}
+	return sorted, nil
+}
+
+// topoSortMaterializedViews sorts materialized views by DependsOn using Kahn's algorithm.
+// Materialized views that depend on other materialized views come after their dependencies.
+// Returns an error if a cycle is detected.
+func topoSortMaterializedViews(mvs []model.MaterializedView) ([]model.MaterializedView, error) {
+	nameToIdx := make(map[string]int, len(mvs))
+	for i, mv := range mvs {
+		nameToIdx[mv.Name] = i
+	}
+
+	// Build in-degree counts and adjacency list.
+	inDegree := make([]int, len(mvs))
+	// dependents[i] = list of materialized view indices that depend on mvs[i].
+	dependents := make([][]int, len(mvs))
+	for i, mv := range mvs {
+		for _, dep := range mv.DependsOn {
+			if depIdx, ok := nameToIdx[dep]; ok {
+				inDegree[i]++
+				dependents[depIdx] = append(dependents[depIdx], i)
+			}
+		}
+	}
+
+	// Kahn's algorithm: start with materialized views that have no dependencies.
+	var queue []int
+	for i, deg := range inDegree {
+		if deg == 0 {
+			queue = append(queue, i)
+		}
+	}
+
+	var sorted []model.MaterializedView
+	for len(queue) > 0 {
+		idx := queue[0]
+		queue = queue[1:]
+		sorted = append(sorted, mvs[idx])
+		for _, depIdx := range dependents[idx] {
+			inDegree[depIdx]--
+			if inDegree[depIdx] == 0 {
+				queue = append(queue, depIdx)
+			}
+		}
+	}
+
+	if len(sorted) != len(mvs) {
+		return nil, fmt.Errorf("cycle detected in materialized view dependencies")
 	}
 	return sorted, nil
 }
