@@ -250,3 +250,131 @@ func TestBuild_JSONSchemaPropagation(t *testing.T) {
 		t.Errorf("expected JSONSchema = %q, got %q", "schema.json", metaCol.JSONSchema)
 	}
 }
+
+func TestBuild_MaterializedViewResolution(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	comment := "Monthly order statistics"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		MaterializedViews: []parse.RawMaterializedView{
+			{
+				Name:    "monthly_stats",
+				Query:   "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				Comment: &comment,
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.MaterializedViews) != 1 {
+		t.Fatalf("expected 1 materialized view, got %d", len(schema.MaterializedViews))
+	}
+
+	mv := schema.MaterializedViews[0]
+	// Name
+	if mv.Name != "monthly_stats" {
+		t.Errorf("name = %q, want %q", mv.Name, "monthly_stats")
+	}
+	// Schema
+	if mv.Schema != "public" {
+		t.Errorf("schema = %q, want %q", mv.Schema, "public")
+	}
+	// Query
+	if mv.Query != "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1" {
+		t.Errorf("query = %q, want %q", mv.Query, "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1")
+	}
+	// Comment (dereferenced from *string)
+	if mv.Comment != "Monthly order statistics" {
+		t.Errorf("comment = %q, want %q", mv.Comment, "Monthly order statistics")
+	}
+	// WithData defaults to true when not set
+	if mv.WithData != true {
+		t.Errorf("with_data = %v, want true", mv.WithData)
+	}
+	// DependsOn is nil/empty
+	if len(mv.DependsOn) != 0 {
+		t.Errorf("depends_on = %v, want empty", mv.DependsOn)
+	}
+	// Indexes is nil/empty
+	if len(mv.Indexes) != 0 {
+		t.Errorf("indexes = %v, want empty", mv.Indexes)
+	}
+}
+
+func TestBuild_MaterializedViewWithDataFalse(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	falseVal := false
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		MaterializedViews: []parse.RawMaterializedView{
+			{
+				Name:     "empty_stats",
+				Query:    "SELECT 1",
+				WithData: &falseVal,
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.MaterializedViews) != 1 {
+		t.Fatalf("expected 1 materialized view, got %d", len(schema.MaterializedViews))
+	}
+
+	mv := schema.MaterializedViews[0]
+	if mv.WithData != false {
+		t.Errorf("with_data = %v, want false", mv.WithData)
+	}
+}
+
+func TestBuild_MaterializedViewIndexes(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	uniqueVal := true
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		MaterializedViews: []parse.RawMaterializedView{
+			{
+				Name:  "monthly_stats",
+				Query: "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				Indexes: map[string]parse.RawIndex{
+					"idx_month": {
+						Columns: []string{"month"},
+						Unique:  &uniqueVal,
+					},
+				},
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.MaterializedViews) != 1 {
+		t.Fatalf("expected 1 materialized view, got %d", len(schema.MaterializedViews))
+	}
+
+	mv := schema.MaterializedViews[0]
+	if len(mv.Indexes) != 1 {
+		t.Fatalf("expected 1 index, got %d", len(mv.Indexes))
+	}
+
+	idx := mv.Indexes[0]
+	if idx.Name != "idx_month" {
+		t.Errorf("index name = %q, want %q", idx.Name, "idx_month")
+	}
+	if len(idx.Columns) != 1 || idx.Columns[0] != "month" {
+		t.Errorf("index columns = %v, want [month]", idx.Columns)
+	}
+	if idx.Unique != true {
+		t.Errorf("index unique = %v, want true", idx.Unique)
+	}
+}
