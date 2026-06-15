@@ -158,13 +158,13 @@ func (p *parser) parseMulDiv() (Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	for p.current().kind == tokenStar {
-		p.advance()
+	for p.current().kind == tokenStar || p.current().kind == tokenSlash || p.current().kind == tokenPercent {
+		op := p.advance()
 		right, err := p.parseCast()
 		if err != nil {
 			return nil, err
 		}
-		left = &BinaryOp{Op: "*", Left: left, Right: right}
+		left = &BinaryOp{Op: op.value, Left: left, Right: right}
 	}
 	return left, nil
 }

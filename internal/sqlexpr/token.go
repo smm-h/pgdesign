@@ -23,6 +23,8 @@ const (
 	tokenStar
 	tokenPlus
 	tokenMinus
+	tokenSlash
+	tokenPercent
 	tokenLess
 	tokenGreater
 	tokenLessEqual
@@ -114,6 +116,14 @@ func tokenize(input string) ([]token, error) {
 
 		case runes[i] == '-':
 			tokens = append(tokens, token{kind: tokenMinus, value: "-", pos: pos})
+			i++
+
+		case runes[i] == '/':
+			tokens = append(tokens, token{kind: tokenSlash, value: "/", pos: pos})
+			i++
+
+		case runes[i] == '%':
+			tokens = append(tokens, token{kind: tokenPercent, value: "%", pos: pos})
 			i++
 
 		case runes[i] == '\'':
