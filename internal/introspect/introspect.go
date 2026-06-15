@@ -77,6 +77,17 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		schema.Views = append(schema.Views, views...)
 	}
 
+	// Extract materialized views from all requested schemas (after tables,
+	// since DependsOn resolution needs the table list).
+	for _, sn := range schemaNames {
+		mvs, mvDiags, err := queryMaterializedViews(ctx, conn, sn, schema.Tables)
+		if err != nil {
+			return nil, nil, fmt.Errorf("materialized views for schema %q: %w", sn, err)
+		}
+		diags = append(diags, mvDiags...)
+		schema.MaterializedViews = append(schema.MaterializedViews, mvs...)
+	}
+
 	return schema, diags, nil
 }
 
@@ -795,4 +806,85 @@ func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string, tables [
 		views = append(views, v)
 	}
 	return views, rows.Err()
+}
+
+// queryMaterializedViewIndexes returns indexes defined on a materialized view.
+func queryMaterializedViewIndexes(ctx context.Context, conn *pgx.Conn, schemaName, mvName string) ([]model.Index, []diagnostic.Diagnostic, error) {
+	// Look up the matview's OID.
+	var oid uint32
+	err := conn.QueryRow(ctx, `
+		SELECT c.oid
+		FROM pg_class c
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'm'
+	`, mvName, schemaName).Scan(&oid)
+	if err != nil {
+		return nil, nil, fmt.Errorf("lookup OID for %s.%s: %w", schemaName, mvName, err)
+	}
+
+	return queryIndexes(ctx, conn, oid, schemaName, mvName)
+}
+
+// queryMaterializedViews returns materialized views defined in the given schema.
+// The tables slice is used to resolve DependsOn by scanning view definitions
+// for table name references.
+func queryMaterializedViews(ctx context.Context, conn *pgx.Conn, schemaName string, tables []model.Table) ([]model.MaterializedView, []diagnostic.Diagnostic, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT m.matviewname, pg_get_viewdef(c.oid, true), d.description, m.ispopulated
+		FROM pg_matviews m
+		JOIN pg_class c ON c.relname = m.matviewname
+		JOIN pg_namespace n ON c.relnamespace = n.oid AND n.nspname = m.schemaname
+		LEFT JOIN pg_description d ON d.objoid = c.oid AND d.objsubid = 0
+		WHERE m.schemaname = $1
+		ORDER BY m.matviewname
+	`, schemaName)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var mvs []model.MaterializedView
+	var diags []diagnostic.Diagnostic
+	for rows.Next() {
+		var name, definition string
+		var comment *string
+		var ispopulated bool
+		if err := rows.Scan(&name, &definition, &comment, &ispopulated); err != nil {
+			return nil, nil, err
+		}
+
+		mv := model.MaterializedView{
+			Name:     name,
+			Schema:   schemaName,
+			Query:    strings.TrimSpace(definition),
+			WithData: ispopulated,
+		}
+		if comment != nil {
+			mv.Comment = *comment
+		}
+
+		// Resolve DependsOn by scanning the view definition for table names.
+		for _, t := range tables {
+			if viewTableNamePattern(t.Name).MatchString(mv.Query) {
+				mv.DependsOn = append(mv.DependsOn, t.Name)
+			}
+		}
+
+		mvs = append(mvs, mv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	// Introspect indexes for each materialized view.
+	for i := range mvs {
+		indexes, idxDiags, err := queryMaterializedViewIndexes(ctx, conn, schemaName, mvs[i].Name)
+		if err != nil {
+			return nil, nil, fmt.Errorf("indexes for materialized view %s: %w", mvs[i].Name, err)
+		}
+		mvs[i].Indexes = indexes
+		diags = append(diags, idxDiags...)
+	}
+
+	return mvs, diags, nil
 }
