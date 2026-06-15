@@ -1002,6 +1002,167 @@ unknown_field = "oops"
 	}
 }
 
+func TestParseMaterializedView_Basic(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[materialized_views.monthly_stats]
+query = "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1"
+comment = "Monthly order statistics"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.MaterializedViews) != 1 {
+		t.Fatalf("expected 1 materialized view, got %d", len(schema.MaterializedViews))
+	}
+
+	mv := schema.MaterializedViews[0]
+	if mv.Name != "monthly_stats" {
+		t.Errorf("name = %q, want %q", mv.Name, "monthly_stats")
+	}
+	if mv.Query != "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1" {
+		t.Errorf("query = %q, want %q", mv.Query, "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1")
+	}
+	if mv.Comment == nil || *mv.Comment != "Monthly order statistics" {
+		t.Errorf("comment = %v, want %q", mv.Comment, "Monthly order statistics")
+	}
+	if mv.WithData != nil {
+		t.Errorf("with_data = %v, want nil", mv.WithData)
+	}
+	if mv.DependsOn != nil {
+		t.Errorf("depends_on = %v, want nil", mv.DependsOn)
+	}
+	if len(mv.Indexes) != 0 {
+		t.Errorf("indexes len = %d, want 0", len(mv.Indexes))
+	}
+}
+
+func TestParseMaterializedView_WithDataFalse(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[materialized_views.monthly_stats]
+query = "SELECT 1"
+with_data = false
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.MaterializedViews) != 1 {
+		t.Fatalf("expected 1 materialized view, got %d", len(schema.MaterializedViews))
+	}
+
+	mv := schema.MaterializedViews[0]
+	if mv.WithData == nil || *mv.WithData != false {
+		t.Errorf("with_data = %v, want false", mv.WithData)
+	}
+}
+
+func TestParseMaterializedView_WithIndexes(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[materialized_views.monthly_stats]
+query = "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1"
+
+[materialized_views.monthly_stats.indexes.idx_month]
+columns = ["month"]
+unique = true
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.MaterializedViews) != 1 {
+		t.Fatalf("expected 1 materialized view, got %d", len(schema.MaterializedViews))
+	}
+
+	mv := schema.MaterializedViews[0]
+	if len(mv.Indexes) != 1 {
+		t.Fatalf("indexes len = %d, want 1", len(mv.Indexes))
+	}
+	idx, ok := mv.Indexes["idx_month"]
+	if !ok {
+		t.Fatalf("indexes missing key %q", "idx_month")
+	}
+	if len(idx.Columns) != 1 || idx.Columns[0] != "month" {
+		t.Errorf("index columns = %v, want [month]", idx.Columns)
+	}
+	if idx.Unique == nil || *idx.Unique != true {
+		t.Errorf("index unique = %v, want true", idx.Unique)
+	}
+}
+
+func TestParseMaterializedView_MissingQuery(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[materialized_views.bad]
+comment = "no query"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+
+	var hasError bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E011" {
+			hasError = true
+			break
+		}
+	}
+	if !hasError {
+		t.Error("expected E011 error for missing query field")
+	}
+}
+
+func TestParseMaterializedView_DependsOn(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[materialized_views.monthly_stats]
+query = "SELECT 1"
+depends_on = ["orders"]
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.MaterializedViews) != 1 {
+		t.Fatalf("expected 1 materialized view, got %d", len(schema.MaterializedViews))
+	}
+
+	mv := schema.MaterializedViews[0]
+	if len(mv.DependsOn) != 1 || mv.DependsOn[0] != "orders" {
+		t.Errorf("depends_on = %v, want [orders]", mv.DependsOn)
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {
