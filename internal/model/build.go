@@ -27,6 +27,7 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	diags = append(diags, resolveDiags...)
 	schema.Enums = enums
 	schema.Views = resolveViews(raw)
+	schema.MaterializedViews = resolveMaterializedViews(raw)
 
 	// Phase 2: order
 	sorted, cycles := topoSort(tables)
@@ -76,6 +77,7 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 		schema.Enums = append(schema.Enums, enums...)
 		allTables = append(allTables, tables...)
 		schema.Views = append(schema.Views, resolveViews(raw)...)
+		schema.MaterializedViews = append(schema.MaterializedViews, resolveMaterializedViews(raw)...)
 	}
 
 	// Phase 2: order all tables together (topo sort sees cross-schema deps).
@@ -145,6 +147,32 @@ func resolveView(rv parse.RawView, schemaName string) View {
 		v.Comment = *rv.Comment
 	}
 	return v
+}
+
+// resolveMaterializedViews converts raw materialized views into model MaterializedViews.
+func resolveMaterializedViews(raw *parse.RawSchema) []MaterializedView {
+	var mvs []MaterializedView
+	for _, rmv := range raw.MaterializedViews {
+		mv := MaterializedView{
+			Name:      rmv.Name,
+			Schema:    raw.Meta.Schema,
+			Query:     rmv.Query,
+			DependsOn: rmv.DependsOn,
+			WithData:  true,
+		}
+		if rmv.Comment != nil {
+			mv.Comment = *rmv.Comment
+		}
+		if rmv.WithData != nil {
+			mv.WithData = *rmv.WithData
+		}
+		for name, rawIdx := range rmv.Indexes {
+			idx := resolveIndex(name, rawIdx)
+			mv.Indexes = append(mv.Indexes, idx)
+		}
+		mvs = append(mvs, mv)
+	}
+	return mvs
 }
 
 // resolveTable resolves a single raw table into a model Table.
