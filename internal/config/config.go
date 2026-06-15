@@ -97,7 +97,7 @@ func (c *Config) Check() error {
 		"python": true, "zig": true, "go": true, "ts": true, "java": true, "kotlin": true,
 	}
 	validModes := map[string]bool{
-		"validators": true, "constants": true,
+		"validators": true, "constants": true, "types": true,
 	}
 	for name, out := range c.Output {
 		if out.Path == "" {
@@ -118,7 +118,7 @@ func (c *Config) Check() error {
 			errs = append(errs, fmt.Errorf("output.%s: invalid lang %q (must be one of: python, zig, go, ts, java, kotlin)", name, out.Lang))
 		}
 		if out.Mode != "" && !validModes[out.Mode] {
-			errs = append(errs, fmt.Errorf("output.%s: invalid mode %q (must be one of: validators, constants)", name, out.Mode))
+			errs = append(errs, fmt.Errorf("output.%s: invalid mode %q (must be one of: validators, constants, types)", name, out.Mode))
 		}
 	}
 

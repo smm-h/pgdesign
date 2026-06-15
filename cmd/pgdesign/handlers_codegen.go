@@ -55,6 +55,14 @@ func handleCodegen(kwargs map[string]interface{}) int {
 			fmt.Fprintf(os.Stderr, "error: unsupported language for constants mode: %s\n", lang)
 			return 1
 		}
+	case "types":
+		switch lang {
+		case "go":
+			gen = &codegen.GoTypesGenerator{}
+		default:
+			fmt.Fprintf(os.Stderr, "error: types mode only supports --lang go, got %s\n", lang)
+			return 1
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "error: unsupported mode: %s\n", mode)
 		return 1

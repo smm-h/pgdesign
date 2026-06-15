@@ -173,7 +173,7 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)),
 			strictcli.StringFlag("lang", "Target language", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
-			strictcli.StringFlag("mode", "Codegen mode", strictcli.Default("validators"), strictcli.Choices("validators", "constants")),
+			strictcli.StringFlag("mode", "Codegen mode", strictcli.Default("validators"), strictcli.Choices("validators", "constants", "types")),
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
 		),
 	)

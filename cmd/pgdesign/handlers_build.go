@@ -217,6 +217,14 @@ func selectCodegenGenerator(outputName, lang, mode string) (codegen.Generator, b
 			fmt.Fprintf(os.Stderr, "build: output %q: unsupported codegen lang %q\n", outputName, lang)
 			return nil, false
 		}
+	case "types":
+		switch lang {
+		case "go":
+			return &codegen.GoTypesGenerator{}, true
+		default:
+			fmt.Fprintf(os.Stderr, "build: output %q: types mode only supports lang \"go\", got %q\n", outputName, lang)
+			return nil, false
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "build: output %q: unsupported codegen mode %q\n", outputName, mode)
 		return nil, false
