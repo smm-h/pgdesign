@@ -1791,3 +1791,135 @@ func TestParseMigration_WithParams(t *testing.T) {
 		t.Errorf("expected with params m=16, ef_construction=200, got %v", op.With)
 	}
 }
+
+func TestGenerateMigration_MaterializedViewAdded(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "app",
+				Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				WithData: true,
+			},
+		},
+	}
+	d := &diff.SchemaDiff{
+		MaterializedViewsAdded: []string{"app.monthly_stats"},
+	}
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0)
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_materialized_view" && op.Name == "app.monthly_stats" {
+			found = true
+			if op.MaterializedViewDef == nil {
+				t.Error("create_materialized_view op has no MaterializedViewDef")
+			} else if op.MaterializedViewDef.Query != "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1" {
+				t.Errorf("MaterializedViewDef.Query = %q, want the monthly_stats query", op.MaterializedViewDef.Query)
+			}
+			if op.Down == nil {
+				t.Error("create_materialized_view op has no down op")
+			} else if len(op.Down.Ops) == 0 {
+				t.Error("create_materialized_view down has no ops")
+			} else if op.Down.Ops[0].Op != "drop_materialized_view" {
+				t.Errorf("create_materialized_view down op = %q, want drop_materialized_view", op.Down.Ops[0].Op)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected create_materialized_view op for app.monthly_stats, got ops: %v", opsDebug(m.DDLOps))
+	}
+}
+
+func TestGenerateMigration_MaterializedViewQueryChanged(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "app",
+				Query:    "SELECT date_trunc('month', created_at) AS month, sum(total) FROM orders GROUP BY 1",
+				WithData: true,
+			},
+		},
+	}
+	d := &diff.SchemaDiff{
+		MaterializedViewsChanged: []diff.MaterializedViewDiff{
+			{
+				Name: "app.monthly_stats",
+				QueryChanged: &[2]string{
+					"SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+					"SELECT date_trunc('month', created_at) AS month, sum(total) FROM orders GROUP BY 1",
+				},
+			},
+		},
+	}
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+	dropIdx := -1
+	createIdx := -1
+	for i, op := range m.DDLOps {
+		if op.Op == "drop_materialized_view" && op.Name == "app.monthly_stats" {
+			dropIdx = i
+		}
+		if op.Op == "create_materialized_view" && op.Name == "app.monthly_stats" {
+			createIdx = i
+		}
+	}
+	if dropIdx == -1 {
+		t.Errorf("expected drop_materialized_view op for app.monthly_stats, got ops: %v", opsDebug(m.DDLOps))
+	}
+	if createIdx == -1 {
+		t.Errorf("expected create_materialized_view op for app.monthly_stats, got ops: %v", opsDebug(m.DDLOps))
+	}
+	if dropIdx != -1 && createIdx != -1 && dropIdx >= createIdx {
+		t.Errorf("drop_materialized_view (index %d) should appear before create_materialized_view (index %d)", dropIdx, createIdx)
+	}
+	if createIdx != -1 {
+		createOp := m.DDLOps[createIdx]
+		if createOp.MaterializedViewDef == nil {
+			t.Error("create_materialized_view op has no MaterializedViewDef")
+		}
+		if createOp.Down == nil {
+			t.Error("create_materialized_view op has no down op")
+		} else if len(createOp.Down.Ops) == 0 {
+			t.Error("create_materialized_view down has no ops")
+		} else if createOp.Down.Ops[0].Op != "drop_materialized_view" {
+			t.Errorf("create_materialized_view down op = %q, want drop_materialized_view", createOp.Down.Ops[0].Op)
+		}
+	}
+}
+
+func TestGenerateMigration_MaterializedViewRemoved(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+	}
+	d := &diff.SchemaDiff{
+		MaterializedViewsRemoved: []string{"app.monthly_stats"},
+	}
+	m, _ := GenerateMigration(d, desired, "0.3.0", nil, 0, 0)
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_materialized_view" && op.Name == "app.monthly_stats" {
+			found = true
+			if op.Down == nil {
+				t.Error("drop_materialized_view op has no down op")
+			} else if !op.Down.Irreversible {
+				t.Error("drop_materialized_view down should be irreversible")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected drop_materialized_view op for app.monthly_stats, got ops: %v", opsDebug(m.DDLOps))
+	}
+}
