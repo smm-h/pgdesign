@@ -7,8 +7,9 @@ package parse
 type RawSchema struct {
 	Meta   RawMeta
 	Types  []RawType
-	Tables []RawTable
-	Views  []RawView
+	Tables            []RawTable
+	Views             []RawView
+	MaterializedViews []RawMaterializedView
 }
 
 // RawMeta holds the [meta] section values.
@@ -39,6 +40,16 @@ type RawView struct {
 	Query     string
 	Comment   *string
 	DependsOn []string
+}
+
+// RawMaterializedView holds a materialized view definition from [materialized_views.*].
+type RawMaterializedView struct {
+	Name      string
+	Query     string
+	Comment   *string
+	DependsOn []string
+	WithData  *bool
+	Indexes   map[string]RawIndex
 }
 
 // RawTable holds a table definition from [tables.*].

@@ -155,6 +155,7 @@ func (p *parser) walk() *RawSchema {
 	schema.Types = p.parseTypes()
 	schema.Tables = p.parseTables()
 	schema.Views = p.parseViews()
+	schema.MaterializedViews = p.parseMaterializedViews()
 	return schema
 }
 
@@ -407,6 +408,92 @@ func (p *parser) parseView(name string, tbl *tomledit.TableNode) RawView {
 	}
 
 	return rv
+}
+
+// parseMaterializedViews extracts all [materialized_views.*] sections in source order.
+func (p *parser) parseMaterializedViews() []RawMaterializedView {
+	var matviews []RawMaterializedView
+
+	for _, child := range p.doc.Children {
+		tbl, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl.KeyPath) == 2 && tbl.KeyPath[0] == "materialized_views" {
+			mvName := tbl.KeyPath[1]
+			rmv := p.parseMaterializedView(mvName, tbl)
+			matviews = append(matviews, rmv)
+		}
+	}
+
+	return matviews
+}
+
+func (p *parser) parseMaterializedView(name string, tbl *tomledit.TableNode) RawMaterializedView {
+	rmv := RawMaterializedView{Name: name}
+
+	knownKeys := map[string]bool{
+		"query": true, "comment": true, "depends_on": true, "with_data": true,
+	}
+
+	for _, child := range tbl.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		key := kv.Key.Parts[0]
+		if !knownKeys[key] {
+			p.warnf("W001", "", "", "unknown key in [materialized_views.%s]: %q", name, key)
+			continue
+		}
+		switch key {
+		case "query":
+			if v, ok := nodeString(kv.Val); ok {
+				rmv.Query = v
+			} else {
+				p.errorf("E010", "", "", "[materialized_views.%s].query must be a string", name)
+			}
+		case "comment":
+			if v, ok := nodeString(kv.Val); ok {
+				rmv.Comment = &v
+			} else {
+				p.errorf("E010", "", "", "[materialized_views.%s].comment must be a string", name)
+			}
+		case "depends_on":
+			if v, ok := nodeStringSlice(kv.Val); ok {
+				rmv.DependsOn = v
+			} else {
+				p.errorf("E010", "", "", "[materialized_views.%s].depends_on must be an array of strings", name)
+			}
+		case "with_data":
+			if v, ok := nodeBool(kv.Val); ok {
+				rmv.WithData = &v
+			} else {
+				p.errorf("E010", "", "", "[materialized_views.%s].with_data must be a boolean", name)
+			}
+		}
+	}
+
+	// query is required
+	if rmv.Query == "" {
+		p.errorf("E011", "", "", "materialized view %q is missing required field \"query\"", name)
+	}
+
+	// Parse indexes
+	rmv.Indexes = make(map[string]RawIndex)
+	for _, child := range p.doc.Children {
+		tbl2, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl2.KeyPath) == 4 && tbl2.KeyPath[0] == "materialized_views" && tbl2.KeyPath[1] == name && tbl2.KeyPath[2] == "indexes" {
+			idxName := tbl2.KeyPath[3]
+			idx := p.parseIndex(name, idxName, tbl2)
+			rmv.Indexes[idxName] = idx
+		}
+	}
+
+	return rmv
 }
 
 func (p *parser) parseTable(name string) RawTable {
