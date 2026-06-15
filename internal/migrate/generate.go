@@ -125,6 +125,23 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 	}
 
+	// Views (created after tables since they may reference tables).
+	for _, viewName := range d.ViewsAdded {
+		view := findView(desired, viewName)
+		schema, _ := splitQualifiedName(viewName)
+		op := DDLOp{
+			Op:      "create_view",
+			Name:    viewName,
+			Schema:  schema,
+			ViewDef: view,
+			Down: &DownOp{
+				Ops: []DDLOp{{Op: "drop_view", Name: viewName}},
+			},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		// CREATE VIEW is safe (no data risk).
+	}
+
 	// Phase 2: Table changes (add columns, alter columns, add constraints).
 	for _, td := range d.TablesChanged {
 		ctx := tableCtx(td.Name)
@@ -501,6 +518,36 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 	}
 
+	// View changes.
+	for _, vd := range d.ViewsChanged {
+		if vd.QueryChanged != nil {
+			// Query changed: CREATE OR REPLACE VIEW.
+			view := findView(desired, vd.Name)
+			// Build an old view for the down op.
+			var oldView *model.View
+			if view != nil {
+				oldView = &model.View{
+					Name:   view.Name,
+					Schema: view.Schema,
+					Query:  vd.QueryChanged[0],
+				}
+			}
+			op := DDLOp{
+				Op:      "create_or_replace_view",
+				Name:    vd.Name,
+				ViewDef: view,
+				Down: &DownOp{
+					Ops: []DDLOp{{Op: "create_or_replace_view", Name: vd.Name, ViewDef: oldView}},
+				},
+			}
+			m.DDLOps = append(m.DDLOps, op)
+			// CREATE OR REPLACE VIEW is safe (views are replaceable).
+		}
+		// Comment changes on views don't need separate migration ops in PostgreSQL;
+		// COMMENT ON VIEW would require separate handling. For now, comment changes
+		// are tracked in the diff but don't generate DDL.
+	}
+
 	// Phase 3: Drops (enums last, tables before enums).
 	for _, tableName := range d.TablesRemoved {
 		ctx := tableCtx(tableName)
@@ -511,6 +558,17 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 		m.DDLOps = append(m.DDLOps, op)
 		diags = append(diags, classifyOp(op, risk.OpDropTable, ctx)...)
+	}
+
+	// Drop views (before dropping tables they may reference, though views on
+	// dropped tables would already be broken).
+	for _, viewName := range d.ViewsRemoved {
+		op := DDLOp{
+			Op:   "drop_view",
+			Name: viewName,
+			Down: &DownOp{Irreversible: true},
+		}
+		m.DDLOps = append(m.DDLOps, op)
 	}
 
 	for _, enumName := range d.EnumsRemoved {
@@ -652,6 +710,28 @@ func findTable(schema *model.Schema, qualifiedName string) *model.Table {
 	return schema.TableByName("", qualifiedName)
 }
 
+func findView(schema *model.Schema, qualifiedName string) *model.View {
+	s, name := splitQualifiedName(qualifiedName)
+	for i := range schema.Views {
+		v := &schema.Views[i]
+		vSchema := v.Schema
+		if vSchema == "" {
+			vSchema = "public"
+		}
+		if vSchema == s && v.Name == name {
+			return v
+		}
+	}
+	return nil
+}
+
+func viewKey(v model.View) string {
+	if v.Schema == "" || v.Schema == "public" {
+		return v.Name
+	}
+	return v.Schema + "." + v.Name
+}
+
 func migrateTableKey(t model.Table) string {
 	if t.Schema == "" || t.Schema == "public" {
 		return t.Name
@@ -713,6 +793,19 @@ func generateDescription(d *diff.SchemaDiff) string {
 	}
 	if len(d.EnumsAdded) > 0 {
 		parts = append(parts, fmt.Sprintf("Add enum %s", strings.Join(d.EnumsAdded, ", ")))
+	}
+	if len(d.ViewsAdded) > 0 {
+		parts = append(parts, fmt.Sprintf("Add view %s", strings.Join(d.ViewsAdded, ", ")))
+	}
+	if len(d.ViewsRemoved) > 0 {
+		parts = append(parts, fmt.Sprintf("Drop view %s", strings.Join(d.ViewsRemoved, ", ")))
+	}
+	if len(d.ViewsChanged) > 0 {
+		names := make([]string, len(d.ViewsChanged))
+		for i, vd := range d.ViewsChanged {
+			names[i] = vd.Name
+		}
+		parts = append(parts, fmt.Sprintf("Alter view %s", strings.Join(names, ", ")))
 	}
 	if len(parts) == 0 {
 		return "Schema migration"

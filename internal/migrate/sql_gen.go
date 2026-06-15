@@ -74,6 +74,12 @@ func OpToSQL(op DDLOp) string {
 		return opCreateTrigger(op)
 	case "drop_trigger":
 		return opDropTrigger(op)
+	case "create_view":
+		return opCreateView(op)
+	case "drop_view":
+		return opDropView(op)
+	case "create_or_replace_view":
+		return opCreateOrReplaceView(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -326,6 +332,27 @@ func opDropTrigger(op DDLOp) string {
 	schema, tableName := splitQualifiedName(op.Table)
 	qualifiedTable := sql.QualifiedName(schema, tableName)
 	return fmt.Sprintf("DROP TRIGGER IF EXISTS %s ON %s;", sql.QuoteIdent(op.Name), qualifiedTable)
+}
+
+func opCreateView(op DDLOp) string {
+	if op.ViewDef != nil {
+		schema, _ := splitQualifiedName(op.Name)
+		return sql.CreateView(schema, op.ViewDef, false)
+	}
+	return fmt.Sprintf("-- create_view: missing view definition for %s", op.Name)
+}
+
+func opDropView(op DDLOp) string {
+	schema, name := splitQualifiedName(op.Name)
+	return sql.DropView(schema, name, false)
+}
+
+func opCreateOrReplaceView(op DDLOp) string {
+	if op.ViewDef != nil {
+		schema, _ := splitQualifiedName(op.Name)
+		return sql.CreateView(schema, op.ViewDef, true)
+	}
+	return fmt.Sprintf("-- create_or_replace_view: missing view definition for %s", op.Name)
 }
 
 // splitQualifiedName splits "schema.table" into ("schema", "table").
