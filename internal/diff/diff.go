@@ -25,6 +25,9 @@ type SchemaDiff struct {
 	ViewsAdded        []string    `json:"views_added,omitempty"`
 	ViewsRemoved      []string    `json:"views_removed,omitempty"`
 	ViewsChanged      []ViewDiff  `json:"views_changed,omitempty"`
+	MaterializedViewsAdded   []string               `json:"materialized_views_added,omitempty"`
+	MaterializedViewsRemoved []string               `json:"materialized_views_removed,omitempty"`
+	MaterializedViewsChanged []MaterializedViewDiff `json:"materialized_views_changed,omitempty"`
 }
 
 // TableDiff describes the differences within a single table.
@@ -90,6 +93,17 @@ type ViewDiff struct {
 	CommentChanged *[2]string `json:"comment_changed,omitempty"`
 }
 
+// MaterializedViewDiff describes changes to a materialized view.
+type MaterializedViewDiff struct {
+	Name            string        `json:"name"`
+	QueryChanged    *[2]string    `json:"query_changed,omitempty"`
+	CommentChanged  *[2]string    `json:"comment_changed,omitempty"`
+	WithDataChanged *[2]bool      `json:"with_data_changed,omitempty"`
+	IndexesAdded    []model.Index `json:"indexes_added,omitempty"`
+	IndexesRemoved  []string      `json:"indexes_removed,omitempty"`
+	IndexesChanged  []IndexChange `json:"indexes_changed,omitempty"`
+}
+
 // FKChange describes a changed foreign key constraint.
 type FKChange struct {
 	Name string   `json:"name"`
@@ -124,7 +138,10 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.ExtensionsRemoved) == 0 &&
 		len(d.ViewsAdded) == 0 &&
 		len(d.ViewsRemoved) == 0 &&
-		len(d.ViewsChanged) == 0
+		len(d.ViewsChanged) == 0 &&
+		len(d.MaterializedViewsAdded) == 0 &&
+		len(d.MaterializedViewsRemoved) == 0 &&
+		len(d.MaterializedViewsChanged) == 0
 }
 
 // Summary returns a human-readable summary of the diff.
@@ -177,6 +194,15 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.ViewsChanged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d view(s) changed", n))
 	}
+	if n := len(d.MaterializedViewsAdded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d materialized view(s) added", n))
+	}
+	if n := len(d.MaterializedViewsRemoved); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d materialized view(s) removed", n))
+	}
+	if n := len(d.MaterializedViewsChanged); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d materialized view(s) changed", n))
+	}
 
 	return strings.Join(parts, ", ")
 }
@@ -191,6 +217,7 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 	diffEnums(d, desired, actual)
 	diffExtensions(d, desired, actual)
 	diffViews(d, desired, actual)
+	diffMaterializedViews(d, desired, actual)
 
 	return d
 }
@@ -979,6 +1006,107 @@ func diffView(desired, actual *model.View) *ViewDiff {
 		return nil
 	}
 	return vd
+}
+
+// diffMaterializedViews matches materialized views by schema-qualified name.
+func diffMaterializedViews(d *SchemaDiff, desired, actual *model.Schema) {
+	actualByKey := make(map[string]*model.MaterializedView, len(actual.MaterializedViews))
+	for i := range actual.MaterializedViews {
+		mv := &actual.MaterializedViews[i]
+		actualByKey[mvKey(mv)] = mv
+	}
+
+	desiredKeys := make(map[string]bool, len(desired.MaterializedViews))
+	for i := range desired.MaterializedViews {
+		dmv := &desired.MaterializedViews[i]
+		key := mvKey(dmv)
+		desiredKeys[key] = true
+
+		amv, found := actualByKey[key]
+		if !found {
+			d.MaterializedViewsAdded = append(d.MaterializedViewsAdded, key)
+			continue
+		}
+
+		mvd := diffMaterializedView(dmv, amv)
+		if mvd != nil {
+			d.MaterializedViewsChanged = append(d.MaterializedViewsChanged, *mvd)
+		}
+	}
+
+	for _, amv := range actual.MaterializedViews {
+		key := mvKey(&amv)
+		if !desiredKeys[key] {
+			d.MaterializedViewsRemoved = append(d.MaterializedViewsRemoved, key)
+		}
+	}
+}
+
+func mvKey(mv *model.MaterializedView) string {
+	if mv.Schema == "" || mv.Schema == "public" {
+		return mv.Name
+	}
+	return mv.Schema + "." + mv.Name
+}
+
+// diffMaterializedView compares two matched materialized views and returns nil if identical.
+func diffMaterializedView(desired, actual *model.MaterializedView) *MaterializedViewDiff {
+	mvd := &MaterializedViewDiff{Name: mvKey(desired)}
+	changed := false
+
+	if desired.Query != actual.Query {
+		mvd.QueryChanged = &[2]string{actual.Query, desired.Query}
+		changed = true
+	}
+
+	if desired.Comment != actual.Comment {
+		mvd.CommentChanged = &[2]string{actual.Comment, desired.Comment}
+		changed = true
+	}
+
+	if desired.WithData != actual.WithData {
+		mvd.WithDataChanged = &[2]bool{actual.WithData, desired.WithData}
+		changed = true
+	}
+
+	// Diff indexes.
+	actualIdxByName := make(map[string]*model.Index, len(actual.Indexes))
+	for i := range actual.Indexes {
+		actualIdxByName[actual.Indexes[i].Name] = &actual.Indexes[i]
+	}
+
+	desiredIdxNames := make(map[string]bool, len(desired.Indexes))
+	for _, didx := range desired.Indexes {
+		desiredIdxNames[didx.Name] = true
+
+		aidx, found := actualIdxByName[didx.Name]
+		if !found {
+			mvd.IndexesAdded = append(mvd.IndexesAdded, didx)
+			changed = true
+			continue
+		}
+
+		if !indexEqual(&didx, aidx) {
+			mvd.IndexesChanged = append(mvd.IndexesChanged, IndexChange{
+				Name: didx.Name,
+				Old:  *aidx,
+				New:  didx,
+			})
+			changed = true
+		}
+	}
+
+	for _, aidx := range actual.Indexes {
+		if !desiredIdxNames[aidx.Name] {
+			mvd.IndexesRemoved = append(mvd.IndexesRemoved, aidx.Name)
+			changed = true
+		}
+	}
+
+	if !changed {
+		return nil
+	}
+	return mvd
 }
 
 // stringDiff returns elements in a that are not in b.

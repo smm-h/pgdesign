@@ -92,6 +92,37 @@ func FormatTerminal(d *SchemaDiff) string {
 		}
 	}
 
+	// Materialized Views
+	for _, name := range d.MaterializedViewsAdded {
+		fmt.Fprintf(&b, "%s+ materialized view %s%s\n", colorGreen, name, colorReset)
+	}
+	for _, name := range d.MaterializedViewsRemoved {
+		fmt.Fprintf(&b, "%s- materialized view %s%s\n", colorRed, name, colorReset)
+	}
+	for _, mvd := range d.MaterializedViewsChanged {
+		fmt.Fprintf(&b, "%s~ materialized view %s%s\n", colorYellow, mvd.Name, colorReset)
+		if mvd.QueryChanged != nil {
+			fmt.Fprintf(&b, "  query:\n")
+			fmt.Fprintf(&b, "    %s- %s%s\n", colorRed, mvd.QueryChanged[0], colorReset)
+			fmt.Fprintf(&b, "    %s+ %s%s\n", colorGreen, mvd.QueryChanged[1], colorReset)
+		}
+		if mvd.CommentChanged != nil {
+			fmt.Fprintf(&b, "  %s~ comment: %q -> %q%s\n", colorYellow, mvd.CommentChanged[0], mvd.CommentChanged[1], colorReset)
+		}
+		if mvd.WithDataChanged != nil {
+			fmt.Fprintf(&b, "  %s~ with_data: %v -> %v%s\n", colorYellow, mvd.WithDataChanged[0], mvd.WithDataChanged[1], colorReset)
+		}
+		for _, idx := range mvd.IndexesAdded {
+			fmt.Fprintf(&b, "  %s+ index %s%s\n", colorGreen, idx.Name, colorReset)
+		}
+		for _, name := range mvd.IndexesRemoved {
+			fmt.Fprintf(&b, "  %s- index %s%s\n", colorRed, name, colorReset)
+		}
+		for _, ic := range mvd.IndexesChanged {
+			fmt.Fprintf(&b, "  %s~ index %s%s\n", colorYellow, ic.Name, colorReset)
+		}
+	}
+
 	return b.String()
 }
 
