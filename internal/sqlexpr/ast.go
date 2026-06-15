@@ -41,6 +41,11 @@ type FloatLiteral struct {
 
 func (n *FloatLiteral) nodeType() string { return "FloatLiteral" }
 
+// NullLiteral is a NULL literal.
+type NullLiteral struct{}
+
+func (n *NullLiteral) nodeType() string { return "NullLiteral" }
+
 // FuncCall is a function call with arguments.
 type FuncCall struct {
 	Name string

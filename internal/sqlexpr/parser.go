@@ -385,6 +385,12 @@ func (p *parser) parsePrimary() (Node, error) {
 			return &BoolLiteral{Value: false}, nil
 		}
 
+		// NULL literal
+		if lower == "null" {
+			p.advance()
+			return &NullLiteral{}, nil
+		}
+
 		// EXISTS
 		if lower == "exists" {
 			return p.parseExists()

@@ -17,6 +17,8 @@ func Walk(node Node, fn func(Node) bool) {
 		// leaf node
 	case *FloatLiteral:
 		// leaf node
+	case *NullLiteral:
+		// leaf node
 	case *FuncCall:
 		for _, arg := range n.Args {
 			Walk(arg, fn)
