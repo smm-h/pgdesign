@@ -868,6 +868,133 @@ down = { irreversible = true }
 	}
 }
 
+func TestGenerateMigration_ViewAdded(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+		Views: []model.View{
+			{
+				Name:   "active_users",
+				Schema: "app",
+				Query:  "SELECT id, name FROM users WHERE active = true",
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		ViewsAdded: []string{"app.active_users"},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0)
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_view" && op.Name == "app.active_users" {
+			found = true
+			if op.ViewDef == nil {
+				t.Error("create_view op has no ViewDef")
+			} else if op.ViewDef.Query != "SELECT id, name FROM users WHERE active = true" {
+				t.Errorf("ViewDef.Query = %q, unexpected", op.ViewDef.Query)
+			}
+			if op.Down == nil {
+				t.Error("create_view op has no down op")
+			} else if len(op.Down.Ops) == 0 {
+				t.Error("create_view down has no ops")
+			} else if op.Down.Ops[0].Op != "drop_view" {
+				t.Errorf("create_view down op = %q, want drop_view", op.Down.Ops[0].Op)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected create_view op for app.active_users, got ops: %v", opsDebug(m.DDLOps))
+	}
+}
+
+func TestGenerateMigration_ViewRemoved(t *testing.T) {
+	desired := &model.Schema{Name: "app"}
+	d := &diff.SchemaDiff{
+		ViewsRemoved: []string{"app.old_view"},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_view" && op.Name == "app.old_view" {
+			found = true
+			if op.Down == nil || !op.Down.Irreversible {
+				t.Error("drop_view should have irreversible down")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected drop_view op for app.old_view, got ops: %v", opsDebug(m.DDLOps))
+	}
+}
+
+func TestGenerateMigration_ViewQueryChanged(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+		Views: []model.View{
+			{
+				Name:   "active_users",
+				Schema: "app",
+				Query:  "SELECT id, name, email FROM users WHERE active = true",
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		ViewsChanged: []diff.ViewDiff{
+			{
+				Name:         "app.active_users",
+				QueryChanged: &[2]string{"SELECT id, name FROM users WHERE active = true", "SELECT id, name, email FROM users WHERE active = true"},
+			},
+		},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.3.0", nil, 0, 0)
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_or_replace_view" && op.Name == "app.active_users" {
+			found = true
+			if op.ViewDef == nil {
+				t.Error("create_or_replace_view op has no ViewDef")
+			}
+			if op.Down == nil {
+				t.Error("create_or_replace_view op has no down op")
+			} else if len(op.Down.Ops) == 0 {
+				t.Error("create_or_replace_view down has no ops")
+			} else {
+				downOp := op.Down.Ops[0]
+				if downOp.Op != "create_or_replace_view" {
+					t.Errorf("down op = %q, want create_or_replace_view", downOp.Op)
+				}
+				if downOp.ViewDef == nil {
+					t.Error("down op has no ViewDef")
+				} else if downOp.ViewDef.Query != "SELECT id, name FROM users WHERE active = true" {
+					t.Errorf("down ViewDef.Query = %q, want old query", downOp.ViewDef.Query)
+				}
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected create_or_replace_view op for app.active_users, got ops: %v", opsDebug(m.DDLOps))
+	}
+}
+
 // --- Integration tests (require local PostgreSQL) ---
 
 func getTestConnStr() string {
