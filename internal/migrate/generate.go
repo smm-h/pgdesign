@@ -249,6 +249,32 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 					m.DDLOps = append(m.DDLOps, op)
 				}
 			}
+			if cc.ArrayChanged != nil {
+				// Look up the column's base PGType from the desired schema.
+				targetType := ""
+				if table := findTable(desired, td.Name); table != nil {
+					for _, col := range table.Columns {
+						if col.Name == cc.Name {
+							targetType = col.PGType
+							if col.Array {
+								targetType += "[]"
+							}
+							break
+						}
+					}
+				}
+				if targetType != "" {
+					op := DDLOp{
+						Op:     "alter_column_type",
+						Table:  td.Name,
+						Column: cc.Name,
+						Type:   targetType,
+						Down:   &DownOp{Irreversible: true},
+					}
+					m.DDLOps = append(m.DDLOps, op)
+					diags = append(diags, classifyOp(op, risk.OpAlterColumnType, ctx)...)
+				}
+			}
 		}
 
 		// Added FKs.
