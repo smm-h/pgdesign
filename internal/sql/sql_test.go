@@ -1172,3 +1172,75 @@ func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
 		t.Errorf("LiteralValue(%q, %q) = %q, want %q", "'created'", "status", got, want)
 	}
 }
+
+func TestCreateMaterializedView_WithData(t *testing.T) {
+	mv := &model.MaterializedView{
+		Name:     "monthly_stats",
+		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+		WithData: true,
+	}
+	got := CreateMaterializedView("public", mv)
+	if !strings.Contains(got, "CREATE MATERIALIZED VIEW public.monthly_stats AS") {
+		t.Errorf("expected CREATE MATERIALIZED VIEW, got:\n%s", got)
+	}
+	if !strings.Contains(got, "WITH DATA;") {
+		t.Errorf("expected WITH DATA, got:\n%s", got)
+	}
+	if strings.Contains(got, "WITH NO DATA") {
+		t.Errorf("expected no WITH NO DATA, got:\n%s", got)
+	}
+}
+
+func TestCreateMaterializedView_WithNoData(t *testing.T) {
+	mv := &model.MaterializedView{
+		Name:     "monthly_stats",
+		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+		WithData: false,
+	}
+	got := CreateMaterializedView("public", mv)
+	if !strings.Contains(got, "CREATE MATERIALIZED VIEW public.monthly_stats AS") {
+		t.Errorf("expected CREATE MATERIALIZED VIEW, got:\n%s", got)
+	}
+	if !strings.Contains(got, "WITH NO DATA;") {
+		t.Errorf("expected WITH NO DATA, got:\n%s", got)
+	}
+	// "WITH NO DATA;" contains "DATA" -- check there is no standalone "WITH DATA;" line.
+	withoutNoData := strings.ReplaceAll(got, "WITH NO DATA;", "")
+	if strings.Contains(withoutNoData, "WITH DATA;") {
+		t.Errorf("expected no standalone WITH DATA, got:\n%s", got)
+	}
+}
+
+func TestDropMaterializedView(t *testing.T) {
+	got := DropMaterializedView("public", "monthly_stats", false)
+	if got != "DROP MATERIALIZED VIEW public.monthly_stats;\n" {
+		t.Errorf("DropMaterializedView = %q, want %q", got, "DROP MATERIALIZED VIEW public.monthly_stats;\n")
+	}
+	if strings.Contains(got, "IF EXISTS") {
+		t.Errorf("expected no IF EXISTS, got:\n%s", got)
+	}
+}
+
+func TestDropMaterializedView_Idempotent(t *testing.T) {
+	got := DropMaterializedView("public", "monthly_stats", true)
+	if got != "DROP MATERIALIZED VIEW IF EXISTS public.monthly_stats;\n" {
+		t.Errorf("DropMaterializedView idempotent = %q, want %q", got, "DROP MATERIALIZED VIEW IF EXISTS public.monthly_stats;\n")
+	}
+}
+
+func TestRefreshMaterializedView(t *testing.T) {
+	got := RefreshMaterializedView("public", "monthly_stats", false)
+	if got != "REFRESH MATERIALIZED VIEW public.monthly_stats;\n" {
+		t.Errorf("RefreshMaterializedView = %q, want %q", got, "REFRESH MATERIALIZED VIEW public.monthly_stats;\n")
+	}
+	if strings.Contains(got, "CONCURRENTLY") {
+		t.Errorf("expected no CONCURRENTLY, got:\n%s", got)
+	}
+}
+
+func TestRefreshMaterializedView_Concurrently(t *testing.T) {
+	got := RefreshMaterializedView("public", "monthly_stats", true)
+	if got != "REFRESH MATERIALIZED VIEW CONCURRENTLY public.monthly_stats;\n" {
+		t.Errorf("RefreshMaterializedView concurrent = %q, want %q", got, "REFRESH MATERIALIZED VIEW CONCURRENTLY public.monthly_stats;\n")
+	}
+}
