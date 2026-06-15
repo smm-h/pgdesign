@@ -32,9 +32,9 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		DBTag  string
 	}
 	type structInfo struct {
-		Name    string
-		Comment string
-		Fields  []fieldInfo
+		Name      string
+		TableName string
+		Fields    []fieldInfo
 	}
 
 	var structs []structInfo
@@ -42,8 +42,8 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 
 	for _, tbl := range schema.Tables {
 		si := structInfo{
-			Name:    toPascalCase(tbl.Name),
-			Comment: tbl.Comment,
+			Name:      toPascalCase(tbl.Name),
+			TableName: tbl.Name,
 		}
 		for _, col := range tbl.Columns {
 			goType, importPath := pgTypeToGo(col)
@@ -92,8 +92,8 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 	// Write structs.
 	for _, si := range structs {
 		buf.WriteString("\n")
-		if si.Comment != "" {
-			fmt.Fprintf(&buf, "// %s represents the %s table.\n", si.Name, si.Comment)
+		if si.TableName != "" {
+			fmt.Fprintf(&buf, "// %s represents the %s table.\n", si.Name, si.TableName)
 		}
 		fmt.Fprintf(&buf, "type %s struct {\n", si.Name)
 
