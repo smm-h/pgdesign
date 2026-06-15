@@ -357,7 +357,8 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 		SELECT i.relname as index_name,
 		       am.amname as method,
 		       pg_get_indexdef(ix.indexrelid) as definition,
-		       ix.indisunique
+		       ix.indisunique,
+		       i.reloptions
 		FROM pg_index ix
 		JOIN pg_class i ON i.oid = ix.indexrelid
 		JOIN pg_am am ON am.oid = i.relam
@@ -375,7 +376,8 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 	for rows.Next() {
 		var name, method, definition string
 		var isUnique bool
-		if err := rows.Scan(&name, &method, &definition, &isUnique); err != nil {
+		var reloptions []string
+		if err := rows.Scan(&name, &method, &definition, &isUnique, &reloptions); err != nil {
 			return nil, nil, err
 		}
 
@@ -392,6 +394,7 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 		idx.Where = parsed.where
 		idx.Include = parsed.include
 		idx.Opclasses = parsed.opclasses
+		idx.With = parseReloptions(reloptions)
 
 		// If the index is unique but not backed by a unique constraint,
 		// record it as a unique index (method is already set).
@@ -402,6 +405,21 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 	}
 
 	return indexes, diags, rows.Err()
+}
+
+// parseReloptions converts pg_class.reloptions (text[] like ["m=16", "ef_construction=200"])
+// into a map[string]string.
+func parseReloptions(opts []string) map[string]string {
+	if len(opts) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(opts))
+	for _, opt := range opts {
+		if idx := strings.IndexByte(opt, '='); idx >= 0 {
+			m[opt[:idx]] = opt[idx+1:]
+		}
+	}
+	return m
 }
 
 // parsedIndex holds parsed components of a pg_get_indexdef() string.
