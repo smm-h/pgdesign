@@ -334,6 +334,78 @@ func TestBuild_MaterializedViewWithDataFalse(t *testing.T) {
 	}
 }
 
+func TestBuild_GeneratedColumnDefaultStored(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	trueVal := true
+	falseVal := false
+	genExpr := "price * quantity"
+
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "orders",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "price", Type: "money"},
+					{Name: "quantity", Type: "counter"},
+					{Name: "total_default", Type: "money", Generated: &genExpr},
+					{Name: "total_virtual", Type: "money", Generated: &genExpr, Stored: &falseVal},
+					{Name: "total_stored", Type: "money", Generated: &genExpr, Stored: &trueVal},
+				},
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+
+	findCol := func(name string) *Column {
+		for i := range schema.Tables[0].Columns {
+			if schema.Tables[0].Columns[i].Name == name {
+				return &schema.Tables[0].Columns[i]
+			}
+		}
+		return nil
+	}
+
+	// stored omitted -> defaults to true
+	col := findCol("total_default")
+	if col == nil {
+		t.Fatal("total_default column not found")
+	}
+	if col.Generated != "price * quantity" {
+		t.Errorf("total_default.Generated = %q, want %q", col.Generated, "price * quantity")
+	}
+	if !col.Stored {
+		t.Error("total_default.Stored = false, want true (default when stored omitted)")
+	}
+
+	// stored = false -> stays false
+	col = findCol("total_virtual")
+	if col == nil {
+		t.Fatal("total_virtual column not found")
+	}
+	if col.Stored {
+		t.Error("total_virtual.Stored = true, want false (explicitly set)")
+	}
+
+	// stored = true -> stays true
+	col = findCol("total_stored")
+	if col == nil {
+		t.Fatal("total_stored column not found")
+	}
+	if !col.Stored {
+		t.Error("total_stored.Stored = false, want true (explicitly set)")
+	}
+}
+
 func TestBuild_MaterializedViewIndexes(t *testing.T) {
 	reg := semtype.NewBuiltinRegistry()
 	uniqueVal := true

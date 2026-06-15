@@ -179,6 +179,59 @@ func TestCreateTable_GeneratedColumn(t *testing.T) {
 	}
 }
 
+func TestColumnDef_VirtualVersionGate(t *testing.T) {
+	base := &model.Table{
+		Name:   "t",
+		Schema: "public",
+		Columns: []model.Column{
+			{Name: "id", PGType: "integer", NotNull: true},
+			{Name: "val", PGType: "integer", NotNull: true},
+			{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+		},
+		PK: []string{"id"},
+	}
+
+	// PG 18 + stored=false -> VIRTUAL
+	got := CreateTable(base, "public", false, 18, nil)
+	if !strings.Contains(got, "VIRTUAL") {
+		t.Errorf("PG18 + stored=false: expected VIRTUAL in output:\n%s", got)
+	}
+	if strings.Contains(got, "STORED") {
+		t.Errorf("PG18 + stored=false: unexpected STORED in output:\n%s", got)
+	}
+
+	// PG 17 + stored=false -> defensively STORED (validate catches this)
+	got = CreateTable(base, "public", false, 17, nil)
+	if !strings.Contains(got, "STORED") {
+		t.Errorf("PG17 + stored=false: expected STORED in output:\n%s", got)
+	}
+	if strings.Contains(got, "VIRTUAL") {
+		t.Errorf("PG17 + stored=false: unexpected VIRTUAL in output:\n%s", got)
+	}
+
+	// PG 0 (unspecified) + stored=false -> VIRTUAL (respect user choice)
+	got = CreateTable(base, "public", false, 0, nil)
+	if !strings.Contains(got, "VIRTUAL") {
+		t.Errorf("PG0 + stored=false: expected VIRTUAL in output:\n%s", got)
+	}
+
+	// PG 0 + stored=true -> STORED
+	base.Columns[2].Stored = true
+	got = CreateTable(base, "public", false, 0, nil)
+	if !strings.Contains(got, "STORED") {
+		t.Errorf("PG0 + stored=true: expected STORED in output:\n%s", got)
+	}
+	if strings.Contains(got, "VIRTUAL") {
+		t.Errorf("PG0 + stored=true: unexpected VIRTUAL in output:\n%s", got)
+	}
+
+	// PG 18 + stored=true -> STORED (explicit stored always wins)
+	got = CreateTable(base, "public", false, 18, nil)
+	if !strings.Contains(got, "STORED") {
+		t.Errorf("PG18 + stored=true: expected STORED in output:\n%s", got)
+	}
+}
+
 func TestCreateTable_IdentityColumn(t *testing.T) {
 	table := &model.Table{
 		Name:   "events",
