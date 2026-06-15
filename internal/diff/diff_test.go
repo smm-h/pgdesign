@@ -1653,3 +1653,108 @@ func TestIndexWithEqual(t *testing.T) {
 		t.Fatalf("expected no changes, got %d table(s) changed", len(d.TablesChanged))
 	}
 }
+
+func TestDiff_ViewAdded(t *testing.T) {
+	desired := &model.Schema{
+		Views: []model.View{
+			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true"},
+		},
+	}
+	actual := &model.Schema{}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.ViewsAdded) != 1 || d.ViewsAdded[0] != "active_users" {
+		t.Errorf("expected active_users added, got: %v", d.ViewsAdded)
+	}
+}
+
+func TestDiff_ViewRemoved(t *testing.T) {
+	desired := &model.Schema{}
+	actual := &model.Schema{
+		Views: []model.View{
+			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.ViewsRemoved) != 1 || d.ViewsRemoved[0] != "active_users" {
+		t.Errorf("expected active_users removed, got: %v", d.ViewsRemoved)
+	}
+}
+
+func TestDiff_ViewChanged(t *testing.T) {
+	desired := &model.Schema{
+		Views: []model.View{
+			{Name: "active_users", Schema: "public", Query: "SELECT id, name FROM users WHERE active = true"},
+		},
+	}
+	actual := &model.Schema{
+		Views: []model.View{
+			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.ViewsChanged) != 1 {
+		t.Fatalf("expected 1 view changed, got %d", len(d.ViewsChanged))
+	}
+	vd := d.ViewsChanged[0]
+	if vd.Name != "active_users" {
+		t.Errorf("expected view name active_users, got %q", vd.Name)
+	}
+	if vd.QueryChanged == nil {
+		t.Fatal("expected QueryChanged to be set")
+	}
+	if vd.QueryChanged[0] != "SELECT * FROM users WHERE active = true" {
+		t.Errorf("expected old query, got %q", vd.QueryChanged[0])
+	}
+	if vd.QueryChanged[1] != "SELECT id, name FROM users WHERE active = true" {
+		t.Errorf("expected new query, got %q", vd.QueryChanged[1])
+	}
+}
+
+func TestDiff_ViewCommentChanged(t *testing.T) {
+	desired := &model.Schema{
+		Views: []model.View{
+			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true", Comment: "New comment"},
+		},
+	}
+	actual := &model.Schema{
+		Views: []model.View{
+			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true", Comment: "Old comment"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.ViewsChanged) != 1 {
+		t.Fatalf("expected 1 view changed, got %d", len(d.ViewsChanged))
+	}
+	vd := d.ViewsChanged[0]
+	if vd.CommentChanged == nil {
+		t.Fatal("expected CommentChanged to be set")
+	}
+	if vd.CommentChanged[0] != "Old comment" || vd.CommentChanged[1] != "New comment" {
+		t.Errorf("expected [Old comment, New comment], got [%q, %q]", vd.CommentChanged[0], vd.CommentChanged[1])
+	}
+	// Query unchanged, so QueryChanged should be nil.
+	if vd.QueryChanged != nil {
+		t.Error("expected QueryChanged to be nil when query is unchanged")
+	}
+}
+
+func TestDiff_ViewUnchanged(t *testing.T) {
+	schema := &model.Schema{
+		Views: []model.View{
+			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true", Comment: "Active users view"},
+		},
+	}
+	d := Diff(schema, schema)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for identical views, got: %s", d.Summary())
+	}
+}
