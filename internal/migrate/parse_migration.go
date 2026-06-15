@@ -22,7 +22,10 @@ type tomlDDL struct {
 	Column   string      `toml:"column,omitempty"`
 	Type     string      `toml:"type,omitempty"`
 	Default  interface{} `toml:"default,omitempty"`
-	NotNull  bool        `toml:"not_null,omitempty"`
+	NotNull   bool        `toml:"not_null,omitempty"`
+	Generated string      `toml:"generated,omitempty"`
+	Stored    bool        `toml:"stored,omitempty"`
+	PGVersion int         `toml:"pg_version,omitempty"`
 	Name     string      `toml:"name,omitempty"`
 	Columns  []string    `toml:"columns,omitempty"`
 	RefTable string      `toml:"ref_table,omitempty"`
@@ -106,7 +109,10 @@ func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 		Column:   td.Column,
 		Type:     td.Type,
 		Default:  td.Default,
-		NotNull:  td.NotNull,
+		NotNull:   td.NotNull,
+		Generated: td.Generated,
+		Stored:    td.Stored,
+		PGVersion: td.PGVersion,
 		Name:     td.Name,
 		Columns:  td.Columns,
 		RefTable: td.RefTable,
@@ -216,6 +222,15 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	}
 	if op.NotNull {
 		b.WriteString("not_null = true\n")
+	}
+	if op.Generated != "" {
+		b.WriteString(fmt.Sprintf("generated = %q\n", op.Generated))
+	}
+	if op.Stored {
+		b.WriteString("stored = true\n")
+	}
+	if op.PGVersion > 0 {
+		b.WriteString(fmt.Sprintf("pg_version = %d\n", op.PGVersion))
 	}
 	if op.Name != "" {
 		b.WriteString(fmt.Sprintf("name = %q\n", op.Name))

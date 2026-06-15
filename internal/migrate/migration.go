@@ -18,9 +18,12 @@ type DDLOp struct {
 	Op       string      // "create_table", "add_column", "drop_table", etc.
 	Table    string      // schema-qualified table name
 	Column   string      // for column ops
-	Type     string      // for add_column
-	Default  interface{} // for add_column
-	NotNull  bool
+	Type      string      // for add_column
+	Default   interface{} // for add_column
+	NotNull   bool
+	Generated string // for add_column: GENERATED ALWAYS AS (expr)
+	Stored    bool   // for add_column: true=STORED, false=VIRTUAL
+	PGVersion int    // target PG version for version-gated DDL
 	Name     string   // for constraints/indexes
 	Columns  []string // for indexes, FKs
 	RefTable string   // for FKs

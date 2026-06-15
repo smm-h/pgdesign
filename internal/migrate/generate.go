@@ -185,7 +185,11 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 					Ops: []DDLOp{{Op: "drop_column", Table: td.Name, Column: col.Name}},
 				},
 			}
-			if col.Default != nil {
+			if col.Generated != "" {
+				op.Generated = col.Generated
+				op.Stored = col.Stored
+				op.PGVersion = desired.PGVersion
+			} else if col.Default != nil {
 				op.Default = *col.Default
 			} else if col.DefaultExpr != "" {
 				op.Default = col.DefaultExpr
