@@ -1580,3 +1580,76 @@ func TestDiffColumnJSONSchemaUnchanged(t *testing.T) {
 		t.Errorf("expected no table changes when json_schema is the same, got %d", len(d.TablesChanged))
 	}
 }
+
+func TestIndexWithChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:   "t",
+			Schema: "public",
+			Indexes: []model.Index{{
+				Name:    "idx_t",
+				Columns: []string{"id"},
+				Method:  "btree",
+				With:    map[string]string{"fillfactor": "80"},
+			}},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name:   "t",
+			Schema: "public",
+			Indexes: []model.Index{{
+				Name:    "idx_t",
+				Columns: []string{"id"},
+				Method:  "btree",
+				With:    map[string]string{"fillfactor": "90"},
+			}},
+		}},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	td := d.TablesChanged[0]
+	if len(td.IndexesChanged) != 1 {
+		t.Fatalf("expected 1 index changed, got %d", len(td.IndexesChanged))
+	}
+	ic := td.IndexesChanged[0]
+	if ic.Old.With["fillfactor"] != "90" {
+		t.Errorf("expected old fillfactor=90, got %s", ic.Old.With["fillfactor"])
+	}
+	if ic.New.With["fillfactor"] != "80" {
+		t.Errorf("expected new fillfactor=80, got %s", ic.New.With["fillfactor"])
+	}
+}
+
+func TestIndexWithEqual(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:   "t",
+			Schema: "public",
+			Indexes: []model.Index{{
+				Name:    "idx_t",
+				Columns: []string{"id"},
+				Method:  "hnsw",
+				With:    map[string]string{"m": "16", "ef_construction": "200"},
+			}},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name:   "t",
+			Schema: "public",
+			Indexes: []model.Index{{
+				Name:    "idx_t",
+				Columns: []string{"id"},
+				Method:  "hnsw",
+				With:    map[string]string{"m": "16", "ef_construction": "200"},
+			}},
+		}},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 0 {
+		t.Fatalf("expected no changes, got %d table(s) changed", len(d.TablesChanged))
+	}
+}
