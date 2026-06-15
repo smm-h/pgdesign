@@ -83,6 +83,9 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 		statsConn.Close(ctx)
 	}
 
+	// Resolve PGVersion: live (from introspect) > config > TOML schema.
+	schema.PGVersion = resolvePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+
 	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold)
 
 	// Print the plan.
@@ -193,6 +196,9 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 		}
 		statsConn.Close(ctx)
 	}
+
+	// Resolve PGVersion: live (from introspect) > config > TOML schema.
+	schema.PGVersion = resolvePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
 
 	m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold)
 
