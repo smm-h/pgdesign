@@ -34,6 +34,13 @@ type IntLiteral struct {
 
 func (n *IntLiteral) nodeType() string { return "IntLiteral" }
 
+// FloatLiteral is a floating-point literal.
+type FloatLiteral struct {
+	Value float64
+}
+
+func (n *FloatLiteral) nodeType() string { return "FloatLiteral" }
+
 // FuncCall is a function call with arguments.
 type FuncCall struct {
 	Name string

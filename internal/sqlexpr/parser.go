@@ -356,6 +356,14 @@ func (p *parser) parsePrimary() (Node, error) {
 		}
 		return &IntLiteral{Value: val}, nil
 
+	case tokenFloat:
+		p.advance()
+		val, err := strconv.ParseFloat(tok.value, 64)
+		if err != nil {
+			return nil, fmt.Errorf("sqlexpr: invalid float %q at position %d", tok.value, tok.pos)
+		}
+		return &FloatLiteral{Value: val}, nil
+
 	case tokenMinus:
 		p.advance()
 		operand, err := p.parsePrimary()

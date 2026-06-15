@@ -12,6 +12,7 @@ const (
 	tokenIdent tokenKind = iota
 	tokenString
 	tokenInt
+	tokenFloat
 	tokenLParen
 	tokenRParen
 	tokenDot
@@ -66,8 +67,17 @@ func tokenize(input string) ([]token, error) {
 			i++
 
 		case runes[i] == '.':
-			tokens = append(tokens, token{kind: tokenDot, value: ".", pos: pos})
-			i++
+			if i+1 < len(runes) && unicode.IsDigit(runes[i+1]) {
+				start := i
+				i++ // consume the dot
+				for i < len(runes) && unicode.IsDigit(runes[i]) {
+					i++
+				}
+				tokens = append(tokens, token{kind: tokenFloat, value: string(runes[start:i]), pos: pos})
+			} else {
+				tokens = append(tokens, token{kind: tokenDot, value: ".", pos: pos})
+				i++
+			}
 
 		case runes[i] == '=' :
 			tokens = append(tokens, token{kind: tokenEquals, value: "=", pos: pos})
@@ -155,7 +165,18 @@ func tokenize(input string) ([]token, error) {
 			for i < len(runes) && unicode.IsDigit(runes[i]) {
 				i++
 			}
-			tokens = append(tokens, token{kind: tokenInt, value: string(runes[start:i]), pos: pos})
+			if i < len(runes) && runes[i] == '.' && (i+1 < len(runes) && unicode.IsDigit(runes[i+1])) {
+				i++ // consume the dot
+				for i < len(runes) && unicode.IsDigit(runes[i]) {
+					i++
+				}
+				tokens = append(tokens, token{kind: tokenFloat, value: string(runes[start:i]), pos: pos})
+			} else if i < len(runes) && runes[i] == '.' {
+				i++ // consume trailing dot (e.g., "1.")
+				tokens = append(tokens, token{kind: tokenFloat, value: string(runes[start:i]), pos: pos})
+			} else {
+				tokens = append(tokens, token{kind: tokenInt, value: string(runes[start:i]), pos: pos})
+			}
 
 		case runes[i] == '_' || unicode.IsLetter(runes[i]):
 			start := i
