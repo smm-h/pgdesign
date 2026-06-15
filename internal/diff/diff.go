@@ -61,6 +61,7 @@ type ColumnChange struct {
 	DefaultChanged  *[2]string          `json:"default_changed"`  // [old, new]
 	CommentChanged   *[2]string          `json:"comment_changed"`   // [old, new]
 	GeneratedChanged *[2]string          `json:"generated_changed,omitempty"` // [old, new]
+	StoredChanged    *[2]bool            `json:"stored_changed,omitempty"`    // [old, new]
 	IdentityChanged  *[2]string          `json:"identity_changed,omitempty"`  // [old, new]
 	ArrayChanged      *[2]bool            `json:"array_changed,omitempty"`
 	JSONSchemaChanged *[2]string          `json:"json_schema_changed,omitempty"`
@@ -390,6 +391,14 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 		changed = true
 	}
 
+	// Stored comparison (STORED <-> VIRTUAL transition).
+	// Only meaningful for generated columns: a change in storage strategy
+	// requires DROP + recreate, which is destructive.
+	if desired.Generated != "" && actual.Generated != "" && desired.Stored != actual.Stored {
+		cc.StoredChanged = &[2]bool{actual.Stored, desired.Stored}
+		changed = true
+	}
+
 	// Identity comparison.
 	if desired.Identity != actual.Identity {
 		cc.IdentityChanged = &[2]string{actual.Identity, desired.Identity}
@@ -459,6 +468,14 @@ func classifyColumnChange(cc *ColumnChange, desired *model.Column) risk.Classifi
 	}
 
 	// Comment changes are safe (no risk escalation needed).
+
+	if cc.StoredChanged != nil {
+		// STORED <-> VIRTUAL requires DROP + recreate of the generated column.
+		c := risk.Classify(risk.OpDropColumn, risk.OpContext{})
+		if c.RiskLevel > highest.RiskLevel {
+			highest = c
+		}
+	}
 
 	return highest
 }
