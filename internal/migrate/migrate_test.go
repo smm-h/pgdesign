@@ -1923,3 +1923,122 @@ func TestGenerateMigration_MaterializedViewRemoved(t *testing.T) {
 		t.Errorf("expected drop_materialized_view op for app.monthly_stats, got ops: %v", opsDebug(m.DDLOps))
 	}
 }
+
+func TestOpToSQL_AddColumnGenerated(t *testing.T) {
+	// PG 18 + stored=true -> STORED
+	op := DDLOp{
+		Op:        "add_column",
+		Table:     "public.orders",
+		Column:    "total",
+		Type:      "integer",
+		Generated: "price * quantity",
+		Stored:    true,
+		PGVersion: 18,
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.orders ADD COLUMN total integer GENERATED ALWAYS AS (price * quantity) STORED;`
+	if got != want {
+		t.Errorf("OpToSQL add_column stored:\ngot:  %s\nwant: %s", got, want)
+	}
+
+	// PG 18 + stored=false -> VIRTUAL
+	op.Stored = false
+	got = OpToSQL(op)
+	if !strings.Contains(got, "VIRTUAL") {
+		t.Errorf("PG18 + stored=false: expected VIRTUAL in: %s", got)
+	}
+	if strings.Contains(got, "STORED") {
+		t.Errorf("PG18 + stored=false: unexpected STORED in: %s", got)
+	}
+
+	// PG 17 + stored=false -> defensively STORED
+	op.PGVersion = 17
+	got = OpToSQL(op)
+	if !strings.Contains(got, "STORED") {
+		t.Errorf("PG17 + stored=false: expected STORED in: %s", got)
+	}
+
+	// PG 0 + stored=false -> VIRTUAL
+	op.PGVersion = 0
+	got = OpToSQL(op)
+	if !strings.Contains(got, "VIRTUAL") {
+		t.Errorf("PG0 + stored=false: expected VIRTUAL in: %s", got)
+	}
+}
+
+func TestMigrationRoundTrip_GeneratedColumn(t *testing.T) {
+	m := &Migration{
+		Description: "add generated column",
+		DDLOps: []DDLOp{
+			{
+				Op:        "add_column",
+				Table:     "public.orders",
+				Column:    "total",
+				Type:      "integer",
+				Generated: "price * quantity",
+				Stored:    true,
+				PGVersion: 18,
+			},
+		},
+	}
+
+	// Serialize to TOML.
+	content := FormatMigration(m)
+
+	// Verify the TOML content contains the expected fields.
+	if !strings.Contains(content, `generated = "price * quantity"`) {
+		t.Errorf("serialized TOML missing generated field:\n%s", content)
+	}
+	if !strings.Contains(content, "stored = true") {
+		t.Errorf("serialized TOML missing stored field:\n%s", content)
+	}
+	if !strings.Contains(content, "pg_version = 18") {
+		t.Errorf("serialized TOML missing pg_version field:\n%s", content)
+	}
+
+	// Parse back.
+	parsed, err := ParseMigration(content)
+	if err != nil {
+		t.Fatalf("parse round-trip failed: %v", err)
+	}
+
+	if len(parsed.DDLOps) != 1 {
+		t.Fatalf("expected 1 DDL op, got %d", len(parsed.DDLOps))
+	}
+
+	op := parsed.DDLOps[0]
+	if op.Generated != "price * quantity" {
+		t.Errorf("round-trip Generated = %q, want %q", op.Generated, "price * quantity")
+	}
+	if !op.Stored {
+		t.Error("round-trip Stored = false, want true")
+	}
+	if op.PGVersion != 18 {
+		t.Errorf("round-trip PGVersion = %d, want 18", op.PGVersion)
+	}
+}
+
+func TestGeneratedStorageKeyword(t *testing.T) {
+	tests := []struct {
+		stored    bool
+		pgVersion int
+		want      string
+	}{
+		{true, 0, "STORED"},
+		{true, 17, "STORED"},
+		{true, 18, "STORED"},
+		{false, 18, "VIRTUAL"},
+		{false, 19, "VIRTUAL"},
+		{false, 17, "STORED"},  // pre-PG18 defensive
+		{false, 12, "STORED"},  // pre-PG18 defensive
+		{false, 0, "VIRTUAL"},  // unspecified, respect user choice
+	}
+
+	for _, tt := range tests {
+		got := generatedStorageKeyword(tt.stored, tt.pgVersion)
+		if got != tt.want {
+			t.Errorf("generatedStorageKeyword(stored=%v, pg=%d) = %q, want %q",
+				tt.stored, tt.pgVersion, got, tt.want)
+		}
+	}
+}
