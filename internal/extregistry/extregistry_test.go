@@ -153,3 +153,58 @@ func TestLoadUserExtensions(t *testing.T) {
 		t.Fatalf("expected my_custom_ext, got %s", ext)
 	}
 }
+
+func TestRequiredExtensionForMethod_Hnsw(t *testing.T) {
+	r := NewBuiltinRegistry()
+	ext, ok := r.RequiredExtensionForMethod("hnsw")
+	if !ok {
+		t.Fatal("expected hnsw to be found")
+	}
+	if ext != "pgvector" {
+		t.Fatalf("expected pgvector, got %s", ext)
+	}
+}
+
+func TestRequiredExtensionForMethod_Ivfflat(t *testing.T) {
+	r := NewBuiltinRegistry()
+	ext, ok := r.RequiredExtensionForMethod("ivfflat")
+	if !ok {
+		t.Fatal("expected ivfflat to be found")
+	}
+	if ext != "pgvector" {
+		t.Fatalf("expected pgvector, got %s", ext)
+	}
+}
+
+func TestRequiredExtensionForMethod_BuiltinBtree(t *testing.T) {
+	r := NewBuiltinRegistry()
+	_, ok := r.RequiredExtensionForMethod("btree")
+	if ok {
+		t.Fatal("expected btree (built-in method) to return false")
+	}
+}
+
+func TestRequiredExtensionForMethod_Unknown(t *testing.T) {
+	r := NewBuiltinRegistry()
+	_, ok := r.RequiredExtensionForMethod("unknown")
+	if ok {
+		t.Fatal("expected unknown method to return false")
+	}
+}
+
+func TestLoadUserExtensions_IndexMethods(t *testing.T) {
+	r := NewBuiltinRegistry()
+	r.LoadUserExtensions([]UserExtension{
+		{
+			Name:         "my_ext",
+			IndexMethods: []string{"my_method"},
+		},
+	})
+	ext, ok := r.RequiredExtensionForMethod("my_method")
+	if !ok {
+		t.Fatal("expected my_method to be found after loading user extension")
+	}
+	if ext != "my_ext" {
+		t.Fatalf("expected my_ext, got %s", ext)
+	}
+}

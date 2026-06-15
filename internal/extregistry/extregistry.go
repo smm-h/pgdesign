@@ -17,7 +17,8 @@ type Registry struct {
 	extensions map[string]*Extension
 	opclassMap map[string]string // opclass name -> extension name
 	typeMap    map[string]string // type name -> extension name
-	funcMap    map[string]string // function name -> extension name
+	funcMap       map[string]string // function name -> extension name
+	indexMethodMap map[string]string // index method name -> extension name
 }
 
 // NewRegistry creates an empty registry.
@@ -26,7 +27,8 @@ func NewRegistry() *Registry {
 		extensions: make(map[string]*Extension),
 		opclassMap: make(map[string]string),
 		typeMap:    make(map[string]string),
-		funcMap:    make(map[string]string),
+		funcMap:       make(map[string]string),
+		indexMethodMap: make(map[string]string),
 	}
 }
 
@@ -41,6 +43,9 @@ func (r *Registry) Register(ext *Extension) {
 	}
 	for _, f := range ext.Functions {
 		r.funcMap[f] = ext.Name
+	}
+	for _, m := range ext.IndexMethods {
+		r.indexMethodMap[m] = ext.Name
 	}
 }
 
@@ -62,22 +67,30 @@ func (r *Registry) RequiredExtensionForFunction(funcName string) (string, bool) 
 	return name, ok
 }
 
+// RequiredExtensionForMethod returns which extension provides the given index method.
+func (r *Registry) RequiredExtensionForMethod(method string) (string, bool) {
+	name, ok := r.indexMethodMap[method]
+	return name, ok
+}
+
 // UserExtension represents a user-defined extension from pgdesign.toml config.
 type UserExtension struct {
-	Name      string
-	Types     []string
-	Opclasses []string
-	Functions []string
+	Name         string
+	Types        []string
+	Opclasses    []string
+	Functions    []string
+	IndexMethods []string
 }
 
 // LoadUserExtensions adds user-defined extensions to the registry.
 func (r *Registry) LoadUserExtensions(exts []UserExtension) {
 	for i := range exts {
 		r.Register(&Extension{
-			Name:      exts[i].Name,
-			Types:     exts[i].Types,
-			Opclasses: exts[i].Opclasses,
-			Functions: exts[i].Functions,
+			Name:         exts[i].Name,
+			Types:        exts[i].Types,
+			Opclasses:    exts[i].Opclasses,
+			Functions:    exts[i].Functions,
+			IndexMethods: exts[i].IndexMethods,
 		})
 	}
 }

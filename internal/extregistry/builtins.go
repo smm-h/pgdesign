@@ -90,5 +90,12 @@ func NewBuiltinRegistry() *Registry {
 		Opclasses: []string{"gin__int_ops"},
 	})
 
+	r.Register(&Extension{
+		Name:         "pgvector",
+		Types:        []string{"vector", "halfvec", "sparsevec"},
+		Opclasses:    []string{"vector_l2_ops", "vector_ip_ops", "vector_cosine_ops", "vector_l1_ops", "halfvec_l2_ops", "bit_hamming_ops", "bit_jaccard_ops"},
+		IndexMethods: []string{"hnsw", "ivfflat"},
+	})
+
 	return r
 }

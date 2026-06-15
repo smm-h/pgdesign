@@ -456,10 +456,11 @@ func configToUserExtensions(exts []config.ExtensionConfig) []extregistry.UserExt
 	result := make([]extregistry.UserExtension, len(exts))
 	for i, e := range exts {
 		result[i] = extregistry.UserExtension{
-			Name:      e.Name,
-			Types:     e.Types,
-			Opclasses: e.Opclasses,
-			Functions: e.Functions,
+			Name:         e.Name,
+			Types:        e.Types,
+			Opclasses:    e.Opclasses,
+			Functions:    e.Functions,
+			IndexMethods: e.IndexMethods,
 		}
 	}
 	return result
