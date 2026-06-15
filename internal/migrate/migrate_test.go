@@ -1464,3 +1464,97 @@ func TestGenerateMigration_ExpandContract_TypeNarrow_LargeTable(t *testing.T) {
 		t.Error("expected EXPAND_CONTRACT_TYPE_NARROW diagnostic for type narrowing on large table")
 	}
 }
+
+func TestGenerateMigration_ArrayChanged_ScalarToArray(t *testing.T) {
+	desired := &model.Schema{
+		Name:      "app",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "posts",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "tags", PGType: "text", NotNull: true, Array: true},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "app.posts",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "tags", ArrayChanged: &[2]bool{false, true}},
+				},
+			},
+		},
+	}
+
+	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0)
+
+	var found bool
+	for _, op := range mig.DDLOps {
+		if op.Op == "alter_column_type" && op.Table == "app.posts" && op.Column == "tags" {
+			found = true
+			if op.Type != "text[]" {
+				t.Errorf("expected target type text[], got %s", op.Type)
+			}
+			if op.Down == nil || !op.Down.Irreversible {
+				t.Error("expected irreversible down op for alter_column_type")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected alter_column_type op for ArrayChanged, got ops: %s", opsDebug(mig.DDLOps))
+	}
+}
+
+func TestGenerateMigration_ArrayChanged_ArrayToScalar(t *testing.T) {
+	desired := &model.Schema{
+		Name:      "app",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "posts",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "tags", PGType: "text", NotNull: true, Array: false},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "app.posts",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "tags", ArrayChanged: &[2]bool{true, false}},
+				},
+			},
+		},
+	}
+
+	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0)
+
+	var found bool
+	for _, op := range mig.DDLOps {
+		if op.Op == "alter_column_type" && op.Table == "app.posts" && op.Column == "tags" {
+			found = true
+			if op.Type != "text" {
+				t.Errorf("expected target type text, got %s", op.Type)
+			}
+			if op.Down == nil || !op.Down.Irreversible {
+				t.Error("expected irreversible down op for alter_column_type")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected alter_column_type op for ArrayChanged, got ops: %s", opsDebug(mig.DDLOps))
+	}
+}
