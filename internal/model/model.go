@@ -130,6 +130,7 @@ type Index struct {
 	Opclasses map[string]string `json:"opclasses,omitempty"`
 	Where     string            `json:"where,omitempty"`
 	Include   []string          `json:"include,omitempty"`
+	With      map[string]string `json:"with,omitempty"`
 	Unique    bool              `json:"unique"`
 	IsAutoFK  bool              `json:"is_auto_fk"`
 }

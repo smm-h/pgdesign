@@ -5,6 +5,7 @@ package sql
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -438,6 +439,20 @@ func CreateIndex(schemaName string, index *model.Index, tableName string, idempo
 			includeCols[i] = QuoteIdent(c)
 		}
 		sb.WriteString(fmt.Sprintf(" INCLUDE (%s)", strings.Join(includeCols, ", ")))
+	}
+
+	// WITH clause (storage parameters).
+	if len(index.With) > 0 {
+		keys := make([]string, 0, len(index.With))
+		for k := range index.With {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		params := make([]string, len(keys))
+		for i, k := range keys {
+			params[i] = fmt.Sprintf("%s = %s", k, index.With[k])
+		}
+		sb.WriteString(fmt.Sprintf(" WITH (%s)", strings.Join(params, ", ")))
 	}
 
 	// WHERE clause.

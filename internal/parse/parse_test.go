@@ -865,6 +865,45 @@ json_schema = "bad.json"
 	}
 }
 
+func TestIndexWithParams(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.items]
+pk = ["id"]
+
+[tables.items.columns.id]
+type = "auto_id"
+
+[tables.items.columns.embedding]
+type = "vector(1536)"
+
+[tables.items.indexes.idx_embedding]
+columns = ["embedding"]
+method = "hnsw"
+with = { m = "16", ef_construction = "200" }
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	idx := schema.Tables[0].Indexes["idx_embedding"]
+	if idx.With == nil {
+		t.Fatal("idx.With should not be nil")
+	}
+	if idx.With["m"] != "16" {
+		t.Errorf("With[m] = %q, want %q", idx.With["m"], "16")
+	}
+	if idx.With["ef_construction"] != "200" {
+		t.Errorf("With[ef_construction] = %q, want %q", idx.With["ef_construction"], "200")
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {

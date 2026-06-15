@@ -84,6 +84,7 @@ type RawIndex struct {
 	Where      *string
 	Include    []string
 	Unique     *bool
+	With       map[string]string  // storage parameters, e.g. { m = "16", ef_construction = "200" }
 }
 
 // RawUnique holds a unique constraint from [tables.*.unique.*].

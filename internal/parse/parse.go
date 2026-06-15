@@ -644,7 +644,7 @@ func (p *parser) parseIndex(tableName, idxName string, tbl *tomledit.TableNode) 
 
 	knownKeys := map[string]bool{
 		"columns": true, "method": true, "opclass": true,
-		"where": true, "include": true, "unique": true,
+		"where": true, "include": true, "unique": true, "with": true,
 	}
 
 	for _, child := range tbl.Children {
@@ -695,6 +695,12 @@ func (p *parser) parseIndex(tableName, idxName string, tbl *tomledit.TableNode) 
 				idx.Unique = &v
 			} else {
 				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].unique must be a boolean", tableName, idxName)
+			}
+		case "with":
+			if m, ok := nodeStringMap(kv.Val); ok {
+				idx.With = m
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].with must be an inline table of strings", tableName, idxName)
 			}
 		}
 	}

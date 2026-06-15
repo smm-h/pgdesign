@@ -370,6 +370,12 @@ func resolveIndex(name string, rawIdx parse.RawIndex) Index {
 			idx.Opclasses[col] = *rawIdx.Opclass
 		}
 	}
+	if rawIdx.With != nil {
+		idx.With = make(map[string]string, len(rawIdx.With))
+		for k, v := range rawIdx.With {
+			idx.With[k] = v
+		}
+	}
 	if rawIdx.Where != nil {
 		idx.Where = *rawIdx.Where
 	}

@@ -1073,6 +1073,50 @@ func TestColumnDef_ArrayIntegerDefault_QuotedEmptyArray(t *testing.T) {
 	}
 }
 
+func TestCreateIndex_WithParams(t *testing.T) {
+	index := &model.Index{
+		Name:    "idx_items_embedding",
+		Columns: []string{"embedding"},
+		Method:  "hnsw",
+		With:    map[string]string{"m": "16", "ef_construction": "200"},
+	}
+
+	got := CreateIndex("public", index, "items", false, false)
+
+	if !strings.Contains(got, "WITH (ef_construction = 200, m = 16)") {
+		t.Errorf("expected WITH clause with sorted keys, got:\n%s", got)
+	}
+	// WITH must come after the column list and before the semicolon.
+	if !strings.Contains(got, "USING hnsw (embedding) WITH (ef_construction = 200, m = 16);") {
+		t.Errorf("expected WITH clause in correct position, got:\n%s", got)
+	}
+}
+
+func TestCreateIndex_WithParamsAndWhere(t *testing.T) {
+	// WITH must come before WHERE.
+	index := &model.Index{
+		Name:    "idx_items_embedding",
+		Columns: []string{"embedding"},
+		Method:  "hnsw",
+		With:    map[string]string{"m": "16"},
+		Where:   "active = true",
+	}
+
+	got := CreateIndex("public", index, "items", false, false)
+
+	withIdx := strings.Index(got, "WITH (m = 16)")
+	whereIdx := strings.Index(got, "WHERE active = true")
+	if withIdx < 0 {
+		t.Fatalf("expected WITH clause, got:\n%s", got)
+	}
+	if whereIdx < 0 {
+		t.Fatalf("expected WHERE clause, got:\n%s", got)
+	}
+	if withIdx >= whereIdx {
+		t.Errorf("WITH clause must come before WHERE clause, got:\n%s", got)
+	}
+}
+
 func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
 	// Wrong pattern: if someone writes default = "'created'" in TOML,
 	// the value reaching LiteralValue is "'created'" (with embedded single quotes).
