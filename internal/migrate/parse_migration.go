@@ -3,6 +3,7 @@ package migrate
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	tomledit "github.com/smm-h/go-toml-edit"
@@ -30,8 +31,9 @@ type tomlDDL struct {
 	Method   string      `toml:"method,omitempty"`
 	Where    string      `toml:"where,omitempty"`
 	Opclass  interface{} `toml:"opclass,omitempty"`
-	Include  []string    `toml:"include,omitempty"`
-	Comment  string      `toml:"comment,omitempty"`
+	Include  []string          `toml:"include,omitempty"`
+	With     map[string]string `toml:"with,omitempty"`
+	Comment  string            `toml:"comment,omitempty"`
 	PK       []string    `toml:"pk,omitempty"`
 	Values   []string    `toml:"values,omitempty"`
 	Schema   string      `toml:"schema,omitempty"`
@@ -113,6 +115,7 @@ func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 		Method:   td.Method,
 		Where:    td.Where,
 		Include:  td.Include,
+		With:     td.With,
 		Comment:  td.Comment,
 		PK:       td.PK,
 		Values:   td.Values,
@@ -266,6 +269,23 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	}
 	if len(op.Include) > 0 {
 		b.WriteString(fmt.Sprintf("include = %s\n", formatStringSlice(op.Include)))
+	}
+	if len(op.With) > 0 {
+		b.WriteString("with = { ")
+		keys := make([]string, 0, len(op.With))
+		for k := range op.With {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		first := true
+		for _, k := range keys {
+			if !first {
+				b.WriteString(", ")
+			}
+			b.WriteString(fmt.Sprintf("%s = %q", k, op.With[k]))
+			first = false
+		}
+		b.WriteString(" }\n")
 	}
 	if op.Comment != "" {
 		b.WriteString(fmt.Sprintf("comment = %q\n", op.Comment))
