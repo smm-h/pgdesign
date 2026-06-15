@@ -583,6 +583,43 @@ func DropView(schemaName, viewName string, idempotent bool) string {
 	return fmt.Sprintf("DROP VIEW%s %s;\n", ifExists, qualified)
 }
 
+// CreateMaterializedView generates a CREATE MATERIALIZED VIEW statement.
+// PostgreSQL does not support CREATE OR REPLACE for materialized views.
+func CreateMaterializedView(schemaName string, mv *model.MaterializedView) string {
+	qualified := QualifiedName(schemaName, mv.Name)
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("CREATE MATERIALIZED VIEW %s AS\n", qualified))
+	sb.WriteString(mv.Query)
+	if mv.WithData {
+		sb.WriteString("\nWITH DATA;\n")
+	} else {
+		sb.WriteString("\nWITH NO DATA;\n")
+	}
+	return sb.String()
+}
+
+// DropMaterializedView generates a DROP MATERIALIZED VIEW statement.
+// When idempotent is true, includes IF EXISTS.
+func DropMaterializedView(schemaName, viewName string, idempotent bool) string {
+	qualified := QualifiedName(schemaName, viewName)
+	ifExists := ""
+	if idempotent {
+		ifExists = " IF EXISTS"
+	}
+	return fmt.Sprintf("DROP MATERIALIZED VIEW%s %s;\n", ifExists, qualified)
+}
+
+// RefreshMaterializedView generates a REFRESH MATERIALIZED VIEW statement.
+// When concurrently is true, adds CONCURRENTLY (requires a unique index to exist).
+func RefreshMaterializedView(schemaName, name string, concurrently bool) string {
+	qualified := QualifiedName(schemaName, name)
+	conc := ""
+	if concurrently {
+		conc = " CONCURRENTLY"
+	}
+	return fmt.Sprintf("REFRESH MATERIALIZED VIEW%s %s;\n", conc, qualified)
+}
+
 // CreateDenyMutationFunction generates a CREATE OR REPLACE FUNCTION statement
 // for the shared pgdesign_deny_mutation trigger function. This function raises
 // an exception when UPDATE or DELETE is attempted on an append-only table.
