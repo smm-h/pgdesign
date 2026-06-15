@@ -1758,3 +1758,193 @@ func TestDiff_ViewUnchanged(t *testing.T) {
 		t.Errorf("expected empty diff for identical views, got: %s", d.Summary())
 	}
 }
+
+func TestDiff_MaterializedViewAdded(t *testing.T) {
+	desired := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				WithData: true,
+			},
+		},
+	}
+	actual := &model.Schema{}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.MaterializedViewsAdded) != 1 || d.MaterializedViewsAdded[0] != "monthly_stats" {
+		t.Errorf("expected monthly_stats added, got: %v", d.MaterializedViewsAdded)
+	}
+}
+
+func TestDiff_MaterializedViewRemoved(t *testing.T) {
+	desired := &model.Schema{}
+	actual := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				WithData: true,
+			},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.MaterializedViewsRemoved) != 1 || d.MaterializedViewsRemoved[0] != "monthly_stats" {
+		t.Errorf("expected monthly_stats removed, got: %v", d.MaterializedViewsRemoved)
+	}
+}
+
+func TestDiff_MaterializedViewQueryChanged(t *testing.T) {
+	desired := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				WithData: true,
+			},
+		},
+	}
+	actual := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    "SELECT date_trunc('week', created_at) AS week, count(*) FROM orders GROUP BY 1",
+				WithData: true,
+			},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.MaterializedViewsChanged) != 1 {
+		t.Fatalf("expected 1 materialized view changed, got %d", len(d.MaterializedViewsChanged))
+	}
+	mvd := d.MaterializedViewsChanged[0]
+	if mvd.Name != "monthly_stats" {
+		t.Errorf("expected name monthly_stats, got %q", mvd.Name)
+	}
+	if mvd.QueryChanged == nil {
+		t.Fatal("expected QueryChanged to be non-nil")
+	}
+	if mvd.QueryChanged[0] != "SELECT date_trunc('week', created_at) AS week, count(*) FROM orders GROUP BY 1" {
+		t.Errorf("expected old query from actual, got %q", mvd.QueryChanged[0])
+	}
+	if mvd.QueryChanged[1] != "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1" {
+		t.Errorf("expected new query from desired, got %q", mvd.QueryChanged[1])
+	}
+}
+
+func TestDiff_MaterializedViewWithDataChanged(t *testing.T) {
+	query := "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1"
+	desired := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    query,
+				WithData: false,
+			},
+		},
+	}
+	actual := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    query,
+				WithData: true,
+			},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.MaterializedViewsChanged) != 1 {
+		t.Fatalf("expected 1 materialized view changed, got %d", len(d.MaterializedViewsChanged))
+	}
+	mvd := d.MaterializedViewsChanged[0]
+	if mvd.WithDataChanged == nil {
+		t.Fatal("expected WithDataChanged to be non-nil")
+	}
+	if mvd.WithDataChanged[0] != true {
+		t.Errorf("expected old WithData=true (actual), got %v", mvd.WithDataChanged[0])
+	}
+	if mvd.WithDataChanged[1] != false {
+		t.Errorf("expected new WithData=false (desired), got %v", mvd.WithDataChanged[1])
+	}
+	if mvd.QueryChanged != nil {
+		t.Error("expected QueryChanged to be nil when query is unchanged")
+	}
+}
+
+func TestDiff_MaterializedViewIndexAdded(t *testing.T) {
+	query := "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1"
+	desired := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    query,
+				WithData: true,
+				Indexes: []model.Index{
+					{Name: "idx_monthly_stats_month", Columns: []string{"month"}, Unique: false},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    query,
+				WithData: true,
+			},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.MaterializedViewsChanged) != 1 {
+		t.Fatalf("expected 1 materialized view changed, got %d", len(d.MaterializedViewsChanged))
+	}
+	mvd := d.MaterializedViewsChanged[0]
+	if len(mvd.IndexesAdded) != 1 {
+		t.Fatalf("expected 1 index added, got %d", len(mvd.IndexesAdded))
+	}
+	if mvd.IndexesAdded[0].Name != "idx_monthly_stats_month" {
+		t.Errorf("expected index name idx_monthly_stats_month, got %q", mvd.IndexesAdded[0].Name)
+	}
+	if mvd.QueryChanged != nil {
+		t.Error("expected QueryChanged to be nil when query is unchanged")
+	}
+}
+
+func TestDiff_MaterializedViewNoChange(t *testing.T) {
+	schema := &model.Schema{
+		MaterializedViews: []model.MaterializedView{
+			{
+				Name:     "monthly_stats",
+				Schema:   "public",
+				Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+				WithData: true,
+			},
+		},
+	}
+	d := Diff(schema, schema)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for identical materialized views, got: %s", d.Summary())
+	}
+}
