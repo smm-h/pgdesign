@@ -1558,3 +1558,109 @@ func TestGenerateMigration_ArrayChanged_ArrayToScalar(t *testing.T) {
 		t.Errorf("expected alter_column_type op for ArrayChanged, got ops: %s", opsDebug(mig.DDLOps))
 	}
 }
+
+func TestGenerateMigration_IndexWithChange(t *testing.T) {
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name: "t",
+			IndexesChanged: []diff.IndexChange{{
+				Name: "idx_t",
+				Old: model.Index{
+					Name:    "idx_t",
+					Columns: []string{"id"},
+					Method:  "btree",
+					With:    map[string]string{"fillfactor": "90"},
+				},
+				New: model.Index{
+					Name:    "idx_t",
+					Columns: []string{"id"},
+					Method:  "btree",
+					With:    map[string]string{"fillfactor": "80"},
+				},
+			}},
+		}},
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:   "t",
+			Schema: "public",
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0)
+	if len(m.DDLOps) < 2 {
+		t.Fatalf("expected at least 2 DDL ops (drop + create), got %d", len(m.DDLOps))
+	}
+	foundDrop := false
+	foundCreate := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_index" && op.Name == "idx_t" {
+			foundDrop = true
+		}
+		if op.Op == "create_index" && op.Name == "idx_t" {
+			foundCreate = true
+			if op.With == nil || op.With["fillfactor"] != "80" {
+				t.Errorf("expected create_index with fillfactor=80, got %v", op.With)
+			}
+		}
+	}
+	if !foundDrop {
+		t.Error("expected drop_index op for idx_t")
+	}
+	if !foundCreate {
+		t.Error("expected create_index op for idx_t")
+	}
+}
+
+func TestOpToSQL_CreateIndexWithParams(t *testing.T) {
+	op := DDLOp{
+		Op:      "create_index",
+		Table:   "public.t",
+		Name:    "idx_t",
+		Columns: []string{"embedding"},
+		Method:  "hnsw",
+		With:    map[string]string{"m": "16", "ef_construction": "200"},
+	}
+	got := OpToSQL(op)
+	if !strings.Contains(got, "WITH (ef_construction = 200, m = 16)") {
+		t.Errorf("expected WITH clause in SQL, got: %s", got)
+	}
+}
+
+func TestOpToSQL_AlterIndexSet(t *testing.T) {
+	op := DDLOp{
+		Op:    "alter_index_set",
+		Table: "public.t",
+		Name:  "idx_t",
+		With:  map[string]string{"fillfactor": "80"},
+	}
+	got := OpToSQL(op)
+	if !strings.Contains(got, "ALTER INDEX") || !strings.Contains(got, "SET (fillfactor = 80)") {
+		t.Errorf("expected ALTER INDEX SET SQL, got: %s", got)
+	}
+}
+
+func TestParseMigration_WithParams(t *testing.T) {
+	m := &Migration{
+		Description: "test with params",
+		DDLOps: []DDLOp{{
+			Op:      "create_index",
+			Table:   "t",
+			Name:    "idx_t",
+			Columns: []string{"embedding"},
+			Method:  "hnsw",
+			With:    map[string]string{"m": "16", "ef_construction": "200"},
+		}},
+	}
+	toml := FormatMigration(m)
+	parsed, err := ParseMigration(toml)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if len(parsed.DDLOps) != 1 {
+		t.Fatalf("expected 1 DDL op, got %d", len(parsed.DDLOps))
+	}
+	op := parsed.DDLOps[0]
+	if op.With == nil || op.With["m"] != "16" || op.With["ef_construction"] != "200" {
+		t.Errorf("expected with params m=16, ef_construction=200, got %v", op.With)
+	}
+}
