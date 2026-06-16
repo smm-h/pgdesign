@@ -78,6 +78,12 @@ const (
 	OpAddCheck                OpType = "add_check"
 	OpDropCheck               OpType = "drop_check"
 	OpAlterIndexSet           OpType = "alter_index_set"
+	OpCreateView              OpType = "create_view"
+	OpDropView                OpType = "drop_view"
+	OpCreateOrReplaceView     OpType = "create_or_replace_view"
+	OpCreateMaterializedView  OpType = "create_materialized_view"
+	OpDropMaterializedView    OpType = "drop_materialized_view"
+	OpRefreshMaterializedView OpType = "refresh_materialized_view"
 )
 
 // OpContext provides context about the operation environment for risk assessment.
@@ -272,6 +278,53 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			RiskLevel:  Safe,
 			LockType:   LockShareUpdateExclusive,
 			Reversible: true,
+		}
+
+	case OpCreateView:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
+		}
+
+	case OpDropView:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockAccessExclusive,
+			Reversible: false,
+			Suggestion: "Dependents (other views, functions) may break",
+		}
+
+	case OpCreateOrReplaceView:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockAccessExclusive,
+			Reversible: true,
+		}
+
+	case OpCreateMaterializedView:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockNone,
+			Reversible: true,
+			Suggestion: "Initial data population may be slow on large datasets",
+		}
+
+	case OpDropMaterializedView:
+		return Classification{
+			RiskLevel:  Dangerous,
+			LockType:   LockAccessExclusive,
+			Reversible: false,
+			DataLoss:   true,
+			Suggestion: "Materialized view data will be lost",
+		}
+
+	case OpRefreshMaterializedView:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockAccessExclusive,
+			Reversible: false,
+			Suggestion: "REFRESH locks the materialized view; consider CONCURRENTLY",
 		}
 
 	default:

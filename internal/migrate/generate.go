@@ -142,7 +142,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			},
 		}
 		m.DDLOps = append(m.DDLOps, op)
-		// CREATE VIEW is safe (no data risk).
+		diags = append(diags, classifyOp(op, risk.OpCreateView, risk.OpContext{})...)
 	}
 
 	// Materialized views added.
@@ -159,6 +159,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			},
 		}
 		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpCreateMaterializedView, risk.OpContext{})...)
 
 		// Create indexes on the materialized view.
 		if mv != nil {
@@ -606,7 +607,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				},
 			}
 			m.DDLOps = append(m.DDLOps, op)
-			// CREATE OR REPLACE VIEW is safe (views are replaceable).
+			diags = append(diags, classifyOp(op, risk.OpCreateOrReplaceView, risk.OpContext{})...)
 		}
 		// Comment changes on views don't need separate migration ops in PostgreSQL;
 		// COMMENT ON VIEW would require separate handling. For now, comment changes
@@ -624,6 +625,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				Down: &DownOp{Irreversible: true},
 			}
 			m.DDLOps = append(m.DDLOps, op)
+			diags = append(diags, classifyOp(op, risk.OpDropMaterializedView, risk.OpContext{})...)
 			op = DDLOp{
 				Op:                  "create_materialized_view",
 				Name:                mvd.Name,
@@ -633,6 +635,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				},
 			}
 			m.DDLOps = append(m.DDLOps, op)
+			diags = append(diags, classifyOp(op, risk.OpCreateMaterializedView, risk.OpContext{})...)
 
 			// Recreate all indexes after recreating the matview.
 			if mv != nil {
@@ -716,6 +719,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			Down: &DownOp{Irreversible: true},
 		}
 		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpDropView, risk.OpContext{})...)
 	}
 
 	// Drop materialized views.
@@ -726,6 +730,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			Down: &DownOp{Irreversible: true},
 		}
 		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpDropMaterializedView, risk.OpContext{})...)
 	}
 
 	for _, enumName := range d.EnumsRemoved {

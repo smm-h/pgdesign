@@ -94,6 +94,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W007", checkRedundantIndex},
 		{"W008", checkCircularFK},
 		{"W010", checkAppendOnlyUpdatedAt},
+		{"E220", checkDependsOnResolvable},
 	}
 
 	for _, r := range rules {
@@ -219,6 +220,28 @@ func checkTableMissingComment(schema *model.Schema, _ *Config) []diagnostic.Diag
 			})
 		}
 	}
+	for _, v := range schema.Views {
+		if v.Comment == "" {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Error,
+				Code:       "E202",
+				Table:      v.Name,
+				Message:    "view missing comment",
+				Suggestion: "Add comment = \"...\" to the view definition",
+			})
+		}
+	}
+	for _, mv := range schema.MaterializedViews {
+		if mv.Comment == "" {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Error,
+				Code:       "E202",
+				Table:      mv.Name,
+				Message:    "materialized view missing comment",
+				Suggestion: "Add comment = \"...\" to the materialized view definition",
+			})
+		}
+	}
 	return diags
 }
 
@@ -291,6 +314,24 @@ func checkDuplicateIndex(schema *model.Schema, _ *Config) []diagnostic.Diagnosti
 						Severity: diagnostic.Error,
 						Code:     "E206",
 						Table:    t.Name,
+						Message:  "index " + idx.Name + " is a prefix of index " + other.Name,
+					})
+					break
+				}
+			}
+		}
+	}
+	for _, mv := range schema.MaterializedViews {
+		for i, idx := range mv.Indexes {
+			for j, other := range mv.Indexes {
+				if i == j {
+					continue
+				}
+				if isPrefix(idx.Columns, other.Columns) && len(idx.Columns) < len(other.Columns) {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity: diagnostic.Error,
+						Code:     "E206",
+						Table:    mv.Name,
 						Message:  "index " + idx.Name + " is a prefix of index " + other.Name,
 					})
 					break
@@ -1035,6 +1076,64 @@ func checkAppendOnlyUpdatedAt(schema *model.Schema, _ *Config) []diagnostic.Diag
 					Column:     col.Name,
 					Message:    fmt.Sprintf("append-only table %q has column %q suggesting mutability", t.Name, col.Name),
 					Suggestion: "Append-only tables cannot be updated; consider removing this column",
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// checkDependsOnResolvable (E220): depends_on references must resolve to existing tables, views, or materialized views.
+func checkDependsOnResolvable(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	// Build lookup set of all known names.
+	known := make(map[string]bool)
+	for _, t := range schema.Tables {
+		known[t.Name] = true
+	}
+	for _, v := range schema.Views {
+		known[v.Name] = true
+	}
+	for _, mv := range schema.MaterializedViews {
+		known[mv.Name] = true
+	}
+
+	// Build lookup for matview names (for cross-type warning).
+	matviewNames := make(map[string]bool)
+	for _, mv := range schema.MaterializedViews {
+		matviewNames[mv.Name] = true
+	}
+
+	var diags []diagnostic.Diagnostic
+	for _, v := range schema.Views {
+		for _, dep := range v.DependsOn {
+			if !known[dep] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E220",
+					Table:      v.Name,
+					Message:    fmt.Sprintf("view %q depends_on %q which does not exist", v.Name, dep),
+					Suggestion: "Check the depends_on list for typos or missing definitions",
+				})
+			} else if matviewNames[dep] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "E220",
+					Table:      v.Name,
+					Message:    fmt.Sprintf("view %q depends_on materialized view %q; cross-type dependency ordering is not enforced", v.Name, dep),
+					Suggestion: "Views are emitted before materialized views in DDL; this dependency may not be satisfied at creation time",
+				})
+			}
+		}
+	}
+	for _, mv := range schema.MaterializedViews {
+		for _, dep := range mv.DependsOn {
+			if !known[dep] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E220",
+					Table:      mv.Name,
+					Message:    fmt.Sprintf("materialized view %q depends_on %q which does not exist", mv.Name, dep),
+					Suggestion: "Check the depends_on list for typos or missing definitions",
 				})
 			}
 		}

@@ -471,6 +471,8 @@ func topoSortViews(views []model.View) ([]model.View, error) {
 	dependents := make([][]int, len(views))
 	for i, v := range views {
 		for _, dep := range v.DependsOn {
+			// Cross-type deps (tables, matviews) are satisfied by DDL section ordering;
+			// invalid deps are caught by E220 validation. Only same-type deps need topo ordering.
 			if depIdx, ok := nameToIdx[dep]; ok {
 				inDegree[i]++
 				dependents[depIdx] = append(dependents[depIdx], i)
@@ -520,6 +522,8 @@ func topoSortMaterializedViews(mvs []model.MaterializedView) ([]model.Materializ
 	dependents := make([][]int, len(mvs))
 	for i, mv := range mvs {
 		for _, dep := range mv.DependsOn {
+			// Cross-type deps (tables, views) are satisfied by DDL section ordering;
+			// invalid deps are caught by E220 validation. Only same-type deps need topo ordering.
 			if depIdx, ok := nameToIdx[dep]; ok {
 				inDegree[i]++
 				dependents[depIdx] = append(dependents[depIdx], i)
