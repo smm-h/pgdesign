@@ -874,3 +874,128 @@ func TestIntrospectMaterializedViewDependsOn(t *testing.T) {
 		t.Errorf("recent_posts.DependsOn = %v, want [posts]", recentPosts.DependsOn)
 	}
 }
+
+func TestIntrospectViewDependsOn_CTE(t *testing.T) {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, testConnStr)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer conn.Close(ctx)
+
+	// Create tables and a CTE-based view in the test schema.
+	// Use cte_ prefix to avoid collision with the shared orders table.
+	setup := `
+		CREATE TABLE ` + testSchema + `.cte_orders (
+			id SERIAL PRIMARY KEY,
+			customer_name TEXT NOT NULL
+		);
+		CREATE TABLE ` + testSchema + `.cte_order_items (
+			id SERIAL PRIMARY KEY,
+			order_id INT NOT NULL REFERENCES ` + testSchema + `.cte_orders(id),
+			quantity INT NOT NULL
+		);
+		CREATE VIEW ` + testSchema + `.order_summary AS
+		WITH item_totals AS (
+			SELECT order_id, SUM(quantity) AS total_items
+			FROM ` + testSchema + `.cte_order_items
+			GROUP BY order_id
+		)
+		SELECT o.id, o.customer_name, it.total_items
+		FROM ` + testSchema + `.cte_orders o
+		JOIN item_totals it ON it.order_id = o.id;
+	`
+	_, err = conn.Exec(ctx, setup)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer func() {
+		conn.Exec(ctx, "DROP VIEW IF EXISTS "+testSchema+".order_summary")
+		conn.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".cte_order_items")
+		conn.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".cte_orders")
+	}()
+
+	schema, _, err := Introspect(ctx, testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	var orderSummary *model.View
+	for i := range schema.Views {
+		if schema.Views[i].Name == "order_summary" {
+			orderSummary = &schema.Views[i]
+			break
+		}
+	}
+	if orderSummary == nil {
+		t.Fatal("order_summary view not found")
+	}
+
+	depSet := map[string]bool{}
+	for _, d := range orderSummary.DependsOn {
+		depSet[d] = true
+	}
+	if !depSet["cte_orders"] || !depSet["cte_order_items"] {
+		t.Errorf("order_summary.DependsOn = %v, want to contain cte_orders and cte_order_items", orderSummary.DependsOn)
+	}
+}
+
+func TestIntrospectViewDependsOn_Subquery(t *testing.T) {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, testConnStr)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer conn.Close(ctx)
+
+	// Create tables and a subquery-based view in the test schema.
+	// Use subq_ prefix to avoid collision with the shared users table.
+	setup := `
+		CREATE TABLE ` + testSchema + `.subq_users (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL
+		);
+		CREATE TABLE ` + testSchema + `.subq_logins (
+			id SERIAL PRIMARY KEY,
+			user_id INT NOT NULL REFERENCES ` + testSchema + `.subq_users(id),
+			logged_at TIMESTAMP NOT NULL DEFAULT NOW()
+		);
+		CREATE VIEW ` + testSchema + `.user_activity AS
+		SELECT u.id, u.name,
+			(SELECT COUNT(*) FROM ` + testSchema + `.subq_logins l WHERE l.user_id = u.id) AS login_count
+		FROM ` + testSchema + `.subq_users u;
+	`
+	_, err = conn.Exec(ctx, setup)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer func() {
+		conn.Exec(ctx, "DROP VIEW IF EXISTS "+testSchema+".user_activity")
+		conn.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".subq_logins")
+		conn.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".subq_users")
+	}()
+
+	schema, _, err := Introspect(ctx, testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	var userActivity *model.View
+	for i := range schema.Views {
+		if schema.Views[i].Name == "user_activity" {
+			userActivity = &schema.Views[i]
+			break
+		}
+	}
+	if userActivity == nil {
+		t.Fatal("user_activity view not found")
+	}
+
+	depSet := map[string]bool{}
+	for _, d := range userActivity.DependsOn {
+		depSet[d] = true
+	}
+	if !depSet["subq_users"] || !depSet["subq_logins"] {
+		t.Errorf("user_activity.DependsOn = %v, want to contain subq_users and subq_logins", userActivity.DependsOn)
+	}
+}
