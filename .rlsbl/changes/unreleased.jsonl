@@ -3,3 +3,4 @@
 {"commits":["d6a4c99fd0784372653652326892bf06bf6a2cee"],"user_facing":true,"description":"**New feature.** Introspect unifies simple defaults into the Default field, reducing false positives when diffing TOML schemas against live databases.","type":"feature"}
 {"commits":["37f3a7578a28d45bef7b3e42971a7c0135694d07"],"user_facing":true,"description":"**New feature.** View dependency extraction uses pg_depend instead of regex heuristics.","type":"feature"}
 {"commits":["f20386ceca86c6685ddd0887c85f08545fe014ed","60192270153b623c88e09e1288b7bcbe4e4fd58a","7323b776d2854dab473815b9898305c481e9caa6"],"user_facing":true,"description":"**Fix.** Index WITH parameter changes on builtin methods (btree, gin, gist) now generate ALTER INDEX SET instead of DROP+CREATE.","type":"fix"}
+{"commits":["7853c7007c0b8022ed1019de87d9fe690e87fe39","5fa12fd0be67c9f9b059f731b5d9f73fc7a4c510"],"user_facing":false}
