@@ -2,6 +2,37 @@
 
 # Changelog
 
+## 0.12.0
+
+Codegen types mode for all 6 languages, introspect improvements, and command consolidation
+
+<details>
+<summary>Context</summary>
+
+This release completes the codegen --mode types feature across all supported languages (Go, TypeScript, Python, Java, Kotlin, Zig), improves introspect fidelity with unified default handling and pg_depend-based view dependencies, generates safer ALTER INDEX SET migrations for builtin method parameter changes, and removes the deprecated validate/audit commands in favor of the unified check command.
+
+</details>
+
+### Breaking
+
+- **Breaking.** Removed `validate` and `audit` commands. Use `pgdesign check --tag validation` and `pgdesign check --tag nf` instead.
+
+### Features
+
+- **New feature.** Codegen `--mode types` now supports all 6 languages (Go, TypeScript, Python, Java, Kotlin, Zig).
+- **New feature.** Introspect unifies simple defaults into the Default field, reducing false positives when diffing TOML schemas against live databases.
+- **New feature.** View dependency extraction uses pg_depend instead of regex heuristics.
+
+### Fixes
+
+- **Fix.** Index WITH parameter changes on builtin methods (btree, gin, gist) now generate ALTER INDEX SET instead of DROP+CREATE.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.11.0
 
 SQL parser foundation, VIRTUAL generated columns, PGVersion fix, go-pgquery integration
@@ -35,12 +66,6 @@ Foundation release for the SQL parser infrastructure. The sqlexpr expression par
 - **Silent failure fixes.** E213 now emits a Warning when a generated column expression cannot be parsed (previously silently skipped). Codegen now distinguishes parse failures (C002) from unrecognized patterns (C001).
 - **Codegen double-parse eliminated.** RLS policy expressions are now parsed once and the AST is reused across all 6 language validators.
 - **Fix TOML serialization for VIRTUAL generated columns.** Migration TOML files now correctly preserve `stored = false` for VIRTUAL generated columns.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.10.0
 
