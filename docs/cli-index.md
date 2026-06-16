@@ -12,11 +12,8 @@ order: 91
 
 PostgreSQL schema compiler
 
-Version: 0.8.1-0.20260614210652-f18c84e8ef93+dirty
-
 ## Commands
 
-- [audit](cli-audit.html) -- Audit schema file(s) or directory for issues
 - [build](cli-build.html) -- Generate all configured outputs
 - [check](cli-check.html) -- Run project checks
 - [codegen](cli-codegen.html) -- Generate application code from schema policies
@@ -27,7 +24,6 @@ Version: 0.8.1-0.20260614210652-f18c84e8ef93+dirty
 - [seed](cli-seed.html) -- Generate type-aware test data
 - [serve](cli-serve.html) -- Start the pgdesign HTTP API server
 - [stats](cli-stats.html) -- Database statistics and health analysis
-- [validate](cli-validate.html) -- Validate schema file(s) or directory
 
 ## Command Groups
 
