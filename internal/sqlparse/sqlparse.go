@@ -1,3 +1,19 @@
+// Package sqlparse wraps wasilibs/go-pgquery, a WASM-based port of
+// PostgreSQL's actual parser (libpg_query), to provide SQL statement splitting
+// and expression deparsing. The WASM implementation requires no CGo, no C
+// compiler, and no native libpg_query build.
+//
+// SplitStatements splits SQL text into individual statements using the real
+// PostgreSQL parser, correctly handling dollar-quoting ($$ blocks), string
+// literals containing semicolons, PL/pgSQL function bodies, and other syntax
+// that naive semicolon splitting breaks on. It replaces the earlier ";\n"
+// split approach.
+//
+// DeparseExpr converts pg_query AST nodes back to SQL text, used for
+// expression normalization.
+//
+// The first call incurs approximately 600ms of latency for WASM runtime
+// initialization; subsequent calls are fast.
 package sqlparse
 
 import (
