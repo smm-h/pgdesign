@@ -28,6 +28,7 @@ type PolicyContext struct {
 	WithCheck    string
 	ErrorCode    string
 	ErrorMessage string
+	AST          sqlexpr.Node // parsed expression AST, set by FilterGeneratable
 }
 
 // ExtractPolicies collects all policies from a schema into PolicyContexts.
@@ -110,6 +111,7 @@ func FilterGeneratable(policies []PolicyContext) ([]PolicyContext, []diagnostic.
 		})
 
 		if matched {
+			p.AST = ast
 			result = append(result, p)
 		} else {
 			diags = append(diags, diagnostic.Diagnostic{

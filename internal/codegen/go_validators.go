@@ -7,7 +7,6 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
-	"github.com/smm-h/pgdesign/internal/sqlexpr"
 )
 
 // GoValidatorGenerator generates Go validator functions for RLS policies.
@@ -30,31 +29,11 @@ func (g *GoValidatorGenerator) Generate(schema *model.Schema) ([]byte, []diagnos
 	buf.WriteString(goHeader(schema.Name))
 
 	for i, pol := range generatable {
-		expr := pol.WithCheck
-		if expr == "" {
-			expr = pol.Using
-		}
-
 		if i > 0 {
 			buf.WriteString("\n")
 		}
 
-		ast, err := sqlexpr.Parse(expr)
-		if err != nil {
-			// Should not happen since FilterGeneratable already parsed successfully,
-			// but handle defensively.
-			buf.WriteString(fmt.Sprintf(
-				"\n// Skipped %s: could not parse expression\n",
-				pol.PolicyName,
-			))
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Warning,
-				Code:     "C001",
-				Table:    pol.TableName,
-				Message:  fmt.Sprintf("policy %q: could not parse expression: %v", pol.PolicyName, err),
-			})
-			continue
-		}
+		ast := pol.AST
 
 		// Check for OR-compound first (before individual pattern detection),
 		// since individual detectors would partially match an OR compound.
