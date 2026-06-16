@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Codegen types mode for all 6 languages, introspect improvements, and command consolidation"
+# Optional context explaining why these changes were made
+context = "This release completes the codegen --mode types feature across all supported languages (Go, TypeScript, Python, Java, Kotlin, Zig), improves introspect fidelity with unified default handling and pg_depend-based view dependencies, generates safer ALTER INDEX SET migrations for builtin method parameter changes, and removes the deprecated validate/audit commands in favor of the unified check command."
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
