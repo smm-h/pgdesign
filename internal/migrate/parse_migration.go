@@ -24,7 +24,7 @@ type tomlDDL struct {
 	Default  interface{} `toml:"default,omitempty"`
 	NotNull   bool        `toml:"not_null,omitempty"`
 	Generated string      `toml:"generated,omitempty"`
-	Stored    bool        `toml:"stored,omitempty"`
+	Stored    bool        `toml:"stored"`
 	PGVersion int         `toml:"pg_version,omitempty"`
 	Name     string      `toml:"name,omitempty"`
 	Columns  []string    `toml:"columns,omitempty"`
@@ -226,8 +226,8 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	if op.Generated != "" {
 		b.WriteString(fmt.Sprintf("generated = %q\n", op.Generated))
 	}
-	if op.Stored {
-		b.WriteString("stored = true\n")
+	if op.Generated != "" {
+		b.WriteString(fmt.Sprintf("stored = %v\n", op.Stored))
 	}
 	if op.PGVersion > 0 {
 		b.WriteString(fmt.Sprintf("pg_version = %d\n", op.PGVersion))

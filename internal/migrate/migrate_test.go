@@ -2018,6 +2018,55 @@ func TestMigrationRoundTrip_GeneratedColumn(t *testing.T) {
 	}
 }
 
+func TestMigrationRoundTrip_VirtualGeneratedColumn(t *testing.T) {
+	m := &Migration{
+		Description: "add virtual generated column",
+		DDLOps: []DDLOp{
+			{
+				Op:        "add_column",
+				Table:     "public.orders",
+				Column:    "total",
+				Type:      "integer",
+				Generated: "price * quantity",
+				Stored:    false,
+				PGVersion: 18,
+			},
+		},
+	}
+
+	// Serialize to TOML.
+	content := FormatMigration(m)
+
+	// Verify the TOML content contains stored = false (not omitted).
+	if !strings.Contains(content, "stored = false") {
+		t.Errorf("serialized TOML missing stored = false:\n%s", content)
+	}
+	if !strings.Contains(content, `generated = "price * quantity"`) {
+		t.Errorf("serialized TOML missing generated field:\n%s", content)
+	}
+
+	// Parse back and verify Stored survives the round-trip as false.
+	parsed, err := ParseMigration(content)
+	if err != nil {
+		t.Fatalf("parse round-trip failed: %v", err)
+	}
+
+	if len(parsed.DDLOps) != 1 {
+		t.Fatalf("expected 1 DDL op, got %d", len(parsed.DDLOps))
+	}
+
+	op := parsed.DDLOps[0]
+	if op.Generated != "price * quantity" {
+		t.Errorf("round-trip Generated = %q, want %q", op.Generated, "price * quantity")
+	}
+	if op.Stored {
+		t.Error("round-trip Stored = true, want false (virtual column)")
+	}
+	if op.PGVersion != 18 {
+		t.Errorf("round-trip PGVersion = %d, want 18", op.PGVersion)
+	}
+}
+
 func TestGeneratedStorageKeyword(t *testing.T) {
 	tests := []struct {
 		stored    bool
