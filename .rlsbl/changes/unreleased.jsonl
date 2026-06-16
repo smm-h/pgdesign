@@ -1,0 +1,1 @@
+{"commits":["8e1f92a4998a185bde72d2ef1724d4ed7d6778ec"],"user_facing":true,"description":"**Bug fix.** Fix panic when running pgdesign from outside its own directory.","type":"fix"}
