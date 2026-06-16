@@ -11,6 +11,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/sqlexpr"
+	"github.com/smm-h/pgdesign/internal/sqlutil"
 )
 
 // Config controls which rules run and their parameters.
@@ -470,10 +471,10 @@ func checkFKMissingIndex(schema *model.Schema, _ *Config) []diagnostic.Diagnosti
 // It parses the expression into an AST, then walks it collecting bare column names.
 // Qualified names (table.column) are returned as the final part only, since this
 // function is used for checking generated column references within the same table.
-func extractColumnRefs(expr string) []string {
-	node, err := sqlexpr.Parse(expr)
-	if err != nil {
-		return nil
+func extractColumnRefs(expr, context string) ([]string, *diagnostic.Diagnostic) {
+	node, diag := sqlutil.ParseExpr(expr, context)
+	if diag != nil {
+		return nil, diag
 	}
 	refs := sqlexpr.CollectColumnRefs(node)
 	var names []string
@@ -482,7 +483,7 @@ func extractColumnRefs(expr string) []string {
 		name := strings.ToLower(ref.Parts[len(ref.Parts)-1])
 		names = append(names, name)
 	}
-	return names
+	return names, nil
 }
 
 // checkGeneratedColRefsGenerated (E213): generated column expression references another generated column.
@@ -505,7 +506,14 @@ func checkGeneratedColRefsGenerated(schema *model.Schema, _ *Config) []diagnosti
 			if col.Generated == "" {
 				continue
 			}
-			refs := extractColumnRefs(col.Generated)
+			refs, parseDiag := extractColumnRefs(col.Generated, fmt.Sprintf("generated column %s.%s", t.Name, col.Name))
+			if parseDiag != nil {
+				parseDiag.Code = "E213"
+				parseDiag.Table = t.Name
+				parseDiag.Column = col.Name
+				diags = append(diags, *parseDiag)
+				continue
+			}
 			for _, ref := range refs {
 				if ref != col.Name && genCols[ref] {
 					diags = append(diags, diagnostic.Diagnostic{
