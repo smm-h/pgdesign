@@ -34,58 +34,6 @@
     }
   },
   "commands": {
-    "audit": {
-      "args": [
-        {
-          "help": "Path(s) to schema file(s) or directory",
-          "name": "path",
-          "variadic": true
-        }
-      ],
-      "flags": [
-        {
-          "default": [],
-          "help": "Limit FD discovery to specific tables",
-          "name": "tables",
-          "repeatable": true,
-          "type": "str"
-        },
-        {
-          "default": 0,
-          "help": "Approximate FD threshold (0.0 = exact only)",
-          "name": "approximate",
-          "type": "float"
-        },
-        {
-          "help": "PostgreSQL connection URL",
-          "name": "db",
-          "type": "str"
-        },
-        {
-          "default": false,
-          "help": "Enable strict normal form checking",
-          "name": "strict-nf",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": false,
-          "help": "Output as JSON",
-          "name": "json",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": [],
-          "help": "Schema name",
-          "name": "schema",
-          "repeatable": true,
-          "type": "str"
-        }
-      ],
-      "help": "Audit schema file(s) or directory for issues",
-      "name": "audit"
-    },
     "build": {
       "flags": [
         {
@@ -196,7 +144,8 @@
         {
           "choices": [
             "validators",
-            "constants"
+            "constants",
+            "types"
           ],
           "default": "validators",
           "help": "Codegen mode",
@@ -469,52 +418,6 @@
       ],
       "help": "Database statistics and health analysis",
       "name": "stats"
-    },
-    "validate": {
-      "args": [
-        {
-          "help": "Path(s) to schema file(s) or directory",
-          "name": "path",
-          "variadic": true
-        }
-      ],
-      "flags": [
-        {
-          "default": false,
-          "help": "Show suppressed diagnostics with their reasons",
-          "name": "show-suppressed",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "help": "PostgreSQL connection URL",
-          "name": "db",
-          "type": "str"
-        },
-        {
-          "default": false,
-          "help": "Enable strict normal form checking",
-          "name": "strict-nf",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": false,
-          "help": "Output as JSON",
-          "name": "json",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": [],
-          "help": "Schema name",
-          "name": "schema",
-          "repeatable": true,
-          "type": "str"
-        }
-      ],
-      "help": "Validate schema file(s) or directory",
-      "name": "validate"
     }
   },
   "defaults": {
@@ -732,5 +635,5 @@
   "help": "PostgreSQL schema compiler",
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
-  "version": "0.8.1-0.20260614210652-f18c84e8ef93+dirty"
+  "version": ""
 }
