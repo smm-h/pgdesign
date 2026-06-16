@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
-	"github.com/smm-h/pgdesign/internal/codegen"
 )
 
 func handleCodegen(kwargs map[string]interface{}) int {
@@ -17,64 +15,9 @@ func handleCodegen(kwargs map[string]interface{}) int {
 	lang := kwargs["lang"].(string)
 	mode := kwargs["mode"].(string)
 
-	var gen codegen.Generator
-	switch mode {
-	case "validators":
-		switch lang {
-		case "python":
-			gen = &codegen.PythonGenerator{}
-		case "zig":
-			gen = &codegen.ZigValidatorGenerator{}
-		case "go":
-			gen = &codegen.GoValidatorGenerator{}
-		case "ts":
-			gen = &codegen.TSValidatorGenerator{}
-		case "java":
-			gen = &codegen.JavaValidatorGenerator{}
-		case "kotlin":
-			gen = &codegen.KotlinValidatorGenerator{}
-		default:
-			fmt.Fprintf(os.Stderr, "error: validators mode only supports --lang python, zig, go, ts, java, or kotlin, got %s\n", lang)
-			return 1
-		}
-	case "constants":
-		switch lang {
-		case "python":
-			gen = &codegen.PythonConstantsGenerator{}
-		case "zig":
-			gen = &codegen.ZigConstantsGenerator{}
-		case "go":
-			gen = &codegen.GoConstantsGenerator{}
-		case "ts":
-			gen = &codegen.TSConstantsGenerator{}
-		case "java":
-			gen = &codegen.JavaConstantsGenerator{}
-		case "kotlin":
-			gen = &codegen.KotlinConstantsGenerator{}
-		default:
-			fmt.Fprintf(os.Stderr, "error: unsupported language for constants mode: %s\n", lang)
-			return 1
-		}
-	case "types":
-		switch lang {
-		case "go":
-			gen = &codegen.GoTypesGenerator{}
-		case "ts":
-			gen = &codegen.TSTypesGenerator{}
-		case "python":
-			gen = &codegen.PythonTypesGenerator{}
-		case "java":
-			gen = &codegen.JavaTypesGenerator{}
-		case "kotlin":
-			gen = &codegen.KotlinTypesGenerator{}
-		case "zig":
-			gen = &codegen.ZigTypesGenerator{}
-		default:
-			fmt.Fprintf(os.Stderr, "error: types mode only supports --lang go, ts, python, java, kotlin, or zig, got %s\n", lang)
-			return 1
-		}
-	default:
-		fmt.Fprintf(os.Stderr, "error: unsupported mode: %s\n", mode)
+	gen, err := SelectGenerator(lang, mode)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
 

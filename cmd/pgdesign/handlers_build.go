@@ -197,65 +197,12 @@ func handleBuild(kwargs map[string]interface{}) int {
 // lang and mode. Returns the generator and true on success, or prints an error
 // and returns false if the combination is unsupported.
 func selectCodegenGenerator(outputName, lang, mode string) (codegen.Generator, bool) {
-	switch mode {
-	case "validators":
-		switch lang {
-		case "python":
-			return &codegen.PythonGenerator{}, true
-		case "zig":
-			return &codegen.ZigValidatorGenerator{}, true
-		case "go":
-			return &codegen.GoValidatorGenerator{}, true
-		case "ts":
-			return &codegen.TSValidatorGenerator{}, true
-		case "java":
-			return &codegen.JavaValidatorGenerator{}, true
-		case "kotlin":
-			return &codegen.KotlinValidatorGenerator{}, true
-		default:
-			fmt.Fprintf(os.Stderr, "build: output %q: unsupported codegen lang %q\n", outputName, lang)
-			return nil, false
-		}
-	case "constants":
-		switch lang {
-		case "python":
-			return &codegen.PythonConstantsGenerator{}, true
-		case "zig":
-			return &codegen.ZigConstantsGenerator{}, true
-		case "go":
-			return &codegen.GoConstantsGenerator{}, true
-		case "ts":
-			return &codegen.TSConstantsGenerator{}, true
-		case "java":
-			return &codegen.JavaConstantsGenerator{}, true
-		case "kotlin":
-			return &codegen.KotlinConstantsGenerator{}, true
-		default:
-			fmt.Fprintf(os.Stderr, "build: output %q: unsupported codegen lang %q\n", outputName, lang)
-			return nil, false
-		}
-	case "types":
-		switch lang {
-		case "go":
-			return &codegen.GoTypesGenerator{}, true
-		case "ts":
-			return &codegen.TSTypesGenerator{}, true
-		case "python":
-			return &codegen.PythonTypesGenerator{}, true
-		case "java":
-			return &codegen.JavaTypesGenerator{}, true
-		case "kotlin":
-			return &codegen.KotlinTypesGenerator{}, true
-		case "zig":
-			return &codegen.ZigTypesGenerator{}, true
-		default:
-			fmt.Fprintf(os.Stderr, "build: output %q: types mode only supports lang \"go\", \"ts\", \"python\", \"java\", \"kotlin\", or \"zig\", got %q\n", outputName, lang)
-			return nil, false
-		}
-	default:
-		fmt.Fprintf(os.Stderr, "build: output %q: unsupported codegen mode %q\n", outputName, mode)
+	gen, err := SelectGenerator(lang, mode)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "build: output %q: %v\n", outputName, err)
 		return nil, false
 	}
+	return gen, true
 }
 
 // codegenHeader returns the generated-file header comment for the given language.
