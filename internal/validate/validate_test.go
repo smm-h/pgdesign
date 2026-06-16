@@ -817,8 +817,16 @@ func TestE213_GeneratedColWithFunctionCalls_NoDiag(t *testing.T) {
 
 	diags, _ := Validate(schema, nil)
 	found := findByCode(diags, "E213")
-	if len(found) > 0 {
-		t.Fatalf("expected no E213 when generated columns only reference regular columns, got %v", found)
+	// Filter to errors only -- parse warnings (e.g., CAST(x AS type) not
+	// supported by sqlexpr) are expected and benign.
+	var errors []diagnostic.Diagnostic
+	for _, d := range found {
+		if d.Severity == diagnostic.Error {
+			errors = append(errors, d)
+		}
+	}
+	if len(errors) > 0 {
+		t.Fatalf("expected no E213 errors when generated columns only reference regular columns, got %v", errors)
 	}
 }
 
@@ -851,7 +859,7 @@ func TestExtractColumnRefs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expr, func(t *testing.T) {
-			got := extractColumnRefs(tt.expr)
+			got, _ := extractColumnRefs(tt.expr, "test")
 			if len(got) != len(tt.want) {
 				t.Fatalf("extractColumnRefs(%q) = %v, want %v", tt.expr, got, tt.want)
 			}

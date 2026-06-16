@@ -116,7 +116,7 @@ func TestGolden(t *testing.T) {
 					expectedPath := filepath.Join(expectedDir, name+fmt.ext)
 
 					// Generate
-					got, err := generate.Generate(schema, fmt.opts)
+					got, _, err := generate.Generate(schema, fmt.opts)
 					if err != nil {
 						t.Fatalf("generate error: %v", err)
 					}
