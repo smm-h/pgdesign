@@ -1,3 +1,61 @@
+// Package sqlexpr is a recursive descent parser for a subset of PostgreSQL
+// SQL expressions. It tokenizes an input string and produces an AST of Node
+// values suitable for static analysis, validation, and code generation.
+//
+// # Operator precedence
+//
+// Levels from lowest to highest binding:
+//
+//  1. OR
+//  2. AND
+//  3. NOT (unary prefix)
+//  4. Comparison: =, !=, <>, <, >, <=, >=, IS NULL, IS NOT NULL,
+//     IS DISTINCT FROM, IN, NOT IN, BETWEEN, LIKE, ILIKE, NOT LIKE, NOT ILIKE
+//  5. Concatenation: ||
+//  6. Addition/Subtraction: +, -
+//  7. Multiplication/Division/Modulo: *, /, %
+//  8. Cast: ::
+//  9. Primary: literals, identifiers, function calls, parenthesized
+//     expressions, unary minus, EXISTS, CASE
+//
+// # Node types
+//
+// The AST consists of the following node types, all implementing [Node]:
+//
+//   - [ColumnRef]: column reference, optionally qualified (column, table.column,
+//     schema.table.column)
+//   - [BoolLiteral]: true or false
+//   - [StringLiteral]: single-quoted string
+//   - [IntLiteral]: integer
+//   - [FloatLiteral]: floating-point number
+//   - [NullLiteral]: NULL
+//   - [FuncCall]: function call with arguments
+//   - [Cast]: PostgreSQL :: cast operator
+//   - [BinaryOp]: binary operation (arithmetic, comparison, logical)
+//   - [UnaryOp]: unary operation (NOT, IS NULL, IS NOT NULL, unary minus)
+//   - [ExistsExpr]: EXISTS (subquery)
+//   - [SelectExpr]: simple SELECT inside EXISTS (columns, FROM, optional WHERE)
+//   - [ParenExpr]: parenthesized expression
+//   - [CaseExpr]: CASE WHEN ... THEN ... ELSE ... END (with [WhenClause])
+//
+// # Keywords
+//
+// The following keywords are recognized (case-insensitive): OR, AND, NOT, IS,
+// NULL, DISTINCT, FROM, IN, BETWEEN, LIKE, ILIKE, EXISTS, SELECT, WHERE, CASE,
+// WHEN, THEN, ELSE, END, TRUE, FALSE.
+//
+// # Limitations
+//
+//   - No full SELECT statements; only simple SELECT inside EXISTS with FROM and
+//     optional WHERE.
+//   - No CAST(x AS type) syntax; only the :: cast operator.
+//   - No window functions, CTEs (WITH), or aggregate DISTINCT (e.g.,
+//     COUNT(DISTINCT x)).
+//   - No ORDER BY, GROUP BY, HAVING, or LIMIT.
+//   - No subqueries outside EXISTS.
+//   - No array subscript notation.
+//   - No SIMILAR TO, ANY, or ALL operators.
+//   - No type modifiers in casts (e.g., ::varchar(255)).
 package sqlexpr
 
 import (
@@ -6,7 +64,14 @@ import (
 	"strings"
 )
 
-// Parse parses a SQL expression string into an AST.
+// Parse parses a SQL expression string into an AST. It handles arithmetic,
+// comparisons, boolean logic, function calls, casts, CASE expressions, and
+// EXISTS subqueries. See the package documentation for the full grammar.
+//
+// On failure, the returned error is a *[ParseError] (which implements error).
+// ParseError contains Pos (byte offset in the input string), Token (the
+// problematic token text), and Msg (human-readable description) for precise
+// error location reporting.
 func Parse(input string) (Node, error) {
 	tokens, err := tokenize(input)
 	if err != nil {
