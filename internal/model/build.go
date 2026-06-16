@@ -273,7 +273,33 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 	}
 
 	// Resolve functional dependencies.
+	colSet := make(map[string]bool, len(t.Columns))
+	for _, col := range t.Columns {
+		colSet[col.Name] = true
+	}
 	for _, rawDep := range rt.Dependencies {
+		for _, name := range rawDep.Determinant {
+			if !colSet[name] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E221",
+					Table:    rt.Name,
+					Column:   name,
+					Message:  fmt.Sprintf("functional dependency references unknown column %q", name),
+				})
+			}
+		}
+		for _, name := range rawDep.Dependent {
+			if !colSet[name] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E221",
+					Table:    rt.Name,
+					Column:   name,
+					Message:  fmt.Sprintf("functional dependency references unknown column %q", name),
+				})
+			}
+		}
 		t.Dependencies = append(t.Dependencies, fd.FuncDep{
 			Determinant: rawDep.Determinant,
 			Dependent:   rawDep.Dependent,
