@@ -862,15 +862,17 @@ func queryPartitionChildren(ctx context.Context, conn *pgx.Conn, parentOID uint3
 
 // queryViewDependsOn returns the names of tables, views, materialized views,
 // and partitioned tables that the given view (or materialized view) depends on,
-// as reported by pg_depend. This replaces regex-based scanning of view
-// definitions with PostgreSQL's authoritative dependency catalog.
+// as reported by pg_depend. PostgreSQL tracks view-to-table dependencies
+// through the view's rewrite rule (pg_rewrite), not the view's pg_class entry
+// directly, so we join through pg_rewrite to find referenced relations.
 func queryViewDependsOn(ctx context.Context, conn *pgx.Conn, viewName, schemaName string) ([]string, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT DISTINCT c.relname
-		FROM pg_depend d
-		JOIN pg_class c ON c.oid = d.refobjid
+		FROM pg_rewrite rw
+		JOIN pg_depend d ON d.objid = rw.oid AND d.classid = 'pg_rewrite'::regclass
+		JOIN pg_class c ON c.oid = d.refobjid AND d.refclassid = 'pg_class'::regclass
 		JOIN pg_namespace n ON n.oid = c.relnamespace
-		WHERE d.objid = (
+		WHERE rw.ev_class = (
 			SELECT c2.oid
 			FROM pg_class c2
 			JOIN pg_namespace n2 ON n2.oid = c2.relnamespace
@@ -931,16 +933,23 @@ func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model
 			v.Comment = *comment
 		}
 
-		// Resolve DependsOn via pg_depend.
-		deps, err := queryViewDependsOn(ctx, conn, name, schemaName)
-		if err != nil {
-			return nil, fmt.Errorf("depends_on for view %s: %w", name, err)
-		}
-		v.DependsOn = deps
-
 		views = append(views, v)
 	}
-	return views, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Resolve DependsOn via pg_depend in a second pass (the connection
+	// cannot execute a nested query while rows are open).
+	for i := range views {
+		deps, err := queryViewDependsOn(ctx, conn, views[i].Name, schemaName)
+		if err != nil {
+			return nil, fmt.Errorf("depends_on for view %s: %w", views[i].Name, err)
+		}
+		views[i].DependsOn = deps
+	}
+
+	return views, nil
 }
 
 // queryMaterializedViewIndexes returns indexes defined on a materialized view.
@@ -997,17 +1006,20 @@ func queryMaterializedViews(ctx context.Context, conn *pgx.Conn, schemaName stri
 			mv.Comment = *comment
 		}
 
-		// Resolve DependsOn via pg_depend.
-		deps, err := queryViewDependsOn(ctx, conn, name, schemaName)
-		if err != nil {
-			return nil, nil, fmt.Errorf("depends_on for materialized view %s: %w", name, err)
-		}
-		mv.DependsOn = deps
-
 		mvs = append(mvs, mv)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, nil, err
+	}
+
+	// Resolve DependsOn via pg_depend in a second pass (the connection
+	// cannot execute a nested query while rows are open).
+	for i := range mvs {
+		deps, err := queryViewDependsOn(ctx, conn, mvs[i].Name, schemaName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("depends_on for materialized view %s: %w", mvs[i].Name, err)
+		}
+		mvs[i].DependsOn = deps
 	}
 
 	// Introspect indexes for each materialized view.
