@@ -384,10 +384,10 @@ func parseSimpleDefault(pgExpr string) (rawValue string, isSimple bool) {
 }
 
 // parseQuotedDefault extracts the value from a single-quoted PG literal,
-// handling escaped quotes ('') and optional ::type cast suffixes.
+// handling escaped quotes (''), chained ::type casts, and COLLATE clauses.
 // Returns the unquoted value and true if the expression is a simple quoted
-// literal (with optional cast), or ("", false) if there's trailing content
-// that makes it complex (operators, etc).
+// literal (with optional casts/collation), or ("", false) if there's trailing
+// content that makes it complex (operators, etc).
 func parseQuotedDefault(pgExpr string) (string, bool) {
 	// Walk past the opening quote to find the matching close quote.
 	// PostgreSQL escapes single quotes as ''.
@@ -408,30 +408,82 @@ func parseQuotedDefault(pgExpr string) (string, bool) {
 		val.WriteByte(pgExpr[i])
 		i++
 	}
-	// After the closing quote, allow an optional ::type cast and nothing else.
+	// After the closing quote, strip optional chained ::type casts,
+	// then an optional COLLATE clause.
 	rest := pgExpr[i:]
+	rest = stripCastChain(rest)
+	rest = stripCollate(rest)
 	if rest == "" {
 		return val.String(), true
 	}
-	if strings.HasPrefix(rest, "::") {
-		// Strip the ::type cast. If there's anything after the type name
-		// (e.g., operators), it's not simple.
-		castType := rest[2:]
-		// A cast type name can contain alphanumerics, underscores, dots (schema.type),
-		// spaces (e.g., "character varying"), and brackets (e.g., "text[]").
-		// If there's anything beyond a valid type name, it's complex.
-		for j := 0; j < len(castType); j++ {
-			c := castType[j]
-			if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '.' || c == '[' || c == ']' || c == ' ' {
+	return "", false
+}
+
+// stripCastChain strips zero or more ::type cast suffixes from the front of s.
+// A type name can contain alphanumerics, underscores, dots (schema.type),
+// and brackets (e.g., "text[]"). Spaces are allowed for multi-word types
+// like "character varying", but not before keywords like COLLATE.
+func stripCastChain(s string) string {
+	for strings.HasPrefix(s, "::") {
+		s = s[2:]
+		j := 0
+		for j < len(s) {
+			c := s[j]
+			if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '.' || c == '[' || c == ']' {
+				j++
 				continue
 			}
-			// Non-type character found -- expression has trailing content.
-			return "", false
+			if c == ' ' {
+				// Space might be part of a multi-word type (e.g., "character varying")
+				// or it might separate the type from a COLLATE clause or another ::cast.
+				// Peek ahead: if what follows the space is COLLATE or ::, stop here.
+				after := strings.TrimLeft(s[j:], " ")
+				if strings.HasPrefix(after, "::") || strings.HasPrefix(strings.ToUpper(after), "COLLATE") || after == "" {
+					break
+				}
+				j++
+				continue
+			}
+			break
 		}
-		return val.String(), true
+		s = s[j:]
 	}
-	// Something other than :: after the closing quote -- complex.
-	return "", false
+	return s
+}
+
+// stripCollate strips an optional COLLATE clause from the front of s.
+// Handles both quoted identifiers (COLLATE "C") and bare identifiers
+// (COLLATE en_US).
+func stripCollate(s string) string {
+	rest := strings.TrimLeft(s, " ")
+	if !strings.HasPrefix(strings.ToUpper(rest), "COLLATE") {
+		return s
+	}
+	rest = rest[len("COLLATE"):]
+	// Must be followed by whitespace (COLLATE is not a prefix of a type name).
+	if len(rest) == 0 || rest[0] != ' ' {
+		return s
+	}
+	rest = strings.TrimLeft(rest, " ")
+	if len(rest) > 0 && rest[0] == '"' {
+		// Quoted identifier: find closing double quote.
+		end := strings.Index(rest[1:], "\"")
+		if end < 0 {
+			return s // unterminated quote -- leave it
+		}
+		return rest[end+2:]
+	}
+	// Bare identifier: alphanumerics, underscores, dots.
+	j := 0
+	for j < len(rest) {
+		c := rest[j]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '.' {
+			j++
+			continue
+		}
+		break
+	}
+	return rest[j:]
 }
 
 // queryPrimaryKey returns the primary key column names for a table OID.
