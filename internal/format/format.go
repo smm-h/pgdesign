@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/smm-h/pgdesign/internal/graph"
 	"github.com/smm-h/pgdesign/internal/parse"
 
 	tomledit "github.com/smm-h/go-toml-edit"
@@ -77,80 +78,30 @@ func orderTables(raw *parse.RawSchema, mode string) []string {
 // topoSortTables performs a topological sort on raw tables using FK refs.
 // FK targets come before FK sources. Ties and cycle members are alphabetical.
 func topoSortTables(tables []parse.RawTable) []string {
-	tableSet := make(map[string]bool, len(tables))
-	for _, t := range tables {
-		tableSet[t.Name] = true
-	}
+	// Pre-sort input alphabetically so TopoSort's input-order preservation
+	// becomes alphabetical tie-breaking.
+	sortedInput := make([]parse.RawTable, len(tables))
+	copy(sortedInput, tables)
+	sort.Slice(sortedInput, func(i, j int) bool {
+		return sortedInput[i].Name < sortedInput[j].Name
+	})
 
-	// Build dependency graph: dependsOn[A] = set of tables A references via FKs.
-	dependsOn := make(map[string]map[string]bool, len(tables))
-	for _, t := range tables {
-		deps := make(map[string]bool)
-		for _, fk := range t.FKs {
-			if fk.RefTable != t.Name && tableSet[fk.RefTable] {
-				deps[fk.RefTable] = true
+	sorted, _ := graph.TopoSort(sortedInput,
+		func(t parse.RawTable) string { return t.Name },
+		func(t parse.RawTable) []string {
+			var deps []string
+			for _, fk := range t.FKs {
+				deps = append(deps, fk.RefTable)
 			}
-		}
-		dependsOn[t.Name] = deps
+			return deps
+		},
+	)
+
+	names := make([]string, len(sorted))
+	for i, t := range sorted {
+		names[i] = t.Name
 	}
-
-	// Kahn's algorithm with alphabetical tie-breaking.
-	inDegree := make(map[string]int, len(tables))
-	for _, t := range tables {
-		inDegree[t.Name] = len(dependsOn[t.Name])
-	}
-
-	// Collect zero-degree nodes, sorted alphabetically.
-	var queue []string
-	for _, t := range tables {
-		if inDegree[t.Name] == 0 {
-			queue = append(queue, t.Name)
-		}
-	}
-	sort.Strings(queue)
-
-	visited := make(map[string]bool, len(tables))
-	var result []string
-
-	for len(queue) > 0 {
-		name := queue[0]
-		queue = queue[1:]
-		if visited[name] {
-			continue
-		}
-		visited[name] = true
-		result = append(result, name)
-
-		// For each table that depends on this one, decrement its in-degree.
-		var newReady []string
-		for _, t := range tables {
-			if visited[t.Name] {
-				continue
-			}
-			if dependsOn[t.Name][name] {
-				inDegree[t.Name]--
-				if inDegree[t.Name] == 0 {
-					newReady = append(newReady, t.Name)
-				}
-			}
-		}
-		sort.Strings(newReady)
-		queue = append(queue, newReady...)
-	}
-
-	// Remaining nodes are in cycles -- add them alphabetically.
-	if len(result) < len(tables) {
-		var remaining []string
-		for _, t := range tables {
-			if !visited[t.Name] {
-				remaining = append(remaining, t.Name)
-			}
-		}
-		sort.Strings(remaining)
-		result = append(result, remaining...)
-	}
-
-	return result
+	return names
 }
 
 // sectionKind classifies a top-level AST node by which schema section it
