@@ -12,6 +12,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/pgdesign/internal/diff"
+	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/introspect"
 	"github.com/smm-h/pgdesign/internal/migrate"
 )
@@ -86,7 +87,7 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 	// Resolve PGVersion: live (from introspect) > config > TOML schema.
 	schema.PGVersion = resolvePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
 
-	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold)
+	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
 
 	// Print the plan.
 	fmt.Println("Migration plan:")
@@ -200,7 +201,7 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 	// Resolve PGVersion: live (from introspect) > config > TOML schema.
 	schema.PGVersion = resolvePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
 
-	m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold)
+	m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
 
 	if len(migDiags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
