@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 0.12.3
+
+Fix CWD-dependent panic
+
+<details>
+<summary>Context</summary>
+
+pgdesign panicked when run from any directory that did not contain .strictcli/checks.toml. The fix embeds checks.toml at compile time via go:embed, eliminating the filesystem dependency.
+
+</details>
+
+### Fixes
+
+- **Bug fix.** Fix panic when running pgdesign from outside its own directory.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.12.2
 
 Split E217 into E217 (unknown method) and E219 (undeclared extension).
@@ -9,12 +30,6 @@ Split E217 into E217 (unknown method) and E219 (undeclared extension).
 ### Breaking
 
 - **Breaking.** Split E217 into two codes: E217 for unknown index methods (typo/nonexistent) and E219 for known extension methods with undeclared extensions. Existing E217 diagnostics for undeclared extensions are now E219.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.12.1
 

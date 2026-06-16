@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "name": "pgdesign",
+  "slug": "pgdesign",
+  "version": "0.12.2",
+  "description": null,
+  "language": "go",
+  "base_url": "https://pgdesign.smmh.dev",
+  "pages": [
+    {
+      "path": "cli-build.md",
+      "title": "pgdesign build",
+      "type": "doc"
+    },
+    {
+      "path": "cli-check.md",
+      "title": "pgdesign check",
+      "type": "doc"
+    },
+    {
+      "path": "cli-codegen.md",
+      "title": "pgdesign codegen",
+      "type": "doc"
+    },
+    {
+      "path": "cli-diff.md",
+      "title": "pgdesign diff",
+      "type": "doc"
+    },
+    {
+      "path": "cli-fmt.md",
+      "title": "pgdesign fmt",
+      "type": "doc"
+    },
+    {
+      "path": "cli-generate.md",
+      "title": "pgdesign generate",
+      "type": "doc"
+    },
+    {
+      "path": "cli-index.md",
+      "title": "pgdesign CLI Reference",
+      "type": "doc"
+    },
+    {
+      "path": "cli-introspect.md",
+      "title": "pgdesign introspect",
+      "type": "doc"
+    },
+    {
+      "path": "cli-migrate.md",
+      "title": "pgdesign migrate",
+      "type": "doc"
+    },
+    {
+      "path": "cli-seed.md",
+      "title": "pgdesign seed",
+      "type": "doc"
+    },
+    {
+      "path": "cli-serve.md",
+      "title": "pgdesign serve",
+      "type": "doc"
+    },
+    {
+      "path": "cli-stats.md",
+      "title": "pgdesign stats",
+      "type": "doc"
+    },
+    {
+      "path": "format-reference.md",
+      "title": "Format Reference",
+      "type": "doc"
+    },
+    {
+      "path": "gen-index.md",
+      "title": "API Reference",
+      "type": "doc"
+    },
+    {
+      "path": "internal-audit.md",
+      "title": "internal/audit",
+      "type": "doc"
+    },
+    {
+      "path": "internal-config.md",
+      "title": "internal/config",
+      "type": "doc"
+    },
+    {
+      "path": "internal-diagnostic.md",
+      "title": "internal/diagnostic",
+      "type": "doc"
+    },
+    {
+      "path": "internal-diff.md",
+      "title": "internal/diff",
+      "type": "doc"
+    },
+    {
+      "path": "internal-discover.md",
+      "title": "internal/discover",
+      "type": "doc"
+    },
+    {
+      "path": "internal-extregistry.md",
+      "title": "internal/extregistry",
+      "type": "doc"
+    },
+    {
+      "path": "internal-fd.md",
+      "title": "internal/fd",
+      "type": "doc"
+    },
+    {
+      "path": "internal-format.md",
+      "title": "internal/format",
+      "type": "doc"
+    },
+    {
+      "path": "internal-generate.md",
+      "title": "internal/generate",
+      "type": "doc"
+    },
+    {
+      "path": "internal-introspect.md",
+      "title": "internal/introspect",
+      "type": "doc"
+    },
+    {
+      "path": "internal-migrate.md",
+      "title": "internal/migrate",
+      "type": "doc"
+    },
+    {
+      "path": "internal-model.md",
+      "title": "internal/model",
+      "type": "doc"
+    },
+    {
+      "path": "internal-parse.md",
+      "title": "internal/parse",
+      "type": "doc"
+    },
+    {
+      "path": "internal-risk.md",
+      "title": "internal/risk",
+      "type": "doc"
+    },
+    {
+      "path": "internal-semtype.md",
+      "title": "internal/semtype",
+      "type": "doc"
+    },
+    {
+      "path": "internal-serve.md",
+      "title": "internal/serve",
+      "type": "doc"
+    },
+    {
+      "path": "internal-sql.md",
+      "title": "internal/sql",
+      "type": "doc"
+    },
+    {
+      "path": "internal-sqlexpr.md",
+      "title": "internal/sqlexpr",
+      "type": "doc"
+    },
+    {
+      "path": "internal-validate.md",
+      "title": "internal/validate",
+      "type": "doc"
+    },
+    {
+      "path": "migration-guide.md",
+      "title": "Migration Guide",
+      "type": "doc"
+    },
+    {
+      "path": "quickstart.md",
+      "title": "Quickstart",
+      "type": "doc"
+    },
+    {
+      "path": "semantic-types.md",
+      "title": "Semantic Types",
+      "type": "doc"
+    },
+    {
+      "path": "validation-rules.md",
+      "title": "Validation Rules",
+      "type": "doc"
+    }
+  ],
+  "posts": [],
+  "last_gen": "2026-06-16T12:32:22.067990+00:00"
+}
