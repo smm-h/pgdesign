@@ -52,14 +52,14 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - `check` command runs registered checks (validation, NF audit, coverage) via strictcli's check framework.
 - `stats` command analyzes live database health: table sizes, index usage, bloat, duplicate indexes.
 - `seed` command generates type-aware test data respecting FK dependencies and semantic types.
-- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Three modes: validators, constants, types (Go only).
+- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Three modes: validators, constants, types.
 - Diff supports three modes: `--live` (against database), `--against` (against another TOML), `--base` (against git ref).
 - `doc` output format generates human-readable schema documentation.
 - Extension-provided types (e.g., `vector` from pgvector) become valid base types when declared via `[[extensions]]` in pgdesign.toml. Undeclared extension types remain hard errors.
 - Index definitions support `with = { key = "value" }` for PostgreSQL storage parameters (e.g., HNSW `m`, `ef_construction`). E216 validates parameters against index method.
 - Views are defined under `[views.*]` with `query`, optional `comment`, and optional `depends_on` for dependency ordering.
 - Materialized views are defined under `[materialized_views.*]` with `query`, optional `comment`, `with_data`, and nested `[materialized_views.*.indexes.*]`.
-- Codegen supports `--mode types` (Go only) for generating Go type definitions from the schema, in addition to `validators` and `constants`.
+- Codegen supports `--mode types` for generating native type definitions from the schema in all 6 languages, in addition to `validators` and `constants`.
 - PGVersion resolution order: live database (introspect) > `[database].pg_version` in pgdesign.toml > `[meta].version` in schema TOML > 0 (conservative defaults).
 - Generated columns: PG 12-17 only support STORED; PG 18+ supports both STORED and VIRTUAL. When `stored` is omitted from TOML, defaults to true. E218 validates version compatibility. STORED-to-VIRTUAL transition is destructive (DROP + recreate).
 
@@ -75,7 +75,7 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Commands registered via `app.Command(name, desc, handler, strictcli.WithArgs(...), strictcli.WithFlags(...))`
 - Handler signature: `func(kwargs map[string]interface{}) int` (returns exit code)
 - Global flags: `quiet`, `db` (PostgreSQL connection string), `strict-nf`
-- Commands: `generate`, `validate`, `audit`, `fmt`, `introspect`, `diff`, `seed`, `serve`, `codegen`, `build`, `stats`
+- Commands: `generate`, `check`, `fmt`, `introspect`, `diff`, `seed`, `serve`, `codegen`, `build`, `stats`
 - Command groups: `migrate` (`plan`, `generate`, `apply`, `rollback`, `status`, `squash`, `test`)
 - `introspect --extensions` discovers extension types, functions, and opclasses from a live database
 
