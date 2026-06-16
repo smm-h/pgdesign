@@ -1,2 +1,0 @@
-{"commits":["a3bbbfab2a443bb57dd6664a8bf7d4139ce8524f"],"user_facing":true,"description":"**Breaking.** Split E217 into two codes: E217 for unknown index methods (typo/nonexistent) and E219 for known extension methods with undeclared extensions. Existing E217 diagnostics for undeclared extensions are now E219.","type":"breaking"}
-{"commits":["62767e0ffaf438449688bffafa3f143821bc92b0","9c59438e8b6c5fa3f025dd72098b54e26781505e"],"user_facing":false}
