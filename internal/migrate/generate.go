@@ -2,10 +2,13 @@ package migrate
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
+	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/risk"
 )
@@ -19,7 +22,7 @@ import (
 // expandContractThreshold is the row count above which set_not_null ops are
 // decomposed into a DML backfill step followed by set_not_null; pass 0 to use
 // the default of 10_000_000.
-func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string, tableStats TableStats, largeFKThreshold int64, expandContractThreshold int64) (*Migration, []diagnostic.Diagnostic) {
+func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string, tableStats TableStats, largeFKThreshold int64, expandContractThreshold int64, extReg *extregistry.Registry) (*Migration, []diagnostic.Diagnostic) {
 	if largeFKThreshold <= 0 {
 		largeFKThreshold = 10_000
 	}
@@ -364,8 +367,42 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			diags = append(diags, classifyOp(op, risk.OpDropIndex, ctx)...)
 		}
 
-		// Changed indexes: drop old + create new.
+		// Changed indexes.
 		for _, ic := range td.IndexesChanged {
+			// When only WITH storage parameters changed and the index method
+			// is a PostgreSQL builtin (btree, gin, gist, brin, hash), use
+			// ALTER INDEX SET instead of DROP+CREATE. Extension methods
+			// (e.g., hnsw from pgvector) may need a full rebuild for
+			// parameter changes.
+			if onlyWithChanged(ic.Old, ic.New) && extReg != nil {
+				method := ic.New.Method
+				if method == "" {
+					method = "btree" // PostgreSQL default
+				}
+				_, isExtension := extReg.RequiredExtensionForMethod(method)
+				if !isExtension {
+					// Builtin method: ALTER INDEX SET is safe.
+					op := DDLOp{
+						Op:    "alter_index_set",
+						Table: td.Name,
+						Name:  ic.New.Name,
+						With:  ic.New.With,
+						Down: &DownOp{
+							Ops: []DDLOp{{
+								Op:    "alter_index_set",
+								Table: td.Name,
+								Name:  ic.Old.Name,
+								With:  ic.Old.With,
+							}},
+						},
+					}
+					m.DDLOps = append(m.DDLOps, op)
+					diags = append(diags, classifyOp(op, risk.OpAlterIndexSet, ctx)...)
+					continue
+				}
+			}
+
+			// Default: DROP + CREATE for extension methods or structural changes.
 			dropOp := DDLOp{
 				Op:    "drop_index",
 				Table: td.Name,
@@ -620,6 +657,31 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				m.DDLOps = append(m.DDLOps, op)
 			}
 			for _, ic := range mvd.IndexesChanged {
+				if onlyWithChanged(ic.Old, ic.New) && extReg != nil {
+					method := ic.New.Method
+					if method == "" {
+						method = "btree"
+					}
+					_, isExtension := extReg.RequiredExtensionForMethod(method)
+					if !isExtension {
+						op := DDLOp{
+							Op:    "alter_index_set",
+							Table: mvd.Name,
+							Name:  ic.New.Name,
+							With:  ic.New.With,
+							Down: &DownOp{
+								Ops: []DDLOp{{
+									Op:    "alter_index_set",
+									Table: mvd.Name,
+									Name:  ic.Old.Name,
+									With:  ic.Old.With,
+								}},
+							},
+						}
+						m.DDLOps = append(m.DDLOps, op)
+						continue
+					}
+				}
 				// Drop old + create new index.
 				m.DDLOps = append(m.DDLOps, DDLOp{
 					Op:    "drop_index",
@@ -678,6 +740,38 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 	}
 
 	return m, diags
+}
+
+// onlyWithChanged reports whether the only difference between old and new
+// is the With storage parameters. All structural properties (columns, method,
+// opclasses, where, include, unique, desc) must be identical.
+func onlyWithChanged(old, new model.Index) bool {
+	if old.Name != new.Name {
+		return false
+	}
+	if !slices.Equal(old.Columns, new.Columns) {
+		return false
+	}
+	if old.Method != new.Method {
+		return false
+	}
+	if old.Where != new.Where {
+		return false
+	}
+	if old.Unique != new.Unique {
+		return false
+	}
+	if !slices.Equal(old.Include, new.Include) {
+		return false
+	}
+	if !slices.Equal(old.Desc, new.Desc) {
+		return false
+	}
+	if !maps.Equal(old.Opclasses, new.Opclasses) {
+		return false
+	}
+	// At this point, only With can differ.
+	return !maps.Equal(old.With, new.With)
 }
 
 func makeFKOp(tableName string, fk model.FK) DDLOp {
