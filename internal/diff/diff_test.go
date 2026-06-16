@@ -1371,6 +1371,27 @@ func TestArrayChangedFormatTerminal(t *testing.T) {
 	}
 }
 
+func TestStoredChangedFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "orders",
+				ColumnsChanged: []ColumnChange{
+					{
+						Name:          "computed",
+						StoredChanged: &[2]bool{true, false},
+						Risk:          risk.Classification{RiskLevel: risk.Dangerous},
+					},
+				},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "stored: true -> false") {
+		t.Errorf("expected 'stored: true -> false' in output, got:\n%s", out)
+	}
+}
+
 func TestAppendOnlyChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
