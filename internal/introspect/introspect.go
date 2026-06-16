@@ -283,7 +283,7 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		query = `
 			SELECT a.attname, format_type(a.atttypid, a.atttypmod) as type,
 			       a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid) as default_expr,
-			       d.description, a.attgenerated::text
+			       d.description, a.attgenerated::text, a.attidentity::text
 			FROM pg_attribute a
 			LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
 			LEFT JOIN pg_description d ON d.objoid = a.attrelid AND d.objsubid = a.attnum
@@ -293,7 +293,7 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		query = `
 			SELECT a.attname, format_type(a.atttypid, a.atttypmod) as type,
 			       a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid) as default_expr,
-			       d.description, '' as attgenerated
+			       d.description, '' as attgenerated, '' as attidentity
 			FROM pg_attribute a
 			LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
 			LEFT JOIN pg_description d ON d.objoid = a.attrelid AND d.objsubid = a.attnum
@@ -313,7 +313,8 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		var defaultExpr *string
 		var comment *string
 		var attgenerated string
-		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment, &attgenerated); err != nil {
+		var attidentity string
+		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment, &attgenerated, &attidentity); err != nil {
 			return nil, err
 		}
 
@@ -331,6 +332,22 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 				defaultExpr = nil
 			}
 			c.Stored = false
+		}
+
+		// Map attidentity: 'a' = ALWAYS, 'd' = BY DEFAULT, '' = not identity.
+		switch attidentity {
+		case "a":
+			c.Identity = "ALWAYS"
+		case "d":
+			c.Identity = "BY DEFAULT"
+		}
+
+		// Identity columns report nextval() as their default, but the Identity
+		// field captures the semantics. Clear the default to avoid duplication.
+		if c.Identity != "" {
+			defaultExpr = nil
+			c.Default = nil
+			c.DefaultExpr = ""
 		}
 
 		// Classify the default: simple literals go into Default (for TOML
