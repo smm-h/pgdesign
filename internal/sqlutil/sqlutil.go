@@ -1,5 +1,13 @@
-// Package sqlutil provides shared adapters between the sqlexpr parser and the
-// diagnostic system, so multiple call sites handle parse failures consistently.
+// Package sqlutil provides a shared adapter between the sqlexpr parser and the
+// diagnostic package, preventing each consumer from reimplementing
+// parse-error-to-diagnostic conversion.
+//
+// ParseExpr parses a SQL expression via sqlexpr.Parse and converts any
+// ParseError into a diagnostic.Warning with position information. The returned
+// diagnostic intentionally has no diagnostic code; consumers assign their own
+// codes since the same parse failure means different things in different
+// contexts (e.g., E213 for generated column validation, C001/C002 for codegen
+// checks).
 package sqlutil
 
 import (
