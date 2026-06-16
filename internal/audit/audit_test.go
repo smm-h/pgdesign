@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -21,14 +22,18 @@ func TestAudit_NoDepsSkipped(t *testing.T) {
 	}
 
 	diags := Audit(schema)
-	if len(diags) != 1 {
-		t.Fatalf("expected 1 diagnostic, got %d: %+v", len(diags), diags)
+	// inferFDs fires before the early return, producing A100 + Info
+	if len(diags) != 2 {
+		t.Fatalf("expected 2 diagnostics (A100 + Info), got %d: %+v", len(diags), diags)
 	}
-	if diags[0].Severity != diagnostic.Info {
-		t.Errorf("expected Info severity, got %v", diags[0].Severity)
+	if diags[0].Code != "A100" {
+		t.Errorf("expected A100 first, got %v", diags[0].Code)
 	}
-	if diags[0].Message != "No functional dependencies declared. NF audit skipped." {
-		t.Errorf("unexpected message: %s", diags[0].Message)
+	if diags[1].Severity != diagnostic.Info {
+		t.Errorf("expected Info severity, got %v", diags[1].Severity)
+	}
+	if diags[1].Message != "No functional dependencies declared. NF audit skipped." {
+		t.Errorf("unexpected message: %s", diags[1].Message)
 	}
 }
 
@@ -205,5 +210,192 @@ func TestAudit_DecompositionSuggestion(t *testing.T) {
 	if !containsStr([]string{suggestion}, "Suggested decomposition:") {
 		// Use strings.Contains for checking
 		t.Logf("suggestion: %s", suggestion)
+	}
+}
+
+func TestAudit_FDInference_PKNoDeps(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "users",
+			Columns: []model.Column{
+				{Name: "id", PGType: "bigint", NotNull: true},
+				{Name: "name", PGType: "text", NotNull: true},
+				{Name: "email", PGType: "text", NotNull: true},
+			},
+			PK: []string{"id"},
+		}},
+	}
+
+	diags := Audit(schema)
+	var a100 []diagnostic.Diagnostic
+	for _, d := range diags {
+		if d.Code == "A100" {
+			a100 = append(a100, d)
+		}
+	}
+	if len(a100) != 1 {
+		t.Fatalf("expected 1 A100 diagnostic, got %d: %+v", len(a100), diags)
+	}
+	if a100[0].Severity != diagnostic.Error {
+		t.Errorf("expected Error severity, got %v", a100[0].Severity)
+	}
+	if !strings.Contains(a100[0].Message, "primary key") {
+		t.Errorf("expected message about primary key, got: %s", a100[0].Message)
+	}
+	if !strings.Contains(a100[0].Message, "email") || !strings.Contains(a100[0].Message, "name") {
+		t.Errorf("expected message to mention undeclared columns, got: %s", a100[0].Message)
+	}
+}
+
+func TestAudit_FDInference_PKDeclared(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "clean",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint", NotNull: true},
+				{Name: "B", PGType: "text", NotNull: true},
+				{Name: "C", PGType: "text", NotNull: true},
+			},
+			PK: []string{"A"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	for _, d := range diags {
+		if d.Code == "A100" {
+			t.Errorf("unexpected A100: %+v", d)
+		}
+	}
+}
+
+func TestAudit_FDInference_UniqueNotNull(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "items",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint", NotNull: true},
+				{Name: "B", PGType: "text", NotNull: true},
+				{Name: "C", PGType: "text", NotNull: true},
+			},
+			PK: []string{"A"},
+			Uniques: []model.UniqueConstraint{
+				{Name: "uq_b", Columns: []string{"B"}},
+			},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	var a100 []diagnostic.Diagnostic
+	for _, d := range diags {
+		if d.Code == "A100" {
+			a100 = append(a100, d)
+		}
+	}
+	if len(a100) != 1 {
+		t.Fatalf("expected 1 A100 for unique constraint, got %d: %+v", len(a100), diags)
+	}
+	if !strings.Contains(a100[0].Message, "unique constraint") {
+		t.Errorf("expected message about unique constraint, got: %s", a100[0].Message)
+	}
+}
+
+func TestAudit_FDInference_UniqueNullable(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "items",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint", NotNull: true},
+				{Name: "B", PGType: "text", NotNull: false},
+				{Name: "C", PGType: "text", NotNull: true},
+			},
+			PK: []string{"A"},
+			Uniques: []model.UniqueConstraint{
+				{Name: "uq_b", Columns: []string{"B"}},
+			},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	for _, d := range diags {
+		if d.Code == "A100" {
+			t.Errorf("unexpected A100 for nullable unique column: %+v", d)
+		}
+	}
+}
+
+func TestAudit_BCNF_Violation_3NF_Pass(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "bcnf_test",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint", NotNull: true},
+				{Name: "B", PGType: "bigint", NotNull: true},
+				{Name: "C", PGType: "bigint", NotNull: true},
+			},
+			PK: []string{"A", "B"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A", "B"}, Dependent: []string{"C"}},
+				{Determinant: []string{"C"}, Dependent: []string{"B"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+
+	// Should have NO W102 (3NF pass -- B is prime)
+	for _, d := range diags {
+		if d.Code == "W102" {
+			t.Errorf("unexpected W102 (3NF violation): %+v", d)
+		}
+	}
+
+	// Should have W103 (BCNF violation -- C is not a superkey)
+	var w103 []diagnostic.Diagnostic
+	for _, d := range diags {
+		if d.Code == "W103" {
+			w103 = append(w103, d)
+		}
+	}
+	if len(w103) != 1 {
+		t.Fatalf("expected 1 W103 diagnostic, got %d: %+v", len(w103), diags)
+	}
+	if w103[0].Column != "B" {
+		t.Errorf("expected BCNF violation for column 'B', got '%s'", w103[0].Column)
+	}
+	if !strings.Contains(w103[0].Message, "BCNF violation") {
+		t.Errorf("expected BCNF violation message, got: %s", w103[0].Message)
+	}
+}
+
+func TestAudit_BCNF_Pass(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "bcnf_clean",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint", NotNull: true},
+				{Name: "B", PGType: "text", NotNull: true},
+				{Name: "C", PGType: "text", NotNull: true},
+			},
+			PK: []string{"A"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	for _, d := range diags {
+		if d.Code == "W103" {
+			t.Errorf("unexpected W103 (BCNF violation): %+v", d)
+		}
 	}
 }
