@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/graph"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/sql"
 )
@@ -460,48 +461,11 @@ func hasExtension(schema *model.Schema, name string) bool {
 // Views that depend on other views come after their dependencies.
 // Returns an error if a cycle is detected.
 func topoSortViews(views []model.View) ([]model.View, error) {
-	nameToIdx := make(map[string]int, len(views))
-	for i, v := range views {
-		nameToIdx[v.Name] = i
-	}
-
-	// Build in-degree counts and adjacency list.
-	inDegree := make([]int, len(views))
-	// dependents[i] = list of view indices that depend on views[i].
-	dependents := make([][]int, len(views))
-	for i, v := range views {
-		for _, dep := range v.DependsOn {
-			// Cross-type deps (tables, matviews) are satisfied by DDL section ordering;
-			// invalid deps are caught by E220 validation. Only same-type deps need topo ordering.
-			if depIdx, ok := nameToIdx[dep]; ok {
-				inDegree[i]++
-				dependents[depIdx] = append(dependents[depIdx], i)
-			}
-		}
-	}
-
-	// Kahn's algorithm: start with views that have no dependencies.
-	var queue []int
-	for i, deg := range inDegree {
-		if deg == 0 {
-			queue = append(queue, i)
-		}
-	}
-
-	var sorted []model.View
-	for len(queue) > 0 {
-		idx := queue[0]
-		queue = queue[1:]
-		sorted = append(sorted, views[idx])
-		for _, depIdx := range dependents[idx] {
-			inDegree[depIdx]--
-			if inDegree[depIdx] == 0 {
-				queue = append(queue, depIdx)
-			}
-		}
-	}
-
-	if len(sorted) != len(views) {
+	sorted, cycles := graph.TopoSort(views,
+		func(v model.View) string { return v.Name },
+		func(v model.View) []string { return v.DependsOn },
+	)
+	if len(cycles) > 0 {
 		return nil, fmt.Errorf("cycle detected in view dependencies")
 	}
 	return sorted, nil
@@ -511,48 +475,11 @@ func topoSortViews(views []model.View) ([]model.View, error) {
 // Materialized views that depend on other materialized views come after their dependencies.
 // Returns an error if a cycle is detected.
 func topoSortMaterializedViews(mvs []model.MaterializedView) ([]model.MaterializedView, error) {
-	nameToIdx := make(map[string]int, len(mvs))
-	for i, mv := range mvs {
-		nameToIdx[mv.Name] = i
-	}
-
-	// Build in-degree counts and adjacency list.
-	inDegree := make([]int, len(mvs))
-	// dependents[i] = list of materialized view indices that depend on mvs[i].
-	dependents := make([][]int, len(mvs))
-	for i, mv := range mvs {
-		for _, dep := range mv.DependsOn {
-			// Cross-type deps (tables, views) are satisfied by DDL section ordering;
-			// invalid deps are caught by E220 validation. Only same-type deps need topo ordering.
-			if depIdx, ok := nameToIdx[dep]; ok {
-				inDegree[i]++
-				dependents[depIdx] = append(dependents[depIdx], i)
-			}
-		}
-	}
-
-	// Kahn's algorithm: start with materialized views that have no dependencies.
-	var queue []int
-	for i, deg := range inDegree {
-		if deg == 0 {
-			queue = append(queue, i)
-		}
-	}
-
-	var sorted []model.MaterializedView
-	for len(queue) > 0 {
-		idx := queue[0]
-		queue = queue[1:]
-		sorted = append(sorted, mvs[idx])
-		for _, depIdx := range dependents[idx] {
-			inDegree[depIdx]--
-			if inDegree[depIdx] == 0 {
-				queue = append(queue, depIdx)
-			}
-		}
-	}
-
-	if len(sorted) != len(mvs) {
+	sorted, cycles := graph.TopoSort(mvs,
+		func(mv model.MaterializedView) string { return mv.Name },
+		func(mv model.MaterializedView) []string { return mv.DependsOn },
+	)
+	if len(cycles) > 0 {
 		return nil, fmt.Errorf("cycle detected in materialized view dependencies")
 	}
 	return sorted, nil
