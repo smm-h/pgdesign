@@ -887,3 +887,64 @@ func TestBuild_IndexDESCEndToEnd(t *testing.T) {
 		t.Error("idx_messages_channel_sent not found in indexes")
 	}
 }
+
+func TestBuild_FDUnknownColumn_E221(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "orders",
+				PK:   []string{"id"},
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "amount", Type: "money"},
+					{Name: "status", Type: "short_text"},
+				},
+				Dependencies: []parse.RawDependency{
+					{Determinant: []string{"order_num"}, Dependent: []string{"amount"}},
+				},
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	found := false
+	for _, d := range diags {
+		if d.Code == "E221" && d.Table == "orders" && d.Column == "order_num" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected E221 diagnostic for unknown FD column 'order_num'")
+	}
+}
+
+func TestBuild_FDValidColumns_NoE221(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "orders",
+				PK:   []string{"id"},
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "amount", Type: "money"},
+					{Name: "status", Type: "short_text"},
+				},
+				Dependencies: []parse.RawDependency{
+					{Determinant: []string{"id"}, Dependent: []string{"amount"}},
+				},
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	for _, d := range diags {
+		if d.Code == "E221" {
+			t.Errorf("unexpected E221 diagnostic: table=%s column=%s message=%s", d.Table, d.Column, d.Message)
+		}
+	}
+}
