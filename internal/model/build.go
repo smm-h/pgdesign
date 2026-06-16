@@ -306,7 +306,7 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 	if err != nil {
 		diags = append(diags, diagnostic.Diagnostic{
 			Severity: diagnostic.Error,
-			Code:     "E101",
+			Code:     "E121",
 			Table:    tableName,
 			Column:   rc.Name,
 			Message:  fmt.Sprintf("cannot resolve type %q: %s", rc.Type, err.Error()),
@@ -375,7 +375,7 @@ func resolvePK(rt parse.RawTable, columns []Column, diags *diagnostic.Diagnostic
 	// Rule 3: no PK found.
 	*diags = append(*diags, diagnostic.Diagnostic{
 		Severity: diagnostic.Error,
-		Code:     "E100",
+		Code:     "E120",
 		Table:    rt.Name,
 		Message:  "table missing primary key",
 	})
@@ -468,14 +468,14 @@ func resolvePolicy(name string, rawPol parse.RawPolicy, tableName string) (Polic
 	if pol.Operation == "" {
 		diags = append(diags, diagnostic.Diagnostic{
 			Severity: diagnostic.Error,
-			Code:     "E102",
+			Code:     "E122",
 			Table:    tableName,
 			Message:  fmt.Sprintf("policy %q missing required field \"for\"", name),
 		})
 	} else if !validOps[pol.Operation] {
 		diags = append(diags, diagnostic.Diagnostic{
 			Severity: diagnostic.Error,
-			Code:     "E102",
+			Code:     "E122",
 			Table:    tableName,
 			Message:  fmt.Sprintf("policy %q has invalid operation %q; must be SELECT, INSERT, UPDATE, DELETE, or ALL", name, pol.Operation),
 		})
@@ -485,7 +485,7 @@ func resolvePolicy(name string, rawPol parse.RawPolicy, tableName string) (Polic
 	if pol.Using == "" && pol.WithCheck == "" {
 		diags = append(diags, diagnostic.Diagnostic{
 			Severity: diagnostic.Error,
-			Code:     "E103",
+			Code:     "E123",
 			Table:    tableName,
 			Message:  fmt.Sprintf("policy %q must have at least one of \"using\" or \"with_check\"", name),
 		})

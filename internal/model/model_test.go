@@ -145,13 +145,13 @@ func TestPK_MissingPKError(t *testing.T) {
 	}
 	found := false
 	for _, d := range diags {
-		if d.Code == "E100" && d.Table == "nokey" {
+		if d.Code == "E120" && d.Table == "nokey" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected E100 diagnostic for table 'nokey'")
+		t.Error("expected E120 diagnostic for table 'nokey'")
 	}
 }
 
@@ -712,13 +712,13 @@ func TestBuild_PolicyInvalidOperation(t *testing.T) {
 	}
 	found := false
 	for _, d := range diags {
-		if d.Code == "E102" {
+		if d.Code == "E122" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected E102 diagnostic for invalid policy operation")
+		t.Error("expected E122 diagnostic for invalid policy operation")
 	}
 }
 
@@ -747,13 +747,13 @@ func TestBuild_PolicyMissingExpr(t *testing.T) {
 	}
 	found := false
 	for _, d := range diags {
-		if d.Code == "E103" {
+		if d.Code == "E123" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected E103 diagnostic for policy missing expressions")
+		t.Error("expected E123 diagnostic for policy missing expressions")
 	}
 }
 
