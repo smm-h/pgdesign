@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
 // Rollback rolls back the most recently applied migration.
@@ -70,7 +71,11 @@ func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTim
 		}
 		for _, downOp := range op.Down.Ops {
 			stmt := OpToSQL(downOp)
-			for _, s := range splitStatements(stmt) {
+			stmts, err := sqlparse.SplitStatements(stmt)
+			if err != nil {
+				return "", fmt.Errorf("parse DML rollback op %d: %w", i, err)
+			}
+			for _, s := range stmts {
 				if _, err := tx.Exec(ctx, s); err != nil {
 					return "", fmt.Errorf("DML rollback op %d: %w\n  SQL: %s", i, err, s)
 				}
@@ -94,7 +99,11 @@ func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTim
 				if err := tx.Commit(ctx); err != nil {
 					return "", fmt.Errorf("commit before non-transactional rollback op %d: %w", i, err)
 				}
-				for _, s := range splitStatements(stmt) {
+				stmts, err := sqlparse.SplitStatements(stmt)
+				if err != nil {
+					return "", fmt.Errorf("parse non-transactional rollback op %d (%s): %w", i, downOp.Op, err)
+				}
+				for _, s := range stmts {
 					if _, err := conn.Exec(ctx, s); err != nil {
 						return "", fmt.Errorf("non-transactional rollback op %d (%s): %w", i, downOp.Op, err)
 					}
@@ -107,7 +116,11 @@ func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTim
 				continue
 			}
 
-			for _, s := range splitStatements(stmt) {
+			stmts, err := sqlparse.SplitStatements(stmt)
+			if err != nil {
+				return "", fmt.Errorf("parse DDL rollback op %d (%s): %w", i, downOp.Op, err)
+			}
+			for _, s := range stmts {
 				if _, err := tx.Exec(ctx, s); err != nil {
 					return "", fmt.Errorf("DDL rollback op %d (%s): %w\n  SQL: %s", i, downOp.Op, err, s)
 				}

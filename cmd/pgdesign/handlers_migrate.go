@@ -6,11 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/introspect"
 	"github.com/smm-h/pgdesign/internal/migrate"
@@ -679,7 +679,13 @@ func handleMigrateTest(kwargs map[string]interface{}) int {
 				continue
 			}
 
-			for _, stmt := range splitStmts(sqlStmt) {
+			stmts, err := sqlparse.SplitStatements(sqlStmt)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "  [fail] %s: parse error: %v\n", pm.version, err)
+				migFailed = true
+				break
+			}
+			for _, stmt := range stmts {
 				if _, err := tx.Exec(ctx, stmt); err != nil {
 					fmt.Fprintf(os.Stderr, "  [fail] %s: %v\n    SQL: %s\n", pm.version, err, stmt)
 					migFailed = true
@@ -739,24 +745,4 @@ func handleMigrateTest(kwargs map[string]interface{}) int {
 		return 1
 	}
 	return 0
-}
-
-// splitStmts splits a multi-statement SQL string (separated by ";\n") into
-// individual statements. Mirrors the logic in migrate.splitStatements.
-func splitStmts(sql string) []string {
-	var stmts []string
-	for _, s := range strings.Split(sql, ";\n") {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		if !strings.HasSuffix(s, ";") {
-			s += ";"
-		}
-		stmts = append(stmts, s)
-	}
-	if len(stmts) == 0 && strings.TrimSpace(sql) != "" {
-		return []string{strings.TrimSpace(sql)}
-	}
-	return stmts
 }

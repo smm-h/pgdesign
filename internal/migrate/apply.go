@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
 // Apply discovers pending migrations in migrationsDir, applies them in semver
@@ -149,7 +150,11 @@ func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout
 			}
 
 			// Execute each statement in the multi-statement string separately.
-			for _, stmt := range splitStatements(sqlStmt) {
+			stmts, err := sqlparse.SplitStatements(sqlStmt)
+			if err != nil {
+				return fmt.Errorf("parse non-transactional op %d (%s): %w", i, op.Op, err)
+			}
+			for _, stmt := range stmts {
 				if _, err := conn.Exec(ctx, stmt); err != nil {
 					return fmt.Errorf("non-transactional op %d (%s): %w", i, op.Op, err)
 				}
@@ -164,7 +169,11 @@ func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout
 		}
 
 		// Execute each statement separately within the transaction.
-		for _, stmt := range splitStatements(sqlStmt) {
+		stmts, err := sqlparse.SplitStatements(sqlStmt)
+		if err != nil {
+			return fmt.Errorf("parse DDL op %d (%s): %w", i, op.Op, err)
+		}
+		for _, stmt := range stmts {
 			if _, err := tx.Exec(ctx, stmt); err != nil {
 				return fmt.Errorf("DDL op %d (%s): %w\n  SQL: %s", i, op.Op, err, stmt)
 			}
@@ -193,27 +202,4 @@ func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout
 	}
 
 	return nil
-}
-
-// splitStatements splits a multi-statement SQL string (separated by ";\n")
-// into individual statements.
-func splitStatements(sql string) []string {
-	// Split by semicolons but keep each as a complete statement.
-	var stmts []string
-	for _, s := range strings.Split(sql, ";\n") {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		// Ensure statement ends with semicolon.
-		if !strings.HasSuffix(s, ";") {
-			s += ";"
-		}
-		stmts = append(stmts, s)
-	}
-	// If no split happened, return the whole thing.
-	if len(stmts) == 0 && strings.TrimSpace(sql) != "" {
-		return []string{strings.TrimSpace(sql)}
-	}
-	return stmts
 }
