@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,9 +16,12 @@ import (
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
+//go:embed .strictcli/checks.toml
+var checksToml []byte
+
 func main() {
 	app := strictcli.NewApp("pgdesign", Version, "PostgreSQL schema compiler",
-		strictcli.WithChecks(".strictcli/checks.toml"),
+		strictcli.WithChecksEmbed(checksToml),
 	)
 
 	app.SetCheckContext(func() strictcli.CheckContext {
@@ -58,7 +62,7 @@ func main() {
 	app.Command("introspect", "Introspect a live PostgreSQL database", handleIntrospect,
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.StringFlag("schema", "Schema name to introspect", strictcli.Repeatable()),
+			strictcli.StringFlag("schema", "Schema name to introspect", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
 			strictcli.BoolFlag("extensions", "Discover extension types, functions, and opclasses"),
 		),
@@ -132,7 +136,7 @@ func main() {
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
 			strictcli.BoolFlag("apply", "Insert directly into database"),
 			strictcli.StringFlag("db", "PostgreSQL connection URL (required with --apply)", strictcli.Default(nil)),
-			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable(), strictcli.Default(nil)),
+			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable(), strictcli.Unique(true), strictcli.Default(nil)),
 		),
 	)
 
@@ -140,7 +144,7 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.IntFlag("port", "HTTP port to listen on", strictcli.Default(8080)),
-			strictcli.StringFlag("schema", "Schema name to serve", strictcli.Repeatable()),
+			strictcli.StringFlag("schema", "Schema name to serve", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.IntFlag("timeout", "Request timeout in seconds", strictcli.Default(30)),
 		),
 	)
@@ -166,7 +170,7 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.BoolFlag("json", "Output as JSON"),
-			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable()),
+			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable(), strictcli.Unique(true)),
 		),
 		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) for cross-reference", strictcli.Variadic(), strictcli.ArgRequired(false))),
 	)
