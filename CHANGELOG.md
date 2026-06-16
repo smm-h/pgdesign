@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 0.12.1
+
+New E217 rule for extension-provided index methods, introspection diff fixes, and documentation corrections.
+
+### Features
+
+- **New rule.** E217 validates that extension-provided index methods (hnsw, ivfflat) require the providing extension to be declared.
+
+### Fixes
+
+- **Fix.** `parseSimpleDefault` now handles double casts and COLLATE clauses, reducing false positives when diffing introspected schemas.
+- **Fix.** Global flags documentation corrected (--db and --strict-nf are per-command since v0.9.0).
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.12.0
 
 Codegen types mode for all 6 languages, introspect improvements, and command consolidation
@@ -26,12 +45,6 @@ This release completes the codegen --mode types feature across all supported lan
 ### Fixes
 
 - **Fix.** Index WITH parameter changes on builtin methods (btree, gin, gist) now generate ALTER INDEX SET instead of DROP+CREATE.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.11.0
 
