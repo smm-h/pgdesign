@@ -3,3 +3,4 @@
 {"commits":["58dd75c2a3ea28448c352b7ca3396e69bc7cc5e3"],"user_facing":false}
 {"commits":["723c2b2be71b7058b0d7db1bfe33ca6f2c4b16e4","97ba7bfb545a66d4d59232743fd6395e010b9686"],"user_facing":false}
 {"commits":["515847f965d8686e7bf835bae3b0ce4f6d7899a2","7cdff3641b7842ca779104ac13643787f171560e","02ad6526ec52eefa80f5605ee5f052abdb577443","0dbdbae1bc948a48f7e66ad6148ea959db926578","7d513bd2ca7f0403a3337f0e74821642edc95096"],"user_facing":true,"description":"**New feature.** Extend validation, risk assessment, and migration support to views and materialized views.","type":"feature"}
+{"commits":["76a941046d1e4bddfeaa28b2d88c4e80a69f4f01"],"user_facing":false}
