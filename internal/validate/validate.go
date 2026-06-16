@@ -80,7 +80,8 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"E213", checkGeneratedColRefsGenerated},
 		{"E214", checkOpclassMissingExtension},
 		{"E216", checkIndexWithParams},
-		{"E217", checkIndexMethodMissingExtension},
+		{"E217", checkUnknownIndexMethod},
+		{"E219", checkIndexMethodMissingExtension},
 		{"E218", checkVirtualRequiresPG18},
 		{"E215", checkPolicyExprMismatch},
 		{"W009", checkPolicyErrorCodeSnakeCase},
@@ -630,7 +631,36 @@ var builtinIndexMethods = map[string]bool{
 	"spgist": true,
 }
 
-// checkIndexMethodMissingExtension (E217): index uses an extension-provided
+// checkUnknownIndexMethod (E217): index uses an unknown index method that is
+// not built into PostgreSQL and not provided by any known extension.
+func checkUnknownIndexMethod(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	if config.ExtRegistry == nil {
+		return nil
+	}
+
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		for _, idx := range t.Indexes {
+			method := strings.ToLower(idx.Method)
+			if method == "" || builtinIndexMethods[method] {
+				continue
+			}
+			_, found := config.ExtRegistry.RequiredExtensionForMethod(method)
+			if !found {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E217",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("unknown index method %q on index %s", method, idx.Name),
+					Suggestion: "Use a built-in method (btree, gin, gist, brin, hash, spgist) or declare the providing extension",
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// checkIndexMethodMissingExtension (E219): index uses an extension-provided
 // method (e.g., hnsw, ivfflat) without the providing extension being declared.
 func checkIndexMethodMissingExtension(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
 	if config.ExtRegistry == nil {
@@ -651,19 +681,12 @@ func checkIndexMethodMissingExtension(schema *model.Schema, config *Config) []di
 			}
 			reqExt, found := config.ExtRegistry.RequiredExtensionForMethod(method)
 			if !found {
-				diags = append(diags, diagnostic.Diagnostic{
-					Severity:   diagnostic.Error,
-					Code:       "E217",
-					Table:      t.Name,
-					Message:    fmt.Sprintf("unknown index method %q on index %s", method, idx.Name),
-					Suggestion: "Use a built-in method (btree, gin, gist, brin, hash, spgist) or declare the providing extension",
-				})
 				continue
 			}
 			if !declaredExts[reqExt] {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
-					Code:       "E217",
+					Code:       "E219",
 					Table:      t.Name,
 					Message:    fmt.Sprintf("index method %q requires extension %q which is not declared", method, reqExt),
 					Suggestion: fmt.Sprintf("Add %q to [meta].extensions", reqExt),

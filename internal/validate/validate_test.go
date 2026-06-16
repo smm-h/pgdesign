@@ -1553,7 +1553,7 @@ func TestE217_HnswWithPgvectorDeclared_NoDiag(t *testing.T) {
 	}
 }
 
-func TestE217_HnswWithoutPgvectorDeclared(t *testing.T) {
+func TestE219_HnswWithoutPgvectorDeclared(t *testing.T) {
 	reg := extregistry.NewBuiltinRegistry()
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -1579,9 +1579,9 @@ func TestE217_HnswWithoutPgvectorDeclared(t *testing.T) {
 		Extensions:  nil, // pgvector NOT declared
 		Disabled:    []string{"W002"},
 	})
-	found := findByCode(diags, "E217")
+	found := findByCode(diags, "E219")
 	if len(found) == 0 {
-		t.Fatal("expected E217 when hnsw used without pgvector declared")
+		t.Fatal("expected E219 when hnsw used without pgvector declared")
 	}
 	if found[0].Table != "items" {
 		t.Errorf("expected table 'items', got %q", found[0].Table)

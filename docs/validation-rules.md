@@ -230,17 +230,32 @@ with = { fillfactor = "90" }  # E216: fillfactor is not valid for hnsw
 
 **Fix:** Use only parameters valid for the index method. Consult the PostgreSQL or extension documentation for supported parameters.
 
-### E217: Index method requires undeclared extension
+### E217: Unknown index method
 
-An index uses an extension-provided index method (e.g., `hnsw`, `ivfflat`) without the providing extension being declared in the schema. Built-in methods (`btree`, `hash`, `gin`, `gist`, `brin`, `spgist`) are always allowed. Unknown methods that are not provided by any known extension are also flagged.
+An index uses a method that is not built into PostgreSQL (`btree`, `hash`, `gin`, `gist`, `brin`,
+`spgist`) and is not provided by any known extension.
 
 ```toml
-[tables.items.indexes.idx_items_embedding]
+[tables.items.indexes.items_embedding_idx]
 columns = ["embedding"]
-method = "hnsw"  # E217: index method "hnsw" requires extension "pgvector" which is not declared
+method = "foo"
 ```
 
-**Fix:** Declare the extension that provides the index method:
+Fix: use a built-in method or declare the extension that provides the desired method via
+`[[extensions]]`.
+
+### E219: Index method requires undeclared extension
+
+An index uses an extension-provided index method (e.g., `hnsw`, `ivfflat`) without the providing
+extension being declared in the schema.
+
+```toml
+[tables.items.indexes.items_embedding_idx]
+columns = ["embedding"]
+method = "hnsw"
+```
+
+Fix: declare the extension:
 
 ```toml
 [[extensions]]
