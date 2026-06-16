@@ -226,6 +226,22 @@ func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersi
 // columnDef builds a single column definition line.
 // pgVersion controls version-specific DDL (0 means unspecified, treated as latest).
 // enums is used to schema-qualify enum type names in column definitions.
+//
+// Generated column DDL varies by PostgreSQL version:
+//   - PG 12-17: only STORED generated columns are supported.
+//   - PG 18+: both STORED and VIRTUAL are supported; when stored is omitted
+//     from the TOML definition, the model layer defaults stored to true, so
+//     STORED is emitted unless the user explicitly sets stored = false.
+//   - pgVersion == 0 (unspecified): the user's explicit choice is respected
+//     as-is (VIRTUAL if stored = false, STORED if stored = true).
+//
+// When pgVersion is between 1 and 17 and the column is not stored, this
+// function defensively emits STORED rather than VIRTUAL, since validate
+// should have already flagged this as E218.
+//
+// Note: transitioning a generated column from STORED to VIRTUAL (or vice
+// versa) is destructive -- PostgreSQL does not support ALTER COLUMN to change
+// the storage mode. The column must be DROPped and recreated.
 func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	// Pre-PG10 identity fallback: replace identity column with bigserial.
 	if col.Identity != "" && pgVersion > 0 && pgVersion < 10 {

@@ -665,6 +665,12 @@ func checkPolicyExprMismatch(schema *model.Schema, _ *Config) []diagnostic.Diagn
 
 // checkVirtualRequiresPG18 flags generated columns with stored=false when the
 // target PG version does not support VIRTUAL generated columns (requires PG 18+).
+//
+// E218 is emitted as an error when pgVersion is between 1 and 17, since those
+// versions only support STORED generated columns. E218 is emitted as a warning
+// when pgVersion is 0 (not configured), because support cannot be verified.
+// In both cases the suggestion directs users to either set stored = true or
+// configure pg_version >= 18 in pgdesign.toml.
 func checkVirtualRequiresPG18(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
