@@ -3,6 +3,8 @@ package sqlparse
 import (
 	"strings"
 	"testing"
+
+	pg "github.com/pganalyze/pg_query_go/v6"
 )
 
 func TestSplitStatements(t *testing.T) {
@@ -114,6 +116,63 @@ $$ LANGUAGE plpgsql;`
 		}
 		if stmts[1] != "ALTER TABLE t ADD COLUMN name text;" {
 			t.Errorf("stmt[1]: expected %q, got %q", "ALTER TABLE t ADD COLUMN name text;", stmts[1])
+		}
+	})
+}
+
+func TestDeparseExpr(t *testing.T) {
+	t.Run("simple column reference", func(t *testing.T) {
+		node := &pg.Node{Node: &pg.Node_ColumnRef{ColumnRef: &pg.ColumnRef{
+			Fields: []*pg.Node{{Node: &pg.Node_String_{String_: &pg.String{Sval: "name"}}}},
+		}}}
+		got, err := DeparseExpr(node)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "name" {
+			t.Errorf("expected %q, got %q", "name", got)
+		}
+	})
+
+	t.Run("function call with arguments", func(t *testing.T) {
+		node := &pg.Node{Node: &pg.Node_FuncCall{FuncCall: &pg.FuncCall{
+			Funcname: []*pg.Node{{Node: &pg.Node_String_{String_: &pg.String{Sval: "lower"}}}},
+			Args: []*pg.Node{{Node: &pg.Node_AConst{AConst: &pg.A_Const{Val: &pg.A_Const_Sval{Sval: &pg.String{Sval: "HELLO"}}}}}},
+		}}}
+		got, err := DeparseExpr(node)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "lower('HELLO')" {
+			t.Errorf("expected %q, got %q", "lower('HELLO')", got)
+		}
+	})
+
+	t.Run("binary operation", func(t *testing.T) {
+		node := &pg.Node{Node: &pg.Node_AExpr{AExpr: &pg.A_Expr{
+			Kind: pg.A_Expr_Kind_AEXPR_OP,
+			Name: []*pg.Node{{Node: &pg.Node_String_{String_: &pg.String{Sval: "+"}}}},
+			Lexpr: &pg.Node{Node: &pg.Node_ColumnRef{ColumnRef: &pg.ColumnRef{
+				Fields: []*pg.Node{{Node: &pg.Node_String_{String_: &pg.String{Sval: "a"}}}},
+			}}},
+			Rexpr: &pg.Node{Node: &pg.Node_ColumnRef{ColumnRef: &pg.ColumnRef{
+				Fields: []*pg.Node{{Node: &pg.Node_String_{String_: &pg.String{Sval: "b"}}}},
+			}}},
+		}}}
+		got, err := DeparseExpr(node)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// pg_query may wrap binary expressions in parentheses
+		if got != "a + b" && got != "(a + b)" {
+			t.Errorf("expected %q or %q, got %q", "a + b", "(a + b)", got)
+		}
+	})
+
+	t.Run("nil node", func(t *testing.T) {
+		_, err := DeparseExpr(nil)
+		if err == nil {
+			t.Fatal("expected error for nil node, got nil")
 		}
 	})
 }
