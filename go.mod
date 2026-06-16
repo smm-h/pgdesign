@@ -4,8 +4,10 @@ go 1.26.3
 
 require (
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/pganalyze/pg_query_go/v6 v6.2.2
 	github.com/smm-h/go-toml-edit v0.1.2
 	github.com/smm-h/strictcli/go v0.9.0
+	github.com/wasilibs/go-pgquery v0.0.0-20260616022436-0b34969e40e5
 	golang.org/x/sync v0.17.0
 	oss.terrastruct.com/d2 v0.7.1
 )
@@ -25,10 +27,8 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mazznoer/csscolorparser v0.1.5 // indirect
-	github.com/pganalyze/pg_query_go/v6 v6.2.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
-	github.com/wasilibs/go-pgquery v0.0.0-20260616022436-0b34969e40e5 // indirect
 	github.com/wasilibs/wazero-helpers v0.0.0-20250123031827-cd30c44769bb // indirect
 	github.com/yuin/goldmark v1.7.4 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
