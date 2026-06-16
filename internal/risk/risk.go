@@ -77,6 +77,7 @@ const (
 	OpDropUnique              OpType = "drop_unique"
 	OpAddCheck                OpType = "add_check"
 	OpDropCheck               OpType = "drop_check"
+	OpAlterIndexSet           OpType = "alter_index_set"
 )
 
 // OpContext provides context about the operation environment for risk assessment.
@@ -264,6 +265,13 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			RiskLevel:  Safe,
 			LockType:   LockAccessExclusive,
 			Reversible: false,
+		}
+
+	case OpAlterIndexSet:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockShareUpdateExclusive,
+			Reversible: true,
 		}
 
 	default:
