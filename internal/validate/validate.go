@@ -658,6 +658,39 @@ func checkOpclassMissingExtension(schema *model.Schema, config *Config) []diagno
 			}
 		}
 	}
+	for _, mv := range schema.MaterializedViews {
+		for _, idx := range mv.Indexes {
+			if len(idx.Opclasses) == 0 {
+				continue
+			}
+			checked := make(map[string]bool)
+			for col, oc := range idx.Opclasses {
+				if checked[oc] {
+					continue
+				}
+				checked[oc] = true
+				reqExt, found := config.ExtRegistry.RequiredExtension(oc)
+				if !found {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity: diagnostic.Hint,
+						Code:     "E214",
+						Table:    mv.Name,
+						Message:  fmt.Sprintf("index %s: unrecognized opclass %q (on column %s); not validated", idx.Name, oc, col),
+					})
+					continue
+				}
+				if !declaredExts[reqExt] {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Error,
+						Code:       "E214",
+						Table:      mv.Name,
+						Message:    "index " + idx.Name + " uses opclass " + oc + " (on column " + col + ") which requires extension " + reqExt,
+						Suggestion: "Add \"" + reqExt + "\" to [meta].extensions",
+					})
+				}
+			}
+		}
+	}
 	return diags
 }
 
@@ -704,6 +737,45 @@ func checkIndexWithParams(schema *model.Schema, config *Config) []diagnostic.Dia
 						Severity:   diagnostic.Error,
 						Code:       "E216",
 						Table:      t.Name,
+						Message:    fmt.Sprintf("index %s has invalid WITH parameter %q for method %s", idx.Name, key, method),
+						Suggestion: fmt.Sprintf("Valid parameters for %s: %s", method, strings.Join(validParams, ", ")),
+					})
+				}
+			}
+		}
+	}
+	for _, mv := range schema.MaterializedViews {
+		for _, idx := range mv.Indexes {
+			if len(idx.With) == 0 {
+				continue
+			}
+			method := idx.Method
+			if method == "" {
+				method = "btree"
+			}
+			validParams, ok := config.ExtRegistry.ValidIndexParams(method)
+			if !ok {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Hint,
+					Code:     "E216",
+					Table:    mv.Name,
+					Message:  fmt.Sprintf("index %s: unrecognized method %q; WITH parameters not validated", idx.Name, method),
+				})
+				continue
+			}
+			for key := range idx.With {
+				valid := false
+				for _, vp := range validParams {
+					if key == vp {
+						valid = true
+						break
+					}
+				}
+				if !valid {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Error,
+						Code:       "E216",
+						Table:      mv.Name,
 						Message:    fmt.Sprintf("index %s has invalid WITH parameter %q for method %s", idx.Name, key, method),
 						Suggestion: fmt.Sprintf("Valid parameters for %s: %s", method, strings.Join(validParams, ", ")),
 					})
@@ -1066,6 +1138,28 @@ func checkRedundantIndex(schema *model.Schema, _ *Config) []diagnostic.Diagnosti
 						Severity:   diagnostic.Warning,
 						Code:       "W007",
 						Table:      t.Name,
+						Message:    "redundant index: " + idx.Name + " is a prefix of " + other.Name + " (same method)",
+						Suggestion: "Drop " + idx.Name + "; " + other.Name + " already covers its queries",
+					})
+					break
+				}
+			}
+		}
+	}
+	for _, mv := range schema.MaterializedViews {
+		for i, idx := range mv.Indexes {
+			for j, other := range mv.Indexes {
+				if i == j {
+					continue
+				}
+				if idx.Method != other.Method {
+					continue
+				}
+				if isPrefix(idx.Columns, other.Columns) && len(idx.Columns) < len(other.Columns) {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Warning,
+						Code:       "W007",
+						Table:      mv.Name,
 						Message:    "redundant index: " + idx.Name + " is a prefix of " + other.Name + " (same method)",
 						Suggestion: "Drop " + idx.Name + "; " + other.Name + " already covers its queries",
 					})
