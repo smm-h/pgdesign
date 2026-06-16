@@ -4,14 +4,18 @@
 
 ## 0.12.3
 
-Fix CWD-dependent panic
+Fix CWD-dependent panic and add view/materialized view support
 
 <details>
 <summary>Context</summary>
 
-pgdesign panicked when run from any directory that did not contain .strictcli/checks.toml. The fix embeds checks.toml at compile time via go:embed, eliminating the filesystem dependency.
+pgdesign panicked when run from any directory that did not contain .strictcli/checks.toml. The fix embeds checks.toml at compile time via go:embed. Additionally, validation, risk assessment, and migration support have been extended to views and materialized views.
 
 </details>
+
+### Features
+
+- **New feature.** Extend validation, risk assessment, and migration support to views and materialized views.
 
 ### Fixes
 
@@ -24,8 +28,6 @@ pgdesign panicked when run from any directory that did not contain .strictcli/ch
 - **Renamed from pgspec to pgdesign.**
 
 ## 0.12.2
-
-Split E217 into E217 (unknown method) and E219 (undeclared extension).
 
 ### Breaking
 
