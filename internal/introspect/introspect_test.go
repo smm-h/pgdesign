@@ -484,7 +484,7 @@ func TestParseIndexDef(t *testing.T) {
 			name:  "partial index",
 			def:   `CREATE INDEX idx_active ON myschema.users USING btree (created_at) WHERE (status = 'active')`,
 			cols:  []string{"created_at"},
-			where: "(status = 'active')",
+			where: "status = 'active'",
 		},
 		{
 			name:    "with include",

@@ -10,8 +10,12 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	pg "github.com/pganalyze/pg_query_go/v6"
+	pg_query "github.com/wasilibs/go-pgquery"
+
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
 // Introspect connects to a PostgreSQL database, extracts schema information
@@ -485,107 +489,95 @@ type parsedIndex struct {
 	opclasses map[string]string
 }
 
-// indexDefPattern matches CREATE [UNIQUE] INDEX name ON [ONLY] schema.table USING method (columns) [INCLUDE (cols)] [WHERE expr]
-var indexDefPattern = regexp.MustCompile(`(?i)CREATE\s+(?:UNIQUE\s+)?INDEX\s+\S+\s+ON\s+(?:ONLY\s+)?\S+\s+USING\s+\S+\s+\((.+?)\)(?:\s+INCLUDE\s+\((.+?)\))?(?:\s+WHERE\s+(.+))?$`)
-
-// parseIndexDef parses a pg_get_indexdef() string into its components.
+// parseIndexDef parses a pg_get_indexdef() string into its components
+// using go-pgquery's AST instead of regex.
 func parseIndexDef(def string) parsedIndex {
 	p := parsedIndex{}
 
-	m := indexDefPattern.FindStringSubmatch(def)
-	if m == nil {
-		// Fallback: cannot parse. Return empty.
+	result, err := pg_query.Parse(def)
+	if err != nil || len(result.Stmts) == 0 {
 		return p
 	}
 
-	// Parse columns and detect per-column opclasses and sort directions.
-	colStr := m[1]
-	p.columns, p.desc, p.opclasses = parseIndexColumns(colStr)
-
-	// INCLUDE columns.
-	if m[2] != "" {
-		p.include = splitAndTrim(m[2])
+	idxStmt := result.Stmts[0].Stmt.GetIndexStmt()
+	if idxStmt == nil {
+		return p
 	}
 
-	// WHERE clause.
-	if m[3] != "" {
-		p.where = strings.TrimSpace(m[3])
-	}
-
-	return p
-}
-
-// parseIndexColumns parses the column list from an index definition,
-// extracting per-column opclasses and sort directions if present.
-func parseIndexColumns(colStr string) ([]string, []bool, map[string]string) {
-	parts := splitAndTrim(colStr)
-	var columns []string
-	var desc []bool
-	var opclasses map[string]string
+	// Parse index columns.
 	anyDesc := false
-
-	for _, part := range parts {
-		// Column may have opclass suffix like "col varchar_pattern_ops"
-		// and/or sort direction suffix like "col DESC" or "col opclass DESC".
-		tokens := strings.Fields(part)
-		isDesc := false
-
-		// Check if the last token is a sort direction.
-		if len(tokens) >= 2 {
-			last := strings.ToUpper(tokens[len(tokens)-1])
-			if last == "DESC" {
-				isDesc = true
-				anyDesc = true
-				tokens = tokens[:len(tokens)-1]
-			} else if last == "ASC" {
-				tokens = tokens[:len(tokens)-1]
-			}
+	for _, paramNode := range idxStmt.IndexParams {
+		elem := paramNode.GetIndexElem()
+		if elem == nil {
+			continue
 		}
 
-		if len(tokens) >= 2 {
-			// Check if the last remaining token looks like an opclass (contains _ops).
-			last := tokens[len(tokens)-1]
-			if strings.Contains(last, "_ops") {
-				colName := strings.Join(tokens[:len(tokens)-1], " ")
-				columns = append(columns, colName)
-				desc = append(desc, isDesc)
-				if opclasses == nil {
-					opclasses = make(map[string]string)
-				}
-				opclasses[colName] = last
-			} else {
-				colName := strings.Join(tokens, " ")
-				columns = append(columns, colName)
-				desc = append(desc, isDesc)
+		// Column name: either a simple name or an expression.
+		var colName string
+		if elem.Name != "" {
+			colName = elem.Name
+		} else if elem.Expr != nil {
+			deparsed, err := sqlparse.DeparseExpr(elem.Expr)
+			if err != nil {
+				continue
 			}
-		} else if len(tokens) == 1 {
-			columns = append(columns, tokens[0])
-			desc = append(desc, isDesc)
-		} else {
-			columns = append(columns, part)
-			desc = append(desc, isDesc)
+			colName = deparsed
+		}
+
+		p.columns = append(p.columns, colName)
+
+		// Sort direction.
+		isDesc := elem.Ordering == pg.SortByDir_SORTBY_DESC
+		if isDesc {
+			anyDesc = true
+		}
+		p.desc = append(p.desc, isDesc)
+
+		// Opclass.
+		if len(elem.Opclass) > 0 {
+			var opclassName string
+			for _, ocNode := range elem.Opclass {
+				if s := ocNode.GetString_(); s != nil {
+					if opclassName != "" {
+						opclassName += "."
+					}
+					opclassName += s.Sval
+				}
+			}
+			if opclassName != "" {
+				if p.opclasses == nil {
+					p.opclasses = make(map[string]string)
+				}
+				p.opclasses[colName] = opclassName
+			}
 		}
 	}
 
 	// Omit desc slice if all columns are ASC.
 	if !anyDesc {
-		desc = nil
+		p.desc = nil
 	}
 
-	return columns, desc, opclasses
-}
-
-// splitAndTrim splits a comma-separated string and trims whitespace.
-func splitAndTrim(s string) []string {
-	parts := strings.Split(s, ",")
-	result := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			result = append(result, p)
+	// INCLUDE columns.
+	for _, inclNode := range idxStmt.IndexIncludingParams {
+		elem := inclNode.GetIndexElem()
+		if elem == nil {
+			continue
+		}
+		if elem.Name != "" {
+			p.include = append(p.include, elem.Name)
 		}
 	}
-	return result
+
+	// WHERE clause.
+	if idxStmt.WhereClause != nil {
+		deparsed, err := sqlparse.DeparseExpr(idxStmt.WhereClause)
+		if err == nil {
+			p.where = deparsed
+		}
+	}
+
+	return p
 }
 
 // queryUniqueConstraints returns unique constraints for a table OID.
