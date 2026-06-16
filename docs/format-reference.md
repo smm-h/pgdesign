@@ -466,7 +466,7 @@ path = "out/schema.json"
 | `format` | string | Output format: `sql`, `d2`, `json`, `svg`, `doc`, or `codegen` |
 | `path` | string | Output file path relative to project root (required) |
 | `lang` | string | Target language for codegen: `go`, `ts`, `java`, `kotlin`, `python`, `zig` (required when format is `codegen`) |
-| `mode` | string | Codegen mode: `validators`, `constants`, or `types` (Go only) (required when format is `codegen`) |
+| `mode` | string | Codegen mode: `validators`, `constants`, or `types` (required when format is `codegen`) |
 | `idempotent` | boolean | For `sql` format: add `IF NOT EXISTS` guards |
 | `comments` | boolean | For `sql` format: include `COMMENT ON` statements (default: true) |
 
