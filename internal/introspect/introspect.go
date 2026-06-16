@@ -335,10 +335,14 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 			c.Stored = false
 		}
 
-		// All defaults are stored in DefaultExpr via pg_get_expr, not in Default.
-		// Default is only set from TOML schema definitions, not introspection.
+		// Classify the default: simple literals go into Default (for TOML
+		// round-trip compatibility), complex expressions stay in DefaultExpr.
 		if defaultExpr != nil {
-			c.DefaultExpr = *defaultExpr
+			if rawVal, ok := parseSimpleDefault(*defaultExpr); ok {
+				c.Default = model.StrPtr(rawVal)
+			} else {
+				c.DefaultExpr = *defaultExpr
+			}
 		}
 		if comment != nil {
 			c.Comment = *comment
@@ -351,6 +355,85 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		cols = append(cols, c)
 	}
 	return cols, rows.Err()
+}
+
+// parseSimpleDefault detects simple literal defaults from pg_get_expr output
+// and returns the raw value suitable for Column.Default. Complex defaults
+// (function calls, expressions) return isSimple=false and should remain in
+// Column.DefaultExpr.
+func parseSimpleDefault(pgExpr string) (rawValue string, isSimple bool) {
+	// Function calls or expressions with parentheses are complex.
+	if strings.Contains(pgExpr, "(") {
+		return "", false
+	}
+	// NULL is not a default -- nullable columns have no default.
+	if pgExpr == "NULL" {
+		return "", false
+	}
+	// Bare integer: 0, 42, -1
+	if matched, _ := regexp.MatchString(`^-?[0-9]+$`, pgExpr); matched {
+		return pgExpr, true
+	}
+	// Bare boolean.
+	if pgExpr == "true" || pgExpr == "false" {
+		return pgExpr, true
+	}
+	// Single-quoted string, optionally with a ::type cast.
+	if len(pgExpr) > 0 && pgExpr[0] == '\'' {
+		return parseQuotedDefault(pgExpr)
+	}
+	return "", false
+}
+
+// parseQuotedDefault extracts the value from a single-quoted PG literal,
+// handling escaped quotes ('') and optional ::type cast suffixes.
+// Returns the unquoted value and true if the expression is a simple quoted
+// literal (with optional cast), or ("", false) if there's trailing content
+// that makes it complex (operators, etc).
+func parseQuotedDefault(pgExpr string) (string, bool) {
+	// Walk past the opening quote to find the matching close quote.
+	// PostgreSQL escapes single quotes as ''.
+	var val strings.Builder
+	i := 1 // skip opening '
+	for i < len(pgExpr) {
+		if pgExpr[i] == '\'' {
+			if i+1 < len(pgExpr) && pgExpr[i+1] == '\'' {
+				// Escaped quote: '' -> '
+				val.WriteByte('\'')
+				i += 2
+				continue
+			}
+			// Closing quote found.
+			i++ // skip the closing '
+			break
+		}
+		val.WriteByte(pgExpr[i])
+		i++
+	}
+	// After the closing quote, allow an optional ::type cast and nothing else.
+	rest := pgExpr[i:]
+	if rest == "" {
+		return val.String(), true
+	}
+	if strings.HasPrefix(rest, "::") {
+		// Strip the ::type cast. If there's anything after the type name
+		// (e.g., operators), it's not simple.
+		castType := rest[2:]
+		// A cast type name can contain alphanumerics, underscores, dots (schema.type),
+		// spaces (e.g., "character varying"), and brackets (e.g., "text[]").
+		// If there's anything beyond a valid type name, it's complex.
+		for j := 0; j < len(castType); j++ {
+			c := castType[j]
+			if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '.' || c == '[' || c == ']' || c == ' ' {
+				continue
+			}
+			// Non-type character found -- expression has trailing content.
+			return "", false
+		}
+		return val.String(), true
+	}
+	// Something other than :: after the closing quote -- complex.
+	return "", false
 }
 
 // queryPrimaryKey returns the primary key column names for a table OID.

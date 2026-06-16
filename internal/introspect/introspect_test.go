@@ -734,3 +734,48 @@ func TestParseReloptions(t *testing.T) {
 		}
 	}
 }
+
+func TestParseSimpleDefault(t *testing.T) {
+	tests := []struct {
+		input    string
+		wantVal  string
+		wantSimp bool
+	}{
+		// Bare integers.
+		{"0", "0", true},
+		{"42", "42", true},
+		{"-1", "-1", true},
+		// Bare booleans.
+		{"true", "true", true},
+		{"false", "false", true},
+		// Single-quoted strings.
+		{"'hello'", "hello", true},
+		// Quoted with type cast.
+		{"'created'::status_enum", "created", true},
+		{"'{}'::jsonb", "{}", true},
+		// Schema-qualified cast.
+		{"'active'::pgdesign_test.status", "active", true},
+		// Escaped quotes inside string.
+		{"'it''s'", "it's", true},
+		// Function calls are complex.
+		{"now()", "", false},
+		{"gen_random_uuid()", "", false},
+		// Expression with operator is complex.
+		{"'hello'::text || ' world'", "", false},
+		// NULL is not a default.
+		{"NULL", "", false},
+		// Nextval (sequence default) is complex.
+		{"nextval('users_id_seq'::regclass)", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			val, ok := parseSimpleDefault(tt.input)
+			if ok != tt.wantSimp {
+				t.Errorf("parseSimpleDefault(%q) simple = %v, want %v", tt.input, ok, tt.wantSimp)
+			}
+			if val != tt.wantVal {
+				t.Errorf("parseSimpleDefault(%q) value = %q, want %q", tt.input, val, tt.wantVal)
+			}
+		})
+	}
+}
