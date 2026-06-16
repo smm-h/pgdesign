@@ -17,7 +17,7 @@ import (
 // and safety diagnostics. The desired schema is used to look up full table
 // definitions for create_table ops. tableStats provides estimated row counts
 // from pg_stat_user_tables (nil when --db is not available or stats are
-// unavailable). largeFKThreshold is the row count above which E215 is emitted
+// unavailable). largeFKThreshold is the row count above which E300 is emitted
 // for ADD CONSTRAINT without NOT VALID; pass 0 to use the default of 10000.
 // expandContractThreshold is the row count above which set_not_null ops are
 // decomposed into a DML backfill step followed by set_not_null; pass 0 to use
@@ -104,7 +104,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				fkOp := makeFKOp(tableName, fk)
 				m.DDLOps = append(m.DDLOps, fkOp)
 				diags = append(diags, classifyOp(fkOp, risk.OpAddFK, ctx)...)
-				diags = append(diags, checkE215(fkOp, ctx, largeFKThreshold)...)
+				diags = append(diags, checkE300(fkOp, ctx, largeFKThreshold)...)
 			}
 			for _, idx := range table.Indexes {
 				idxOp := makeIndexOp(tableName, idx)
@@ -331,7 +331,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			fkOp := makeFKOp(td.Name, fk)
 			m.DDLOps = append(m.DDLOps, fkOp)
 			diags = append(diags, classifyOp(fkOp, risk.OpAddFK, ctx)...)
-			diags = append(diags, checkE215(fkOp, ctx, largeFKThreshold)...)
+			diags = append(diags, checkE300(fkOp, ctx, largeFKThreshold)...)
 		}
 
 		// Removed FKs.
@@ -840,16 +840,16 @@ func makeCheckOp(tableName string, ck model.CheckConstraint) DDLOp {
 	}
 }
 
-// checkE215 emits an E215 diagnostic when an add_fk op targets a table with
+// checkE300 emits an E300 diagnostic when an add_fk op targets a table with
 // more rows than the threshold. The diagnostic warns that ADD CONSTRAINT
 // without NOT VALID will lock the table during validation.
-func checkE215(op DDLOp, ctx risk.OpContext, threshold int64) []diagnostic.Diagnostic {
+func checkE300(op DDLOp, ctx risk.OpContext, threshold int64) []diagnostic.Diagnostic {
 	if op.Op != "add_fk" || ctx.EstimatedRows <= threshold {
 		return nil
 	}
 	return []diagnostic.Diagnostic{{
 		Severity:   diagnostic.Warning,
-		Code:       "E215",
+		Code:       "E300",
 		Table:      opTarget(op),
 		Message:    fmt.Sprintf("ADD CONSTRAINT without NOT VALID on table with %d rows will lock the table; consider NOT VALID + VALIDATE CONSTRAINT", ctx.EstimatedRows),
 		Suggestion: "Add with NOT VALID, then VALIDATE CONSTRAINT in a separate step",

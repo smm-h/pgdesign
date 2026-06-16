@@ -1326,7 +1326,7 @@ func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
 	}
 }
 
-func TestGenerateMigration_E215_AddFKLargeTable(t *testing.T) {
+func TestGenerateMigration_E300_AddFKLargeTable(t *testing.T) {
 	desired := &model.Schema{
 		Name:      "game",
 		PGVersion: 17,
@@ -1361,25 +1361,25 @@ func TestGenerateMigration_E215_AddFKLargeTable(t *testing.T) {
 	stats := TableStats{"scores": 50_000}
 	_, diags := GenerateMigration(d, desired, "0.8.0", stats, 10_000, 0, extregistry.NewBuiltinRegistry())
 
-	hasE215 := false
+	hasE300 := false
 	for _, diag := range diags {
-		if diag.Code == "E215" {
-			hasE215 = true
+		if diag.Code == "E300" {
+			hasE300 = true
 			if !strings.Contains(diag.Message, "50000") {
-				t.Errorf("E215 message should mention row count, got: %s", diag.Message)
+				t.Errorf("E300 message should mention row count, got: %s", diag.Message)
 			}
 			if !strings.Contains(diag.Message, "NOT VALID") {
-				t.Errorf("E215 message should mention NOT VALID, got: %s", diag.Message)
+				t.Errorf("E300 message should mention NOT VALID, got: %s", diag.Message)
 			}
 			break
 		}
 	}
-	if !hasE215 {
-		t.Error("expected E215 diagnostic for add_fk on table with >10000 rows")
+	if !hasE300 {
+		t.Error("expected E300 diagnostic for add_fk on table with >10000 rows")
 	}
 }
 
-func TestGenerateMigration_NoStats_NoE215_NoEscalation(t *testing.T) {
+func TestGenerateMigration_NoStats_NoE300_NoEscalation(t *testing.T) {
 	desired := &model.Schema{
 		Name:      "game",
 		PGVersion: 17,
@@ -1414,12 +1414,12 @@ func TestGenerateMigration_NoStats_NoE215_NoEscalation(t *testing.T) {
 		},
 	}
 
-	// nil stats: no E215, no escalation.
+	// nil stats: no E300, no escalation.
 	_, diags := GenerateMigration(d, desired, "0.9.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 
 	for _, diag := range diags {
-		if diag.Code == "E215" {
-			t.Error("unexpected E215 when stats are nil")
+		if diag.Code == "E300" {
+			t.Error("unexpected E300 when stats are nil")
 		}
 		// set_not_null is Caution but should NOT escalate without EstimatedRows.
 		if diag.Code == "MIGRATE_RISK" && diag.Severity == diagnostic.Error &&
