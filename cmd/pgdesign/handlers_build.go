@@ -238,8 +238,10 @@ func selectCodegenGenerator(outputName, lang, mode string) (codegen.Generator, b
 		switch lang {
 		case "go":
 			return &codegen.GoTypesGenerator{}, true
+		case "ts":
+			return &codegen.TSTypesGenerator{}, true
 		default:
-			fmt.Fprintf(os.Stderr, "build: output %q: types mode only supports lang \"go\", got %q\n", outputName, lang)
+			fmt.Fprintf(os.Stderr, "build: output %q: types mode only supports lang \"go\" or \"ts\", got %q\n", outputName, lang)
 			return nil, false
 		}
 	default:
