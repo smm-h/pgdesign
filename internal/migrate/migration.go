@@ -13,6 +13,20 @@ type Migration struct {
 	DMLOps      []DMLOp
 }
 
+// Design decision: DDLOp is intentionally a flat struct.
+//
+// Each operation type uses a subset of fields; unused fields stay at zero values.
+// This was considered against a tagged-union approach (interface + type-specific
+// sub-structs) and kept flat because:
+//
+//  1. parse_migration.go uses matching flat TOML structs — both layers would
+//     need to change in lockstep.
+//  2. Go lacks sum types; the alternatives (interface + type switch, embedded
+//     sub-structs) add indirection without compile-time safety.
+//  3. DDLOp is internal-only — it never crosses an API boundary.
+//  4. Pointer fields (*model.Table, etc.) already handle complex payloads;
+//     nil means "not applicable to this op."
+
 // DDLOp represents a single DDL operation in a migration.
 type DDLOp struct {
 	Op       string      // "create_table", "add_column", "drop_table", etc.
