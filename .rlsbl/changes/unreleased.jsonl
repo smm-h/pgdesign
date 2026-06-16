@@ -1,0 +1,1 @@
+{"commits":["5423652ef7a1c62ce7e132f0f8a2042524136692"],"user_facing":true,"description":"**Breaking.** Removed `validate` and `audit` commands. Use `pgdesign check --tag validation` and `pgdesign check --tag nf` instead.","type":"breaking"}
