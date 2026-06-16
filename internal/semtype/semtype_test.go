@@ -601,3 +601,34 @@ func TestExtensionType_UnknownStillRejected(t *testing.T) {
 		t.Error("expected diagnostic code E106 for truly unknown base type")
 	}
 }
+
+func TestLoadUserScalarType_RangeTypes(t *testing.T) {
+	rangeTypes := []string{
+		"int4range", "int8range", "numrange", "tsrange", "tstzrange", "daterange",
+		"int4multirange", "int8multirange", "nummultirange", "tsmultirange", "tstzmultirange", "datemultirange",
+	}
+
+	for _, rt := range rangeTypes {
+		t.Run(rt, func(t *testing.T) {
+			r := NewBuiltinRegistry()
+			userTypes := []UserTypeDef{
+				{
+					Name: "my_" + rt,
+					Kind: "scalar",
+					Base: rt,
+				},
+			}
+			diags := r.LoadUserTypes(userTypes)
+			if diags.HasErrors() {
+				t.Fatalf("expected no errors for range type %q, got: %v", rt, diags)
+			}
+			td, err := r.Resolve("my_" + rt)
+			if err != nil {
+				t.Fatalf("Resolve(my_%s) error: %v", rt, err)
+			}
+			if td.BaseType != rt {
+				t.Errorf("BaseType = %q, want %q", td.BaseType, rt)
+			}
+		})
+	}
+}
