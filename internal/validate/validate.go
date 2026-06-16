@@ -65,7 +65,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 
 	rules := []rule{
 		{"E200", checkMissingColumnType},
-		{"E110", checkColumnDefaultQuotes},
+		{"E205", checkColumnDefaultQuotes},
 		{"E201", checkFKMissingOnDelete},
 		{"E202", checkTableMissingComment},
 		{"E203", checkTableMissingPK},
@@ -167,7 +167,7 @@ func checkMissingColumnType(schema *model.Schema, _ *Config) []diagnostic.Diagno
 	return diags
 }
 
-// checkColumnDefaultQuotes (E110): default value contains embedded SQL quotes.
+// checkColumnDefaultQuotes (E205): default value contains embedded SQL quotes.
 func checkColumnDefaultQuotes(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
@@ -175,7 +175,7 @@ func checkColumnDefaultQuotes(schema *model.Schema, _ *Config) []diagnostic.Diag
 			if col.Default != nil && len(*col.Default) >= 2 && strings.HasPrefix(*col.Default, "'") && strings.HasSuffix(*col.Default, "'") {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
-					Code:       "E110",
+					Code:       "E205",
 					Table:      t.Name,
 					Column:     col.Name,
 					Message:    fmt.Sprintf("default %q appears to contain SQL quotes; use raw values (e.g., \"created\" not \"'created'\")", *col.Default),

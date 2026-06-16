@@ -1244,7 +1244,7 @@ func TestAppendOnlyUpdatedAtWarning(t *testing.T) {
 	}
 }
 
-func TestE110_ColumnDefaultEmbeddedQuotes(t *testing.T) {
+func TestE205_ColumnDefaultEmbeddedQuotes(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -1263,23 +1263,23 @@ func TestE110_ColumnDefaultEmbeddedQuotes(t *testing.T) {
 		},
 	}
 	active, _ := Validate(schema, nil)
-	e110s := findByCode(active, "E110")
-	if len(e110s) != 2 {
-		t.Errorf("expected 2 E110 diagnostics, got %d", len(e110s))
-		for _, d := range e110s {
-			t.Logf("  E110: %s", d.Message)
+	e205s := findByCode(active, "E205")
+	if len(e205s) != 2 {
+		t.Errorf("expected 2 E205 diagnostics, got %d", len(e205s))
+		for _, d := range e205s {
+			t.Logf("  E205: %s", d.Message)
 		}
 	}
 	// Check that the two are for "status" and "data" columns
 	cols := make(map[string]bool)
-	for _, d := range e110s {
+	for _, d := range e205s {
 		cols[d.Column] = true
 	}
 	if !cols["status"] {
-		t.Error("expected E110 for column 'status'")
+		t.Error("expected E205 for column 'status'")
 	}
 	if !cols["data"] {
-		t.Error("expected E110 for column 'data'")
+		t.Error("expected E205 for column 'data'")
 	}
 }
 
