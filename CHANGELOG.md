@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.12.2
+
+Split E217 into E217 (unknown method) and E219 (undeclared extension).
+
+### Breaking
+
+- **Breaking.** Split E217 into two codes: E217 for unknown index methods (typo/nonexistent) and E219 for known extension methods with undeclared extensions. Existing E217 diagnostics for undeclared extensions are now E219.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.12.1
 
 New E217 rule for extension-provided index methods, introspection diff fixes, and documentation corrections.
@@ -14,12 +28,6 @@ New E217 rule for extension-provided index methods, introspection diff fixes, an
 
 - **Fix.** `parseSimpleDefault` now handles double casts and COLLATE clauses, reducing false positives when diffing introspected schemas.
 - **Fix.** Global flags documentation corrected (--db and --strict-nf are per-command since v0.9.0).
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.12.0
 

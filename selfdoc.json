@@ -1,5 +1,5 @@
 {
-  "version": "0.12.1",
+  "version": "0.12.2",
   "base_url": "https://pgdesign.smmh.dev",
   "root_files": [
     "docs/_CLAUDE.md",
@@ -87,7 +87,7 @@
   "output": "docs/_build/",
   "versions": [
     {
-      "version": "0.12.1",
+      "version": "0.12.2",
       "indexed": true
     }
   ],
