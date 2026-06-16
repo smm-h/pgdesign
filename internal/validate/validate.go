@@ -412,8 +412,11 @@ func checkNamingConvention(schema *model.Schema, config *Config) []diagnostic.Di
 
 	pattern := snakeCasePattern
 	if config.NamingPattern != "" && config.NamingPattern != "snake_case" {
-		// Only snake_case is supported for now; other patterns could be added.
-		return nil
+		return []diagnostic.Diagnostic{{
+			Severity: diagnostic.Error,
+			Code:     "E211",
+			Message:  fmt.Sprintf("unsupported naming pattern: %q", config.NamingPattern),
+		}}
 	}
 
 	for _, t := range schema.Tables {
@@ -536,7 +539,11 @@ func checkGeneratedColRefsGenerated(schema *model.Schema, _ *Config) []diagnosti
 // checkOpclassMissingExtension (E214): index opclass requires an extension not declared.
 func checkOpclassMissingExtension(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
 	if config.ExtRegistry == nil {
-		return nil
+		return []diagnostic.Diagnostic{{
+			Severity: diagnostic.Hint,
+			Code:     "E214",
+			Message:  "E214 skipped: no extension registry configured",
+		}}
 	}
 
 	var diags []diagnostic.Diagnostic
@@ -560,6 +567,12 @@ func checkOpclassMissingExtension(schema *model.Schema, config *Config) []diagno
 				checked[oc] = true
 				reqExt, found := config.ExtRegistry.RequiredExtension(oc)
 				if !found {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity: diagnostic.Hint,
+						Code:     "E214",
+						Table:    t.Name,
+						Message:  fmt.Sprintf("index %s: unrecognized opclass %q (on column %s); not validated", idx.Name, oc, col),
+					})
 					continue
 				}
 				if !declaredExts[reqExt] {
@@ -580,7 +593,11 @@ func checkOpclassMissingExtension(schema *model.Schema, config *Config) []diagno
 // checkIndexWithParams (E216): index WITH parameter is not valid for the index method.
 func checkIndexWithParams(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
 	if config.ExtRegistry == nil {
-		return nil
+		return []diagnostic.Diagnostic{{
+			Severity: diagnostic.Hint,
+			Code:     "E216",
+			Message:  "E216 skipped: no extension registry configured",
+		}}
 	}
 
 	var diags []diagnostic.Diagnostic
@@ -595,6 +612,12 @@ func checkIndexWithParams(schema *model.Schema, config *Config) []diagnostic.Dia
 			}
 			validParams, ok := config.ExtRegistry.ValidIndexParams(method)
 			if !ok {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Hint,
+					Code:     "E216",
+					Table:    t.Name,
+					Message:  fmt.Sprintf("index %s: unrecognized method %q; WITH parameters not validated", idx.Name, method),
+				})
 				continue
 			}
 			for key := range idx.With {
