@@ -225,34 +225,19 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 
 // diffTables matches tables by schema-qualified name and diffs matched pairs.
 func diffTables(d *SchemaDiff, desired, actual *model.Schema) {
-	actualByKey := make(map[string]*model.Table, len(actual.Tables))
-	for i := range actual.Tables {
-		t := &actual.Tables[i]
-		actualByKey[tableKey(t)] = t
+	added, removed, matched := matchObjects(desired.Tables, actual.Tables, func(t model.Table) string {
+		return tableKey(&t)
+	})
+	for _, t := range added {
+		d.TablesAdded = append(d.TablesAdded, tableKey(&t))
 	}
-
-	desiredKeys := make(map[string]bool, len(desired.Tables))
-	for i := range desired.Tables {
-		dt := &desired.Tables[i]
-		key := tableKey(dt)
-		desiredKeys[key] = true
-
-		at, found := actualByKey[key]
-		if !found {
-			d.TablesAdded = append(d.TablesAdded, key)
-			continue
-		}
-
-		td := diffTable(dt, at)
+	for _, t := range removed {
+		d.TablesRemoved = append(d.TablesRemoved, tableKey(&t))
+	}
+	for _, p := range matched {
+		td := diffTable(&p.Desired, &p.Actual)
 		if !isTableDiffEmpty(&td) {
 			d.TablesChanged = append(d.TablesChanged, td)
-		}
-	}
-
-	for _, at := range actual.Tables {
-		key := tableKey(&at)
-		if !desiredKeys[key] {
-			d.TablesRemoved = append(d.TablesRemoved, key)
 		}
 	}
 }
@@ -323,30 +308,19 @@ func isTableDiffEmpty(td *TableDiff) bool {
 
 // diffColumns matches columns by name and classifies changes with risk.
 func diffColumns(td *TableDiff, desired, actual *model.Table) {
-	actualByName := make(map[string]*model.Column, len(actual.Columns))
-	for i := range actual.Columns {
-		actualByName[actual.Columns[i].Name] = &actual.Columns[i]
+	added, removed, matched := matchObjects(desired.Columns, actual.Columns, func(c model.Column) string {
+		return c.Name
+	})
+	for _, c := range added {
+		td.ColumnsAdded = append(td.ColumnsAdded, c)
 	}
-
-	desiredNames := make(map[string]bool, len(desired.Columns))
-	for _, dc := range desired.Columns {
-		desiredNames[dc.Name] = true
-
-		ac, found := actualByName[dc.Name]
-		if !found {
-			td.ColumnsAdded = append(td.ColumnsAdded, dc)
-			continue
-		}
-
-		cc := diffColumn(&dc, ac)
+	for _, c := range removed {
+		td.ColumnsRemoved = append(td.ColumnsRemoved, c.Name)
+	}
+	for _, p := range matched {
+		cc := diffColumn(&p.Desired, &p.Actual)
 		if cc != nil {
 			td.ColumnsChanged = append(td.ColumnsChanged, *cc)
-		}
-	}
-
-	for _, ac := range actual.Columns {
-		if !desiredNames[ac.Name] {
-			td.ColumnsRemoved = append(td.ColumnsRemoved, ac.Name)
 		}
 	}
 }
@@ -554,33 +528,22 @@ func normalizeDefault(literal *string, expr string) string {
 
 // diffFKs matches foreign keys by name.
 func diffFKs(td *TableDiff, desired, actual *model.Table) {
-	actualByName := make(map[string]*model.FK, len(actual.FKs))
-	for i := range actual.FKs {
-		actualByName[actual.FKs[i].Name] = &actual.FKs[i]
+	added, removed, matched := matchObjects(desired.FKs, actual.FKs, func(fk model.FK) string {
+		return fk.Name
+	})
+	for _, fk := range added {
+		td.FKsAdded = append(td.FKsAdded, fk)
 	}
-
-	desiredNames := make(map[string]bool, len(desired.FKs))
-	for _, dfk := range desired.FKs {
-		desiredNames[dfk.Name] = true
-
-		afk, found := actualByName[dfk.Name]
-		if !found {
-			td.FKsAdded = append(td.FKsAdded, dfk)
-			continue
-		}
-
-		if !fkEqual(&dfk, afk) {
+	for _, fk := range removed {
+		td.FKsRemoved = append(td.FKsRemoved, fk.Name)
+	}
+	for _, p := range matched {
+		if !fkEqual(&p.Desired, &p.Actual) {
 			td.FKsChanged = append(td.FKsChanged, FKChange{
-				Name: dfk.Name,
-				Old:  *afk,
-				New:  dfk,
+				Name: p.Desired.Name,
+				Old:  p.Actual,
+				New:  p.Desired,
 			})
-		}
-	}
-
-	for _, afk := range actual.FKs {
-		if !desiredNames[afk.Name] {
-			td.FKsRemoved = append(td.FKsRemoved, afk.Name)
 		}
 	}
 }
@@ -596,33 +559,22 @@ func fkEqual(a, b *model.FK) bool {
 
 // diffIndexes matches indexes by name.
 func diffIndexes(td *TableDiff, desired, actual *model.Table) {
-	actualByName := make(map[string]*model.Index, len(actual.Indexes))
-	for i := range actual.Indexes {
-		actualByName[actual.Indexes[i].Name] = &actual.Indexes[i]
+	added, removed, matched := matchObjects(desired.Indexes, actual.Indexes, func(idx model.Index) string {
+		return idx.Name
+	})
+	for _, idx := range added {
+		td.IndexesAdded = append(td.IndexesAdded, idx)
 	}
-
-	desiredNames := make(map[string]bool, len(desired.Indexes))
-	for _, didx := range desired.Indexes {
-		desiredNames[didx.Name] = true
-
-		aidx, found := actualByName[didx.Name]
-		if !found {
-			td.IndexesAdded = append(td.IndexesAdded, didx)
-			continue
-		}
-
-		if !indexEqual(&didx, aidx) {
+	for _, idx := range removed {
+		td.IndexesRemoved = append(td.IndexesRemoved, idx.Name)
+	}
+	for _, p := range matched {
+		if !indexEqual(&p.Desired, &p.Actual) {
 			td.IndexesChanged = append(td.IndexesChanged, IndexChange{
-				Name: didx.Name,
-				Old:  *aidx,
-				New:  didx,
+				Name: p.Desired.Name,
+				Old:  p.Actual,
+				New:  p.Desired,
 			})
-		}
-	}
-
-	for _, aidx := range actual.Indexes {
-		if !desiredNames[aidx.Name] {
-			td.IndexesRemoved = append(td.IndexesRemoved, aidx.Name)
 		}
 	}
 }
@@ -672,62 +624,38 @@ func mapEqual(a, b map[string]string) bool {
 
 // diffUniques matches unique constraints by name.
 func diffUniques(td *TableDiff, desired, actual *model.Table) {
-	actualByName := make(map[string]*model.UniqueConstraint, len(actual.Uniques))
-	for i := range actual.Uniques {
-		actualByName[actual.Uniques[i].Name] = &actual.Uniques[i]
+	added, removed, matched := matchObjects(desired.Uniques, actual.Uniques, func(u model.UniqueConstraint) string {
+		return u.Name
+	})
+	for _, u := range added {
+		td.UniquesAdded = append(td.UniquesAdded, u)
 	}
-
-	desiredNames := make(map[string]bool, len(desired.Uniques))
-	for _, du := range desired.Uniques {
-		desiredNames[du.Name] = true
-
-		au, found := actualByName[du.Name]
-		if !found {
-			td.UniquesAdded = append(td.UniquesAdded, du)
-			continue
-		}
-
-		if !sliceEqual(du.Columns, au.Columns) {
-			// Unique constraint columns changed: remove old, add new.
-			td.UniquesRemoved = append(td.UniquesRemoved, au.Name)
-			td.UniquesAdded = append(td.UniquesAdded, du)
-		}
+	for _, u := range removed {
+		td.UniquesRemoved = append(td.UniquesRemoved, u.Name)
 	}
-
-	for _, au := range actual.Uniques {
-		if !desiredNames[au.Name] {
-			td.UniquesRemoved = append(td.UniquesRemoved, au.Name)
+	for _, p := range matched {
+		if !sliceEqual(p.Desired.Columns, p.Actual.Columns) {
+			td.UniquesRemoved = append(td.UniquesRemoved, p.Actual.Name)
+			td.UniquesAdded = append(td.UniquesAdded, p.Desired)
 		}
 	}
 }
 
 // diffChecks matches check constraints by name.
 func diffChecks(td *TableDiff, desired, actual *model.Table) {
-	actualByName := make(map[string]*model.CheckConstraint, len(actual.Checks))
-	for i := range actual.Checks {
-		actualByName[actual.Checks[i].Name] = &actual.Checks[i]
+	added, removed, matched := matchObjects(desired.Checks, actual.Checks, func(c model.CheckConstraint) string {
+		return c.Name
+	})
+	for _, c := range added {
+		td.ChecksAdded = append(td.ChecksAdded, c)
 	}
-
-	desiredNames := make(map[string]bool, len(desired.Checks))
-	for _, dc := range desired.Checks {
-		desiredNames[dc.Name] = true
-
-		ac, found := actualByName[dc.Name]
-		if !found {
-			td.ChecksAdded = append(td.ChecksAdded, dc)
-			continue
-		}
-
-		if dc.Expr != ac.Expr {
-			// Check expression changed: remove old, add new.
-			td.ChecksRemoved = append(td.ChecksRemoved, ac.Name)
-			td.ChecksAdded = append(td.ChecksAdded, dc)
-		}
+	for _, c := range removed {
+		td.ChecksRemoved = append(td.ChecksRemoved, c.Name)
 	}
-
-	for _, ac := range actual.Checks {
-		if !desiredNames[ac.Name] {
-			td.ChecksRemoved = append(td.ChecksRemoved, ac.Name)
+	for _, p := range matched {
+		if p.Desired.Expr != p.Actual.Expr {
+			td.ChecksRemoved = append(td.ChecksRemoved, p.Actual.Name)
+			td.ChecksAdded = append(td.ChecksAdded, p.Desired)
 		}
 	}
 }
@@ -814,34 +742,19 @@ func partitionChildKey(ps *model.PartitionSpec) string {
 
 // diffEnums matches enums by schema-qualified name.
 func diffEnums(d *SchemaDiff, desired, actual *model.Schema) {
-	actualByKey := make(map[string]*model.Enum, len(actual.Enums))
-	for i := range actual.Enums {
-		e := &actual.Enums[i]
-		actualByKey[enumKey(e)] = e
+	added, removed, matched := matchObjects(desired.Enums, actual.Enums, func(e model.Enum) string {
+		return enumKey(&e)
+	})
+	for _, e := range added {
+		d.EnumsAdded = append(d.EnumsAdded, enumKey(&e))
 	}
-
-	desiredKeys := make(map[string]bool, len(desired.Enums))
-	for i := range desired.Enums {
-		de := &desired.Enums[i]
-		key := enumKey(de)
-		desiredKeys[key] = true
-
-		ae, found := actualByKey[key]
-		if !found {
-			d.EnumsAdded = append(d.EnumsAdded, key)
-			continue
-		}
-
-		ed := diffEnum(de, ae)
+	for _, e := range removed {
+		d.EnumsRemoved = append(d.EnumsRemoved, enumKey(&e))
+	}
+	for _, p := range matched {
+		ed := diffEnum(&p.Desired, &p.Actual)
 		if ed != nil {
 			d.EnumsChanged = append(d.EnumsChanged, *ed)
-		}
-	}
-
-	for _, ae := range actual.Enums {
-		key := enumKey(&ae)
-		if !desiredKeys[key] {
-			d.EnumsRemoved = append(d.EnumsRemoved, key)
 		}
 	}
 }
@@ -965,34 +878,19 @@ func diffExtensions(d *SchemaDiff, desired, actual *model.Schema) {
 
 // diffViews matches views by schema-qualified name.
 func diffViews(d *SchemaDiff, desired, actual *model.Schema) {
-	actualByKey := make(map[string]*model.View, len(actual.Views))
-	for i := range actual.Views {
-		v := &actual.Views[i]
-		actualByKey[viewKey(v)] = v
+	added, removed, matched := matchObjects(desired.Views, actual.Views, func(v model.View) string {
+		return viewKey(&v)
+	})
+	for _, v := range added {
+		d.ViewsAdded = append(d.ViewsAdded, viewKey(&v))
 	}
-
-	desiredKeys := make(map[string]bool, len(desired.Views))
-	for i := range desired.Views {
-		dv := &desired.Views[i]
-		key := viewKey(dv)
-		desiredKeys[key] = true
-
-		av, found := actualByKey[key]
-		if !found {
-			d.ViewsAdded = append(d.ViewsAdded, key)
-			continue
-		}
-
-		vd := diffView(dv, av)
+	for _, v := range removed {
+		d.ViewsRemoved = append(d.ViewsRemoved, viewKey(&v))
+	}
+	for _, p := range matched {
+		vd := diffView(&p.Desired, &p.Actual)
 		if vd != nil {
 			d.ViewsChanged = append(d.ViewsChanged, *vd)
-		}
-	}
-
-	for _, av := range actual.Views {
-		key := viewKey(&av)
-		if !desiredKeys[key] {
-			d.ViewsRemoved = append(d.ViewsRemoved, key)
 		}
 	}
 }
@@ -1027,34 +925,19 @@ func diffView(desired, actual *model.View) *ViewDiff {
 
 // diffMaterializedViews matches materialized views by schema-qualified name.
 func diffMaterializedViews(d *SchemaDiff, desired, actual *model.Schema) {
-	actualByKey := make(map[string]*model.MaterializedView, len(actual.MaterializedViews))
-	for i := range actual.MaterializedViews {
-		mv := &actual.MaterializedViews[i]
-		actualByKey[mvKey(mv)] = mv
+	added, removed, matched := matchObjects(desired.MaterializedViews, actual.MaterializedViews, func(mv model.MaterializedView) string {
+		return mvKey(&mv)
+	})
+	for _, mv := range added {
+		d.MaterializedViewsAdded = append(d.MaterializedViewsAdded, mvKey(&mv))
 	}
-
-	desiredKeys := make(map[string]bool, len(desired.MaterializedViews))
-	for i := range desired.MaterializedViews {
-		dmv := &desired.MaterializedViews[i]
-		key := mvKey(dmv)
-		desiredKeys[key] = true
-
-		amv, found := actualByKey[key]
-		if !found {
-			d.MaterializedViewsAdded = append(d.MaterializedViewsAdded, key)
-			continue
-		}
-
-		mvd := diffMaterializedView(dmv, amv)
+	for _, mv := range removed {
+		d.MaterializedViewsRemoved = append(d.MaterializedViewsRemoved, mvKey(&mv))
+	}
+	for _, p := range matched {
+		mvd := diffMaterializedView(&p.Desired, &p.Actual)
 		if mvd != nil {
 			d.MaterializedViewsChanged = append(d.MaterializedViewsChanged, *mvd)
-		}
-	}
-
-	for _, amv := range actual.MaterializedViews {
-		key := mvKey(&amv)
-		if !desiredKeys[key] {
-			d.MaterializedViewsRemoved = append(d.MaterializedViewsRemoved, key)
 		}
 	}
 }
@@ -1087,35 +970,24 @@ func diffMaterializedView(desired, actual *model.MaterializedView) *Materialized
 	}
 
 	// Diff indexes.
-	actualIdxByName := make(map[string]*model.Index, len(actual.Indexes))
-	for i := range actual.Indexes {
-		actualIdxByName[actual.Indexes[i].Name] = &actual.Indexes[i]
+	idxAdded, idxRemoved, idxMatched := matchObjects(desired.Indexes, actual.Indexes, func(idx model.Index) string {
+		return idx.Name
+	})
+	for _, idx := range idxAdded {
+		mvd.IndexesAdded = append(mvd.IndexesAdded, idx)
+		changed = true
 	}
-
-	desiredIdxNames := make(map[string]bool, len(desired.Indexes))
-	for _, didx := range desired.Indexes {
-		desiredIdxNames[didx.Name] = true
-
-		aidx, found := actualIdxByName[didx.Name]
-		if !found {
-			mvd.IndexesAdded = append(mvd.IndexesAdded, didx)
-			changed = true
-			continue
-		}
-
-		if !indexEqual(&didx, aidx) {
+	for _, idx := range idxRemoved {
+		mvd.IndexesRemoved = append(mvd.IndexesRemoved, idx.Name)
+		changed = true
+	}
+	for _, p := range idxMatched {
+		if !indexEqual(&p.Desired, &p.Actual) {
 			mvd.IndexesChanged = append(mvd.IndexesChanged, IndexChange{
-				Name: didx.Name,
-				Old:  *aidx,
-				New:  didx,
+				Name: p.Desired.Name,
+				Old:  p.Actual,
+				New:  p.Desired,
 			})
-			changed = true
-		}
-	}
-
-	for _, aidx := range actual.Indexes {
-		if !desiredIdxNames[aidx.Name] {
-			mvd.IndexesRemoved = append(mvd.IndexesRemoved, aidx.Name)
 			changed = true
 		}
 	}
