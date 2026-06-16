@@ -1,0 +1,4 @@
+{"commits":["4128e13d151c2f5e208fdc5ccd7df11a13e2ac5e","e9e6be69653ebca2b14a9bf68a42218cce42bff4"],"user_facing":true,"description":"**New rule.** E217 validates that extension-provided index methods (hnsw, ivfflat) require the providing extension to be declared.","type":"feature"}
+{"commits":["e39c772146cae8ff2d7f70bf7c23861584e8b670","32a0ce3f49cc29e3739316b3163b83caba051f4c"],"user_facing":true,"description":"**Fix.** `parseSimpleDefault` now handles double casts and COLLATE clauses, reducing false positives when diffing introspected schemas.","type":"fix"}
+{"commits":["0dab697c5af9de421173741889f31ea4cddaea8b"],"user_facing":true,"description":"**Fix.** Global flags documentation corrected (--db and --strict-nf are per-command since v0.9.0).","type":"fix"}
+{"commits":["6e6ed9f1be24aa99d0ec81eb33ba34c4d9331f11","a66b7c690cf6a8e37cfb88b44913cc2652d29b9e","bba4339321ebf41e481822dbfe6f7e0cebd0e98d"],"user_facing":false}
