@@ -1687,6 +1687,7 @@ func TestGenerateMigration_ArrayChanged_ArrayToScalar(t *testing.T) {
 }
 
 func TestGenerateMigration_IndexWithChange(t *testing.T) {
+	// Btree with-only change should produce a single alter_index_set, not DROP+CREATE.
 	d := &diff.SchemaDiff{
 		TablesChanged: []diff.TableDiff{{
 			Name: "t",
@@ -1714,8 +1715,122 @@ func TestGenerateMigration_IndexWithChange(t *testing.T) {
 		}},
 	}
 	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0)
-	if len(m.DDLOps) < 2 {
-		t.Fatalf("expected at least 2 DDL ops (drop + create), got %d", len(m.DDLOps))
+	if len(m.DDLOps) != 1 {
+		t.Fatalf("expected exactly 1 DDL op (alter_index_set), got %d: %s", len(m.DDLOps), opsDebug(m.DDLOps))
+	}
+	op := m.DDLOps[0]
+	if op.Op != "alter_index_set" {
+		t.Errorf("expected op alter_index_set, got %q", op.Op)
+	}
+	if op.Name != "idx_t" {
+		t.Errorf("expected name idx_t, got %q", op.Name)
+	}
+	if op.Table != "t" {
+		t.Errorf("expected table t, got %q", op.Table)
+	}
+	if op.With == nil || op.With["fillfactor"] != "80" {
+		t.Errorf("expected With fillfactor=80, got %v", op.With)
+	}
+	if op.Down == nil {
+		t.Fatal("expected Down op for alter_index_set")
+	}
+	if len(op.Down.Ops) != 1 {
+		t.Fatalf("expected 1 down op, got %d", len(op.Down.Ops))
+	}
+	downOp := op.Down.Ops[0]
+	if downOp.Op != "alter_index_set" {
+		t.Errorf("expected down op alter_index_set, got %q", downOp.Op)
+	}
+	if downOp.With == nil || downOp.With["fillfactor"] != "90" {
+		t.Errorf("expected down With fillfactor=90 (old value), got %v", downOp.With)
+	}
+}
+
+func TestGenerateMigration_IndexWithChange_ExtensionMethod(t *testing.T) {
+	// Extension methods (hnsw) require DROP+CREATE even for with-only changes,
+	// because ALTER INDEX SET does not work for extension-defined parameters.
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name: "t",
+			IndexesChanged: []diff.IndexChange{{
+				Name: "idx_t_embedding",
+				Old: model.Index{
+					Name:    "idx_t_embedding",
+					Columns: []string{"embedding"},
+					Method:  "hnsw",
+					With:    map[string]string{"m": "16", "ef_construction": "200"},
+				},
+				New: model.Index{
+					Name:    "idx_t_embedding",
+					Columns: []string{"embedding"},
+					Method:  "hnsw",
+					With:    map[string]string{"m": "32", "ef_construction": "200"},
+				},
+			}},
+		}},
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:   "t",
+			Schema: "public",
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0)
+	if len(m.DDLOps) != 2 {
+		t.Fatalf("expected 2 DDL ops (drop + create) for extension method, got %d: %s", len(m.DDLOps), opsDebug(m.DDLOps))
+	}
+	foundDrop := false
+	foundCreate := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_index" && op.Name == "idx_t_embedding" {
+			foundDrop = true
+		}
+		if op.Op == "create_index" && op.Name == "idx_t_embedding" {
+			foundCreate = true
+			if op.With == nil || op.With["m"] != "32" || op.With["ef_construction"] != "200" {
+				t.Errorf("expected create_index with m=32 ef_construction=200, got %v", op.With)
+			}
+		}
+	}
+	if !foundDrop {
+		t.Errorf("expected drop_index op for idx_t_embedding, got: %s", opsDebug(m.DDLOps))
+	}
+	if !foundCreate {
+		t.Errorf("expected create_index op for idx_t_embedding, got: %s", opsDebug(m.DDLOps))
+	}
+}
+
+func TestGenerateMigration_IndexWithChange_ColumnsAlsoChanged(t *testing.T) {
+	// When columns change alongside With, DROP+CREATE is required even for builtin methods.
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name: "t",
+			IndexesChanged: []diff.IndexChange{{
+				Name: "idx_t",
+				Old: model.Index{
+					Name:    "idx_t",
+					Columns: []string{"id"},
+					Method:  "btree",
+					With:    map[string]string{"fillfactor": "90"},
+				},
+				New: model.Index{
+					Name:    "idx_t",
+					Columns: []string{"id", "name"},
+					Method:  "btree",
+					With:    map[string]string{"fillfactor": "70"},
+				},
+			}},
+		}},
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:   "t",
+			Schema: "public",
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0)
+	if len(m.DDLOps) != 2 {
+		t.Fatalf("expected 2 DDL ops (drop + create) for columns+with change, got %d: %s", len(m.DDLOps), opsDebug(m.DDLOps))
 	}
 	foundDrop := false
 	foundCreate := false
@@ -1725,16 +1840,19 @@ func TestGenerateMigration_IndexWithChange(t *testing.T) {
 		}
 		if op.Op == "create_index" && op.Name == "idx_t" {
 			foundCreate = true
-			if op.With == nil || op.With["fillfactor"] != "80" {
-				t.Errorf("expected create_index with fillfactor=80, got %v", op.With)
+			if len(op.Columns) != 2 || op.Columns[0] != "id" || op.Columns[1] != "name" {
+				t.Errorf("expected create_index columns [id, name], got %v", op.Columns)
+			}
+			if op.With == nil || op.With["fillfactor"] != "70" {
+				t.Errorf("expected create_index with fillfactor=70, got %v", op.With)
 			}
 		}
 	}
 	if !foundDrop {
-		t.Error("expected drop_index op for idx_t")
+		t.Errorf("expected drop_index op for idx_t, got: %s", opsDebug(m.DDLOps))
 	}
 	if !foundCreate {
-		t.Error("expected create_index op for idx_t")
+		t.Errorf("expected create_index op for idx_t, got: %s", opsDebug(m.DDLOps))
 	}
 }
 
