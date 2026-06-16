@@ -785,6 +785,12 @@ func TestParseSimpleDefault(t *testing.T) {
 		{"NULL", "", false},
 		// Nextval (sequence default) is complex.
 		{"nextval('users_id_seq'::regclass)", "", false},
+		// Double cast: strip all casts after closing quote.
+		{"'5'::integer::text", "5", true},
+		// COLLATE clause after quoted literal.
+		{"'hello' COLLATE \"C\"", "hello", true},
+		// Cast + COLLATE combined.
+		{"'hello'::text COLLATE \"C\"", "hello", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
