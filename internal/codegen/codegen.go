@@ -10,6 +10,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/sqlexpr"
+	"github.com/smm-h/pgdesign/internal/sqlutil"
 )
 
 // Generator generates application code from a resolved schema.
@@ -59,8 +60,8 @@ func ExtractPolicies(schema *model.Schema) []PolicyContext {
 //     FuncCall named "current_setting"
 //
 // Policies that lack an ErrorCode are silently skipped. Policies whose
-// expression cannot be parsed or does not match any pattern produce a C001
-// diagnostic and are excluded from the result.
+// expression cannot be parsed produce a C002 diagnostic, and those that do not
+// match any pattern produce a C001 diagnostic; both are excluded from the result.
 func FilterGeneratable(policies []PolicyContext) ([]PolicyContext, []diagnostic.Diagnostic) {
 	var result []PolicyContext
 	var diags []diagnostic.Diagnostic
@@ -73,14 +74,11 @@ func FilterGeneratable(policies []PolicyContext) ([]PolicyContext, []diagnostic.
 			expr = p.Using
 		}
 
-		ast, err := sqlexpr.Parse(expr)
-		if err != nil {
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Warning,
-				Code:     "C001",
-				Table:    p.TableName,
-				Message:  fmt.Sprintf("policy %q: unparsable expression: %v", p.PolicyName, err),
-			})
+		ast, parseDiag := sqlutil.ParseExpr(expr, fmt.Sprintf("policy %s.%s", p.TableName, p.PolicyName))
+		if parseDiag != nil {
+			parseDiag.Code = "C002"
+			parseDiag.Table = p.TableName
+			diags = append(diags, *parseDiag)
 			continue
 		}
 
