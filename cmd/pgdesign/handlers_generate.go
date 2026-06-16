@@ -40,10 +40,13 @@ func handleGenerate(kwargs map[string]interface{}) int {
 		PGVersion:       pgVersion,
 	}
 
-	out, err := generate.Generate(schema, opts)
+	out, genDiags, err := generate.Generate(schema, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "generate: %v\n", err)
 		return 1
+	}
+	if len(genDiags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(genDiags, true))
 	}
 	fmt.Print(out)
 	return 0

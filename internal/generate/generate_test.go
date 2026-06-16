@@ -15,7 +15,7 @@ import (
 // mustGenerate calls Generate and fails the test on error.
 func mustGenerate(t *testing.T, schema *model.Schema, opts Options) string {
 	t.Helper()
-	out, err := Generate(schema, opts)
+	out, _, err := Generate(schema, opts)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
 	}
@@ -1175,7 +1175,7 @@ func TestGenerate_UnsupportedFormat(t *testing.T) {
 	}
 
 	opts := Options{Format: "invalid_format"}
-	out, err := Generate(schema, opts)
+	out, _, err := Generate(schema, opts)
 
 	if err == nil {
 		t.Fatal("expected error for unsupported format, got nil")

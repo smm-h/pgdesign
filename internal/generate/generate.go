@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/sql"
 )
@@ -20,25 +21,27 @@ type Options struct {
 }
 
 // Generate produces DDL output for the given schema according to opts.
-func Generate(schema *model.Schema, opts Options) (string, error) {
+func Generate(schema *model.Schema, opts Options) (string, []diagnostic.Diagnostic, error) {
 	switch strings.ToLower(opts.Format) {
 	case "sql", "":
-		return generateSQL(schema, opts), nil
+		out, diags := generateSQL(schema, opts)
+		return out, diags, nil
 	case "d2":
-		return GenerateD2(schema), nil
+		return GenerateD2(schema), nil, nil
 	case "json":
-		return generateJSON(schema)
+		out, err := generateJSON(schema)
+		return out, nil, err
 	case "svg":
 		d2Source := GenerateD2(schema)
 		svg, err := RenderSVG(d2Source)
 		if err != nil {
-			return "", fmt.Errorf("svg render: %w", err)
+			return "", nil, fmt.Errorf("svg render: %w", err)
 		}
-		return string(svg), nil
+		return string(svg), nil, nil
 	case "doc":
-		return generateDoc(schema), nil
+		return generateDoc(schema), nil, nil
 	default:
-		return "", fmt.Errorf("unsupported format: %s", opts.Format)
+		return "", nil, fmt.Errorf("unsupported format: %s", opts.Format)
 	}
 }
 
@@ -67,8 +70,9 @@ func generateJSON(schema *model.Schema) (string, error) {
 	return string(data), nil
 }
 
-func generateSQL(schema *model.Schema, opts Options) string {
+func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagnostic) {
 	var sections []string
+	var diags []diagnostic.Diagnostic
 
 	// 1. CREATE SCHEMA
 	// In multi-schema mode, schema.Name is empty; emit CREATE SCHEMA for each
@@ -305,10 +309,21 @@ func generateSQL(schema *model.Schema, opts Options) string {
 	if len(schema.Views) > 0 {
 		sorted, err := topoSortViews(schema.Views)
 		if err != nil {
-			// Cycle in view dependencies -- emit in original order with a comment.
+			// Cycle in view dependencies -- emit in original order with a warning.
 			sorted = schema.Views
+			var cycleMembers []string
+			for _, v := range sorted {
+				cycleMembers = append(cycleMembers, v.Name)
+			}
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Message:  fmt.Sprintf("dependency cycle detected among views: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
+			})
 		}
 		var viewStmts []string
+		if err != nil {
+			viewStmts = append(viewStmts, "-- WARNING: dependency cycle detected; emitted in declaration order")
+		}
 		schemaName := schema.Name
 		for i := range sorted {
 			v := &sorted[i]
@@ -329,10 +344,21 @@ func generateSQL(schema *model.Schema, opts Options) string {
 	if len(schema.MaterializedViews) > 0 {
 		sorted, err := topoSortMaterializedViews(schema.MaterializedViews)
 		if err != nil {
-			// Cycle in materialized view dependencies -- emit in original order.
+			// Cycle in materialized view dependencies -- emit in original order with a warning.
 			sorted = schema.MaterializedViews
+			var cycleMembers []string
+			for _, mv := range sorted {
+				cycleMembers = append(cycleMembers, mv.Name)
+			}
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Message:  fmt.Sprintf("dependency cycle detected among materialized views: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
+			})
 		}
 		var mvStmts []string
+		if err != nil {
+			mvStmts = append(mvStmts, "-- WARNING: dependency cycle detected; emitted in declaration order")
+		}
 		schemaName := schema.Name
 		for i := range sorted {
 			mv := &sorted[i]
@@ -353,7 +379,7 @@ func generateSQL(schema *model.Schema, opts Options) string {
 		}
 	}
 
-	return strings.Join(sections, "\n\n") + "\n"
+	return strings.Join(sections, "\n\n") + "\n", diags
 }
 
 // sortedFKs returns FKs sorted alphabetically by name.
