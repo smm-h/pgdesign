@@ -201,3 +201,48 @@ func TestLockTypeString(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateView(t *testing.T) {
+	c := Classify(OpCreateView, OpContext{})
+	if c.RiskLevel != Safe {
+		t.Errorf("expected Safe, got %s", c.RiskLevel)
+	}
+}
+
+func TestDropView(t *testing.T) {
+	c := Classify(OpDropView, OpContext{})
+	if c.RiskLevel != Caution {
+		t.Errorf("expected Caution, got %s", c.RiskLevel)
+	}
+}
+
+func TestCreateOrReplaceView(t *testing.T) {
+	c := Classify(OpCreateOrReplaceView, OpContext{})
+	if c.RiskLevel != Safe {
+		t.Errorf("expected Safe, got %s", c.RiskLevel)
+	}
+}
+
+func TestCreateMaterializedView(t *testing.T) {
+	c := Classify(OpCreateMaterializedView, OpContext{})
+	if c.RiskLevel != Caution {
+		t.Errorf("expected Caution, got %s", c.RiskLevel)
+	}
+}
+
+func TestDropMaterializedView(t *testing.T) {
+	c := Classify(OpDropMaterializedView, OpContext{})
+	if c.RiskLevel != Dangerous {
+		t.Errorf("expected Dangerous, got %s", c.RiskLevel)
+	}
+	if !c.DataLoss {
+		t.Error("expected DataLoss")
+	}
+}
+
+func TestRefreshMaterializedView(t *testing.T) {
+	c := Classify(OpRefreshMaterializedView, OpContext{})
+	if c.RiskLevel != Caution {
+		t.Errorf("expected Caution, got %s", c.RiskLevel)
+	}
+}
