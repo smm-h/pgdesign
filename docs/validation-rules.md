@@ -230,6 +230,23 @@ with = { fillfactor = "90" }  # E216: fillfactor is not valid for hnsw
 
 **Fix:** Use only parameters valid for the index method. Consult the PostgreSQL or extension documentation for supported parameters.
 
+### E217: Index method requires undeclared extension
+
+An index uses an extension-provided index method (e.g., `hnsw`, `ivfflat`) without the providing extension being declared in the schema. Built-in methods (`btree`, `hash`, `gin`, `gist`, `brin`, `spgist`) are always allowed. Unknown methods that are not provided by any known extension are also flagged.
+
+```toml
+[tables.items.indexes.idx_items_embedding]
+columns = ["embedding"]
+method = "hnsw"  # E217: index method "hnsw" requires extension "pgvector" which is not declared
+```
+
+**Fix:** Declare the extension that provides the index method:
+
+```toml
+[[extensions]]
+name = "pgvector"
+```
+
 ## Warning rules
 
 Warnings highlight potential design issues but do not block DDL generation.
