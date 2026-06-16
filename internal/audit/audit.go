@@ -1,5 +1,5 @@
 // Package audit provides normal form analysis for pgdesign schemas.
-// It detects 1NF, 2NF, and 3NF violations using declared functional dependencies
+// It detects 1NF, 2NF, 3NF, and BCNF violations using declared functional dependencies
 // and suggests decompositions via Bernstein's synthesis algorithm.
 package audit
 
@@ -44,6 +44,9 @@ func auditTable(tbl *model.Table) []diagnostic.Diagnostic {
 	if hasViolation {
 		diags = append(diags, suggestDecomposition(tbl)...)
 	}
+
+	bcnfDiags, _ := checkBCNF(tbl)
+	diags = append(diags, bcnfDiags...)
 
 	return diags
 }
@@ -166,6 +169,40 @@ func check3NF(tbl *model.Table) ([]diagnostic.Diagnostic, bool) {
 					attr,
 					formatAttrs(dep.Determinant),
 					attr,
+				),
+			})
+		}
+	}
+
+	return diags, hasViolation
+}
+
+// checkBCNF detects Boyce-Codd Normal Form violations. Returns diagnostics and whether any violation was found.
+func checkBCNF(tbl *model.Table) ([]diagnostic.Diagnostic, bool) {
+	var diags []diagnostic.Diagnostic
+	hasViolation := false
+
+	allAttrs := columnNames(tbl)
+
+	// Decompose all dependencies to single-attribute RHS for checking
+	for _, dep := range tbl.Dependencies {
+		for _, attr := range dep.Dependent {
+			// Check: is X a superkey?
+			if fd.IsSuperkey(dep.Determinant, allAttrs, tbl.Dependencies) {
+				continue
+			}
+			// BCNF violation: determinant is not a superkey (no prime exception)
+			hasViolation = true
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Code:     "W103",
+				Table:    tbl.Name,
+				Column:   attr,
+				Message: fmt.Sprintf(
+					"BCNF violation: '%s' -> '%s' where %s is not a superkey.",
+					formatAttrs(dep.Determinant),
+					attr,
+					formatAttrs(dep.Determinant),
 				),
 			})
 		}
