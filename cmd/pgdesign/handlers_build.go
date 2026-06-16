@@ -240,8 +240,10 @@ func selectCodegenGenerator(outputName, lang, mode string) (codegen.Generator, b
 			return &codegen.GoTypesGenerator{}, true
 		case "ts":
 			return &codegen.TSTypesGenerator{}, true
+		case "python":
+			return &codegen.PythonTypesGenerator{}, true
 		default:
-			fmt.Fprintf(os.Stderr, "build: output %q: types mode only supports lang \"go\" or \"ts\", got %q\n", outputName, lang)
+			fmt.Fprintf(os.Stderr, "build: output %q: types mode only supports lang \"go\", \"ts\", or \"python\", got %q\n", outputName, lang)
 			return nil, false
 		}
 	default:
