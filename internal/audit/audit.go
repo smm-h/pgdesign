@@ -26,6 +26,9 @@ func Audit(schema *model.Schema) []diagnostic.Diagnostic {
 func auditTable(tbl *model.Table) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 
+	// Check for implied FDs from PK/UNIQUE that are not declared
+	diags = append(diags, inferFDs(tbl)...)
+
 	if len(tbl.Dependencies) == 0 {
 		diags = append(diags, diagnostic.Diagnostic{
 			Severity: diagnostic.Info,
@@ -35,7 +38,6 @@ func auditTable(tbl *model.Table) []diagnostic.Diagnostic {
 		return diags
 	}
 
-	diags = append(diags, inferFDs(tbl)...)
 	diags = append(diags, check1NF(tbl)...)
 	diags = append(diags, check2NF(tbl)...)
 
