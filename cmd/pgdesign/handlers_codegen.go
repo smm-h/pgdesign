@@ -67,8 +67,10 @@ func handleCodegen(kwargs map[string]interface{}) int {
 			gen = &codegen.JavaTypesGenerator{}
 		case "kotlin":
 			gen = &codegen.KotlinTypesGenerator{}
+		case "zig":
+			gen = &codegen.ZigTypesGenerator{}
 		default:
-			fmt.Fprintf(os.Stderr, "error: types mode only supports --lang go, ts, python, java, or kotlin, got %s\n", lang)
+			fmt.Fprintf(os.Stderr, "error: types mode only supports --lang go, ts, python, java, kotlin, or zig, got %s\n", lang)
 			return 1
 		}
 	default:

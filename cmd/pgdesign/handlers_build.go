@@ -246,8 +246,10 @@ func selectCodegenGenerator(outputName, lang, mode string) (codegen.Generator, b
 			return &codegen.JavaTypesGenerator{}, true
 		case "kotlin":
 			return &codegen.KotlinTypesGenerator{}, true
+		case "zig":
+			return &codegen.ZigTypesGenerator{}, true
 		default:
-			fmt.Fprintf(os.Stderr, "build: output %q: types mode only supports lang \"go\", \"ts\", \"python\", \"java\", or \"kotlin\", got %q\n", outputName, lang)
+			fmt.Fprintf(os.Stderr, "build: output %q: types mode only supports lang \"go\", \"ts\", \"python\", \"java\", \"kotlin\", or \"zig\", got %q\n", outputName, lang)
 			return nil, false
 		}
 	default:
