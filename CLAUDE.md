@@ -13,7 +13,9 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `audit` checks normal form compliance (1NF/2NF/3NF) using functional dependencies
 - `fd` provides functional dependency primitives (closure, minimal cover, candidate keys)
 - `discover` discovers functional dependencies from live data using the TANE algorithm
-- `sqlexpr` parses and walks SQL expressions; used by validate (E213) and codegen (expression-driven validators)
+- `sqlexpr` parses and walks SQL expressions (recursive descent parser with 9 precedence levels, supports arithmetic, comparisons, boolean logic, casts, CASE, EXISTS subqueries); used by validate (E213) and codegen (expression-driven validators)
+- `sqlparse` wraps wasilibs/go-pgquery (WASM-based PostgreSQL parser, no CGo) for proper SQL statement splitting and expression deparsing
+- `sqlutil` provides shared adapter between sqlexpr and diagnostic for consistent parse-error-to-diagnostic conversion
 - `codegen` generates type-safe application code (Go, TS, Java, Kotlin, Python, Zig) from the model
 - `diff` compares two models or a model against a live database
 - `migrate` generates migrations with risk classification and safety linting
@@ -28,7 +30,7 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `extregistry` validates PostgreSQL extension references
 - `config` handles project configuration loading from pgdesign.toml
 
-The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, discover -> audit/check, seed -> generate, introspect -> serve. Views depend on tables; materialized views depend on tables and views.
+The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, sqlutil -> validate/codegen, sqlparse -> migrate/generate, discover -> audit/check, seed -> generate, introspect -> serve. Views depend on tables; materialized views depend on tables and views.
 
 ## Key conventions
 
@@ -58,6 +60,8 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Views are defined under `[views.*]` with `query`, optional `comment`, and optional `depends_on` for dependency ordering.
 - Materialized views are defined under `[materialized_views.*]` with `query`, optional `comment`, `with_data`, and nested `[materialized_views.*.indexes.*]`.
 - Codegen supports `--mode types` (Go only) for generating Go type definitions from the schema, in addition to `validators` and `constants`.
+- PGVersion resolution order: live database (introspect) > `[database].pg_version` in pgdesign.toml > `[meta].version` in schema TOML > 0 (conservative defaults).
+- Generated columns: PG 12-17 only support STORED; PG 18+ supports both STORED and VIRTUAL. When `stored` is omitted from TOML, defaults to true. E218 validates version compatibility. STORED-to-VIRTUAL transition is destructive (DROP + recreate).
 
 ## Testing
 
@@ -81,6 +85,7 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - `strictcli`: CLI framework
 - `pgx/v5`: PostgreSQL driver
 - `d2`: diagram rendering (native Go library, no external binary)
+- `go-pgquery`: WASM-based PostgreSQL parser (no CGo); used for SQL statement splitting
 
 ## Build
 
