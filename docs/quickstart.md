@@ -114,7 +114,7 @@ pgdesign generate --format svg schema.toml
 ## Validating a schema
 
 ```
-pgdesign validate schema.toml
+pgdesign check --tag validation
 ```
 
 The validator checks for errors (missing types, FK targets that don't exist, naming violations) and warnings (god tables, orphan tables, missing timestamps). Exit code is 1 if any errors are found.
@@ -149,16 +149,10 @@ pgdesign fmt --table-order=alphabetical --column-order=fk_last schema.toml
 ## Auditing for normal form violations
 
 ```
-pgdesign audit schema.toml
+pgdesign check --tag nf
 ```
 
-The audit command checks for 1NF, 2NF, and 3NF violations using declared functional dependencies. For tables without dependencies declared, the audit is skipped.
-
-With a live database connection, pgdesign can discover functional dependencies automatically:
-
-```
-pgdesign audit --db "postgres://user:pass@localhost/mydb" schema.toml
-```
+The NF check examines 1NF, 2NF, and 3NF violations using declared functional dependencies. For tables without dependencies declared, the check is skipped. When a database URL is configured (in `pgdesign.toml` or `PGDESIGN_DB`), pgdesign discovers functional dependencies automatically.
 
 Use `--strict-nf` on the `generate` command to block DDL output when NF violations exist:
 

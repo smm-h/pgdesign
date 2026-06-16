@@ -27,8 +27,7 @@ pip install pgdesign
 | Command | Description |
 |---------|-------------|
 | `generate` | Generate SQL from schema file(s) or directory |
-| `validate` | Validate schema file(s) for errors and warnings |
-| `audit` | Audit schema for normal form violations |
+| `check` | Run project checks (`--tag validation`, `--tag nf`, `--tag coverage`) |
 | `fmt` | Format schema file(s) or directory |
 | `introspect` | Introspect a live PostgreSQL database |
 | `diff` | Diff schema against a live database, another TOML, or a git ref |

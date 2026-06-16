@@ -306,7 +306,7 @@ default_expr = "now()"  # W010: mutable default on append-only table
 
 ## Normal form audit warnings
 
-These are emitted by `pgdesign audit`, not `pgdesign validate`. They require functional dependencies to be declared on the table.
+These are emitted by `pgdesign check --tag nf`, not `pgdesign check --tag validation`. They require functional dependencies to be declared on the table.
 
 ### W100: 1NF violation (repeating group)
 
@@ -345,7 +345,7 @@ Disable rules by code in `pgdesign.toml`:
 disable = ["W002", "W005", "W006"]
 ```
 
-This skips the disabled rules during `pgdesign validate`. The codes apply to the validation rules (E2xx, W00x). Audit warnings (W1xx) are controlled separately via `pgdesign audit`.
+This skips the disabled rules during `pgdesign check --tag validation`. The codes apply to the validation rules (E2xx, W00x). Audit warnings (W1xx) are emitted by `pgdesign check --tag nf`.
 
 ## Codegen diagnostics
 

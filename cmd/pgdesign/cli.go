@@ -44,29 +44,6 @@ func main() {
 		),
 	)
 
-	app.Command("validate", "Validate schema file(s) or directory", handleValidate,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
-		strictcli.WithFlags(
-			strictcli.BoolFlag("show-suppressed", "Show suppressed diagnostics with their reasons"),
-			strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)),
-			strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"),
-			strictcli.BoolFlag("json", "Output as JSON"),
-			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable()),
-		),
-	)
-
-	app.Command("audit", "Audit schema file(s) or directory for issues", handleAudit,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
-		strictcli.WithFlags(
-			strictcli.StringFlag("tables", "Limit FD discovery to specific tables", strictcli.Repeatable()),
-			strictcli.FloatFlag("approximate", "Approximate FD threshold (0.0 = exact only)", strictcli.Default(0.0)),
-			strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)),
-			strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"),
-			strictcli.BoolFlag("json", "Output as JSON"),
-			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable()),
-		),
-	)
-
 	app.Command("fmt", "Format a pgdesign schema file or directory", handleFmt,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to file or directory")),
 		strictcli.WithFlags(

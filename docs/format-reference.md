@@ -287,7 +287,7 @@ Each partition child:
 
 ## Functional dependencies
 
-Used by the `audit` command for normal form analysis.
+Used by `pgdesign check --tag nf` for normal form analysis.
 
 ```toml
 [[tables.enrollments.dependencies]]
@@ -429,7 +429,7 @@ Suppress specific diagnostics on individual tables or columns. Each key is `"tab
 "audit_log.W002" = "standalone audit table with no FK relationships by design"
 ```
 
-Use the `--show-suppressed` flag with `pgdesign validate` to include suppressed diagnostics in the output (marked as suppressed with their reason).
+Suppressed diagnostics are excluded from check output. Suppression applies during `pgdesign check --tag validation`.
 
 ## [output.*]
 

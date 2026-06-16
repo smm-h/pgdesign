@@ -73,7 +73,7 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Commands registered via `app.Command(name, desc, handler, strictcli.WithArgs(...), strictcli.WithFlags(...))`
 - Handler signature: `func(kwargs map[string]interface{}) int` (returns exit code)
 - Global flags: `quiet`, `db` (PostgreSQL connection string), `strict-nf`
-- Commands: `generate`, `validate`, `audit`, `fmt`, `introspect`, `diff`, `seed`, `serve`, `codegen`, `build`, `stats`
+- Commands: `generate`, `check`, `fmt`, `introspect`, `diff`, `seed`, `serve`, `codegen`, `build`, `stats`
 - Command groups: `migrate` (`plan`, `generate`, `apply`, `rollback`, `status`, `squash`, `test`)
 - `introspect --extensions` discovers extension types, functions, and opclasses from a live database
 
