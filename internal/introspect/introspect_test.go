@@ -124,6 +124,25 @@ func TestMain(m *testing.M) {
 		CREATE TABLE ` + testSchema + `.orders_eu
 			PARTITION OF ` + testSchema + `.orders
 			FOR VALUES IN ('eu-west', 'eu-central');
+
+		-- View: depends on users
+		CREATE VIEW ` + testSchema + `.active_users AS
+			SELECT id, name, email FROM ` + testSchema + `.users WHERE status = 'active';
+		COMMENT ON VIEW ` + testSchema + `.active_users IS 'Active users only';
+
+		-- View: depends on users AND posts (multi-table)
+		CREATE VIEW ` + testSchema + `.user_posts AS
+			SELECT u.name, p.title
+			FROM ` + testSchema + `.users u
+			JOIN ` + testSchema + `.posts p ON p.author_id = u.id;
+		COMMENT ON VIEW ` + testSchema + `.user_posts IS 'User post listing';
+
+		-- Materialized view: depends on posts
+		CREATE MATERIALIZED VIEW ` + testSchema + `.recent_posts AS
+			SELECT id, title, created_at FROM ` + testSchema + `.posts
+			WHERE published = true
+			ORDER BY created_at DESC;
+		COMMENT ON MATERIALIZED VIEW ` + testSchema + `.recent_posts IS 'Recent published posts';
 	`
 
 	_, execErr := conn.Exec(ctx, setupSQL)
@@ -777,5 +796,75 @@ func TestParseSimpleDefault(t *testing.T) {
 				t.Errorf("parseSimpleDefault(%q) value = %q, want %q", tt.input, val, tt.wantVal)
 			}
 		})
+	}
+}
+
+func TestIntrospectViewDependsOn(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	// active_users depends on users only.
+	var activeUsers *model.View
+	for i := range schema.Views {
+		if schema.Views[i].Name == "active_users" {
+			activeUsers = &schema.Views[i]
+			break
+		}
+	}
+	if activeUsers == nil {
+		t.Fatal("active_users view not found")
+	}
+	if len(activeUsers.DependsOn) != 1 || activeUsers.DependsOn[0] != "users" {
+		t.Errorf("active_users.DependsOn = %v, want [users]", activeUsers.DependsOn)
+	}
+
+	// user_posts depends on both users and posts.
+	var userPosts *model.View
+	for i := range schema.Views {
+		if schema.Views[i].Name == "user_posts" {
+			userPosts = &schema.Views[i]
+			break
+		}
+	}
+	if userPosts == nil {
+		t.Fatal("user_posts view not found")
+	}
+	if len(userPosts.DependsOn) != 2 {
+		t.Fatalf("user_posts.DependsOn = %v, want 2 entries", userPosts.DependsOn)
+	}
+	// pg_depend returns sorted by relname.
+	depSet := map[string]bool{}
+	for _, d := range userPosts.DependsOn {
+		depSet[d] = true
+	}
+	if !depSet["users"] || !depSet["posts"] {
+		t.Errorf("user_posts.DependsOn = %v, want to contain users and posts", userPosts.DependsOn)
+	}
+}
+
+func TestIntrospectMaterializedViewDependsOn(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	if len(schema.MaterializedViews) < 1 {
+		t.Fatal("no materialized views found")
+	}
+
+	var recentPosts *model.MaterializedView
+	for i := range schema.MaterializedViews {
+		if schema.MaterializedViews[i].Name == "recent_posts" {
+			recentPosts = &schema.MaterializedViews[i]
+			break
+		}
+	}
+	if recentPosts == nil {
+		t.Fatal("recent_posts materialized view not found")
+	}
+	if len(recentPosts.DependsOn) != 1 || recentPosts.DependsOn[0] != "posts" {
+		t.Errorf("recent_posts.DependsOn = %v, want [posts]", recentPosts.DependsOn)
 	}
 }

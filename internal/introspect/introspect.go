@@ -71,20 +71,18 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		schema.Tables = append(schema.Tables, tables...)
 	}
 
-	// Extract views from all requested schemas (after tables, since
-	// DependsOn resolution needs the table list).
+	// Extract views from all requested schemas.
 	for _, sn := range schemaNames {
-		views, err := queryViews(ctx, conn, sn, schema.Tables)
+		views, err := queryViews(ctx, conn, sn)
 		if err != nil {
 			return nil, nil, fmt.Errorf("views for schema %q: %w", sn, err)
 		}
 		schema.Views = append(schema.Views, views...)
 	}
 
-	// Extract materialized views from all requested schemas (after tables,
-	// since DependsOn resolution needs the table list).
+	// Extract materialized views from all requested schemas.
 	for _, sn := range schemaNames {
-		mvs, mvDiags, err := queryMaterializedViews(ctx, conn, sn, schema.Tables)
+		mvs, mvDiags, err := queryMaterializedViews(ctx, conn, sn)
 		if err != nil {
 			return nil, nil, fmt.Errorf("materialized views for schema %q: %w", sn, err)
 		}
@@ -862,17 +860,46 @@ func queryPartitionChildren(ctx context.Context, conn *pgx.Conn, parentOID uint3
 	return children, nil
 }
 
-// viewTableNamePattern matches a table name surrounded by word boundaries
-// (whitespace, punctuation, or string edges). Built per table name in
-// queryViews because the name is interpolated into the pattern.
-func viewTableNamePattern(tableName string) *regexp.Regexp {
-	return regexp.MustCompile(`(?i)(?:^|[^a-z0-9_])` + regexp.QuoteMeta(tableName) + `(?:$|[^a-z0-9_])`)
+// queryViewDependsOn returns the names of tables, views, materialized views,
+// and partitioned tables that the given view (or materialized view) depends on,
+// as reported by pg_depend. This replaces regex-based scanning of view
+// definitions with PostgreSQL's authoritative dependency catalog.
+func queryViewDependsOn(ctx context.Context, conn *pgx.Conn, viewName, schemaName string) ([]string, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT DISTINCT c.relname
+		FROM pg_depend d
+		JOIN pg_class c ON c.oid = d.refobjid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE d.objid = (
+			SELECT c2.oid
+			FROM pg_class c2
+			JOIN pg_namespace n2 ON n2.oid = c2.relnamespace
+			WHERE c2.relname = $1 AND n2.nspname = $2
+		)
+		AND d.deptype = 'n'
+		AND c.relkind IN ('r', 'v', 'm', 'p')
+		AND c.relname != $1
+		ORDER BY c.relname
+	`, viewName, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var deps []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		deps = append(deps, name)
+	}
+	return deps, rows.Err()
 }
 
-// queryViews returns views defined in the given schema. The tables slice is
-// used to resolve DependsOn by scanning view definitions for table name
-// references.
-func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string, tables []model.Table) ([]model.View, error) {
+// queryViews returns views defined in the given schema. DependsOn is resolved
+// via pg_depend.
+func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.View, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT v.viewname, pg_get_viewdef(c.oid, true), d.description
 		FROM pg_views v
@@ -904,12 +931,12 @@ func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string, tables [
 			v.Comment = *comment
 		}
 
-		// Resolve DependsOn by scanning the view definition for table names.
-		for _, t := range tables {
-			if viewTableNamePattern(t.Name).MatchString(v.Query) {
-				v.DependsOn = append(v.DependsOn, t.Name)
-			}
+		// Resolve DependsOn via pg_depend.
+		deps, err := queryViewDependsOn(ctx, conn, name, schemaName)
+		if err != nil {
+			return nil, fmt.Errorf("depends_on for view %s: %w", name, err)
 		}
+		v.DependsOn = deps
 
 		views = append(views, v)
 	}
@@ -934,9 +961,8 @@ func queryMaterializedViewIndexes(ctx context.Context, conn *pgx.Conn, schemaNam
 }
 
 // queryMaterializedViews returns materialized views defined in the given schema.
-// The tables slice is used to resolve DependsOn by scanning view definitions
-// for table name references.
-func queryMaterializedViews(ctx context.Context, conn *pgx.Conn, schemaName string, tables []model.Table) ([]model.MaterializedView, []diagnostic.Diagnostic, error) {
+// DependsOn is resolved via pg_depend.
+func queryMaterializedViews(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.MaterializedView, []diagnostic.Diagnostic, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT m.matviewname, pg_get_viewdef(c.oid, true), d.description, m.ispopulated
 		FROM pg_matviews m
@@ -971,12 +997,12 @@ func queryMaterializedViews(ctx context.Context, conn *pgx.Conn, schemaName stri
 			mv.Comment = *comment
 		}
 
-		// Resolve DependsOn by scanning the view definition for table names.
-		for _, t := range tables {
-			if viewTableNamePattern(t.Name).MatchString(mv.Query) {
-				mv.DependsOn = append(mv.DependsOn, t.Name)
-			}
+		// Resolve DependsOn via pg_depend.
+		deps, err := queryViewDependsOn(ctx, conn, name, schemaName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("depends_on for materialized view %s: %w", name, err)
 		}
+		mv.DependsOn = deps
 
 		mvs = append(mvs, mv)
 	}
