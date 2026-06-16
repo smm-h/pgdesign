@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
+	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 )
 
@@ -37,7 +38,7 @@ func TestGenerateMigration_AddTable(t *testing.T) {
 		TablesAdded: []string{"game.players"},
 	}
 
-	m, diags := GenerateMigration(d, desired, "0.1.0", nil, 0, 0)
+	m, diags := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -100,7 +101,7 @@ func TestGenerateMigration_AddColumn(t *testing.T) {
 		},
 	}
 
-	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -154,7 +155,7 @@ func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
 		},
 	}
 
-	_, diags := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
+	_, diags := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 
 	// PG11 with constant default: should be safe, no risk diagnostics.
 	for _, diag := range diags {
@@ -193,7 +194,7 @@ func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
 		},
 	}
 
-	_, diags := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
+	_, diags := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 
 	// PG9 with constant default: should be dangerous, expect risk diagnostic.
 	hasDangerous := false
@@ -214,7 +215,7 @@ func TestGenerateMigration_DropTable(t *testing.T) {
 		TablesRemoved: []string{"game.old_table"},
 	}
 
-	m, diags := GenerateMigration(d, desired, "0.3.0", nil, 0, 0)
+	m, diags := GenerateMigration(d, desired, "0.3.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -281,7 +282,7 @@ func TestGenerateMigration_PartitionChildAdded(t *testing.T) {
 		},
 	}
 
-	m, diags := GenerateMigration(d, desired, "0.4.0", nil, 0, 0)
+	m, diags := GenerateMigration(d, desired, "0.4.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -352,7 +353,7 @@ func TestGenerateMigration_PartitionChildRemoved(t *testing.T) {
 		},
 	}
 
-	m, diags := GenerateMigration(d, desired, "0.5.0", nil, 0, 0)
+	m, diags := GenerateMigration(d, desired, "0.5.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -411,7 +412,7 @@ func TestGenerateMigration_PartitionStrategyChanged(t *testing.T) {
 		},
 	}
 
-	_, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0)
+	_, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 
 	// Should have a warning about strategy change.
 	hasWarning := false
@@ -884,7 +885,7 @@ func TestGenerateMigration_ViewAdded(t *testing.T) {
 		ViewsAdded: []string{"app.active_users"},
 	}
 
-	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -919,7 +920,7 @@ func TestGenerateMigration_ViewRemoved(t *testing.T) {
 		ViewsRemoved: []string{"app.old_view"},
 	}
 
-	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -960,7 +961,7 @@ func TestGenerateMigration_ViewQueryChanged(t *testing.T) {
 		},
 	}
 
-	m, _ := GenerateMigration(d, desired, "0.3.0", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "0.3.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -1223,7 +1224,7 @@ func TestAppendOnlyMigration(t *testing.T) {
 		},
 	}
 
-	m, diags := GenerateMigration(d, desired, "001", nil, 0, 0)
+	m, diags := GenerateMigration(d, desired, "001", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	_ = diags
 
 	// Should have create_function and create_trigger ops.
@@ -1288,7 +1289,7 @@ func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
 	}
 
 	stats := TableStats{"players": 2_000_000}
-	_, diags := GenerateMigration(d, desired, "0.7.0", stats, 0, 0)
+	_, diags := GenerateMigration(d, desired, "0.7.0", stats, 0, 0, extregistry.NewBuiltinRegistry())
 
 	hasDangerous := false
 	for _, diag := range diags {
@@ -1315,7 +1316,7 @@ func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
 		},
 	}
 
-	_, diags2 := GenerateMigration(d2, desired, "0.7.1", stats, 0, 0)
+	_, diags2 := GenerateMigration(d2, desired, "0.7.1", stats, 0, 0, extregistry.NewBuiltinRegistry())
 
 	for _, diag := range diags2 {
 		if diag.Code == "MIGRATE_RISK" && diag.Severity == diagnostic.Error &&
@@ -1358,7 +1359,7 @@ func TestGenerateMigration_E215_AddFKLargeTable(t *testing.T) {
 	}
 
 	stats := TableStats{"scores": 50_000}
-	_, diags := GenerateMigration(d, desired, "0.8.0", stats, 10_000, 0)
+	_, diags := GenerateMigration(d, desired, "0.8.0", stats, 10_000, 0, extregistry.NewBuiltinRegistry())
 
 	hasE215 := false
 	for _, diag := range diags {
@@ -1414,7 +1415,7 @@ func TestGenerateMigration_NoStats_NoE215_NoEscalation(t *testing.T) {
 	}
 
 	// nil stats: no E215, no escalation.
-	_, diags := GenerateMigration(d, desired, "0.9.0", nil, 0, 0)
+	_, diags := GenerateMigration(d, desired, "0.9.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 
 	for _, diag := range diags {
 		if diag.Code == "E215" {
@@ -1458,7 +1459,7 @@ func TestGenerateMigration_ExpandContract_SetNotNull_LargeTable(t *testing.T) {
 	}
 
 	stats := TableStats{"players": 15_000_000}
-	m, _ := GenerateMigration(d, desired, "1.0.0", stats, 0, 0)
+	m, _ := GenerateMigration(d, desired, "1.0.0", stats, 0, 0, extregistry.NewBuiltinRegistry())
 
 	// Should have a backfill DML op.
 	if len(m.DMLOps) != 1 {
@@ -1519,7 +1520,7 @@ func TestGenerateMigration_ExpandContract_SetNotNull_SmallTable(t *testing.T) {
 	}
 
 	stats := TableStats{"players": 5_000_000}
-	m, _ := GenerateMigration(d, desired, "1.1.0", stats, 0, 0)
+	m, _ := GenerateMigration(d, desired, "1.1.0", stats, 0, 0, extregistry.NewBuiltinRegistry())
 
 	// Should have NO DML ops.
 	if len(m.DMLOps) != 0 {
@@ -1569,7 +1570,7 @@ func TestGenerateMigration_ExpandContract_TypeNarrow_LargeTable(t *testing.T) {
 	}
 
 	stats := TableStats{"players": 15_000_000}
-	_, diags := GenerateMigration(d, desired, "1.2.0", stats, 0, 0)
+	_, diags := GenerateMigration(d, desired, "1.2.0", stats, 0, 0, extregistry.NewBuiltinRegistry())
 
 	hasWarning := false
 	for _, diag := range diags {
@@ -1619,7 +1620,7 @@ func TestGenerateMigration_ArrayChanged_ScalarToArray(t *testing.T) {
 		},
 	}
 
-	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0)
+	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 
 	var found bool
 	for _, op := range mig.DDLOps {
@@ -1666,7 +1667,7 @@ func TestGenerateMigration_ArrayChanged_ArrayToScalar(t *testing.T) {
 		},
 	}
 
-	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0)
+	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 
 	var found bool
 	for _, op := range mig.DDLOps {
@@ -1714,7 +1715,7 @@ func TestGenerateMigration_IndexWithChange(t *testing.T) {
 			Schema: "public",
 		}},
 	}
-	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if len(m.DDLOps) != 1 {
 		t.Fatalf("expected exactly 1 DDL op (alter_index_set), got %d: %s", len(m.DDLOps), opsDebug(m.DDLOps))
 	}
@@ -1775,7 +1776,7 @@ func TestGenerateMigration_IndexWithChange_ExtensionMethod(t *testing.T) {
 			Schema: "public",
 		}},
 	}
-	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if len(m.DDLOps) != 2 {
 		t.Fatalf("expected 2 DDL ops (drop + create) for extension method, got %d: %s", len(m.DDLOps), opsDebug(m.DDLOps))
 	}
@@ -1828,7 +1829,7 @@ func TestGenerateMigration_IndexWithChange_ColumnsAlsoChanged(t *testing.T) {
 			Schema: "public",
 		}},
 	}
-	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "001", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if len(m.DDLOps) != 2 {
 		t.Fatalf("expected 2 DDL ops (drop + create) for columns+with change, got %d: %s", len(m.DDLOps), opsDebug(m.DDLOps))
 	}
@@ -1925,7 +1926,7 @@ func TestGenerateMigration_MaterializedViewAdded(t *testing.T) {
 	d := &diff.SchemaDiff{
 		MaterializedViewsAdded: []string{"app.monthly_stats"},
 	}
-	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -1976,7 +1977,7 @@ func TestGenerateMigration_MaterializedViewQueryChanged(t *testing.T) {
 			},
 		},
 	}
-	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
@@ -2021,7 +2022,7 @@ func TestGenerateMigration_MaterializedViewRemoved(t *testing.T) {
 	d := &diff.SchemaDiff{
 		MaterializedViewsRemoved: []string{"app.monthly_stats"},
 	}
-	m, _ := GenerateMigration(d, desired, "0.3.0", nil, 0, 0)
+	m, _ := GenerateMigration(d, desired, "0.3.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if m == nil {
 		t.Fatal("expected non-nil migration")
 	}
