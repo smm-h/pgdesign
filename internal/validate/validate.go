@@ -491,6 +491,36 @@ func checkNamingConvention(schema *model.Schema, config *Config) []diagnostic.Di
 			}
 		}
 	}
+	for _, v := range schema.Views {
+		if !pattern.MatchString(v.Name) {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E211",
+				Table:    v.Name,
+				Message:  "view name \"" + v.Name + "\" violates naming convention (snake_case)",
+			})
+		}
+	}
+	for _, mv := range schema.MaterializedViews {
+		if !pattern.MatchString(mv.Name) {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E211",
+				Table:    mv.Name,
+				Message:  "materialized view name \"" + mv.Name + "\" violates naming convention (snake_case)",
+			})
+		}
+		for _, idx := range mv.Indexes {
+			if !pattern.MatchString(idx.Name) {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E211",
+					Table:    mv.Name,
+					Message:  "index name \"" + idx.Name + "\" violates naming convention (snake_case)",
+				})
+			}
+		}
+	}
 	return diags
 }
 
