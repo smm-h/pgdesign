@@ -1521,6 +1521,138 @@ func TestE218_StoredGenerated_NoDiag(t *testing.T) {
 	}
 }
 
+func TestE217_HnswWithPgvectorDeclared_NoDiag(t *testing.T) {
+	reg := extregistry.NewBuiltinRegistry()
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "items",
+			Schema:  "public",
+			Comment: "Items table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "embedding", PGType: "vector(384)"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Indexes: []model.Index{{
+				Name:    "idx_items_embedding",
+				Columns: []string{"embedding"},
+				Method:  "hnsw",
+			}},
+		}},
+	}
+
+	diags, _ := Validate(schema, &Config{
+		ExtRegistry: reg,
+		Extensions:  []string{"pgvector"},
+		Disabled:    []string{"W002"},
+	})
+	found := findByCode(diags, "E217")
+	if len(found) > 0 {
+		t.Fatalf("expected no E217 when pgvector is declared, got: %s", found[0].Message)
+	}
+}
+
+func TestE217_HnswWithoutPgvectorDeclared(t *testing.T) {
+	reg := extregistry.NewBuiltinRegistry()
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "items",
+			Schema:  "public",
+			Comment: "Items table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "embedding", PGType: "vector(384)"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Indexes: []model.Index{{
+				Name:    "idx_items_embedding",
+				Columns: []string{"embedding"},
+				Method:  "hnsw",
+			}},
+		}},
+	}
+
+	diags, _ := Validate(schema, &Config{
+		ExtRegistry: reg,
+		Extensions:  nil, // pgvector NOT declared
+		Disabled:    []string{"W002"},
+	})
+	found := findByCode(diags, "E217")
+	if len(found) == 0 {
+		t.Fatal("expected E217 when hnsw used without pgvector declared")
+	}
+	if found[0].Table != "items" {
+		t.Errorf("expected table 'items', got %q", found[0].Table)
+	}
+}
+
+func TestE217_BtreeIndex_NoDiag(t *testing.T) {
+	reg := extregistry.NewBuiltinRegistry()
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "items",
+			Schema:  "public",
+			Comment: "Items table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "name", PGType: "text"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Indexes: []model.Index{{
+				Name:    "idx_items_name",
+				Columns: []string{"name"},
+				Method:  "btree",
+			}},
+		}},
+	}
+
+	diags, _ := Validate(schema, &Config{
+		ExtRegistry: reg,
+		Disabled:    []string{"W002"},
+	})
+	found := findByCode(diags, "E217")
+	if len(found) > 0 {
+		t.Fatalf("expected no E217 for builtin btree method, got: %s", found[0].Message)
+	}
+}
+
+func TestE217_UnknownMethod(t *testing.T) {
+	reg := extregistry.NewBuiltinRegistry()
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "items",
+			Schema:  "public",
+			Comment: "Items table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid"},
+				{Name: "name", PGType: "text"},
+				{Name: "created_at", PGType: "timestamptz"},
+			},
+			Indexes: []model.Index{{
+				Name:    "idx_items_name",
+				Columns: []string{"name"},
+				Method:  "foo",
+			}},
+		}},
+	}
+
+	diags, _ := Validate(schema, &Config{
+		ExtRegistry: reg,
+		Disabled:    []string{"W002"},
+	})
+	found := findByCode(diags, "E217")
+	if len(found) == 0 {
+		t.Fatal("expected E217 for unknown index method 'foo'")
+	}
+	if found[0].Table != "items" {
+		t.Errorf("expected table 'items', got %q", found[0].Table)
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {
