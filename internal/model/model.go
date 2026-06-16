@@ -1,5 +1,24 @@
 // Package model provides the resolved intermediate representation (IR) for pgdesign.
 // It is the canonical in-memory schema that all downstream packages consume.
+//
+// Adding a new schema object type (e.g., domain, sequence, composite type):
+//
+//  1.  parse/types.go          — raw TOML struct for the new object
+//  2.  parse/parse.go          — parse function to populate the raw struct
+//  3.  model/model.go          — model struct + field on Schema
+//  4.  model/build.go          — resolve function (type resolution, dependency wiring)
+//  5.  validate/validate.go    — validation checks (E-codes)
+//  6.  generate/generate.go    — DDL generation section
+//  7.  sql/sql.go              — DDL helper functions (CREATE, ALTER, DROP)
+//  8.  diff/diff.go            — diff fields + comparison (use matchObjects[T])
+//  9.  migrate/generate.go     — migration op generation
+//  10. migrate/sql_gen.go      — op-to-SQL rendering
+//  11. migrate/parse_migration.go — TOML serialization (tomlDDL fields)
+//  12. risk/risk.go            — risk classification for new ops
+//  13. introspect/introspect.go — pg_catalog query
+//  14. introspect/export.go    — TOML export
+//  15. generate/d2.go          — diagram rendering (optional)
+//  16. generate/doc.go         — documentation output (optional)
 package model
 
 import (
