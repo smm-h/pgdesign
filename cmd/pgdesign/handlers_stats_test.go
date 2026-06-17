@@ -2,12 +2,14 @@ package main
 
 import (
 	"testing"
+
+	"github.com/smm-h/pgdesign/internal/workload"
 )
 
 func TestFindDuplicateIndexes(t *testing.T) {
 	tests := []struct {
 		name    string
-		indexes []IndexInfo
+		indexes []workload.IndexInfo
 		want    int
 	}{
 		{
@@ -17,7 +19,7 @@ func TestFindDuplicateIndexes(t *testing.T) {
 		},
 		{
 			name: "no duplicates",
-			indexes: []IndexInfo{
+			indexes: []workload.IndexInfo{
 				{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
 				{Schema: "public", Table: "users", Name: "idx_b", Columns: []string{"b"}},
 			},
@@ -25,7 +27,7 @@ func TestFindDuplicateIndexes(t *testing.T) {
 		},
 		{
 			name: "simple prefix",
-			indexes: []IndexInfo{
+			indexes: []workload.IndexInfo{
 				{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
 				{Schema: "public", Table: "users", Name: "idx_a_b", Columns: []string{"a", "b"}},
 			},
@@ -33,7 +35,7 @@ func TestFindDuplicateIndexes(t *testing.T) {
 		},
 		{
 			name: "not prefix different first column",
-			indexes: []IndexInfo{
+			indexes: []workload.IndexInfo{
 				{Schema: "public", Table: "users", Name: "idx_b", Columns: []string{"b"}},
 				{Schema: "public", Table: "users", Name: "idx_a_b", Columns: []string{"a", "b"}},
 			},
@@ -41,7 +43,7 @@ func TestFindDuplicateIndexes(t *testing.T) {
 		},
 		{
 			name: "equal columns not duplicate",
-			indexes: []IndexInfo{
+			indexes: []workload.IndexInfo{
 				{Schema: "public", Table: "users", Name: "idx_a_1", Columns: []string{"a", "b"}},
 				{Schema: "public", Table: "users", Name: "idx_a_2", Columns: []string{"a", "b"}},
 			},
@@ -49,7 +51,7 @@ func TestFindDuplicateIndexes(t *testing.T) {
 		},
 		{
 			name: "different tables not duplicate",
-			indexes: []IndexInfo{
+			indexes: []workload.IndexInfo{
 				{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
 				{Schema: "public", Table: "orders", Name: "idx_a_b", Columns: []string{"a", "b"}},
 			},
@@ -57,7 +59,7 @@ func TestFindDuplicateIndexes(t *testing.T) {
 		},
 		{
 			name: "multiple duplicates",
-			indexes: []IndexInfo{
+			indexes: []workload.IndexInfo{
 				{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
 				{Schema: "public", Table: "users", Name: "idx_a_b", Columns: []string{"a", "b"}},
 				{Schema: "public", Table: "users", Name: "idx_a_b_c", Columns: []string{"a", "b", "c"}},
@@ -66,7 +68,7 @@ func TestFindDuplicateIndexes(t *testing.T) {
 		},
 		{
 			name: "different schemas not duplicate",
-			indexes: []IndexInfo{
+			indexes: []workload.IndexInfo{
 				{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
 				{Schema: "private", Table: "users", Name: "idx_a_b", Columns: []string{"a", "b"}},
 			},
@@ -76,9 +78,9 @@ func TestFindDuplicateIndexes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FindDuplicateIndexes(tt.indexes)
+			got := workload.FindDuplicateIndexes(tt.indexes)
 			if len(got) != tt.want {
-				t.Errorf("FindDuplicateIndexes() returned %d duplicates, want %d", len(got), tt.want)
+				t.Errorf("workload.FindDuplicateIndexes() returned %d duplicates, want %d", len(got), tt.want)
 				for _, d := range got {
 					t.Logf("  %s is a prefix of %s (table: %s.%s)", d.Index, d.SupersetIndex, d.Schema, d.Table)
 				}
@@ -88,11 +90,11 @@ func TestFindDuplicateIndexes(t *testing.T) {
 }
 
 func TestFindDuplicateIndexesFields(t *testing.T) {
-	indexes := []IndexInfo{
+	indexes := []workload.IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_email", Columns: []string{"email"}},
 		{Schema: "public", Table: "users", Name: "idx_email_name", Columns: []string{"email", "name"}},
 	}
-	got := FindDuplicateIndexes(indexes)
+	got := workload.FindDuplicateIndexes(indexes)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 duplicate, got %d", len(got))
 	}

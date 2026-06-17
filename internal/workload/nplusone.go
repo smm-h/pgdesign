@@ -29,7 +29,7 @@ func DetectNPlusOne(fkGraph *model.FKGraph, stats []StatementStats) []diagnostic
 	seen := make(map[pair]bool)
 	var diags []diagnostic.Diagnostic
 
-	for fromTable, edges := range fkGraph.Forward {
+	for _, edges := range fkGraph.Forward {
 		for _, edge := range edges {
 			p := pair{edge.FromTable, edge.ToTable}
 			if seen[p] {
@@ -63,7 +63,6 @@ func DetectNPlusOne(fkGraph *model.FKGraph, stats []StatementStats) []diagnostic
 				}
 			}
 		}
-		_ = fromTable
 	}
 
 	return diags
