@@ -36,6 +36,7 @@ type Schema struct {
 	Views              []View              `json:"views,omitempty"`
 	MaterializedViews  []MaterializedView  `json:"materialized_views,omitempty"`
 	Sequences          []Sequence          `json:"sequences,omitempty"`
+	Functions          []Function          `json:"functions,omitempty"`
 	CycleGroups        [][]string          `json:"cycle_groups,omitempty"`
 	PGVersion   int        `json:"pg_version"`
 }
@@ -246,6 +247,31 @@ type Sequence struct {
 	Comment   string `json:"comment,omitempty"`
 }
 
+// FunctionArg represents a single argument to a function or procedure.
+type FunctionArg struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	Default string `json:"default,omitempty"`
+}
+
+// Function represents a resolved function or procedure definition.
+type Function struct {
+	Name            string        `json:"name"`
+	Schema          string        `json:"schema,omitempty"`
+	Language        string        `json:"language"`
+	ReturnType      string        `json:"return_type,omitempty"`
+	Args            []FunctionArg `json:"args,omitempty"`
+	Body            string        `json:"body"`
+	Comment         string        `json:"comment,omitempty"`
+	Volatility      string        `json:"volatility,omitempty"`
+	Parallel        string        `json:"parallel,omitempty"`
+	SecurityDefiner bool          `json:"security_definer,omitempty"`
+	IsProc          bool          `json:"is_proc,omitempty"`
+	Cost            *float64      `json:"cost,omitempty"`
+	Rows            *float64      `json:"rows,omitempty"`
+	DependsOn       []string      `json:"depends_on,omitempty"`
+}
+
 // Domain represents a resolved PostgreSQL domain type.
 type Domain struct {
 	Name        string `json:"name"`
@@ -297,5 +323,11 @@ func StrPtr(s string) *string {
 // Int64Ptr returns a pointer to the given int64. Used for constructing
 // struct literals with *int64 fields.
 func Int64Ptr(v int64) *int64 {
+	return &v
+}
+
+// Float64Ptr returns a pointer to the given float64. Used for constructing
+// struct literals with *float64 fields.
+func Float64Ptr(v float64) *float64 {
 	return &v
 }

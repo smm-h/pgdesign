@@ -11,6 +11,7 @@ type RawSchema struct {
 	Views             []RawView
 	MaterializedViews []RawMaterializedView
 	Sequences         []RawSequence
+	Functions         []RawFunction
 }
 
 // RawMeta holds the [meta] section values.
@@ -184,4 +185,29 @@ type RawMaintenance struct {
 	Premake            *int
 	Retention          *string
 	RetentionKeepTable *bool
+}
+
+// RawFunctionArg holds a function argument from [[functions.*.args]].
+type RawFunctionArg struct {
+	Name    string
+	Type    string
+	Default *string
+}
+
+// RawFunction holds a function or procedure definition from [functions.*].
+type RawFunction struct {
+	Name            string
+	Language        *string
+	Returns         *string
+	Body            *string
+	File            *string
+	Comment         *string
+	Volatility      *string
+	Parallel        *string
+	SecurityDefiner *bool
+	Procedure       *bool
+	Cost            *float64
+	Rows            *float64
+	DependsOn       []string
+	Args            []RawFunctionArg
 }
