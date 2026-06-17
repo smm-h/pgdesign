@@ -34,6 +34,11 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	schema.Tables = sorted
 	schema.CycleGroups = cycles
 
+	// Phase 1b: resolve sequences (needs schema.Tables for owned_by validation).
+	seqs, seqDiags := resolveSequences(raw, schema)
+	diags = append(diags, seqDiags...)
+	schema.Sequences = seqs
+
 	// Phase 3: enrich
 	enrichDiags := enrich(schema)
 	diags = append(diags, enrichDiags...)
@@ -84,6 +89,13 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	sorted, cycles := topoSort(allTables)
 	schema.Tables = sorted
 	schema.CycleGroups = cycles
+
+	// Resolve sequences across all schemas (needs merged tables for owned_by validation).
+	for _, raw := range raws {
+		seqs, seqDiags := resolveSequences(raw, schema)
+		diags = append(diags, seqDiags...)
+		schema.Sequences = append(schema.Sequences, seqs...)
+	}
 
 	// Phase 3: enrich.
 	enrichDiags := enrich(schema)
@@ -173,6 +185,82 @@ func resolveMaterializedViews(raw *parse.RawSchema) []MaterializedView {
 		mvs = append(mvs, mv)
 	}
 	return mvs
+}
+
+// resolveSequences converts raw sequences into model Sequences and validates
+// owned_by references against the schema's tables.
+func resolveSequences(raw *parse.RawSchema, schema *Schema) ([]Sequence, diagnostic.Diagnostics) {
+	var seqs []Sequence
+	var diags diagnostic.Diagnostics
+
+	for _, rs := range raw.Sequences {
+		seq := Sequence{
+			Name:      rs.Name,
+			Schema:    raw.Meta.Schema,
+			Start:     rs.Start,
+			Increment: rs.Increment,
+			MinValue:  rs.MinValue,
+			MaxValue:  rs.MaxValue,
+			Cache:     rs.Cache,
+		}
+		if rs.Cycle != nil {
+			seq.Cycle = *rs.Cycle
+		}
+		if rs.OwnedBy != nil {
+			seq.OwnedBy = *rs.OwnedBy
+		}
+		if rs.Comment != nil {
+			seq.Comment = *rs.Comment
+		}
+
+		// Validate owned_by reference.
+		if seq.OwnedBy != "" {
+			parts := strings.SplitN(seq.OwnedBy, ".", 2)
+			if len(parts) != 2 {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E124",
+					Message:  fmt.Sprintf("sequence %q: owned_by must be in \"table.column\" format, got %q", rs.Name, seq.OwnedBy),
+				})
+			} else {
+				tableName, colName := parts[0], parts[1]
+				table := schema.TableByName(raw.Meta.Schema, tableName)
+				if table == nil {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity: diagnostic.Error,
+						Code:     "E124",
+						Message:  fmt.Sprintf("sequence %q: owned_by references unknown table %q", rs.Name, tableName),
+					})
+				} else {
+					found := false
+					for _, col := range table.Columns {
+						if col.Name == colName {
+							found = true
+							if col.Identity != "" {
+								diags = append(diags, diagnostic.Diagnostic{
+									Severity: diagnostic.Error,
+									Code:     "E124",
+									Message:  fmt.Sprintf("sequence %q: owned_by cannot target identity column %q.%q", rs.Name, tableName, colName),
+								})
+							}
+							break
+						}
+					}
+					if !found {
+						diags = append(diags, diagnostic.Diagnostic{
+							Severity: diagnostic.Error,
+							Code:     "E124",
+							Message:  fmt.Sprintf("sequence %q: owned_by references unknown column %q.%q", rs.Name, tableName, colName),
+						})
+					}
+				}
+			}
+		}
+
+		seqs = append(seqs, seq)
+	}
+
+	return seqs, diags
 }
 
 // resolveTable resolves a single raw table into a model Table.
