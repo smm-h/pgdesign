@@ -1,3 +1,8 @@
+---
+title: "Design Intelligence"
+description: "How pgdesign analyzes schema structure for cascade risks, constraint subsumption, dead columns, row size estimation, and natural key candidates."
+---
+
 # Design Intelligence
 
 The design intelligence subsystem analyzes schema structure beyond basic validation. It surfaces structural issues, optimization opportunities, and design anti-patterns through 12 diagnostics registered under the `"design"` tag. All diagnostics are implemented in `internal/validate/validate.go` and registered via `cmd/pgdesign/checks.go`.

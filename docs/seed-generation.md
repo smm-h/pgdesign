@@ -1,3 +1,8 @@
+---
+title: "Seed Data Generation"
+description: "How pgdesign generates type-aware test data for all 42 PostgreSQL types with CHECK/UNIQUE awareness, FK dependency ordering, and multiple output formats."
+---
+
 # Seed Data Generation
 
 The seed generator produces type-aware test data for all tables in a pgdesign schema. It respects FK dependencies, CHECK constraints, UNIQUE constraints, semantic types, and column nullability. Output is either INSERT statements or PostgreSQL COPY format.
