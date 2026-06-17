@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
@@ -193,8 +194,8 @@ func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout
 		if op.SQL == "" {
 			continue
 		}
-		if _, err := tx.Exec(ctx, op.SQL); err != nil {
-			return fmt.Errorf("DML op %d (%s): %w\n  SQL: %s", i, op.Op, err, op.SQL)
+		if err := executeDMLOp(ctx, tx, i, op); err != nil {
+			return err
 		}
 	}
 
@@ -308,10 +309,37 @@ func applyPhaseOps(ctx context.Context, conn *pgx.Conn, m *Migration, phase stri
 		if op.SQL == "" {
 			continue
 		}
-		if _, err := tx.Exec(ctx, op.SQL); err != nil {
-			return fmt.Errorf("DML op %d (%s): %w\n  SQL: %s", i, op.Op, err, op.SQL)
+		if err := executeDMLOp(ctx, tx, i, op); err != nil {
+			return err
 		}
 	}
 
 	return tx.Commit(ctx)
+}
+
+// sqlExecer is implemented by both pgx.Tx and *pgx.Conn.
+type sqlExecer interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
+
+// executeDMLOp executes a single DML operation. When BatchSize > 0, the SQL
+// is executed in a loop until zero rows are affected, allowing large data
+// modifications to proceed in manageable chunks.
+func executeDMLOp(ctx context.Context, exec sqlExecer, idx int, op DMLOp) error {
+	if op.BatchSize <= 0 {
+		if _, err := exec.Exec(ctx, op.SQL); err != nil {
+			return fmt.Errorf("DML op %d (%s): %w\n  SQL: %s", idx, op.Op, err, op.SQL)
+		}
+		return nil
+	}
+
+	for {
+		tag, err := exec.Exec(ctx, op.SQL)
+		if err != nil {
+			return fmt.Errorf("DML op %d (%s): %w\n  SQL: %s", idx, op.Op, err, op.SQL)
+		}
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+	}
 }
