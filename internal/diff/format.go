@@ -148,6 +148,37 @@ func FormatTerminal(d *SchemaDiff) string {
 		}
 	}
 
+	// Domains
+	for _, name := range d.DomainsAdded {
+		fmt.Fprintf(&b, "%s+ domain %s%s\n", colorGreen, name, colorReset)
+	}
+	for _, name := range d.DomainsRemoved {
+		fmt.Fprintf(&b, "%s- domain %s%s\n", colorRed, name, colorReset)
+	}
+	for _, dd := range d.DomainsChanged {
+		fmt.Fprintf(&b, "%s~ domain %s%s\n", colorYellow, dd.Name, colorReset)
+		if dd.CheckChanged != nil {
+			fmt.Fprintf(&b, "  %s~ check: %q -> %q%s\n", colorYellow, dd.CheckChanged[0], dd.CheckChanged[1], colorReset)
+		}
+		if dd.DefaultChanged != nil {
+			fmt.Fprintf(&b, "  %s~ default: %q -> %q%s\n", colorYellow, dd.DefaultChanged[0], dd.DefaultChanged[1], colorReset)
+		}
+		if dd.NotNullChanged != nil {
+			old := "NULL"
+			new_ := "NULL"
+			if dd.NotNullChanged[0] {
+				old = "NOT NULL"
+			}
+			if dd.NotNullChanged[1] {
+				new_ = "NOT NULL"
+			}
+			fmt.Fprintf(&b, "  %s~ not_null: %s -> %s%s\n", colorYellow, old, new_, colorReset)
+		}
+		if dd.CommentChanged != nil {
+			fmt.Fprintf(&b, "  %s~ comment: %q -> %q%s\n", colorYellow, dd.CommentChanged[0], dd.CommentChanged[1], colorReset)
+		}
+	}
+
 	return b.String()
 }
 

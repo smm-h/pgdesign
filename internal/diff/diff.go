@@ -34,6 +34,9 @@ type SchemaDiff struct {
 	CompositeTypesAdded   []string            `json:"composite_types_added,omitempty"`
 	CompositeTypesRemoved []string            `json:"composite_types_removed,omitempty"`
 	CompositeTypesChanged []CompositeTypeDiff `json:"composite_types_changed,omitempty"`
+	DomainsAdded          []string            `json:"domains_added,omitempty"`
+	DomainsRemoved        []string            `json:"domains_removed,omitempty"`
+	DomainsChanged        []DomainDiff        `json:"domains_changed,omitempty"`
 	FunctionsAdded        []string            `json:"functions_added,omitempty"`
 	FunctionsRemoved      []string            `json:"functions_removed,omitempty"`
 	FunctionsChanged      []FunctionDiff      `json:"functions_changed,omitempty"`
@@ -164,6 +167,15 @@ type FunctionDiff struct {
 	IsProcChanged     *[2]bool     `json:"is_proc_changed,omitempty"`
 }
 
+// DomainDiff describes changes to a domain type.
+type DomainDiff struct {
+	Name           string     `json:"name"`
+	CheckChanged   *[2]string `json:"check_changed,omitempty"`
+	DefaultChanged *[2]string `json:"default_changed,omitempty"`
+	NotNullChanged *[2]bool   `json:"not_null_changed,omitempty"`
+	CommentChanged *[2]string `json:"comment_changed,omitempty"`
+}
+
 // FKChange describes a changed foreign key constraint.
 type FKChange struct {
 	Name string   `json:"name"`
@@ -208,6 +220,9 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.CompositeTypesAdded) == 0 &&
 		len(d.CompositeTypesRemoved) == 0 &&
 		len(d.CompositeTypesChanged) == 0 &&
+		len(d.DomainsAdded) == 0 &&
+		len(d.DomainsRemoved) == 0 &&
+		len(d.DomainsChanged) == 0 &&
 		len(d.FunctionsAdded) == 0 &&
 		len(d.FunctionsRemoved) == 0 &&
 		len(d.FunctionsChanged) == 0
@@ -290,6 +305,15 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.CompositeTypesChanged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d composite type(s) changed", n))
 	}
+	if n := len(d.DomainsAdded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d domain(s) added", n))
+	}
+	if n := len(d.DomainsRemoved); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d domain(s) removed", n))
+	}
+	if n := len(d.DomainsChanged); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d domain(s) changed", n))
+	}
 	if n := len(d.FunctionsAdded); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d function(s) added", n))
 	}
@@ -316,6 +340,7 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 	diffMaterializedViews(d, desired, actual)
 	diffSequences(d, desired, actual)
 	diffCompositeTypes(d, desired, actual)
+	diffDomains(d, desired, actual)
 	diffFunctions(d, desired, actual)
 
 	return d
@@ -1487,4 +1512,70 @@ func float64PtrEqual(a, b *float64) bool {
 		return false
 	}
 	return *a == *b
+}
+
+// diffDomains matches domains by schema-qualified name.
+func diffDomains(d *SchemaDiff, desired, actual *model.Schema) {
+	added, removed, matched := matchObjects(desired.Domains, actual.Domains, func(dom model.Domain) string {
+		return domainKey(&dom)
+	})
+	for _, dom := range added {
+		d.DomainsAdded = append(d.DomainsAdded, domainKey(&dom))
+	}
+	for _, dom := range removed {
+		d.DomainsRemoved = append(d.DomainsRemoved, domainKey(&dom))
+	}
+	for _, p := range matched {
+		dd := diffDomain(&p.Desired, &p.Actual)
+		if dd != nil {
+			d.DomainsChanged = append(d.DomainsChanged, *dd)
+		}
+	}
+}
+
+func domainKey(d *model.Domain) string {
+	if d.Schema == "" || d.Schema == "public" {
+		return d.Name
+	}
+	return d.Schema + "." + d.Name
+}
+
+// diffDomain compares two matched domains and returns nil if identical.
+func diffDomain(desired, actual *model.Domain) *DomainDiff {
+	dd := &DomainDiff{Name: domainKey(desired)}
+	changed := false
+
+	if desired.Check != actual.Check {
+		dd.CheckChanged = &[2]string{actual.Check, desired.Check}
+		changed = true
+	}
+
+	// Compare defaults: normalize DefaultExpr and Default into a single string for comparison.
+	desiredDefault := desired.DefaultExpr
+	if desiredDefault == "" {
+		desiredDefault = desired.Default
+	}
+	actualDefault := actual.DefaultExpr
+	if actualDefault == "" {
+		actualDefault = actual.Default
+	}
+	if desiredDefault != actualDefault {
+		dd.DefaultChanged = &[2]string{actualDefault, desiredDefault}
+		changed = true
+	}
+
+	if desired.NotNull != actual.NotNull {
+		dd.NotNullChanged = &[2]bool{actual.NotNull, desired.NotNull}
+		changed = true
+	}
+
+	if desired.Comment != actual.Comment {
+		dd.CommentChanged = &[2]string{actual.Comment, desired.Comment}
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return dd
 }
