@@ -692,10 +692,10 @@ func diffPartitioning(td *TableDiff, desired, actual *model.Table) {
 	desiredKey := ""
 	actualKey := ""
 	if dp != nil {
-		desiredKey = dp.Column
+		desiredKey = strings.Join(dp.Columns, ", ")
 	}
 	if ap != nil {
-		actualKey = ap.Column
+		actualKey = strings.Join(ap.Columns, ", ")
 	}
 
 	if desiredKey != actualKey {
@@ -729,15 +729,15 @@ func diffPartitioning(td *TableDiff, desired, actual *model.Table) {
 }
 
 // partitionChildKey returns an identifier for a partition child.
-// Combines Strategy and Column to form a unique key for the child partition.
+// Combines Name and Bound to form a unique key for the child partition.
 func partitionChildKey(ps *model.PartitionSpec) string {
-	if ps.Strategy != "" && ps.Column != "" {
-		return ps.Strategy + ":" + ps.Column
+	if ps.Name != "" && ps.Bound != "" {
+		return ps.Name + ":" + ps.Bound
 	}
-	if ps.Strategy != "" {
-		return ps.Strategy
+	if ps.Name != "" {
+		return ps.Name
 	}
-	return ps.Column
+	return ps.Bound
 }
 
 // diffEnums matches enums by schema-qualified name.
