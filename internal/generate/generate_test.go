@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -870,6 +871,52 @@ func TestPartmanNotEmittedWithoutExtension(t *testing.T) {
 
 	if strings.Contains(out, "partman") {
 		t.Errorf("should not contain partman SQL without pg_partman extension, got:\n%s", out)
+	}
+}
+
+func TestPartmanMultiColumnError(t *testing.T) {
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pg_partman"},
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "year", PGType: "integer", NotNull: true},
+					{Name: "region", PGType: "text", NotNull: true},
+				},
+				PK: []string{"id"},
+				Partitioning: &model.PartitionSpec{
+					Strategy: "range",
+					Columns:  []string{"year", "region"},
+				},
+				Maintenance: &model.MaintenanceConfig{
+					Premake:   3,
+					Retention: "90 days",
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	_, diags, err := Generate(schema, opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !diagnostic.Diagnostics(diags).HasErrors() {
+		t.Fatal("expected diagnostic error for pg_partman + multi-column, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E010" && strings.Contains(d.Message, "pg_partman") && strings.Contains(d.Message, "multi-column") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected pg_partman multi-column error diagnostic (E010), got: %v", diags)
 	}
 }
 
