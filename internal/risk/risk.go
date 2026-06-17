@@ -91,6 +91,10 @@ const (
 	OpAlterSequence           OpType = "alter_sequence"
 	OpCreateCompositeType     OpType = "create_composite_type"
 	OpDropCompositeType       OpType = "drop_composite_type"
+
+	OpCreateFunction          OpType = "create_function"
+	OpDropFunction            OpType = "drop_function"
+	OpCreateOrReplaceFunction OpType = "create_or_replace_function"
 )
 
 // OpContext provides context about the operation environment for risk assessment.
@@ -385,6 +389,28 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			Reversible: false,
 			DataLoss:   true,
 			Suggestion: "Dropping a composite type with CASCADE affects all columns using this type",
+		}
+
+	case OpCreateFunction:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
+		}
+
+	case OpDropFunction:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockNone,
+			Reversible: false,
+			Suggestion: "Dependents (triggers, views, other functions) may break",
+		}
+
+	case OpCreateOrReplaceFunction:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
 		}
 
 	default:
