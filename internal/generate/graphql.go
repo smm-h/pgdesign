@@ -64,11 +64,6 @@ func pgTypeToGraphQL(pgType string, isPK bool, enumNames map[string]bool) string
 	return "String"
 }
 
-// reverseRelation tracks that a referring table has a FK pointing at a target table.
-type reverseRelation struct {
-	tableName string
-}
-
 // generateGraphQL produces a GraphQL schema from the resolved schema.
 func generateGraphQL(schema *model.Schema) string {
 	var b strings.Builder
@@ -79,16 +74,11 @@ func generateGraphQL(schema *model.Schema) string {
 		enumNames[e.Name] = true
 	}
 
-	// Build reverse relations: for each table, which other tables reference it.
-	tables := schema.TableOrder()
-	reverseRels := make(map[string][]reverseRelation)
-	for _, t := range tables {
-		for _, fk := range t.FKs {
-			reverseRels[fk.RefTable] = append(reverseRels[fk.RefTable], reverseRelation{
-				tableName: t.Name,
-			})
-		}
+	if schema.FKGraph == nil {
+		schema.BuildFKGraph()
 	}
+
+	tables := schema.TableOrder()
 
 	// Scalars.
 	b.WriteString("scalar DateTime\nscalar JSON\n")
@@ -201,10 +191,15 @@ func generateGraphQL(schema *model.Schema) string {
 			typeName  string
 		}
 		var revFields []revField
-		for _, rel := range reverseRels[t.Name] {
+		seen := make(map[string]bool)
+		for _, edge := range schema.FKGraph.Reverse[t.Name] {
+			if seen[edge.FKName] {
+				continue
+			}
+			seen[edge.FKName] = true
 			revFields = append(revFields, revField{
-				fieldName: toCamelCase(rel.tableName),
-				typeName:  toPascalCase(rel.tableName),
+				fieldName: toCamelCase(edge.FromTable),
+				typeName:  toPascalCase(edge.FromTable),
 			})
 		}
 		sort.Slice(revFields, func(i, j int) bool {
