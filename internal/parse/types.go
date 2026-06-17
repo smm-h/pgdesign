@@ -80,6 +80,7 @@ type RawTable struct {
 	Checks       map[string]RawCheck
 	Exclusions   map[string]RawExclusion
 	Policies     map[string]RawPolicy
+	Triggers     map[string]RawTrigger
 	EnableRLS    bool
 	Partitioning *RawPartitioning
 	Dependencies []RawDependency
@@ -162,6 +163,22 @@ type RawPolicy struct {
 	WithCheck    string // SQL expr for new rows
 	ErrorCode    string // application error code
 	ErrorMessage string // human-readable error message
+}
+
+// RawTrigger holds a trigger definition from [tables.*.triggers.*].
+type RawTrigger struct {
+	Name              string
+	Function          string
+	Events            []string
+	Timing            string
+	ForEach           *string
+	When              *string
+	Constraint        *bool
+	Deferrable        *bool
+	InitiallyDeferred *bool
+	ReferencingOld    *string
+	ReferencingNew    *string
+	Comment           *string
 }
 
 // RawPartitioning holds partition configuration from [tables.*.partitioning].

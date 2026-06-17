@@ -852,6 +852,7 @@ func (p *parser) parseTable(name string) RawTable {
 		Checks:     make(map[string]RawCheck),
 		Exclusions: make(map[string]RawExclusion),
 		Policies:   make(map[string]RawPolicy),
+		Triggers:   make(map[string]RawTrigger),
 	}
 
 	// Find the [tables.<name>] table node for top-level keys
@@ -869,7 +870,7 @@ func (p *parser) parseTable(name string) RawTable {
 			if !knownKeys[key] {
 				// Could be a dotted key for sub-sections; skip known sub-section prefixes
 				if key == "columns" || key == "fks" || key == "indexes" ||
-					key == "unique" || key == "checks" || key == "exclusions" || key == "policies" ||
+					key == "unique" || key == "checks" || key == "exclusions" || key == "policies" || key == "triggers" ||
 					key == "partitioning" || key == "dependencies" || key == "maintenance" {
 					continue
 				}
@@ -925,6 +926,9 @@ func (p *parser) parseTable(name string) RawTable {
 
 	// Parse policies
 	p.parsePolicies(name, &rt)
+
+	// Parse triggers
+	p.parseTriggers(name, &rt)
 
 	// Parse partitioning
 	p.parsePartitioning(name, &rt)
@@ -1481,6 +1485,126 @@ func (p *parser) parsePolicy(tableName, polName string, tbl *tomledit.TableNode)
 	}
 
 	return pol
+}
+
+// parseTriggers extracts triggers from [tables.<name>.triggers.*].
+func (p *parser) parseTriggers(tableName string, rt *RawTable) {
+	prefix := []string{"tables", tableName, "triggers"}
+
+	for _, child := range p.doc.Children {
+		tbl, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl.KeyPath) == 4 && pathHasPrefix(tbl.KeyPath, prefix) {
+			trigName := tbl.KeyPath[3]
+			trig := p.parseTrigger(tableName, trigName, tbl)
+			rt.Triggers[trigName] = trig
+		}
+	}
+}
+
+func (p *parser) parseTrigger(tableName, trigName string, tbl *tomledit.TableNode) RawTrigger {
+	trig := RawTrigger{Name: trigName}
+
+	knownKeys := map[string]bool{
+		"function": true, "events": true, "timing": true, "for_each": true,
+		"when": true, "constraint": true, "deferrable": true, "initially_deferred": true,
+		"referencing_old": true, "referencing_new": true, "comment": true,
+	}
+
+	for _, child := range tbl.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		key := kv.Key.Parts[0]
+		if !knownKeys[key] {
+			p.warnf("W001", tableName, "", "unknown key in [tables.%s.triggers.%s]: %q", tableName, trigName, key)
+			continue
+		}
+		switch key {
+		case "function":
+			if v, ok := nodeString(kv.Val); ok {
+				trig.Function = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].function must be a string", tableName, trigName)
+			}
+		case "events":
+			if arr, ok := nodeStringSlice(kv.Val); ok {
+				trig.Events = arr
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].events must be an array of strings", tableName, trigName)
+			}
+		case "timing":
+			if v, ok := nodeString(kv.Val); ok {
+				trig.Timing = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].timing must be a string", tableName, trigName)
+			}
+		case "for_each":
+			if v, ok := nodeString(kv.Val); ok {
+				trig.ForEach = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].for_each must be a string", tableName, trigName)
+			}
+		case "when":
+			if v, ok := nodeString(kv.Val); ok {
+				trig.When = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].when must be a string", tableName, trigName)
+			}
+		case "constraint":
+			if v, ok := nodeBool(kv.Val); ok {
+				trig.Constraint = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].constraint must be a boolean", tableName, trigName)
+			}
+		case "deferrable":
+			if v, ok := nodeBool(kv.Val); ok {
+				trig.Deferrable = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].deferrable must be a boolean", tableName, trigName)
+			}
+		case "initially_deferred":
+			if v, ok := nodeBool(kv.Val); ok {
+				trig.InitiallyDeferred = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].initially_deferred must be a boolean", tableName, trigName)
+			}
+		case "referencing_old":
+			if v, ok := nodeString(kv.Val); ok {
+				trig.ReferencingOld = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].referencing_old must be a string", tableName, trigName)
+			}
+		case "referencing_new":
+			if v, ok := nodeString(kv.Val); ok {
+				trig.ReferencingNew = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].referencing_new must be a string", tableName, trigName)
+			}
+		case "comment":
+			if v, ok := nodeString(kv.Val); ok {
+				trig.Comment = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].comment must be a string", tableName, trigName)
+			}
+		}
+	}
+
+	// Validate required fields.
+	if trig.Function == "" {
+		p.errorf("E010", tableName, "", "[tables.%s.triggers.%s] missing required field \"function\"", tableName, trigName)
+	}
+	if len(trig.Events) == 0 {
+		p.errorf("E010", tableName, "", "[tables.%s.triggers.%s] missing required field \"events\"", tableName, trigName)
+	}
+	if trig.Timing == "" {
+		p.errorf("E010", tableName, "", "[tables.%s.triggers.%s] missing required field \"timing\"", tableName, trigName)
+	}
+
+	return trig
 }
 
 // parsePartitioning extracts partitioning from [tables.<name>.partitioning].
