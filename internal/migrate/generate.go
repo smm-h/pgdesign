@@ -1038,13 +1038,13 @@ func generateDescription(d *diff.SchemaDiff) string {
 // partitionChildKey returns the key used to identify a partition child in diffs.
 // Must match diff.partitionChildKey exactly.
 func partitionChildKey(ps *model.PartitionSpec) string {
-	if ps.Strategy != "" && ps.Column != "" {
-		return ps.Strategy + ":" + ps.Column
+	if ps.Name != "" && ps.Bound != "" {
+		return ps.Name + ":" + ps.Bound
 	}
-	if ps.Strategy != "" {
-		return ps.Strategy
+	if ps.Name != "" {
+		return ps.Name
 	}
-	return ps.Column
+	return ps.Bound
 }
 
 // findPartitionChild looks up a partition child spec by its diff key in the
@@ -1063,15 +1063,11 @@ func findPartitionChild(table *model.Table, childKey string) *model.PartitionSpe
 }
 
 // partitionChildQualifiedName derives the schema-qualified child table name
-// from the parent table name and child spec. Uses the child's Name field if
-// set, otherwise falls back to the Strategy field (which some specs use as
-// the child table name).
+// from the parent table name and child spec. Uses the child's Name field;
+// child partitions should always have a Name set.
 func partitionChildQualifiedName(parentQualified string, child *model.PartitionSpec) string {
 	schema, _ := splitQualifiedName(parentQualified)
 	childName := child.Name
-	if childName == "" {
-		childName = child.Strategy
-	}
 	if schema != "" && schema != "public" {
 		return schema + "." + childName
 	}
