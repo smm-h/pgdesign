@@ -127,6 +127,62 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		diags = append(diags, classifyOp(createOp, risk.OpCreateCompositeType, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
+	// Create domains (after enums and composite types, before tables).
+	for _, domName := range d.DomainsAdded {
+		schema, name := splitQualifiedName(domName)
+		dom := findDomain(desired, domName)
+		op := DDLOp{
+			Op:        "create_domain",
+			Name:      name,
+			Schema:    schema,
+			DomainDef: dom,
+			Down: &DownOp{
+				Ops: []DDLOp{{Op: "drop_domain", Name: name, Schema: schema}},
+			},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpCreateDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
+	// Changed domains: alter constraints.
+	for _, dd := range d.DomainsChanged {
+		schema, name := splitQualifiedName(dd.Name)
+		if dd.CheckChanged != nil {
+			// Drop old constraint if it existed.
+			if dd.CheckChanged[0] != "" {
+				dropOp := DDLOp{
+					Op:     "alter_domain_drop_constraint",
+					Name:   name,
+					Schema: schema,
+					Column: name + "_check", // constraint name
+					Down:   &DownOp{Irreversible: true},
+				}
+				m.DDLOps = append(m.DDLOps, dropOp)
+				diags = append(diags, classifyOp(dropOp, risk.OpAlterDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			}
+			// Add new constraint if there is one.
+			if dd.CheckChanged[1] != "" {
+				addOp := DDLOp{
+					Op:     "alter_domain_add_constraint",
+					Name:   name,
+					Schema: schema,
+					Column: name + "_check", // constraint name
+					Expr:   dd.CheckChanged[1],
+					Down: &DownOp{
+						Ops: []DDLOp{{
+							Op:     "alter_domain_drop_constraint",
+							Name:   name,
+							Schema: schema,
+							Column: name + "_check",
+						}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, addOp)
+				diags = append(diags, classifyOp(addOp, risk.OpAlterDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			}
+		}
+	}
+
 	for _, tableName := range d.TablesAdded {
 		table := findTable(desired, tableName)
 		ctx := tableCtx(tableName)
@@ -976,6 +1032,19 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		diags = append(diags, classifyOp(op, risk.OpDropCompositeType, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
+	// Drop domains.
+	for _, domName := range d.DomainsRemoved {
+		schema, name := splitQualifiedName(domName)
+		op := DDLOp{
+			Op:     "drop_domain",
+			Name:   name,
+			Schema: schema,
+			Down:   &DownOp{Irreversible: true},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpDropDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
 	// Drop functions.
 	for _, fnName := range d.FunctionsRemoved {
 		fn := findFunction(desired, fnName)
@@ -1344,6 +1413,19 @@ func generateDescription(d *diff.SchemaDiff) string {
 		}
 		parts = append(parts, fmt.Sprintf("Alter composite type %s", strings.Join(names, ", ")))
 	}
+	if len(d.DomainsAdded) > 0 {
+		parts = append(parts, fmt.Sprintf("Add domain %s", strings.Join(d.DomainsAdded, ", ")))
+	}
+	if len(d.DomainsRemoved) > 0 {
+		parts = append(parts, fmt.Sprintf("Drop domain %s", strings.Join(d.DomainsRemoved, ", ")))
+	}
+	if len(d.DomainsChanged) > 0 {
+		names := make([]string, len(d.DomainsChanged))
+		for i, dd := range d.DomainsChanged {
+			names[i] = dd.Name
+		}
+		parts = append(parts, fmt.Sprintf("Alter domain %s", strings.Join(names, ", ")))
+	}
 	if len(d.FunctionsAdded) > 0 {
 		parts = append(parts, fmt.Sprintf("Add function %s", strings.Join(d.FunctionsAdded, ", ")))
 	}
@@ -1499,4 +1581,20 @@ func funcKey(f model.Function) string {
 		return f.Name
 	}
 	return f.Schema + "." + f.Name
+}
+
+func findDomain(schema *model.Schema, qualifiedName string) *model.Domain {
+	for i := range schema.Domains {
+		if domainKey(schema.Domains[i]) == qualifiedName {
+			return &schema.Domains[i]
+		}
+	}
+	return nil
+}
+
+func domainKey(d model.Domain) string {
+	if d.Schema == "" || d.Schema == "public" {
+		return d.Name
+	}
+	return d.Schema + "." + d.Name
 }

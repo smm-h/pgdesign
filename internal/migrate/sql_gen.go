@@ -104,6 +104,14 @@ func OpToSQL(op DDLOp) string {
 		return opDropCompositeType(op)
 	case "create_or_replace_function":
 		return opCreateOrReplaceFunction(op)
+	case "create_domain":
+		return opCreateDomain(op)
+	case "drop_domain":
+		return opDropDomain(op)
+	case "alter_domain_add_constraint":
+		return opAlterDomainAddConstraint(op)
+	case "alter_domain_drop_constraint":
+		return opAlterDomainDropConstraint(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -606,4 +614,55 @@ func opDropCompositeType(op DDLOp) string {
 		schema = "public"
 	}
 	return sql.DropCompositeType(schema, op.Name, true)
+}
+
+func opCreateDomain(op DDLOp) string {
+	if op.DomainDef != nil {
+		schema := op.Schema
+		if schema == "" {
+			schema = "public"
+		}
+		return sql.CreateDomain(schema, *op.DomainDef)
+	}
+	// Fallback.
+	if op.Schema != "" {
+		return fmt.Sprintf("-- create_domain: missing definition for %s.%s", op.Schema, op.Name)
+	}
+	return fmt.Sprintf("-- create_domain: missing definition for %s", op.Name)
+}
+
+func opDropDomain(op DDLOp) string {
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	return sql.DropDomain(schema, op.Name, true)
+}
+
+func opAlterDomainAddConstraint(op DDLOp) string {
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	qualified := sql.QualifiedName(schema, op.Name)
+	constraintName := op.Name + "_check"
+	if op.Column != "" {
+		constraintName = op.Column
+	}
+	return fmt.Sprintf("ALTER DOMAIN %s ADD CONSTRAINT %s CHECK (%s);",
+		qualified, sql.QuoteIdent(constraintName), op.Expr)
+}
+
+func opAlterDomainDropConstraint(op DDLOp) string {
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	qualified := sql.QualifiedName(schema, op.Name)
+	constraintName := op.Name + "_check"
+	if op.Column != "" {
+		constraintName = op.Column
+	}
+	return fmt.Sprintf("ALTER DOMAIN %s DROP CONSTRAINT %s;",
+		qualified, sql.QuoteIdent(constraintName))
 }
