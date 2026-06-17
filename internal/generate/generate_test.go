@@ -1908,3 +1908,66 @@ func TestSemanticTypeCheckInDDL(t *testing.T) {
 		t.Errorf("expected CHECK for email contact, got:\n%s", out)
 	}
 }
+
+func TestExclusionConstraintDDL(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Comment: "Room bookings",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "room_id", PGType: "integer", NotNull: true},
+				{Name: "during", PGType: "tsrange", NotNull: true},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "room_id", Operator: "="},
+					{Column: "during", Operator: "&&"},
+				},
+			}},
+		}},
+	}
+
+	out := mustGenerate(t, schema, Options{Format: "sql"})
+
+	expected := `ALTER TABLE "".bookings ADD CONSTRAINT no_overlap EXCLUDE USING gist (room_id WITH =, during WITH &&);`
+	if !strings.Contains(out, expected) {
+		t.Errorf("expected exclusion DDL:\n%s\n\ngot:\n%s", expected, out)
+	}
+}
+
+func TestExclusionConstraintDDLWithWhere(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Comment: "Room bookings",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "room_id", PGType: "integer", NotNull: true},
+				{Name: "during", PGType: "tsrange", NotNull: true},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "room_id", Operator: "="},
+					{Column: "during", Operator: "&&"},
+				},
+				Where:             "active = true",
+				Deferrable:        true,
+				InitiallyDeferred: true,
+			}},
+		}},
+	}
+
+	out := mustGenerate(t, schema, Options{Format: "sql"})
+
+	expected := `ALTER TABLE "".bookings ADD CONSTRAINT no_overlap EXCLUDE USING gist (room_id WITH =, during WITH &&) WHERE (active = true) DEFERRABLE INITIALLY DEFERRED;`
+	if !strings.Contains(out, expected) {
+		t.Errorf("expected exclusion DDL:\n%s\n\ngot:\n%s", expected, out)
+	}
+}
