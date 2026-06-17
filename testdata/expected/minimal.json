@@ -35,7 +35,13 @@
       "fks": [],
       "indexes": [],
       "uniques": [],
-      "checks": []
+      "checks": [
+        {
+          "name": "chk_users_email",
+          "expr": "email ~ '^[^@]+@[^@]+\\.[^@]+$'"
+        }
+      ],
+      "exclusions": []
     }
   ],
   "pg_version": 16

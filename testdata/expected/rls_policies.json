@@ -43,7 +43,13 @@
       "fks": [],
       "indexes": [],
       "uniques": [],
-      "checks": [],
+      "checks": [
+        {
+          "name": "chk_documents_title",
+          "expr": "LENGTH(title) \u003c= 255"
+        }
+      ],
+      "exclusions": [],
       "policies": [
         {
           "name": "owners_delete",

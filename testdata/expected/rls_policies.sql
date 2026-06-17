@@ -10,6 +10,8 @@ CREATE TABLE secure.documents (
     CONSTRAINT pk_documents PRIMARY KEY (id)
 );
 
+ALTER TABLE secure.documents ADD CONSTRAINT chk_documents_title CHECK (LENGTH(title) <= 255);
+
 COMMENT ON TABLE secure.documents IS 'User documents with row-level security';
 
 ALTER TABLE secure.documents ENABLE ROW LEVEL SECURITY;

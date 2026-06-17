@@ -7,4 +7,6 @@ CREATE TABLE public.users (
     CONSTRAINT pk_users PRIMARY KEY (id)
 );
 
+ALTER TABLE public.users ADD CONSTRAINT chk_users_email CHECK (email ~ '^[^@]+@[^@]+\.[^@]+$');
+
 COMMENT ON TABLE public.users IS 'User accounts';

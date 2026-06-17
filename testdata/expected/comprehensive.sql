@@ -79,9 +79,16 @@ ALTER TABLE app.comments ADD CONSTRAINT fk_comments_task FOREIGN KEY (task_id) R
 
 ALTER TABLE app.tasks ADD CONSTRAINT uq_tasks_project_title UNIQUE (project_id, title);
 
+ALTER TABLE app.projects ADD CONSTRAINT chk_projects_description CHECK (LENGTH(description) <= 255);
+ALTER TABLE app.projects ADD CONSTRAINT chk_projects_name CHECK (LENGTH(name) <= 255);
+ALTER TABLE app.tasks ADD CONSTRAINT chk_tasks_title CHECK (LENGTH(title) <= 255);
 ALTER TABLE app.tasks ADD CONSTRAINT ck_tasks_positive_hours CHECK (estimated_hours >= 0);
+ALTER TABLE app.audit_log ADD CONSTRAINT chk_audit_log_action CHECK (LENGTH(action) <= 255);
 ALTER TABLE app.audit_log ADD CONSTRAINT ck_metadata_title_type CHECK (metadata ? 'title' AND jsonb_typeof(metadata->'title') = 'string');
 ALTER TABLE app.audit_log ADD CONSTRAINT ck_metadata_value_type CHECK (metadata ? 'value' AND jsonb_typeof(metadata->'value') = 'number');
+ALTER TABLE app.events ADD CONSTRAINT chk_events_event_type CHECK (LENGTH(event_type) <= 255);
+ALTER TABLE app.comments ADD CONSTRAINT chk_comments_body CHECK (LENGTH(body) <= 255);
+ALTER TABLE app.comments ADD CONSTRAINT chk_comments_tags CHECK (LENGTH(tags) <= 255);
 
 CREATE INDEX idx_tasks_project_id ON app.tasks (project_id);
 CREATE INDEX idx_tasks_title ON app.tasks (title text_pattern_ops);

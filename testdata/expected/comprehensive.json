@@ -63,7 +63,17 @@
       "fks": [],
       "indexes": [],
       "uniques": [],
-      "checks": [],
+      "checks": [
+        {
+          "name": "chk_projects_description",
+          "expr": "LENGTH(description) \u003c= 255"
+        },
+        {
+          "name": "chk_projects_name",
+          "expr": "LENGTH(name) \u003c= 255"
+        }
+      ],
+      "exclusions": [],
       "policies": [
         {
           "name": "owner_delete",
@@ -204,10 +214,15 @@
       ],
       "checks": [
         {
+          "name": "chk_tasks_title",
+          "expr": "LENGTH(title) \u003c= 255"
+        },
+        {
           "name": "ck_tasks_positive_hours",
           "expr": "estimated_hours \u003e= 0"
         }
-      ]
+      ],
+      "exclusions": []
     },
     {
       "name": "audit_log",
@@ -290,6 +305,10 @@
       "uniques": [],
       "checks": [
         {
+          "name": "chk_audit_log_action",
+          "expr": "LENGTH(action) \u003c= 255"
+        },
+        {
           "name": "ck_metadata_title_type",
           "expr": "metadata ? 'title' AND jsonb_typeof(metadata-\u003e'title') = 'string'"
         },
@@ -298,6 +317,7 @@
           "expr": "metadata ? 'value' AND jsonb_typeof(metadata-\u003e'value') = 'number'"
         }
       ],
+      "exclusions": [],
       "append_only": true
     },
     {
@@ -373,7 +393,13 @@
         }
       ],
       "uniques": [],
-      "checks": [],
+      "checks": [
+        {
+          "name": "chk_events_event_type",
+          "expr": "LENGTH(event_type) \u003c= 255"
+        }
+      ],
+      "exclusions": [],
       "partitioning": {
         "strategy": "range",
         "columns": [
@@ -480,7 +506,17 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [
+        {
+          "name": "chk_comments_body",
+          "expr": "LENGTH(body) \u003c= 255"
+        },
+        {
+          "name": "chk_comments_tags",
+          "expr": "LENGTH(tags) \u003c= 255"
+        }
+      ],
+      "exclusions": []
     }
   ],
   "pg_version": 16

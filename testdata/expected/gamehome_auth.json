@@ -81,7 +81,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "magic_links",
@@ -129,7 +130,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "credentials",
@@ -190,7 +192,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "sessions",
@@ -277,7 +280,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "provider_links",
@@ -344,7 +348,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "email_verifications",
@@ -411,7 +416,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "password_resets",
@@ -472,7 +478,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "totp_secrets",
@@ -534,7 +541,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "recovery_codes",
@@ -595,7 +603,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "webauthn_credentials",
@@ -681,7 +690,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     }
   ],
   "pg_version": 1

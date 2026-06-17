@@ -254,7 +254,8 @@
           "name": "ck_players_ai_model_consistency",
           "expr": "(is_ai = true AND ai_model IS NOT NULL) OR (is_ai = false AND ai_model IS NULL)"
         }
-      ]
+      ],
+      "exclusions": []
     },
     {
       "name": "server_registry",
@@ -350,7 +351,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "experiment",
@@ -419,7 +421,8 @@
           ]
         }
       ],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "achievement_def",
@@ -480,7 +483,8 @@
           ]
         }
       ],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "friendships",
@@ -612,7 +616,8 @@
           "name": "ck_friendships_ordered",
           "expr": "player_a \u003c player_b"
         }
-      ]
+      ],
+      "exclusions": []
     },
     {
       "name": "game_catalog",
@@ -734,7 +739,8 @@
           "name": "ck_game_catalog_generation_consistency",
           "expr": "(ai_generated = true AND generation_model IS NOT NULL) OR (ai_generated = false AND generation_model IS NULL AND generation_prompt IS NULL)"
         }
-      ]
+      ],
+      "exclusions": []
     },
     {
       "name": "chat_messages",
@@ -828,6 +834,7 @@
       ],
       "uniques": [],
       "checks": [],
+      "exclusions": [],
       "partitioning": {
         "strategy": "range",
         "columns": [
@@ -917,7 +924,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "player_age_verification",
@@ -1028,7 +1036,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "player_profile",
@@ -1103,7 +1112,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "player_setting",
@@ -1159,7 +1169,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "follow",
@@ -1241,7 +1252,8 @@
           "name": "ck_follow_no_self",
           "expr": "follower_id \u003c\u003e followed_id"
         }
-      ]
+      ],
+      "exclusions": []
     },
     {
       "name": "report",
@@ -1339,7 +1351,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "currency_balance",
@@ -1396,7 +1409,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "currency_transaction",
@@ -1495,7 +1509,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "notification",
@@ -1594,7 +1609,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "api_keys",
@@ -1689,7 +1705,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "experiment_assignment",
@@ -1773,7 +1790,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "platform_leaderboards",
@@ -1884,7 +1902,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "game_version",
@@ -1967,7 +1986,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "game_fork",
@@ -2076,7 +2096,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "game_like",
@@ -2153,7 +2174,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "game_comment",
@@ -2242,7 +2264,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "generation_job",
@@ -2380,7 +2403,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "session",
@@ -2524,7 +2548,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "achievement",
@@ -2630,7 +2655,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "moderation_action",
@@ -2698,7 +2724,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "game_play",
@@ -2829,7 +2856,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "session_participant",
@@ -2913,7 +2941,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "action_log",
@@ -3010,7 +3039,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     },
     {
       "name": "state_snapshot",
@@ -3081,7 +3111,8 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [],
+      "exclusions": []
     }
   ],
   "pg_version": 1

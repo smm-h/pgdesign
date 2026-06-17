@@ -75,7 +75,13 @@
         }
       ],
       "uniques": [],
-      "checks": []
+      "checks": [
+        {
+          "name": "chk_messages_channel",
+          "expr": "LENGTH(channel) \u003c= 255"
+        }
+      ],
+      "exclusions": []
     }
   ],
   "pg_version": 16
