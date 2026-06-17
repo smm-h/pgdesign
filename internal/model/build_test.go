@@ -3,6 +3,7 @@ package model
 import (
 	"testing"
 
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
 )
@@ -520,5 +521,235 @@ func TestBuild_SemanticTypeCheckConstraints(t *testing.T) {
 		if ck.Name == "chk_profiles_id" {
 			t.Error("id type should not produce a CHECK constraint")
 		}
+	}
+}
+
+func int64Ptr(v int64) *int64 { return &v }
+
+func TestBuild_SequenceResolution(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	trueVal := true
+	comment := "Order ID sequence"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Sequences: []parse.RawSequence{
+			{
+				Name:      "order_seq",
+				Start:     int64Ptr(100),
+				Increment: int64Ptr(2),
+				MinValue:  int64Ptr(1),
+				MaxValue:  int64Ptr(999999),
+				Cache:     int64Ptr(10),
+				Cycle:     &trueVal,
+				Comment:   &comment,
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Sequences) != 1 {
+		t.Fatalf("expected 1 sequence, got %d", len(schema.Sequences))
+	}
+
+	seq := schema.Sequences[0]
+	if seq.Name != "order_seq" {
+		t.Errorf("name = %q, want %q", seq.Name, "order_seq")
+	}
+	if seq.Schema != "public" {
+		t.Errorf("schema = %q, want %q", seq.Schema, "public")
+	}
+	if seq.Start == nil || *seq.Start != 100 {
+		t.Errorf("start = %v, want 100", seq.Start)
+	}
+	if seq.Increment == nil || *seq.Increment != 2 {
+		t.Errorf("increment = %v, want 2", seq.Increment)
+	}
+	if seq.MinValue == nil || *seq.MinValue != 1 {
+		t.Errorf("min_value = %v, want 1", seq.MinValue)
+	}
+	if seq.MaxValue == nil || *seq.MaxValue != 999999 {
+		t.Errorf("max_value = %v, want 999999", seq.MaxValue)
+	}
+	if seq.Cache == nil || *seq.Cache != 10 {
+		t.Errorf("cache = %v, want 10", seq.Cache)
+	}
+	if !seq.Cycle {
+		t.Error("cycle = false, want true")
+	}
+	if seq.OwnedBy != "" {
+		t.Errorf("owned_by = %q, want empty", seq.OwnedBy)
+	}
+	if seq.Comment != "Order ID sequence" {
+		t.Errorf("comment = %q, want %q", seq.Comment, "Order ID sequence")
+	}
+}
+
+func TestBuild_SequenceOwnedByValid(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	ownedBy := "orders.total"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "orders",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "total", Type: "counter"},
+				},
+			},
+		},
+		Sequences: []parse.RawSequence{
+			{
+				Name:    "order_seq",
+				OwnedBy: &ownedBy,
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+}
+
+func TestBuild_SequenceOwnedByInvalidFormat(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	ownedBy := "no_dot"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Sequences: []parse.RawSequence{
+			{
+				Name:    "bad_seq",
+				OwnedBy: &ownedBy,
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for invalid owned_by format")
+	}
+
+	var hasE124 bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E124" {
+			hasE124 = true
+			break
+		}
+	}
+	if !hasE124 {
+		t.Error("expected E124 error for invalid owned_by format")
+	}
+}
+
+func TestBuild_SequenceOwnedByUnknownTable(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	ownedBy := "nonexistent.col"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Sequences: []parse.RawSequence{
+			{
+				Name:    "bad_seq",
+				OwnedBy: &ownedBy,
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for unknown table in owned_by")
+	}
+
+	var hasE124 bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E124" {
+			hasE124 = true
+			break
+		}
+	}
+	if !hasE124 {
+		t.Error("expected E124 error for unknown table in owned_by")
+	}
+}
+
+func TestBuild_SequenceOwnedByUnknownColumn(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	ownedBy := "users.nonexistent"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "users",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "name", Type: "short_text"},
+				},
+			},
+		},
+		Sequences: []parse.RawSequence{
+			{
+				Name:    "bad_seq",
+				OwnedBy: &ownedBy,
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for unknown column in owned_by")
+	}
+
+	var hasE124 bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E124" {
+			hasE124 = true
+			break
+		}
+	}
+	if !hasE124 {
+		t.Error("expected E124 error for unknown column in owned_by")
+	}
+}
+
+func TestBuild_SequenceOwnedByIdentityColumn(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	ownedBy := "users.id"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "users",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "auto_id"},
+					{Name: "name", Type: "short_text"},
+				},
+			},
+		},
+		Sequences: []parse.RawSequence{
+			{
+				Name:    "bad_seq",
+				OwnedBy: &ownedBy,
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for identity column in owned_by")
+	}
+
+	var hasE124 bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E124" {
+			hasE124 = true
+			break
+		}
+	}
+	if !hasE124 {
+		t.Error("expected E124 error for identity column in owned_by")
 	}
 }

@@ -1679,6 +1679,200 @@ operators = ["=", "&&"]
 	}
 }
 
+func TestSequenceParsing_Basic(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[sequences.order_seq]
+start = 1000
+increment = 2
+min_value = 1
+max_value = 999999
+cache = 10
+cycle = true
+owned_by = "orders.id"
+comment = "Order ID sequence"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Sequences) != 1 {
+		t.Fatalf("expected 1 sequence, got %d", len(schema.Sequences))
+	}
+
+	seq := schema.Sequences[0]
+	if seq.Name != "order_seq" {
+		t.Errorf("sequence name = %q, want %q", seq.Name, "order_seq")
+	}
+	if seq.Start == nil || *seq.Start != 1000 {
+		t.Errorf("start = %v, want 1000", seq.Start)
+	}
+	if seq.Increment == nil || *seq.Increment != 2 {
+		t.Errorf("increment = %v, want 2", seq.Increment)
+	}
+	if seq.MinValue == nil || *seq.MinValue != 1 {
+		t.Errorf("min_value = %v, want 1", seq.MinValue)
+	}
+	if seq.MaxValue == nil || *seq.MaxValue != 999999 {
+		t.Errorf("max_value = %v, want 999999", seq.MaxValue)
+	}
+	if seq.Cache == nil || *seq.Cache != 10 {
+		t.Errorf("cache = %v, want 10", seq.Cache)
+	}
+	if seq.Cycle == nil || *seq.Cycle != true {
+		t.Errorf("cycle = %v, want true", seq.Cycle)
+	}
+	if seq.OwnedBy == nil || *seq.OwnedBy != "orders.id" {
+		t.Errorf("owned_by = %v, want %q", seq.OwnedBy, "orders.id")
+	}
+	if seq.Comment == nil || *seq.Comment != "Order ID sequence" {
+		t.Errorf("comment = %v, want %q", seq.Comment, "Order ID sequence")
+	}
+}
+
+func TestSequenceParsing_Minimal(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[sequences.simple_seq]
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Sequences) != 1 {
+		t.Fatalf("expected 1 sequence, got %d", len(schema.Sequences))
+	}
+
+	seq := schema.Sequences[0]
+	if seq.Name != "simple_seq" {
+		t.Errorf("sequence name = %q, want %q", seq.Name, "simple_seq")
+	}
+	if seq.Start != nil {
+		t.Errorf("start should be nil, got %v", *seq.Start)
+	}
+	if seq.Increment != nil {
+		t.Errorf("increment should be nil, got %v", *seq.Increment)
+	}
+	if seq.MinValue != nil {
+		t.Errorf("min_value should be nil, got %v", *seq.MinValue)
+	}
+	if seq.MaxValue != nil {
+		t.Errorf("max_value should be nil, got %v", *seq.MaxValue)
+	}
+	if seq.Cache != nil {
+		t.Errorf("cache should be nil, got %v", *seq.Cache)
+	}
+	if seq.Cycle != nil {
+		t.Errorf("cycle should be nil, got %v", *seq.Cycle)
+	}
+	if seq.OwnedBy != nil {
+		t.Errorf("owned_by should be nil, got %v", *seq.OwnedBy)
+	}
+	if seq.Comment != nil {
+		t.Errorf("comment should be nil, got %v", *seq.Comment)
+	}
+}
+
+func TestSequenceParsing_UnknownKey(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[sequences.s]
+start = 1
+unknown_field = "bad"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+
+	var hasWarning bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Warning && d.Code == "W001" {
+			hasWarning = true
+			break
+		}
+	}
+	if !hasWarning {
+		t.Error("expected W001 warning for unknown key in sequence")
+	}
+}
+
+func TestSequenceParsing_InvalidTypes(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[sequences.bad]
+start = "not_a_number"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+
+	var hasError bool
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E010" {
+			hasError = true
+			break
+		}
+	}
+	if !hasError {
+		t.Error("expected E010 error for invalid type on sequence field")
+	}
+}
+
+func TestSequenceParsing_Multiple(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[sequences.seq_a]
+start = 1
+
+[sequences.seq_b]
+start = 100
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Sequences) != 2 {
+		t.Fatalf("expected 2 sequences, got %d", len(schema.Sequences))
+	}
+
+	if schema.Sequences[0].Name != "seq_a" {
+		t.Errorf("sequences[0].name = %q, want %q", schema.Sequences[0].Name, "seq_a")
+	}
+	if schema.Sequences[0].Start == nil || *schema.Sequences[0].Start != 1 {
+		t.Errorf("sequences[0].start = %v, want 1", schema.Sequences[0].Start)
+	}
+	if schema.Sequences[1].Name != "seq_b" {
+		t.Errorf("sequences[1].name = %q, want %q", schema.Sequences[1].Name, "seq_b")
+	}
+	if schema.Sequences[1].Start == nil || *schema.Sequences[1].Start != 100 {
+		t.Errorf("sequences[1].start = %v, want 100", schema.Sequences[1].Start)
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {
