@@ -3305,3 +3305,161 @@ func TestTriggerUnchanged(t *testing.T) {
 		t.Errorf("expected empty diff for identical triggers, got: %s", d.Summary())
 	}
 }
+
+func int64Ptr(v int64) *int64 { return &v }
+
+func TestSequenceFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		SequencesAdded:   []string{"order_seq"},
+		SequencesRemoved: []string{"old_seq"},
+		SequencesChanged: []SequenceDiff{
+			{
+				Name:         "counter_seq",
+				StartChanged: &[2]*int64{int64Ptr(1), int64Ptr(100)},
+				CycleChanged: &[2]bool{false, true},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "+ sequence order_seq") {
+		t.Errorf("expected sequence added in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "- sequence old_seq") {
+		t.Errorf("expected sequence removed in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "~ sequence counter_seq") {
+		t.Errorf("expected sequence changed in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "start: 1 -> 100") {
+		t.Errorf("expected start change in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "cycle: false -> true") {
+		t.Errorf("expected cycle change in output, got:\n%s", out)
+	}
+}
+
+func TestFunctionFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		FunctionsAdded:   []string{"new_fn"},
+		FunctionsRemoved: []string{"old_fn"},
+		FunctionsChanged: []FunctionDiff{
+			{
+				Name:              "my_fn",
+				BodyChanged:       &[2]string{"old body", "new body"},
+				VolatilityChanged: &[2]string{"VOLATILE", "STABLE"},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "+ function new_fn") {
+		t.Errorf("expected function added in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "- function old_fn") {
+		t.Errorf("expected function removed in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "~ function my_fn") {
+		t.Errorf("expected function changed in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "body changed") {
+		t.Errorf("expected body changed in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "volatility: VOLATILE -> STABLE") {
+		t.Errorf("expected volatility change in output, got:\n%s", out)
+	}
+}
+
+func TestExclusionFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "bookings",
+				ExclusionsAdded: []model.ExclusionConstraint{
+					{Name: "no_overlap"},
+				},
+				ExclusionsRemoved: []string{"old_excl"},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "+ exclusion no_overlap") {
+		t.Errorf("expected exclusion added in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "- exclusion old_excl") {
+		t.Errorf("expected exclusion removed in output, got:\n%s", out)
+	}
+}
+
+func TestTriggerFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "orders",
+				TriggersAdded: []model.Trigger{
+					{
+						Name:     "audit_trigger",
+						Function: "audit_fn",
+						Events:   []string{"INSERT"},
+						Timing:   "AFTER",
+						ForEach:  "ROW",
+					},
+				},
+				TriggersRemoved: []string{"old_trigger"},
+				TriggersChanged: []TriggerChange{
+					{Name: "update_trigger"},
+				},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "+ trigger audit_trigger") {
+		t.Errorf("expected trigger added in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "- trigger old_trigger") {
+		t.Errorf("expected trigger removed in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "~ trigger update_trigger") {
+		t.Errorf("expected trigger changed in output, got:\n%s", out)
+	}
+}
+
+func TestCollationFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "users",
+				ColumnsChanged: []ColumnChange{
+					{
+						Name:             "name",
+						CollationChanged: &[2]string{"en_US", "de_DE"},
+						Risk:             risk.Classification{RiskLevel: risk.Safe},
+					},
+				},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, `collation: "en_US" -> "de_DE"`) {
+		t.Errorf("expected collation change in output, got:\n%s", out)
+	}
+}
+
+func TestStatisticsFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "metrics",
+				ColumnsChanged: []ColumnChange{
+					{
+						Name:              "value",
+						StatisticsChanged: &[2]*int{intPtr(100), intPtr(1000)},
+						Risk:              risk.Classification{RiskLevel: risk.Safe},
+					},
+				},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "statistics: 100 -> 1000") {
+		t.Errorf("expected statistics change in output, got:\n%s", out)
+	}
+}

@@ -182,6 +182,104 @@ func FormatTerminal(d *SchemaDiff) string {
 		}
 	}
 
+	// Sequences
+	for _, name := range d.SequencesAdded {
+		fmt.Fprintf(&b, "%s+ sequence %s%s\n", colorGreen, name, colorReset)
+	}
+	for _, name := range d.SequencesRemoved {
+		fmt.Fprintf(&b, "%s- sequence %s%s\n", colorRed, name, colorReset)
+	}
+	for _, sd := range d.SequencesChanged {
+		fmt.Fprintf(&b, "%s~ sequence %s%s\n", colorYellow, sd.Name, colorReset)
+		if sd.StartChanged != nil {
+			fmt.Fprintf(&b, "  %s~ start: %s -> %s%s\n", colorYellow, formatOptionalInt64(sd.StartChanged[0]), formatOptionalInt64(sd.StartChanged[1]), colorReset)
+		}
+		if sd.IncrementChanged != nil {
+			fmt.Fprintf(&b, "  %s~ increment: %s -> %s%s\n", colorYellow, formatOptionalInt64(sd.IncrementChanged[0]), formatOptionalInt64(sd.IncrementChanged[1]), colorReset)
+		}
+		if sd.MinValueChanged != nil {
+			fmt.Fprintf(&b, "  %s~ min_value: %s -> %s%s\n", colorYellow, formatOptionalInt64(sd.MinValueChanged[0]), formatOptionalInt64(sd.MinValueChanged[1]), colorReset)
+		}
+		if sd.MaxValueChanged != nil {
+			fmt.Fprintf(&b, "  %s~ max_value: %s -> %s%s\n", colorYellow, formatOptionalInt64(sd.MaxValueChanged[0]), formatOptionalInt64(sd.MaxValueChanged[1]), colorReset)
+		}
+		if sd.CacheChanged != nil {
+			fmt.Fprintf(&b, "  %s~ cache: %s -> %s%s\n", colorYellow, formatOptionalInt64(sd.CacheChanged[0]), formatOptionalInt64(sd.CacheChanged[1]), colorReset)
+		}
+		if sd.CycleChanged != nil {
+			fmt.Fprintf(&b, "  %s~ cycle: %s -> %s%s\n", colorYellow, boolStr(sd.CycleChanged[0]), boolStr(sd.CycleChanged[1]), colorReset)
+		}
+		if sd.OwnedByChanged != nil {
+			fmt.Fprintf(&b, "  %s~ owned_by: %q -> %q%s\n", colorYellow, sd.OwnedByChanged[0], sd.OwnedByChanged[1], colorReset)
+		}
+		if sd.CommentChanged != nil {
+			fmt.Fprintf(&b, "  %s~ comment: %q -> %q%s\n", colorYellow, sd.CommentChanged[0], sd.CommentChanged[1], colorReset)
+		}
+	}
+
+	// Functions
+	for _, name := range d.FunctionsAdded {
+		fmt.Fprintf(&b, "%s+ function %s%s\n", colorGreen, name, colorReset)
+	}
+	for _, name := range d.FunctionsRemoved {
+		fmt.Fprintf(&b, "%s- function %s%s\n", colorRed, name, colorReset)
+	}
+	for _, fd := range d.FunctionsChanged {
+		fmt.Fprintf(&b, "%s~ function %s%s\n", colorYellow, fd.Name, colorReset)
+		if fd.BodyChanged != nil {
+			fmt.Fprintf(&b, "  %s~ body changed%s\n", colorYellow, colorReset)
+		}
+		if fd.ReturnTypeChanged != nil {
+			fmt.Fprintf(&b, "  %s~ returns: %s -> %s%s\n", colorYellow, fd.ReturnTypeChanged[0], fd.ReturnTypeChanged[1], colorReset)
+		}
+		if fd.ArgsChanged {
+			fmt.Fprintf(&b, "  %s~ args changed%s\n", colorYellow, colorReset)
+		}
+		if fd.SignatureChanged {
+			fmt.Fprintf(&b, "  %s~ signature changed (requires DROP + CREATE)%s\n", colorRed, colorReset)
+		}
+		if fd.LanguageChanged != nil {
+			fmt.Fprintf(&b, "  %s~ language: %s -> %s%s\n", colorYellow, fd.LanguageChanged[0], fd.LanguageChanged[1], colorReset)
+		}
+		if fd.VolatilityChanged != nil {
+			fmt.Fprintf(&b, "  %s~ volatility: %s -> %s%s\n", colorYellow, fd.VolatilityChanged[0], fd.VolatilityChanged[1], colorReset)
+		}
+		if fd.ParallelChanged != nil {
+			fmt.Fprintf(&b, "  %s~ parallel: %s -> %s%s\n", colorYellow, fd.ParallelChanged[0], fd.ParallelChanged[1], colorReset)
+		}
+		if fd.SecurityChanged != nil {
+			old := "INVOKER"
+			new_ := "INVOKER"
+			if fd.SecurityChanged[0] {
+				old = "DEFINER"
+			}
+			if fd.SecurityChanged[1] {
+				new_ = "DEFINER"
+			}
+			fmt.Fprintf(&b, "  %s~ security: %s -> %s%s\n", colorYellow, old, new_, colorReset)
+		}
+		if fd.CommentChanged != nil {
+			fmt.Fprintf(&b, "  %s~ comment: %q -> %q%s\n", colorYellow, fd.CommentChanged[0], fd.CommentChanged[1], colorReset)
+		}
+		if fd.CostChanged != nil {
+			fmt.Fprintf(&b, "  %s~ cost: %s -> %s%s\n", colorYellow, formatOptionalFloat64(fd.CostChanged[0]), formatOptionalFloat64(fd.CostChanged[1]), colorReset)
+		}
+		if fd.RowsChanged != nil {
+			fmt.Fprintf(&b, "  %s~ rows: %s -> %s%s\n", colorYellow, formatOptionalFloat64(fd.RowsChanged[0]), formatOptionalFloat64(fd.RowsChanged[1]), colorReset)
+		}
+		if fd.IsProcChanged != nil {
+			oldKind := "FUNCTION"
+			newKind := "FUNCTION"
+			if fd.IsProcChanged[0] {
+				oldKind = "PROCEDURE"
+			}
+			if fd.IsProcChanged[1] {
+				newKind = "PROCEDURE"
+			}
+			fmt.Fprintf(&b, "  %s~ kind: %s -> %s%s\n", colorYellow, oldKind, newKind, colorReset)
+		}
+	}
+
 	return b.String()
 }
 
@@ -262,6 +360,25 @@ func formatTableDiff(b *strings.Builder, td *TableDiff) {
 		fmt.Fprintf(b, "  %s- check %s%s\n", colorRed, name, colorReset)
 	}
 
+	// Exclusions
+	for _, exc := range td.ExclusionsAdded {
+		fmt.Fprintf(b, "  %s+ exclusion %s%s\n", colorGreen, exc.Name, colorReset)
+	}
+	for _, name := range td.ExclusionsRemoved {
+		fmt.Fprintf(b, "  %s- exclusion %s%s\n", colorRed, name, colorReset)
+	}
+
+	// Triggers
+	for _, trig := range td.TriggersAdded {
+		fmt.Fprintf(b, "  %s+ trigger %s%s\n", colorGreen, trig.Name, colorReset)
+	}
+	for _, name := range td.TriggersRemoved {
+		fmt.Fprintf(b, "  %s- trigger %s%s\n", colorRed, name, colorReset)
+	}
+	for _, tc := range td.TriggersChanged {
+		fmt.Fprintf(b, "  %s~ trigger %s%s\n", colorYellow, tc.Name, colorReset)
+	}
+
 	// Partitioning
 	if pd := td.PartitioningChanged; pd != nil {
 		if pd.StrategyChanged != nil {
@@ -324,6 +441,15 @@ func formatColumnChange(b *strings.Builder, cc *ColumnChange) {
 	if cc.ArrayChanged != nil {
 		fmt.Fprintf(b, "    array: %s -> %s\n", arrayStr(cc.ArrayChanged[0]), arrayStr(cc.ArrayChanged[1]))
 	}
+	if cc.CollationChanged != nil {
+		fmt.Fprintf(b, "    collation: %q -> %q\n", cc.CollationChanged[0], cc.CollationChanged[1])
+	}
+	if cc.JSONSchemaChanged != nil {
+		fmt.Fprintf(b, "    json_schema: %q -> %q\n", cc.JSONSchemaChanged[0], cc.JSONSchemaChanged[1])
+	}
+	if cc.StatisticsChanged != nil {
+		fmt.Fprintf(b, "    statistics: %s -> %s\n", formatOptionalInt(cc.StatisticsChanged[0]), formatOptionalInt(cc.StatisticsChanged[1]))
+	}
 }
 
 func boolStr(v bool) string {
@@ -355,6 +481,27 @@ func riskBadge(level risk.RiskLevel) string {
 	default:
 		return ""
 	}
+}
+
+func formatOptionalInt64(v *int64) string {
+	if v == nil {
+		return "default"
+	}
+	return fmt.Sprintf("%d", *v)
+}
+
+func formatOptionalFloat64(v *float64) string {
+	if v == nil {
+		return "default"
+	}
+	return fmt.Sprintf("%g", *v)
+}
+
+func formatOptionalInt(v *int) string {
+	if v == nil {
+		return "default"
+	}
+	return fmt.Sprintf("%d", *v)
 }
 
 // FormatJSON renders the diff as a JSON string.
