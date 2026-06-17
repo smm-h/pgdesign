@@ -819,11 +819,11 @@ func queryPartitionSpec(ctx context.Context, conn *pgx.Conn, tableOID uint32, co
 	}
 
 	// Resolve attribute numbers to column names.
-	partColumn := resolvePartColumn(partAttrs, columns)
+	partColumns := resolvePartColumns(partAttrs, columns)
 
 	ps := &model.PartitionSpec{
 		Strategy: mapPartStrategy(stratCode),
-		Column:   partColumn,
+		Columns:  partColumns,
 	}
 
 	// Query child partitions.
@@ -836,10 +836,9 @@ func queryPartitionSpec(ctx context.Context, conn *pgx.Conn, tableOID uint32, co
 	return ps, nil
 }
 
-// resolvePartColumn maps partition key attribute numbers to column names.
-// For single-column partitioning (the common case), returns the column name.
-// For multi-column or expression-based keys, joins with commas.
-func resolvePartColumn(attNums []int32, columns []model.Column) string {
+// resolvePartColumns maps partition key attribute numbers to column names.
+// Returns one name per partition key column.
+func resolvePartColumns(attNums []int32, columns []model.Column) []string {
 	// Build attnum-to-name map. attnum is 1-based.
 	attnumMap := make(map[int32]string, len(columns))
 	for i, c := range columns {
@@ -858,7 +857,7 @@ func resolvePartColumn(attNums []int32, columns []model.Column) string {
 		}
 	}
 
-	return strings.Join(names, ", ")
+	return names
 }
 
 // queryPartitionChildren returns child partitions for a parent OID,
@@ -903,9 +902,8 @@ func queryPartitionChildren(ctx context.Context, conn *pgx.Conn, parentOID uint3
 	var children []model.PartitionSpec
 	for _, ci := range childInfos {
 		child := model.PartitionSpec{
-			// Convention: child.Strategy = partition name, child.Column = bound expression.
-			Strategy: ci.name,
-			Column:   ci.boundExpr,
+			Name:  ci.name,
+			Bound: ci.boundExpr,
 		}
 
 		// If the child is itself partitioned, recurse to get its sub-partitions.
