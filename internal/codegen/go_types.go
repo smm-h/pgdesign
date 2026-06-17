@@ -46,7 +46,19 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 			TableName: tbl.Name,
 		}
 		for _, col := range tbl.Columns {
-			goType, importPath := pgTypeToGo(col)
+			var goType string
+			var importPath string
+			isBytea := strings.ToLower(col.PGType) == "bytea"
+
+			if col.SemanticTypeName == "money" {
+				goType = LookupMoneyType(LangGo)
+			} else {
+				m := LookupType(col.PGType, LangGo)
+				goType = m.Type
+				importPath = m.Import
+			}
+			goType = applyModifiers(goType, col, isBytea)
+
 			if importPath != "" {
 				imports[importPath] = true
 			}
@@ -89,6 +101,13 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		buf.WriteString(")\n")
 	}
 
+	// Write enums.
+	enumBlock := GenerateEnums(schema.Enums, LangGo)
+	if enumBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(enumBlock)
+	}
+
 	// Write structs.
 	for _, si := range structs {
 		buf.WriteString("\n")
@@ -116,60 +135,6 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 	}
 
 	return buf.Bytes(), nil
-}
-
-// pgTypeToGo maps a column's PostgreSQL type to a Go type string and an
-// optional import path. It handles semantic types, arrays, and nullability.
-func pgTypeToGo(col model.Column) (goType string, importPath string) {
-	// Semantic type overrides.
-	if col.SemanticTypeName == "money" {
-		goType = "int64"
-		return applyModifiers(goType, col, false), ""
-	}
-
-	pgType := strings.ToLower(col.PGType)
-
-	isBytea := false
-	switch pgType {
-	case "integer", "int4":
-		goType = "int32"
-	case "bigint", "int8":
-		goType = "int64"
-	case "smallint", "int2":
-		goType = "int16"
-	case "text", "varchar", "character varying", "char", "character", "bpchar":
-		goType = "string"
-	case "boolean", "bool":
-		goType = "bool"
-	case "timestamptz", "timestamp", "timestamp with time zone", "timestamp without time zone":
-		goType = "time.Time"
-		importPath = "time"
-	case "uuid":
-		goType = "uuid.UUID"
-		importPath = "github.com/google/uuid"
-	case "jsonb", "json":
-		goType = "json.RawMessage"
-		importPath = "encoding/json"
-	case "numeric", "decimal":
-		goType = "string"
-	case "real", "float4":
-		goType = "float32"
-	case "double precision", "float8":
-		goType = "float64"
-	case "bytea":
-		goType = "[]byte"
-		isBytea = true
-	case "date":
-		goType = "time.Time"
-		importPath = "time"
-	case "interval":
-		goType = "string"
-	default:
-		// Enum types and anything unrecognized fall back to string.
-		goType = "string"
-	}
-
-	return applyModifiers(goType, col, isBytea), importPath
 }
 
 // applyModifiers wraps a base Go type with slice/pointer prefixes based on
