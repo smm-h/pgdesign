@@ -20,7 +20,9 @@ type tomlDDL struct {
 	Op       string      `toml:"op"`
 	Table    string      `toml:"table,omitempty"`
 	Column   string      `toml:"column,omitempty"`
-	Type     string      `toml:"type,omitempty"`
+	Type      string      `toml:"type,omitempty"`
+	Collation string      `toml:"collation,omitempty"`
+	Statistics *int       `toml:"statistics,omitempty"`
 	Default  interface{} `toml:"default,omitempty"`
 	NotNull   bool        `toml:"not_null,omitempty"`
 	Generated string      `toml:"generated,omitempty"`
@@ -33,7 +35,8 @@ type tomlDDL struct {
 	OnDelete string      `toml:"on_delete,omitempty"`
 	Method   string      `toml:"method,omitempty"`
 	Where    string      `toml:"where,omitempty"`
-	Opclass  interface{} `toml:"opclass,omitempty"`
+	Opclass       interface{} `toml:"opclass,omitempty"`
+	IdxCollation  interface{} `toml:"collations,omitempty"`
 	Include  []string          `toml:"include,omitempty"`
 	With     map[string]string `toml:"with,omitempty"`
 	Comment  string            `toml:"comment,omitempty"`
@@ -104,29 +107,31 @@ func ParseMigration(data string) (*Migration, error) {
 
 func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 	op := DDLOp{
-		Op:       td.Op,
-		Table:    td.Table,
-		Column:   td.Column,
-		Type:     td.Type,
-		Default:  td.Default,
-		NotNull:   td.NotNull,
-		Generated: td.Generated,
-		Stored:    td.Stored,
-		PGVersion: td.PGVersion,
-		Name:     td.Name,
-		Columns:  td.Columns,
-		RefTable: td.RefTable,
-		RefCols:  td.RefCols,
-		OnDelete: td.OnDelete,
-		Method:   td.Method,
-		Where:    td.Where,
-		Include:  td.Include,
-		With:     td.With,
-		Comment:  td.Comment,
-		PK:       td.PK,
-		Values:   td.Values,
-		Schema:   td.Schema,
-		Expr:     td.Expr,
+		Op:         td.Op,
+		Table:      td.Table,
+		Column:     td.Column,
+		Type:       td.Type,
+		Collation:  td.Collation,
+		Statistics: td.Statistics,
+		Default:    td.Default,
+		NotNull:    td.NotNull,
+		Generated:  td.Generated,
+		Stored:     td.Stored,
+		PGVersion:  td.PGVersion,
+		Name:       td.Name,
+		Columns:    td.Columns,
+		RefTable:   td.RefTable,
+		RefCols:    td.RefCols,
+		OnDelete:   td.OnDelete,
+		Method:     td.Method,
+		Where:      td.Where,
+		Include:    td.Include,
+		With:       td.With,
+		Comment:    td.Comment,
+		PK:         td.PK,
+		Values:     td.Values,
+		Schema:     td.Schema,
+		Expr:       td.Expr,
 	}
 	// Convert opclass: string becomes a map applied to all columns,
 	// map is copied directly.
@@ -143,6 +148,23 @@ func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 		for k, val := range v {
 			if s, ok := val.(string); ok {
 				op.Opclasses[k] = s
+			}
+		}
+	}
+	// Convert index collations: same pattern as opclass.
+	switch v := td.IdxCollation.(type) {
+	case string:
+		if v != "" {
+			op.Collations = make(map[string]string, len(td.Columns))
+			for _, col := range td.Columns {
+				op.Collations[col] = v
+			}
+		}
+	case map[string]interface{}:
+		op.Collations = make(map[string]string, len(v))
+		for k, val := range v {
+			if s, ok := val.(string); ok {
+				op.Collations[k] = s
 			}
 		}
 	}
@@ -217,6 +239,12 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	if op.Type != "" {
 		b.WriteString(fmt.Sprintf("type = %q\n", op.Type))
 	}
+	if op.Collation != "" {
+		b.WriteString(fmt.Sprintf("collation = %q\n", op.Collation))
+	}
+	if op.Statistics != nil {
+		b.WriteString(fmt.Sprintf("statistics = %d\n", *op.Statistics))
+	}
 	if op.Default != nil {
 		writeDefault(b, op.Default)
 	}
@@ -276,6 +304,35 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 						b.WriteString(", ")
 					}
 					b.WriteString(fmt.Sprintf("%s = %q", col, oc))
+					first = false
+				}
+			}
+			b.WriteString(" }\n")
+		}
+	}
+	if len(op.Collations) > 0 {
+		// Same pattern as opclasses: compact string if all same, inline table otherwise.
+		allSame := true
+		var singleVal string
+		for _, v := range op.Collations {
+			if singleVal == "" {
+				singleVal = v
+			} else if v != singleVal {
+				allSame = false
+				break
+			}
+		}
+		if allSame && singleVal != "" {
+			b.WriteString(fmt.Sprintf("collations = %q\n", singleVal))
+		} else {
+			b.WriteString("collations = { ")
+			first := true
+			for _, col := range op.Columns {
+				if coll, ok := op.Collations[col]; ok {
+					if !first {
+						b.WriteString(", ")
+					}
+					b.WriteString(fmt.Sprintf("%s = %q", col, coll))
 					first = false
 				}
 			}
