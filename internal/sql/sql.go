@@ -876,6 +876,64 @@ func CreateAppendOnlyTrigger(schemaName, tableName string) string {
 		qualifiedTable, qualifiedFunc)
 }
 
+// CreateTrigger generates a CREATE [CONSTRAINT] TRIGGER statement for a user-defined trigger.
+// Emits: CREATE [CONSTRAINT] TRIGGER name timing events ON [schema.]table
+//
+//	[REFERENCING OLD TABLE AS x NEW TABLE AS y]
+//	FOR EACH ROW|STATEMENT [WHEN (condition)]
+//	EXECUTE FUNCTION [schema.]func_name()
+func CreateTrigger(schemaName, tableName string, t model.Trigger) string {
+	qualifiedTable := QualifiedName(schemaName, tableName)
+
+	var sb strings.Builder
+	sb.WriteString("CREATE ")
+	if t.Constraint {
+		sb.WriteString("CONSTRAINT ")
+	}
+	sb.WriteString(fmt.Sprintf("TRIGGER %s %s %s ON %s",
+		QuoteIdent(t.Name),
+		t.Timing,
+		strings.Join(t.Events, " OR "),
+		qualifiedTable))
+
+	// Deferrable (only meaningful for constraint triggers).
+	if t.Deferrable {
+		sb.WriteString(" DEFERRABLE")
+		if t.InitiallyDeferred {
+			sb.WriteString(" INITIALLY DEFERRED")
+		}
+	}
+
+	// REFERENCING clause for transition tables.
+	if t.ReferencingOld != "" || t.ReferencingNew != "" {
+		sb.WriteString(" REFERENCING")
+		if t.ReferencingOld != "" {
+			sb.WriteString(fmt.Sprintf(" OLD TABLE AS %s", QuoteIdent(t.ReferencingOld)))
+		}
+		if t.ReferencingNew != "" {
+			sb.WriteString(fmt.Sprintf(" NEW TABLE AS %s", QuoteIdent(t.ReferencingNew)))
+		}
+	}
+
+	sb.WriteString(fmt.Sprintf(" FOR EACH %s", t.ForEach))
+
+	if t.When != "" {
+		sb.WriteString(fmt.Sprintf(" WHEN (%s)", t.When))
+	}
+
+	// Function name: schema-qualify it.
+	qualifiedFunc := QualifiedName(schemaName, t.Function)
+	sb.WriteString(fmt.Sprintf(" EXECUTE FUNCTION %s();", qualifiedFunc))
+
+	return sb.String()
+}
+
+// DropTrigger generates a DROP TRIGGER statement.
+func DropTrigger(schemaName, tableName, triggerName string) string {
+	qualifiedTable := QualifiedName(schemaName, tableName)
+	return fmt.Sprintf("DROP TRIGGER %s ON %s;", QuoteIdent(triggerName), qualifiedTable)
+}
+
 // CreateFunction generates a CREATE OR REPLACE FUNCTION/PROCEDURE statement.
 // For procedures (f.IsProc), RETURNS and volatility/parallel/cost/rows are omitted.
 func CreateFunction(schemaName string, f model.Function) string {
