@@ -94,24 +94,78 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 	fmt.Printf("  Description: %s\n", m.Description)
 	fmt.Println()
 
-	for i, op := range m.DDLOps {
-		sqlStmt := migrate.OpToSQL(op)
-		fmt.Printf("  %d. [%s] %s\n", i+1, op.Op, opSummary(op))
-		fmt.Printf("     SQL: %s\n", sqlStmt)
-		if op.Down != nil {
-			if op.Down.Irreversible {
-				fmt.Println("     Down: IRREVERSIBLE")
-			} else {
-				fmt.Println("     Down: reversible")
+	if migrate.HasPhases(m) {
+		ddlIdx := 0
+		dmlIdx := 0
+		for _, phase := range []string{migrate.PhaseExpand, migrate.PhaseMigrate, migrate.PhaseContract} {
+			// Check if this phase has any ops.
+			hasOps := false
+			for _, op := range m.DDLOps {
+				if op.Phase == phase {
+					hasOps = true
+					break
+				}
+			}
+			if !hasOps {
+				for _, op := range m.DMLOps {
+					if op.Phase == phase {
+						hasOps = true
+						break
+					}
+				}
+			}
+			if !hasOps {
+				continue
+			}
+
+			fmt.Printf("  -- Phase: %s --\n", phase)
+			for _, op := range m.DDLOps {
+				if op.Phase != phase {
+					continue
+				}
+				ddlIdx++
+				sqlStmt := migrate.OpToSQL(op)
+				fmt.Printf("  %d. [%s] %s\n", ddlIdx, op.Op, opSummary(op))
+				fmt.Printf("     SQL: %s\n", sqlStmt)
+				if op.Down != nil {
+					if op.Down.Irreversible {
+						fmt.Println("     Down: IRREVERSIBLE")
+					} else {
+						fmt.Println("     Down: reversible")
+					}
+				}
+				fmt.Println()
+			}
+			for _, op := range m.DMLOps {
+				if op.Phase != phase {
+					continue
+				}
+				dmlIdx++
+				fmt.Printf("  DML %d. [%s]\n", dmlIdx, op.Op)
+				fmt.Printf("     SQL: %s\n", op.SQL)
+				fmt.Println()
 			}
 		}
-		fmt.Println()
-	}
+	} else {
+		for i, op := range m.DDLOps {
+			sqlStmt := migrate.OpToSQL(op)
+			fmt.Printf("  %d. [%s] %s\n", i+1, op.Op, opSummary(op))
+			fmt.Printf("     SQL: %s\n", sqlStmt)
+			if op.Down != nil {
+				if op.Down.Irreversible {
+					fmt.Println("     Down: IRREVERSIBLE")
+				} else {
+					fmt.Println("     Down: reversible")
+				}
+			}
+			fmt.Println()
+		}
 
-	for i, op := range m.DMLOps {
-		fmt.Printf("  DML %d. [%s]\n", i+1, op.Op)
-		fmt.Printf("     SQL: %s\n", op.SQL)
-		fmt.Println()
+		for i, op := range m.DMLOps {
+			fmt.Printf("  DML %d. [%s]\n", i+1, op.Op)
+			fmt.Printf("     SQL: %s\n", op.SQL)
+			fmt.Println()
+		}
 	}
 
 	if len(migDiags) > 0 {
