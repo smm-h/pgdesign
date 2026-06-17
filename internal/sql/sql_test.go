@@ -1580,3 +1580,59 @@ func TestDropDomain(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateSequence_Full(t *testing.T) {
+	seq := &model.Sequence{
+		Name:      "order_seq",
+		Start:     model.Int64Ptr(100),
+		Increment: model.Int64Ptr(2),
+		MinValue:  model.Int64Ptr(1),
+		MaxValue:  model.Int64Ptr(999999),
+		Cache:     model.Int64Ptr(10),
+		Cycle:     true,
+		OwnedBy:   "orders.id",
+	}
+	got := CreateSequence("myapp", seq)
+	want := "CREATE SEQUENCE myapp.order_seq START WITH 100 INCREMENT BY 2 MINVALUE 1 MAXVALUE 999999 CACHE 10 CYCLE OWNED BY myapp.orders.id;"
+	if got != want {
+		t.Errorf("CreateSequence() =\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestCreateSequence_Minimal(t *testing.T) {
+	seq := &model.Sequence{Name: "simple_seq"}
+	got := CreateSequence("public", seq)
+	want := "CREATE SEQUENCE public.simple_seq NO MINVALUE NO MAXVALUE NO CYCLE;"
+	if got != want {
+		t.Errorf("CreateSequence() =\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestDropSequence(t *testing.T) {
+	got := DropSequence("myapp", "order_seq", false)
+	want := "DROP SEQUENCE myapp.order_seq;"
+	if got != want {
+		t.Errorf("DropSequence() = %q, want %q", got, want)
+	}
+}
+
+func TestDropSequence_Cascade(t *testing.T) {
+	got := DropSequence("myapp", "order_seq", true)
+	want := "DROP SEQUENCE myapp.order_seq CASCADE;"
+	if got != want {
+		t.Errorf("DropSequence() = %q, want %q", got, want)
+	}
+}
+
+func TestAlterSequence(t *testing.T) {
+	seq := &model.Sequence{
+		Name:  "order_seq",
+		Start: model.Int64Ptr(500),
+		Cache: model.Int64Ptr(20),
+	}
+	got := AlterSequence("myapp", seq)
+	want := "ALTER SEQUENCE myapp.order_seq START WITH 500 NO MINVALUE NO MAXVALUE CACHE 20 NO CYCLE;"
+	if got != want {
+		t.Errorf("AlterSequence() =\n  %s\nwant:\n  %s", got, want)
+	}
+}

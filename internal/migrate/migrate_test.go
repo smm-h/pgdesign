@@ -2451,3 +2451,180 @@ func TestOpToSQL_DropExclusion(t *testing.T) {
 		t.Errorf("OpToSQL(drop_exclusion):\ngot:  %s\nwant: %s", got, want)
 	}
 }
+
+func TestGenerateMigration_SequenceAdded(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Sequences: []model.Sequence{{
+			Name:   "order_seq",
+			Schema: "public",
+			Start:  model.Int64Ptr(100),
+		}},
+	}
+
+	d := &diff.SchemaDiff{
+		SequencesAdded: []string{"order_seq"},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_sequence" && op.Name == "order_seq" {
+			found = true
+			if op.SequenceDef == nil {
+				t.Error("create_sequence op has no SequenceDef")
+			} else if op.SequenceDef.Start == nil || *op.SequenceDef.Start != 100 {
+				t.Errorf("SequenceDef.Start = %v, want 100", op.SequenceDef.Start)
+			}
+			if op.Down == nil {
+				t.Error("create_sequence op has no down op")
+			} else if len(op.Down.Ops) == 0 {
+				t.Error("create_sequence down has no ops")
+			} else if op.Down.Ops[0].Op != "drop_sequence" {
+				t.Errorf("create_sequence down op = %q, want drop_sequence", op.Down.Ops[0].Op)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected create_sequence op for order_seq, got ops: %v", opsDebug(m.DDLOps))
+	}
+}
+
+func TestGenerateMigration_SequenceRemoved(t *testing.T) {
+	desired := &model.Schema{Name: "public"}
+	d := &diff.SchemaDiff{
+		SequencesRemoved: []string{"order_seq"},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_sequence" && op.Name == "order_seq" {
+			found = true
+			if op.Down == nil || !op.Down.Irreversible {
+				t.Error("drop_sequence should have irreversible down")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected drop_sequence op for order_seq, got ops: %v", opsDebug(m.DDLOps))
+	}
+}
+
+func TestGenerateMigration_SequenceChanged(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Sequences: []model.Sequence{{
+			Name:   "order_seq",
+			Schema: "public",
+			Start:  model.Int64Ptr(500),
+			Cache:  model.Int64Ptr(20),
+		}},
+	}
+
+	d := &diff.SchemaDiff{
+		SequencesChanged: []diff.SequenceDiff{{
+			Name:         "order_seq",
+			StartChanged: &[2]*int64{model.Int64Ptr(100), model.Int64Ptr(500)},
+			CacheChanged: &[2]*int64{model.Int64Ptr(10), model.Int64Ptr(20)},
+		}},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.3.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "alter_sequence" && op.Name == "order_seq" {
+			found = true
+			if op.SequenceDef == nil {
+				t.Error("alter_sequence op has no SequenceDef")
+			} else {
+				if op.SequenceDef.Start == nil || *op.SequenceDef.Start != 500 {
+					t.Errorf("SequenceDef.Start = %v, want 500", op.SequenceDef.Start)
+				}
+				if op.SequenceDef.Cache == nil || *op.SequenceDef.Cache != 20 {
+					t.Errorf("SequenceDef.Cache = %v, want 20", op.SequenceDef.Cache)
+				}
+			}
+			if op.Down == nil || !op.Down.Irreversible {
+				t.Error("alter_sequence should have irreversible down")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected alter_sequence op for order_seq, got ops: %v", opsDebug(m.DDLOps))
+	}
+}
+
+func TestMigrate_SequenceSQL(t *testing.T) {
+	// create_sequence
+	createOp := DDLOp{
+		Op:     "create_sequence",
+		Name:   "order_seq",
+		Schema: "public",
+		SequenceDef: &model.Sequence{
+			Name:  "order_seq",
+			Start: model.Int64Ptr(100),
+		},
+	}
+	got := OpToSQL(createOp)
+	if !strings.Contains(got, "CREATE SEQUENCE") {
+		t.Errorf("create_sequence SQL missing CREATE SEQUENCE: %s", got)
+	}
+	if !strings.Contains(got, "order_seq") {
+		t.Errorf("create_sequence SQL missing sequence name: %s", got)
+	}
+	if !strings.Contains(got, "START WITH 100") {
+		t.Errorf("create_sequence SQL missing START WITH: %s", got)
+	}
+
+	// drop_sequence
+	dropOp := DDLOp{
+		Op:     "drop_sequence",
+		Name:   "order_seq",
+		Schema: "public",
+	}
+	got = OpToSQL(dropOp)
+	if !strings.Contains(got, "DROP SEQUENCE") {
+		t.Errorf("drop_sequence SQL missing DROP SEQUENCE: %s", got)
+	}
+	if !strings.Contains(got, "order_seq") {
+		t.Errorf("drop_sequence SQL missing sequence name: %s", got)
+	}
+
+	// alter_sequence
+	alterOp := DDLOp{
+		Op:     "alter_sequence",
+		Name:   "order_seq",
+		Schema: "public",
+		SequenceDef: &model.Sequence{
+			Name:  "order_seq",
+			Start: model.Int64Ptr(500),
+			Cache: model.Int64Ptr(20),
+		},
+	}
+	got = OpToSQL(alterOp)
+	if !strings.Contains(got, "ALTER SEQUENCE") {
+		t.Errorf("alter_sequence SQL missing ALTER SEQUENCE: %s", got)
+	}
+	if !strings.Contains(got, "START WITH 500") {
+		t.Errorf("alter_sequence SQL missing START WITH: %s", got)
+	}
+	if !strings.Contains(got, "CACHE 20") {
+		t.Errorf("alter_sequence SQL missing CACHE: %s", got)
+	}
+}
