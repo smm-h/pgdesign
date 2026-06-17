@@ -307,9 +307,21 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		if table != nil {
 			for _, fk := range table.FKs {
 				fkOp := makeFKOp(tableName, fk)
-				m.DDLOps = append(m.DDLOps, fkOp)
-				diags = append(diags, classifyOp(fkOp, risk.OpAddFK, ctx)...)
-				diags = append(diags, checkE300(fkOp, ctx, largeFKThreshold)...)
+				splitOps, splitDiags := splitLargeFKOp(fkOp, ctx, largeFKThreshold)
+				if splitOps != nil {
+					for _, sop := range splitOps {
+						m.DDLOps = append(m.DDLOps, sop)
+						opType := risk.OpAddFKNotValid
+						if sop.Op == "validate_constraint" {
+							opType = risk.OpValidateConstraint
+						}
+						diags = append(diags, classifyOp(sop, opType, ctx)...)
+					}
+					diags = append(diags, splitDiags...)
+				} else {
+					m.DDLOps = append(m.DDLOps, fkOp)
+					diags = append(diags, classifyOp(fkOp, risk.OpAddFK, ctx)...)
+				}
 			}
 			for _, idx := range table.Indexes {
 				idxOp := makeIndexOp(tableName, idx)
@@ -653,9 +665,21 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		// Added FKs.
 		for _, fk := range td.FKsAdded {
 			fkOp := makeFKOp(td.Name, fk)
-			m.DDLOps = append(m.DDLOps, fkOp)
-			diags = append(diags, classifyOp(fkOp, risk.OpAddFK, ctx)...)
-			diags = append(diags, checkE300(fkOp, ctx, largeFKThreshold)...)
+			splitOps, splitDiags := splitLargeFKOp(fkOp, ctx, largeFKThreshold)
+			if splitOps != nil {
+				for _, sop := range splitOps {
+					m.DDLOps = append(m.DDLOps, sop)
+					opType := risk.OpAddFKNotValid
+					if sop.Op == "validate_constraint" {
+						opType = risk.OpValidateConstraint
+					}
+					diags = append(diags, classifyOp(sop, opType, ctx)...)
+				}
+				diags = append(diags, splitDiags...)
+			} else {
+				m.DDLOps = append(m.DDLOps, fkOp)
+				diags = append(diags, classifyOp(fkOp, risk.OpAddFK, ctx)...)
+			}
 		}
 
 		// Removed FKs.
@@ -679,9 +703,21 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			m.DDLOps = append(m.DDLOps, dropOp)
 
 			addOp := makeFKOp(td.Name, fc.New)
-			m.DDLOps = append(m.DDLOps, addOp)
-			diags = append(diags, classifyOp(addOp, risk.OpAddFK, ctx)...)
-			diags = append(diags, checkE300(addOp, ctx, largeFKThreshold)...)
+			splitOps, splitDiags := splitLargeFKOp(addOp, ctx, largeFKThreshold)
+			if splitOps != nil {
+				for _, sop := range splitOps {
+					m.DDLOps = append(m.DDLOps, sop)
+					opType := risk.OpAddFKNotValid
+					if sop.Op == "validate_constraint" {
+						opType = risk.OpValidateConstraint
+					}
+					diags = append(diags, classifyOp(sop, opType, ctx)...)
+				}
+				diags = append(diags, splitDiags...)
+			} else {
+				m.DDLOps = append(m.DDLOps, addOp)
+				diags = append(diags, classifyOp(addOp, risk.OpAddFK, ctx)...)
+			}
 		}
 
 		// Added indexes.
@@ -1518,20 +1554,32 @@ func makeExclusionOp(tableName string, exc model.ExclusionConstraint) DDLOp {
 	}
 }
 
-// checkE300 emits an E300 diagnostic when an add_fk op targets a table with
-// more rows than the threshold. The diagnostic warns that ADD CONSTRAINT
-// without NOT VALID will lock the table during validation.
-func checkE300(op DDLOp, ctx risk.OpContext, threshold int64) []diagnostic.Diagnostic {
+// splitLargeFKOp splits an add_fk op into add_fk_not_valid + validate_constraint
+// when the target table exceeds the row threshold. Returns nil, nil when no
+// split is needed.
+func splitLargeFKOp(op DDLOp, ctx risk.OpContext, threshold int64) ([]DDLOp, []diagnostic.Diagnostic) {
 	if op.Op != "add_fk" || ctx.EstimatedRows <= threshold {
-		return nil
+		return nil, nil
 	}
-	return []diagnostic.Diagnostic{{
-		Severity:   diagnostic.Warning,
-		Code:       "E300",
-		Table:      opTarget(op),
-		Message:    fmt.Sprintf("ADD CONSTRAINT without NOT VALID on table with %d rows will lock the table; consider NOT VALID + VALIDATE CONSTRAINT", ctx.EstimatedRows),
-		Suggestion: "Add with NOT VALID, then VALIDATE CONSTRAINT in a separate step",
-	}}
+	addNotValid := DDLOp{
+		Op:       "add_fk_not_valid",
+		Table:    op.Table,
+		Name:     op.Name,
+		Columns:  op.Columns,
+		RefTable: op.RefTable,
+		RefCols:  op.RefCols,
+		OnDelete: op.OnDelete,
+		Down: &DownOp{
+			Ops: []DDLOp{{Op: "drop_fk", Table: op.Table, Name: op.Name}},
+		},
+	}
+	validate := DDLOp{
+		Op:    "validate_constraint",
+		Table: op.Table,
+		Name:  op.Name,
+		Down:  &DownOp{Irreversible: true},
+	}
+	return []DDLOp{addNotValid, validate}, nil
 }
 
 func classifyOp(op DDLOp, opType risk.OpType, ctx risk.OpContext) []diagnostic.Diagnostic {
