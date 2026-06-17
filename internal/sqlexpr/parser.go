@@ -9,7 +9,7 @@
 //  1. OR
 //  2. AND
 //  3. NOT (unary prefix)
-//  4. Comparison: =, !=, <>, <, >, <=, >=, IS NULL, IS NOT NULL,
+//  4. Comparison: =, !=, <>, <, >, <=, >=, ~, ~*, !~, !~*, IS NULL, IS NOT NULL,
 //     IS DISTINCT FROM, IN, NOT IN, BETWEEN, LIKE, ILIKE, NOT LIKE, NOT ILIKE
 //  5. Concatenation: ||
 //  6. Addition/Subtraction: +, -
@@ -179,7 +179,8 @@ func (p *parser) parseComparison() (Node, error) {
 
 	// Standard operator comparisons: =, !=, <>, <, >, <=, >=
 	switch tok.kind {
-	case tokenEquals, tokenNotEquals, tokenLess, tokenGreater, tokenLessEqual, tokenGreaterEqual:
+	case tokenEquals, tokenNotEquals, tokenLess, tokenGreater, tokenLessEqual, tokenGreaterEqual,
+		tokenTilde, tokenTildeAsterisk, tokenNotTilde, tokenNotTildeAsterisk:
 		op := p.advance()
 		right, err := p.parseConcat()
 		if err != nil {

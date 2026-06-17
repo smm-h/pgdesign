@@ -31,6 +31,10 @@ const (
 	tokenLessEqual
 	tokenGreaterEqual
 	tokenEOF
+	tokenTilde             // ~
+	tokenTildeAsterisk     // ~*
+	tokenNotTilde          // !~
+	tokenNotTildeAsterisk  // !~*
 )
 
 type token struct {
@@ -87,9 +91,28 @@ func tokenize(input string) ([]token, error) {
 			tokens = append(tokens, token{kind: tokenDoubleColon, value: "::", pos: pos})
 			i += 2
 
-		case runes[i] == '!' && i+1 < len(runes) && runes[i+1] == '=':
-			tokens = append(tokens, token{kind: tokenNotEquals, value: "!=", pos: pos})
-			i += 2
+		case runes[i] == '!':
+			if i+2 < len(runes) && runes[i+1] == '~' && runes[i+2] == '*' {
+				tokens = append(tokens, token{kind: tokenNotTildeAsterisk, value: "!~*", pos: pos})
+				i += 3
+			} else if i+1 < len(runes) && runes[i+1] == '~' {
+				tokens = append(tokens, token{kind: tokenNotTilde, value: "!~", pos: pos})
+				i += 2
+			} else if i+1 < len(runes) && runes[i+1] == '=' {
+				tokens = append(tokens, token{kind: tokenNotEquals, value: "!=", pos: pos})
+				i += 2
+			} else {
+				return nil, fmt.Errorf("sqlexpr: unexpected character '!' at position %d", pos)
+			}
+
+		case runes[i] == '~':
+			if i+1 < len(runes) && runes[i+1] == '*' {
+				tokens = append(tokens, token{kind: tokenTildeAsterisk, value: "~*", pos: pos})
+				i += 2
+			} else {
+				tokens = append(tokens, token{kind: tokenTilde, value: "~", pos: pos})
+				i++
+			}
 
 		case runes[i] == '<':
 			if i+1 < len(runes) && runes[i+1] == '>' {

@@ -163,3 +163,34 @@ func TestTokenizeMixed(t *testing.T) {
 		})
 	})
 }
+
+func TestTokenizeRegex(t *testing.T) {
+	t.Run("tilde", func(t *testing.T) {
+		assertTokens(t, "~", []token{{kind: tokenTilde, value: "~"}})
+	})
+	t.Run("tilde asterisk", func(t *testing.T) {
+		assertTokens(t, "~*", []token{{kind: tokenTildeAsterisk, value: "~*"}})
+	})
+	t.Run("not tilde", func(t *testing.T) {
+		assertTokens(t, "!~", []token{{kind: tokenNotTilde, value: "!~"}})
+	})
+	t.Run("not tilde asterisk", func(t *testing.T) {
+		assertTokens(t, "!~*", []token{{kind: tokenNotTildeAsterisk, value: "!~*"}})
+	})
+	t.Run("all regex operators in expression", func(t *testing.T) {
+		assertTokens(t, "a ~ b", []token{
+			{kind: tokenIdent, value: "a"},
+			{kind: tokenTilde, value: "~"},
+			{kind: tokenIdent, value: "b"},
+		})
+	})
+	t.Run("not equals still works", func(t *testing.T) {
+		assertTokens(t, "!=", []token{{kind: tokenNotEquals, value: "!="}})
+	})
+	t.Run("bare bang errors", func(t *testing.T) {
+		_, err := tokenize("!")
+		if err == nil {
+			t.Fatal("expected error for bare !")
+		}
+	})
+}

@@ -951,3 +951,59 @@ func TestParseIsDistinctFrom(t *testing.T) {
 		assertColumnRef(t, bo.Right, "b")
 	})
 }
+
+func TestParseRegex(t *testing.T) {
+	t.Run("regex match", func(t *testing.T) {
+		node, err := Parse("name ~ '^[A-Z]'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "~")
+		assertColumnRef(t, bo.Left, "name")
+		assertStringLiteral(t, bo.Right, "^[A-Z]")
+	})
+
+	t.Run("case insensitive regex", func(t *testing.T) {
+		node, err := Parse("name ~* '^[a-z]'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "~*")
+		assertColumnRef(t, bo.Left, "name")
+		assertStringLiteral(t, bo.Right, "^[a-z]")
+	})
+
+	t.Run("negated regex", func(t *testing.T) {
+		node, err := Parse("name !~ '^[0-9]'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "!~")
+		assertColumnRef(t, bo.Left, "name")
+		assertStringLiteral(t, bo.Right, "^[0-9]")
+	})
+
+	t.Run("negated case insensitive regex", func(t *testing.T) {
+		node, err := Parse("name !~* '^[0-9]'")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bo := assertBinaryOp(t, node, "!~*")
+		assertColumnRef(t, bo.Left, "name")
+		assertStringLiteral(t, bo.Right, "^[0-9]")
+	})
+
+	t.Run("regex combined with AND", func(t *testing.T) {
+		node, err := Parse("name ~ '^[A-Z]' AND age > 18")
+		if err != nil {
+			t.Fatal(err)
+		}
+		and := assertBinaryOp(t, node, "AND")
+		regex := assertBinaryOp(t, and.Left, "~")
+		assertColumnRef(t, regex.Left, "name")
+		assertStringLiteral(t, regex.Right, "^[A-Z]")
+		gt := assertBinaryOp(t, and.Right, ">")
+		assertColumnRef(t, gt.Left, "age")
+		assertIntLiteral(t, gt.Right, 18)
+	})
+}
