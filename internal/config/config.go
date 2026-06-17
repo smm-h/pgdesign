@@ -59,7 +59,7 @@ type MigrateConfig struct {
 
 // OutputConfig holds an [output.<name>] section describing a build output target.
 type OutputConfig struct {
-	Format     string `toml:"format"`     // sql, d2, json, svg, doc, codegen
+	Format     string `toml:"format"`     // sql, d2, json, svg, doc, graphql, codegen
 	Path       string `toml:"path"`       // relative to project root
 	Lang       string `toml:"lang"`       // for codegen: python, zig, go, ts, java, kotlin
 	Mode       string `toml:"mode"`       // for codegen: validators, constants
@@ -91,7 +91,7 @@ func (c *Config) Check() error {
 	}
 
 	validFormats := map[string]bool{
-		"sql": true, "d2": true, "json": true, "svg": true, "doc": true, "codegen": true,
+		"sql": true, "d2": true, "json": true, "svg": true, "doc": true, "graphql": true, "codegen": true,
 	}
 	validLangs := map[string]bool{
 		"python": true, "zig": true, "go": true, "ts": true, "java": true, "kotlin": true,
@@ -104,7 +104,7 @@ func (c *Config) Check() error {
 			errs = append(errs, fmt.Errorf("output.%s: path is required", name))
 		}
 		if !validFormats[out.Format] {
-			errs = append(errs, fmt.Errorf("output.%s: invalid format %q (must be one of: sql, d2, json, svg, doc, codegen)", name, out.Format))
+			errs = append(errs, fmt.Errorf("output.%s: invalid format %q (must be one of: sql, d2, json, svg, doc, graphql, codegen)", name, out.Format))
 		}
 		if out.Format == "codegen" {
 			if out.Lang == "" {

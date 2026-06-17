@@ -17,7 +17,7 @@ import (
 type Options struct {
 	Idempotent      bool
 	IncludeComments bool
-	Format          string // "sql", "json", "d2", "svg", "doc"
+	Format          string // "sql", "json", "d2", "svg", "doc", "graphql"
 	PGVersion       int
 }
 
@@ -41,6 +41,8 @@ func Generate(schema *model.Schema, opts Options) (string, []diagnostic.Diagnost
 		return string(svg), nil, nil
 	case "doc":
 		return generateDoc(schema), nil, nil
+	case "graphql":
+		return generateGraphQL(schema), nil, nil
 	default:
 		return "", nil, fmt.Errorf("unsupported format: %s", opts.Format)
 	}
