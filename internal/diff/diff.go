@@ -34,6 +34,9 @@ type SchemaDiff struct {
 	CompositeTypesAdded   []string            `json:"composite_types_added,omitempty"`
 	CompositeTypesRemoved []string            `json:"composite_types_removed,omitempty"`
 	CompositeTypesChanged []CompositeTypeDiff `json:"composite_types_changed,omitempty"`
+	FunctionsAdded        []string            `json:"functions_added,omitempty"`
+	FunctionsRemoved      []string            `json:"functions_removed,omitempty"`
+	FunctionsChanged      []FunctionDiff      `json:"functions_changed,omitempty"`
 }
 
 // TableDiff describes the differences within a single table.
@@ -144,6 +147,23 @@ type CompositeFieldChange struct {
 	TypeChanged *[2]string `json:"type_changed,omitempty"` // [old, new]
 }
 
+// FunctionDiff describes changes to a function/procedure.
+type FunctionDiff struct {
+	Name              string       `json:"name"`
+	BodyChanged       *[2]string   `json:"body_changed,omitempty"`
+	ReturnTypeChanged *[2]string   `json:"return_type_changed,omitempty"`
+	ArgsChanged       bool         `json:"args_changed,omitempty"`
+	SignatureChanged  bool         `json:"signature_changed,omitempty"` // true when arg types/count or return type changed (requires DROP+CREATE)
+	LanguageChanged   *[2]string   `json:"language_changed,omitempty"`
+	VolatilityChanged *[2]string   `json:"volatility_changed,omitempty"`
+	ParallelChanged   *[2]string   `json:"parallel_changed,omitempty"`
+	SecurityChanged   *[2]bool     `json:"security_changed,omitempty"`
+	CommentChanged    *[2]string   `json:"comment_changed,omitempty"`
+	CostChanged       *[2]*float64 `json:"cost_changed,omitempty"`
+	RowsChanged       *[2]*float64 `json:"rows_changed,omitempty"`
+	IsProcChanged     *[2]bool     `json:"is_proc_changed,omitempty"`
+}
+
 // FKChange describes a changed foreign key constraint.
 type FKChange struct {
 	Name string   `json:"name"`
@@ -187,7 +207,10 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.SequencesChanged) == 0 &&
 		len(d.CompositeTypesAdded) == 0 &&
 		len(d.CompositeTypesRemoved) == 0 &&
-		len(d.CompositeTypesChanged) == 0
+		len(d.CompositeTypesChanged) == 0 &&
+		len(d.FunctionsAdded) == 0 &&
+		len(d.FunctionsRemoved) == 0 &&
+		len(d.FunctionsChanged) == 0
 }
 
 // Summary returns a human-readable summary of the diff.
@@ -267,6 +290,15 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.CompositeTypesChanged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d composite type(s) changed", n))
 	}
+	if n := len(d.FunctionsAdded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d function(s) added", n))
+	}
+	if n := len(d.FunctionsRemoved); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d function(s) removed", n))
+	}
+	if n := len(d.FunctionsChanged); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d function(s) changed", n))
+	}
 
 	return strings.Join(parts, ", ")
 }
@@ -284,6 +316,7 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 	diffMaterializedViews(d, desired, actual)
 	diffSequences(d, desired, actual)
 	diffCompositeTypes(d, desired, actual)
+	diffFunctions(d, desired, actual)
 
 	return d
 }
@@ -1314,4 +1347,144 @@ func diffCompositeType(desired, actual *model.CompositeType) *CompositeTypeDiff 
 		return nil
 	}
 	return ctd
+}
+
+func funcKey(f *model.Function) string {
+	if f.Schema == "" || f.Schema == "public" {
+		return f.Name
+	}
+	return f.Schema + "." + f.Name
+}
+
+// diffFunctions matches functions by schema-qualified name.
+func diffFunctions(d *SchemaDiff, desired, actual *model.Schema) {
+	added, removed, matched := matchObjects(desired.Functions, actual.Functions, func(f model.Function) string {
+		return funcKey(&f)
+	})
+	for _, f := range added {
+		d.FunctionsAdded = append(d.FunctionsAdded, funcKey(&f))
+	}
+	for _, f := range removed {
+		d.FunctionsRemoved = append(d.FunctionsRemoved, funcKey(&f))
+	}
+	for _, p := range matched {
+		fd := diffFunction(&p.Desired, &p.Actual)
+		if fd != nil {
+			d.FunctionsChanged = append(d.FunctionsChanged, *fd)
+		}
+	}
+}
+
+// diffFunction compares two matched functions and returns nil if identical.
+func diffFunction(desired, actual *model.Function) *FunctionDiff {
+	fd := &FunctionDiff{Name: funcKey(desired)}
+	changed := false
+
+	if desired.Body != actual.Body {
+		fd.BodyChanged = &[2]string{actual.Body, desired.Body}
+		changed = true
+	}
+
+	if desired.ReturnType != actual.ReturnType {
+		fd.ReturnTypeChanged = &[2]string{actual.ReturnType, desired.ReturnType}
+		changed = true
+	}
+
+	if !funcArgsEqual(desired.Args, actual.Args) {
+		fd.ArgsChanged = true
+		changed = true
+	}
+
+	// SignatureChanged: true when arg types/count or return type changed.
+	// This is distinct from ArgsChanged which also fires for name/default changes.
+	// Signature change requires DROP+CREATE; body-only can use CREATE OR REPLACE.
+	if desired.ReturnType != actual.ReturnType || !funcArgSignatureEqual(desired.Args, actual.Args) {
+		fd.SignatureChanged = true
+	}
+
+	if desired.Language != actual.Language {
+		fd.LanguageChanged = &[2]string{actual.Language, desired.Language}
+		changed = true
+	}
+
+	if desired.Volatility != actual.Volatility {
+		fd.VolatilityChanged = &[2]string{actual.Volatility, desired.Volatility}
+		changed = true
+	}
+
+	if desired.Parallel != actual.Parallel {
+		fd.ParallelChanged = &[2]string{actual.Parallel, desired.Parallel}
+		changed = true
+	}
+
+	if desired.SecurityDefiner != actual.SecurityDefiner {
+		fd.SecurityChanged = &[2]bool{actual.SecurityDefiner, desired.SecurityDefiner}
+		changed = true
+	}
+
+	if desired.Comment != actual.Comment {
+		fd.CommentChanged = &[2]string{actual.Comment, desired.Comment}
+		changed = true
+	}
+
+	if !float64PtrEqual(desired.Cost, actual.Cost) {
+		fd.CostChanged = &[2]*float64{actual.Cost, desired.Cost}
+		changed = true
+	}
+
+	if !float64PtrEqual(desired.Rows, actual.Rows) {
+		fd.RowsChanged = &[2]*float64{actual.Rows, desired.Rows}
+		changed = true
+	}
+
+	if desired.IsProc != actual.IsProc {
+		fd.IsProcChanged = &[2]bool{actual.IsProc, desired.IsProc}
+		changed = true
+		// Kind change (function <-> procedure) always changes signature.
+		fd.SignatureChanged = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return fd
+}
+
+// funcArgsEqual returns true if two arg slices are identical (name, type, default).
+func funcArgsEqual(a, b []model.FunctionArg) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Name != b[i].Name || a[i].Type != b[i].Type || a[i].Default != b[i].Default {
+			return false
+		}
+	}
+	return true
+}
+
+// funcArgSignatureEqual returns true if arg types and count match.
+// Only compares types (not names or defaults) since PostgreSQL identifies
+// function signatures by argument types, not names.
+func funcArgSignatureEqual(a, b []model.FunctionArg) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if normalizeType(a[i].Type) != normalizeType(b[i].Type) {
+			return false
+		}
+	}
+	return true
+}
+
+// float64PtrEqual returns true if two *float64 pointers represent the same value.
+func float64PtrEqual(a, b *float64) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
