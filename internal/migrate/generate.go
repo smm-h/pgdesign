@@ -335,6 +335,11 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				m.DDLOps = append(m.DDLOps, excOp)
 				diags = append(diags, classifyOp(excOp, risk.OpAddExclusion, ctx)...)
 			}
+			for _, trig := range table.Triggers {
+				trigOp := makeTriggerOp(tableName, trig)
+				m.DDLOps = append(m.DDLOps, trigOp)
+				diags = append(diags, classifyOp(trigOp, risk.OpCreateTrigger, ctx)...)
+			}
 		}
 	}
 
@@ -886,6 +891,40 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				}
 			}
 		}
+
+		// Added triggers.
+		for _, trig := range td.TriggersAdded {
+			trigOp := makeTriggerOp(td.Name, trig)
+			m.DDLOps = append(m.DDLOps, trigOp)
+			diags = append(diags, classifyOp(trigOp, risk.OpCreateTrigger, ctx)...)
+		}
+
+		// Removed triggers.
+		for _, trigName := range td.TriggersRemoved {
+			op := DDLOp{
+				Op:    "drop_trigger",
+				Table: td.Name,
+				Name:  trigName,
+				Down:  &DownOp{Irreversible: true},
+			}
+			m.DDLOps = append(m.DDLOps, op)
+			diags = append(diags, classifyOp(op, risk.OpDropTrigger, ctx)...)
+		}
+
+		// Changed triggers: DROP old + CREATE new.
+		for _, tc := range td.TriggersChanged {
+			dropOp := DDLOp{
+				Op:    "drop_trigger",
+				Table: td.Name,
+				Name:  tc.Old.Name,
+			}
+			m.DDLOps = append(m.DDLOps, dropOp)
+			diags = append(diags, classifyOp(dropOp, risk.OpDropTrigger, ctx)...)
+
+			createOp := makeTriggerOp(td.Name, tc.New)
+			m.DDLOps = append(m.DDLOps, createOp)
+			diags = append(diags, classifyOp(createOp, risk.OpCreateTrigger, ctx)...)
+		}
 	}
 
 	// View changes.
@@ -1264,6 +1303,18 @@ func makeCheckOp(tableName string, ck model.CheckConstraint) DDLOp {
 		Expr:  ck.Expr,
 		Down: &DownOp{
 			Ops: []DDLOp{{Op: "drop_check", Table: tableName, Name: ck.Name}},
+		},
+	}
+}
+
+func makeTriggerOp(tableName string, trig model.Trigger) DDLOp {
+	return DDLOp{
+		Op:         "create_trigger",
+		Table:      tableName,
+		Name:       trig.Name,
+		TriggerDef: &trig,
+		Down: &DownOp{
+			Ops: []DDLOp{{Op: "drop_trigger", Table: tableName, Name: trig.Name}},
 		},
 	}
 }

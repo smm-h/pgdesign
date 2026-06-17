@@ -459,6 +459,11 @@ func opDropFunction(op DDLOp) string {
 }
 
 func opCreateTrigger(op DDLOp) string {
+	if op.TriggerDef != nil {
+		schema, tableName := splitQualifiedName(op.Table)
+		return sql.CreateTrigger(schema, tableName, *op.TriggerDef)
+	}
+	// Legacy: append-only trigger.
 	schema, tableName := splitQualifiedName(op.Table)
 	return sql.CreateAppendOnlyTrigger(schema, tableName)
 }
