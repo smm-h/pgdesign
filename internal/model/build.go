@@ -533,6 +533,7 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 		t.Dependencies = append(t.Dependencies, fd.FuncDep{
 			Determinant: rawDep.Determinant,
 			Dependent:   rawDep.Dependent,
+			Source:      "declared",
 		})
 	}
 
