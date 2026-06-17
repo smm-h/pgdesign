@@ -314,6 +314,58 @@ func Export(schema *model.Schema) ([]byte, error) {
 				}
 			}
 		}
+
+		// Triggers
+		for _, trig := range t.Triggers {
+			trigPath := tblPath + ".triggers." + trig.Name
+			if err := doc.NewTable(trigPath); err != nil {
+				return nil, fmt.Errorf("create trigger %s: %w", trigPath, err)
+			}
+			if err := doc.SetCreate(trigPath+".function", trig.Function); err != nil {
+				return nil, fmt.Errorf("set %s.function: %w", trigPath, err)
+			}
+			if err := doc.SetCreate(trigPath+".events", toAnySlice(trig.Events)); err != nil {
+				return nil, fmt.Errorf("set %s.events: %w", trigPath, err)
+			}
+			if err := doc.SetCreate(trigPath+".timing", trig.Timing); err != nil {
+				return nil, fmt.Errorf("set %s.timing: %w", trigPath, err)
+			}
+			if trig.ForEach != "" && trig.ForEach != "STATEMENT" {
+				if err := doc.SetCreate(trigPath+".for_each", trig.ForEach); err != nil {
+					return nil, fmt.Errorf("set %s.for_each: %w", trigPath, err)
+				}
+			}
+			if trig.When != "" {
+				if err := doc.SetCreate(trigPath+".when", trig.When); err != nil {
+					return nil, fmt.Errorf("set %s.when: %w", trigPath, err)
+				}
+			}
+			if trig.Constraint {
+				if err := doc.SetCreate(trigPath+".constraint", true); err != nil {
+					return nil, fmt.Errorf("set %s.constraint: %w", trigPath, err)
+				}
+			}
+			if trig.Deferrable {
+				if err := doc.SetCreate(trigPath+".deferrable", true); err != nil {
+					return nil, fmt.Errorf("set %s.deferrable: %w", trigPath, err)
+				}
+			}
+			if trig.InitiallyDeferred {
+				if err := doc.SetCreate(trigPath+".initially_deferred", true); err != nil {
+					return nil, fmt.Errorf("set %s.initially_deferred: %w", trigPath, err)
+				}
+			}
+			if trig.ReferencingOld != "" {
+				if err := doc.SetCreate(trigPath+".referencing_old", trig.ReferencingOld); err != nil {
+					return nil, fmt.Errorf("set %s.referencing_old: %w", trigPath, err)
+				}
+			}
+			if trig.ReferencingNew != "" {
+				if err := doc.SetCreate(trigPath+".referencing_new", trig.ReferencingNew); err != nil {
+					return nil, fmt.Errorf("set %s.referencing_new: %w", trigPath, err)
+				}
+			}
+		}
 	}
 
 	// [views.*]
