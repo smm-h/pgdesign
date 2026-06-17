@@ -1917,7 +1917,7 @@ func queryPolicies(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]mode
 		SELECT
 			p.polname,
 			p.polpermissive,
-			p.polcmd,
+			p.polcmd::text,
 			COALESCE(pg_get_expr(p.polqual, p.polrelid), '') AS using_expr,
 			COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') AS with_check_expr,
 			ARRAY(
