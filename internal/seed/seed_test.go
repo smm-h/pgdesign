@@ -3,6 +3,7 @@ package seed
 import (
 	"math/rand"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -544,6 +545,624 @@ func TestGenerate_NullNeverForNotNull(t *testing.T) {
 		val = strings.TrimSuffix(val, ");")
 		if val == "NULL" {
 			t.Fatal("got NULL for a NOT NULL column")
+		}
+	}
+}
+
+func TestGenerate_CheckRange(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_checks", Schema: "public",
+				Comment: "Test CHECK constraints",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "age", PGType: "integer", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_age", Expr: "age >= 18 AND age <= 65"},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, diags := Generate(schema, 100, rng, nil)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	insertIdx := strings.Index(out, "INSERT INTO public.test_checks")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_checks")
+	}
+
+	block := out[insertIdx:]
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		row := strings.TrimPrefix(line, "(")
+		row = strings.TrimSuffix(row, "),")
+		row = strings.TrimSuffix(row, ");")
+		parts := strings.SplitN(row, ", ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		ageStr := parts[1]
+		age, err := strconv.Atoi(ageStr)
+		if err != nil {
+			t.Errorf("could not parse age %q: %v", ageStr, err)
+			continue
+		}
+		if age < 18 || age > 65 {
+			t.Errorf("age %d outside CHECK range [18, 65]", age)
+		}
+	}
+}
+
+func TestGenerate_CheckLength(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_length", Schema: "public",
+				Comment: "Test length CHECK",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "code", PGType: "text", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_code_len", Expr: "length(code) <= 5"},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 50, rng, nil)
+
+	insertIdx := strings.Index(out, "INSERT INTO public.test_length")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_length")
+	}
+
+	block := out[insertIdx:]
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		row := strings.TrimPrefix(line, "(")
+		row = strings.TrimSuffix(row, "),")
+		row = strings.TrimSuffix(row, ");")
+		parts := strings.SplitN(row, ", ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		val := parts[1]
+		// Strip surrounding quotes.
+		if strings.HasPrefix(val, "'") && strings.HasSuffix(val, "'") {
+			val = val[1 : len(val)-1]
+		}
+		if len(val) > 5 {
+			t.Errorf("code value %q exceeds length 5 (len=%d)", val, len(val))
+		}
+	}
+}
+
+func TestGenerate_CheckRegex(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_regex", Schema: "public",
+				Comment: "Test regex CHECK",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "code", PGType: "text", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_code_fmt", Expr: "code ~ '^[A-Z]{3}-[0-9]{4}$'"},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 50, rng, nil)
+
+	re := regexp.MustCompile(`^[A-Z]{3}-[0-9]{4}$`)
+
+	insertIdx := strings.Index(out, "INSERT INTO public.test_regex")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_regex")
+	}
+
+	block := out[insertIdx:]
+	matched := 0
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		row := strings.TrimPrefix(line, "(")
+		row = strings.TrimSuffix(row, "),")
+		row = strings.TrimSuffix(row, ");")
+		parts := strings.SplitN(row, ", ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		val := parts[1]
+		if strings.HasPrefix(val, "'") && strings.HasSuffix(val, "'") {
+			val = val[1 : len(val)-1]
+		}
+		if !re.MatchString(val) {
+			t.Errorf("code value %q does not match regex ^[A-Z]{3}-[0-9]{4}$", val)
+		}
+		matched++
+	}
+	if matched == 0 {
+		t.Error("no rows checked")
+	}
+}
+
+func TestGenerate_UniqueConstraint(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_unique", Schema: "public",
+				Comment: "Test unique",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email"},
+				},
+				Uniques: []model.UniqueConstraint{
+					{Name: "uq_email", Columns: []string{"email"}},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 20, rng, nil)
+
+	insertIdx := strings.Index(out, "INSERT INTO public.test_unique")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_unique")
+	}
+
+	block := out[insertIdx:]
+	emails := make(map[string]bool)
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		row := strings.TrimPrefix(line, "(")
+		row = strings.TrimSuffix(row, "),")
+		row = strings.TrimSuffix(row, ");")
+		parts := strings.SplitN(row, ", ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		email := parts[1]
+		if emails[email] {
+			t.Errorf("duplicate email: %s", email)
+		}
+		emails[email] = true
+	}
+}
+
+func TestGenerate_ZipfFKDistribution(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "categories", Schema: "public",
+				Comment: "Categories",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+			},
+			{
+				Name: "items", Schema: "public",
+				Comment: "Items",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "cat_id", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
+				},
+				FKs: []model.FK{
+					{Name: "fk_items_cat", Columns: []string{"cat_id"}, RefSchema: "public", RefTable: "categories", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 100, rng, nil)
+
+	catIdx := strings.Index(out, "INSERT INTO public.categories")
+	itemIdx := strings.Index(out, "INSERT INTO public.items")
+	if catIdx < 0 || itemIdx < 0 {
+		t.Fatal("missing expected INSERT statements")
+	}
+
+	// Collect category IDs.
+	catBlock := out[catIdx:itemIdx]
+	var catIDs []string
+	for _, line := range strings.Split(catBlock, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		row := strings.TrimPrefix(line, "(")
+		row = strings.TrimSuffix(row, "),")
+		row = strings.TrimSuffix(row, ");")
+		parts := strings.SplitN(row, ", ", 2)
+		if len(parts) >= 1 {
+			catIDs = append(catIDs, parts[0])
+		}
+	}
+
+	// Count references per category from items.
+	refCounts := make(map[string]int)
+	itemBlock := out[itemIdx:]
+	for _, line := range strings.Split(itemBlock, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		row := strings.TrimPrefix(line, "(")
+		row = strings.TrimSuffix(row, "),")
+		row = strings.TrimSuffix(row, ");")
+		parts := strings.SplitN(row, ", ", 2)
+		if len(parts) >= 2 {
+			refCounts[parts[1]]++
+		}
+	}
+
+	// With Zipf, the first category should have more references than the last.
+	// At minimum, the distribution should not be perfectly uniform.
+	if len(catIDs) < 2 {
+		t.Skip("too few categories for distribution check")
+	}
+	firstCount := refCounts[catIDs[0]]
+	lastCount := refCounts[catIDs[len(catIDs)-1]]
+	t.Logf("Zipf FK distribution: first=%d, last=%d (out of 100 items, %d categories)",
+		firstCount, lastCount, len(catIDs))
+	// The first should be referenced notably more (Zipf skew). With s=1.5 and
+	// 100 categories, the first should be referenced ~50% of the time.
+	if firstCount <= lastCount && firstCount < 5 {
+		t.Error("Zipf distribution not detected: first category not referenced more than last")
+	}
+}
+
+func TestGenerate_LogNormalMoney(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_money", Schema: "public",
+				Comment: "Test money",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "amount", PGType: "bigint", NotNull: true, SemanticTypeName: "money"},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 200, rng, nil)
+
+	insertIdx := strings.Index(out, "INSERT INTO public.test_money")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_money")
+	}
+
+	block := out[insertIdx:]
+	var amounts []int
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		row := strings.TrimPrefix(line, "(")
+		row = strings.TrimSuffix(row, "),")
+		row = strings.TrimSuffix(row, ");")
+		parts := strings.SplitN(row, ", ", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		v, err := strconv.Atoi(parts[1])
+		if err != nil {
+			t.Errorf("could not parse money %q: %v", parts[1], err)
+			continue
+		}
+		amounts = append(amounts, v)
+	}
+
+	if len(amounts) < 100 {
+		t.Fatalf("expected at least 100 amounts, got %d", len(amounts))
+	}
+
+	// Log-normal produces varied values; check that not all values are identical
+	// and that the max is capped at 999999.
+	seen := make(map[int]bool)
+	for _, a := range amounts {
+		seen[a] = true
+		if a > 999999 {
+			t.Errorf("money amount %d exceeds cap of 999999", a)
+		}
+		if a < 0 {
+			t.Errorf("money amount %d is negative", a)
+		}
+	}
+	if len(seen) < 10 {
+		t.Errorf("expected variety in money amounts, got only %d distinct values", len(seen))
+	}
+}
+
+func TestGenerate_ArrayPopulation(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_arrays", Schema: "public",
+				Comment: "Test arrays",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "tags", PGType: "text", NotNull: true, Array: true},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 10, rng, nil)
+
+	insertIdx := strings.Index(out, "INSERT INTO public.test_arrays")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_arrays")
+	}
+
+	// Check that arrays use ARRAY[...] syntax, not '{}'.
+	if strings.Contains(out[insertIdx:], "'{}'") {
+		t.Error("arrays should not use empty '{}' syntax; expected ARRAY[...]")
+	}
+
+	block := out[insertIdx:]
+	foundArray := false
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		if strings.Contains(line, "ARRAY[") {
+			foundArray = true
+			break
+		}
+	}
+	if !foundArray {
+		t.Error("expected ARRAY[...] syntax in output")
+	}
+}
+
+func TestGenerate_PerTableRowCount(t *testing.T) {
+	schema := testSchema()
+	rng := rand.New(rand.NewSource(42))
+	cfg := &SeedConfig{
+		TableRows: map[string]int{
+			"organizations": 2,
+			"users":         7,
+		},
+	}
+	out, _ := Generate(schema, 10, rng, cfg)
+
+	// Organizations should have 2 rows (overridden from default 10).
+	orgIdx := strings.Index(out, "INSERT INTO public.organizations")
+	usrIdx := strings.Index(out, "INSERT INTO public.users")
+	if orgIdx < 0 || usrIdx < 0 {
+		t.Fatal("missing expected INSERT statements")
+	}
+
+	orgBlock := out[orgIdx:usrIdx]
+	orgRows := strings.Count(orgBlock, "  (")
+	if orgRows != 2 {
+		t.Errorf("expected 2 organization rows, got %d", orgRows)
+	}
+
+	usrBlock := out[usrIdx:]
+	usrRows := strings.Count(usrBlock, "  (")
+	if usrRows != 7 {
+		t.Errorf("expected 7 user rows, got %d", usrRows)
+	}
+}
+
+func TestGenerate_FKCycleHandling(t *testing.T) {
+	// Two tables that reference each other (cycle).
+	schema := &model.Schema{
+		Name: "public",
+		CycleGroups: [][]string{{"departments", "employees"}},
+		Tables: []model.Table{
+			{
+				Name: "departments", Schema: "public",
+				Comment: "Departments",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "head_id", PGType: "uuid", NotNull: false, SemanticTypeName: "ref"},
+				},
+				FKs: []model.FK{
+					{Name: "fk_dept_head", Columns: []string{"head_id"}, RefSchema: "public", RefTable: "employees", RefColumns: []string{"id"}, OnDelete: "SET NULL"},
+				},
+			},
+			{
+				Name: "employees", Schema: "public",
+				Comment: "Employees",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "dept_id", PGType: "uuid", NotNull: false, SemanticTypeName: "ref"},
+				},
+				FKs: []model.FK{
+					{Name: "fk_emp_dept", Columns: []string{"dept_id"}, RefSchema: "public", RefTable: "departments", RefColumns: []string{"id"}, OnDelete: "SET NULL"},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, diags := Generate(schema, 3, rng, nil)
+
+	// Should not have errors.
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	// The output should contain INSERT statements.
+	if !strings.Contains(out, "INSERT INTO public.departments") {
+		t.Error("missing departments INSERT")
+	}
+	if !strings.Contains(out, "INSERT INTO public.employees") {
+		t.Error("missing employees INSERT")
+	}
+
+	// The cycle FK columns should be NULL in the initial INSERT.
+	// Look for the deferred UPDATE section.
+	if !strings.Contains(out, "FK cycle resolution") {
+		t.Error("missing FK cycle resolution UPDATE section")
+	}
+	if !strings.Contains(out, "UPDATE public.") {
+		t.Error("missing UPDATE statements for cycle resolution")
+	}
+}
+
+func TestGenerate_FKCycleNotNull(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		CycleGroups: [][]string{{"alpha", "beta"}},
+		Tables: []model.Table{
+			{
+				Name: "alpha", Schema: "public",
+				Comment: "Alpha",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "beta_id", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
+				},
+				FKs: []model.FK{
+					{Name: "fk_alpha_beta", Columns: []string{"beta_id"}, RefSchema: "public", RefTable: "beta", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				},
+			},
+			{
+				Name: "beta", Schema: "public",
+				Comment: "Beta",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "alpha_id", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
+				},
+				FKs: []model.FK{
+					{Name: "fk_beta_alpha", Columns: []string{"alpha_id"}, RefSchema: "public", RefTable: "alpha", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	_, diags := Generate(schema, 3, rng, nil)
+
+	// Should emit S001 warnings for NOT NULL FK columns in cycles.
+	hasS001 := false
+	for _, d := range diags {
+		if d.Code == "S001" {
+			hasS001 = true
+			break
+		}
+	}
+	if !hasS001 {
+		t.Error("expected S001 diagnostic for NOT NULL FK column in cycle")
+	}
+}
+
+func TestGenerate_JSONBWithSchema(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_jsonb", Schema: "public",
+				Comment: "Test JSONB",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "schemas/data.json"},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 5, rng, nil)
+
+	insertIdx := strings.Index(out, "INSERT INTO public.test_jsonb")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_jsonb")
+	}
+
+	block := out[insertIdx:]
+	// Each row should have a JSON object with _schema key, not empty '{}'.
+	if strings.Contains(block, "'{}'::jsonb") {
+		t.Error("expected JSON with _schema marker, got empty object")
+	}
+	if !strings.Contains(block, "_schema") {
+		t.Error("expected _schema key in generated JSON")
+	}
+	if !strings.Contains(block, "schemas/data.json") {
+		t.Error("expected json_schema path in generated JSON")
+	}
+}
+
+func TestRegenFromPattern(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+
+	tests := []struct {
+		pattern string
+		re      string // go regex to validate output
+	}{
+		{`^[A-Z]{3}$`, `^[A-Z]{3}$`},
+		{`^[0-9]{4}-[0-9]{2}$`, `^[0-9]{4}-[0-9]{2}$`},
+		{`^(foo|bar|baz)$`, `^(foo|bar|baz)$`},
+		{`^[a-z]+$`, `^[a-z]+$`},
+		{`^test_[0-9]?$`, `^test_[0-9]?$`},
+	}
+
+	for _, tc := range tests {
+		for i := 0; i < 20; i++ {
+			got, err := regenFromPattern(tc.pattern, rng)
+			if err != nil {
+				t.Errorf("regenFromPattern(%q): %v", tc.pattern, err)
+				break
+			}
+			re := regexp.MustCompile(tc.re)
+			if !re.MatchString(got) {
+				t.Errorf("regenFromPattern(%q) = %q, does not match %s", tc.pattern, got, tc.re)
+			}
 		}
 	}
 }
