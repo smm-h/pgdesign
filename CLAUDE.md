@@ -8,7 +8,7 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 
 - `parse` parses TOML schemas (uses go-toml-edit for comment preservation)
 - `model` builds the resolved intermediate representation (tables, views, materialized views); `Schema.Build()` resolves types and dependencies
-- `validate` validates the model and detects anti-patterns
+- `validate` validates the model and detects anti-patterns; includes design intelligence checks (cascade analysis, constraint subsumption, dead columns, row size estimation, natural key surfacing)
 - `generate` produces DDL and D2 diagram output
 - `audit` checks normal form compliance (1NF/2NF/3NF/BCNF) using functional dependencies; FD inference from PK/UNIQUE forces explicit declaration; Armstrong relation counterexamples in violation diagnostics
 - `fd` provides functional dependency primitives (closure, minimal cover, candidate keys, BCNF decomposition, lossless-join verification, dependency-preservation checking, Armstrong relation generation)
@@ -19,9 +19,9 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `sqlutil` provides shared adapter between sqlexpr and diagnostic for consistent parse-error-to-diagnostic conversion
 - `codegen` generates type-safe application code (Go, TS, Java, Kotlin, Python, Zig) from the model; modes: validators, constants, types, constraints (Go/TS), gorm, drizzle, sqlalchemy, jpa, graphql; shared type mapping and enum generation across all 6 languages
 - `diff` compares two models or a model against a live database
-- `migrate` generates migrations with risk classification and safety linting
+- `migrate` generates migrations with risk classification and safety linting; expand/migrate/contract phasing, NOT VALID + VALIDATE auto-split for large tables, batched DML, volatile default detection, squash consolidation (inverse pair cancellation, type change merging, CREATE TABLE folding), multi-step rollback with reversibility pre-check
 - `introspect` reads a live database via pg_catalog into a model
-- `seed` generates type-aware test data for schema tables
+- `seed` generates type-aware test data for schema tables; supports all 42 PG types, Zipf/log-normal distributions, regex generation from CHECK patterns, FK cycle handling (two-pass NULL then UPDATE), COPY and batch INSERT formats, edge-case boundary values, CHECK/UNIQUE constraint awareness
 - `serve` exposes the HTTP API and web UI
 - `diagnostic` provides error/warning/hint reporting used across all packages
 - `semtype` defines the semantic type system (builtins + user-defined enums + scalar types that produce CREATE DOMAIN + composite types)
@@ -30,8 +30,9 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `format` handles output formatting
 - `extregistry` validates PostgreSQL extension references
 - `config` handles project configuration loading from pgdesign.toml
+- `workload` analyzes query patterns and recommends indexes; structural tier (schema-only: JSONB/array/tsvector GIN, BRIN for append-only, boolean selectivity, excessive indexes, duplicate detection) and live tier (pg_stat_statements extraction, N+1 detection via call ratio cross-reference, sequential scan analysis)
 
-The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, sqlutil -> validate/codegen, sqlparse -> migrate/generate/introspect, graph -> model/generate/format, discover -> audit/check, seed -> generate, introspect -> serve. Views depend on tables; materialized views depend on tables and views; functions depend on tables (auto-detected for SQL-language functions); triggers depend on functions.
+The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen/seed, sqlutil -> validate/codegen, sqlparse -> migrate/generate/introspect, graph -> model/generate/format, discover -> audit/check, seed -> generate, introspect -> serve, workload -> check/serve. Views depend on tables; materialized views depend on tables and views; functions depend on tables (auto-detected for SQL-language functions); triggers depend on functions.
 
 ## Key conventions
 
@@ -76,6 +77,12 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Function dependency auto-detection for `LANGUAGE sql` functions via go-pgquery AST walking. PL/pgSQL requires explicit `depends_on`.
 - PGVersion resolution order: live database (introspect) > `[database].pg_version` in pgdesign.toml > `[meta].version` in schema TOML > 0 (conservative defaults).
 - Generated columns: PG 12-17 only support STORED; PG 18+ supports both STORED and VIRTUAL. When `stored` is omitted from TOML, defaults to true. E218 validates version compatibility. STORED-to-VIRTUAL transition is destructive (DROP + recreate).
+- RLS policies support PERMISSIVE (default) and RESTRICTIVE modes, FORCE ROW LEVEL SECURITY on table owners. Policies are diffed, migrated (ADD/DROP POLICY), and introspected from live databases. PG 10+ version gate for RESTRICTIVE. W011 warns when a table has RLS enabled but no policies for common operations; W012 warns about operation gaps in policy coverage.
+- FK graph is built once during `Schema.Build()` and stored persistently on the Schema struct (`FKGraph` with forward/reverse adjacency maps, fan-in/fan-out counts). Cascade walkers (DFS depth, BFS breadth, BFS chain) power validate, codegen, and workload analysis.
+- Design intelligence checks (`check --tag design`): W013 cascade depth exceeds threshold, W014 cascade breadth exceeds threshold, W015 mixed ON DELETE actions in cascade chain, I001 natural key candidate surfacing, W016 PK subsumes UNIQUE, W017 redundant NOT NULL check, W018 domain CHECK duplicates column CHECK, W019 range subsumption, I002 dead column detection (schema-only heuristic), I003 row size exceeds TOAST threshold, W021 excessive row size, I004 column reordering optimization.
+- Migration intelligence: phase-annotated expand/migrate/contract (single-file, safe ops collapse to single transaction), NOT VALID + VALIDATE CONSTRAINT auto-split for FK/CHECK on large tables (>10K rows), batched DML with configurable batch size (MVCC-aware), volatile default detection (risk escalation for gen_random_uuid/now), squash consolidation (12 inverse pair types, sequential type merging, CREATE TABLE folding), multi-step rollback with reversibility pre-check.
+- Workload analysis (`check --tag workload`): structural index recommendations W022 (JSONB no GIN), W023 (array no GIN), W024 (tsvector no GIN), I005 (append-only BRIN candidate); live analysis via pg_stat_statements for N+1 detection W025 (call ratio >= 100x), sequential scan detection W026 (seq_scan > 10x idx_scan); I006 boolean index low selectivity, I007 excessive indexes (10+).
+- Seed generation: `--seed` for deterministic output, `--format copy|insert` (COPY 5-10x faster, psql-only), `--clean` emits TRUNCATE CASCADE, `--mode edge-cases` generates boundary values, `--counts table=N` for per-table row counts. Distributions: Zipf (s=1.5) for FK references, log-normal for money. Regex generation from CHECK patterns via regexp/syntax AST walk. FK cycles use two-pass NULL-then-UPDATE (S001 if cycle column is NOT NULL). Batch INSERT (1000 rows/statement). CHECK hint extraction for range/length/regex constraints, UNIQUE enforcement with 100 retries.
 
 ## Testing
 
