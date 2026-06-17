@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -689,6 +691,11 @@ func handleMigrateTest(kwargs map[string]interface{}) int {
 		return 1
 	}
 
+	shadow, _ := kwargs["shadow"].(bool)
+	if shadow {
+		return handleMigrateTestShadow(kwargs)
+	}
+
 	cfg := loadProjectConfig(".")
 
 	dir := kwargs["dir"].(string)
@@ -864,4 +871,299 @@ func handleMigrateTest(kwargs map[string]interface{}) int {
 		return 1
 	}
 	return 0
+}
+
+func handleMigrateTestShadow(kwargs map[string]interface{}) int {
+	dbURL := kwargs["db"].(string)
+	quiet := kwargs["quiet"].(bool)
+	timeout := kwargs["timeout"].(int)
+
+	// Require path arg for shadow mode.
+	rawPaths, ok := kwargs["path"].([]interface{})
+	if !ok || len(rawPaths) == 0 {
+		fmt.Fprintln(os.Stderr, "error: schema path is required for --shadow mode")
+		return 1
+	}
+	paths := make([]string, len(rawPaths))
+	for i, v := range rawPaths {
+		paths[i] = v.(string)
+	}
+
+	// Build desired schema from TOML.
+	schema, exitCode := parseAndBuild(paths)
+	if exitCode != 0 {
+		return exitCode
+	}
+
+	cfg := loadProjectConfig(paths[0])
+
+	dir := kwargs["dir"].(string)
+	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+		dir = cfg.Project.MigrationsDir
+	}
+
+	schemaNames := []string{"public"}
+	if schema.Name != "" && schema.Name != "public" {
+		schemaNames = []string{schema.Name}
+	} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
+		schemaNames = cfgNames
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	// Connect to the source database for admin operations (CREATE/DROP DATABASE).
+	conn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+		return 1
+	}
+	defer conn.Close(ctx)
+
+	// Check for stale shadow databases.
+	rows, err := conn.Query(ctx, "SELECT datname FROM pg_database WHERE datname LIKE 'pgdesign_shadow_%'")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: cannot check for stale shadow databases: %v\n", err)
+	} else {
+		var stale []string
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err == nil {
+				stale = append(stale, name)
+			}
+		}
+		rows.Close()
+		if len(stale) > 0 {
+			fmt.Fprintf(os.Stderr, "warning: found %d stale shadow database(s):\n", len(stale))
+			for _, s := range stale {
+				fmt.Fprintf(os.Stderr, "  - %s\n", s)
+			}
+			fmt.Fprintln(os.Stderr, "  Run DROP DATABASE manually to clean up.")
+		}
+	}
+
+	// Create shadow database.
+	shadowName := fmt.Sprintf("pgdesign_shadow_%d", time.Now().Unix())
+	if !quiet {
+		fmt.Printf("Creating shadow database: %s\n", shadowName)
+	}
+
+	// CREATE DATABASE cannot run inside a transaction.
+	if _, err := conn.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s", shadowName)); err != nil {
+		fmt.Fprintf(os.Stderr, "error: create shadow database: %v\n", err)
+		return 1
+	}
+
+	// Ensure cleanup on exit.
+	defer func() {
+		// Use a fresh context for cleanup in case the original was cancelled.
+		cleanCtx := context.Background()
+		if _, err := conn.Exec(cleanCtx, fmt.Sprintf("DROP DATABASE IF EXISTS %s", shadowName)); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to drop shadow database %s: %v\n", shadowName, err)
+			fmt.Fprintf(os.Stderr, "  Clean up manually: DROP DATABASE %s;\n", shadowName)
+		} else if !quiet {
+			fmt.Printf("Dropped shadow database: %s\n", shadowName)
+		}
+	}()
+
+	// Build connection string for the shadow database.
+	shadowURL, err := buildShadowURL(dbURL, shadowName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: build shadow URL: %v\n", err)
+		return 1
+	}
+
+	// Connect to shadow and replay migrations.
+	shadowConn, err := pgx.Connect(ctx, shadowURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: connect to shadow: %v\n", err)
+		return 1
+	}
+
+	if !quiet {
+		fmt.Printf("Replaying migrations from %s...\n", dir)
+	}
+
+	lockTimeout := cfg.Migrate.LockTimeout
+	applied, err := migrate.Apply(ctx, shadowConn, dir, lockTimeout)
+	shadowConn.Close(ctx) // Must close before DROP DATABASE.
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: replay migrations: %v\n", err)
+		if len(applied) > 0 {
+			fmt.Fprintf(os.Stderr, "Applied before failure: %v\n", applied)
+		}
+		return 1
+	}
+
+	if !quiet {
+		fmt.Printf("Applied %d migration(s) to shadow.\n", len(applied))
+	}
+
+	// Introspect the shadow database.
+	if !quiet {
+		fmt.Println("Introspecting shadow database...")
+	}
+	actual, intrDiags, err := introspect.Introspect(ctx, shadowURL, schemaNames)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: introspect shadow: %v\n", err)
+		return 1
+	}
+	if len(intrDiags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(intrDiags, true))
+	}
+	if diagnostic.Diagnostics(intrDiags).HasErrors() {
+		return 1
+	}
+
+	// Resolve PGVersion.
+	schema.PGVersion = resolvePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+
+	// Diff shadow against desired.
+	d := diff.Diff(schema, actual)
+	if d.IsEmpty() {
+		if !quiet {
+			fmt.Println("\nResult: PASS")
+			fmt.Println("Shadow database matches desired schema exactly.")
+		}
+		return 0
+	}
+
+	// Report discrepancies.
+	fmt.Println("\nResult: FAIL")
+	fmt.Println("Shadow database diverges from desired schema:")
+	printSchemaDiffSummary(d)
+	return 1
+}
+
+// buildShadowURL takes a PostgreSQL connection URL and swaps the database name.
+func buildShadowURL(dbURL, shadowDB string) (string, error) {
+	u, err := url.Parse(dbURL)
+	if err != nil {
+		return "", fmt.Errorf("parse connection URL: %w", err)
+	}
+	u.Path = "/" + shadowDB
+	return u.String(), nil
+}
+
+// printSchemaDiffSummary prints a human-readable summary of schema differences.
+func printSchemaDiffSummary(d *diff.SchemaDiff) {
+	if len(d.TablesAdded) > 0 {
+		fmt.Printf("  Tables in TOML but not in shadow: %s\n", strings.Join(d.TablesAdded, ", "))
+	}
+	if len(d.TablesRemoved) > 0 {
+		fmt.Printf("  Tables in shadow but not in TOML: %s\n", strings.Join(d.TablesRemoved, ", "))
+	}
+	for _, td := range d.TablesChanged {
+		fmt.Printf("  Table %s differs:\n", td.Name)
+		if len(td.ColumnsAdded) > 0 {
+			names := make([]string, len(td.ColumnsAdded))
+			for i, c := range td.ColumnsAdded {
+				names[i] = c.Name
+			}
+			fmt.Printf("    Missing columns: %s\n", strings.Join(names, ", "))
+		}
+		if len(td.ColumnsRemoved) > 0 {
+			fmt.Printf("    Extra columns: %s\n", strings.Join(td.ColumnsRemoved, ", "))
+		}
+		if len(td.ColumnsChanged) > 0 {
+			names := make([]string, len(td.ColumnsChanged))
+			for i, c := range td.ColumnsChanged {
+				names[i] = c.Name
+			}
+			fmt.Printf("    Changed columns: %s\n", strings.Join(names, ", "))
+		}
+		if len(td.IndexesAdded) > 0 {
+			names := make([]string, len(td.IndexesAdded))
+			for i, idx := range td.IndexesAdded {
+				names[i] = idx.Name
+			}
+			fmt.Printf("    Missing indexes: %s\n", strings.Join(names, ", "))
+		}
+		if len(td.IndexesRemoved) > 0 {
+			fmt.Printf("    Extra indexes: %s\n", strings.Join(td.IndexesRemoved, ", "))
+		}
+		if len(td.FKsAdded) > 0 {
+			names := make([]string, len(td.FKsAdded))
+			for i, fk := range td.FKsAdded {
+				names[i] = fk.Name
+			}
+			fmt.Printf("    Missing foreign keys: %s\n", strings.Join(names, ", "))
+		}
+		if len(td.FKsRemoved) > 0 {
+			fmt.Printf("    Extra foreign keys: %s\n", strings.Join(td.FKsRemoved, ", "))
+		}
+		if len(td.ChecksAdded) > 0 {
+			names := make([]string, len(td.ChecksAdded))
+			for i, c := range td.ChecksAdded {
+				names[i] = c.Name
+			}
+			fmt.Printf("    Missing check constraints: %s\n", strings.Join(names, ", "))
+		}
+		if len(td.ChecksRemoved) > 0 {
+			fmt.Printf("    Extra check constraints: %s\n", strings.Join(td.ChecksRemoved, ", "))
+		}
+		if td.PKChanged != nil {
+			fmt.Printf("    Primary key differs: shadow=%v, desired=%v\n", td.PKChanged[0], td.PKChanged[1])
+		}
+		if td.CommentChanged != nil {
+			fmt.Println("    Comment differs")
+		}
+	}
+	if len(d.EnumsAdded) > 0 {
+		fmt.Printf("  Enums in TOML but not in shadow: %s\n", strings.Join(d.EnumsAdded, ", "))
+	}
+	if len(d.EnumsRemoved) > 0 {
+		fmt.Printf("  Enums in shadow but not in TOML: %s\n", strings.Join(d.EnumsRemoved, ", "))
+	}
+	for _, ed := range d.EnumsChanged {
+		fmt.Printf("  Enum %s differs:\n", ed.Name)
+		if len(ed.ValuesAdded) > 0 {
+			fmt.Printf("    Missing values: %s\n", strings.Join(ed.ValuesAdded, ", "))
+		}
+		if len(ed.ValuesRemoved) > 0 {
+			fmt.Printf("    Extra values: %s\n", strings.Join(ed.ValuesRemoved, ", "))
+		}
+	}
+	if len(d.ExtensionsAdded) > 0 {
+		fmt.Printf("  Extensions in TOML but not in shadow: %s\n", strings.Join(d.ExtensionsAdded, ", "))
+	}
+	if len(d.ExtensionsRemoved) > 0 {
+		fmt.Printf("  Extensions in shadow but not in TOML: %s\n", strings.Join(d.ExtensionsRemoved, ", "))
+	}
+	if len(d.ViewsAdded) > 0 {
+		fmt.Printf("  Views in TOML but not in shadow: %s\n", strings.Join(d.ViewsAdded, ", "))
+	}
+	if len(d.ViewsRemoved) > 0 {
+		fmt.Printf("  Views in shadow but not in TOML: %s\n", strings.Join(d.ViewsRemoved, ", "))
+	}
+	if len(d.MaterializedViewsAdded) > 0 {
+		fmt.Printf("  Materialized views in TOML but not in shadow: %s\n", strings.Join(d.MaterializedViewsAdded, ", "))
+	}
+	if len(d.MaterializedViewsRemoved) > 0 {
+		fmt.Printf("  Materialized views in shadow but not in TOML: %s\n", strings.Join(d.MaterializedViewsRemoved, ", "))
+	}
+	if len(d.SequencesAdded) > 0 {
+		fmt.Printf("  Sequences in TOML but not in shadow: %s\n", strings.Join(d.SequencesAdded, ", "))
+	}
+	if len(d.SequencesRemoved) > 0 {
+		fmt.Printf("  Sequences in shadow but not in TOML: %s\n", strings.Join(d.SequencesRemoved, ", "))
+	}
+	if len(d.FunctionsAdded) > 0 {
+		fmt.Printf("  Functions in TOML but not in shadow: %s\n", strings.Join(d.FunctionsAdded, ", "))
+	}
+	if len(d.FunctionsRemoved) > 0 {
+		fmt.Printf("  Functions in shadow but not in TOML: %s\n", strings.Join(d.FunctionsRemoved, ", "))
+	}
+	if len(d.DomainsAdded) > 0 {
+		fmt.Printf("  Domains in TOML but not in shadow: %s\n", strings.Join(d.DomainsAdded, ", "))
+	}
+	if len(d.DomainsRemoved) > 0 {
+		fmt.Printf("  Domains in shadow but not in TOML: %s\n", strings.Join(d.DomainsRemoved, ", "))
+	}
+	if len(d.CompositeTypesAdded) > 0 {
+		fmt.Printf("  Composite types in TOML but not in shadow: %s\n", strings.Join(d.CompositeTypesAdded, ", "))
+	}
+	if len(d.CompositeTypesRemoved) > 0 {
+		fmt.Printf("  Composite types in shadow but not in TOML: %s\n", strings.Join(d.CompositeTypesRemoved, ", "))
+	}
 }
