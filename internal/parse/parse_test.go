@@ -1679,6 +1679,70 @@ operators = ["=", "&&"]
 	}
 }
 
+func TestParseUniqueDeferrable(t *testing.T) {
+	input := `
+[tables.users]
+comment = "users table"
+
+[tables.users.columns.id]
+type = "integer"
+
+[tables.users.columns.email]
+type = "text"
+
+[tables.users.unique.uq_email]
+columns = ["email"]
+deferrable = true
+initially_deferred = true
+`
+	schema, diags := Bytes([]byte(input))
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+	tbl := schema.Tables[0]
+	if len(tbl.Uniques) != 1 {
+		t.Fatalf("expected 1 unique constraint, got %d", len(tbl.Uniques))
+	}
+	uq := tbl.Uniques["uq_email"]
+	if uq.Deferrable == nil || !*uq.Deferrable {
+		t.Errorf("Deferrable = %v, want ptr to true", uq.Deferrable)
+	}
+	if uq.InitiallyDeferred == nil || !*uq.InitiallyDeferred {
+		t.Errorf("InitiallyDeferred = %v, want ptr to true", uq.InitiallyDeferred)
+	}
+}
+
+func TestParseUniqueDefaults(t *testing.T) {
+	input := `
+[tables.users]
+comment = "users table"
+
+[tables.users.columns.id]
+type = "integer"
+
+[tables.users.columns.email]
+type = "text"
+
+[tables.users.unique.uq_email]
+columns = ["email"]
+`
+	schema, diags := Bytes([]byte(input))
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	tbl := schema.Tables[0]
+	uq := tbl.Uniques["uq_email"]
+	if uq.Deferrable != nil {
+		t.Errorf("Deferrable = %v, want nil", uq.Deferrable)
+	}
+	if uq.InitiallyDeferred != nil {
+		t.Errorf("InitiallyDeferred = %v, want nil", uq.InitiallyDeferred)
+	}
+}
+
 func TestSequenceParsing_Basic(t *testing.T) {
 	content := `[meta]
 version = 1

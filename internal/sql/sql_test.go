@@ -822,6 +822,35 @@ func TestAlterTableAddUnique_Idempotent(t *testing.T) {
 	}
 }
 
+func TestAlterTableAddUnique_Deferrable(t *testing.T) {
+	uq := &model.UniqueConstraint{
+		Name:       "uq_users_email",
+		Columns:    []string{"email"},
+		Deferrable: true,
+	}
+
+	got := AlterTableAddUnique("public", "users", uq, false)
+	want := "ALTER TABLE public.users ADD CONSTRAINT uq_users_email UNIQUE (email) DEFERRABLE;"
+	if got != want {
+		t.Errorf("AlterTableAddUnique deferrable:\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestAlterTableAddUnique_DeferrableInitiallyDeferred(t *testing.T) {
+	uq := &model.UniqueConstraint{
+		Name:              "uq_users_email",
+		Columns:           []string{"email"},
+		Deferrable:        true,
+		InitiallyDeferred: true,
+	}
+
+	got := AlterTableAddUnique("public", "users", uq, false)
+	want := "ALTER TABLE public.users ADD CONSTRAINT uq_users_email UNIQUE (email) DEFERRABLE INITIALLY DEFERRED;"
+	if got != want {
+		t.Errorf("AlterTableAddUnique deferrable initially deferred:\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
 func TestCreatePartitionOf(t *testing.T) {
 	child := &model.PartitionSpec{
 		Name:  "events_2024_01",
