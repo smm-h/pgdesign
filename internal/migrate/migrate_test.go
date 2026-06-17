@@ -2403,3 +2403,51 @@ func TestOpCreateIndexWithCollation(t *testing.T) {
 		t.Errorf("expected COLLATE C in index DDL, got:\n%s", got)
 	}
 }
+
+func TestOpToSQL_AddExclusion(t *testing.T) {
+	op := DDLOp{
+		Op:        "add_exclusion",
+		Table:     "bookings",
+		Name:      "no_overlap",
+		Method:    "gist",
+		Columns:   []string{"room_id", "during"},
+		Operators: []string{"=", "&&"},
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.bookings ADD CONSTRAINT no_overlap EXCLUDE USING gist (room_id WITH =, during WITH &&);`
+	if got != want {
+		t.Errorf("OpToSQL(add_exclusion):\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestOpToSQL_AddExclusionWithWhere(t *testing.T) {
+	op := DDLOp{
+		Op:                "add_exclusion",
+		Table:             "bookings",
+		Name:              "no_overlap",
+		Method:            "gist",
+		Columns:           []string{"room_id", "during"},
+		Operators:         []string{"=", "&&"},
+		Where:             "active = true",
+		Deferrable:        true,
+		InitiallyDeferred: true,
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.bookings ADD CONSTRAINT no_overlap EXCLUDE USING gist (room_id WITH =, during WITH &&) WHERE (active = true) DEFERRABLE INITIALLY DEFERRED;`
+	if got != want {
+		t.Errorf("OpToSQL(add_exclusion with where):\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestOpToSQL_DropExclusion(t *testing.T) {
+	op := DDLOp{
+		Op:    "drop_exclusion",
+		Table: "bookings",
+		Name:  "no_overlap",
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.bookings DROP CONSTRAINT no_overlap;`
+	if got != want {
+		t.Errorf("OpToSQL(drop_exclusion):\ngot:  %s\nwant: %s", got, want)
+	}
+}
