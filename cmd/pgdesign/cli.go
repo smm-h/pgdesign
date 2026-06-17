@@ -133,6 +133,7 @@ func main() {
 		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) or directory", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.IntFlag("rows", "Rows per table", strictcli.Default(10)),
+			strictcli.IntFlag("seed", "RNG seed for reproducibility", strictcli.Default(nil)),
 			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
 			strictcli.BoolFlag("apply", "Insert directly into database"),
 			strictcli.StringFlag("db", "PostgreSQL connection URL (required with --apply)", strictcli.Default(nil)),

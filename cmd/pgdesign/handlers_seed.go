@@ -29,7 +29,16 @@ func handleSeed(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	var rngSeed int64
+	if seedVal, hasSeed := kwargs["seed"].(int); hasSeed {
+		rngSeed = int64(seedVal)
+	} else {
+		rngSeed = time.Now().UnixNano()
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "seed: %d\n", rngSeed)
+		}
+	}
+	rng := rand.New(rand.NewSource(rngSeed))
 	sql := seed.Generate(schema, rows, rng)
 
 	if outputPath != "" {
