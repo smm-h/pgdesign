@@ -358,6 +358,12 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 		})
 	}
 
+	// Resolve exclusion constraints.
+	for name, rawExc := range rt.Exclusions {
+		exc := resolveExclusion(name, rawExc)
+		t.Exclusions = append(t.Exclusions, exc)
+	}
+
 	// Resolve policies.
 	for name, rawPol := range rt.Policies {
 		pol, polDiags := resolvePolicy(name, rawPol, rt.Name)
@@ -647,6 +653,38 @@ func resolvePolicy(name string, rawPol parse.RawPolicy, tableName string) (Polic
 	}
 
 	return pol, diags
+}
+
+func resolveExclusion(name string, raw parse.RawExclusion) ExclusionConstraint {
+	exc := ExclusionConstraint{
+		Name:   name,
+		Method: "gist", // default
+	}
+	if raw.Method != nil {
+		exc.Method = *raw.Method
+	}
+	if raw.Where != nil {
+		exc.Where = *raw.Where
+	}
+	if raw.Deferrable != nil {
+		exc.Deferrable = *raw.Deferrable
+	}
+	if raw.InitiallyDeferred != nil {
+		exc.InitiallyDeferred = *raw.InitiallyDeferred
+	}
+
+	// Pair up columns[i] with operators[i] into ExclusionElements.
+	for i := range raw.Columns {
+		elem := ExclusionElement{
+			Column: raw.Columns[i],
+		}
+		if i < len(raw.Operators) {
+			elem.Operator = raw.Operators[i]
+		}
+		exc.Elements = append(exc.Elements, elem)
+	}
+
+	return exc
 }
 
 // parseIndexColumns splits raw column strings like "col DESC" into separate

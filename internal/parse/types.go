@@ -76,6 +76,7 @@ type RawTable struct {
 	Indexes      map[string]RawIndex
 	Uniques      map[string]RawUnique
 	Checks       map[string]RawCheck
+	Exclusions   map[string]RawExclusion
 	Policies     map[string]RawPolicy
 	EnableRLS    bool
 	Partitioning *RawPartitioning
@@ -135,6 +136,17 @@ type RawUnique struct {
 type RawCheck struct {
 	Name string
 	Expr string
+}
+
+// RawExclusion holds an exclusion constraint from [tables.*.exclusions.*].
+type RawExclusion struct {
+	Name              string
+	Columns           []string
+	Operators         []string
+	Method            *string
+	Where             *string
+	Deferrable        *bool
+	InitiallyDeferred *bool
 }
 
 // RawPolicy holds a row-level security policy from [tables.*.policies.*].

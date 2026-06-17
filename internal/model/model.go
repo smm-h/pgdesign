@@ -85,8 +85,9 @@ type Table struct {
 	FKs          []FK               `json:"fks"`
 	Indexes      []Index            `json:"indexes"`
 	Uniques      []UniqueConstraint `json:"uniques"`
-	Checks       []CheckConstraint  `json:"checks"`
-	Partitioning *PartitionSpec     `json:"partitioning,omitempty"`
+	Checks       []CheckConstraint    `json:"checks"`
+	Exclusions   []ExclusionConstraint `json:"exclusions"`
+	Partitioning *PartitionSpec       `json:"partitioning,omitempty"`
 	Dependencies []fd.FuncDep       `json:"dependencies,omitempty"`
 	Maintenance  *MaintenanceConfig `json:"maintenance,omitempty"`
 	Owner        string             `json:"owner,omitempty"`
@@ -191,6 +192,22 @@ type UniqueConstraint struct {
 type CheckConstraint struct {
 	Name string `json:"name"`
 	Expr string `json:"expr"`
+}
+
+// ExclusionElement represents a single element in an exclusion constraint.
+type ExclusionElement struct {
+	Column   string `json:"column"`
+	Operator string `json:"operator"`
+}
+
+// ExclusionConstraint represents an exclusion constraint.
+type ExclusionConstraint struct {
+	Name              string             `json:"name"`
+	Method            string             `json:"method"` // "gist", "spgist"
+	Elements          []ExclusionElement `json:"elements"`
+	Where             string             `json:"where,omitempty"`
+	Deferrable        bool               `json:"deferrable,omitempty"`
+	InitiallyDeferred bool               `json:"initially_deferred,omitempty"`
 }
 
 // Policy represents a row-level security (RLS) policy.

@@ -595,8 +595,9 @@ func (p *parser) parseTable(name string) RawTable {
 		FKs:      make(map[string]RawFK),
 		Indexes:  make(map[string]RawIndex),
 		Uniques:  make(map[string]RawUnique),
-		Checks:   make(map[string]RawCheck),
-		Policies: make(map[string]RawPolicy),
+		Checks:     make(map[string]RawCheck),
+		Exclusions: make(map[string]RawExclusion),
+		Policies:   make(map[string]RawPolicy),
 	}
 
 	// Find the [tables.<name>] table node for top-level keys
@@ -614,7 +615,7 @@ func (p *parser) parseTable(name string) RawTable {
 			if !knownKeys[key] {
 				// Could be a dotted key for sub-sections; skip known sub-section prefixes
 				if key == "columns" || key == "fks" || key == "indexes" ||
-					key == "unique" || key == "checks" || key == "policies" ||
+					key == "unique" || key == "checks" || key == "exclusions" || key == "policies" ||
 					key == "partitioning" || key == "dependencies" || key == "maintenance" {
 					continue
 				}
@@ -664,6 +665,9 @@ func (p *parser) parseTable(name string) RawTable {
 
 	// Parse checks
 	p.parseChecks(name, &rt)
+
+	// Parse exclusion constraints
+	p.parseExclusions(name, &rt)
 
 	// Parse policies
 	p.parsePolicies(name, &rt)
@@ -1057,6 +1061,82 @@ func (p *parser) parseCheck(tableName, chkName string, tbl *tomledit.TableNode) 
 	}
 
 	return chk
+}
+
+// parseExclusions extracts exclusion constraints from [tables.<name>.exclusions.*].
+func (p *parser) parseExclusions(tableName string, rt *RawTable) {
+	prefix := []string{"tables", tableName, "exclusions"}
+
+	for _, child := range p.doc.Children {
+		tbl, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl.KeyPath) == 4 && pathHasPrefix(tbl.KeyPath, prefix) {
+			excName := tbl.KeyPath[3]
+			exc := p.parseExclusion(tableName, excName, tbl)
+			rt.Exclusions[excName] = exc
+		}
+	}
+}
+
+func (p *parser) parseExclusion(tableName, excName string, tbl *tomledit.TableNode) RawExclusion {
+	exc := RawExclusion{Name: excName}
+
+	for _, child := range tbl.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		key := kv.Key.Parts[0]
+		switch key {
+		case "columns":
+			if v, ok := nodeStringSlice(kv.Val); ok {
+				exc.Columns = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].columns must be an array of strings", tableName, excName)
+			}
+		case "operators":
+			if v, ok := nodeStringSlice(kv.Val); ok {
+				exc.Operators = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].operators must be an array of strings", tableName, excName)
+			}
+		case "method":
+			if v, ok := nodeString(kv.Val); ok {
+				exc.Method = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].method must be a string", tableName, excName)
+			}
+		case "where":
+			if v, ok := nodeString(kv.Val); ok {
+				exc.Where = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].where must be a string", tableName, excName)
+			}
+		case "deferrable":
+			if v, ok := nodeBool(kv.Val); ok {
+				exc.Deferrable = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].deferrable must be a boolean", tableName, excName)
+			}
+		case "initially_deferred":
+			if v, ok := nodeBool(kv.Val); ok {
+				exc.InitiallyDeferred = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].initially_deferred must be a boolean", tableName, excName)
+			}
+		default:
+			p.warnf("W001", tableName, "", "unknown key in [tables.%s.exclusions.%s]: %q", tableName, excName, key)
+		}
+	}
+
+	// Validate: columns and operators must have the same length and at least one element.
+	if len(exc.Columns) > 0 && len(exc.Operators) > 0 && len(exc.Columns) != len(exc.Operators) {
+		p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s]: columns and operators must have the same length (got %d columns, %d operators)", tableName, excName, len(exc.Columns), len(exc.Operators))
+	}
+
+	return exc
 }
 
 // parsePolicies extracts RLS policies from [tables.<name>.policies.*].
