@@ -176,3 +176,104 @@ func TestDeparseExpr(t *testing.T) {
 		}
 	})
 }
+
+func TestExtractTableRefs(t *testing.T) {
+	tests := []struct {
+		name    string
+		sql     string
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "simple SELECT",
+			sql:  "SELECT * FROM users",
+			want: []string{"users"},
+		},
+		{
+			name: "JOIN",
+			sql:  "SELECT * FROM users u JOIN orders o ON o.user_id = u.id",
+			want: []string{"orders", "users"},
+		},
+		{
+			name: "subquery",
+			sql:  "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders)",
+			want: []string{"orders", "users"},
+		},
+		{
+			name: "schema-qualified",
+			sql:  "SELECT * FROM auth.users",
+			want: []string{"auth.users"},
+		},
+		{
+			name: "INSERT",
+			sql:  "INSERT INTO users (name) VALUES ('test')",
+			want: []string{"users"},
+		},
+		{
+			name: "UPDATE",
+			sql:  "UPDATE users SET name = 'test' WHERE id = 1",
+			want: []string{"users"},
+		},
+		{
+			name: "DELETE",
+			sql:  "DELETE FROM users WHERE id = 1",
+			want: []string{"users"},
+		},
+		{
+			name:    "PL/pgSQL body",
+			sql:     "BEGIN\n  INSERT INTO t VALUES (1);\nEND;",
+			wantErr: true,
+		},
+		{
+			name: "empty input",
+			sql:  "",
+			want: nil,
+		},
+		{
+			name: "multiple references deduplicated",
+			sql:  "SELECT * FROM users u1 JOIN users u2 ON u1.id = u2.id",
+			want: []string{"users"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ExtractTableRefs(tt.sql)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.want == nil {
+				if got != nil {
+					t.Fatalf("expected nil, got %v", got)
+				}
+				return
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("expected %d refs %v, got %d refs %v", len(tt.want), tt.want, len(got), got)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Errorf("ref[%d]: expected %q, got %q", i, tt.want[i], got[i])
+				}
+			}
+		})
+	}
+}
+
+func TestExtractTableRefsEdgeCases(t *testing.T) {
+	// Verify the function compiles and handles whitespace-only input.
+	refs, err := ExtractTableRefs("   \t\n  ")
+	if err != nil {
+		t.Fatalf("unexpected error for whitespace input: %v", err)
+	}
+	if refs != nil {
+		t.Errorf("expected nil for whitespace input, got %v", refs)
+	}
+
+}

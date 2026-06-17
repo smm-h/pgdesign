@@ -17,6 +17,8 @@
 package sqlparse
 
 import (
+	"encoding/json"
+	"sort"
 	"strings"
 
 	pg "github.com/pganalyze/pg_query_go/v6"
@@ -55,6 +57,82 @@ func SplitStatements(sql string) ([]string, error) {
 		stmts = append(stmts, text)
 	}
 	return stmts, nil
+}
+
+// ExtractTableRefs parses the given SQL and returns a sorted, deduplicated
+// list of table names referenced in the statement. Schema-qualified references
+// are returned as "schema.table". Returns nil, nil for empty input. Returns an
+// error if the SQL cannot be parsed (e.g., PL/pgSQL bodies).
+func ExtractTableRefs(sql string) ([]string, error) {
+	trimmed := strings.TrimSpace(sql)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	jsonStr, err := pg_query.ParseToJSON(trimmed)
+	if err != nil {
+		return nil, err
+	}
+
+	var tree interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &tree); err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]bool)
+	walkForRangeVars(tree, seen)
+
+	refs := make([]string, 0, len(seen))
+	for name := range seen {
+		refs = append(refs, name)
+	}
+	sort.Strings(refs)
+	return refs, nil
+}
+
+// walkForRangeVars recursively walks a JSON tree looking for table references
+// and collects their names into the seen map. Table references appear in two
+// forms in pg_query JSON:
+//   - SELECT/FROM: {"RangeVar": {"relname": "t", ...}}
+//   - INSERT/UPDATE/DELETE: {"relation": {"relname": "t", ...}} (no RangeVar wrapper)
+func walkForRangeVars(node interface{}, seen map[string]bool) {
+	switch v := node.(type) {
+	case map[string]interface{}:
+		// Check for RangeVar wrapper (SELECT FROM, JOIN, etc.)
+		if rv, ok := v["RangeVar"]; ok {
+			extractRelname(rv, seen)
+		}
+		// Check for bare relation object (INSERT, UPDATE, DELETE targets)
+		if rel, ok := v["relation"]; ok {
+			extractRelname(rel, seen)
+		}
+		for _, val := range v {
+			walkForRangeVars(val, seen)
+		}
+	case []interface{}:
+		for _, item := range v {
+			walkForRangeVars(item, seen)
+		}
+	}
+}
+
+// extractRelname extracts relname and optional schemaname from a RangeVar-like
+// JSON object and adds the table reference to seen.
+func extractRelname(node interface{}, seen map[string]bool) {
+	m, ok := node.(map[string]interface{})
+	if !ok {
+		return
+	}
+	relname, _ := m["relname"].(string)
+	if relname == "" {
+		return
+	}
+	schemaname, _ := m["schemaname"].(string)
+	name := relname
+	if schemaname != "" {
+		name = schemaname + "." + relname
+	}
+	seen[name] = true
 }
 
 // DeparseExpr converts a pg_query AST expression node back to its SQL string
