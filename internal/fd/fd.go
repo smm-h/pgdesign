@@ -260,3 +260,222 @@ func isSupersetOfAny(combo []string, keys [][]string) bool {
 	}
 	return false
 }
+
+// Component represents a relation produced by BCNF decomposition.
+type Component struct {
+	Name       string    // suggested table name
+	Attributes []string  // columns in this component (sorted)
+	FDs        []FuncDep // FDs projected onto this component
+}
+
+// BCNFDecompose decomposes a relation into BCNF components.
+// Returns one Component per BCNF sub-relation, with names derived from the
+// original name (e.g., "orders_1", "orders_2").
+func BCNFDecompose(name string, allAttrs []string, fds []FuncDep) []Component {
+	attrs := make([]string, len(allAttrs))
+	copy(attrs, allAttrs)
+	sort.Strings(attrs)
+
+	mc := MinimalCover(fds)
+
+	// Check if already in BCNF: every non-trivial FD's determinant is a superkey.
+	var violating *FuncDep
+	for i, fd := range mc {
+		// Skip trivial FDs (dependent is subset of determinant).
+		if isSubset(fd.Dependent, fd.Determinant) {
+			continue
+		}
+		if !IsSuperkey(fd.Determinant, attrs, mc) {
+			violating = &mc[i]
+			break
+		}
+	}
+
+	if violating == nil {
+		projected := projectFDs(attrs, mc)
+		return []Component{{
+			Name:       name,
+			Attributes: attrs,
+			FDs:        projected,
+		}}
+	}
+
+	// Decompose on the violating FD.
+	xPlus := Closure(violating.Determinant, mc)
+
+	// R1 = X+ (closure of the violating determinant)
+	r1Attrs := make([]string, len(xPlus))
+	copy(r1Attrs, xPlus)
+	sort.Strings(r1Attrs)
+
+	// R2 = X union (allAttrs minus X+)
+	diff := setDifference(attrs, xPlus)
+	r2Attrs := setUnion(violating.Determinant, diff)
+
+	// Recurse on both halves.
+	left := BCNFDecompose(name, r1Attrs, mc)
+	right := BCNFDecompose(name, r2Attrs, mc)
+
+	components := append(left, right...)
+
+	// Renumber if more than one component.
+	if len(components) == 1 {
+		components[0].Name = name
+	} else {
+		for i := range components {
+			components[i].Name = name + "_" + itoa(i+1)
+		}
+	}
+
+	return components
+}
+
+// projectFDs projects a set of FDs onto a subset of attributes.
+// For each FD X->Y where X is a subset of attrs, computes closure(X) under
+// the original fds, intersects with attrs, and produces X -> (intersection - X).
+// The result is minimized via MinimalCover.
+func projectFDs(attrs []string, fds []FuncDep) []FuncDep {
+	var projected []FuncDep
+
+	for _, fd := range fds {
+		if !isSubset(fd.Determinant, attrs) {
+			continue
+		}
+		closure := Closure(fd.Determinant, fds)
+		inter := setIntersection(closure, attrs)
+		rhs := setDifference(inter, fd.Determinant)
+		if len(rhs) == 0 {
+			continue
+		}
+		projected = append(projected, FuncDep{
+			Determinant: fd.Determinant,
+			Dependent:   rhs,
+		})
+	}
+
+	return MinimalCover(projected)
+}
+
+// setDifference returns elements in a that are not in b, sorted.
+func setDifference(a, b []string) []string {
+	bSet := make(map[string]struct{}, len(b))
+	for _, v := range b {
+		bSet[v] = struct{}{}
+	}
+	var result []string
+	for _, v := range a {
+		if _, ok := bSet[v]; !ok {
+			result = append(result, v)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
+// setIntersection returns elements present in both a and b, sorted.
+func setIntersection(a, b []string) []string {
+	bSet := make(map[string]struct{}, len(b))
+	for _, v := range b {
+		bSet[v] = struct{}{}
+	}
+	var result []string
+	for _, v := range a {
+		if _, ok := bSet[v]; ok {
+			result = append(result, v)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
+// IsLosslessJoin checks whether decomposing into r1 and r2 is lossless
+// under the given FDs. The decomposition is lossless if the closure of
+// (r1 intersect r2) contains all of r1 or all of r2.
+func IsLosslessJoin(r1, r2 []string, allAttrs []string, fds []FuncDep) bool {
+	inter := setIntersection(r1, r2)
+	if len(inter) == 0 {
+		return false
+	}
+	closure := Closure(inter, fds)
+	return isSubset(r1, closure) || isSubset(r2, closure)
+}
+
+// PreservesDependencies checks whether the projected FDs in the given
+// components preserve all original FDs. Returns true if all are preserved,
+// along with any lost FDs (with multi-attribute dependents merged).
+func PreservesDependencies(original []FuncDep, components []Component) (preserved bool, lost []FuncDep) {
+	// Collect all projected FDs from all components.
+	var projectedAll []FuncDep
+	for _, comp := range components {
+		projectedAll = append(projectedAll, comp.FDs...)
+	}
+
+	// Decompose each original FD to single-attribute RHS and check.
+	// Track lost FDs keyed by determinant for merging.
+	type lostEntry struct {
+		det  []string
+		deps []string
+	}
+	lostMap := make(map[string]*lostEntry)
+
+	for _, fd := range original {
+		for _, attr := range fd.Dependent {
+			// Check if X -> attr is preserved.
+			closure := Closure(fd.Determinant, projectedAll)
+			if !contains(closure, attr) {
+				key := joinAttrs(fd.Determinant)
+				if entry, ok := lostMap[key]; ok {
+					if !contains(entry.deps, attr) {
+						entry.deps = append(entry.deps, attr)
+						sort.Strings(entry.deps)
+					}
+				} else {
+					det := make([]string, len(fd.Determinant))
+					copy(det, fd.Determinant)
+					sort.Strings(det)
+					lostMap[key] = &lostEntry{
+						det:  det,
+						deps: []string{attr},
+					}
+				}
+			}
+		}
+	}
+
+	if len(lostMap) == 0 {
+		return true, nil
+	}
+
+	// Collect and sort lost FDs for determinism.
+	lost = make([]FuncDep, 0, len(lostMap))
+	for _, entry := range lostMap {
+		lost = append(lost, FuncDep{
+			Determinant: entry.det,
+			Dependent:   entry.deps,
+		})
+	}
+	sort.Slice(lost, func(i, j int) bool {
+		di := joinAttrs(lost[i].Determinant)
+		dj := joinAttrs(lost[j].Determinant)
+		if di != dj {
+			return di < dj
+		}
+		return joinAttrs(lost[i].Dependent) < joinAttrs(lost[j].Dependent)
+	})
+
+	return false, lost
+}
+
+// itoa converts a small non-negative integer to its string representation
+// without importing strconv.
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var digits []byte
+	for n > 0 {
+		digits = append([]byte{byte('0' + n%10)}, digits...)
+		n /= 10
+	}
+	return string(digits)
+}
