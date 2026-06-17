@@ -91,6 +91,9 @@ const (
 	OpAlterSequence           OpType = "alter_sequence"
 	OpCreateCompositeType     OpType = "create_composite_type"
 	OpDropCompositeType       OpType = "drop_composite_type"
+	OpCreateDomain            OpType = "create_domain"
+	OpDropDomain              OpType = "drop_domain"
+	OpAlterDomain             OpType = "alter_domain"
 
 	OpCreateFunction          OpType = "create_function"
 	OpDropFunction            OpType = "drop_function"
@@ -389,6 +392,29 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			Reversible: false,
 			DataLoss:   true,
 			Suggestion: "Dropping a composite type with CASCADE affects all columns using this type",
+		}
+
+	case OpCreateDomain:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
+		}
+
+	case OpDropDomain:
+		return Classification{
+			RiskLevel:  Dangerous,
+			LockType:   LockAccessExclusive,
+			Reversible: false,
+			DataLoss:   true,
+			Suggestion: "Dropping a domain with CASCADE affects all columns using this type",
+		}
+
+	case OpAlterDomain:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockAccessExclusive,
+			Reversible: true,
 		}
 
 	case OpCreateFunction:
