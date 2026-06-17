@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -23,9 +24,10 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	}
 
 	// Phase 1: resolve
-	tables, enums, resolveDiags := resolve(raw, reg)
+	tables, enums, compositeTypes, resolveDiags := resolve(raw, reg)
 	diags = append(diags, resolveDiags...)
 	schema.Enums = enums
+	schema.CompositeTypes = compositeTypes
 	schema.Views = resolveViews(raw)
 	schema.MaterializedViews = resolveMaterializedViews(raw)
 
@@ -77,9 +79,10 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	// Phase 1: resolve all schemas.
 	var allTables []Table
 	for _, raw := range raws {
-		tables, enums, resolveDiags := resolve(raw, reg)
+		tables, enums, compositeTypes, resolveDiags := resolve(raw, reg)
 		diags = append(diags, resolveDiags...)
 		schema.Enums = append(schema.Enums, enums...)
+		schema.CompositeTypes = append(schema.CompositeTypes, compositeTypes...)
 		allTables = append(allTables, tables...)
 		schema.Views = append(schema.Views, resolveViews(raw)...)
 		schema.MaterializedViews = append(schema.MaterializedViews, resolveMaterializedViews(raw)...)
@@ -105,10 +108,11 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 }
 
 // resolve expands semantic types into PG types and builds model structs.
-func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, diagnostic.Diagnostics) {
+func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []CompositeType, diagnostic.Diagnostics) {
 	var diags diagnostic.Diagnostics
 	var tables []Table
 	var enums []Enum
+	var compositeTypes []CompositeType
 
 	// Build enums from raw types with kind=enum.
 	for _, rt := range raw.Types {
@@ -125,6 +129,33 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, diag
 		}
 	}
 
+	// Build composite types from raw types with kind=composite.
+	for _, rt := range raw.Types {
+		if strings.EqualFold(rt.Kind, "composite") {
+			ct := CompositeType{
+				Schema: raw.Meta.Schema,
+				Name:   rt.Name,
+			}
+			if rt.Comment != nil {
+				ct.Comment = *rt.Comment
+			}
+			// Fields come from the parsed RawType.Fields map.
+			// Sort field names for deterministic output.
+			var fieldNames []string
+			for name := range rt.Fields {
+				fieldNames = append(fieldNames, name)
+			}
+			sort.Strings(fieldNames)
+			for _, name := range fieldNames {
+				ct.Fields = append(ct.Fields, CompositeField{
+					Name:   name,
+					PGType: rt.Fields[name],
+				})
+			}
+			compositeTypes = append(compositeTypes, ct)
+		}
+	}
+
 	// Resolve tables.
 	for _, rt := range raw.Tables {
 		t, tableDiags := resolveTable(rt, raw.Meta.Schema, reg)
@@ -134,7 +165,7 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, diag
 		}
 	}
 
-	return tables, enums, diags
+	return tables, enums, compositeTypes, diags
 }
 
 // resolveViews converts raw views into model Views.

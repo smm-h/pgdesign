@@ -30,8 +30,9 @@ type Schema struct {
 	Name        string     `json:"name"`
 	Extensions  []string   `json:"extensions"`
 	Enums       []Enum     `json:"enums"`
-	Domains     []Domain   `json:"domains,omitempty"`
-	Tables      []Table    `json:"tables"`
+	Domains        []Domain        `json:"domains,omitempty"`
+	CompositeTypes []CompositeType `json:"composite_types,omitempty"`
+	Tables         []Table         `json:"tables"`
 	Views              []View              `json:"views,omitempty"`
 	MaterializedViews  []MaterializedView  `json:"materialized_views,omitempty"`
 	Sequences          []Sequence          `json:"sequences,omitempty"`
@@ -253,6 +254,20 @@ type Domain struct {
 	DefaultExpr string `json:"default_expr,omitempty"`
 	Check       string `json:"check,omitempty"`
 	Comment     string `json:"comment,omitempty"`
+}
+
+// CompositeField represents a single field in a composite type.
+type CompositeField struct {
+	Name   string `json:"name"`
+	PGType string `json:"pg_type"`
+}
+
+// CompositeType represents a resolved PostgreSQL composite type.
+type CompositeType struct {
+	Name    string           `json:"name"`
+	Schema  string           `json:"schema,omitempty"`
+	Fields  []CompositeField `json:"fields"`
+	Comment string           `json:"comment,omitempty"`
 }
 
 // PartitionSpec represents partitioning configuration.
