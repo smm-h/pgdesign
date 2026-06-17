@@ -2210,3 +2210,196 @@ func TestGeneratedStorageKeyword(t *testing.T) {
 		}
 	}
 }
+
+func intPtr(v int) *int { return &v }
+
+func TestGenerateMigration_CollationChange(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:   "messages",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "content", PGType: "text", Collation: "de_DE"},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "public.messages",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "content", CollationChanged: &[2]string{"", "de_DE"}},
+				},
+			},
+		},
+	}
+
+	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	var found bool
+	for _, op := range mig.DDLOps {
+		if op.Op == "alter_column_type" && op.Table == "public.messages" && op.Column == "content" {
+			found = true
+			if op.Collation != "de_DE" {
+				t.Errorf("Collation = %q, want %q", op.Collation, "de_DE")
+			}
+			if op.Type != "text" {
+				t.Errorf("Type = %q, want %q", op.Type, "text")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected alter_column_type op for collation change, got ops: %s", opsDebug(mig.DDLOps))
+	}
+}
+
+func TestGenerateMigration_StatisticsChange(t *testing.T) {
+	v := 1000
+	desired := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", Statistics: &v},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "public.users",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "name", StatisticsChanged: &[2]*int{nil, &v}},
+				},
+			},
+		},
+	}
+
+	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	var found bool
+	for _, op := range mig.DDLOps {
+		if op.Op == "set_statistics" && op.Table == "public.users" && op.Column == "name" {
+			found = true
+			if op.Statistics == nil || *op.Statistics != 1000 {
+				t.Errorf("Statistics = %v, want *1000", op.Statistics)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected set_statistics op, got ops: %s", opsDebug(mig.DDLOps))
+	}
+}
+
+func TestGenerateMigration_StatisticsReset(t *testing.T) {
+	v := 500
+	desired := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text"},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "public.users",
+				ColumnsChanged: []diff.ColumnChange{
+					{Name: "name", StatisticsChanged: &[2]*int{&v, nil}},
+				},
+			},
+		},
+	}
+
+	mig, _ := GenerateMigration(d, desired, "1.0.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	var found bool
+	for _, op := range mig.DDLOps {
+		if op.Op == "set_statistics" && op.Table == "public.users" && op.Column == "name" {
+			found = true
+			if op.Statistics != nil {
+				t.Errorf("Statistics = %v, want nil (reset to default)", op.Statistics)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected set_statistics op for reset, got ops: %s", opsDebug(mig.DDLOps))
+	}
+}
+
+func TestOpSetStatistics(t *testing.T) {
+	v := 1000
+	op := DDLOp{
+		Op:         "set_statistics",
+		Table:      "users",
+		Column:     "name",
+		Statistics: &v,
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.users ALTER COLUMN name SET STATISTICS 1000;`
+	if got != want {
+		t.Errorf("got:\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestOpSetStatisticsReset(t *testing.T) {
+	op := DDLOp{
+		Op:     "set_statistics",
+		Table:  "users",
+		Column: "name",
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.users ALTER COLUMN name SET STATISTICS -1;`
+	if got != want {
+		t.Errorf("got:\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestOpAlterColumnTypeWithCollation(t *testing.T) {
+	op := DDLOp{
+		Op:        "alter_column_type",
+		Table:     "messages",
+		Column:    "content",
+		Type:      "text",
+		Collation: "de_DE",
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.messages ALTER COLUMN content TYPE text COLLATE "de_DE";`
+	if got != want {
+		t.Errorf("got:\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestOpCreateIndexWithCollation(t *testing.T) {
+	op := DDLOp{
+		Op:         "create_index",
+		Table:      "messages",
+		Name:       "idx_messages_content",
+		Columns:    []string{"content"},
+		Collations: map[string]string{"content": "C"},
+	}
+	got := OpToSQL(op)
+	if !strings.Contains(got, `content COLLATE "C"`) {
+		t.Errorf("expected COLLATE C in index DDL, got:\n%s", got)
+	}
+}

@@ -2059,3 +2059,264 @@ func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
 		t.Errorf("expected empty diff for non-generated columns with different Stored, got: %+v", d)
 	}
 }
+
+func intPtr(v int) *int { return &v }
+
+func TestColumnCollationChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", Collation: "de_DE"},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", Collation: ""},
+				},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff for collation change")
+	}
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	tc := d.TablesChanged[0]
+	if len(tc.ColumnsChanged) != 1 {
+		t.Fatalf("expected 1 column changed, got %d", len(tc.ColumnsChanged))
+	}
+	cc := tc.ColumnsChanged[0]
+	if cc.Name != "name" {
+		t.Errorf("changed column = %q, want %q", cc.Name, "name")
+	}
+	if cc.CollationChanged == nil {
+		t.Fatal("CollationChanged is nil, expected [empty, de_DE]")
+	}
+	if cc.CollationChanged[0] != "" || cc.CollationChanged[1] != "de_DE" {
+		t.Errorf("CollationChanged = %v, want [\"\", \"de_DE\"]", cc.CollationChanged)
+	}
+}
+
+func TestColumnCollationUnchanged(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", Collation: "C"},
+				},
+			},
+		},
+	}
+
+	d := Diff(schema, schema)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff when collation is unchanged, got: %s", d.Summary())
+	}
+}
+
+func TestColumnStatisticsChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", Statistics: intPtr(1000)},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text"},
+				},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff for statistics change")
+	}
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	tc := d.TablesChanged[0]
+	if len(tc.ColumnsChanged) != 1 {
+		t.Fatalf("expected 1 column changed, got %d", len(tc.ColumnsChanged))
+	}
+	cc := tc.ColumnsChanged[0]
+	if cc.StatisticsChanged == nil {
+		t.Fatal("StatisticsChanged is nil")
+	}
+	if cc.StatisticsChanged[0] != nil {
+		t.Errorf("StatisticsChanged[0] = %v, want nil", cc.StatisticsChanged[0])
+	}
+	if cc.StatisticsChanged[1] == nil || *cc.StatisticsChanged[1] != 1000 {
+		t.Errorf("StatisticsChanged[1] = %v, want *1000", cc.StatisticsChanged[1])
+	}
+}
+
+func TestColumnStatisticsReset(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text"},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", Statistics: intPtr(500)},
+				},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff for statistics reset")
+	}
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	tc := d.TablesChanged[0]
+	if len(tc.ColumnsChanged) != 1 {
+		t.Fatalf("expected 1 column changed, got %d", len(tc.ColumnsChanged))
+	}
+	cc := tc.ColumnsChanged[0]
+	if cc.StatisticsChanged == nil {
+		t.Fatal("StatisticsChanged is nil")
+	}
+	if cc.StatisticsChanged[0] == nil || *cc.StatisticsChanged[0] != 500 {
+		t.Errorf("StatisticsChanged[0] = %v, want *500", cc.StatisticsChanged[0])
+	}
+	if cc.StatisticsChanged[1] != nil {
+		t.Errorf("StatisticsChanged[1] = %v, want nil", cc.StatisticsChanged[1])
+	}
+}
+
+func TestColumnStatisticsUnchanged(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", Statistics: intPtr(1000)},
+				},
+			},
+		},
+	}
+
+	d := Diff(schema, schema)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff when statistics are unchanged, got: %s", d.Summary())
+	}
+}
+
+func TestIndexCollationChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text"},
+				},
+				Indexes: []model.Index{
+					{Name: "idx_users_name", Columns: []string{"name"}, Collations: map[string]string{"name": "C"}},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text"},
+				},
+				Indexes: []model.Index{
+					{Name: "idx_users_name", Columns: []string{"name"}},
+				},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff for index collation change")
+	}
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	tc := d.TablesChanged[0]
+	if len(tc.IndexesChanged) != 1 {
+		t.Fatalf("expected 1 index changed, got %d", len(tc.IndexesChanged))
+	}
+	ic := tc.IndexesChanged[0]
+	if ic.Name != "idx_users_name" {
+		t.Errorf("changed index = %q, want %q", ic.Name, "idx_users_name")
+	}
+}
+
+func TestIndexCollationUnchanged(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "public",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text"},
+				},
+				Indexes: []model.Index{
+					{Name: "idx_users_name", Columns: []string{"name"}, Collations: map[string]string{"name": "C"}},
+				},
+			},
+		},
+	}
+
+	d := Diff(schema, schema)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff when index collation is unchanged, got: %s", d.Summary())
+	}
+}
