@@ -101,6 +101,14 @@ const (
 
 	OpCreateTrigger OpType = "create_trigger"
 	OpDropTrigger   OpType = "drop_trigger"
+
+	OpCreatePolicy OpType = "create_policy"
+	OpDropPolicy   OpType = "drop_policy"
+	OpAlterPolicy  OpType = "alter_policy"
+	OpEnableRLS    OpType = "enable_rls"
+	OpDisableRLS   OpType = "disable_rls"
+	OpForceRLS     OpType = "force_rls"
+	OpNoForceRLS   OpType = "no_force_rls"
 )
 
 // OpContext provides context about the operation environment for risk assessment.
@@ -454,6 +462,60 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			RiskLevel:  Caution,
 			LockType:   LockShareRowExclusive,
 			Reversible: false,
+		}
+
+	case OpCreatePolicy:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
+		}
+
+	case OpDropPolicy:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockNone,
+			Reversible: false,
+			Suggestion: "Dropping a policy may expose rows that were previously hidden",
+		}
+
+	case OpAlterPolicy:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
+		}
+
+	case OpEnableRLS:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockAccessExclusive,
+			Reversible: true,
+			Suggestion: "Enabling RLS restricts access; ensure policies are in place first",
+		}
+
+	case OpDisableRLS:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockAccessExclusive,
+			Reversible: true,
+			Suggestion: "Disabling RLS removes all row-level restrictions",
+		}
+
+	case OpForceRLS:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockAccessExclusive,
+			Reversible: true,
+			Suggestion: "Force RLS applies policies even to table owner",
+		}
+
+	case OpNoForceRLS:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockAccessExclusive,
+			Reversible: true,
+			Suggestion: "Removing forced RLS exempts the table owner from policies",
 		}
 
 	default:
