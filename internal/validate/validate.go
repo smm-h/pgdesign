@@ -5,6 +5,7 @@ package validate
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -16,12 +17,14 @@ import (
 
 // Config controls which rules run and their parameters.
 type Config struct {
-	Disabled      []string              // codes to skip, e.g. ["W002", "W005"]
-	Suppress      map[string]string     // per-table/column suppression, key: "table.column.CODE" or "table.CODE", value: reason
-	NamingPattern string                // "snake_case" (default)
-	MaxColumns    int                   // default 30
-	Extensions    []string              // declared extensions (from meta)
-	ExtRegistry   *extregistry.Registry
+	Disabled          []string              // codes to skip, e.g. ["W002", "W005"]
+	Suppress          map[string]string     // per-table/column suppression, key: "table.column.CODE" or "table.CODE", value: reason
+	NamingPattern     string                // "snake_case" (default)
+	MaxColumns        int                   // default 30
+	CascadeMaxDepth   int                   // default 3
+	CascadeMaxBreadth int                   // default 5
+	Extensions        []string              // declared extensions (from meta)
+	ExtRegistry       *extregistry.Registry
 }
 
 // SuppressedDiagnostic pairs a diagnostic with the reason it was suppressed.
@@ -45,6 +48,12 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 	}
 	if config.MaxColumns == 0 {
 		config.MaxColumns = 30
+	}
+	if config.CascadeMaxDepth == 0 {
+		config.CascadeMaxDepth = 3
+	}
+	if config.CascadeMaxBreadth == 0 {
+		config.CascadeMaxBreadth = 5
 	}
 	if config.NamingPattern == "" {
 		config.NamingPattern = "snake_case"
@@ -99,6 +108,9 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"E222", checkRestrictivePolicyRequiresPG10},
 		{"W011", checkRLSWithoutPolicies},
 		{"W012", checkRLSOperationGap},
+		{"W013", checkCascadeDepth},
+		{"W014", checkCascadeBreadth},
+		{"W015", checkMixedOnDelete},
 	}
 
 	for _, r := range rules {
@@ -1392,6 +1404,95 @@ func checkRLSOperationGap(schema *model.Schema, _ *Config) []diagnostic.Diagnost
 				Suggestion: "Uncovered operations default to the table's PERMISSIVE/RESTRICTIVE behavior; add explicit policies if needed",
 			})
 		}
+	}
+	return diags
+}
+
+// checkCascadeDepth (W013): CASCADE chain exceeds max depth threshold.
+func checkCascadeDepth(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	if schema.FKGraph == nil {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		depth := schema.FKGraph.CascadeDepth(t.Name)
+		if depth > config.CascadeMaxDepth {
+			chain := schema.FKGraph.CascadeChain(t.Name)
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Warning,
+				Code:       "W013",
+				Table:      t.Name,
+				Message:    fmt.Sprintf("CASCADE depth %d exceeds threshold %d: %s -> %s", depth, config.CascadeMaxDepth, t.Name, strings.Join(chain, " -> ")),
+				Suggestion: "Consider using RESTRICT or SET NULL to break the cascade chain",
+			})
+		}
+	}
+	return diags
+}
+
+// checkCascadeBreadth (W014): single DELETE cascades to too many tables.
+func checkCascadeBreadth(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	if schema.FKGraph == nil {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		breadth := schema.FKGraph.CascadeBreadth(t.Name)
+		if breadth >= config.CascadeMaxBreadth {
+			chain := schema.FKGraph.CascadeChain(t.Name)
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Warning,
+				Code:       "W014",
+				Table:      t.Name,
+				Message:    fmt.Sprintf("deleting from %q cascades to %d tables: %s", t.Name, breadth, strings.Join(chain, ", ")),
+				Suggestion: "Consider using RESTRICT or SET NULL to limit cascade blast radius",
+			})
+		}
+	}
+	return diags
+}
+
+// checkMixedOnDelete (W015): incoming FKs to the same table use different ON DELETE actions.
+func checkMixedOnDelete(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	if schema.FKGraph == nil {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		edges := schema.FKGraph.Reverse[t.Name]
+		if len(edges) == 0 {
+			continue
+		}
+		// Deduplicate by FKName to handle multi-column FKs.
+		actionByFK := make(map[string]string)
+		for _, edge := range edges {
+			if _, seen := actionByFK[edge.FKName]; !seen {
+				actionByFK[edge.FKName] = strings.ToUpper(edge.OnDelete)
+			}
+		}
+		// Collect distinct actions and which FKs use them.
+		fksByAction := make(map[string][]string)
+		for fkName, action := range actionByFK {
+			fksByAction[action] = append(fksByAction[action], fkName)
+		}
+		if len(fksByAction) < 2 {
+			continue
+		}
+		// Build a deterministic message listing each action and its FKs.
+		var parts []string
+		for action, fks := range fksByAction {
+			sort.Strings(fks)
+			parts = append(parts, fmt.Sprintf("%s (%s)", action, strings.Join(fks, ", ")))
+		}
+		// Sort for deterministic output.
+		sort.Strings(parts)
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity:   diagnostic.Warning,
+			Code:       "W015",
+			Table:      t.Name,
+			Message:    fmt.Sprintf("mixed ON DELETE actions on incoming FKs to %q: %s", t.Name, strings.Join(parts, "; ")),
+			Suggestion: "Consider using a consistent ON DELETE action for all FKs referencing this table",
+		})
 	}
 	return diags
 }
