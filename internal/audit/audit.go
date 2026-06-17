@@ -48,6 +48,9 @@ func auditTable(tbl *model.Table) []diagnostic.Diagnostic {
 		diags = append(diags, suggestDecomposition(tbl)...)
 	}
 
+	// Compare declared FDs against minimal cover
+	diags = append(diags, compareMinimalCover(tbl)...)
+
 	bcnfDiags, hasBCNFViolation := checkBCNF(tbl)
 	diags = append(diags, bcnfDiags...)
 
@@ -165,6 +168,18 @@ func check3NF(tbl *model.Table) ([]diagnostic.Diagnostic, bool) {
 			}
 			// Violation
 			hasViolation = true
+
+			// Generate counterexample showing the redundancy
+			violating := fd.FuncDep{Determinant: dep.Determinant, Dependent: []string{attr}}
+			rows := fd.ArmstrongRelation(allAttrs, tbl.Dependencies, violating)
+			counterexample := fmt.Sprintf(
+				"Counterexample showing redundancy from %s:\n%s  (%s is redundantly repeated for the same %s value)",
+				violating.String(),
+				fd.FormatRelation(allAttrs, rows),
+				attr,
+				formatAttrs(dep.Determinant),
+			)
+
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity: diagnostic.Warning,
 				Code:     "W102",
@@ -177,6 +192,7 @@ func check3NF(tbl *model.Table) ([]diagnostic.Diagnostic, bool) {
 					formatAttrs(dep.Determinant),
 					attr,
 				),
+				Suggestion: counterexample,
 			})
 		}
 	}
@@ -200,6 +216,18 @@ func checkBCNF(tbl *model.Table) ([]diagnostic.Diagnostic, bool) {
 			}
 			// BCNF violation: determinant is not a superkey (no prime exception)
 			hasViolation = true
+
+			// Generate counterexample showing the redundancy
+			violating := fd.FuncDep{Determinant: dep.Determinant, Dependent: []string{attr}}
+			rows := fd.ArmstrongRelation(allAttrs, tbl.Dependencies, violating)
+			counterexample := fmt.Sprintf(
+				"Counterexample showing redundancy from %s:\n%s  (%s is redundantly repeated for the same %s value)",
+				violating.String(),
+				fd.FormatRelation(allAttrs, rows),
+				attr,
+				formatAttrs(dep.Determinant),
+			)
+
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity: diagnostic.Warning,
 				Code:     "W103",
@@ -211,6 +239,7 @@ func checkBCNF(tbl *model.Table) ([]diagnostic.Diagnostic, bool) {
 					attr,
 					formatAttrs(dep.Determinant),
 				),
+				Suggestion: counterexample,
 			})
 		}
 	}
@@ -333,6 +362,76 @@ func suggestBCNFDecomposition(tbl *model.Table, has3NFViolation bool) []diagnost
 	}
 
 	return diags
+}
+
+// compareMinimalCover compares declared FDs against their minimal cover.
+// If the minimal cover has fewer FDs, emits an Info diagnostic showing the reduction.
+func compareMinimalCover(tbl *model.Table) []diagnostic.Diagnostic {
+	minCover := fd.MinimalCover(tbl.Dependencies)
+
+	// Count declared FDs when decomposed to single-attribute RHS (for fair comparison)
+	declaredCount := 0
+	for _, dep := range tbl.Dependencies {
+		declaredCount += len(dep.Dependent)
+	}
+
+	mcCount := len(minCover) // MinimalCover already decomposes to single-attribute RHS
+
+	if mcCount >= declaredCount {
+		return nil // No reduction
+	}
+
+	// Format the minimal cover
+	var mcStrs []string
+	for _, f := range minCover {
+		mcStrs = append(mcStrs, f.String())
+	}
+
+	// Format the original FDs (decomposed)
+	var origStrs []string
+	for _, dep := range tbl.Dependencies {
+		for _, attr := range dep.Dependent {
+			single := fd.FuncDep{Determinant: dep.Determinant, Dependent: []string{attr}}
+			origStrs = append(origStrs, single.String())
+		}
+	}
+
+	// Find which FDs were removed (derivable from others)
+	var derivable []string
+	for _, orig := range origStrs {
+		found := false
+		for _, mc := range mcStrs {
+			if orig == mc {
+				found = true
+				break
+			}
+		}
+		if !found {
+			derivable = append(derivable, orig)
+		}
+	}
+
+	msg := fmt.Sprintf(
+		"Minimal cover of declared FDs (%d FDs reduced to %d):\n  %s\nOriginal FDs %s contain redundancy: %s %s derivable.",
+		declaredCount,
+		mcCount,
+		strings.Join(mcStrs, "\n  "),
+		strings.Join(origStrs, ", "),
+		strings.Join(derivable, ", "),
+		func() string {
+			if len(derivable) == 1 {
+				return "is"
+			}
+			return "are"
+		}(),
+	)
+
+	return []diagnostic.Diagnostic{{
+		Severity: diagnostic.Info,
+		Code:     "I100",
+		Table:    tbl.Name,
+		Message:  msg,
+	}}
 }
 
 // columnNames returns all column names from a table.
