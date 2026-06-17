@@ -34,6 +34,7 @@ type Schema struct {
 	Tables      []Table    `json:"tables"`
 	Views              []View              `json:"views,omitempty"`
 	MaterializedViews  []MaterializedView  `json:"materialized_views,omitempty"`
+	Sequences          []Sequence          `json:"sequences,omitempty"`
 	CycleGroups        [][]string          `json:"cycle_groups,omitempty"`
 	PGVersion   int        `json:"pg_version"`
 }
@@ -211,6 +212,20 @@ type Enum struct {
 	Comment string   `json:"comment,omitempty"`
 }
 
+// Sequence represents a standalone PostgreSQL sequence.
+type Sequence struct {
+	Name      string `json:"name"`
+	Schema    string `json:"schema,omitempty"`
+	Start     *int64 `json:"start,omitempty"`
+	Increment *int64 `json:"increment,omitempty"`
+	MinValue  *int64 `json:"min_value,omitempty"`
+	MaxValue  *int64 `json:"max_value,omitempty"`
+	Cache     *int64 `json:"cache,omitempty"`
+	Cycle     bool   `json:"cycle,omitempty"`
+	OwnedBy   string `json:"owned_by,omitempty"`
+	Comment   string `json:"comment,omitempty"`
+}
+
 // Domain represents a resolved PostgreSQL domain type.
 type Domain struct {
 	Name        string `json:"name"`
@@ -243,4 +258,10 @@ type MaintenanceConfig struct {
 // struct literals with *string fields.
 func StrPtr(s string) *string {
 	return &s
+}
+
+// Int64Ptr returns a pointer to the given int64. Used for constructing
+// struct literals with *int64 fields.
+func Int64Ptr(v int64) *int64 {
+	return &v
 }
