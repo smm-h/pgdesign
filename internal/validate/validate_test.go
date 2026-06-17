@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -1748,6 +1749,279 @@ func TestE221_ExclusionRangeOperatorOnly(t *testing.T) {
 	found := findByCode(diags, "E221")
 	if len(found) > 0 {
 		t.Fatalf("expected no E221 when only && operator is used, got: %s", found[0].Message)
+	}
+}
+
+func TestE222_RestrictivePolicyPG9_Error(t *testing.T) {
+	schema := &model.Schema{
+		PGVersion: 9,
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				Policies: []model.Policy{{
+					Name:      "restrict_read",
+					Type:      "RESTRICTIVE",
+					Operation: "SELECT",
+					Using:     "false",
+				}},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := false
+	for _, d := range diags {
+		if d.Code == "E222" && d.Severity == diagnostic.Error {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected E222 error for RESTRICTIVE policy on PG 9")
+	}
+}
+
+func TestE222_RestrictivePolicyPGUnknown_Warning(t *testing.T) {
+	schema := &model.Schema{
+		PGVersion: 0,
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				Policies: []model.Policy{{
+					Name:      "restrict_read",
+					Type:      "RESTRICTIVE",
+					Operation: "SELECT",
+					Using:     "false",
+				}},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := false
+	for _, d := range diags {
+		if d.Code == "E222" && d.Severity == diagnostic.Warning {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected E222 warning for RESTRICTIVE policy with unknown PG version")
+	}
+}
+
+func TestE222_RestrictivePolicyPG10_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		PGVersion: 10,
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				Policies: []model.Policy{{
+					Name:      "restrict_read",
+					Type:      "RESTRICTIVE",
+					Operation: "SELECT",
+					Using:     "false",
+				}},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "E222" {
+			t.Fatalf("unexpected E222 for PG 10: %v", d)
+		}
+	}
+}
+
+func TestE222_PermissivePolicyPG9_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		PGVersion: 9,
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				Policies: []model.Policy{{
+					Name:      "allow_read",
+					Type:      "PERMISSIVE",
+					Operation: "SELECT",
+					Using:     "true",
+				}},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "E222" {
+			t.Fatalf("unexpected E222 for PERMISSIVE policy: %v", d)
+		}
+	}
+}
+
+func TestW011_RLSWithoutPolicies(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:      "secrets",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := false
+	for _, d := range diags {
+		if d.Code == "W011" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected W011 for enable_rls with no policies")
+	}
+}
+
+func TestW011_RLSWithPolicies_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				Policies: []model.Policy{{
+					Name:      "read_all",
+					Type:      "PERMISSIVE",
+					Operation: "ALL",
+					Using:     "true",
+				}},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W011" {
+			t.Fatalf("unexpected W011 when policies exist: %v", d)
+		}
+	}
+}
+
+func TestW012_RLSOperationGap(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				Policies: []model.Policy{
+					{Name: "read", Type: "PERMISSIVE", Operation: "SELECT", Using: "true"},
+					{Name: "write", Type: "PERMISSIVE", Operation: "INSERT", WithCheck: "true"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := false
+	for _, d := range diags {
+		if d.Code == "W012" {
+			found = true
+			if !strings.Contains(d.Message, "UPDATE") || !strings.Contains(d.Message, "DELETE") {
+				t.Errorf("expected W012 to mention UPDATE and DELETE, got: %s", d.Message)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected W012 for missing UPDATE and DELETE policies")
+	}
+}
+
+func TestW012_ALLCoversEverything_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				Policies: []model.Policy{{
+					Name:      "full_access",
+					Type:      "PERMISSIVE",
+					Operation: "ALL",
+					Using:     "true",
+				}},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W012" {
+			t.Fatalf("unexpected W012 when ALL operation covers everything: %v", d)
+		}
+	}
+}
+
+func TestW012_AllFourOperations_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				Policies: []model.Policy{
+					{Name: "read", Type: "PERMISSIVE", Operation: "SELECT", Using: "true"},
+					{Name: "create", Type: "PERMISSIVE", Operation: "INSERT", WithCheck: "true"},
+					{Name: "edit", Type: "PERMISSIVE", Operation: "UPDATE", Using: "true", WithCheck: "true"},
+					{Name: "remove", Type: "PERMISSIVE", Operation: "DELETE", Using: "true"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W012" {
+			t.Fatalf("unexpected W012 when all operations covered: %v", d)
+		}
+	}
+}
+
+func TestW012_NoPolicies_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:      "docs",
+				Schema:    "public",
+				EnableRLS: true,
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W012" {
+			t.Fatalf("unexpected W012 when no policies exist (W011 handles this case): %v", d)
+		}
 	}
 }
 
