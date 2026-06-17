@@ -2,6 +2,7 @@ package seed
 
 import (
 	"math/rand"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -213,5 +214,334 @@ func TestGenerate_Deterministic(t *testing.T) {
 
 	if out1 != out2 {
 		t.Error("Generate with the same seed should produce identical output")
+	}
+}
+
+func TestGenerate_AllPGTypes(t *testing.T) {
+	// Every PG type the seed generator handles, each as a separate column.
+	// All are NOT NULL so NULL injection does not interfere.
+	pgTypes := []string{
+		"boolean",
+		"integer", "bigint", "smallint",
+		"serial", "bigserial", "smallserial",
+		"numeric",
+		"real", "float4", "float8",
+		"uuid",
+		"text", "varchar", "char",
+		"bytea",
+		"date", "time", "timetz",
+		"timestamp", "timestamptz",
+		"interval",
+		"json", "jsonb",
+		"xml",
+		"inet", "cidr", "macaddr",
+		"tsvector", "tsquery",
+		"oid",
+		"citext",
+		"int4range", "int8range", "numrange", "daterange", "tsrange", "tstzrange",
+		"int4multirange", "int8multirange", "nummultirange", "datemultirange", "tsmultirange", "tstzmultirange",
+	}
+
+	var cols []model.Column
+	for _, pgType := range pgTypes {
+		cols = append(cols, model.Column{
+			Name:    "col_" + strings.ReplaceAll(pgType, " ", "_"),
+			PGType:  pgType,
+			NotNull: true,
+		})
+	}
+
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:    "test_types",
+				Schema:  "public",
+				Comment: "Test types",
+				PK:      []string{"col_boolean"},
+				Columns: cols,
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(99))
+	out := Generate(schema, 1, rng)
+
+	// Find the INSERT and extract the single row tuple.
+	insertIdx := strings.Index(out, "INSERT INTO public.test_types")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_types")
+	}
+
+	// Extract the row between the first "  (" and ");"
+	block := out[insertIdx:]
+	rowStart := strings.Index(block, "  (")
+	if rowStart < 0 {
+		t.Fatal("no row tuple found")
+	}
+	rowEnd := strings.Index(block[rowStart:], ");")
+	if rowEnd < 0 {
+		t.Fatal("no row terminator found")
+	}
+	rowStr := block[rowStart : rowStart+rowEnd+2]
+	rowStr = strings.TrimPrefix(strings.TrimSpace(rowStr), "(")
+	rowStr = strings.TrimSuffix(rowStr, ");")
+
+	// Split values by ", " -- this is fragile for values containing ", " but
+	// works for the known generator output because quoted strings use underscores
+	// and ranges use commas without spaces after them.
+	values := splitRow(rowStr)
+	if len(values) != len(pgTypes) {
+		t.Fatalf("expected %d values, got %d\nrow: %s", len(pgTypes), len(values), rowStr)
+	}
+
+	// Build a map for easy lookup.
+	valMap := make(map[string]string)
+	for i, pgType := range pgTypes {
+		valMap[pgType] = values[i]
+	}
+
+	// Global check: no value should be the fallback "'sample'" used for unknown types.
+	for _, pgType := range pgTypes {
+		v := valMap[pgType]
+		if v == "'sample'" {
+			t.Errorf("%s: got fallback 'sample' value", pgType)
+		}
+		if v == "" {
+			t.Errorf("%s: got empty value", pgType)
+		}
+	}
+
+	// Per-type format checks.
+	checks := []struct {
+		pgType string
+		check  func(string) bool
+		desc   string
+	}{
+		{"boolean", func(v string) bool { return v == "true" || v == "false" }, "must be 'true' or 'false'"},
+		{"integer", func(v string) bool { return regexp.MustCompile(`^\d+$`).MatchString(v) }, "must be all digits"},
+		{"bigint", func(v string) bool { return regexp.MustCompile(`^\d+$`).MatchString(v) }, "must be all digits"},
+		{"smallint", func(v string) bool { return regexp.MustCompile(`^\d+$`).MatchString(v) }, "must be all digits"},
+		{"serial", func(v string) bool { return v == "DEFAULT" }, "must be DEFAULT"},
+		{"bigserial", func(v string) bool { return v == "DEFAULT" }, "must be DEFAULT"},
+		{"smallserial", func(v string) bool { return v == "DEFAULT" }, "must be DEFAULT"},
+		{"numeric", func(v string) bool { return strings.Contains(v, ".") }, "must contain a decimal point"},
+		{"real", func(v string) bool { return strings.Contains(v, ".") }, "must contain a decimal point"},
+		{"float4", func(v string) bool { return strings.Contains(v, ".") }, "must contain a decimal point"},
+		{"float8", func(v string) bool { return strings.Contains(v, ".") }, "must contain a decimal point"},
+		{"uuid", func(v string) bool {
+			return regexp.MustCompile(`^'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'$`).MatchString(v)
+		}, "must be a quoted UUID v4"},
+		{"date", func(v string) bool {
+			return regexp.MustCompile(`^'\d{4}-\d{2}-\d{2}'$`).MatchString(v)
+		}, "must match 'YYYY-MM-DD'"},
+		{"time", func(v string) bool {
+			return regexp.MustCompile(`^'\d{2}:\d{2}:\d{2}'$`).MatchString(v)
+		}, "must match 'HH:MM:SS'"},
+		{"timetz", func(v string) bool {
+			return regexp.MustCompile(`^'\d{2}:\d{2}:\d{2}\+00'$`).MatchString(v)
+		}, "must match 'HH:MM:SS+00'"},
+		{"timestamp", func(v string) bool {
+			return strings.Contains(v, "-") && strings.Contains(v, ":")
+		}, "must contain date and time parts"},
+		{"timestamptz", func(v string) bool {
+			return strings.Contains(v, "-") && strings.Contains(v, ":")
+		}, "must contain date and time parts"},
+		{"interval", func(v string) bool {
+			return strings.Contains(v, "days") || strings.Contains(v, "hours") || strings.Contains(v, "minutes")
+		}, "must contain 'days', 'hours', or 'minutes'"},
+		{"varchar", func(v string) bool { return strings.HasPrefix(v, "'") }, "must start with quote"},
+		{"char", func(v string) bool { return strings.HasPrefix(v, "'") }, "must start with quote"},
+		{"bytea", func(v string) bool { return strings.HasPrefix(v, "'\\x") }, "must start with '\\x"},
+		{"inet", func(v string) bool {
+			return regexp.MustCompile(`^'\d+\.\d+\.\d+\.\d+'$`).MatchString(v)
+		}, "must be dotted quad like 'N.N.N.N'"},
+		{"cidr", func(v string) bool { return strings.HasSuffix(v, "/24'") }, "must end with /24'"},
+		{"macaddr", func(v string) bool {
+			return regexp.MustCompile(`^'[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}'$`).MatchString(v)
+		}, "must be colon-separated hex"},
+		{"xml", func(v string) bool { return strings.Contains(v, "<val>") }, "must contain '<val>'"},
+		{"tsvector", func(v string) bool { return strings.Contains(v, "::tsvector") }, "must contain '::tsvector'"},
+		{"tsquery", func(v string) bool { return strings.Contains(v, "::tsquery") }, "must contain '::tsquery'"},
+		{"oid", func(v string) bool { return regexp.MustCompile(`^\d+$`).MatchString(v) }, "must be all digits"},
+		{"json", func(v string) bool { return strings.Contains(v, "::json") }, "must contain '::json'"},
+		{"jsonb", func(v string) bool { return strings.Contains(v, "::jsonb") }, "must contain '::jsonb'"},
+		{"citext", func(v string) bool { return strings.HasPrefix(v, "'") }, "must start with quote"},
+		// Range types
+		{"int4range", func(v string) bool { return strings.Contains(v, "[") && strings.Contains(v, ")") }, "must contain '[' and ')'"},
+		{"int8range", func(v string) bool { return strings.Contains(v, "[") && strings.Contains(v, ")") }, "must contain '[' and ')'"},
+		{"numrange", func(v string) bool { return strings.Contains(v, "[") && strings.Contains(v, ")") }, "must contain '[' and ')'"},
+		{"daterange", func(v string) bool { return strings.Contains(v, "[") && strings.Contains(v, ")") }, "must contain '[' and ')'"},
+		{"tsrange", func(v string) bool { return strings.Contains(v, "[") && strings.Contains(v, ")") }, "must contain '[' and ')'"},
+		{"tstzrange", func(v string) bool { return strings.Contains(v, "[") && strings.Contains(v, ")") }, "must contain '[' and ')'"},
+		// Multirange types
+		{"int4multirange", func(v string) bool { return strings.Contains(v, "{[") && strings.Contains(v, ")}") }, "must contain '{[' and ')}'"},
+		{"int8multirange", func(v string) bool { return strings.Contains(v, "{[") && strings.Contains(v, ")}") }, "must contain '{[' and ')}'"},
+		{"nummultirange", func(v string) bool { return strings.Contains(v, "{[") && strings.Contains(v, ")}") }, "must contain '{[' and ')}'"},
+		{"datemultirange", func(v string) bool { return strings.Contains(v, "{[") && strings.Contains(v, ")}") }, "must contain '{[' and ')}'"},
+		{"tsmultirange", func(v string) bool { return strings.Contains(v, "{[") && strings.Contains(v, ")}") }, "must contain '{[' and ')}'"},
+		{"tstzmultirange", func(v string) bool { return strings.Contains(v, "{[") && strings.Contains(v, ")}") }, "must contain '{[' and ')}'"},
+	}
+
+	for _, c := range checks {
+		v := valMap[c.pgType]
+		if !c.check(v) {
+			t.Errorf("%s: value %q failed check: %s", c.pgType, v, c.desc)
+		}
+	}
+}
+
+// splitRow splits a SQL row tuple by ", " while respecting quoted strings and
+// nested structures (ranges contain commas without trailing spaces).
+func splitRow(row string) []string {
+	var parts []string
+	var current strings.Builder
+	inQuote := false
+	depth := 0 // tracks nesting inside '...' for range literals
+
+	for i := 0; i < len(row); i++ {
+		ch := row[i]
+
+		if ch == '\'' && !inQuote {
+			inQuote = true
+			current.WriteByte(ch)
+			continue
+		}
+		if ch == '\'' && inQuote {
+			// Check for escaped quotes ('')
+			if i+1 < len(row) && row[i+1] == '\'' {
+				current.WriteByte(ch)
+				current.WriteByte(ch)
+				i++
+				continue
+			}
+			inQuote = false
+			current.WriteByte(ch)
+			continue
+		}
+		if inQuote {
+			current.WriteByte(ch)
+			continue
+		}
+
+		// Outside quotes: track parenthesis depth for cast expressions.
+		if ch == '(' {
+			depth++
+			current.WriteByte(ch)
+			continue
+		}
+		if ch == ')' {
+			depth--
+			current.WriteByte(ch)
+			continue
+		}
+
+		// Split on ", " only at top level.
+		if depth == 0 && ch == ',' && i+1 < len(row) && row[i+1] == ' ' {
+			parts = append(parts, current.String())
+			current.Reset()
+			i++ // skip the space
+			continue
+		}
+
+		current.WriteByte(ch)
+	}
+	if current.Len() > 0 {
+		parts = append(parts, current.String())
+	}
+	return parts
+}
+
+func TestGenerate_NullInjection(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:    "test_nulls",
+				Schema:  "public",
+				Comment: "Test nulls",
+				PK:      []string{"col_text"},
+				Columns: []model.Column{
+					{Name: "col_text", PGType: "text", NotNull: false},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(77))
+	out := Generate(schema, 1000, rng)
+
+	// Count NULL values in the output.
+	insertIdx := strings.Index(out, "INSERT INTO public.test_nulls")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_nulls")
+	}
+
+	block := out[insertIdx:]
+	nullCount := 0
+	totalCount := 0
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		totalCount++
+		// Extract the value: strip "(" prefix and ")," or ");" suffix.
+		val := strings.TrimPrefix(line, "(")
+		val = strings.TrimSuffix(val, "),")
+		val = strings.TrimSuffix(val, ");")
+		if val == "NULL" {
+			nullCount++
+		}
+	}
+
+	if totalCount != 1000 {
+		t.Fatalf("expected 1000 rows, got %d", totalCount)
+	}
+
+	pct := float64(nullCount) / float64(totalCount) * 100
+	t.Logf("NULL injection: %d/%d = %.1f%%", nullCount, totalCount, pct)
+
+	if pct < 5.0 || pct > 20.0 {
+		t.Errorf("NULL percentage %.1f%% is outside expected range [5%%, 20%%]", pct)
+	}
+}
+
+func TestGenerate_NullNeverForNotNull(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:    "test_notnull",
+				Schema:  "public",
+				Comment: "Test not null",
+				PK:      []string{"col_text"},
+				Columns: []model.Column{
+					{Name: "col_text", PGType: "text", NotNull: true},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(77))
+	out := Generate(schema, 100, rng)
+
+	insertIdx := strings.Index(out, "INSERT INTO public.test_notnull")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO public.test_notnull")
+	}
+
+	block := out[insertIdx:]
+	for _, line := range strings.Split(block, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "(") {
+			continue
+		}
+		val := strings.TrimPrefix(line, "(")
+		val = strings.TrimSuffix(val, "),")
+		val = strings.TrimSuffix(val, ");")
+		if val == "NULL" {
+			t.Fatal("got NULL for a NOT NULL column")
+		}
 	}
 }
