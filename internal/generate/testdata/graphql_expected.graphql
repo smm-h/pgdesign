@@ -1,0 +1,45 @@
+scalar DateTime
+scalar JSON
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum OrderStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+}
+
+type Users {
+  id: ID!
+  name: String!
+  email: String!
+  role: UserRole!
+  metadata: JSON
+  createdAt: DateTime!
+  orders: [Orders!]!
+}
+
+type Orders {
+  id: ID!
+  userId: String!
+  status: OrderStatus!
+  total: Float!
+  tags: [String!]!
+  notes: String
+  users: Users!
+  orderItems: [OrderItems!]!
+}
+
+type OrderItems {
+  id: ID!
+  orderId: Int!
+  productName: String!
+  quantity: Int!
+  price: Float!
+  orders: Orders!
+}
+
