@@ -322,7 +322,8 @@ func queryDomains(ctx context.Context, conn *pgx.Conn, schemaName string) ([]mod
 // queryTables returns all tables (regular + partitioned) in the given schema.
 func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersion int) ([]model.Table, []diagnostic.Diagnostic, error) {
 	rows, err := conn.Query(ctx, `
-		SELECT c.oid, c.relname, c.relkind::text, d.description
+		SELECT c.oid, c.relname, c.relkind::text, d.description,
+		       c.relrowsecurity, c.relforcerowsecurity
 		FROM pg_class c
 		JOIN pg_namespace n ON c.relnamespace = n.oid
 		LEFT JOIN pg_description d ON d.objoid = c.oid AND d.objsubid = 0
@@ -335,17 +336,19 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersi
 	defer rows.Close()
 
 	type tableInfo struct {
-		oid     uint32
-		name    string
-		relkind string // "r" = regular, "p" = partitioned
-		comment string
+		oid       uint32
+		name      string
+		relkind   string // "r" = regular, "p" = partitioned
+		comment   string
+		enableRLS bool
+		forceRLS  bool
 	}
 
 	var infos []tableInfo
 	for rows.Next() {
 		var ti tableInfo
 		var comment *string
-		if err := rows.Scan(&ti.oid, &ti.name, &ti.relkind, &comment); err != nil {
+		if err := rows.Scan(&ti.oid, &ti.name, &ti.relkind, &comment, &ti.enableRLS, &ti.forceRLS); err != nil {
 			return nil, nil, err
 		}
 		if comment != nil {
@@ -362,9 +365,11 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersi
 
 	for _, ti := range infos {
 		t := model.Table{
-			Name:    ti.name,
-			Schema:  schemaName,
-			Comment: ti.comment,
+			Name:      ti.name,
+			Schema:    schemaName,
+			Comment:   ti.comment,
+			EnableRLS: ti.enableRLS,
+			ForceRLS:  ti.forceRLS,
 		}
 
 		// Columns
@@ -423,6 +428,13 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersi
 			return nil, nil, fmt.Errorf("triggers for %s.%s: %w", schemaName, ti.name, err)
 		}
 		t.Triggers = trigs
+
+		// Policies
+		pols, err := queryPolicies(ctx, conn, ti.oid)
+		if err != nil {
+			return nil, nil, fmt.Errorf("policies for %s.%s: %w", schemaName, ti.name, err)
+		}
+		t.Policies = pols
 
 		// Partition metadata (only for partitioned tables).
 		if ti.relkind == "p" {
@@ -1897,4 +1909,77 @@ func extractFunctionBody(funcdef string) string {
 	body = strings.TrimPrefix(body, "\n")
 	body = strings.TrimSuffix(body, "\n")
 	return body
+}
+
+// queryPolicies returns RLS policies for a table OID.
+func queryPolicies(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model.Policy, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT
+			p.polname,
+			p.polpermissive,
+			p.polcmd,
+			COALESCE(pg_get_expr(p.polqual, p.polrelid), '') AS using_expr,
+			COALESCE(pg_get_expr(p.polwithcheck, p.polrelid), '') AS with_check_expr,
+			ARRAY(
+				SELECT r.rolname
+				FROM unnest(p.polroles) AS role_oid
+				JOIN pg_roles r ON r.oid = role_oid
+			) AS role_names
+		FROM pg_policy p
+		WHERE p.polrelid = $1
+		ORDER BY p.polname
+	`, tableOID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var policies []model.Policy
+	for rows.Next() {
+		var (
+			name       string
+			permissive bool
+			cmd        string
+			usingExpr  string
+			withCheck  string
+			roleNames  []string
+		)
+		if err := rows.Scan(&name, &permissive, &cmd, &usingExpr, &withCheck, &roleNames); err != nil {
+			return nil, err
+		}
+
+		pol := model.Policy{
+			Name:      name,
+			Operation: mapPolCmd(cmd),
+			Using:     usingExpr,
+			WithCheck: withCheck,
+		}
+		if !permissive {
+			pol.Type = "RESTRICTIVE"
+		}
+		// Empty roleNames means PUBLIC (the {0} OID doesn't join to pg_roles).
+		if len(roleNames) > 0 {
+			pol.Role = strings.Join(roleNames, ", ")
+		}
+		policies = append(policies, pol)
+	}
+	return policies, rows.Err()
+}
+
+// mapPolCmd converts pg_policy.polcmd to a human-readable operation name.
+func mapPolCmd(cmd string) string {
+	switch cmd {
+	case "*":
+		return "ALL"
+	case "r":
+		return "SELECT"
+	case "a":
+		return "INSERT"
+	case "w":
+		return "UPDATE"
+	case "d":
+		return "DELETE"
+	default:
+		return "ALL"
+	}
 }
