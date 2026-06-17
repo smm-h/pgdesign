@@ -3481,3 +3481,453 @@ func TestGenerateMigration_FKChanged(t *testing.T) {
 		t.Errorf("expected add_fk OnDelete=CASCADE, got %s", m.DDLOps[1].OnDelete)
 	}
 }
+
+// --- RLS policy migration tests ---
+
+func TestGenerateMigration_NewTableWithRLS(t *testing.T) {
+	pol := model.Policy{
+		Name:      "users_select",
+		Type:      "PERMISSIVE",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "documents",
+			Schema:    "public",
+			Comment:   "docs table",
+			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			PK:        []string{"id"},
+			EnableRLS: true,
+			ForceRLS:  true,
+			Policies:  []model.Policy{pol},
+		}},
+	}
+	d := &diff.SchemaDiff{
+		TablesAdded: []string{"documents"},
+	}
+	m, _ := GenerateMigration(d, desired, "0.0.1", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	// Collect op names.
+	var ops []string
+	for _, op := range m.DDLOps {
+		ops = append(ops, op.Op)
+	}
+	// Should have: create_table, enable_rls, force_rls, create_policy.
+	found := map[string]bool{}
+	for _, op := range m.DDLOps {
+		found[op.Op] = true
+	}
+	for _, expected := range []string{"create_table", "enable_rls", "force_rls", "create_policy"} {
+		if !found[expected] {
+			t.Errorf("expected op %q not found in migration ops: %v", expected, ops)
+		}
+	}
+
+	// Check ordering: enable_rls before create_policy.
+	enableIdx := -1
+	policyIdx := -1
+	for i, op := range m.DDLOps {
+		if op.Op == "enable_rls" {
+			enableIdx = i
+		}
+		if op.Op == "create_policy" {
+			policyIdx = i
+		}
+	}
+	if enableIdx >= policyIdx {
+		t.Errorf("enable_rls (idx %d) should come before create_policy (idx %d)", enableIdx, policyIdx)
+	}
+
+	// Check reversibility.
+	for _, op := range m.DDLOps {
+		if op.Op == "enable_rls" && op.Down != nil {
+			if len(op.Down.Ops) == 0 || op.Down.Ops[0].Op != "disable_rls" {
+				t.Errorf("enable_rls down should be disable_rls")
+			}
+		}
+		if op.Op == "force_rls" && op.Down != nil {
+			if len(op.Down.Ops) == 0 || op.Down.Ops[0].Op != "no_force_rls" {
+				t.Errorf("force_rls down should be no_force_rls")
+			}
+		}
+	}
+}
+
+func TestGenerateMigration_EnableRLSChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "documents",
+			Schema:    "public",
+			Comment:   "docs table",
+			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			PK:        []string{"id"},
+			EnableRLS: true,
+		}},
+	}
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name:             "documents",
+			EnableRLSChanged: &[2]bool{false, true},
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "0.0.1", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "enable_rls" {
+			found = true
+			if op.Table != "documents" {
+				t.Errorf("enable_rls table = %q, want documents", op.Table)
+			}
+			if op.Down == nil || len(op.Down.Ops) == 0 || op.Down.Ops[0].Op != "disable_rls" {
+				t.Errorf("enable_rls down should be disable_rls")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected enable_rls op not found")
+	}
+}
+
+func TestGenerateMigration_DisableRLS(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "documents",
+			Schema:    "public",
+			Comment:   "docs table",
+			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			PK:        []string{"id"},
+			EnableRLS: false,
+		}},
+	}
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name:             "documents",
+			EnableRLSChanged: &[2]bool{true, false},
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "0.0.1", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "disable_rls" {
+			found = true
+			if op.Table != "documents" {
+				t.Errorf("disable_rls table = %q, want documents", op.Table)
+			}
+			if op.Down == nil || len(op.Down.Ops) == 0 || op.Down.Ops[0].Op != "enable_rls" {
+				t.Errorf("disable_rls down should be enable_rls")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected disable_rls op not found")
+	}
+}
+
+func TestGenerateMigration_ForceRLSChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "documents",
+			Schema:    "public",
+			Comment:   "docs table",
+			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			PK:        []string{"id"},
+			ForceRLS:  true,
+		}},
+	}
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name:            "documents",
+			ForceRLSChanged: &[2]bool{false, true},
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "0.0.1", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "force_rls" {
+			found = true
+			if op.Table != "documents" {
+				t.Errorf("force_rls table = %q, want documents", op.Table)
+			}
+			if op.Down == nil || len(op.Down.Ops) == 0 || op.Down.Ops[0].Op != "no_force_rls" {
+				t.Errorf("force_rls down should be no_force_rls")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected force_rls op not found")
+	}
+}
+
+func TestGenerateMigration_NoForceRLS(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:      "documents",
+			Schema:    "public",
+			Comment:   "docs table",
+			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			PK:        []string{"id"},
+			ForceRLS:  false,
+		}},
+	}
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name:            "documents",
+			ForceRLSChanged: &[2]bool{true, false},
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "0.0.1", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "no_force_rls" {
+			found = true
+			if op.Table != "documents" {
+				t.Errorf("no_force_rls table = %q, want documents", op.Table)
+			}
+			if op.Down == nil || len(op.Down.Ops) == 0 || op.Down.Ops[0].Op != "force_rls" {
+				t.Errorf("no_force_rls down should be force_rls")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected no_force_rls op not found")
+	}
+}
+
+func TestGenerateMigration_PolicyAdded(t *testing.T) {
+	pol := model.Policy{
+		Name:      "users_select",
+		Type:      "PERMISSIVE",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:     "documents",
+			Schema:   "public",
+			Comment:  "docs",
+			Columns:  []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			PK:       []string{"id"},
+			Policies: []model.Policy{pol},
+		}},
+	}
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name:          "documents",
+			PoliciesAdded: []model.Policy{pol},
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "0.0.1", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_policy" {
+			found = true
+			if op.Name != "users_select" {
+				t.Errorf("create_policy name = %q, want users_select", op.Name)
+			}
+			if op.PolicyDef == nil {
+				t.Fatalf("create_policy PolicyDef is nil")
+			}
+			if op.PolicyDef.Using != "user_id = current_user_id()" {
+				t.Errorf("PolicyDef.Using = %q", op.PolicyDef.Using)
+			}
+			// Down should be drop_policy.
+			if op.Down == nil || len(op.Down.Ops) == 0 || op.Down.Ops[0].Op != "drop_policy" {
+				t.Errorf("create_policy down should be drop_policy")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected create_policy op not found")
+	}
+}
+
+func TestGenerateMigration_PolicyRemoved(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "documents",
+			Schema:  "public",
+			Comment: "docs",
+			Columns: []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			PK:      []string{"id"},
+		}},
+	}
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name:            "documents",
+			PoliciesRemoved: []string{"old_policy"},
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "0.0.1", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_policy" {
+			found = true
+			if op.Name != "old_policy" {
+				t.Errorf("drop_policy name = %q, want old_policy", op.Name)
+			}
+			if op.Table != "documents" {
+				t.Errorf("drop_policy table = %q, want documents", op.Table)
+			}
+			// Down should be irreversible.
+			if op.Down == nil || !op.Down.Irreversible {
+				t.Errorf("drop_policy down should be irreversible")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected drop_policy op not found")
+	}
+}
+
+func TestGenerateMigration_PolicyChanged(t *testing.T) {
+	newPol := model.Policy{
+		Name:      "users_select",
+		Type:      "PERMISSIVE",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id() AND active",
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:     "documents",
+			Schema:   "public",
+			Comment:  "docs",
+			Columns:  []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			PK:       []string{"id"},
+			Policies: []model.Policy{newPol},
+		}},
+	}
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{{
+			Name: "documents",
+			PoliciesChanged: []diff.PolicyDiff{{
+				Name:         "users_select",
+				UsingChanged: &[2]string{"user_id = current_user_id()", "user_id = current_user_id() AND active"},
+			}},
+		}},
+	}
+	m, _ := GenerateMigration(d, desired, "0.0.1", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	// Expect drop_policy followed by create_policy.
+	dropFound := false
+	createFound := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_policy" && op.Name == "users_select" {
+			dropFound = true
+		}
+		if op.Op == "create_policy" && op.Name == "users_select" {
+			createFound = true
+			if op.PolicyDef == nil {
+				t.Error("expected PolicyDef to be set")
+			} else if op.PolicyDef.Using != "user_id = current_user_id() AND active" {
+				t.Errorf("expected new Using expression, got %s", op.PolicyDef.Using)
+			}
+		}
+	}
+	if !dropFound {
+		t.Error("expected drop_policy op for changed policy")
+	}
+	if !createFound {
+		t.Error("expected create_policy op for changed policy")
+	}
+}
+
+func TestOpToSQL_CreatePolicy(t *testing.T) {
+	pol := model.Policy{
+		Name:      "users_select",
+		Type:      "PERMISSIVE",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+	}
+	op := DDLOp{
+		Op:        "create_policy",
+		Table:     "public.documents",
+		Name:      "users_select",
+		Schema:    "public",
+		PolicyDef: &pol,
+	}
+	sql := OpToSQL(op)
+	if !strings.Contains(sql, "CREATE POLICY") {
+		t.Errorf("expected CREATE POLICY, got: %s", sql)
+	}
+	if !strings.Contains(sql, "users_select") {
+		t.Errorf("expected policy name, got: %s", sql)
+	}
+	if !strings.Contains(sql, "USING") {
+		t.Errorf("expected USING clause, got: %s", sql)
+	}
+}
+
+func TestOpToSQL_DropPolicy(t *testing.T) {
+	op := DDLOp{
+		Op:     "drop_policy",
+		Table:  "public.documents",
+		Name:   "old_policy",
+		Schema: "public",
+	}
+	sql := OpToSQL(op)
+	if !strings.Contains(sql, "DROP POLICY") {
+		t.Errorf("expected DROP POLICY, got: %s", sql)
+	}
+	if !strings.Contains(sql, "old_policy") {
+		t.Errorf("expected policy name, got: %s", sql)
+	}
+}
+
+func TestOpToSQL_EnableRLS(t *testing.T) {
+	op := DDLOp{
+		Op:     "enable_rls",
+		Table:  "public.documents",
+		Schema: "public",
+	}
+	sql := OpToSQL(op)
+	if !strings.Contains(sql, "ENABLE ROW LEVEL SECURITY") {
+		t.Errorf("expected ENABLE ROW LEVEL SECURITY, got: %s", sql)
+	}
+}
+
+func TestOpToSQL_DisableRLS(t *testing.T) {
+	op := DDLOp{
+		Op:     "disable_rls",
+		Table:  "public.documents",
+		Schema: "public",
+	}
+	sql := OpToSQL(op)
+	if !strings.Contains(sql, "DISABLE ROW LEVEL SECURITY") {
+		t.Errorf("expected DISABLE ROW LEVEL SECURITY, got: %s", sql)
+	}
+}
+
+func TestOpToSQL_ForceRLS(t *testing.T) {
+	op := DDLOp{
+		Op:     "force_rls",
+		Table:  "public.documents",
+		Schema: "public",
+	}
+	sql := OpToSQL(op)
+	if !strings.Contains(sql, "FORCE ROW LEVEL SECURITY") {
+		t.Errorf("expected FORCE ROW LEVEL SECURITY, got: %s", sql)
+	}
+}
+
+func TestOpToSQL_NoForceRLS(t *testing.T) {
+	op := DDLOp{
+		Op:     "no_force_rls",
+		Table:  "public.documents",
+		Schema: "public",
+	}
+	sql := OpToSQL(op)
+	if !strings.Contains(sql, "NO FORCE ROW LEVEL SECURITY") {
+		t.Errorf("expected NO FORCE ROW LEVEL SECURITY, got: %s", sql)
+	}
+}
