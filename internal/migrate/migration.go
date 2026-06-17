@@ -81,10 +81,11 @@ type DDLOp struct {
 
 // DMLOp represents a DML operation in a migration.
 type DMLOp struct {
-	Op    string // "backfill", "transform"
-	Phase string // "expand", "migrate", "contract", or "" (single-phase)
-	SQL  string
-	Down *DownOp
+	Op        string // "backfill", "transform"
+	Phase     string // "expand", "migrate", "contract", or "" (single-phase)
+	SQL       string
+	BatchSize int // 0 means no batching; >0 loops until 0 rows affected
+	Down      *DownOp
 }
 
 // DownOp represents the rollback operation(s) for a DDL or DML op.
