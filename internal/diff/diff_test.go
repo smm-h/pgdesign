@@ -3170,3 +3170,30 @@ func TestDomainCommentChanged(t *testing.T) {
 		t.Errorf("unexpected comment change: %v", dd.CommentChanged)
 	}
 }
+
+func TestDomainBaseTypeChanged(t *testing.T) {
+	desired := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "counter", Schema: "public", BaseType: "bigint"},
+		},
+	}
+	actual := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "counter", Schema: "public", BaseType: "integer"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.DomainsChanged) != 1 {
+		t.Fatalf("expected 1 domain changed, got %d", len(d.DomainsChanged))
+	}
+	dd := d.DomainsChanged[0]
+	if dd.BaseTypeChanged == nil {
+		t.Fatal("expected BaseTypeChanged to be set")
+	}
+	if dd.BaseTypeChanged[0] != "integer" || dd.BaseTypeChanged[1] != "bigint" {
+		t.Errorf("unexpected base type change: %v", dd.BaseTypeChanged)
+	}
+}

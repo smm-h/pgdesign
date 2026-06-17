@@ -3053,3 +3053,202 @@ func TestOpToSQL_AlterDomainDropConstraint(t *testing.T) {
 		t.Errorf("expected constraint name slug_check, got: %q", got)
 	}
 }
+
+func TestGenerateMigration_DomainBaseTypeChanged(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+		Domains: []model.Domain{
+			{Name: "counter", Schema: "public", BaseType: "bigint"},
+		},
+	}
+	d := &diff.SchemaDiff{
+		DomainsChanged: []diff.DomainDiff{
+			{
+				Name:            "counter",
+				BaseTypeChanged: &[2]string{"integer", "bigint"},
+			},
+		},
+	}
+
+	m, diags := GenerateMigration(d, desired, "0.4.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	var dropFound, createFound bool
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_domain" && op.Name == "counter" {
+			dropFound = true
+		}
+		if op.Op == "create_domain" && op.Name == "counter" {
+			createFound = true
+			if op.DomainDef == nil {
+				t.Error("expected DomainDef on recreate")
+			}
+		}
+	}
+	if !dropFound {
+		t.Error("expected drop_domain op for base type change")
+	}
+	if !createFound {
+		t.Error("expected create_domain op for base type change")
+	}
+
+	// Should have a dangerous diagnostic for DROP.
+	hasDangerous := false
+	for _, diag := range diags {
+		if strings.Contains(diag.Message, "drop_domain") {
+			hasDangerous = true
+			break
+		}
+	}
+	if !hasDangerous {
+		t.Error("expected dangerous diagnostic for domain base type change DROP")
+	}
+}
+
+func TestGenerateMigration_DomainDefaultChanged(t *testing.T) {
+	desired := &model.Schema{Name: "app"}
+	d := &diff.SchemaDiff{
+		DomainsChanged: []diff.DomainDiff{
+			{
+				Name:           "counter",
+				DefaultChanged: &[2]string{"0", "1"},
+			},
+		},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.5.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "alter_domain_set_default" && op.Name == "counter" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected alter_domain_set_default op")
+	}
+}
+
+func TestGenerateMigration_DomainDefaultRemoved(t *testing.T) {
+	desired := &model.Schema{Name: "app"}
+	d := &diff.SchemaDiff{
+		DomainsChanged: []diff.DomainDiff{
+			{
+				Name:           "counter",
+				DefaultChanged: &[2]string{"0", ""},
+			},
+		},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.6.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "alter_domain_drop_default" && op.Name == "counter" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected alter_domain_drop_default op")
+	}
+}
+
+func TestGenerateMigration_DomainNotNullChanged(t *testing.T) {
+	desired := &model.Schema{Name: "app"}
+	d := &diff.SchemaDiff{
+		DomainsChanged: []diff.DomainDiff{
+			{
+				Name:           "slug",
+				NotNullChanged: &[2]bool{false, true},
+			},
+		},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.7.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "alter_domain_set_not_null" && op.Name == "slug" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected alter_domain_set_not_null op")
+	}
+}
+
+func TestOpToSQL_AlterDomainSetDefault(t *testing.T) {
+	op := DDLOp{
+		Op:      "alter_domain_set_default",
+		Name:    "counter",
+		Schema:  "public",
+		Default: "42",
+		Type:    "bigint",
+	}
+	got := OpToSQL(op)
+	if !strings.Contains(got, "ALTER DOMAIN") {
+		t.Errorf("expected ALTER DOMAIN, got: %q", got)
+	}
+	if !strings.Contains(got, "SET DEFAULT") {
+		t.Errorf("expected SET DEFAULT, got: %q", got)
+	}
+}
+
+func TestOpToSQL_AlterDomainDropDefault(t *testing.T) {
+	op := DDLOp{
+		Op:     "alter_domain_drop_default",
+		Name:   "counter",
+		Schema: "public",
+	}
+	got := OpToSQL(op)
+	if !strings.Contains(got, "ALTER DOMAIN") {
+		t.Errorf("expected ALTER DOMAIN, got: %q", got)
+	}
+	if !strings.Contains(got, "DROP DEFAULT") {
+		t.Errorf("expected DROP DEFAULT, got: %q", got)
+	}
+}
+
+func TestOpToSQL_AlterDomainSetNotNull(t *testing.T) {
+	op := DDLOp{
+		Op:     "alter_domain_set_not_null",
+		Name:   "slug",
+		Schema: "public",
+	}
+	got := OpToSQL(op)
+	if !strings.Contains(got, "ALTER DOMAIN") {
+		t.Errorf("expected ALTER DOMAIN, got: %q", got)
+	}
+	if !strings.Contains(got, "SET NOT NULL") {
+		t.Errorf("expected SET NOT NULL, got: %q", got)
+	}
+}
+
+func TestOpToSQL_AlterDomainDropNotNull(t *testing.T) {
+	op := DDLOp{
+		Op:     "alter_domain_drop_not_null",
+		Name:   "slug",
+		Schema: "public",
+	}
+	got := OpToSQL(op)
+	if !strings.Contains(got, "ALTER DOMAIN") {
+		t.Errorf("expected ALTER DOMAIN, got: %q", got)
+	}
+	if !strings.Contains(got, "DROP NOT NULL") {
+		t.Errorf("expected DROP NOT NULL, got: %q", got)
+	}
+}
