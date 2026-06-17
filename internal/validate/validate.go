@@ -96,6 +96,9 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W010", checkAppendOnlyUpdatedAt},
 		{"E220", checkDependsOnResolvable},
 		{"E221", checkExclusionBtreeGist},
+		{"E222", checkRestrictivePolicyRequiresPG10},
+		{"W011", checkRLSWithoutPolicies},
+		{"W012", checkRLSOperationGap},
 	}
 
 	for _, r := range rules {
@@ -1296,6 +1299,98 @@ func checkExclusionBtreeGist(s *model.Schema, config *Config) []diagnostic.Diagn
 					Message:  fmt.Sprintf("exclusion constraint %q uses non-range operators; declare btree_gist in [[extensions]]", exc.Name),
 				})
 			}
+		}
+	}
+	return diags
+}
+
+// checkRestrictivePolicyRequiresPG10 flags RESTRICTIVE policies when the target
+// PG version does not support them (requires PG 10+).
+func checkRestrictivePolicyRequiresPG10(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		for _, pol := range t.Policies {
+			if pol.Type != "RESTRICTIVE" {
+				continue
+			}
+			if schema.PGVersion > 0 && schema.PGVersion < 10 {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E222",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("RESTRICTIVE policy %q requires PostgreSQL 10+, but target version is %d", pol.Name, schema.PGVersion),
+					Suggestion: "Use type = \"permissive\", or configure pg_version >= 10 in pgdesign.toml",
+				})
+			} else if schema.PGVersion == 0 {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "E222",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("RESTRICTIVE policy %q requires PostgreSQL 10+; target version is not configured", pol.Name),
+					Suggestion: "Set pg_version in [meta] to confirm PG 10+ support, or use type = \"permissive\"",
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// checkRLSWithoutPolicies warns when enable_rls is set but no policies are defined.
+func checkRLSWithoutPolicies(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if t.EnableRLS && len(t.Policies) == 0 {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Warning,
+				Code:       "W011",
+				Table:      t.Name,
+				Message:    fmt.Sprintf("table %q has enable_rls = true but no policies defined", t.Name),
+				Suggestion: "Add RLS policies, or RLS will deny all access to non-owner roles",
+			})
+		}
+	}
+	return diags
+}
+
+// checkRLSOperationGap warns when RLS is enabled but policies don't cover all operations.
+func checkRLSOperationGap(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if !t.EnableRLS || len(t.Policies) == 0 {
+			continue
+		}
+		covered := map[string]bool{
+			"SELECT": false,
+			"INSERT": false,
+			"UPDATE": false,
+			"DELETE": false,
+		}
+		for _, pol := range t.Policies {
+			op := strings.ToUpper(pol.Operation)
+			if op == "ALL" {
+				// ALL covers every operation.
+				for k := range covered {
+					covered[k] = true
+				}
+			} else if _, ok := covered[op]; ok {
+				covered[op] = true
+			}
+		}
+		var missing []string
+		// Deterministic order for output.
+		for _, op := range []string{"SELECT", "INSERT", "UPDATE", "DELETE"} {
+			if !covered[op] {
+				missing = append(missing, op)
+			}
+		}
+		if len(missing) > 0 {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Warning,
+				Code:       "W012",
+				Table:      t.Name,
+				Message:    fmt.Sprintf("table %q has RLS enabled but no policies for: %s", t.Name, strings.Join(missing, ", ")),
+				Suggestion: "Uncovered operations default to the table's PERMISSIVE/RESTRICTIVE behavior; add explicit policies if needed",
+			})
 		}
 	}
 	return diags
