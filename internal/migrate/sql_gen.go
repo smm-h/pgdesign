@@ -120,6 +120,18 @@ func OpToSQL(op DDLOp) string {
 		return opAlterDomainSetNotNull(op)
 	case "alter_domain_drop_not_null":
 		return opAlterDomainDropNotNull(op)
+	case "create_policy":
+		return opCreatePolicy(op)
+	case "drop_policy":
+		return opDropPolicy(op)
+	case "enable_rls":
+		return opEnableRLS(op)
+	case "disable_rls":
+		return opDisableRLS(op)
+	case "force_rls":
+		return opForceRLS(op)
+	case "no_force_rls":
+		return opNoForceRLS(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -715,4 +727,37 @@ func opAlterDomainDropNotNull(op DDLOp) string {
 	}
 	qualified := sql.QualifiedName(schema, op.Name)
 	return fmt.Sprintf("ALTER DOMAIN %s DROP NOT NULL;", qualified)
+}
+
+func opCreatePolicy(op DDLOp) string {
+	if op.PolicyDef == nil {
+		return fmt.Sprintf("-- create_policy %s: missing PolicyDef", op.Name)
+	}
+	schema, tableName := splitQualifiedName(op.Table)
+	return sql.CreatePolicy(schema, tableName, *op.PolicyDef)
+}
+
+func opDropPolicy(op DDLOp) string {
+	schema, tableName := splitQualifiedName(op.Table)
+	return sql.DropPolicy(schema, tableName, op.Name)
+}
+
+func opEnableRLS(op DDLOp) string {
+	schema, tableName := splitQualifiedName(op.Table)
+	return sql.AlterTableEnableRLS(schema, tableName)
+}
+
+func opDisableRLS(op DDLOp) string {
+	schema, tableName := splitQualifiedName(op.Table)
+	return sql.AlterTableDisableRLS(schema, tableName)
+}
+
+func opForceRLS(op DDLOp) string {
+	schema, tableName := splitQualifiedName(op.Table)
+	return sql.AlterTableForceRLS(schema, tableName)
+}
+
+func opNoForceRLS(op DDLOp) string {
+	schema, tableName := splitQualifiedName(op.Table)
+	return sql.AlterTableNoForceRLS(schema, tableName)
 }
