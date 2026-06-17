@@ -32,12 +32,14 @@ type DDLOp struct {
 	Op       string      // "create_table", "add_column", "drop_table", etc.
 	Table    string      // schema-qualified table name
 	Column   string      // for column ops
-	Type      string      // for add_column
-	Default   interface{} // for add_column
-	NotNull   bool
-	Generated string // for add_column: GENERATED ALWAYS AS (expr)
-	Stored    bool   // for add_column: true=STORED, false=VIRTUAL
-	PGVersion int    // target PG version for version-gated DDL
+	Type       string      // for add_column
+	Collation  string      // for column collation (ALTER COLUMN TYPE ... COLLATE)
+	Statistics *int        // for set_statistics ops
+	Default    interface{} // for add_column
+	NotNull    bool
+	Generated  string // for add_column: GENERATED ALWAYS AS (expr)
+	Stored     bool   // for add_column: true=STORED, false=VIRTUAL
+	PGVersion  int    // target PG version for version-gated DDL
 	Name     string   // for constraints/indexes
 	Columns  []string // for indexes, FKs
 	RefTable string   // for FKs
@@ -45,8 +47,9 @@ type DDLOp struct {
 	OnDelete string   // for FKs
 	Method    string            // for indexes
 	Where     string            // for partial indexes
-	Opclasses map[string]string // per-column opclass
-	Desc      []bool            // per-column DESC (parallel to Columns)
+	Opclasses  map[string]string // per-column opclass
+	Collations map[string]string // per-column collation for indexes
+	Desc       []bool            // per-column DESC (parallel to Columns)
 	Include   []string
 	With      map[string]string // index storage parameters (WITH clause)
 	Comment  string   // for tables

@@ -86,6 +86,8 @@ func OpToSQL(op DDLOp) string {
 		return opDropMaterializedView(op)
 	case "refresh_materialized_view":
 		return opRefreshMaterializedView(op)
+	case "set_statistics":
+		return opSetStatistics(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -162,9 +164,23 @@ func opDropColumn(op DDLOp) string {
 		quoteQualified(op.Table), sql.QuoteIdent(op.Column))
 }
 
+func opSetStatistics(op DDLOp) string {
+	if op.Statistics != nil {
+		return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET STATISTICS %d;",
+			quoteQualified(op.Table), sql.QuoteIdent(op.Column), *op.Statistics)
+	}
+	// Reset to default (-1 means database default).
+	return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET STATISTICS -1;",
+		quoteQualified(op.Table), sql.QuoteIdent(op.Column))
+}
+
 func opAlterColumnType(op DDLOp) string {
+	typeExpr := op.Type
+	if op.Collation != "" {
+		typeExpr += " COLLATE " + sql.QuoteIdent(op.Collation)
+	}
 	return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s;",
-		quoteQualified(op.Table), sql.QuoteIdent(op.Column), op.Type)
+		quoteQualified(op.Table), sql.QuoteIdent(op.Column), typeExpr)
 }
 
 func opSetNotNull(op DDLOp) string {
@@ -219,14 +235,15 @@ func opDropFK(op DDLOp) string {
 
 func opCreateIndex(op DDLOp) string {
 	idx := &model.Index{
-		Name:      op.Name,
-		Columns:   op.Columns,
-		Desc:      op.Desc,
-		Method:    op.Method,
-		Opclasses: op.Opclasses,
-		Where:     op.Where,
-		Include:   op.Include,
-		With:      op.With,
+		Name:       op.Name,
+		Columns:    op.Columns,
+		Desc:       op.Desc,
+		Method:     op.Method,
+		Opclasses:  op.Opclasses,
+		Collations: op.Collations,
+		Where:      op.Where,
+		Include:    op.Include,
+		With:       op.With,
 	}
 	schema, tableName := splitQualifiedName(op.Table)
 	return sql.CreateIndex(schema, idx, tableName, false, false)
@@ -242,14 +259,15 @@ func opDropIndex(op DDLOp) string {
 
 func opCreateIndexConcurrently(op DDLOp) string {
 	idx := &model.Index{
-		Name:      op.Name,
-		Columns:   op.Columns,
-		Desc:      op.Desc,
-		Method:    op.Method,
-		Opclasses: op.Opclasses,
-		Where:     op.Where,
-		Include:   op.Include,
-		With:      op.With,
+		Name:       op.Name,
+		Columns:    op.Columns,
+		Desc:       op.Desc,
+		Method:     op.Method,
+		Opclasses:  op.Opclasses,
+		Collations: op.Collations,
+		Where:      op.Where,
+		Include:    op.Include,
+		With:       op.With,
 	}
 	schema, tableName := splitQualifiedName(op.Table)
 	return sql.CreateIndex(schema, idx, tableName, false, true)

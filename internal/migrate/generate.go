@@ -324,6 +324,47 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 					diags = append(diags, classifyOp(op, risk.OpAlterColumnType, ctx)...)
 				}
 			}
+			if cc.CollationChanged != nil {
+				// PostgreSQL requires ALTER COLUMN TYPE ... COLLATE for collation changes.
+				// Look up the full type from the desired schema.
+				targetType := ""
+				targetCollation := ""
+				if table := findTable(desired, td.Name); table != nil {
+					for _, col := range table.Columns {
+						if col.Name == cc.Name {
+							targetType = col.PGType
+							if col.Array {
+								targetType += "[]"
+							}
+							targetCollation = col.Collation
+							break
+						}
+					}
+				}
+				if targetType != "" {
+					op := DDLOp{
+						Op:        "alter_column_type",
+						Table:     td.Name,
+						Column:    cc.Name,
+						Type:      targetType,
+						Collation: targetCollation,
+						Down:      &DownOp{Irreversible: true},
+					}
+					m.DDLOps = append(m.DDLOps, op)
+					diags = append(diags, classifyOp(op, risk.OpAlterColumnType, ctx)...)
+				}
+			}
+			if cc.StatisticsChanged != nil {
+				op := DDLOp{
+					Op:         "set_statistics",
+					Table:      td.Name,
+					Column:     cc.Name,
+					Statistics: cc.StatisticsChanged[1], // new value
+					Down:       &DownOp{Irreversible: true},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				// Statistics changes are safe -- no risk classification needed.
+			}
 		}
 
 		// Added FKs.
@@ -775,6 +816,9 @@ func onlyWithChanged(old, new model.Index) bool {
 	if !maps.Equal(old.Opclasses, new.Opclasses) {
 		return false
 	}
+	if !maps.Equal(old.Collations, new.Collations) {
+		return false
+	}
 	// At this point, only With can differ.
 	return !maps.Equal(old.With, new.With)
 }
@@ -800,16 +844,17 @@ func makeFKOp(tableName string, fk model.FK) DDLOp {
 
 func makeIndexOp(tableName string, idx model.Index) DDLOp {
 	return DDLOp{
-		Op:        "create_index",
-		Table:     tableName,
-		Name:      idx.Name,
-		Columns:   idx.Columns,
-		Desc:      idx.Desc,
-		Method:    idx.Method,
-		Opclasses: idx.Opclasses,
-		Where:     idx.Where,
-		Include:   idx.Include,
-		With:      idx.With,
+		Op:         "create_index",
+		Table:      tableName,
+		Name:       idx.Name,
+		Columns:    idx.Columns,
+		Desc:       idx.Desc,
+		Method:     idx.Method,
+		Opclasses:  idx.Opclasses,
+		Collations: idx.Collations,
+		Where:      idx.Where,
+		Include:    idx.Include,
+		With:       idx.With,
 		Down: &DownOp{
 			Ops: []DDLOp{{Op: "drop_index", Table: tableName, Name: idx.Name}},
 		},
