@@ -3463,3 +3463,378 @@ func TestStatisticsFormatTerminal(t *testing.T) {
 		t.Errorf("expected statistics change in output, got:\n%s", out)
 	}
 }
+
+func TestPolicyAdded(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "app", Using: "id = current_user_id()"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 changed table, got %d", len(d.TablesChanged))
+	}
+	td := d.TablesChanged[0]
+	if len(td.PoliciesAdded) != 1 {
+		t.Fatalf("expected 1 policy added, got %d", len(td.PoliciesAdded))
+	}
+	if td.PoliciesAdded[0].Name != "users_select" {
+		t.Errorf("expected policy name users_select, got %s", td.PoliciesAdded[0].Name)
+	}
+}
+
+func TestPolicyRemoved(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public"},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "app", Using: "id = current_user_id()"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	td := d.TablesChanged[0]
+	if len(td.PoliciesRemoved) != 1 || td.PoliciesRemoved[0] != "users_select" {
+		t.Errorf("expected users_select removed, got %v", td.PoliciesRemoved)
+	}
+}
+
+func TestPolicyChanged_UsingChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "app", Using: "id = new_fn()"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "app", Using: "id = current_user_id()"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	td := d.TablesChanged[0]
+	if len(td.PoliciesChanged) != 1 {
+		t.Fatalf("expected 1 policy changed, got %d", len(td.PoliciesChanged))
+	}
+	pd := td.PoliciesChanged[0]
+	if pd.Name != "users_select" {
+		t.Errorf("expected policy name users_select, got %s", pd.Name)
+	}
+	if pd.UsingChanged == nil {
+		t.Fatal("expected UsingChanged to be set")
+	}
+	if pd.UsingChanged[0] != "id = current_user_id()" || pd.UsingChanged[1] != "id = new_fn()" {
+		t.Errorf("unexpected UsingChanged: %v", pd.UsingChanged)
+	}
+}
+
+func TestPolicyChanged_TypeChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "RESTRICTIVE", Operation: "SELECT", Role: "app", Using: "true"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "app", Using: "true"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	pd := d.TablesChanged[0].PoliciesChanged[0]
+	if pd.TypeChanged == nil {
+		t.Fatal("expected TypeChanged to be set")
+	}
+	if pd.TypeChanged[0] != "PERMISSIVE" || pd.TypeChanged[1] != "RESTRICTIVE" {
+		t.Errorf("unexpected TypeChanged: %v", pd.TypeChanged)
+	}
+}
+
+func TestPolicyChanged_RoleChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "admin", Using: "true"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "app", Using: "true"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	pd := d.TablesChanged[0].PoliciesChanged[0]
+	if pd.RoleChanged == nil {
+		t.Fatal("expected RoleChanged to be set")
+	}
+	if pd.RoleChanged[0] != "app" || pd.RoleChanged[1] != "admin" {
+		t.Errorf("unexpected RoleChanged: %v", pd.RoleChanged)
+	}
+}
+
+func TestPolicyChanged_WithCheckChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_insert", Type: "PERMISSIVE", Operation: "INSERT", Role: "app", WithCheck: "role = 'user'"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_insert", Type: "PERMISSIVE", Operation: "INSERT", Role: "app", WithCheck: "true"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	pd := d.TablesChanged[0].PoliciesChanged[0]
+	if pd.WithCheckChanged == nil {
+		t.Fatal("expected WithCheckChanged to be set")
+	}
+	if pd.WithCheckChanged[0] != "true" || pd.WithCheckChanged[1] != "role = 'user'" {
+		t.Errorf("unexpected WithCheckChanged: %v", pd.WithCheckChanged)
+	}
+}
+
+func TestPolicyChanged_MultipleFields(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "admin", Using: "id = new_fn()", ErrorCode: "ACCESS_DENIED"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{
+				{Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT", Role: "app", Using: "id = current_user_id()", ErrorCode: "FORBIDDEN"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	pd := d.TablesChanged[0].PoliciesChanged[0]
+	if pd.UsingChanged == nil {
+		t.Error("expected UsingChanged to be set")
+	}
+	if pd.RoleChanged == nil {
+		t.Error("expected RoleChanged to be set")
+	}
+	if pd.ErrorCodeChanged == nil {
+		t.Error("expected ErrorCodeChanged to be set")
+	}
+	// These should NOT be set since they didn't change.
+	if pd.TypeChanged != nil {
+		t.Error("expected TypeChanged to be nil")
+	}
+	if pd.WithCheckChanged != nil {
+		t.Error("expected WithCheckChanged to be nil")
+	}
+	if pd.ErrorMessageChanged != nil {
+		t.Error("expected ErrorMessageChanged to be nil")
+	}
+}
+
+func TestPolicyUnchanged(t *testing.T) {
+	pol := model.Policy{
+		Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT",
+		Role: "app", Using: "id = current_user_id()",
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{pol}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Policies: []model.Policy{pol}},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for identical policies, got: %s", d.Summary())
+	}
+}
+
+func TestEnableRLSChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", EnableRLS: true},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", EnableRLS: false},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	td := d.TablesChanged[0]
+	if td.EnableRLSChanged == nil {
+		t.Fatal("expected EnableRLSChanged to be set")
+	}
+	if td.EnableRLSChanged[0] != false || td.EnableRLSChanged[1] != true {
+		t.Errorf("unexpected EnableRLSChanged: %v", td.EnableRLSChanged)
+	}
+}
+
+func TestForceRLSChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", ForceRLS: true},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", ForceRLS: false},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	td := d.TablesChanged[0]
+	if td.ForceRLSChanged == nil {
+		t.Fatal("expected ForceRLSChanged to be set")
+	}
+	if td.ForceRLSChanged[0] != false || td.ForceRLSChanged[1] != true {
+		t.Errorf("unexpected ForceRLSChanged: %v", td.ForceRLSChanged)
+	}
+}
+
+func TestEnableRLSUnchanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", EnableRLS: true},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", EnableRLS: true},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff when EnableRLS is the same, got: %s", d.Summary())
+	}
+}
+
+func TestPolicyFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "users",
+				PoliciesAdded: []model.Policy{
+					{Name: "users_insert", Type: "PERMISSIVE", Operation: "INSERT", Role: "app"},
+				},
+				PoliciesRemoved: []string{"users_delete"},
+				PoliciesChanged: []PolicyDiff{
+					{
+						Name:         "users_select",
+						UsingChanged: &[2]string{"old_expr", "new_expr"},
+						RoleChanged:  &[2]string{"app", "admin"},
+					},
+				},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "+ policy users_insert") {
+		t.Errorf("expected policy added in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "- policy users_delete") {
+		t.Errorf("expected policy removed in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "~ policy users_select") {
+		t.Errorf("expected policy changed in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `using: "old_expr" -> "new_expr"`) {
+		t.Errorf("expected using change in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `role: "app" -> "admin"`) {
+		t.Errorf("expected role change in output, got:\n%s", out)
+	}
+}
+
+func TestRLSFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name:             "users",
+				EnableRLSChanged: &[2]bool{false, true},
+				ForceRLSChanged:  &[2]bool{true, false},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "enable_rls:") {
+		t.Errorf("expected enable_rls in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "force_rls:") {
+		t.Errorf("expected force_rls in output, got:\n%s", out)
+	}
+}
+
+func TestPolicySummary(t *testing.T) {
+	d := &SchemaDiff{
+		TablesChanged: []TableDiff{
+			{
+				Name: "users",
+				PoliciesAdded: []model.Policy{
+					{Name: "users_insert"},
+				},
+				PoliciesRemoved: []string{"users_delete"},
+				PoliciesChanged: []PolicyDiff{
+					{Name: "users_select", UsingChanged: &[2]string{"old", "new"}},
+				},
+			},
+		},
+	}
+	summary := d.Summary()
+	if !strings.Contains(summary, "policy/policies modified") {
+		t.Errorf("expected summary to mention policy/policies modified, got: %s", summary)
+	}
+}
