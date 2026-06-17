@@ -728,6 +728,99 @@ func RefreshMaterializedView(schemaName, name string, concurrently bool) string 
 	return fmt.Sprintf("REFRESH MATERIALIZED VIEW%s %s;\n", conc, qualified)
 }
 
+// CreateSequence generates a CREATE SEQUENCE statement.
+func CreateSequence(schemaName string, seq *model.Sequence) string {
+	qualified := QualifiedName(schemaName, seq.Name)
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("CREATE SEQUENCE %s", qualified))
+
+	if seq.Start != nil {
+		sb.WriteString(fmt.Sprintf(" START WITH %d", *seq.Start))
+	}
+	if seq.Increment != nil {
+		sb.WriteString(fmt.Sprintf(" INCREMENT BY %d", *seq.Increment))
+	}
+	if seq.MinValue != nil {
+		sb.WriteString(fmt.Sprintf(" MINVALUE %d", *seq.MinValue))
+	} else {
+		sb.WriteString(" NO MINVALUE")
+	}
+	if seq.MaxValue != nil {
+		sb.WriteString(fmt.Sprintf(" MAXVALUE %d", *seq.MaxValue))
+	} else {
+		sb.WriteString(" NO MAXVALUE")
+	}
+	if seq.Cache != nil {
+		sb.WriteString(fmt.Sprintf(" CACHE %d", *seq.Cache))
+	}
+	if seq.Cycle {
+		sb.WriteString(" CYCLE")
+	} else {
+		sb.WriteString(" NO CYCLE")
+	}
+	if seq.OwnedBy != "" {
+		// OwnedBy is in "table.column" format; schema-qualify the table part.
+		parts := strings.SplitN(seq.OwnedBy, ".", 2)
+		if len(parts) == 2 {
+			sb.WriteString(fmt.Sprintf(" OWNED BY %s.%s", QualifiedName(schemaName, parts[0]), QuoteIdent(parts[1])))
+		}
+	}
+
+	sb.WriteString(";")
+	return sb.String()
+}
+
+// DropSequence generates a DROP SEQUENCE statement.
+func DropSequence(schemaName, name string, cascade bool) string {
+	qualified := QualifiedName(schemaName, name)
+	cascadeStr := ""
+	if cascade {
+		cascadeStr = " CASCADE"
+	}
+	return fmt.Sprintf("DROP SEQUENCE %s%s;", qualified, cascadeStr)
+}
+
+// AlterSequence generates an ALTER SEQUENCE statement for changing parameters.
+func AlterSequence(schemaName string, seq *model.Sequence) string {
+	qualified := QualifiedName(schemaName, seq.Name)
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("ALTER SEQUENCE %s", qualified))
+
+	if seq.Start != nil {
+		sb.WriteString(fmt.Sprintf(" START WITH %d", *seq.Start))
+	}
+	if seq.Increment != nil {
+		sb.WriteString(fmt.Sprintf(" INCREMENT BY %d", *seq.Increment))
+	}
+	if seq.MinValue != nil {
+		sb.WriteString(fmt.Sprintf(" MINVALUE %d", *seq.MinValue))
+	} else {
+		sb.WriteString(" NO MINVALUE")
+	}
+	if seq.MaxValue != nil {
+		sb.WriteString(fmt.Sprintf(" MAXVALUE %d", *seq.MaxValue))
+	} else {
+		sb.WriteString(" NO MAXVALUE")
+	}
+	if seq.Cache != nil {
+		sb.WriteString(fmt.Sprintf(" CACHE %d", *seq.Cache))
+	}
+	if seq.Cycle {
+		sb.WriteString(" CYCLE")
+	} else {
+		sb.WriteString(" NO CYCLE")
+	}
+	if seq.OwnedBy != "" {
+		parts := strings.SplitN(seq.OwnedBy, ".", 2)
+		if len(parts) == 2 {
+			sb.WriteString(fmt.Sprintf(" OWNED BY %s.%s", QualifiedName(schemaName, parts[0]), QuoteIdent(parts[1])))
+		}
+	}
+
+	sb.WriteString(";")
+	return sb.String()
+}
+
 // CreateDenyMutationFunction generates a CREATE OR REPLACE FUNCTION statement
 // for the shared pgdesign_deny_mutation trigger function. This function raises
 // an exception when UPDATE or DELETE is attempted on an append-only table.

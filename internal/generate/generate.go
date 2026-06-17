@@ -60,6 +60,11 @@ func generateJSON(schema *model.Schema) (string, error) {
 	sort.Slice(s.Domains, func(i, j int) bool {
 		return s.Domains[i].Name < s.Domains[j].Name
 	})
+	s.Sequences = make([]model.Sequence, len(schema.Sequences))
+	copy(s.Sequences, schema.Sequences)
+	sort.Slice(s.Sequences, func(i, j int) bool {
+		return s.Sequences[i].Name < s.Sequences[j].Name
+	})
 	s.Tables = make([]model.Table, len(schema.Tables))
 	copy(s.Tables, schema.Tables)
 	for i := range s.Tables {
@@ -113,6 +118,15 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			extStmts = append(extStmts, sql.CreateExtension(ext, opts.Idempotent))
 		}
 		sections = append(sections, strings.Join(extStmts, "\n"))
+	}
+
+	// 2b. CREATE SEQUENCE
+	if len(schema.Sequences) > 0 {
+		var seqStmts []string
+		for i := range schema.Sequences {
+			seqStmts = append(seqStmts, sql.CreateSequence(schema.Sequences[i].Schema, &schema.Sequences[i]))
+		}
+		sections = append(sections, strings.Join(seqStmts, "\n"))
 	}
 
 	// 3. CREATE TYPE ... AS ENUM
@@ -300,6 +314,13 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 					qualified := sql.QualifiedName(t.Schema, t.Name) + "." + sql.QuoteIdent(col.Name)
 					commentStmts = append(commentStmts, sql.CommentOn("COLUMN", qualified, col.Comment))
 				}
+			}
+		}
+		// Sequence comments
+		for _, seq := range schema.Sequences {
+			if seq.Comment != "" {
+				qualified := sql.QualifiedName(seq.Schema, seq.Name)
+				commentStmts = append(commentStmts, sql.CommentOn("SEQUENCE", qualified, seq.Comment))
 			}
 		}
 		if len(commentStmts) > 0 {
