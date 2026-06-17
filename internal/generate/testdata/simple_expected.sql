@@ -22,6 +22,8 @@ ALTER TABLE shop.orders ADD CONSTRAINT fk_orders_customers FOREIGN KEY (customer
 
 ALTER TABLE shop.customers ADD CONSTRAINT uq_customers_email UNIQUE (email);
 
+ALTER TABLE shop.customers ADD CONSTRAINT chk_customers_email CHECK (email ~ '^[^@]+@[^@]+\.[^@]+$');
+ALTER TABLE shop.customers ADD CONSTRAINT chk_customers_name CHECK (LENGTH(name) <= 255);
 ALTER TABLE shop.orders ADD CONSTRAINT ck_orders_positive_total CHECK (total >= 0);
 
 CREATE INDEX idx_orders_status ON shop.orders (customer_id);

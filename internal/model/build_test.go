@@ -450,3 +450,75 @@ func TestBuild_MaterializedViewIndexes(t *testing.T) {
 		t.Errorf("index unique = %v, want true", idx.Unique)
 	}
 }
+
+func TestBuild_SemanticTypeCheckConstraints(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "profiles",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "handle", Type: "slug"},
+					{Name: "contact", Type: "email"},
+					{Name: "bio", Type: "short_text"},
+					{Name: "name", Type: "short_text"},
+				},
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+
+	tbl := schema.Tables[0]
+
+	// Should have 3 semantic type CHECKs: slug, email, short_text (x2)
+	// Verify each by looking for the constraint name and checking the expression.
+	checksByName := make(map[string]string)
+	for _, ck := range tbl.Checks {
+		checksByName[ck.Name] = ck.Expr
+	}
+
+	// slug: handle ~ '^[a-z0-9-]+$'
+	if expr, ok := checksByName["chk_profiles_handle"]; !ok {
+		t.Error("missing CHECK constraint chk_profiles_handle for slug type")
+	} else if expr != "handle ~ '^[a-z0-9-]+$'" {
+		t.Errorf("chk_profiles_handle expr = %q, want %q", expr, "handle ~ '^[a-z0-9-]+$'")
+	}
+
+	// email: contact ~ '^[^@]+@[^@]+\.[^@]+$'
+	if expr, ok := checksByName["chk_profiles_contact"]; !ok {
+		t.Error("missing CHECK constraint chk_profiles_contact for email type")
+	} else if expr != "contact ~ '^[^@]+@[^@]+\\.[^@]+$'" {
+		t.Errorf("chk_profiles_contact expr = %q, want %q", expr, "contact ~ '^[^@]+@[^@]+\\.[^@]+$'")
+	}
+
+	// short_text: LENGTH(bio) <= 255
+	if expr, ok := checksByName["chk_profiles_bio"]; !ok {
+		t.Error("missing CHECK constraint chk_profiles_bio for short_text type")
+	} else if expr != "LENGTH(bio) <= 255" {
+		t.Errorf("chk_profiles_bio expr = %q, want %q", expr, "LENGTH(bio) <= 255")
+	}
+
+	// short_text: LENGTH(name) <= 255
+	if expr, ok := checksByName["chk_profiles_name"]; !ok {
+		t.Error("missing CHECK constraint chk_profiles_name for short_text type")
+	} else if expr != "LENGTH(name) <= 255" {
+		t.Errorf("chk_profiles_name expr = %q, want %q", expr, "LENGTH(name) <= 255")
+	}
+
+	// Types without checks (id, ref, timestamp, etc.) should NOT generate CHECK constraints.
+	for _, ck := range tbl.Checks {
+		if ck.Name == "chk_profiles_id" {
+			t.Error("id type should not produce a CHECK constraint")
+		}
+	}
+}

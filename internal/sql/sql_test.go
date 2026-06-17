@@ -1408,3 +1408,92 @@ func TestCreateIndex_MultiColumnCollation(t *testing.T) {
 		t.Errorf("expected COLLATE C for last_name, got:\n%s", got)
 	}
 }
+
+func TestCreateDomain(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema string
+		domain model.Domain
+		want   string
+	}{
+		{
+			name:   "basic",
+			schema: "app",
+			domain: model.Domain{Name: "slug", BaseType: "text"},
+			want:   "CREATE DOMAIN app.slug AS text;",
+		},
+		{
+			name:   "with_not_null",
+			schema: "app",
+			domain: model.Domain{Name: "email", BaseType: "text", NotNull: true},
+			want:   "CREATE DOMAIN app.email AS text NOT NULL;",
+		},
+		{
+			name:   "with_check",
+			schema: "public",
+			domain: model.Domain{Name: "positive_int", BaseType: "integer", Check: "VALUE > 0"},
+			want:   "CREATE DOMAIN public.positive_int AS integer CHECK (VALUE > 0);",
+		},
+		{
+			name:   "with_default_literal",
+			schema: "app",
+			domain: model.Domain{Name: "counter", BaseType: "bigint", NotNull: true, Default: "0"},
+			want:   "CREATE DOMAIN app.counter AS bigint NOT NULL DEFAULT 0;",
+		},
+		{
+			name:   "with_default_expr",
+			schema: "app",
+			domain: model.Domain{Name: "ts", BaseType: "timestamptz", NotNull: true, DefaultExpr: "now()"},
+			want:   "CREATE DOMAIN app.ts AS timestamptz NOT NULL DEFAULT now();",
+		},
+		{
+			name:   "full",
+			schema: "myapp",
+			domain: model.Domain{Name: "slug", BaseType: "text", NotNull: true, Check: "VALUE ~ '^[a-z0-9-]+$'"},
+			want:   "CREATE DOMAIN myapp.slug AS text NOT NULL CHECK (VALUE ~ '^[a-z0-9-]+$');",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CreateDomain(tt.schema, tt.domain)
+			if got != tt.want {
+				t.Errorf("CreateDomain() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDropDomain(t *testing.T) {
+	tests := []struct {
+		name    string
+		schema  string
+		domain  string
+		cascade bool
+		want    string
+	}{
+		{
+			name:    "without_cascade",
+			schema:  "app",
+			domain:  "slug",
+			cascade: false,
+			want:    "DROP DOMAIN app.slug;",
+		},
+		{
+			name:    "with_cascade",
+			schema:  "app",
+			domain:  "email",
+			cascade: true,
+			want:    "DROP DOMAIN app.email CASCADE;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := DropDomain(tt.schema, tt.domain, tt.cascade)
+			if got != tt.want {
+				t.Errorf("DropDomain() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

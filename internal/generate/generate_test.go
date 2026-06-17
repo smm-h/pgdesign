@@ -1806,3 +1806,105 @@ func TestSetStatistics_NotEmittedWhenNil(t *testing.T) {
 		t.Errorf("should not contain SET STATISTICS when no column has Statistics set, got:\n%s", out)
 	}
 }
+
+func TestDomainDDL(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Domains: []model.Domain{
+			{
+				Name:     "slug",
+				Schema:   "app",
+				BaseType: "text",
+				NotNull:  true,
+				Check:    "VALUE ~ '^[a-z0-9-]+$'",
+			},
+			{
+				Name:     "email_addr",
+				Schema:   "app",
+				BaseType: "text",
+				NotNull:  true,
+				Check:    "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'",
+			},
+		},
+		Enums: []model.Enum{
+			{Schema: "app", Name: "role", Values: []string{"admin", "user"}},
+		},
+		Tables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	// Domains should be present.
+	if !strings.Contains(out, "CREATE DOMAIN app.slug AS text NOT NULL CHECK (VALUE ~ '^[a-z0-9-]+$');") {
+		t.Errorf("expected CREATE DOMAIN for slug, got:\n%s", out)
+	}
+	if !strings.Contains(out, "CREATE DOMAIN app.email_addr AS text NOT NULL CHECK (VALUE ~ '^[^@]+@[^@]+\\.[^@]+$');") {
+		t.Errorf("expected CREATE DOMAIN for email_addr, got:\n%s", out)
+	}
+
+	// Domains should appear after enums but before tables.
+	enumPos := strings.Index(out, "CREATE TYPE")
+	domainPos := strings.Index(out, "CREATE DOMAIN")
+	tablePos := strings.Index(out, "CREATE TABLE")
+
+	if enumPos < 0 {
+		t.Fatal("missing CREATE TYPE in output")
+	}
+	if domainPos < 0 {
+		t.Fatal("missing CREATE DOMAIN in output")
+	}
+	if tablePos < 0 {
+		t.Fatal("missing CREATE TABLE in output")
+	}
+
+	if domainPos < enumPos {
+		t.Errorf("CREATE DOMAIN should appear after CREATE TYPE, domain=%d enum=%d", domainPos, enumPos)
+	}
+	if domainPos > tablePos {
+		t.Errorf("CREATE DOMAIN should appear before CREATE TABLE, domain=%d table=%d", domainPos, tablePos)
+	}
+}
+
+func TestSemanticTypeCheckInDDL(t *testing.T) {
+	// End-to-end test: parse a TOML with slug/email columns, build,
+	// generate DDL, and verify CHECK constraints appear.
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "profiles",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "handle", PGType: "text", NotNull: true, SemanticTypeName: "slug"},
+					{Name: "contact", PGType: "text", NotNull: true, SemanticTypeName: "email"},
+				},
+				PK: []string{"id"},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_profiles_handle", Expr: "handle ~ '^[a-z0-9-]+$'"},
+					{Name: "chk_profiles_contact", Expr: "contact ~ '^[^@]+@[^@]+\\.[^@]+$'"},
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "chk_profiles_handle CHECK (handle ~ '^[a-z0-9-]+$')") {
+		t.Errorf("expected CHECK for slug handle, got:\n%s", out)
+	}
+	if !strings.Contains(out, "chk_profiles_contact CHECK (contact ~ '^[^@]+@[^@]+\\.[^@]+$')") {
+		t.Errorf("expected CHECK for email contact, got:\n%s", out)
+	}
+}
