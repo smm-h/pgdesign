@@ -2671,3 +2671,195 @@ func TestMigrate_SequenceSQL(t *testing.T) {
 		t.Errorf("alter_sequence SQL missing CACHE: %s", got)
 	}
 }
+
+func TestGenerateMigration_AddFunction(t *testing.T) {
+	desired := &model.Schema{
+		Functions: []model.Function{
+			{
+				Name:       "calculate_tax",
+				Schema:     "public",
+				Language:   "plpgsql",
+				ReturnType: "numeric",
+				Args:       []model.FunctionArg{{Name: "amount", Type: "numeric"}},
+				Body:       "BEGIN RETURN amount * 0.1; END;",
+			},
+		},
+	}
+	d := &diff.SchemaDiff{
+		FunctionsAdded: []string{"calculate_tax"},
+	}
+
+	m, diags := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_function" && op.Name == "calculate_tax" {
+			found = true
+			if op.FunctionDef == nil {
+				t.Error("create_function op has no FunctionDef")
+			}
+			if op.Down == nil || len(op.Down.Ops) == 0 {
+				t.Error("create_function should have reversible down (drop_function)")
+			} else if op.Down.Ops[0].Op != "drop_function" {
+				t.Errorf("down op = %q, want drop_function", op.Down.Ops[0].Op)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected create_function op for calculate_tax")
+	}
+
+	// create_function is safe, should not have risk diagnostics.
+	for _, diag := range diags {
+		if diag.Code == "MIGRATE_RISK" && strings.Contains(diag.Message, "create_function") {
+			t.Errorf("unexpected risk diagnostic for create_function: %s", diag.Message)
+		}
+	}
+}
+
+func TestGenerateMigration_DropFunction(t *testing.T) {
+	desired := &model.Schema{}
+	d := &diff.SchemaDiff{
+		FunctionsRemoved: []string{"old_func"},
+	}
+
+	m, diags := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_function" && op.Name == "old_func" {
+			found = true
+			if op.Down == nil || !op.Down.Irreversible {
+				t.Error("drop_function should be irreversible")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected drop_function op for old_func")
+	}
+
+	// drop_function is Caution, should have a warning diagnostic.
+	hasCaution := false
+	for _, diag := range diags {
+		if diag.Code == "MIGRATE_RISK" && strings.Contains(diag.Message, "drop_function") {
+			hasCaution = true
+			break
+		}
+	}
+	if !hasCaution {
+		t.Error("expected caution diagnostic for drop_function")
+	}
+}
+
+func TestGenerateMigration_FunctionBodyChange(t *testing.T) {
+	desired := &model.Schema{
+		Functions: []model.Function{
+			{
+				Name:       "calc",
+				Schema:     "public",
+				Language:   "plpgsql",
+				ReturnType: "numeric",
+				Args:       []model.FunctionArg{{Name: "x", Type: "numeric"}},
+				Body:       "BEGIN RETURN x * 2; END;",
+			},
+		},
+	}
+	d := &diff.SchemaDiff{
+		FunctionsChanged: []diff.FunctionDiff{
+			{
+				Name:             "calc",
+				BodyChanged:      &[2]string{"BEGIN RETURN x; END;", "BEGIN RETURN x * 2; END;"},
+				SignatureChanged: false,
+			},
+		},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.3.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_or_replace_function" && op.Name == "calc" {
+			found = true
+			if op.FunctionDef == nil {
+				t.Error("create_or_replace_function op has no FunctionDef")
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected create_or_replace_function op for body-only change")
+	}
+}
+
+func TestGenerateMigration_FunctionSignatureChange(t *testing.T) {
+	desired := &model.Schema{
+		Functions: []model.Function{
+			{
+				Name:       "calc",
+				Schema:     "public",
+				Language:   "plpgsql",
+				ReturnType: "numeric",
+				Args:       []model.FunctionArg{{Name: "x", Type: "numeric"}, {Name: "y", Type: "numeric"}},
+				Body:       "BEGIN RETURN x + y; END;",
+			},
+		},
+	}
+	d := &diff.SchemaDiff{
+		FunctionsChanged: []diff.FunctionDiff{
+			{
+				Name:             "calc",
+				ArgsChanged:      true,
+				SignatureChanged: true,
+			},
+		},
+	}
+
+	m, diags := GenerateMigration(d, desired, "0.4.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	// Should have DROP then CREATE (not CREATE OR REPLACE).
+	hasDropFunc := false
+	hasCreateFunc := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_function" && op.Name == "calc" {
+			hasDropFunc = true
+		}
+		if op.Op == "create_function" && op.Name == "calc" {
+			hasCreateFunc = true
+		}
+		if op.Op == "create_or_replace_function" {
+			t.Error("signature change should not use create_or_replace_function")
+		}
+	}
+	if !hasDropFunc {
+		t.Error("expected drop_function for signature change")
+	}
+	if !hasCreateFunc {
+		t.Error("expected create_function for signature change")
+	}
+
+	// Should have the FUNCTION_SIGNATURE_CHANGE warning.
+	hasSigWarning := false
+	for _, diag := range diags {
+		if diag.Code == "FUNCTION_SIGNATURE_CHANGE" {
+			hasSigWarning = true
+			break
+		}
+	}
+	if !hasSigWarning {
+		t.Error("expected FUNCTION_SIGNATURE_CHANGE diagnostic")
+	}
+}

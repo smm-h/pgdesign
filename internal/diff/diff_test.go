@@ -2831,3 +2831,342 @@ func TestCompositeTypeSchemaQualified(t *testing.T) {
 		t.Errorf("expected 'custom.address', got: %v", d.CompositeTypesAdded)
 	}
 }
+
+func TestFunctionAdded(t *testing.T) {
+	desired := &model.Schema{
+		Functions: []model.Function{
+			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric", Body: "BEGIN RETURN amount * 0.1; END;"},
+		},
+	}
+	actual := &model.Schema{}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.FunctionsAdded) != 1 || d.FunctionsAdded[0] != "calculate_tax" {
+		t.Errorf("expected calculate_tax added, got: %v", d.FunctionsAdded)
+	}
+}
+
+func TestFunctionRemoved(t *testing.T) {
+	desired := &model.Schema{}
+	actual := &model.Schema{
+		Functions: []model.Function{
+			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric", Body: "BEGIN RETURN amount * 0.1; END;"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.FunctionsRemoved) != 1 || d.FunctionsRemoved[0] != "calculate_tax" {
+		t.Errorf("expected calculate_tax removed, got: %v", d.FunctionsRemoved)
+	}
+}
+
+func TestFunctionBodyChanged(t *testing.T) {
+	desired := &model.Schema{
+		Functions: []model.Function{
+			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
+				Args: []model.FunctionArg{{Name: "amount", Type: "numeric"}},
+				Body: "BEGIN RETURN amount * 0.2; END;"},
+		},
+	}
+	actual := &model.Schema{
+		Functions: []model.Function{
+			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
+				Args: []model.FunctionArg{{Name: "amount", Type: "numeric"}},
+				Body: "BEGIN RETURN amount * 0.1; END;"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.FunctionsChanged) != 1 {
+		t.Fatalf("expected 1 function changed, got %d", len(d.FunctionsChanged))
+	}
+	fd := d.FunctionsChanged[0]
+	if fd.BodyChanged == nil {
+		t.Fatal("expected BodyChanged to be set")
+	}
+	if fd.SignatureChanged {
+		t.Error("body-only change should not set SignatureChanged")
+	}
+}
+
+func TestFunctionSignatureChanged(t *testing.T) {
+	desired := &model.Schema{
+		Functions: []model.Function{
+			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
+				Args: []model.FunctionArg{{Name: "amount", Type: "numeric"}, {Name: "rate", Type: "numeric"}},
+				Body: "BEGIN RETURN amount * rate; END;"},
+		},
+	}
+	actual := &model.Schema{
+		Functions: []model.Function{
+			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
+				Args: []model.FunctionArg{{Name: "amount", Type: "numeric"}},
+				Body: "BEGIN RETURN amount * 0.1; END;"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.FunctionsChanged) != 1 {
+		t.Fatalf("expected 1 function changed, got %d", len(d.FunctionsChanged))
+	}
+	fd := d.FunctionsChanged[0]
+	if !fd.ArgsChanged {
+		t.Error("expected ArgsChanged to be true")
+	}
+	if !fd.SignatureChanged {
+		t.Error("expected SignatureChanged to be true when arg count changes")
+	}
+}
+
+func TestFunctionReturnTypeChanged(t *testing.T) {
+	desired := &model.Schema{
+		Functions: []model.Function{
+			{Name: "get_name", Schema: "public", Language: "sql", ReturnType: "text",
+				Body: "SELECT name FROM users LIMIT 1"},
+		},
+	}
+	actual := &model.Schema{
+		Functions: []model.Function{
+			{Name: "get_name", Schema: "public", Language: "sql", ReturnType: "varchar",
+				Body: "SELECT name FROM users LIMIT 1"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.FunctionsChanged) != 1 {
+		t.Fatalf("expected 1 function changed, got %d", len(d.FunctionsChanged))
+	}
+	fd := d.FunctionsChanged[0]
+	if fd.ReturnTypeChanged == nil {
+		t.Fatal("expected ReturnTypeChanged to be set")
+	}
+	if !fd.SignatureChanged {
+		t.Error("expected SignatureChanged when return type changes")
+	}
+}
+
+func TestFunctionArgDefaultOnly(t *testing.T) {
+	// Changing only arg defaults should set ArgsChanged but NOT SignatureChanged.
+	desired := &model.Schema{
+		Functions: []model.Function{
+			{Name: "calc", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
+				Args: []model.FunctionArg{{Name: "amount", Type: "numeric", Default: "100"}},
+				Body: "BEGIN RETURN amount; END;"},
+		},
+	}
+	actual := &model.Schema{
+		Functions: []model.Function{
+			{Name: "calc", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
+				Args: []model.FunctionArg{{Name: "amount", Type: "numeric", Default: "0"}},
+				Body: "BEGIN RETURN amount; END;"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.FunctionsChanged) != 1 {
+		t.Fatalf("expected 1 function changed, got %d", len(d.FunctionsChanged))
+	}
+	fd := d.FunctionsChanged[0]
+	if !fd.ArgsChanged {
+		t.Error("expected ArgsChanged for default change")
+	}
+	if fd.SignatureChanged {
+		t.Error("default-only change should not set SignatureChanged")
+	}
+}
+
+func TestFunctionIdenticalNoDiff(t *testing.T) {
+	fn := model.Function{
+		Name: "calc", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
+		Args: []model.FunctionArg{{Name: "a", Type: "numeric"}},
+		Body: "BEGIN RETURN a; END;",
+	}
+	schema := &model.Schema{Functions: []model.Function{fn}}
+	d := Diff(schema, schema)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for identical functions, got: %s", d.Summary())
+	}
+}
+
+func TestFunctionSummary(t *testing.T) {
+	d := &SchemaDiff{
+		FunctionsAdded:   []string{"fn1"},
+		FunctionsRemoved: []string{"fn2"},
+		FunctionsChanged: []FunctionDiff{{Name: "fn3"}},
+	}
+	s := d.Summary()
+	if !strings.Contains(s, "1 function(s) added") {
+		t.Errorf("summary missing added: %s", s)
+	}
+	if !strings.Contains(s, "1 function(s) removed") {
+		t.Errorf("summary missing removed: %s", s)
+	}
+	if !strings.Contains(s, "1 function(s) changed") {
+		t.Errorf("summary missing changed: %s", s)
+	}
+}
+
+func TestDomainAdded(t *testing.T) {
+	desired := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+		},
+	}
+	actual := &model.Schema{}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.DomainsAdded) != 1 || d.DomainsAdded[0] != "slug" {
+		t.Errorf("expected slug added, got: %v", d.DomainsAdded)
+	}
+}
+
+func TestDomainRemoved(t *testing.T) {
+	desired := &model.Schema{}
+	actual := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.DomainsRemoved) != 1 || d.DomainsRemoved[0] != "slug" {
+		t.Errorf("expected slug removed, got: %v", d.DomainsRemoved)
+	}
+}
+
+func TestDomainCheckChanged(t *testing.T) {
+	desired := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9_-]+$'"},
+		},
+	}
+	actual := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.DomainsChanged) != 1 {
+		t.Fatalf("expected 1 domain changed, got %d", len(d.DomainsChanged))
+	}
+	dd := d.DomainsChanged[0]
+	if dd.Name != "slug" {
+		t.Errorf("expected domain name slug, got %q", dd.Name)
+	}
+	if dd.CheckChanged == nil {
+		t.Fatal("expected CheckChanged to be set")
+	}
+	if dd.CheckChanged[0] != "VALUE ~ '^[a-z0-9-]+$'" || dd.CheckChanged[1] != "VALUE ~ '^[a-z0-9_-]+$'" {
+		t.Errorf("unexpected check change: %v", dd.CheckChanged)
+	}
+}
+
+func TestDomainDefaultChanged(t *testing.T) {
+	desired := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "counter", Schema: "public", BaseType: "bigint", Default: "1"},
+		},
+	}
+	actual := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "counter", Schema: "public", BaseType: "bigint", Default: "0"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.DomainsChanged) != 1 {
+		t.Fatalf("expected 1 domain changed, got %d", len(d.DomainsChanged))
+	}
+	dd := d.DomainsChanged[0]
+	if dd.DefaultChanged == nil {
+		t.Fatal("expected DefaultChanged to be set")
+	}
+	if dd.DefaultChanged[0] != "0" || dd.DefaultChanged[1] != "1" {
+		t.Errorf("unexpected default change: %v", dd.DefaultChanged)
+	}
+}
+
+func TestDomainNotNullChanged(t *testing.T) {
+	desired := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", NotNull: true},
+		},
+	}
+	actual := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", NotNull: false},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.DomainsChanged) != 1 {
+		t.Fatalf("expected 1 domain changed, got %d", len(d.DomainsChanged))
+	}
+	dd := d.DomainsChanged[0]
+	if dd.NotNullChanged == nil {
+		t.Fatal("expected NotNullChanged to be set")
+	}
+	if dd.NotNullChanged[0] != false || dd.NotNullChanged[1] != true {
+		t.Errorf("unexpected not_null change: %v", dd.NotNullChanged)
+	}
+}
+
+func TestDomainUnchanged(t *testing.T) {
+	schema := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+		},
+	}
+	d := Diff(schema, schema)
+	if len(d.DomainsAdded) != 0 || len(d.DomainsRemoved) != 0 || len(d.DomainsChanged) != 0 {
+		t.Error("expected no domain changes for identical schemas")
+	}
+}
+
+func TestDomainSchemaQualified(t *testing.T) {
+	desired := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "custom", BaseType: "text"},
+		},
+	}
+	actual := &model.Schema{}
+	d := Diff(desired, actual)
+	if len(d.DomainsAdded) != 1 || d.DomainsAdded[0] != "custom.slug" {
+		t.Errorf("expected custom.slug added, got: %v", d.DomainsAdded)
+	}
+}
+
+func TestDomainCommentChanged(t *testing.T) {
+	desired := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", Comment: "URL-safe identifier"},
+		},
+	}
+	actual := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "slug", Schema: "public", BaseType: "text", Comment: "old comment"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.DomainsChanged) != 1 {
+		t.Fatalf("expected 1 domain changed, got %d", len(d.DomainsChanged))
+	}
+	dd := d.DomainsChanged[0]
+	if dd.CommentChanged == nil {
+		t.Fatal("expected CommentChanged to be set")
+	}
+	if dd.CommentChanged[0] != "old comment" || dd.CommentChanged[1] != "URL-safe identifier" {
+		t.Errorf("unexpected comment change: %v", dd.CommentChanged)
+	}
+}
