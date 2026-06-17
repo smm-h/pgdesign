@@ -70,6 +70,20 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 		default:
 			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: go, ts)", mode, lang)
 		}
+	case "gorm":
+		switch lang {
+		case "go":
+			return &codegen.GoGormGenerator{}, nil
+		default:
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: go)", mode, lang)
+		}
+	case "drizzle":
+		switch lang {
+		case "ts":
+			return &codegen.TSDrizzleGenerator{}, nil
+		default:
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: ts)", mode, lang)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported codegen mode: %s", mode)
 	}
