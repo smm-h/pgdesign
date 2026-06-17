@@ -1290,6 +1290,226 @@ columns = ["created_at"]
 	}
 }
 
+func TestParseColumnCollation(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.messages]
+pk = ["id"]
+comment = "Messages table"
+
+[tables.messages.columns.id]
+type = "bigint"
+
+[tables.messages.columns.content]
+type = "text"
+collation = "de_DE"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	tbl := schema.Tables[0]
+	var contentCol *RawColumn
+	for i := range tbl.Columns {
+		if tbl.Columns[i].Name == "content" {
+			contentCol = &tbl.Columns[i]
+			break
+		}
+	}
+	if contentCol == nil {
+		t.Fatal("expected content column")
+	}
+	if contentCol.Collation == nil {
+		t.Fatal("expected Collation to be set")
+	}
+	if *contentCol.Collation != "de_DE" {
+		t.Errorf("Collation = %q, want %q", *contentCol.Collation, "de_DE")
+	}
+}
+
+func TestParseColumnStatistics(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.messages]
+pk = ["id"]
+comment = "Messages table"
+
+[tables.messages.columns.id]
+type = "bigint"
+
+[tables.messages.columns.content]
+type = "text"
+statistics = 1000
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	tbl := schema.Tables[0]
+	var contentCol *RawColumn
+	for i := range tbl.Columns {
+		if tbl.Columns[i].Name == "content" {
+			contentCol = &tbl.Columns[i]
+			break
+		}
+	}
+	if contentCol == nil {
+		t.Fatal("expected content column")
+	}
+	if contentCol.Statistics == nil {
+		t.Fatal("expected Statistics to be set")
+	}
+	if *contentCol.Statistics != 1000 {
+		t.Errorf("Statistics = %d, want %d", *contentCol.Statistics, 1000)
+	}
+}
+
+func TestParseIndexCollation_String(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.messages]
+pk = ["id"]
+comment = "Messages table"
+
+[tables.messages.columns.id]
+type = "bigint"
+
+[tables.messages.columns.content]
+type = "text"
+
+[tables.messages.indexes.idx_content]
+columns = ["content"]
+collation = "C"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	idx := schema.Tables[0].Indexes["idx_content"]
+	if idx.Collation == nil {
+		t.Fatal("expected Collation to be set")
+	}
+	if *idx.Collation != "C" {
+		t.Errorf("Collation = %q, want %q", *idx.Collation, "C")
+	}
+	if idx.CollationMap != nil {
+		t.Errorf("CollationMap should be nil for single string, got %v", idx.CollationMap)
+	}
+}
+
+func TestParseIndexCollation_Map(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.people]
+pk = ["id"]
+comment = "People table"
+
+[tables.people.columns.id]
+type = "bigint"
+
+[tables.people.columns.first_name]
+type = "text"
+
+[tables.people.columns.last_name]
+type = "text"
+
+[tables.people.indexes.idx_names]
+columns = ["first_name", "last_name"]
+collation = { first_name = "de_DE", last_name = "C" }
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	idx := schema.Tables[0].Indexes["idx_names"]
+	if idx.Collation != nil {
+		t.Errorf("Collation should be nil for map syntax, got %v", idx.Collation)
+	}
+	if idx.CollationMap == nil {
+		t.Fatal("CollationMap should not be nil")
+	}
+	if idx.CollationMap["first_name"] != "de_DE" {
+		t.Errorf("CollationMap[first_name] = %q, want %q", idx.CollationMap["first_name"], "de_DE")
+	}
+	if idx.CollationMap["last_name"] != "C" {
+		t.Errorf("CollationMap[last_name] = %q, want %q", idx.CollationMap["last_name"], "C")
+	}
+}
+
+func TestParseColumnCollationAndStatistics(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.messages]
+pk = ["id"]
+comment = "Messages table"
+
+[tables.messages.columns.id]
+type = "bigint"
+
+[tables.messages.columns.content]
+type = "text"
+collation = "de_DE"
+statistics = 1000
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	tbl := schema.Tables[0]
+	var contentCol *RawColumn
+	for i := range tbl.Columns {
+		if tbl.Columns[i].Name == "content" {
+			contentCol = &tbl.Columns[i]
+			break
+		}
+	}
+	if contentCol == nil {
+		t.Fatal("expected content column")
+	}
+	if contentCol.Collation == nil {
+		t.Fatal("expected Collation to be set")
+	}
+	if *contentCol.Collation != "de_DE" {
+		t.Errorf("Collation = %q, want %q", *contentCol.Collation, "de_DE")
+	}
+	if contentCol.Statistics == nil {
+		t.Fatal("expected Statistics to be set")
+	}
+	if *contentCol.Statistics != 1000 {
+		t.Errorf("Statistics = %d, want %d", *contentCol.Statistics, 1000)
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {
