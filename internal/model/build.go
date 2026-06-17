@@ -499,6 +499,12 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 	if rt.EnableRLS {
 		t.EnableRLS = true
 	}
+	// Explicit force_rls from TOML.
+	if rt.ForceRLS {
+		t.ForceRLS = true
+		// force_rls implies enable_rls.
+		t.EnableRLS = true
+	}
 
 	// Resolve triggers.
 	for name, rawTrig := range rt.Triggers {
@@ -749,6 +755,7 @@ func resolvePolicy(name string, rawPol parse.RawPolicy, tableName string) (Polic
 
 	pol := Policy{
 		Name:         name,
+		Type:         strings.ToUpper(rawPol.Type),
 		Operation:    strings.ToUpper(rawPol.For),
 		Role:         rawPol.To,
 		Using:        rawPol.Using,
@@ -774,6 +781,20 @@ func resolvePolicy(name string, rawPol parse.RawPolicy, tableName string) (Polic
 			Code:     "E122",
 			Table:    tableName,
 			Message:  fmt.Sprintf("policy %q has invalid operation %q; must be SELECT, INSERT, UPDATE, DELETE, or ALL", name, pol.Operation),
+		})
+	}
+
+	// Validate policy type. Default to PERMISSIVE if empty.
+	if pol.Type == "" {
+		pol.Type = "PERMISSIVE"
+	}
+	validTypes := map[string]bool{"PERMISSIVE": true, "RESTRICTIVE": true}
+	if !validTypes[pol.Type] {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E124",
+			Table:    tableName,
+			Message:  fmt.Sprintf("policy %q has invalid type %q; must be PERMISSIVE or RESTRICTIVE", name, pol.Type),
 		})
 	}
 

@@ -101,6 +101,7 @@ type Table struct {
 	Policies     []Policy           `json:"policies,omitempty"`
 	Triggers     []Trigger          `json:"triggers,omitempty"`
 	EnableRLS    bool               `json:"enable_rls,omitempty"`
+	ForceRLS     bool               `json:"force_rls,omitempty"`
 	AppendOnly   bool               `json:"append_only,omitempty"`
 
 	candidateKeys [][]string // cached result of CandidateKeys()
@@ -223,6 +224,7 @@ type ExclusionConstraint struct {
 // Policy represents a row-level security (RLS) policy.
 type Policy struct {
 	Name         string `json:"name"`
+	Type         string `json:"type,omitempty"`           // PERMISSIVE (default) or RESTRICTIVE
 	Operation    string `json:"operation"`               // SELECT, INSERT, UPDATE, DELETE, ALL
 	Role         string `json:"role,omitempty"`           // PG role the policy applies to (e.g., "game_app")
 	Using        string `json:"using,omitempty"`          // SQL expression for existing rows (SELECT/UPDATE/DELETE)

@@ -82,6 +82,7 @@ type RawTable struct {
 	Policies     map[string]RawPolicy
 	Triggers     map[string]RawTrigger
 	EnableRLS    bool
+	ForceRLS     bool
 	Partitioning *RawPartitioning
 	Dependencies []RawDependency
 	Maintenance  *RawMaintenance
@@ -157,6 +158,7 @@ type RawExclusion struct {
 // RawPolicy holds a row-level security policy from [tables.*.policies.*].
 type RawPolicy struct {
 	Name         string
+	Type         string // PERMISSIVE or RESTRICTIVE
 	For          string // SELECT, INSERT, UPDATE, DELETE, ALL
 	To           string // role name
 	Using        string // SQL expr for existing rows

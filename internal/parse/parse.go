@@ -859,7 +859,7 @@ func (p *parser) parseTable(name string) RawTable {
 	tableTbl := p.findTableByPath([]string{"tables", name})
 	if tableTbl != nil {
 		knownKeys := map[string]bool{
-			"comment": true, "pk": true, "enable_rls": true, "append_only": true,
+			"comment": true, "pk": true, "enable_rls": true, "force_rls": true, "append_only": true,
 		}
 		for _, child := range tableTbl.Children {
 			kv, ok := child.(*tomledit.KeyValueNode)
@@ -895,6 +895,12 @@ func (p *parser) parseTable(name string) RawTable {
 					rt.EnableRLS = v
 				} else {
 					p.errorf("E010", name, "", "[tables.%s].enable_rls must be a boolean", name)
+				}
+			case "force_rls":
+				if v, ok := nodeBool(kv.Val); ok {
+					rt.ForceRLS = v
+				} else {
+					p.errorf("E010", name, "", "[tables.%s].force_rls must be a boolean", name)
 				}
 			case "append_only":
 				if v, ok := nodeBool(kv.Val); ok {
@@ -1430,7 +1436,7 @@ func (p *parser) parsePolicy(tableName, polName string, tbl *tomledit.TableNode)
 	pol := RawPolicy{Name: polName}
 
 	knownKeys := map[string]bool{
-		"for": true, "to": true, "using": true,
+		"type": true, "for": true, "to": true, "using": true,
 		"with_check": true, "error_code": true, "error_message": true,
 	}
 
@@ -1445,6 +1451,12 @@ func (p *parser) parsePolicy(tableName, polName string, tbl *tomledit.TableNode)
 			continue
 		}
 		switch key {
+		case "type":
+			if v, ok := nodeString(kv.Val); ok {
+				pol.Type = v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].type must be a string", tableName, polName)
+			}
 		case "for":
 			if v, ok := nodeString(kv.Val); ok {
 				pol.For = v
