@@ -495,6 +495,19 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			}
 			m.DDLOps = append(m.DDLOps, op)
 			diags = append(diags, classifyOp(op, risk.OpAddColumn, colCtx)...)
+
+			// Volatile defaults trigger table rewrites even on PG 11+.
+			if isVolatileDefault(op.Default) {
+				defaultStr := fmt.Sprintf("%v", op.Default)
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "VOLATILE_DEFAULT",
+					Table:      td.Name,
+					Column:     col.Name,
+					Message:    fmt.Sprintf("Column %s.%s has volatile default %q; volatile defaults trigger table rewrites even on PG 11+", td.Name, col.Name, defaultStr),
+					Suggestion: "Consider adding the column without a default, then backfilling with a DML step",
+				})
+			}
 		}
 
 		// Changed columns.
@@ -1580,6 +1593,30 @@ func splitLargeFKOp(op DDLOp, ctx risk.OpContext, threshold int64) ([]DDLOp, []d
 		Down:  &DownOp{Irreversible: true},
 	}
 	return []DDLOp{addNotValid, validate}, nil
+}
+
+// isVolatileDefault checks whether a DDLOp default value contains a volatile
+// PostgreSQL function call. Volatile defaults trigger table rewrites even on
+// PG 11+ when adding a NOT NULL column.
+func isVolatileDefault(val interface{}) bool {
+	if val == nil {
+		return false
+	}
+	s := strings.ToLower(fmt.Sprintf("%v", val))
+	for _, pattern := range []string{
+		"now()",
+		"clock_timestamp()",
+		"random()",
+		"nextval(",
+		"gen_random_uuid()",
+		"txid_current()",
+		"statement_timestamp()",
+	} {
+		if strings.Contains(s, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func classifyOp(op DDLOp, opType risk.OpType, ctx risk.OpContext) []diagnostic.Diagnostic {
