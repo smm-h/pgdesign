@@ -208,7 +208,7 @@ func opCreateTableConsolidated(op DDLOp) string {
 			}
 			tbl.FKs = append(tbl.FKs, fk)
 
-		case "create_index":
+		case "create_index", "add_index":
 			idx := model.Index{
 				Name:       cop.Name,
 				Columns:    cop.Columns,

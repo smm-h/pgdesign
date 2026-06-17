@@ -174,7 +174,7 @@ func optimizeDDLOps(ops []DDLOp) ([]DDLOp, int, int, int) {
 	// Pass 3: Consolidate add_column, add_fk, create_index, add_unique,
 	// add_check, add_exclusion into a preceding create_table on the same table.
 	consolidatable := map[string]bool{
-		"add_column": true, "add_fk": true, "create_index": true,
+		"add_column": true, "add_fk": true, "create_index": true, "add_index": true,
 		"add_unique": true, "add_check": true, "add_exclusion": true,
 	}
 
