@@ -113,6 +113,16 @@ func Export(schema *model.Schema) ([]byte, error) {
 					return nil, fmt.Errorf("set %s.array: %w", colPath, err)
 				}
 			}
+			if c.Collation != "" {
+				if err := doc.SetCreate(colPath+".collation", c.Collation); err != nil {
+					return nil, fmt.Errorf("set %s.collation: %w", colPath, err)
+				}
+			}
+			if c.Statistics != nil {
+				if err := doc.SetCreate(colPath+".statistics", int64(*c.Statistics)); err != nil {
+					return nil, fmt.Errorf("set %s.statistics: %w", colPath, err)
+				}
+			}
 			if c.Comment != "" {
 				if err := doc.SetCreate(colPath+".comment", c.Comment); err != nil {
 					return nil, fmt.Errorf("set %s.comment: %w", colPath, err)
@@ -158,6 +168,11 @@ func Export(schema *model.Schema) ([]byte, error) {
 			}
 			if len(idx.Opclasses) > 0 {
 				if err := setOpclass(doc, idxPath, idx); err != nil {
+					return nil, err
+				}
+			}
+			if len(idx.Collations) > 0 {
+				if err := setCollation(doc, idxPath, idx); err != nil {
 					return nil, err
 				}
 			}
@@ -261,6 +276,11 @@ func Export(schema *model.Schema) ([]byte, error) {
 					return nil, fmt.Errorf("set %s.opclass: %w", idxPath, err)
 				}
 			}
+			if len(idx.Collations) > 0 {
+				if err := setCollation(doc, idxPath, idx); err != nil {
+					return nil, err
+				}
+			}
 			if idx.Where != "" {
 				if err := doc.SetCreate(idxPath+".where", idx.Where); err != nil {
 					return nil, fmt.Errorf("set %s.where: %w", idxPath, err)
@@ -309,6 +329,33 @@ func setOpclass(doc *tomledit.DocumentNode, idxPath string, idx model.Index) err
 		}
 	}
 	return doc.SetCreate(idxPath+".opclass", m)
+}
+
+// setCollation sets the collation key on an index table. If all collations
+// are the same, it uses a compact string form. Otherwise, it uses an inline
+// table with per-column collation values.
+func setCollation(doc *tomledit.DocumentNode, idxPath string, idx model.Index) error {
+	allSame := true
+	var singleVal string
+	for _, v := range idx.Collations {
+		if singleVal == "" {
+			singleVal = v
+		} else if v != singleVal {
+			allSame = false
+			break
+		}
+	}
+	if allSame && singleVal != "" {
+		return doc.SetCreate(idxPath+".collation", singleVal)
+	}
+	// Per-column collation as inline table.
+	m := make(map[string]any, len(idx.Collations))
+	for _, col := range idx.Columns {
+		if coll, ok := idx.Collations[col]; ok {
+			m[col] = coll
+		}
+	}
+	return doc.SetCreate(idxPath+".collation", m)
 }
 
 // toAnySlice converts a []string to []any for go-toml-edit's valueToNode.

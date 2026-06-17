@@ -283,20 +283,26 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		query = `
 			SELECT a.attname, format_type(a.atttypid, a.atttypmod) as type,
 			       a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid) as default_expr,
-			       d.description, a.attgenerated::text, a.attidentity::text
+			       d.description, a.attgenerated::text, a.attidentity::text,
+			       COALESCE(co.collname, '') as collation,
+			       a.attstattarget
 			FROM pg_attribute a
 			LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
 			LEFT JOIN pg_description d ON d.objoid = a.attrelid AND d.objsubid = a.attnum
+			LEFT JOIN pg_collation co ON co.oid = a.attcollation AND a.attcollation <> 0
 			WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
 			ORDER BY a.attnum`
 	} else {
 		query = `
 			SELECT a.attname, format_type(a.atttypid, a.atttypmod) as type,
 			       a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid) as default_expr,
-			       d.description, '' as attgenerated, '' as attidentity
+			       d.description, '' as attgenerated, '' as attidentity,
+			       COALESCE(co.collname, '') as collation,
+			       a.attstattarget
 			FROM pg_attribute a
 			LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
 			LEFT JOIN pg_description d ON d.objoid = a.attrelid AND d.objsubid = a.attnum
+			LEFT JOIN pg_collation co ON co.oid = a.attcollation AND a.attcollation <> 0
 			WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
 			ORDER BY a.attnum`
 	}
@@ -314,7 +320,9 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		var comment *string
 		var attgenerated string
 		var attidentity string
-		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment, &attgenerated, &attidentity); err != nil {
+		var collation string
+		var attstattarget int32
+		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment, &attgenerated, &attidentity, &collation, &attstattarget); err != nil {
 			return nil, err
 		}
 
@@ -366,6 +374,16 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		if strings.HasSuffix(c.PGType, "[]") {
 			c.Array = true
 			c.PGType = strings.TrimSuffix(c.PGType, "[]")
+		}
+		// Collation: non-empty means explicit collation was set.
+		// Filter out "default" collation -- it's the same as no collation.
+		if collation != "" && collation != "default" {
+			c.Collation = collation
+		}
+		// Statistics: -1 means database default (no explicit setting).
+		if attstattarget >= 0 {
+			v := int(attstattarget)
+			c.Statistics = &v
 		}
 		cols = append(cols, c)
 	}
@@ -602,6 +620,7 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 		idx.Where = parsed.where
 		idx.Include = parsed.include
 		idx.Opclasses = parsed.opclasses
+		idx.Collations = parsed.collations
 		idx.With = parseReloptions(reloptions)
 
 		// If the index is unique but not backed by a unique constraint,
@@ -632,11 +651,12 @@ func parseReloptions(opts []string) map[string]string {
 
 // parsedIndex holds parsed components of a pg_get_indexdef() string.
 type parsedIndex struct {
-	columns   []string
-	desc      []bool // parallel to columns; true if DESC
-	where     string
-	include   []string
-	opclasses map[string]string
+	columns    []string
+	desc       []bool // parallel to columns; true if DESC
+	where      string
+	include    []string
+	opclasses  map[string]string
+	collations map[string]string
 }
 
 // parseIndexDef parses a pg_get_indexdef() string into its components
@@ -701,6 +721,24 @@ func parseIndexDef(def string) parsedIndex {
 				p.opclasses[colName] = opclassName
 			}
 		}
+			// Collation.
+			if len(elem.Collation) > 0 {
+				var collName string
+				for _, cNode := range elem.Collation {
+					if s := cNode.GetString_(); s != nil {
+						if collName != "" {
+							collName += "."
+						}
+						collName += s.Sval
+					}
+				}
+				if collName != "" {
+					if p.collations == nil {
+						p.collations = make(map[string]string)
+					}
+					p.collations[colName] = collName
+				}
+			}
 	}
 
 	// Omit desc slice if all columns are ASC.
