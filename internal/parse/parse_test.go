@@ -633,6 +633,103 @@ with_check = "channel_id = current_setting('app.channel_id')::uuid"
 	}
 }
 
+func TestPolicyType(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.docs]
+pk = ["id"]
+comment = "Test docs"
+
+[tables.docs.columns.id]
+type = "id"
+
+[tables.docs.policies.read_all]
+for = "SELECT"
+type = "permissive"
+using = "true"
+
+[tables.docs.policies.restrict_write]
+for = "INSERT"
+type = "restrictive"
+with_check = "user_id = current_user()"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	tbl := schema.Tables[0]
+	if len(tbl.Policies) != 2 {
+		t.Fatalf("expected 2 policies, got %d", len(tbl.Policies))
+	}
+
+	read, ok := tbl.Policies["read_all"]
+	if !ok {
+		t.Fatal("expected policy 'read_all'")
+	}
+	if read.Type != "permissive" {
+		t.Errorf("read_all.Type = %q, want %q", read.Type, "permissive")
+	}
+
+	restrict, ok := tbl.Policies["restrict_write"]
+	if !ok {
+		t.Fatal("expected policy 'restrict_write'")
+	}
+	if restrict.Type != "restrictive" {
+		t.Errorf("restrict_write.Type = %q, want %q", restrict.Type, "restrictive")
+	}
+}
+
+func TestForceRLS(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.secrets]
+pk = ["id"]
+comment = "Secret data"
+force_rls = true
+
+[tables.secrets.columns.id]
+type = "id"
+
+[tables.normal]
+pk = ["id"]
+comment = "Normal table"
+
+[tables.normal.columns.id]
+type = "id"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 2 {
+		t.Fatalf("expected 2 tables, got %d", len(schema.Tables))
+	}
+
+	for _, tbl := range schema.Tables {
+		if tbl.Name == "secrets" {
+			if !tbl.ForceRLS {
+				t.Error("expected secrets.ForceRLS = true")
+			}
+		} else if tbl.Name == "normal" {
+			if tbl.ForceRLS {
+				t.Error("expected normal.ForceRLS = false")
+			}
+		}
+	}
+}
+
 func TestArrayColumn(t *testing.T) {
 	content := `[meta]
 version = 1

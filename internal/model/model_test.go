@@ -948,3 +948,137 @@ func TestBuild_FDValidColumns_NoE221(t *testing.T) {
 		}
 	}
 }
+
+func TestBuild_PolicyType(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name:    "docs",
+				PK:      []string{"id"},
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}},
+				Policies: map[string]parse.RawPolicy{
+					"permissive_explicit": {
+						For:   "SELECT",
+						Type:  "permissive",
+						Using: "true",
+					},
+					"restrictive_explicit": {
+						For:   "SELECT",
+						Type:  "RESTRICTIVE",
+						Using: "true",
+					},
+					"default_type": {
+						For:   "SELECT",
+						Using: "true",
+					},
+				},
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	docs := schema.TableByName("public", "docs")
+	if docs == nil {
+		t.Fatal("docs table not found")
+	}
+
+	policyMap := make(map[string]Policy)
+	for _, p := range docs.Policies {
+		policyMap[p.Name] = p
+	}
+
+	// Explicit permissive should be uppercased.
+	if p, ok := policyMap["permissive_explicit"]; !ok {
+		t.Fatal("missing policy 'permissive_explicit'")
+	} else if p.Type != "PERMISSIVE" {
+		t.Errorf("permissive_explicit.Type = %q, want %q", p.Type, "PERMISSIVE")
+	}
+
+	// Explicit restrictive should be uppercased.
+	if p, ok := policyMap["restrictive_explicit"]; !ok {
+		t.Fatal("missing policy 'restrictive_explicit'")
+	} else if p.Type != "RESTRICTIVE" {
+		t.Errorf("restrictive_explicit.Type = %q, want %q", p.Type, "RESTRICTIVE")
+	}
+
+	// Empty type should default to PERMISSIVE.
+	if p, ok := policyMap["default_type"]; !ok {
+		t.Fatal("missing policy 'default_type'")
+	} else if p.Type != "PERMISSIVE" {
+		t.Errorf("default_type.Type = %q, want %q", p.Type, "PERMISSIVE")
+	}
+}
+
+func TestBuild_PolicyInvalidType(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name:    "items",
+				PK:      []string{"id"},
+				Columns: []parse.RawColumn{{Name: "id", Type: "id"}},
+				Policies: map[string]parse.RawPolicy{
+					"bad_type": {
+						For:   "SELECT",
+						Type:  "exclusive",
+						Using: "true",
+					},
+				},
+			},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	if !diags.HasErrors() {
+		t.Fatal("expected error for invalid policy type")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Code == "E124" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected E124 diagnostic for invalid policy type")
+	}
+}
+
+func TestBuild_ForceRLSImpliesEnableRLS(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name:     "secrets",
+				PK:       []string{"id"},
+				Columns:  []parse.RawColumn{{Name: "id", Type: "id"}},
+				ForceRLS: true,
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	secrets := schema.TableByName("public", "secrets")
+	if secrets == nil {
+		t.Fatal("secrets table not found")
+	}
+	if !secrets.ForceRLS {
+		t.Error("expected ForceRLS = true")
+	}
+	if !secrets.EnableRLS {
+		t.Error("expected EnableRLS = true when ForceRLS is set")
+	}
+}
