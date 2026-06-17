@@ -157,6 +157,9 @@ func FormatTerminal(d *SchemaDiff) string {
 	}
 	for _, dd := range d.DomainsChanged {
 		fmt.Fprintf(&b, "%s~ domain %s%s\n", colorYellow, dd.Name, colorReset)
+		if dd.BaseTypeChanged != nil {
+			fmt.Fprintf(&b, "  %s~ base_type: %s -> %s%s\n", colorYellow, dd.BaseTypeChanged[0], dd.BaseTypeChanged[1], colorReset)
+		}
 		if dd.CheckChanged != nil {
 			fmt.Fprintf(&b, "  %s~ check: %q -> %q%s\n", colorYellow, dd.CheckChanged[0], dd.CheckChanged[1], colorReset)
 		}

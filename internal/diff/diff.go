@@ -169,8 +169,9 @@ type FunctionDiff struct {
 
 // DomainDiff describes changes to a domain type.
 type DomainDiff struct {
-	Name           string     `json:"name"`
-	CheckChanged   *[2]string `json:"check_changed,omitempty"`
+	Name            string     `json:"name"`
+	BaseTypeChanged *[2]string `json:"base_type_changed,omitempty"`
+	CheckChanged    *[2]string `json:"check_changed,omitempty"`
 	DefaultChanged *[2]string `json:"default_changed,omitempty"`
 	NotNullChanged *[2]bool   `json:"not_null_changed,omitempty"`
 	CommentChanged *[2]string `json:"comment_changed,omitempty"`
@@ -1544,6 +1545,11 @@ func domainKey(d *model.Domain) string {
 func diffDomain(desired, actual *model.Domain) *DomainDiff {
 	dd := &DomainDiff{Name: domainKey(desired)}
 	changed := false
+
+	if normalizeType(desired.BaseType) != normalizeType(actual.BaseType) {
+		dd.BaseTypeChanged = &[2]string{actual.BaseType, desired.BaseType}
+		changed = true
+	}
 
 	if desired.Check != actual.Check {
 		dd.CheckChanged = &[2]string{actual.Check, desired.Check}
