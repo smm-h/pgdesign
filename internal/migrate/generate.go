@@ -635,6 +635,21 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			m.DDLOps = append(m.DDLOps, op)
 		}
 
+		// Changed FKs: DROP old + ADD new.
+		for _, fc := range td.FKsChanged {
+			dropOp := DDLOp{
+				Op:    "drop_fk",
+				Table: td.Name,
+				Name:  fc.Old.Name,
+			}
+			m.DDLOps = append(m.DDLOps, dropOp)
+
+			addOp := makeFKOp(td.Name, fc.New)
+			m.DDLOps = append(m.DDLOps, addOp)
+			diags = append(diags, classifyOp(addOp, risk.OpAddFK, ctx)...)
+			diags = append(diags, checkE300(addOp, ctx, largeFKThreshold)...)
+		}
+
 		// Added indexes.
 		for _, idx := range td.IndexesAdded {
 			idxOp := makeIndexOp(td.Name, idx)

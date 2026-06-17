@@ -3421,3 +3421,63 @@ func TestOpToSQL_CreateTrigger(t *testing.T) {
 		t.Errorf("expected function name in SQL, got: %s", sql)
 	}
 }
+
+func TestGenerateMigration_FKChanged(t *testing.T) {
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "scores",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "player_id", PGType: "bigint", NotNull: true},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.scores",
+				FKsChanged: []diff.FKChange{
+					{
+						Name: "fk_scores_player",
+						Old: model.FK{
+							Name:       "fk_scores_player",
+							Columns:    []string{"player_id"},
+							RefTable:   "players",
+							RefColumns: []string{"id"},
+							OnDelete:   "RESTRICT",
+						},
+						New: model.FK{
+							Name:       "fk_scores_player",
+							Columns:    []string{"player_id"},
+							RefTable:   "players",
+							RefColumns: []string{"id"},
+							OnDelete:   "CASCADE",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.8.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+	if len(m.DDLOps) != 2 {
+		t.Fatalf("expected 2 DDL ops, got %d", len(m.DDLOps))
+	}
+
+	if m.DDLOps[0].Op != "drop_fk" {
+		t.Errorf("expected first op to be drop_fk, got %s", m.DDLOps[0].Op)
+	}
+	if m.DDLOps[1].Op != "add_fk" {
+		t.Errorf("expected second op to be add_fk, got %s", m.DDLOps[1].Op)
+	}
+	if m.DDLOps[1].OnDelete != "CASCADE" {
+		t.Errorf("expected add_fk OnDelete=CASCADE, got %s", m.DDLOps[1].OnDelete)
+	}
+}
