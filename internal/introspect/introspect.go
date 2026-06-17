@@ -61,6 +61,15 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		schema.Enums = append(schema.Enums, enums...)
 	}
 
+	// Extract composite types from all requested schemas.
+	for _, sn := range schemaNames {
+		cts, err := queryCompositeTypes(ctx, conn, sn)
+		if err != nil {
+			return nil, nil, fmt.Errorf("composite types for schema %q: %w", sn, err)
+		}
+		schema.CompositeTypes = append(schema.CompositeTypes, cts...)
+	}
+
 	// Extract tables from all requested schemas.
 	for _, sn := range schemaNames {
 		tables, tableDiags, err := queryTables(ctx, conn, sn, pgVersion)
@@ -176,6 +185,59 @@ func queryEnums(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model
 		enums = append(enums, e)
 	}
 	return enums, rows.Err()
+}
+
+// queryCompositeTypes returns user-defined composite types in the given schema,
+// excluding table row types (every table auto-creates a composite type for its rows).
+func queryCompositeTypes(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.CompositeType, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT t.typname,
+		       array_agg(a.attname ORDER BY a.attnum) as field_names,
+		       array_agg(format_type(a.atttypid, a.atttypmod) ORDER BY a.attnum) as field_types,
+		       d.description
+		FROM pg_type t
+		JOIN pg_namespace n ON n.oid = t.typnamespace
+		JOIN pg_attribute a ON a.attrelid = t.typrelid AND a.attnum > 0 AND NOT a.attisdropped
+		LEFT JOIN pg_description d ON d.objoid = t.oid
+		WHERE n.nspname = $1
+		  AND t.typtype = 'c'
+		  AND t.typrelid NOT IN (
+		      SELECT oid FROM pg_class
+		      WHERE relkind IN ('r', 'v', 'm', 'p', 'f', 't')
+		  )
+		GROUP BY t.typname, d.description
+		ORDER BY t.typname
+	`, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cts []model.CompositeType
+	for rows.Next() {
+		var name string
+		var fieldNames []string
+		var fieldTypes []string
+		var comment *string
+		if err := rows.Scan(&name, &fieldNames, &fieldTypes, &comment); err != nil {
+			return nil, err
+		}
+		ct := model.CompositeType{
+			Name:   name,
+			Schema: schemaName,
+		}
+		if comment != nil {
+			ct.Comment = *comment
+		}
+		for i := range fieldNames {
+			ct.Fields = append(ct.Fields, model.CompositeField{
+				Name:   fieldNames[i],
+				PGType: fieldTypes[i],
+			})
+		}
+		cts = append(cts, ct)
+	}
+	return cts, rows.Err()
 }
 
 // queryTables returns all tables (regular + partitioned) in the given schema.

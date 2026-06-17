@@ -52,6 +52,32 @@ func Export(schema *model.Schema) ([]byte, error) {
 		}
 	}
 
+	// [types.*] for composite types
+	for _, ct := range schema.CompositeTypes {
+		path := "types." + ct.Name
+		if err := doc.NewTable(path); err != nil {
+			return nil, fmt.Errorf("create type %s: %w", ct.Name, err)
+		}
+		if err := doc.SetCreate(path+".kind", "composite"); err != nil {
+			return nil, fmt.Errorf("set %s.kind: %w", path, err)
+		}
+		if ct.Comment != "" {
+			if err := doc.SetCreate(path+".comment", ct.Comment); err != nil {
+				return nil, fmt.Errorf("set %s.comment: %w", path, err)
+			}
+		}
+		// Fields as a sub-table [types.NAME.fields]
+		fieldsPath := path + ".fields"
+		if err := doc.NewTable(fieldsPath); err != nil {
+			return nil, fmt.Errorf("create %s: %w", fieldsPath, err)
+		}
+		for _, f := range ct.Fields {
+			if err := doc.SetCreate(fieldsPath+"."+f.Name, f.PGType); err != nil {
+				return nil, fmt.Errorf("set %s.%s: %w", fieldsPath, f.Name, err)
+			}
+		}
+	}
+
 	// [tables.*]
 	for _, t := range schema.Tables {
 		tblPath := "tables." + t.Name
