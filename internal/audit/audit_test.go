@@ -466,3 +466,207 @@ func TestAudit_BCNF_NoDecomposition_WhenClean(t *testing.T) {
 		}
 	}
 }
+
+func TestAudit_3NF_Counterexample(t *testing.T) {
+	// Table(A, B, C) PK={A} deps: A->B, B->C
+	// B->C is a 3NF violation; W102 should include a counterexample
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "employees",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint"},
+				{Name: "B", PGType: "text"},
+				{Name: "C", PGType: "text"},
+			},
+			PK: []string{"A"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B"}},
+				{Determinant: []string{"B"}, Dependent: []string{"C"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	var w102 []diagnostic.Diagnostic
+	for _, d := range diags {
+		if d.Code == "W102" {
+			w102 = append(w102, d)
+		}
+	}
+	if len(w102) == 0 {
+		t.Fatalf("expected W102 diagnostic, got none. All diags: %+v", diags)
+	}
+
+	// The Suggestion field should contain the counterexample
+	if w102[0].Suggestion == "" {
+		t.Fatal("expected W102 to have a non-empty Suggestion with counterexample")
+	}
+	if !strings.Contains(w102[0].Suggestion, "Counterexample") {
+		t.Errorf("expected Suggestion to contain 'Counterexample', got: %s", w102[0].Suggestion)
+	}
+	// Should mention the violating FD
+	if !strings.Contains(w102[0].Suggestion, "B") {
+		t.Errorf("expected Suggestion to mention attribute B, got: %s", w102[0].Suggestion)
+	}
+	// Should contain table formatting (pipe characters)
+	if !strings.Contains(w102[0].Suggestion, "|") {
+		t.Errorf("expected Suggestion to contain table formatting, got: %s", w102[0].Suggestion)
+	}
+}
+
+func TestAudit_BCNF_Counterexample(t *testing.T) {
+	// Table(A, B, C) PK={A,B} deps: AB->C, C->B
+	// C->B is a BCNF violation; W103 should include a counterexample
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "bcnf_test",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint", NotNull: true},
+				{Name: "B", PGType: "bigint", NotNull: true},
+				{Name: "C", PGType: "bigint", NotNull: true},
+			},
+			PK: []string{"A", "B"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A", "B"}, Dependent: []string{"C"}},
+				{Determinant: []string{"C"}, Dependent: []string{"B"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	var w103 []diagnostic.Diagnostic
+	for _, d := range diags {
+		if d.Code == "W103" {
+			w103 = append(w103, d)
+		}
+	}
+	if len(w103) == 0 {
+		t.Fatalf("expected W103 diagnostic, got none. All diags: %+v", diags)
+	}
+
+	if w103[0].Suggestion == "" {
+		t.Fatal("expected W103 to have a non-empty Suggestion with counterexample")
+	}
+	if !strings.Contains(w103[0].Suggestion, "Counterexample") {
+		t.Errorf("expected Suggestion to contain 'Counterexample', got: %s", w103[0].Suggestion)
+	}
+	if !strings.Contains(w103[0].Suggestion, "|") {
+		t.Errorf("expected Suggestion to contain table formatting, got: %s", w103[0].Suggestion)
+	}
+}
+
+func TestAudit_MinimalCover_WithRedundancy(t *testing.T) {
+	// Table(A, B, C) PK={A} deps: A->B, B->C, A->C
+	// A->C is derivable from A->B, B->C -- minimal cover should detect this
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "redundant",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint"},
+				{Name: "B", PGType: "text"},
+				{Name: "C", PGType: "text"},
+			},
+			PK: []string{"A"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B"}},
+				{Determinant: []string{"B"}, Dependent: []string{"C"}},
+				{Determinant: []string{"A"}, Dependent: []string{"C"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	var i100 []diagnostic.Diagnostic
+	for _, d := range diags {
+		if d.Code == "I100" {
+			i100 = append(i100, d)
+		}
+	}
+	if len(i100) == 0 {
+		t.Fatalf("expected I100 diagnostic for minimal cover redundancy, got none. All diags: %+v", diags)
+	}
+	if !strings.Contains(i100[0].Message, "reduced to") {
+		t.Errorf("expected message about reduction, got: %s", i100[0].Message)
+	}
+	if !strings.Contains(i100[0].Message, "derivable") {
+		t.Errorf("expected message about derivable FDs, got: %s", i100[0].Message)
+	}
+}
+
+func TestAudit_MinimalCover_NoRedundancy(t *testing.T) {
+	// Table(A, B, C) PK={A} deps: A->B, A->C -- already minimal
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "clean",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint"},
+				{Name: "B", PGType: "text"},
+				{Name: "C", PGType: "text"},
+			},
+			PK: []string{"A"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	for _, d := range diags {
+		if d.Code == "I100" {
+			t.Errorf("unexpected I100 diagnostic for clean FD set: %+v", d)
+		}
+	}
+}
+
+func TestAudit_FDSource_Declared(t *testing.T) {
+	// When FDs are set directly with Source="declared", verify they work correctly in audit
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "sourced",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint"},
+				{Name: "B", PGType: "text"},
+				{Name: "C", PGType: "text"},
+			},
+			PK: []string{"A"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B", "C"}, Source: "declared"},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	// Should work normally -- no warnings or errors
+	for _, d := range diags {
+		if d.Severity == diagnostic.Warning || d.Severity == diagnostic.Error {
+			t.Errorf("unexpected warning/error: %+v", d)
+		}
+	}
+}
+
+func TestAudit_FDInference_UpdatedMessage(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "users",
+			Columns: []model.Column{
+				{Name: "id", PGType: "bigint", NotNull: true},
+				{Name: "name", PGType: "text", NotNull: true},
+			},
+			PK: []string{"id"},
+		}},
+	}
+
+	diags := Audit(schema)
+	var a100 []diagnostic.Diagnostic
+	for _, d := range diags {
+		if d.Code == "A100" {
+			a100 = append(a100, d)
+		}
+	}
+	if len(a100) == 0 {
+		t.Fatalf("expected A100, got none")
+	}
+	if !strings.Contains(a100[0].Message, "inferred FD") {
+		t.Errorf("expected message to say 'inferred FD', got: %s", a100[0].Message)
+	}
+}
