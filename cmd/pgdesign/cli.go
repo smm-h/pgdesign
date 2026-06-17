@@ -120,6 +120,7 @@ func main() {
 			strictcli.StringFlag("from", "Start version (inclusive)"),
 			strictcli.StringFlag("to", "End version (inclusive)"),
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for safety check"),
 		),
 	)
 	mig.Command("test", "Test migrations against a staging database", handleMigrateTest,

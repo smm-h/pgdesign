@@ -65,3 +65,8 @@ func compareSemver(a, b string) int {
 	}
 	return 0
 }
+
+// InSemverRange returns true if version is in the [from, to] range (inclusive).
+func InSemverRange(version, from, to string) bool {
+	return compareSemver(version, from) >= 0 && compareSemver(version, to) <= 0
+}

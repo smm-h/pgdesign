@@ -568,6 +568,46 @@ func handleMigrateSquash(kwargs map[string]interface{}) int {
 		return 1
 	}
 
+	dbURL, _ := kwargs["db"].(string)
+	if dbURL != "" {
+		ctx := context.Background()
+		conn, err := pgx.Connect(ctx, dbURL)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: connect for safety check: %v\n", err)
+			return 1
+		}
+		defer conn.Close(ctx)
+
+		if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+
+		applied, err := migrate.AppliedVersions(ctx, conn)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+
+		// Check if any migration in the [from, to] range has been applied.
+		var appliedInRange []string
+		for _, v := range applied {
+			if migrate.InSemverRange(v, from, to) {
+				appliedInRange = append(appliedInRange, v)
+			}
+		}
+
+		if len(appliedInRange) > 0 {
+			diags := []diagnostic.Diagnostic{{
+				Severity: diagnostic.Error,
+				Code:     "M200",
+				Message:  fmt.Sprintf("cannot squash: %d migration(s) in range [%s, %s] have been applied: %v; squashing would desynchronize the tracking table", len(appliedInRange), from, to, appliedInRange),
+			}}
+			fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+			return 1
+		}
+	}
+
 	result, err := migrate.SquashMigrations(dir, from, to)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
