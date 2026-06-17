@@ -1558,7 +1558,6 @@ func queryFunctions(ctx context.Context, conn *pgx.Conn, schemaName string) ([]m
 		LEFT JOIN pg_description d ON d.objoid = p.oid AND d.classoid = 'pg_proc'::regclass
 		WHERE n.nspname = $1
 			AND p.prokind IN ('f', 'p')
-			AND NOT p.proisagg
 			AND NOT p.prorettype = 'trigger'::regtype
 			AND p.proname != 'pgdesign_deny_mutation'
 		ORDER BY p.proname
