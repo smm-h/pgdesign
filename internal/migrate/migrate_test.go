@@ -733,6 +733,32 @@ func TestSemverCompare(t *testing.T) {
 	}
 }
 
+func TestInSemverRange(t *testing.T) {
+	tests := []struct {
+		version, from, to string
+		want              bool
+	}{
+		// In range.
+		{"0.2.0", "0.1.0", "0.3.0", true},
+		{"0.1.0", "0.1.0", "0.3.0", true}, // inclusive lower bound
+		{"0.3.0", "0.1.0", "0.3.0", true}, // inclusive upper bound
+		{"1.0.0", "1.0.0", "1.0.0", true}, // single-version range
+		// Out of range.
+		{"0.0.9", "0.1.0", "0.3.0", false},
+		{"0.3.1", "0.1.0", "0.3.0", false},
+		{"2.0.0", "0.1.0", "1.0.0", false},
+		// Multi-digit components.
+		{"0.10.0", "0.9.0", "0.11.0", true},
+		{"0.8.0", "0.9.0", "0.11.0", false},
+	}
+	for _, tt := range tests {
+		got := InSemverRange(tt.version, tt.from, tt.to)
+		if got != tt.want {
+			t.Errorf("InSemverRange(%q, %q, %q) = %v, want %v", tt.version, tt.from, tt.to, got, tt.want)
+		}
+	}
+}
+
 func TestSplitQualifiedName(t *testing.T) {
 	tests := []struct {
 		input      string
