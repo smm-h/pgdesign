@@ -92,6 +92,12 @@ func OpToSQL(op DDLOp) string {
 		return opRefreshMaterializedView(op)
 	case "set_statistics":
 		return opSetStatistics(op)
+	case "create_sequence":
+		return opCreateSequence(op)
+	case "drop_sequence":
+		return opDropSequence(op)
+	case "alter_sequence":
+		return opAlterSequence(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -453,6 +459,41 @@ func opDropMaterializedView(op DDLOp) string {
 func opRefreshMaterializedView(op DDLOp) string {
 	schema, name := splitQualifiedName(op.Name)
 	return sql.RefreshMaterializedView(schema, name, false)
+}
+
+func opCreateSequence(op DDLOp) string {
+	if op.SequenceDef != nil {
+		schema := op.Schema
+		if schema == "" {
+			schema = "public"
+		}
+		return sql.CreateSequence(schema, op.SequenceDef)
+	}
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	return fmt.Sprintf("CREATE SEQUENCE %s;", sql.QualifiedName(schema, op.Name))
+}
+
+func opDropSequence(op DDLOp) string {
+	schema, name := splitQualifiedName(op.Name)
+	return sql.DropSequence(schema, name, false)
+}
+
+func opAlterSequence(op DDLOp) string {
+	if op.SequenceDef != nil {
+		schema := op.Schema
+		if schema == "" {
+			schema = "public"
+		}
+		return sql.AlterSequence(schema, op.SequenceDef)
+	}
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	return fmt.Sprintf("ALTER SEQUENCE %s;", sql.QualifiedName(schema, op.Name))
 }
 
 // splitQualifiedName splits "schema.table" into ("schema", "table").
