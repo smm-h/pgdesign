@@ -312,9 +312,12 @@ func BCNFDecompose(name string, allAttrs []string, fds []FuncDep) []Component {
 	diff := setDifference(attrs, xPlus)
 	r2Attrs := setUnion(violating.Determinant, diff)
 
-	// Recurse on both halves.
-	left := BCNFDecompose(name, r1Attrs, mc)
-	right := BCNFDecompose(name, r2Attrs, mc)
+	// Project FDs onto each sub-relation before recursing.
+	r1FDs := projectFDs(r1Attrs, mc)
+	r2FDs := projectFDs(r2Attrs, mc)
+
+	left := BCNFDecompose(name, r1Attrs, r1FDs)
+	right := BCNFDecompose(name, r2Attrs, r2FDs)
 
 	components := append(left, right...)
 
