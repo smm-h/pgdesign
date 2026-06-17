@@ -15,3 +15,4 @@
 {"commits":["2829fcd59c47d17865fadda3ed8ae9ddc440099e"],"user_facing":true,"description":"**Scalar type CHECKs no longer silently lost.** CHECK constraints defined on semantic types are now enforced at the database level via generated domains.","type":"fix"}
 {"commits":["4145d1dcd20cc1554264188f12d34850a8a290c7","40b5cef0c2429879b2483c62cda7d886f9914e67"],"user_facing":true,"description":"**GORM struct tag generation (--mode gorm).** Generates Go structs with GORM-compatible struct tags for ORM integration.","type":"feature"}
 {"commits":["17874fb598b051d76b8ee36ec54a2808a22fcf25"],"user_facing":true,"description":"**E221 validates FD column names.** Functional dependency declarations now error if they reference non-existent columns.","type":"fix"}
+{"commits":["0a58d7e0b399fb71d28103120d517368a353788f"],"user_facing":true,"description":"**Drizzle schema generation (--mode drizzle).** Generates Drizzle ORM schema definitions in TypeScript.","type":"feature"}
