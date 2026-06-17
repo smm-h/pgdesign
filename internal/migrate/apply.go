@@ -123,7 +123,7 @@ func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout
 		return fmt.Errorf("parse: %w", err)
 	}
 
-	// Set lock_timeout for this session.
+	// Set lock_timeout for this session (persists across transactions).
 	if lockTimeout == "" {
 		lockTimeout = "5s"
 	}
@@ -131,6 +131,14 @@ func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout
 		return fmt.Errorf("set lock_timeout: %w", err)
 	}
 
+	if HasPhases(m) {
+		if err := applyPhased(ctx, conn, m, mf); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Original flat execution path (no phases).
 	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
@@ -202,4 +210,108 @@ func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout
 	}
 
 	return nil
+}
+
+// applyPhased executes a migration phase-by-phase: expand, migrate, contract.
+// Each phase runs in its own transaction (with non-transactional ops handled
+// the same way as the flat path). The migration is recorded in a final
+// transaction after all phases complete.
+func applyPhased(ctx context.Context, conn *pgx.Conn, m *Migration, mf migrationFile) error {
+	phases := []string{PhaseExpand, PhaseMigrate, PhaseContract}
+	for _, phase := range phases {
+		if err := applyPhaseOps(ctx, conn, m, phase); err != nil {
+			return fmt.Errorf("phase %s: %w", phase, err)
+		}
+	}
+	// Record migration in its own transaction.
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin (record): %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx,
+		"INSERT INTO pgdesign_migrations (version, checksum, description) VALUES ($1, $2, $3)",
+		mf.version, mf.checksum, m.Description); err != nil {
+		return fmt.Errorf("record migration: %w", err)
+	}
+	return tx.Commit(ctx)
+}
+
+// applyPhaseOps executes all DDL and DML ops belonging to a single phase
+// within a transaction, handling non-transactional ops by committing and
+// re-opening the transaction as needed.
+func applyPhaseOps(ctx context.Context, conn *pgx.Conn, m *Migration, phase string) error {
+	// Collect DDL ops for this phase.
+	var ddlOps []DDLOp
+	for _, op := range m.DDLOps {
+		if op.Phase == phase {
+			ddlOps = append(ddlOps, op)
+		}
+	}
+	// Collect DML ops for this phase.
+	var dmlOps []DMLOp
+	for _, op := range m.DMLOps {
+		if op.Phase == phase {
+			dmlOps = append(dmlOps, op)
+		}
+	}
+
+	if len(ddlOps) == 0 && len(dmlOps) == 0 {
+		return nil
+	}
+
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	for i, op := range ddlOps {
+		sqlStmt := OpToSQL(op)
+		if sqlStmt == "" {
+			continue
+		}
+
+		if IsNonTransactional(op) {
+			if err := tx.Commit(ctx); err != nil {
+				return fmt.Errorf("commit before non-transactional op %d (%s): %w", i, op.Op, err)
+			}
+			stmts, err := sqlparse.SplitStatements(sqlStmt)
+			if err != nil {
+				return fmt.Errorf("parse non-transactional op %d (%s): %w", i, op.Op, err)
+			}
+			for _, stmt := range stmts {
+				if _, err := conn.Exec(ctx, stmt); err != nil {
+					return fmt.Errorf("non-transactional op %d (%s): %w", i, op.Op, err)
+				}
+			}
+			tx, err = conn.Begin(ctx)
+			if err != nil {
+				return fmt.Errorf("begin after non-transactional op %d: %w", i, err)
+			}
+			defer tx.Rollback(ctx)
+			continue
+		}
+
+		stmts, err := sqlparse.SplitStatements(sqlStmt)
+		if err != nil {
+			return fmt.Errorf("parse DDL op %d (%s): %w", i, op.Op, err)
+		}
+		for _, stmt := range stmts {
+			if _, err := tx.Exec(ctx, stmt); err != nil {
+				return fmt.Errorf("DDL op %d (%s): %w\n  SQL: %s", i, op.Op, err, stmt)
+			}
+		}
+	}
+
+	for i, op := range dmlOps {
+		if op.SQL == "" {
+			continue
+		}
+		if _, err := tx.Exec(ctx, op.SQL); err != nil {
+			return fmt.Errorf("DML op %d (%s): %w\n  SQL: %s", i, op.Op, err, op.SQL)
+		}
+	}
+
+	return tx.Commit(ctx)
 }
