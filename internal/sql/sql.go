@@ -710,6 +710,21 @@ func CreatePolicy(schemaName, tableName string, p model.Policy) string {
 	return sb.String()
 }
 
+// DropPolicy generates a DROP POLICY statement.
+func DropPolicy(schemaName, tableName, policyName string) string {
+	return fmt.Sprintf("DROP POLICY %s ON %s;", QuoteIdent(policyName), QualifiedName(schemaName, tableName))
+}
+
+// AlterTableDisableRLS generates an ALTER TABLE ... DISABLE ROW LEVEL SECURITY statement.
+func AlterTableDisableRLS(schemaName, tableName string) string {
+	return fmt.Sprintf("ALTER TABLE %s DISABLE ROW LEVEL SECURITY;", QualifiedName(schemaName, tableName))
+}
+
+// AlterTableNoForceRLS generates an ALTER TABLE ... NO FORCE ROW LEVEL SECURITY statement.
+func AlterTableNoForceRLS(schemaName, tableName string) string {
+	return fmt.Sprintf("ALTER TABLE %s NO FORCE ROW LEVEL SECURITY;", QualifiedName(schemaName, tableName))
+}
+
 // CreateView generates a CREATE VIEW statement.
 // When idempotent is true, uses CREATE OR REPLACE VIEW instead of CREATE VIEW.
 func CreateView(schemaName string, view *model.View, idempotent bool) string {
