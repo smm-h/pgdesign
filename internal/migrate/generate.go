@@ -1365,6 +1365,8 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		diags = append(diags, classifyOp(op, risk.OpDropFunction, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
+	AnnotatePhases(m, desired.PGVersion)
+
 	return m, diags
 }
 

@@ -18,6 +18,7 @@ type tomlMigration struct {
 
 type tomlDDL struct {
 	Op       string      `toml:"op"`
+	Phase    string      `toml:"phase,omitempty"`
 	Table    string      `toml:"table,omitempty"`
 	Column   string      `toml:"column,omitempty"`
 	Type      string      `toml:"type,omitempty"`
@@ -51,7 +52,8 @@ type tomlDDL struct {
 }
 
 type tomlDML struct {
-	Op   string    `toml:"op"`
+	Op    string    `toml:"op"`
+	Phase string    `toml:"phase,omitempty"`
 	SQL  string    `toml:"sql"`
 	Down *tomlDown `toml:"down,omitempty"`
 }
@@ -99,8 +101,9 @@ func ParseMigration(data string) (*Migration, error) {
 
 	for _, td := range tm.DML {
 		op := DMLOp{
-			Op:  td.Op,
-			SQL: td.SQL,
+			Op:    td.Op,
+			Phase: td.Phase,
+			SQL:   td.SQL,
 		}
 		if td.Down != nil {
 			op.Down = convertTomlDown(td.Down)
@@ -114,6 +117,7 @@ func ParseMigration(data string) (*Migration, error) {
 func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 	op := DDLOp{
 		Op:         td.Op,
+		Phase:      td.Phase,
 		Table:      td.Table,
 		Column:     td.Column,
 		Type:       td.Type,
@@ -239,6 +243,9 @@ func FormatMigration(m *Migration) string {
 
 func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	b.WriteString(fmt.Sprintf("op = %q\n", op.Op))
+	if op.Phase != "" {
+		b.WriteString(fmt.Sprintf("phase = %q\n", op.Phase))
+	}
 	if op.Table != "" {
 		b.WriteString(fmt.Sprintf("table = %q\n", op.Table))
 	}
@@ -391,6 +398,9 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 
 func writeDMLOp(b *strings.Builder, op *DMLOp) {
 	b.WriteString(fmt.Sprintf("op = %q\n", op.Op))
+	if op.Phase != "" {
+		b.WriteString(fmt.Sprintf("phase = %q\n", op.Phase))
+	}
 	b.WriteString(fmt.Sprintf("sql = %q\n", op.SQL))
 	if op.Down != nil {
 		writeDownOp(b, op.Down)

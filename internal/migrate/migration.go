@@ -30,6 +30,7 @@ type Migration struct {
 // DDLOp represents a single DDL operation in a migration.
 type DDLOp struct {
 	Op       string      // "create_table", "add_column", "drop_table", etc.
+	Phase    string      // "expand", "migrate", "contract", or "" (single-phase)
 	Table    string      // schema-qualified table name
 	Column   string      // for column ops
 	Type       string      // for add_column
@@ -78,7 +79,8 @@ type DDLOp struct {
 
 // DMLOp represents a DML operation in a migration.
 type DMLOp struct {
-	Op   string // "backfill", "transform"
+	Op    string // "backfill", "transform"
+	Phase string // "expand", "migrate", "contract", or "" (single-phase)
 	SQL  string
 	Down *DownOp
 }
