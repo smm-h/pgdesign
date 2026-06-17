@@ -77,6 +77,8 @@ const (
 	OpDropUnique              OpType = "drop_unique"
 	OpAddCheck                OpType = "add_check"
 	OpDropCheck               OpType = "drop_check"
+	OpAddExclusion            OpType = "add_exclusion"
+	OpDropExclusion           OpType = "drop_exclusion"
 	OpAlterIndexSet           OpType = "alter_index_set"
 	OpCreateView              OpType = "create_view"
 	OpDropView                OpType = "drop_view"
@@ -270,6 +272,21 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 		}
 
 	case OpDropCheck:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockAccessExclusive,
+			Reversible: false,
+		}
+
+	case OpAddExclusion:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockShareLock,
+			Reversible: true,
+			Suggestion: "EXCLUDE constraint may fail if existing data violates the constraint",
+		}
+
+	case OpDropExclusion:
 		return Classification{
 			RiskLevel:  Safe,
 			LockType:   LockAccessExclusive,

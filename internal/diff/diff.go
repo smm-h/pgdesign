@@ -48,7 +48,9 @@ type TableDiff struct {
 	UniquesAdded   []model.UniqueConstraint `json:"uniques_added"`
 	UniquesRemoved []string                 `json:"uniques_removed"`
 	ChecksAdded    []model.CheckConstraint  `json:"checks_added"`
-	ChecksRemoved  []string                 `json:"checks_removed"`
+	ChecksRemoved     []string                    `json:"checks_removed"`
+	ExclusionsAdded   []model.ExclusionConstraint `json:"exclusions_added"`
+	ExclusionsRemoved []string                    `json:"exclusions_removed"`
 	CommentChanged      *[2]string               `json:"comment_changed"`                // [old, new]
 	PKChanged           *[2][]string             `json:"pk_changed"`                     // [old, new]
 	OwnerChanged        *[2]string               `json:"owner_changed"`
@@ -289,6 +291,7 @@ func diffTable(desired, actual *model.Table) TableDiff {
 	diffIndexes(&td, desired, actual)
 	diffUniques(&td, desired, actual)
 	diffChecks(&td, desired, actual)
+	diffExclusions(&td, desired, actual)
 
 	// Comment
 	if desired.Comment != actual.Comment {
@@ -330,6 +333,8 @@ func isTableDiffEmpty(td *TableDiff) bool {
 		len(td.UniquesRemoved) == 0 &&
 		len(td.ChecksAdded) == 0 &&
 		len(td.ChecksRemoved) == 0 &&
+		len(td.ExclusionsAdded) == 0 &&
+		len(td.ExclusionsRemoved) == 0 &&
 		td.CommentChanged == nil &&
 		td.PKChanged == nil &&
 		td.OwnerChanged == nil &&
@@ -710,6 +715,40 @@ func diffChecks(td *TableDiff, desired, actual *model.Table) {
 			td.ChecksAdded = append(td.ChecksAdded, p.Desired)
 		}
 	}
+}
+
+// diffExclusions matches exclusion constraints by name.
+func diffExclusions(td *TableDiff, desired, actual *model.Table) {
+	added, removed, matched := matchObjects(desired.Exclusions, actual.Exclusions, func(e model.ExclusionConstraint) string {
+		return e.Name
+	})
+	for _, e := range added {
+		td.ExclusionsAdded = append(td.ExclusionsAdded, e)
+	}
+	for _, e := range removed {
+		td.ExclusionsRemoved = append(td.ExclusionsRemoved, e.Name)
+	}
+	for _, p := range matched {
+		if !exclusionEqual(p.Desired, p.Actual) {
+			td.ExclusionsRemoved = append(td.ExclusionsRemoved, p.Actual.Name)
+			td.ExclusionsAdded = append(td.ExclusionsAdded, p.Desired)
+		}
+	}
+}
+
+func exclusionEqual(a, b model.ExclusionConstraint) bool {
+	if a.Method != b.Method || a.Where != b.Where || a.Deferrable != b.Deferrable || a.InitiallyDeferred != b.InitiallyDeferred {
+		return false
+	}
+	if len(a.Elements) != len(b.Elements) {
+		return false
+	}
+	for i := range a.Elements {
+		if a.Elements[i].Column != b.Elements[i].Column || a.Elements[i].Operator != b.Elements[i].Operator {
+			return false
+		}
+	}
+	return true
 }
 
 // diffPartitioning compares partitioning configuration between two tables.

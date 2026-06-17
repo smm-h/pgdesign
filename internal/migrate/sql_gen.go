@@ -58,6 +58,10 @@ func OpToSQL(op DDLOp) string {
 		return opAddCheck(op)
 	case "drop_check":
 		return opDropCheck(op)
+	case "add_exclusion":
+		return opAddExclusion(op)
+	case "drop_exclusion":
+		return opDropExclusion(op)
 	case "create_enum":
 		return opCreateEnum(op)
 	case "alter_enum_add_value":
@@ -314,6 +318,40 @@ func opAddCheck(op DDLOp) string {
 }
 
 func opDropCheck(op DDLOp) string {
+	return fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT %s;",
+		quoteQualified(op.Table), sql.QuoteIdent(op.Name))
+}
+
+func opAddExclusion(op DDLOp) string {
+	elems := make([]string, len(op.Columns))
+	for i := range op.Columns {
+		operator := "&&"
+		if i < len(op.Operators) {
+			operator = op.Operators[i]
+		}
+		elems[i] = fmt.Sprintf("%s WITH %s", sql.QuoteIdent(op.Columns[i]), operator)
+	}
+	method := op.Method
+	if method == "" {
+		method = "gist"
+	}
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "ALTER TABLE %s ADD CONSTRAINT %s EXCLUDE USING %s (%s)",
+		quoteQualified(op.Table), sql.QuoteIdent(op.Name), method, strings.Join(elems, ", "))
+	if op.Where != "" {
+		fmt.Fprintf(&buf, " WHERE (%s)", op.Where)
+	}
+	if op.Deferrable {
+		buf.WriteString(" DEFERRABLE")
+		if op.InitiallyDeferred {
+			buf.WriteString(" INITIALLY DEFERRED")
+		}
+	}
+	buf.WriteString(";")
+	return buf.String()
+}
+
+func opDropExclusion(op DDLOp) string {
 	return fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT %s;",
 		quoteQualified(op.Table), sql.QuoteIdent(op.Name))
 }

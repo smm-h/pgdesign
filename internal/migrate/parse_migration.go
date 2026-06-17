@@ -44,6 +44,9 @@ type tomlDDL struct {
 	Values   []string    `toml:"values,omitempty"`
 	Schema   string      `toml:"schema,omitempty"`
 	Expr     string      `toml:"expr,omitempty"`
+	Operators         []string `toml:"operators,omitempty"`
+	Deferrable        bool     `toml:"deferrable,omitempty"`
+	InitiallyDeferred bool     `toml:"initially_deferred,omitempty"`
 	Down     *tomlDown   `toml:"down,omitempty"`
 }
 
@@ -60,6 +63,9 @@ type tomlDown struct {
 	Column       string    `toml:"column,omitempty"`
 	Name         string    `toml:"name,omitempty"`
 	Columns      []string  `toml:"columns,omitempty"`
+	Operators         []string `toml:"operators,omitempty"`
+	Deferrable        bool     `toml:"deferrable,omitempty"`
+	InitiallyDeferred bool     `toml:"initially_deferred,omitempty"`
 	Ops          []tomlDDL `toml:"ops,omitempty"`
 }
 
@@ -131,7 +137,10 @@ func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 		PK:         td.PK,
 		Values:     td.Values,
 		Schema:     td.Schema,
-		Expr:       td.Expr,
+		Expr:              td.Expr,
+		Operators:         td.Operators,
+		Deferrable:        td.Deferrable,
+		InitiallyDeferred: td.InitiallyDeferred,
 	}
 	// Convert opclass: string becomes a map applied to all columns,
 	// map is copied directly.

@@ -125,6 +125,11 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				m.DDLOps = append(m.DDLOps, ckOp)
 				diags = append(diags, classifyOp(ckOp, risk.OpAddCheck, ctx)...)
 			}
+			for _, exc := range table.Exclusions {
+				excOp := makeExclusionOp(tableName, exc)
+				m.DDLOps = append(m.DDLOps, excOp)
+				diags = append(diags, classifyOp(excOp, risk.OpAddExclusion, ctx)...)
+			}
 		}
 	}
 
@@ -168,6 +173,23 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				m.DDLOps = append(m.DDLOps, idxOp)
 			}
 		}
+	}
+
+	// Sequences added.
+	for _, seqName := range d.SequencesAdded {
+		seq := findSequence(desired, seqName)
+		schema, name := splitQualifiedName(seqName)
+		op := DDLOp{
+			Op:          "create_sequence",
+			Name:        name,
+			Schema:      schema,
+			SequenceDef: seq,
+			Down: &DownOp{
+				Ops: []DDLOp{{Op: "drop_sequence", Name: name, Schema: schema}},
+			},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpCreateSequence, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
 	// Phase 2: Table changes (add columns, alter columns, add constraints).
@@ -500,6 +522,25 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			diags = append(diags, classifyOp(op, risk.OpDropCheck, ctx)...)
 		}
 
+		// Added exclusions.
+		for _, exc := range td.ExclusionsAdded {
+			excOp := makeExclusionOp(td.Name, exc)
+			m.DDLOps = append(m.DDLOps, excOp)
+			diags = append(diags, classifyOp(excOp, risk.OpAddExclusion, ctx)...)
+		}
+
+		// Removed exclusions.
+		for _, excName := range td.ExclusionsRemoved {
+			op := DDLOp{
+				Op:    "drop_exclusion",
+				Table: td.Name,
+				Name:  excName,
+				Down:  &DownOp{Irreversible: true},
+			}
+			m.DDLOps = append(m.DDLOps, op)
+			diags = append(diags, classifyOp(op, risk.OpDropExclusion, ctx)...)
+		}
+
 		// Removed columns.
 		for _, colName := range td.ColumnsRemoved {
 			op := DDLOp{
@@ -739,6 +780,21 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 	}
 
+	// Sequence changes.
+	for _, sd := range d.SequencesChanged {
+		seq := findSequence(desired, sd.Name)
+		schema, name := splitQualifiedName(sd.Name)
+		op := DDLOp{
+			Op:          "alter_sequence",
+			Name:        name,
+			Schema:      schema,
+			SequenceDef: seq,
+			Down:        &DownOp{Irreversible: true},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpAlterSequence, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
 	// Phase 3: Drops (enums last, tables before enums).
 	for _, tableName := range d.TablesRemoved {
 		ctx := tableCtx(tableName)
@@ -772,6 +828,17 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 		m.DDLOps = append(m.DDLOps, op)
 		diags = append(diags, classifyOp(op, risk.OpDropMaterializedView, risk.OpContext{})...)
+	}
+
+	// Drop sequences.
+	for _, seqName := range d.SequencesRemoved {
+		op := DDLOp{
+			Op:   "drop_sequence",
+			Name: seqName,
+			Down: &DownOp{Irreversible: true},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpDropSequence, risk.OpContext{})...)
 	}
 
 	for _, enumName := range d.EnumsRemoved {
@@ -885,6 +952,29 @@ func makeCheckOp(tableName string, ck model.CheckConstraint) DDLOp {
 	}
 }
 
+func makeExclusionOp(tableName string, exc model.ExclusionConstraint) DDLOp {
+	cols := make([]string, len(exc.Elements))
+	ops := make([]string, len(exc.Elements))
+	for i, elem := range exc.Elements {
+		cols[i] = elem.Column
+		ops[i] = elem.Operator
+	}
+	return DDLOp{
+		Op:                "add_exclusion",
+		Table:             tableName,
+		Name:              exc.Name,
+		Columns:           cols,
+		Method:            exc.Method,
+		Where:             exc.Where,
+		Operators:         ops,
+		Deferrable:        exc.Deferrable,
+		InitiallyDeferred: exc.InitiallyDeferred,
+		Down: &DownOp{
+			Ops: []DDLOp{{Op: "drop_exclusion", Table: tableName, Name: exc.Name}},
+		},
+	}
+}
+
 // checkE300 emits an E300 diagnostic when an add_fk op targets a table with
 // more rows than the threshold. The diagnostic warns that ADD CONSTRAINT
 // without NOT VALID will lock the table during validation.
@@ -974,6 +1064,17 @@ func findMaterializedView(schema *model.Schema, qualifiedName string) *model.Mat
 		}
 		if mvSchema == s && mv.Name == name {
 			return mv
+		}
+	}
+	return nil
+}
+
+func findSequence(schema *model.Schema, qualifiedName string) *model.Sequence {
+	_, name := splitQualifiedName(qualifiedName)
+	for i := range schema.Sequences {
+		s := &schema.Sequences[i]
+		if s.Name == name {
+			return s
 		}
 	}
 	return nil
