@@ -31,3 +31,21 @@
 {"commits":["b6354ddd3c91983dff0b5837537f0028785c5d73"],"user_facing":true,"description":"**Identity column introspection.** Introspect now detects GENERATED ALWAYS/BY DEFAULT AS IDENTITY columns via attidentity.","type":"feature"}
 {"commits":["46da1dd47ae75808b972434ae617a15e13bd576b"],"user_facing":true,"description":"**Shared codegen type mapping infrastructure.** All codegen generators now share a unified TypeMapping system, eliminating duplicated type conversion logic.","type":"feature"}
 {"commits":["2757845d22140f54665dddc74bc400f2460d55a4"],"user_facing":true,"description":"**Shared SelectGenerator for codegen.** Extracted common generator selection logic to eliminate duplicated switch trees across codegen modes.","type":"feature"}
+{"commits":["3d2c4de50e71e74ba9d232d49f635b6923c162ef","84b61913ab725ef50b824b691e19e593d6c89e6b","fda6caabe106279d933c1b902afb9a02d7dba949","5b1ba6a6bbdae3918b75928f3867e43f0304b2d3","09d11de87115271b93a550cb2120c9f753a4e7b1","7a04d09a8c6e76cc872d6a230989816ba416fcef","551fcc77affaf39d8a706728284e539052827b58","fe46ce3da13fad58928cf1d0ea2bebb0ddae301e","64db48bf17319f3631eb3ea7a96e604b5d8c1df3","f19e112265faae64c1402813669e5625acd1f069","6b707447e0ff92b707bc8f68f54702ade0ca1489","fe3f18397c7f998b7a9e3e183ab81a771f9beb33"],"user_facing":false}
+{"commits":["231d0779741d5e448241e200a9eda7e486ddbf4a","0a46ac8583997db26ada9a959d078061f0488ac7","9cfb81f4ef2ca6b3d9ce1020228fdba8026fe358","d7c5893b9c82fc435cc79ff05fdde2dd25e1748a"],"user_facing":false}
+{"commits":["3f9a3614fc1e73f8f633a3b305887d6e98b450f5","22c61206fe62c64fc5e6318b9e441d587cf7ef88","7c108cd5656c4647a8939a4c2ac98022a4311e73","93925076d78bb8b98558608ede03e122beca6089"],"user_facing":false}
+{"commits":["9163a76afcef2474cc57380426c0af5098a9bd2e","50b3dd9f0468720fec140fd19794664d577feeb2","690a52c151c2351813e4dcce4f809c965d6bdb72","74b438925378a141aa9c2bfb8b27fb2e7350ccb7","d94e5c158f042abf44e56b334ceb3bdbc0667c25"],"user_facing":false}
+{"commits":["1563ba8edfc50c7b321722743b40e7cec9166808","53f011a7ab3b669e05a4898dbc3cb24570e83aa6"],"user_facing":false}
+{"commits":["3e884a4ac8073c1b5057d4b6526ee77671821b83","18769b36eb90a1dbacc3214b4829f4609315bab4"],"user_facing":false}
+{"commits":["76a17309ec2124323c9bc1a880ce97f81ab7d5d4","569bbc13a2841e0553fca898bfcef4a123e92660","ea03c29f4bd8a69fe2daf620660e6c68284198d4"],"user_facing":false}
+{"commits":["31fe637ebd58d218f5b65ae5f3e82252e0dbba4c"],"user_facing":false}
+{"commits":["c3a793d6a1bcceb4addd79ba3215cb3928702a1a","c7be64ccc395196cde7b75735d381580dd155520","c390d7069ec423282f3b296b5d3b372fe995abb4","41693cbd2c78f2cbb563f17a7d3b3dd737f59e7b","dcc81c471459d0fc37dad2706555b0e7025c81d8","d8c73213ceaaad8a1daba7e0ba8e5b3e2aa26116"],"user_facing":false}
+{"commits":["9eecabd82a63ce33e6c75162e60d7fe48760dddd"],"user_facing":false}
+{"commits":["332d93cf717f8c8e05d8bc81b2ebb167d108b179","1f152cceb53601ffd97b5bf5087fa185d36c329b"],"user_facing":false}
+{"commits":["6f70f4ad2fd618ba4806ad41cd68f89f76546bde"],"user_facing":false}
+{"commits":["dbcac9a5dfa58c5d19052f47f5f919b614988db6","842847cec49bbdd64e1101cbbe56c4c8848b9d44","858c6b990e3d8fb48db54a06b51976e645c342fc","8f76cf89745a3e22e988b83f2a655598c66bfe3a"],"user_facing":false}
+{"commits":["99e207a12b562690eaeba2186196b888c96cd821"],"user_facing":false}
+{"commits":["363163626789b28e9af461b33e60e9af101e6c47","3f213320275121805e96cb8644c11ddac5d06849","3203c848de31d7d5c06df9e590a61258bfee230a","b2735912657a6485b3655b0c7a4e26902026d8d6","47a4594ec3d92a00efa55d2ad0110116d19832e4","d709a27caf780a19663539dbd8327a01ad2ba9bf","e0e20eb9c6dafe20783de2687b3fb80f0df1cb4b","6571ece69391f9ac0e6e623403d26a1fbba227f1","cf34e0892b6aaaa915369d97de62f27f973e108b"],"user_facing":false}
+{"commits":["2ae30d320962b4e599899104b1762ed260c6a917","76c3545f14d81db492078983700eb2768ee39b48"],"user_facing":false}
+{"commits":["ce24ef2fb3c89485040edd1b150aee28586ca3fa"],"user_facing":false}
+{"commits":["970c151080e2fab9d250ddafd2fd5be3b6507186","a92810f86a50b5951da14d8a1c550f7b79f2b278"],"user_facing":false}
