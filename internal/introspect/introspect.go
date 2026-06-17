@@ -321,7 +321,7 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		var attgenerated string
 		var attidentity string
 		var collation string
-		var attstattarget int32
+		var attstattarget *int32
 		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment, &attgenerated, &attidentity, &collation, &attstattarget); err != nil {
 			return nil, err
 		}
@@ -380,9 +380,9 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		if collation != "" && collation != "default" {
 			c.Collation = collation
 		}
-		// Statistics: -1 means database default (no explicit setting).
-		if attstattarget >= 0 {
-			v := int(attstattarget)
+		// Statistics: NULL (PG 17+) or -1 (older) means database default.
+		if attstattarget != nil && *attstattarget >= 0 {
+			v := int(*attstattarget)
 			c.Statistics = &v
 		}
 		cols = append(cols, c)
