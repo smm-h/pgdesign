@@ -723,11 +723,18 @@ func diffUniques(td *TableDiff, desired, actual *model.Table) {
 		td.UniquesRemoved = append(td.UniquesRemoved, u.Name)
 	}
 	for _, p := range matched {
-		if !sliceEqual(p.Desired.Columns, p.Actual.Columns) {
+		if !uniqueEqual(p.Desired, p.Actual) {
 			td.UniquesRemoved = append(td.UniquesRemoved, p.Actual.Name)
 			td.UniquesAdded = append(td.UniquesAdded, p.Desired)
 		}
 	}
+}
+
+func uniqueEqual(a, b model.UniqueConstraint) bool {
+	if a.Deferrable != b.Deferrable || a.InitiallyDeferred != b.InitiallyDeferred {
+		return false
+	}
+	return sliceEqual(a.Columns, b.Columns)
 }
 
 // diffChecks matches check constraints by name.

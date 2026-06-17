@@ -58,8 +58,8 @@ type DDLOp struct {
 	Schema   string   // for enums (schema-qualified ops)
 	Expr              string   // for check constraints
 	Operators         []string // for exclusion constraints
-	Deferrable        bool     // for exclusion constraints
-	InitiallyDeferred bool     // for exclusion constraints
+	Deferrable        bool     // for exclusion and unique constraints
+	InitiallyDeferred bool     // for exclusion and unique constraints
 
 	TableDef          *model.Table          // full table def for create_table (not serialized)
 	PartitionChildSpec *model.PartitionSpec // child spec for create_partition (not serialized)

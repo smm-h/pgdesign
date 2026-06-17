@@ -988,10 +988,12 @@ func makeIndexOp(tableName string, idx model.Index) DDLOp {
 
 func makeUniqueOp(tableName string, uq model.UniqueConstraint) DDLOp {
 	return DDLOp{
-		Op:      "add_unique",
-		Table:   tableName,
-		Name:    uq.Name,
-		Columns: uq.Columns,
+		Op:                "add_unique",
+		Table:             tableName,
+		Name:              uq.Name,
+		Columns:           uq.Columns,
+		Deferrable:        uq.Deferrable,
+		InitiallyDeferred: uq.InitiallyDeferred,
 		Down: &DownOp{
 			Ops: []DDLOp{{Op: "drop_unique", Table: tableName, Name: uq.Name}},
 		},

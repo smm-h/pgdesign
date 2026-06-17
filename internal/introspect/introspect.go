@@ -850,11 +850,13 @@ func parseIndexDef(def string) parsedIndex {
 func queryUniqueConstraints(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model.UniqueConstraint, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT con.conname,
-		       array_agg(a.attname ORDER BY array_position(con.conkey, a.attnum))
+		       array_agg(a.attname ORDER BY array_position(con.conkey, a.attnum)),
+		       con.condeferrable,
+		       con.condeferred
 		FROM pg_constraint con
 		JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = ANY(con.conkey)
 		WHERE con.conrelid = $1 AND con.contype = 'u'
-		GROUP BY con.conname
+		GROUP BY con.conname, con.condeferrable, con.condeferred
 		ORDER BY con.conname
 	`, tableOID)
 	if err != nil {
@@ -865,7 +867,7 @@ func queryUniqueConstraints(ctx context.Context, conn *pgx.Conn, tableOID uint32
 	var uqs []model.UniqueConstraint
 	for rows.Next() {
 		var uq model.UniqueConstraint
-		if err := rows.Scan(&uq.Name, &uq.Columns); err != nil {
+		if err := rows.Scan(&uq.Name, &uq.Columns, &uq.Deferrable, &uq.InitiallyDeferred); err != nil {
 			return nil, err
 		}
 		uqs = append(uqs, uq)

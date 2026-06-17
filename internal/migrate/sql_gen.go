@@ -313,8 +313,17 @@ func opAlterIndexSet(op DDLOp) string {
 
 func opAddUnique(op DDLOp) string {
 	cols := quoteIdentSlice(op.Columns)
-	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s UNIQUE (%s);",
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "ALTER TABLE %s ADD CONSTRAINT %s UNIQUE (%s)",
 		quoteQualified(op.Table), sql.QuoteIdent(op.Name), strings.Join(cols, ", "))
+	if op.Deferrable {
+		buf.WriteString(" DEFERRABLE")
+		if op.InitiallyDeferred {
+			buf.WriteString(" INITIALLY DEFERRED")
+		}
+	}
+	buf.WriteString(";")
+	return buf.String()
 }
 
 func opDropUnique(op DDLOp) string {
