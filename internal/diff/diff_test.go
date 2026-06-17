@@ -3197,3 +3197,111 @@ func TestDomainBaseTypeChanged(t *testing.T) {
 		t.Errorf("unexpected base type change: %v", dd.BaseTypeChanged)
 	}
 }
+
+func TestTriggerAdded(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Triggers: []model.Trigger{
+				{Name: "audit_insert", Function: "audit_fn", Events: []string{"INSERT"}, Timing: "AFTER", ForEach: "ROW"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public"},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 changed table, got %d", len(d.TablesChanged))
+	}
+	td := d.TablesChanged[0]
+	if len(td.TriggersAdded) != 1 {
+		t.Fatalf("expected 1 trigger added, got %d", len(td.TriggersAdded))
+	}
+	if td.TriggersAdded[0].Name != "audit_insert" {
+		t.Errorf("expected trigger name audit_insert, got %s", td.TriggersAdded[0].Name)
+	}
+}
+
+func TestTriggerRemoved(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public"},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Triggers: []model.Trigger{
+				{Name: "audit_insert", Function: "audit_fn", Events: []string{"INSERT"}, Timing: "AFTER", ForEach: "ROW"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	td := d.TablesChanged[0]
+	if len(td.TriggersRemoved) != 1 || td.TriggersRemoved[0] != "audit_insert" {
+		t.Errorf("expected audit_insert removed, got %v", td.TriggersRemoved)
+	}
+}
+
+func TestTriggerChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Triggers: []model.Trigger{
+				{Name: "audit_insert", Function: "new_audit_fn", Events: []string{"INSERT", "UPDATE"}, Timing: "AFTER", ForEach: "ROW"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Triggers: []model.Trigger{
+				{Name: "audit_insert", Function: "audit_fn", Events: []string{"INSERT"}, Timing: "AFTER", ForEach: "ROW"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	td := d.TablesChanged[0]
+	if len(td.TriggersChanged) != 1 {
+		t.Fatalf("expected 1 trigger changed, got %d", len(td.TriggersChanged))
+	}
+	tc := td.TriggersChanged[0]
+	if tc.Name != "audit_insert" {
+		t.Errorf("expected trigger name audit_insert, got %s", tc.Name)
+	}
+	if tc.Old.Function != "audit_fn" {
+		t.Errorf("expected old function audit_fn, got %s", tc.Old.Function)
+	}
+	if tc.New.Function != "new_audit_fn" {
+		t.Errorf("expected new function new_audit_fn, got %s", tc.New.Function)
+	}
+}
+
+func TestTriggerUnchanged(t *testing.T) {
+	trig := model.Trigger{
+		Name: "audit_insert", Function: "audit_fn", Events: []string{"INSERT"},
+		Timing: "AFTER", ForEach: "ROW",
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Triggers: []model.Trigger{trig}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Triggers: []model.Trigger{trig}},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for identical triggers, got: %s", d.Summary())
+	}
+}

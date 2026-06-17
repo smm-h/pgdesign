@@ -60,6 +60,9 @@ type TableDiff struct {
 	ChecksRemoved     []string                    `json:"checks_removed"`
 	ExclusionsAdded   []model.ExclusionConstraint `json:"exclusions_added"`
 	ExclusionsRemoved []string                    `json:"exclusions_removed"`
+	TriggersAdded   []model.Trigger `json:"triggers_added,omitempty"`
+	TriggersRemoved []string        `json:"triggers_removed,omitempty"`
+	TriggersChanged []TriggerChange `json:"triggers_changed,omitempty"`
 	CommentChanged      *[2]string               `json:"comment_changed"`                // [old, new]
 	PKChanged           *[2][]string             `json:"pk_changed"`                     // [old, new]
 	OwnerChanged        *[2]string               `json:"owner_changed"`
@@ -189,6 +192,13 @@ type IndexChange struct {
 	Name string      `json:"name"`
 	Old  model.Index `json:"old"`
 	New  model.Index `json:"new"`
+}
+
+// TriggerChange describes a changed trigger.
+type TriggerChange struct {
+	Name string        `json:"name"`
+	Old  model.Trigger `json:"old"`
+	New  model.Trigger `json:"new"`
 }
 
 // PartitionDiff describes changes to a table's partitioning configuration.
@@ -383,6 +393,7 @@ func diffTable(desired, actual *model.Table) TableDiff {
 	diffUniques(&td, desired, actual)
 	diffChecks(&td, desired, actual)
 	diffExclusions(&td, desired, actual)
+	diffTriggers(&td, desired, actual)
 
 	// Comment
 	if desired.Comment != actual.Comment {
@@ -426,6 +437,9 @@ func isTableDiffEmpty(td *TableDiff) bool {
 		len(td.ChecksRemoved) == 0 &&
 		len(td.ExclusionsAdded) == 0 &&
 		len(td.ExclusionsRemoved) == 0 &&
+		len(td.TriggersAdded) == 0 &&
+		len(td.TriggersRemoved) == 0 &&
+		len(td.TriggersChanged) == 0 &&
 		td.CommentChanged == nil &&
 		td.PKChanged == nil &&
 		td.OwnerChanged == nil &&
@@ -847,6 +861,42 @@ func exclusionEqual(a, b model.ExclusionConstraint) bool {
 		}
 	}
 	return true
+}
+
+// diffTriggers matches triggers by name.
+func diffTriggers(td *TableDiff, desired, actual *model.Table) {
+	added, removed, matched := matchObjects(desired.Triggers, actual.Triggers, func(trig model.Trigger) string {
+		return trig.Name
+	})
+	for _, trig := range added {
+		td.TriggersAdded = append(td.TriggersAdded, trig)
+	}
+	for _, trig := range removed {
+		td.TriggersRemoved = append(td.TriggersRemoved, trig.Name)
+	}
+	for _, p := range matched {
+		if !triggerEqual(&p.Desired, &p.Actual) {
+			td.TriggersChanged = append(td.TriggersChanged, TriggerChange{
+				Name: p.Desired.Name,
+				Old:  p.Actual,
+				New:  p.Desired,
+			})
+		}
+	}
+}
+
+func triggerEqual(a, b *model.Trigger) bool {
+	return a.Name == b.Name &&
+		a.Function == b.Function &&
+		sliceEqual(a.Events, b.Events) &&
+		a.Timing == b.Timing &&
+		a.ForEach == b.ForEach &&
+		a.When == b.When &&
+		a.Constraint == b.Constraint &&
+		a.Deferrable == b.Deferrable &&
+		a.InitiallyDeferred == b.InitiallyDeferred &&
+		a.ReferencingOld == b.ReferencingOld &&
+		a.ReferencingNew == b.ReferencingNew
 }
 
 // diffPartitioning compares partitioning configuration between two tables.
