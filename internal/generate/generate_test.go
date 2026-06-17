@@ -13,6 +13,9 @@ import (
 	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
+// intPtr returns a pointer to the given int.
+func intPtr(n int) *int { return &n }
+
 // mustGenerate calls Generate and fails the test on error.
 func mustGenerate(t *testing.T, schema *model.Schema, opts Options) string {
 	t.Helper()
@@ -1748,5 +1751,58 @@ func TestGenerateSQL_MaterializedViewWithIndex(t *testing.T) {
 	}
 	if indexIdx <= matviewIdx {
 		t.Errorf("CREATE INDEX should appear after CREATE MATERIALIZED VIEW, matview at %d, index at %d", matviewIdx, indexIdx)
+	}
+}
+
+func TestSetStatistics(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "kind", PGType: "text", NotNull: true, Statistics: intPtr(1000)},
+					{Name: "payload", PGType: "jsonb", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "ALTER TABLE app.events ALTER COLUMN kind SET STATISTICS 1000;") {
+		t.Errorf("expected SET STATISTICS for kind column, got:\n%s", out)
+	}
+	// Columns without Statistics should not appear in SET STATISTICS.
+	if strings.Contains(out, "SET STATISTICS") && strings.Contains(out, "payload") && strings.Contains(out, "ALTER COLUMN payload") {
+		t.Errorf("should not contain SET STATISTICS for payload, got:\n%s", out)
+	}
+}
+
+func TestSetStatistics_NotEmittedWhenNil(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	if strings.Contains(out, "SET STATISTICS") {
+		t.Errorf("should not contain SET STATISTICS when no column has Statistics set, got:\n%s", out)
 	}
 }

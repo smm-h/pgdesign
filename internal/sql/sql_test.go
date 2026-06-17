@@ -1318,3 +1318,93 @@ func TestRefreshMaterializedView_Concurrently(t *testing.T) {
 		t.Errorf("RefreshMaterializedView concurrent = %q, want %q", got, "REFRESH MATERIALIZED VIEW CONCURRENTLY public.monthly_stats;\n")
 	}
 }
+
+func TestCreateTable_ColumnCollation(t *testing.T) {
+	table := &model.Table{
+		Name:   "messages",
+		Schema: "public",
+		Columns: []model.Column{
+			{Name: "id", PGType: "bigint", NotNull: true},
+			{Name: "content", PGType: "text", NotNull: true, Collation: "de_DE"},
+			{Name: "title", PGType: "text", NotNull: true, Collation: "C"},
+		},
+		PK: []string{"id"},
+	}
+	got := CreateTable(table, "public", false, 0, nil)
+	if !strings.Contains(got, `content text COLLATE "de_DE" NOT NULL`) {
+		t.Errorf("expected COLLATE de_DE for content, got:\n%s", got)
+	}
+	if !strings.Contains(got, `title text COLLATE "C" NOT NULL`) {
+		t.Errorf("expected COLLATE C for title, got:\n%s", got)
+	}
+}
+
+func TestCreateTable_ColumnCollation_NoCollation(t *testing.T) {
+	table := &model.Table{
+		Name:   "items",
+		Schema: "public",
+		Columns: []model.Column{
+			{Name: "id", PGType: "bigint", NotNull: true},
+			{Name: "name", PGType: "text", NotNull: true},
+		},
+		PK: []string{"id"},
+	}
+	got := CreateTable(table, "public", false, 0, nil)
+	if strings.Contains(got, "COLLATE") {
+		t.Errorf("should not contain COLLATE when no collation set, got:\n%s", got)
+	}
+}
+
+func TestCreateIndex_WithCollation(t *testing.T) {
+	index := &model.Index{
+		Name:       "idx_messages_content",
+		Columns:    []string{"content"},
+		Collations: map[string]string{"content": "C"},
+	}
+	got := CreateIndex("public", index, "messages", false, false)
+	if !strings.Contains(got, `content COLLATE "C"`) {
+		t.Errorf("expected COLLATE C for content, got:\n%s", got)
+	}
+}
+
+func TestCreateIndex_WithCollationAndOpclass(t *testing.T) {
+	index := &model.Index{
+		Name:       "idx_messages_content",
+		Columns:    []string{"content"},
+		Collations: map[string]string{"content": "C"},
+		Opclasses:  map[string]string{"content": "varchar_pattern_ops"},
+	}
+	got := CreateIndex("public", index, "messages", false, false)
+	// PostgreSQL order: column COLLATE collation opclass
+	if !strings.Contains(got, `content COLLATE "C" varchar_pattern_ops`) {
+		t.Errorf("expected COLLATE before opclass, got:\n%s", got)
+	}
+}
+
+func TestCreateIndex_WithCollationAndDesc(t *testing.T) {
+	index := &model.Index{
+		Name:       "idx_messages_content",
+		Columns:    []string{"content"},
+		Collations: map[string]string{"content": "de_DE"},
+		Desc:       []bool{true},
+	}
+	got := CreateIndex("public", index, "messages", false, false)
+	if !strings.Contains(got, `content COLLATE "de_DE" DESC`) {
+		t.Errorf("expected COLLATE before DESC, got:\n%s", got)
+	}
+}
+
+func TestCreateIndex_MultiColumnCollation(t *testing.T) {
+	index := &model.Index{
+		Name:       "idx_multi",
+		Columns:    []string{"first_name", "last_name"},
+		Collations: map[string]string{"first_name": "de_DE", "last_name": "C"},
+	}
+	got := CreateIndex("public", index, "users", false, false)
+	if !strings.Contains(got, `first_name COLLATE "de_DE"`) {
+		t.Errorf("expected COLLATE de_DE for first_name, got:\n%s", got)
+	}
+	if !strings.Contains(got, `last_name COLLATE "C"`) {
+		t.Errorf("expected COLLATE C for last_name, got:\n%s", got)
+	}
+}
