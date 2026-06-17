@@ -35,6 +35,7 @@ func main() {
 	app.RegisterCheck("validation", checkValidation)
 	app.RegisterCheck("nf", checkNF)
 	app.RegisterCheck("coverage", checkCoverage)
+	app.RegisterCheck("design", checkDesign)
 
 	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output"))
 

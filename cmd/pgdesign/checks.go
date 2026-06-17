@@ -314,6 +314,75 @@ func analyzeCoverage(schema *model.Schema) []diagnostic.Diagnostic {
 	return diags
 }
 
+// designCodes are the validation diagnostic codes for schema design checks.
+var designCodes = map[string]bool{
+	"W013": true, // CASCADE depth
+	"W014": true, // CASCADE breadth
+	"W015": true, // Mixed ON DELETE
+	"I001": true, // Natural key candidate
+	"W016": true, // PK subsumes UNIQUE
+	"W017": true, // Redundant IS NOT NULL CHECK
+	"W018": true, // Domain CHECK duplicate
+	"W019": true, // Range subsumption
+}
+
+func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
+	root := ctx.ProjectRoot()
+
+	paths, err := loadSchemaForCheck(root)
+	if err != nil {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
+		}
+	}
+
+	schema, exitCode := parseAndBuild(paths)
+	if exitCode != 0 {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: "schema parse/build failed",
+		}
+	}
+
+	cfg := loadProjectConfig(root)
+
+	extReg := extregistry.NewBuiltinRegistry()
+	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
+
+	valCfg := &validate.Config{
+		NamingPattern: cfg.Validate.NamingPattern,
+		MaxColumns:    cfg.Validate.MaxColumns,
+		Disabled:      cfg.Validate.Disable,
+		Suppress:      cfg.Suppress,
+		Extensions:    schema.Extensions,
+		ExtRegistry:   extReg,
+	}
+
+	diags, _ := validate.Validate(schema, valCfg)
+
+	// Filter to design-related codes only.
+	var designDiags []diagnostic.Diagnostic
+	for _, d := range diags {
+		if designCodes[d.Code] {
+			designDiags = append(designDiags, d)
+		}
+	}
+
+	if len(designDiags) == 0 {
+		return strictcli.CheckResult{
+			Status:  "pass",
+			Message: "no design issues found",
+		}
+	}
+
+	return strictcli.CheckResult{
+		Status:  "warn",
+		Message: fmt.Sprintf("%d design issue(s) found", len(designDiags)),
+		Details: diagDetails(designDiags),
+	}
+}
+
 func checkCoverage(ctx strictcli.CheckContext) strictcli.CheckResult {
 	root := ctx.ProjectRoot()
 
