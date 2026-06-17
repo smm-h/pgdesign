@@ -3,6 +3,7 @@ package fd
 import (
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -444,5 +445,142 @@ func TestItoa(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("itoa(%d) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+// --- FuncDep.String tests ---
+
+func TestFuncDep_String(t *testing.T) {
+	tests := []struct {
+		name string
+		fd   FuncDep
+		want string
+	}{
+		{
+			name: "single_to_single",
+			fd:   FuncDep{Determinant: []string{"A"}, Dependent: []string{"B"}},
+			want: "{A} -> {B}",
+		},
+		{
+			name: "multi_to_multi",
+			fd:   FuncDep{Determinant: []string{"B", "A"}, Dependent: []string{"D", "C"}},
+			want: "{A, B} -> {C, D}",
+		},
+		{
+			name: "single_to_multi",
+			fd:   FuncDep{Determinant: []string{"X"}, Dependent: []string{"Z", "Y"}},
+			want: "{X} -> {Y, Z}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.fd.String()
+			if got != tt.want {
+				t.Errorf("String() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// --- ArmstrongRelation tests ---
+
+func TestArmstrongRelation_3NFViolation(t *testing.T) {
+	// Table(A, B, C) with A->B, B->C: B->C is a 3NF violation
+	allAttrs := []string{"A", "B", "C"}
+	fds := []FuncDep{
+		{Determinant: []string{"A"}, Dependent: []string{"B"}},
+		{Determinant: []string{"B"}, Dependent: []string{"C"}},
+	}
+	violating := FuncDep{Determinant: []string{"B"}, Dependent: []string{"C"}}
+
+	rows := ArmstrongRelation(allAttrs, fds, violating)
+	if len(rows) < 2 {
+		t.Fatalf("expected at least 2 rows, got %d", len(rows))
+	}
+
+	// First two rows should agree on the determinant (B)
+	if rows[0]["B"] != rows[1]["B"] {
+		t.Errorf("rows 0 and 1 should agree on determinant B: got %q and %q", rows[0]["B"], rows[1]["B"])
+	}
+
+	// First two rows should agree on the dependent (C) since B determines C
+	if rows[0]["C"] != rows[1]["C"] {
+		t.Errorf("rows 0 and 1 should agree on C (determined by B): got %q and %q", rows[0]["C"], rows[1]["C"])
+	}
+
+	// First two rows should differ on non-determined attributes (A is not in closure of B)
+	// Actually, B->C means closure of {B} under fds = {B, C}. A is not in the closure.
+	if rows[0]["A"] == rows[1]["A"] {
+		t.Errorf("rows 0 and 1 should differ on non-determined attribute A: both got %q", rows[0]["A"])
+	}
+
+	// Third row should have different determinant values
+	if len(rows) >= 3 && rows[2]["B"] == rows[0]["B"] {
+		t.Errorf("row 2 should have different B value from row 0: both got %q", rows[0]["B"])
+	}
+}
+
+func TestArmstrongRelation_BCNFViolation(t *testing.T) {
+	// Table(A, B, C) PK={A,B} deps: AB->C, C->B
+	// C->B is a BCNF violation (C is not a superkey)
+	allAttrs := []string{"A", "B", "C"}
+	fds := []FuncDep{
+		{Determinant: []string{"A", "B"}, Dependent: []string{"C"}},
+		{Determinant: []string{"C"}, Dependent: []string{"B"}},
+	}
+	violating := FuncDep{Determinant: []string{"C"}, Dependent: []string{"B"}}
+
+	rows := ArmstrongRelation(allAttrs, fds, violating)
+	if len(rows) < 2 {
+		t.Fatalf("expected at least 2 rows, got %d", len(rows))
+	}
+
+	// First two rows should agree on determinant C
+	if rows[0]["C"] != rows[1]["C"] {
+		t.Errorf("rows 0 and 1 should agree on determinant C: got %q and %q", rows[0]["C"], rows[1]["C"])
+	}
+
+	// First two rows should agree on dependent B (since C determines B)
+	if rows[0]["B"] != rows[1]["B"] {
+		t.Errorf("rows 0 and 1 should agree on B (determined by C): got %q and %q", rows[0]["B"], rows[1]["B"])
+	}
+
+	// First two rows should differ on A (not determined by C)
+	if rows[0]["A"] == rows[1]["A"] {
+		t.Errorf("rows 0 and 1 should differ on non-determined attribute A: both got %q", rows[0]["A"])
+	}
+}
+
+// --- FormatRelation tests ---
+
+func TestFormatRelation(t *testing.T) {
+	allAttrs := []string{"A", "B", "C"}
+	rows := []map[string]string{
+		{"A": "1", "B": "x", "C": "p"},
+		{"A": "2", "B": "x", "C": "p"},
+	}
+	got := FormatRelation(allAttrs, rows)
+	// Should contain header with all attributes
+	if !strings.Contains(got, "| A |") {
+		t.Errorf("expected header with A, got:\n%s", got)
+	}
+	if !strings.Contains(got, "| B |") {
+		t.Errorf("expected header with B, got:\n%s", got)
+	}
+	// Should contain the row values
+	if !strings.Contains(got, "1") || !strings.Contains(got, "2") {
+		t.Errorf("expected row values, got:\n%s", got)
+	}
+}
+
+func TestFormatRelation_Truncation(t *testing.T) {
+	allAttrs := []string{"A"}
+	var rows []map[string]string
+	for i := 0; i < 15; i++ {
+		rows = append(rows, map[string]string{"A": "v" + itoa(i)})
+	}
+	got := FormatRelation(allAttrs, rows)
+	if !strings.Contains(got, "truncated to 10 rows") {
+		t.Errorf("expected truncation notice, got:\n%s", got)
 	}
 }
