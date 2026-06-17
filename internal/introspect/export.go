@@ -209,6 +209,46 @@ func Export(schema *model.Schema) ([]byte, error) {
 				return nil, fmt.Errorf("set %s.expr: %w", ckPath, err)
 			}
 		}
+
+		// Exclusion constraints
+		for _, exc := range t.Exclusions {
+			excPath := tblPath + ".exclusions." + exc.Name
+			if err := doc.NewTable(excPath); err != nil {
+				return nil, fmt.Errorf("create exclusion %s: %w", excPath, err)
+			}
+			cols := make([]interface{}, len(exc.Elements))
+			ops := make([]interface{}, len(exc.Elements))
+			for i, elem := range exc.Elements {
+				cols[i] = elem.Column
+				ops[i] = elem.Operator
+			}
+			if err := doc.SetCreate(excPath+".columns", cols); err != nil {
+				return nil, fmt.Errorf("set %s.columns: %w", excPath, err)
+			}
+			if err := doc.SetCreate(excPath+".operators", ops); err != nil {
+				return nil, fmt.Errorf("set %s.operators: %w", excPath, err)
+			}
+			if exc.Method != "" && exc.Method != "gist" {
+				if err := doc.SetCreate(excPath+".method", exc.Method); err != nil {
+					return nil, fmt.Errorf("set %s.method: %w", excPath, err)
+				}
+			}
+			if exc.Where != "" {
+				if err := doc.SetCreate(excPath+".where", exc.Where); err != nil {
+					return nil, fmt.Errorf("set %s.where: %w", excPath, err)
+				}
+			}
+			if exc.Deferrable {
+				if err := doc.SetCreate(excPath+".deferrable", true); err != nil {
+					return nil, fmt.Errorf("set %s.deferrable: %w", excPath, err)
+				}
+			}
+			if exc.InitiallyDeferred {
+				if err := doc.SetCreate(excPath+".initially_deferred", true); err != nil {
+					return nil, fmt.Errorf("set %s.initially_deferred: %w", excPath, err)
+				}
+			}
+		}
 	}
 
 	// [views.*]
@@ -295,6 +335,54 @@ func Export(schema *model.Schema) ([]byte, error) {
 				if err := doc.SetCreate(idxPath+".unique", true); err != nil {
 					return nil, fmt.Errorf("set %s.unique: %w", idxPath, err)
 				}
+			}
+		}
+	}
+
+	// [sequences.*]
+	for _, seq := range schema.Sequences {
+		seqPath := "sequences." + seq.Name
+		if err := doc.NewTable(seqPath); err != nil {
+			return nil, fmt.Errorf("create sequence %s: %w", seq.Name, err)
+		}
+		if seq.Start != nil {
+			if err := doc.SetCreate(seqPath+".start", *seq.Start); err != nil {
+				return nil, fmt.Errorf("set %s.start: %w", seqPath, err)
+			}
+		}
+		if seq.Increment != nil {
+			if err := doc.SetCreate(seqPath+".increment", *seq.Increment); err != nil {
+				return nil, fmt.Errorf("set %s.increment: %w", seqPath, err)
+			}
+		}
+		if seq.MinValue != nil {
+			if err := doc.SetCreate(seqPath+".min_value", *seq.MinValue); err != nil {
+				return nil, fmt.Errorf("set %s.min_value: %w", seqPath, err)
+			}
+		}
+		if seq.MaxValue != nil {
+			if err := doc.SetCreate(seqPath+".max_value", *seq.MaxValue); err != nil {
+				return nil, fmt.Errorf("set %s.max_value: %w", seqPath, err)
+			}
+		}
+		if seq.Cache != nil {
+			if err := doc.SetCreate(seqPath+".cache", *seq.Cache); err != nil {
+				return nil, fmt.Errorf("set %s.cache: %w", seqPath, err)
+			}
+		}
+		if seq.Cycle {
+			if err := doc.SetCreate(seqPath+".cycle", true); err != nil {
+				return nil, fmt.Errorf("set %s.cycle: %w", seqPath, err)
+			}
+		}
+		if seq.OwnedBy != "" {
+			if err := doc.SetCreate(seqPath+".owned_by", seq.OwnedBy); err != nil {
+				return nil, fmt.Errorf("set %s.owned_by: %w", seqPath, err)
+			}
+		}
+		if seq.Comment != "" {
+			if err := doc.SetCreate(seqPath+".comment", seq.Comment); err != nil {
+				return nil, fmt.Errorf("set %s.comment: %w", seqPath, err)
 			}
 		}
 	}

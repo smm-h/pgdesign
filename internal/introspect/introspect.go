@@ -90,6 +90,15 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		schema.MaterializedViews = append(schema.MaterializedViews, mvs...)
 	}
 
+	// Extract sequences from all requested schemas.
+	for _, sn := range schemaNames {
+		seqs, err := querySequences(ctx, conn, sn)
+		if err != nil {
+			return nil, nil, fmt.Errorf("sequences for schema %q: %w", sn, err)
+		}
+		schema.Sequences = append(schema.Sequences, seqs...)
+	}
+
 	return schema, diags, nil
 }
 
@@ -259,6 +268,13 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersi
 			return nil, nil, fmt.Errorf("checks for %s.%s: %w", schemaName, ti.name, err)
 		}
 		t.Checks = cks
+
+		// Exclusion constraints
+		excls, err := queryExclusionConstraints(ctx, conn, ti.oid)
+		if err != nil {
+			return nil, nil, fmt.Errorf("exclusions for %s.%s: %w", schemaName, ti.name, err)
+		}
+		t.Exclusions = excls
 
 		// Partition metadata (only for partitioned tables).
 		if ti.relkind == "p" {
@@ -827,6 +843,152 @@ func queryCheckConstraints(ctx context.Context, conn *pgx.Conn, tableOID uint32)
 	return cks, rows.Err()
 }
 
+// queryExclusionConstraints returns exclusion constraints for a table OID.
+func queryExclusionConstraints(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model.ExclusionConstraint, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT con.conname, pg_get_constraintdef(con.oid)
+		FROM pg_constraint con
+		WHERE con.conrelid = $1 AND con.contype = 'x'
+		ORDER BY con.conname
+	`, tableOID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var excls []model.ExclusionConstraint
+	for rows.Next() {
+		var name, def string
+		if err := rows.Scan(&name, &def); err != nil {
+			return nil, err
+		}
+		exc := parseExclusionDef(name, def)
+		excls = append(excls, exc)
+	}
+	return excls, rows.Err()
+}
+
+// parseExclusionDef parses the output of pg_get_constraintdef for an exclusion
+// constraint. The format is:
+//
+//	EXCLUDE USING method (col1 WITH op1, col2 WITH op2) WHERE (predicate)
+//	optionally: DEFERRABLE INITIALLY DEFERRED
+func parseExclusionDef(name, def string) model.ExclusionConstraint {
+	exc := model.ExclusionConstraint{Name: name}
+
+	s := def
+
+	// Strip leading "EXCLUDE USING "
+	if strings.HasPrefix(strings.ToUpper(s), "EXCLUDE USING ") {
+		s = s[len("EXCLUDE USING "):]
+	}
+
+	// Extract method (everything before the first '(')
+	parenIdx := strings.Index(s, "(")
+	if parenIdx > 0 {
+		exc.Method = strings.TrimSpace(s[:parenIdx])
+		s = s[parenIdx:]
+	}
+
+	// Find matching closing paren for elements
+	if len(s) > 0 && s[0] == '(' {
+		depth := 0
+		closeIdx := -1
+		for i, ch := range s {
+			if ch == '(' {
+				depth++
+			} else if ch == ')' {
+				depth--
+				if depth == 0 {
+					closeIdx = i
+					break
+				}
+			}
+		}
+		if closeIdx > 0 {
+			elemStr := s[1:closeIdx]
+			s = strings.TrimSpace(s[closeIdx+1:])
+
+			// Parse elements: "col1 WITH op1, col2 WITH op2"
+			parts := splitExclusionElements(elemStr)
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				// Each part is "column WITH operator"
+				withIdx := strings.Index(strings.ToUpper(part), " WITH ")
+				if withIdx >= 0 {
+					col := strings.TrimSpace(part[:withIdx])
+					op := strings.TrimSpace(part[withIdx+6:])
+					exc.Elements = append(exc.Elements, model.ExclusionElement{
+						Column:   col,
+						Operator: op,
+					})
+				}
+			}
+		}
+	}
+
+	// Check for WHERE clause
+	upperS := strings.ToUpper(s)
+	if whereIdx := strings.Index(upperS, "WHERE"); whereIdx >= 0 {
+		rest := strings.TrimSpace(s[whereIdx+5:])
+		// Strip surrounding parens
+		if len(rest) > 0 && rest[0] == '(' {
+			depth := 0
+			closeIdx := -1
+			for i, ch := range rest {
+				if ch == '(' {
+					depth++
+				} else if ch == ')' {
+					depth--
+					if depth == 0 {
+						closeIdx = i
+						break
+					}
+				}
+			}
+			if closeIdx > 0 {
+				exc.Where = rest[1:closeIdx]
+				s = strings.TrimSpace(rest[closeIdx+1:])
+			}
+		}
+	}
+
+	// Check for DEFERRABLE
+	if strings.Contains(strings.ToUpper(s), "DEFERRABLE") {
+		exc.Deferrable = true
+		if strings.Contains(strings.ToUpper(s), "INITIALLY DEFERRED") {
+			exc.InitiallyDeferred = true
+		}
+	}
+
+	return exc
+}
+
+// splitExclusionElements splits a comma-separated element list, respecting
+// parenthesized expressions (e.g., type casts or function calls in column expressions).
+func splitExclusionElements(s string) []string {
+	var parts []string
+	depth := 0
+	start := 0
+	for i, ch := range s {
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				parts = append(parts, s[start:i])
+				start = i + 1
+			}
+		}
+	}
+	if start < len(s) {
+		parts = append(parts, s[start:])
+	}
+	return parts
+}
+
 // mapPartStrategy maps a pg_partitioned_table.partstrat character to a strategy name.
 func mapPartStrategy(code string) string {
 	switch code {
@@ -1138,4 +1300,93 @@ func queryMaterializedViews(ctx context.Context, conn *pgx.Conn, schemaName stri
 	}
 
 	return mvs, diags, nil
+}
+
+// querySequences extracts standalone sequences from pg_catalog.
+// Identity-backed sequences are filtered out (they're managed by identity columns).
+func querySequences(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.Sequence, error) {
+	query := `
+		SELECT
+			c.relname AS seq_name,
+			s.seqstart,
+			s.seqincrement,
+			s.seqmin,
+			s.seqmax,
+			s.seqcache,
+			s.seqcycle,
+			pg_catalog.obj_description(c.oid, 'pg_class') AS comment,
+			-- OWNED BY: find the dependent table.column via pg_depend
+			(
+				SELECT t.relname || '.' || a.attname
+				FROM pg_depend d
+				JOIN pg_class t ON t.oid = d.refobjid
+				JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+				WHERE d.objid = c.oid
+				  AND d.deptype = 'a'
+				  AND d.classid = 'pg_class'::regclass
+				  AND d.refclassid = 'pg_class'::regclass
+				  AND d.refobjsubid > 0
+				LIMIT 1
+			) AS owned_by
+		FROM pg_sequence s
+		JOIN pg_class c ON c.oid = s.seqrelid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE n.nspname = $1
+		  AND c.relkind = 'S'
+		  -- Exclude identity-backed sequences: they have an internal dependency
+		  -- from pg_depend where the owning column has attidentity set.
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM pg_depend d
+			JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+			WHERE d.objid = c.oid
+			  AND d.deptype = 'i'
+			  AND a.attidentity != ''
+		  )
+		ORDER BY c.relname`
+
+	rows, err := conn.Query(ctx, query, schemaName)
+	if err != nil {
+		return nil, fmt.Errorf("query sequences: %w", err)
+	}
+	defer rows.Close()
+
+	var seqs []model.Sequence
+	for rows.Next() {
+		var (
+			name      string
+			start     int64
+			increment int64
+			minVal    int64
+			maxVal    int64
+			cache     int64
+			cycle     bool
+			comment   *string
+			ownedBy   *string
+		)
+		if err := rows.Scan(&name, &start, &increment, &minVal, &maxVal, &cache, &cycle, &comment, &ownedBy); err != nil {
+			return nil, fmt.Errorf("scan sequence: %w", err)
+		}
+
+		seq := model.Sequence{
+			Name:      name,
+			Schema:    schemaName,
+			Start:     &start,
+			Increment: &increment,
+			MinValue:  &minVal,
+			MaxValue:  &maxVal,
+			Cache:     &cache,
+			Cycle:     cycle,
+		}
+		if comment != nil {
+			seq.Comment = *comment
+		}
+		if ownedBy != nil {
+			seq.OwnedBy = *ownedBy
+		}
+
+		seqs = append(seqs, seq)
+	}
+
+	return seqs, rows.Err()
 }
