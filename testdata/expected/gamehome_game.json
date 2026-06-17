@@ -830,7 +830,9 @@
       "checks": [],
       "partitioning": {
         "strategy": "range",
-        "column": "sent_at",
+        "columns": [
+          "sent_at"
+        ],
         "children": null
       },
       "maintenance": {

@@ -376,18 +376,20 @@
       "checks": [],
       "partitioning": {
         "strategy": "range",
-        "column": "occurred_at",
+        "columns": [
+          "occurred_at"
+        ],
         "children": [
           {
             "strategy": "",
-            "column": "",
+            "columns": null,
             "name": "events_2024_q1",
             "bound": "FROM ('2024-01-01') TO ('2024-04-01')",
             "children": null
           },
           {
             "strategy": "",
-            "column": "",
+            "columns": null,
             "name": "events_2024_q2",
             "bound": "FROM ('2024-04-01') TO ('2024-07-01')",
             "children": null
