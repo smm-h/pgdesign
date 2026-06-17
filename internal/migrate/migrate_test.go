@@ -261,10 +261,10 @@ func TestGenerateMigration_PartitionChildAdded(t *testing.T) {
 				},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
-					Column:   "created_at",
+					Columns:  []string{"created_at"},
 					Children: []model.PartitionSpec{
-						{Strategy: "events_2024", Column: "2024-01-01"},
-						{Strategy: "events_2025", Column: "2025-01-01"},
+						{Name: "events_2024", Bound: "2024-01-01"},
+						{Name: "events_2025", Bound: "2025-01-01"},
 					},
 				},
 			},
@@ -294,8 +294,8 @@ func TestGenerateMigration_PartitionChildAdded(t *testing.T) {
 			found = true
 			if op.PartitionChildSpec == nil {
 				t.Error("create_partition op has no PartitionChildSpec")
-			} else if op.PartitionChildSpec.Strategy != "events_2025" {
-				t.Errorf("child spec strategy = %q, want events_2025", op.PartitionChildSpec.Strategy)
+			} else if op.PartitionChildSpec.Name != "events_2025" {
+				t.Errorf("child spec name = %q, want events_2025", op.PartitionChildSpec.Name)
 			}
 			if op.Down == nil {
 				t.Error("create_partition op has no down op")
@@ -333,9 +333,9 @@ func TestGenerateMigration_PartitionChildRemoved(t *testing.T) {
 				},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
-					Column:   "created_at",
+					Columns:  []string{"created_at"},
 					Children: []model.PartitionSpec{
-						{Strategy: "events_2024", Column: "2024-01-01"},
+						{Name: "events_2024", Bound: "2024-01-01"},
 					},
 				},
 			},
@@ -395,7 +395,7 @@ func TestGenerateMigration_PartitionStrategyChanged(t *testing.T) {
 				Schema: "public",
 				Partitioning: &model.PartitionSpec{
 					Strategy: "hash",
-					Column:   "id",
+					Columns:  []string{"id"},
 				},
 			},
 		},
