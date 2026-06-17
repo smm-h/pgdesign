@@ -143,7 +143,7 @@ func generateDoc(schema *model.Schema) string {
 
 		// Partitioning
 		if t.Partitioning != nil {
-			fmt.Fprintf(&b, "\n**Partitioning:** %s on %s\n", t.Partitioning.Strategy, t.Partitioning.Column)
+			fmt.Fprintf(&b, "\n**Partitioning:** %s on %s\n", t.Partitioning.Strategy, strings.Join(t.Partitioning.Columns, ", "))
 		}
 
 		// RLS
