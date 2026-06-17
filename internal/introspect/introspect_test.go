@@ -1067,3 +1067,83 @@ func TestIntrospectViewDependsOn_Subquery(t *testing.T) {
 		t.Errorf("user_activity.DependsOn = %v, want to contain subq_users and subq_logins", userActivity.DependsOn)
 	}
 }
+
+func TestParseExclusionDef(t *testing.T) {
+	tests := []struct {
+		name          string
+		defInput      string
+		wantMethod    string
+		wantElems     []model.ExclusionElement
+		wantWhere     string
+		wantDefer     bool
+		wantInitDefer bool
+	}{
+		{
+			name:       "basic",
+			defInput:   "EXCLUDE USING gist (room_id WITH =, during WITH &&)",
+			wantMethod: "gist",
+			wantElems: []model.ExclusionElement{
+				{Column: "room_id", Operator: "="},
+				{Column: "during", Operator: "&&"},
+			},
+		},
+		{
+			name:       "with where",
+			defInput:   "EXCLUDE USING gist (room_id WITH =, during WITH &&) WHERE (active = true)",
+			wantMethod: "gist",
+			wantElems: []model.ExclusionElement{
+				{Column: "room_id", Operator: "="},
+				{Column: "during", Operator: "&&"},
+			},
+			wantWhere: "active = true",
+		},
+		{
+			name:       "deferrable",
+			defInput:   "EXCLUDE USING gist (room_id WITH =) DEFERRABLE INITIALLY DEFERRED",
+			wantMethod: "gist",
+			wantElems: []model.ExclusionElement{
+				{Column: "room_id", Operator: "="},
+			},
+			wantDefer:     true,
+			wantInitDefer: true,
+		},
+		{
+			name:       "spgist method",
+			defInput:   "EXCLUDE USING spgist (ip_range WITH &&)",
+			wantMethod: "spgist",
+			wantElems: []model.ExclusionElement{
+				{Column: "ip_range", Operator: "&&"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exc := parseExclusionDef("test_constraint", tt.defInput)
+			if exc.Name != "test_constraint" {
+				t.Errorf("Name = %q, want %q", exc.Name, "test_constraint")
+			}
+			if exc.Method != tt.wantMethod {
+				t.Errorf("Method = %q, want %q", exc.Method, tt.wantMethod)
+			}
+			if len(exc.Elements) != len(tt.wantElems) {
+				t.Fatalf("Elements count = %d, want %d", len(exc.Elements), len(tt.wantElems))
+			}
+			for i, want := range tt.wantElems {
+				got := exc.Elements[i]
+				if got.Column != want.Column || got.Operator != want.Operator {
+					t.Errorf("Element[%d] = {%q, %q}, want {%q, %q}", i, got.Column, got.Operator, want.Column, want.Operator)
+				}
+			}
+			if exc.Where != tt.wantWhere {
+				t.Errorf("Where = %q, want %q", exc.Where, tt.wantWhere)
+			}
+			if exc.Deferrable != tt.wantDefer {
+				t.Errorf("Deferrable = %v, want %v", exc.Deferrable, tt.wantDefer)
+			}
+			if exc.InitiallyDeferred != tt.wantInitDefer {
+				t.Errorf("InitiallyDeferred = %v, want %v", exc.InitiallyDeferred, tt.wantInitDefer)
+			}
+		})
+	}
+}
