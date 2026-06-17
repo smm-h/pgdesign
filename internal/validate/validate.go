@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -112,6 +113,10 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W014", checkCascadeBreadth},
 		{"W015", checkMixedOnDelete},
 		{"I001", checkNaturalKey},
+		{"W016", checkPKSubsumesUnique},
+		{"W017", checkRedundantNullCheck},
+		{"W018", checkDomainCheckDuplicate},
+		{"W019", checkRangeSubsumption},
 	}
 
 	for _, r := range rules {
@@ -1557,6 +1562,552 @@ func containsSurrogateCol(t model.Table, key []string) bool {
 		}
 	}
 	return false
+}
+
+// checkPKSubsumesUnique (W016): UNIQUE constraint whose columns are a subset of the PK.
+func checkPKSubsumesUnique(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if len(t.PK) == 0 {
+			continue
+		}
+		pkSet := make(map[string]bool, len(t.PK))
+		for _, col := range t.PK {
+			pkSet[col] = true
+		}
+		for _, u := range t.Uniques {
+			allInPK := true
+			for _, col := range u.Columns {
+				if !pkSet[col] {
+					allInPK = false
+					break
+				}
+			}
+			if allInPK {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "W016",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("redundant UNIQUE constraint %q: columns (%s) are already covered by the primary key", u.Name, strings.Join(u.Columns, ", ")),
+					Suggestion: "Drop the UNIQUE constraint; the primary key already enforces uniqueness",
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// isNotNullRe matches CHECK expressions of the form "col IS NOT NULL".
+var isNotNullRe = regexp.MustCompile(`(?i)^\s*\(?\s*(\w+)\s+IS\s+NOT\s+NULL\s*\)?\s*$`)
+
+// checkRedundantNullCheck (W017): CHECK (col IS NOT NULL) on an already NOT NULL column.
+func checkRedundantNullCheck(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		notNullCols := make(map[string]bool)
+		for _, col := range t.Columns {
+			if col.NotNull {
+				notNullCols[col.Name] = true
+			}
+		}
+		for _, chk := range t.Checks {
+			colName := extractIsNotNullColumn(chk.Expr)
+			if colName == "" {
+				continue
+			}
+			if notNullCols[colName] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "W017",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("redundant CHECK %q: column %q is already NOT NULL", chk.Name, colName),
+					Suggestion: "Drop the CHECK constraint; NOT NULL already prevents null values",
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// extractIsNotNullColumn returns the column name if the expression is "col IS NOT NULL", or "".
+func extractIsNotNullColumn(expr string) string {
+	// Try AST-based detection first.
+	node, err := sqlexpr.Parse(expr)
+	if err == nil {
+		col := isNotNullAST(node)
+		if col != "" {
+			return col
+		}
+	}
+	// Fall back to regex.
+	m := isNotNullRe.FindStringSubmatch(expr)
+	if m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// isNotNullAST checks if the AST represents "col IS NOT NULL", unwrapping parens.
+func isNotNullAST(node sqlexpr.Node) string {
+	switch n := node.(type) {
+	case *sqlexpr.ParenExpr:
+		return isNotNullAST(n.Inner)
+	case *sqlexpr.UnaryOp:
+		if strings.EqualFold(n.Op, "IS NOT NULL") {
+			if ref, ok := n.Operand.(*sqlexpr.ColumnRef); ok && len(ref.Parts) == 1 {
+				return ref.Parts[0]
+			}
+		}
+	}
+	return ""
+}
+
+// checkDomainCheckDuplicate (W018): column CHECK identical to its domain CHECK.
+func checkDomainCheckDuplicate(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	if len(schema.Domains) == 0 {
+		return diags
+	}
+	domainByName := make(map[string]model.Domain, len(schema.Domains))
+	for _, d := range schema.Domains {
+		domainByName[d.Name] = d
+	}
+	for _, t := range schema.Tables {
+		// Build column type map for this table.
+		colType := make(map[string]string, len(t.Columns))
+		for _, col := range t.Columns {
+			colType[col.Name] = col.SemanticTypeName
+		}
+		for _, chk := range t.Checks {
+			col := extractCheckColumn(chk.Expr)
+			if col == "" {
+				continue
+			}
+			typeName := colType[col]
+			if typeName == "" {
+				continue
+			}
+			dom, ok := domainByName[typeName]
+			if !ok || dom.Check == "" {
+				continue
+			}
+			// Replace VALUE in domain CHECK with the column name, then normalize both.
+			domExpr := replaceValue(dom.Check, col)
+			if normalizeExpr(domExpr) == normalizeExpr(chk.Expr) {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Warning,
+					Code:       "W018",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("redundant CHECK %q on column %q: identical to domain %q CHECK", chk.Name, col, dom.Name),
+					Suggestion: "Drop the column-level CHECK; the domain already enforces this constraint",
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// extractCheckColumn walks the AST for ColumnRef nodes. Returns the column name
+// if exactly one distinct column is referenced, otherwise "".
+func extractCheckColumn(expr string) string {
+	node, err := sqlexpr.Parse(expr)
+	if err != nil {
+		return ""
+	}
+	cols := make(map[string]bool)
+	walkColumns(node, cols)
+	if len(cols) != 1 {
+		return ""
+	}
+	for c := range cols {
+		return c
+	}
+	return ""
+}
+
+// walkColumns collects all single-part ColumnRef names from the AST.
+func walkColumns(node sqlexpr.Node, cols map[string]bool) {
+	if node == nil {
+		return
+	}
+	switch n := node.(type) {
+	case *sqlexpr.ColumnRef:
+		if len(n.Parts) == 1 {
+			cols[n.Parts[0]] = true
+		}
+	case *sqlexpr.BinaryOp:
+		walkColumns(n.Left, cols)
+		walkColumns(n.Right, cols)
+	case *sqlexpr.UnaryOp:
+		walkColumns(n.Operand, cols)
+	case *sqlexpr.ParenExpr:
+		walkColumns(n.Inner, cols)
+	case *sqlexpr.FuncCall:
+		for _, arg := range n.Args {
+			walkColumns(arg, cols)
+		}
+	case *sqlexpr.Cast:
+		walkColumns(n.Expr, cols)
+	case *sqlexpr.CaseExpr:
+		for _, w := range n.Whens {
+			walkColumns(w.Condition, cols)
+			walkColumns(w.Result, cols)
+		}
+		walkColumns(n.Else, cols)
+	}
+}
+
+// replaceValue replaces occurrences of VALUE (case-insensitive, word boundary) with colName.
+var valueRe = regexp.MustCompile(`(?i)\bVALUE\b`)
+
+func replaceValue(expr string, colName string) string {
+	return valueRe.ReplaceAllString(expr, colName)
+}
+
+// normalizeExpr produces a canonical string from an SQL expression for comparison.
+func normalizeExpr(expr string) string {
+	node, err := sqlexpr.Parse(expr)
+	if err != nil {
+		// Fallback: lowercase, collapse whitespace.
+		return collapseWhitespace(strings.ToLower(expr))
+	}
+	return canonicalString(node)
+}
+
+// canonicalString recursively produces a canonical string representation of an AST node.
+func canonicalString(node sqlexpr.Node) string {
+	if node == nil {
+		return ""
+	}
+	switch n := node.(type) {
+	case *sqlexpr.BinaryOp:
+		left := canonicalString(n.Left)
+		right := canonicalString(n.Right)
+		op := strings.ToUpper(n.Op)
+		// Sort commutative operands alphabetically.
+		if op == "AND" || op == "OR" {
+			parts := []string{left, right}
+			sort.Strings(parts)
+			return parts[0] + " " + op + " " + parts[1]
+		}
+		return left + " " + op + " " + right
+	case *sqlexpr.UnaryOp:
+		return canonicalString(n.Operand) + " " + strings.ToUpper(n.Op)
+	case *sqlexpr.ParenExpr:
+		// Strip parens for normalization.
+		return canonicalString(n.Inner)
+	case *sqlexpr.ColumnRef:
+		return strings.Join(n.Parts, ".")
+	case *sqlexpr.NullLiteral:
+		return "NULL"
+	case *sqlexpr.IntLiteral:
+		return strconv.Itoa(n.Value)
+	case *sqlexpr.FloatLiteral:
+		return strconv.FormatFloat(n.Value, 'f', -1, 64)
+	case *sqlexpr.StringLiteral:
+		return "'" + n.Value + "'"
+	case *sqlexpr.BoolLiteral:
+		if n.Value {
+			return "TRUE"
+		}
+		return "FALSE"
+	case *sqlexpr.FuncCall:
+		args := make([]string, len(n.Args))
+		for i, arg := range n.Args {
+			args[i] = canonicalString(arg)
+		}
+		return strings.ToUpper(n.Name) + "(" + strings.Join(args, ", ") + ")"
+	case *sqlexpr.Cast:
+		return canonicalString(n.Expr) + "::" + strings.ToUpper(n.TypeName)
+	default:
+		return fmt.Sprintf("%v", n)
+	}
+}
+
+// collapseWhitespace normalizes runs of whitespace to single spaces and trims.
+func collapseWhitespace(s string) string {
+	fields := strings.Fields(s)
+	return strings.Join(fields, " ")
+}
+
+// checkRangeSubsumption (W019): a CHECK constraint subsumed by another on the same column.
+func checkRangeSubsumption(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if len(t.Checks) < 2 {
+			continue
+		}
+		// Extract range info for each single-column CHECK.
+		type checkRange struct {
+			name  string
+			rng   *rangeInfo
+		}
+		var ranges []checkRange
+		for _, chk := range t.Checks {
+			ri := extractRange(chk.Expr)
+			if ri != nil {
+				ranges = append(ranges, checkRange{name: chk.Name, rng: ri})
+			}
+		}
+		// For each pair on the same column, check if one subsumes the other.
+		for i := 0; i < len(ranges); i++ {
+			for j := 0; j < len(ranges); j++ {
+				if i == j {
+					continue
+				}
+				ri := ranges[i]
+				rj := ranges[j]
+				if ri.rng.Column != rj.rng.Column {
+					continue
+				}
+				if ri.rng.subsumes(rj.rng) && !rj.rng.subsumes(ri.rng) {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Warning,
+						Code:       "W019",
+						Table:      t.Name,
+						Message:    fmt.Sprintf("redundant CHECK %q: subsumed by %q on column %q", rj.name, ri.name, ri.rng.Column),
+						Suggestion: "Drop the narrower constraint or merge the checks",
+					})
+				}
+			}
+		}
+	}
+	return diags
+}
+
+// rangeInfo represents a range constraint on a single column.
+type rangeInfo struct {
+	Column   string
+	Low      *float64
+	High     *float64
+	LowIncl  bool
+	HighIncl bool
+}
+
+// extractRange parses a CHECK expression and extracts a range if it matches known patterns.
+func extractRange(expr string) *rangeInfo {
+	node, err := sqlexpr.Parse(expr)
+	if err != nil {
+		return nil
+	}
+	return extractRangeFromAST(unwrapParens(node))
+}
+
+// unwrapParens strips outer ParenExpr wrappers.
+func unwrapParens(node sqlexpr.Node) sqlexpr.Node {
+	for {
+		p, ok := node.(*sqlexpr.ParenExpr)
+		if !ok {
+			return node
+		}
+		node = p.Inner
+	}
+}
+
+// extractRangeFromAST extracts range info from an AST node.
+func extractRangeFromAST(node sqlexpr.Node) *rangeInfo {
+	// Check for AND combining two comparisons: col >= L AND col <= H
+	if bin, ok := node.(*sqlexpr.BinaryOp); ok && strings.EqualFold(bin.Op, "AND") {
+		left := extractRangeFromAST(unwrapParens(bin.Left))
+		right := extractRangeFromAST(unwrapParens(bin.Right))
+		if left != nil && right != nil && left.Column == right.Column {
+			return mergeRanges(left, right)
+		}
+		return nil
+	}
+	// Single comparison: col >= N, col > N, col <= N, col < N
+	if bin, ok := node.(*sqlexpr.BinaryOp); ok {
+		col, val, colOnLeft := extractComparisonParts(bin)
+		if col == "" {
+			return nil
+		}
+		op := strings.ToUpper(bin.Op)
+		if !colOnLeft {
+			// Flip: 5 <= col becomes col >= 5
+			op = flipOp(op)
+		}
+		ri := &rangeInfo{Column: col}
+		switch op {
+		case ">=":
+			ri.Low = &val
+			ri.LowIncl = true
+		case ">":
+			ri.Low = &val
+			ri.LowIncl = false
+		case "<=":
+			ri.High = &val
+			ri.HighIncl = true
+		case "<":
+			ri.High = &val
+			ri.HighIncl = false
+		default:
+			return nil
+		}
+		return ri
+	}
+	return nil
+}
+
+// extractComparisonParts extracts the column name and numeric value from a comparison BinaryOp.
+// Returns the column name, numeric value, and whether the column was on the left side.
+func extractComparisonParts(bin *sqlexpr.BinaryOp) (col string, val float64, colOnLeft bool) {
+	leftCol := extractSingleColumn(bin.Left)
+	rightCol := extractSingleColumn(bin.Right)
+	leftVal, leftIsNum := extractNumericValue(bin.Right)
+	rightVal, rightIsNum := extractNumericValue(bin.Left)
+
+	if leftCol != "" && leftIsNum {
+		return leftCol, leftVal, true
+	}
+	if rightCol != "" && rightIsNum {
+		return rightCol, rightVal, false
+	}
+	return "", 0, false
+}
+
+// extractSingleColumn returns the column name if the node is a single-part ColumnRef.
+func extractSingleColumn(node sqlexpr.Node) string {
+	node = unwrapParens(node)
+	if ref, ok := node.(*sqlexpr.ColumnRef); ok && len(ref.Parts) == 1 {
+		return ref.Parts[0]
+	}
+	return ""
+}
+
+// extractNumericValue returns a float64 if the node is a numeric literal.
+func extractNumericValue(node sqlexpr.Node) (float64, bool) {
+	node = unwrapParens(node)
+	switch n := node.(type) {
+	case *sqlexpr.IntLiteral:
+		return float64(n.Value), true
+	case *sqlexpr.FloatLiteral:
+		return n.Value, true
+	case *sqlexpr.UnaryOp:
+		// Handle negative numbers: -5 is UnaryOp{Op: "-", Operand: IntLiteral{5}}
+		if n.Op == "-" {
+			if v, ok := extractNumericValue(n.Operand); ok {
+				return -v, true
+			}
+		}
+	}
+	return 0, false
+}
+
+// flipOp reverses a comparison operator (for when column is on the right).
+func flipOp(op string) string {
+	switch op {
+	case ">=":
+		return "<="
+	case ">":
+		return "<"
+	case "<=":
+		return ">="
+	case "<":
+		return ">"
+	default:
+		return op
+	}
+}
+
+// mergeRanges combines two single-bound ranges on the same column into one.
+func mergeRanges(a, b *rangeInfo) *rangeInfo {
+	ri := &rangeInfo{Column: a.Column}
+	// Take low from whichever has it.
+	if a.Low != nil {
+		ri.Low = a.Low
+		ri.LowIncl = a.LowIncl
+	}
+	if b.Low != nil {
+		if ri.Low == nil {
+			ri.Low = b.Low
+			ri.LowIncl = b.LowIncl
+		} else {
+			// Both have a low bound; take the tighter one.
+			if *b.Low > *ri.Low || (*b.Low == *ri.Low && !b.LowIncl) {
+				ri.Low = b.Low
+				ri.LowIncl = b.LowIncl
+			}
+		}
+	}
+	// Take high from whichever has it.
+	if a.High != nil {
+		ri.High = a.High
+		ri.HighIncl = a.HighIncl
+	}
+	if b.High != nil {
+		if ri.High == nil {
+			ri.High = b.High
+			ri.HighIncl = b.HighIncl
+		} else {
+			// Both have a high bound; take the tighter one.
+			if *b.High < *ri.High || (*b.High == *ri.High && !b.HighIncl) {
+				ri.High = b.High
+				ri.HighIncl = b.HighIncl
+			}
+		}
+	}
+	return ri
+}
+
+// subsumes returns true if r's range entirely covers other's range.
+func (r *rangeInfo) subsumes(other *rangeInfo) bool {
+	if r.Column != other.Column {
+		return false
+	}
+	// Check low bound: r's low must be <= other's low.
+	if !lowBoundCovers(r.Low, r.LowIncl, other.Low, other.LowIncl) {
+		return false
+	}
+	// Check high bound: r's high must be >= other's high.
+	if !highBoundCovers(r.High, r.HighIncl, other.High, other.HighIncl) {
+		return false
+	}
+	return true
+}
+
+// lowBoundCovers returns true if outer's low bound is wider than or equal to inner's.
+// nil means unbounded (negative infinity).
+func lowBoundCovers(outerLow *float64, outerIncl bool, innerLow *float64, innerIncl bool) bool {
+	if outerLow == nil {
+		// Unbounded outer always covers.
+		return true
+	}
+	if innerLow == nil {
+		// Inner is unbounded but outer is not.
+		return false
+	}
+	if *outerLow < *innerLow {
+		return true
+	}
+	if *outerLow > *innerLow {
+		return false
+	}
+	// Equal values: outer must be at least as inclusive.
+	if outerIncl {
+		return true
+	}
+	return !innerIncl
+}
+
+// highBoundCovers returns true if outer's high bound is wider than or equal to inner's.
+// nil means unbounded (positive infinity).
+func highBoundCovers(outerHigh *float64, outerIncl bool, innerHigh *float64, innerIncl bool) bool {
+	if outerHigh == nil {
+		return true
+	}
+	if innerHigh == nil {
+		return false
+	}
+	if *outerHigh > *innerHigh {
+		return true
+	}
+	if *outerHigh < *innerHigh {
+		return false
+	}
+	if outerIncl {
+		return true
+	}
+	return !innerIncl
 }
 
 // --- Helpers ---
