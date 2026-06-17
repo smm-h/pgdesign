@@ -875,3 +875,80 @@ func CreateAppendOnlyTrigger(schemaName, tableName string) string {
 	return fmt.Sprintf("CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
 		qualifiedTable, qualifiedFunc)
 }
+
+// CreateFunction generates a CREATE OR REPLACE FUNCTION/PROCEDURE statement.
+// For procedures (f.IsProc), RETURNS and volatility/parallel/cost/rows are omitted.
+func CreateFunction(schemaName string, f model.Function) string {
+	qualified := QualifiedName(schemaName, f.Name)
+
+	// Build argument list
+	argParts := make([]string, len(f.Args))
+	for i, arg := range f.Args {
+		argDef := QuoteIdent(arg.Name) + " " + arg.Type
+		if arg.Default != "" {
+			argDef += " DEFAULT " + arg.Default
+		}
+		argParts[i] = argDef
+	}
+	argList := strings.Join(argParts, ", ")
+
+	var sb strings.Builder
+	if f.IsProc {
+		sb.WriteString(fmt.Sprintf("CREATE OR REPLACE PROCEDURE %s(%s)", qualified, argList))
+	} else {
+		sb.WriteString(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s(%s)", qualified, argList))
+		sb.WriteString(fmt.Sprintf("\nRETURNS %s", f.ReturnType))
+	}
+
+	sb.WriteString(fmt.Sprintf("\nAS $pgdesign$\n%s\n$pgdesign$", f.Body))
+	sb.WriteString(fmt.Sprintf("\nLANGUAGE %s", f.Language))
+
+	if !f.IsProc {
+		if f.Volatility != "" {
+			sb.WriteString("\n" + f.Volatility)
+		}
+		if f.Parallel != "" {
+			sb.WriteString("\nPARALLEL " + f.Parallel)
+		}
+	}
+
+	if f.SecurityDefiner {
+		sb.WriteString("\nSECURITY DEFINER")
+	}
+
+	if !f.IsProc {
+		if f.Cost != nil {
+			sb.WriteString(fmt.Sprintf("\nCOST %g", *f.Cost))
+		}
+		if f.Rows != nil {
+			sb.WriteString(fmt.Sprintf("\nROWS %g", *f.Rows))
+		}
+	}
+
+	sb.WriteString(";")
+	return sb.String()
+}
+
+// DropFunction generates a DROP FUNCTION/PROCEDURE statement.
+// Includes argument types for overload resolution.
+func DropFunction(schemaName string, f model.Function, cascade bool) string {
+	qualified := QualifiedName(schemaName, f.Name)
+
+	// Build argument type list for overload resolution
+	argTypes := make([]string, len(f.Args))
+	for i, arg := range f.Args {
+		argTypes[i] = arg.Type
+	}
+
+	kind := "FUNCTION"
+	if f.IsProc {
+		kind = "PROCEDURE"
+	}
+
+	cascadeStr := ""
+	if cascade {
+		cascadeStr = " CASCADE"
+	}
+
+	return fmt.Sprintf("DROP %s %s(%s)%s;", kind, qualified, strings.Join(argTypes, ", "), cascadeStr)
+}

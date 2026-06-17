@@ -80,6 +80,11 @@ func generateJSON(schema *model.Schema) (string, error) {
 		s.Tables[i].Exclusions = sortedExclusions(s.Tables[i].Exclusions)
 		s.Tables[i].Policies = sortedPolicies(s.Tables[i].Policies)
 	}
+	s.Functions = make([]model.Function, len(schema.Functions))
+	copy(s.Functions, schema.Functions)
+	sort.Slice(s.Functions, func(i, j int) bool {
+		return s.Functions[i].Name < s.Functions[j].Name
+	})
 	data, err := json.MarshalIndent(&s, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("json marshal: %w", err)
@@ -475,6 +480,44 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		}
 	}
 
+	// 16. CREATE FUNCTION / CREATE PROCEDURE (topologically sorted by DependsOn)
+	if len(schema.Functions) > 0 {
+		sorted, err := topoSortFunctions(schema.Functions)
+		if err != nil {
+			sorted = schema.Functions
+			var cycleMembers []string
+			for _, f := range sorted {
+				cycleMembers = append(cycleMembers, f.Name)
+			}
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Message:  fmt.Sprintf("dependency cycle detected among functions: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
+			})
+		}
+		var funcStmts []string
+		if err != nil {
+			funcStmts = append(funcStmts, "-- WARNING: dependency cycle detected; emitted in declaration order")
+		}
+		schemaName := schema.Name
+		for i := range sorted {
+			f := &sorted[i]
+			if f.Schema != "" {
+				schemaName = f.Schema
+			}
+			funcStmts = append(funcStmts, sql.CreateFunction(schemaName, *f))
+			if f.Comment != "" && opts.IncludeComments {
+				kind := "FUNCTION"
+				if f.IsProc {
+					kind = "PROCEDURE"
+				}
+				funcStmts = append(funcStmts, sql.CommentOn(kind, sql.QualifiedName(schemaName, f.Name), f.Comment))
+			}
+		}
+		if len(funcStmts) > 0 {
+			sections = append(sections, strings.Join(funcStmts, "\n"))
+		}
+	}
+
 	return strings.Join(sections, "\n\n") + "\n", diags
 }
 
@@ -586,6 +629,18 @@ func topoSortMaterializedViews(mvs []model.MaterializedView) ([]model.Materializ
 	)
 	if len(cycles) > 0 {
 		return nil, fmt.Errorf("cycle detected in materialized view dependencies")
+	}
+	return sorted, nil
+}
+
+// topoSortFunctions sorts functions by DependsOn using Kahn's algorithm.
+func topoSortFunctions(funcs []model.Function) ([]model.Function, error) {
+	sorted, cycles := graph.TopoSort(funcs,
+		func(f model.Function) string { return f.Name },
+		func(f model.Function) []string { return f.DependsOn },
+	)
+	if len(cycles) > 0 {
+		return nil, fmt.Errorf("cycle detected in function dependencies")
 	}
 	return sorted, nil
 }

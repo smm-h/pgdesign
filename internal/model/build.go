@@ -31,6 +31,7 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	schema.Domains = domains
 	schema.Views = resolveViews(raw)
 	schema.MaterializedViews = resolveMaterializedViews(raw)
+	schema.Functions = resolveFunctions(raw)
 
 	// Phase 2: order
 	sorted, cycles := topoSort(tables)
@@ -88,6 +89,7 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 		allTables = append(allTables, tables...)
 		schema.Views = append(schema.Views, resolveViews(raw)...)
 		schema.MaterializedViews = append(schema.MaterializedViews, resolveMaterializedViews(raw)...)
+		schema.Functions = append(schema.Functions, resolveFunctions(raw)...)
 	}
 
 	// Phase 2: order all tables together (topo sort sees cross-schema deps).
@@ -241,6 +243,63 @@ func resolveMaterializedViews(raw *parse.RawSchema) []MaterializedView {
 		mvs = append(mvs, mv)
 	}
 	return mvs
+}
+
+// resolveFunctions converts raw functions into model Functions.
+func resolveFunctions(raw *parse.RawSchema) []Function {
+	var funcs []Function
+	for _, rf := range raw.Functions {
+		f := resolveFunction(rf, raw.Meta.Schema)
+		funcs = append(funcs, f)
+	}
+	return funcs
+}
+
+// resolveFunction converts a single raw function into a model Function.
+func resolveFunction(rf parse.RawFunction, schemaName string) Function {
+	f := Function{
+		Name:      rf.Name,
+		Schema:    schemaName,
+		DependsOn: rf.DependsOn,
+	}
+	if rf.Language != nil {
+		f.Language = *rf.Language
+	}
+	if rf.Returns != nil {
+		f.ReturnType = *rf.Returns
+	}
+	if rf.Body != nil {
+		f.Body = *rf.Body
+	}
+	if rf.Comment != nil {
+		f.Comment = *rf.Comment
+	}
+	if rf.Volatility != nil {
+		f.Volatility = strings.ToUpper(*rf.Volatility)
+	}
+	if rf.Parallel != nil {
+		f.Parallel = strings.ToUpper(*rf.Parallel)
+	}
+	if rf.SecurityDefiner != nil {
+		f.SecurityDefiner = *rf.SecurityDefiner
+	}
+	if rf.Procedure != nil {
+		f.IsProc = *rf.Procedure
+	}
+	f.Cost = rf.Cost
+	f.Rows = rf.Rows
+	// Convert args
+	for _, ra := range rf.Args {
+		arg := FunctionArg{
+			Name: ra.Name,
+			Type: ra.Type,
+		}
+		if ra.Default != nil {
+			arg.Default = *ra.Default
+		}
+		f.Args = append(f.Args, arg)
+	}
+	return f
 }
 
 // resolveSequences converts raw sequences into model Sequences and validates
