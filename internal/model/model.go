@@ -94,6 +94,7 @@ type Table struct {
 	Maintenance  *MaintenanceConfig `json:"maintenance,omitempty"`
 	Owner        string             `json:"owner,omitempty"`
 	Policies     []Policy           `json:"policies,omitempty"`
+	Triggers     []Trigger          `json:"triggers,omitempty"`
 	EnableRLS    bool               `json:"enable_rls,omitempty"`
 	AppendOnly   bool               `json:"append_only,omitempty"`
 
@@ -223,6 +224,22 @@ type Policy struct {
 	WithCheck    string `json:"with_check,omitempty"`     // SQL expression for new rows (INSERT/UPDATE)
 	ErrorCode    string `json:"error_code,omitempty"`     // Application-level error code (e.g., "chat_disabled")
 	ErrorMessage string `json:"error_message,omitempty"` // Human-readable error message
+}
+
+// Trigger represents a user-defined trigger on a table.
+type Trigger struct {
+	Name              string   `json:"name"`
+	Function          string   `json:"function"`
+	Events            []string `json:"events"`
+	Timing            string   `json:"timing"`
+	ForEach           string   `json:"for_each"`
+	When              string   `json:"when,omitempty"`
+	Constraint        bool     `json:"constraint,omitempty"`
+	Deferrable        bool     `json:"deferrable,omitempty"`
+	InitiallyDeferred bool     `json:"initially_deferred,omitempty"`
+	ReferencingOld    string   `json:"referencing_old,omitempty"`
+	ReferencingNew    string   `json:"referencing_new,omitempty"`
+	Comment           string   `json:"comment,omitempty"`
 }
 
 // Enum represents a resolved enum type.
