@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -2528,6 +2529,307 @@ func TestW019_NoOverlap_NoDiag(t *testing.T) {
 		if d.Code == "W019" {
 			t.Fatalf("unexpected W019 when CHECKs are on different columns: %v", d)
 		}
+	}
+}
+
+func TestI002_DeadColumn(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "orders", Schema: "public", Comment: "Orders",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "status", PGType: "text", NotNull: true},
+					{Name: "orphan_col", PGType: "text", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_status", Expr: "status IN ('active', 'cancelled')"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I002")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 I002 diagnostic, got %d: %v", len(found), found)
+	}
+	if found[0].Column != "orphan_col" {
+		t.Errorf("expected I002 on orphan_col, got %s", found[0].Column)
+	}
+}
+
+func TestI002_AllColumnsReferenced_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "users", Schema: "public", Comment: "Users",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "org_id", PGType: "uuid", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "age", PGType: "integer", NotNull: true},
+					{Name: "full_name", PGType: "text", NotNull: true, Generated: "name || ' (user)'"},
+				},
+				FKs: []model.FK{
+					{Name: "fk_org", Columns: []string{"org_id"}, RefTable: "orgs", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				},
+				Uniques: []model.UniqueConstraint{
+					{Name: "uq_email", Columns: []string{"email"}},
+				},
+				Indexes: []model.Index{
+					{Name: "idx_name", Columns: []string{"name"}},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_age", Expr: "age >= 0"},
+				},
+			},
+			{
+				Name: "orgs", Schema: "public", Comment: "Organizations",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I002")
+	if len(found) != 0 {
+		t.Fatalf("expected no I002 diagnostics, got %d: %v", len(found), found)
+	}
+}
+
+func TestI002_FKRefColumnsReferenced(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "orders", Schema: "public", Comment: "Orders",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "code", PGType: "text", NotNull: true},
+				},
+			},
+			{
+				Name: "items", Schema: "public", Comment: "Items",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "order_id", PGType: "uuid", NotNull: true},
+				},
+				FKs: []model.FK{
+					{Name: "fk_order", Columns: []string{"order_id"}, RefTable: "orders", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I002")
+	// "code" on orders should be flagged (not in PK, not referenced by FK refcolumns, not in any constraint)
+	if len(found) != 1 {
+		t.Fatalf("expected 1 I002 diagnostic (for orders.code), got %d: %v", len(found), found)
+	}
+	if found[0].Table != "orders" || found[0].Column != "code" {
+		t.Errorf("expected I002 on orders.code, got %s.%s", found[0].Table, found[0].Column)
+	}
+}
+
+func TestI002_ViewReferenceSuppresses(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "products", Schema: "public", Comment: "Products",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "unreferenced", PGType: "text", NotNull: true},
+				},
+			},
+		},
+		Views: []model.View{
+			{Name: "v_products", Query: "SELECT * FROM products"},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I002")
+	if len(found) != 0 {
+		t.Fatalf("expected no I002 when view references table, got %d: %v", len(found), found)
+	}
+}
+
+func TestI002_PolicyUsingSuppresses(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "secrets", Schema: "public", Comment: "Secrets",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "owner_id", PGType: "uuid", NotNull: true},
+				},
+				EnableRLS: true,
+				Policies: []model.Policy{
+					{Name: "owner_only", Operation: "ALL", Using: "owner_id = current_user_id()"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I002")
+	if len(found) != 0 {
+		t.Fatalf("expected no I002 when policy USING references column, got %d: %v", len(found), found)
+	}
+}
+
+func TestI003_RowSizeToastThreshold(t *testing.T) {
+	cols := []model.Column{
+		{Name: "id", PGType: "uuid", NotNull: true},
+	}
+	for i := 0; i < 32; i++ {
+		cols = append(cols, model.Column{
+			Name:    fmt.Sprintf("data_%d", i),
+			PGType:  "jsonb",
+			NotNull: true,
+		})
+	}
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "wide_table", Schema: "public", Comment: "Wide table",
+				PK: []string{"id"},
+				Columns: cols,
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I003")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 I003 diagnostic, got %d: %v", len(found), found)
+	}
+}
+
+func TestW021_RowSizeExceedsPage(t *testing.T) {
+	cols := []model.Column{
+		{Name: "id", PGType: "uuid", NotNull: true},
+	}
+	for i := 0; i < 130; i++ {
+		cols = append(cols, model.Column{
+			Name:    fmt.Sprintf("blob_%d", i),
+			PGType:  "jsonb",
+			NotNull: true,
+		})
+	}
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "mega_table", Schema: "public", Comment: "Mega table",
+				PK: []string{"id"},
+				Columns: cols,
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W021")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 W021 diagnostic, got %d: %v", len(found), found)
+	}
+	// Should NOT also have I003 (W021 is exclusive with I003)
+	i003 := findByCode(diags, "I003")
+	if len(i003) != 0 {
+		t.Errorf("expected no I003 when W021 fires, got %d", len(i003))
+	}
+}
+
+func TestI003_SmallTable_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "users", Schema: "public", Comment: "Users",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true},
+					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "I003" || d.Code == "W021" {
+			t.Fatalf("unexpected row size diagnostic on small table: %v", d)
+		}
+	}
+}
+
+func TestI004_ColumnReordering(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "padded", Schema: "public", Comment: "Padded table",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "flag1", PGType: "boolean", NotNull: true},
+					{Name: "big1", PGType: "bigint", NotNull: true},
+					{Name: "flag2", PGType: "boolean", NotNull: true},
+					{Name: "big2", PGType: "bigint", NotNull: true},
+					{Name: "flag3", PGType: "boolean", NotNull: true},
+					{Name: "big3", PGType: "bigint", NotNull: true},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I004")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 I004 diagnostic, got %d: %v", len(found), found)
+	}
+}
+
+func TestI004_OptimalOrder_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "optimal", Schema: "public", Comment: "Optimal table",
+				PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "big1", PGType: "bigint", NotNull: true},
+					{Name: "big2", PGType: "bigint", NotNull: true},
+					{Name: "big3", PGType: "bigint", NotNull: true},
+					{Name: "flag1", PGType: "boolean", NotNull: true},
+					{Name: "flag2", PGType: "boolean", NotNull: true},
+					{Name: "flag3", PGType: "boolean", NotNull: true},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I004")
+	if len(found) != 0 {
+		t.Fatalf("expected no I004 for optimally ordered columns, got %d: %v", len(found), found)
+	}
+}
+
+func TestEstimateRowSize_KnownSchema(t *testing.T) {
+	cols := []model.Column{
+		{Name: "id", PGType: "uuid", NotNull: true},
+		{Name: "count", PGType: "integer", NotNull: true},
+		{Name: "total", PGType: "bigint", NotNull: true},
+	}
+	size, padding := estimateRowSize(cols)
+	// Header(24) + uuid(16)=40, int(4)=44, align-to-8=48, bigint(8)=56, +4 ItemId=60
+	// Padding: totalSize(60) - headerEnd(24) - rawData(16+4+8=28) = 8
+	if size != 60 {
+		t.Errorf("expected row size 60, got %d", size)
+	}
+	if padding != 8 {
+		t.Errorf("expected padding 8, got %d", padding)
 	}
 }
 
