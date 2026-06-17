@@ -2464,6 +2464,61 @@ func TestDiff_ExclusionChanged(t *testing.T) {
 	}
 }
 
+func TestDiff_UniqueChangedDeferrable(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:    "users",
+				Comment: "users table",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true},
+				},
+				PK: []string{"id"},
+				Uniques: []model.UniqueConstraint{
+					{Name: "uq_email", Columns: []string{"email"}, Deferrable: true, InitiallyDeferred: true},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:    "users",
+				Comment: "users table",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true},
+				},
+				PK: []string{"id"},
+				Uniques: []model.UniqueConstraint{
+					{Name: "uq_email", Columns: []string{"email"}},
+				},
+			},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 changed table, got %d", len(d.TablesChanged))
+	}
+	td := d.TablesChanged[0]
+	if len(td.UniquesRemoved) != 1 {
+		t.Fatalf("expected 1 unique removed (old version), got %d", len(td.UniquesRemoved))
+	}
+	if len(td.UniquesAdded) != 1 {
+		t.Fatalf("expected 1 unique added (new version), got %d", len(td.UniquesAdded))
+	}
+	if !td.UniquesAdded[0].Deferrable {
+		t.Error("expected added unique to be deferrable")
+	}
+	if !td.UniquesAdded[0].InitiallyDeferred {
+		t.Error("expected added unique to be initially deferred")
+	}
+}
+
 func TestDiff_SequenceAdded(t *testing.T) {
 	desired := &model.Schema{
 		Name: "public",

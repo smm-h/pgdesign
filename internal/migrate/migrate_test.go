@@ -2452,6 +2452,49 @@ func TestOpToSQL_DropExclusion(t *testing.T) {
 	}
 }
 
+func TestOpToSQL_AddUnique(t *testing.T) {
+	op := DDLOp{
+		Op:      "add_unique",
+		Table:   "users",
+		Name:    "uq_email",
+		Columns: []string{"email"},
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.users ADD CONSTRAINT uq_email UNIQUE (email);`
+	if got != want {
+		t.Errorf("OpToSQL(add_unique):\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestOpToSQL_AddUniqueDeferrable(t *testing.T) {
+	op := DDLOp{
+		Op:                "add_unique",
+		Table:             "users",
+		Name:              "uq_email",
+		Columns:           []string{"email"},
+		Deferrable:        true,
+		InitiallyDeferred: true,
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.users ADD CONSTRAINT uq_email UNIQUE (email) DEFERRABLE INITIALLY DEFERRED;`
+	if got != want {
+		t.Errorf("OpToSQL(add_unique deferrable):\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestOpToSQL_DropUnique(t *testing.T) {
+	op := DDLOp{
+		Op:    "drop_unique",
+		Table: "users",
+		Name:  "uq_email",
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.users DROP CONSTRAINT uq_email;`
+	if got != want {
+		t.Errorf("OpToSQL(drop_unique):\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
 func TestGenerateMigration_SequenceAdded(t *testing.T) {
 	desired := &model.Schema{
 		Name: "public",
