@@ -156,6 +156,7 @@ func (p *parser) walk() *RawSchema {
 	schema.Tables = p.parseTables()
 	schema.Views = p.parseViews()
 	schema.MaterializedViews = p.parseMaterializedViews()
+	schema.Sequences = p.parseSequences()
 	return schema
 }
 
@@ -494,6 +495,98 @@ func (p *parser) parseMaterializedView(name string, tbl *tomledit.TableNode) Raw
 	}
 
 	return rmv
+}
+
+// parseSequences extracts all [sequences.*] sections in source order.
+func (p *parser) parseSequences() []RawSequence {
+	var seqs []RawSequence
+
+	for _, child := range p.doc.Children {
+		tbl, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl.KeyPath) == 2 && tbl.KeyPath[0] == "sequences" {
+			seqName := tbl.KeyPath[1]
+			rs := p.parseSequence(seqName, tbl)
+			seqs = append(seqs, rs)
+		}
+	}
+
+	return seqs
+}
+
+func (p *parser) parseSequence(name string, tbl *tomledit.TableNode) RawSequence {
+	rs := RawSequence{Name: name}
+
+	knownKeys := map[string]bool{
+		"start": true, "increment": true, "min_value": true, "max_value": true,
+		"cache": true, "cycle": true, "owned_by": true, "comment": true,
+	}
+
+	for _, child := range tbl.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		key := kv.Key.Parts[0]
+		if !knownKeys[key] {
+			p.warnf("W001", "", "", "unknown key in [sequences.%s]: %q", name, key)
+			continue
+		}
+		switch key {
+		case "start":
+			if v, ok := nodeInt(kv.Val); ok {
+				rs.Start = &v
+			} else {
+				p.errorf("E010", "", "", "[sequences.%s].start must be an integer", name)
+			}
+		case "increment":
+			if v, ok := nodeInt(kv.Val); ok {
+				rs.Increment = &v
+			} else {
+				p.errorf("E010", "", "", "[sequences.%s].increment must be an integer", name)
+			}
+		case "min_value":
+			if v, ok := nodeInt(kv.Val); ok {
+				rs.MinValue = &v
+			} else {
+				p.errorf("E010", "", "", "[sequences.%s].min_value must be an integer", name)
+			}
+		case "max_value":
+			if v, ok := nodeInt(kv.Val); ok {
+				rs.MaxValue = &v
+			} else {
+				p.errorf("E010", "", "", "[sequences.%s].max_value must be an integer", name)
+			}
+		case "cache":
+			if v, ok := nodeInt(kv.Val); ok {
+				rs.Cache = &v
+			} else {
+				p.errorf("E010", "", "", "[sequences.%s].cache must be an integer", name)
+			}
+		case "cycle":
+			if v, ok := nodeBool(kv.Val); ok {
+				rs.Cycle = &v
+			} else {
+				p.errorf("E010", "", "", "[sequences.%s].cycle must be a boolean", name)
+			}
+		case "owned_by":
+			if v, ok := nodeString(kv.Val); ok {
+				rs.OwnedBy = &v
+			} else {
+				p.errorf("E010", "", "", "[sequences.%s].owned_by must be a string", name)
+			}
+		case "comment":
+			if v, ok := nodeString(kv.Val); ok {
+				rs.Comment = &v
+			} else {
+				p.errorf("E010", "", "", "[sequences.%s].comment must be a string", name)
+			}
+		}
+	}
+
+	return rs
 }
 
 func (p *parser) parseTable(name string) RawTable {

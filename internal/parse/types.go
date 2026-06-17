@@ -10,6 +10,7 @@ type RawSchema struct {
 	Tables            []RawTable
 	Views             []RawView
 	MaterializedViews []RawMaterializedView
+	Sequences         []RawSequence
 }
 
 // RawMeta holds the [meta] section values.
@@ -50,6 +51,19 @@ type RawMaterializedView struct {
 	DependsOn []string
 	WithData  *bool
 	Indexes   map[string]RawIndex
+}
+
+// RawSequence holds a sequence definition from [sequences.*].
+type RawSequence struct {
+	Name      string
+	Start     *int64
+	Increment *int64
+	MinValue  *int64
+	MaxValue  *int64
+	Cache     *int64
+	Cycle     *bool
+	OwnedBy   *string
+	Comment   *string
 }
 
 // RawTable holds a table definition from [tables.*].
