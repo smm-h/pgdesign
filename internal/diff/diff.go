@@ -64,7 +64,9 @@ type ColumnChange struct {
 	StoredChanged    *[2]bool            `json:"stored_changed,omitempty"`    // [old, new]
 	IdentityChanged  *[2]string          `json:"identity_changed,omitempty"`  // [old, new]
 	ArrayChanged      *[2]bool            `json:"array_changed,omitempty"`
+	CollationChanged  *[2]string          `json:"collation_changed,omitempty"`
 	JSONSchemaChanged *[2]string          `json:"json_schema_changed,omitempty"`
+	StatisticsChanged *[2]*int            `json:"statistics_changed,omitempty"`
 	Risk              risk.Classification `json:"risk"`
 }
 
@@ -391,6 +393,18 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 		changed = true
 	}
 
+	// Collation comparison.
+	if desired.Collation != actual.Collation {
+		cc.CollationChanged = &[2]string{actual.Collation, desired.Collation}
+		changed = true
+	}
+
+	// Statistics comparison.
+	if !intPtrEqual(desired.Statistics, actual.Statistics) {
+		cc.StatisticsChanged = &[2]*int{actual.Statistics, desired.Statistics}
+		changed = true
+	}
+
 	if !changed {
 		return nil
 	}
@@ -446,6 +460,14 @@ func classifyColumnChange(cc *ColumnChange, desired *model.Column) risk.Classifi
 	if cc.StoredChanged != nil {
 		// STORED <-> VIRTUAL requires DROP + recreate of the generated column.
 		c := risk.Classify(risk.OpDropColumn, risk.OpContext{})
+		if c.RiskLevel > highest.RiskLevel {
+			highest = c
+		}
+	}
+
+	if cc.CollationChanged != nil {
+		// Collation change requires ALTER COLUMN TYPE ... COLLATE.
+		c := risk.Classify(risk.OpAlterColumnType, risk.OpContext{})
 		if c.RiskLevel > highest.RiskLevel {
 			highest = c
 		}
@@ -585,6 +607,7 @@ func indexEqual(a, b *model.Index) bool {
 		boolSliceEqual(a.Desc, b.Desc) &&
 		a.Method == b.Method &&
 		mapEqual(a.Opclasses, b.Opclasses) &&
+		mapEqual(a.Collations, b.Collations) &&
 		a.Where == b.Where &&
 		sliceEqual(a.Include, b.Include) &&
 		mapEqual(a.With, b.With)
@@ -1024,4 +1047,16 @@ func sliceEqual(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// intPtrEqual returns true if two *int pointers represent the same value.
+// nil and nil are equal; nil and non-nil are not.
+func intPtrEqual(a, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
