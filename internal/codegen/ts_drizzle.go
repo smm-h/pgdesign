@@ -25,22 +25,8 @@ func (g *TSDrizzleGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		return buf.Bytes(), nil
 	}
 
-	// Pre-compute reverse FK map: for each table, which other tables reference it
-	// via single-column FKs.
-	type reverseFK struct {
-		SourceTable  string
-		SourceColumn string
-	}
-	reverseFKs := make(map[string][]reverseFK)
-	for _, tbl := range schema.Tables {
-		for _, fk := range tbl.FKs {
-			if len(fk.Columns) == 1 {
-				reverseFKs[fk.RefTable] = append(reverseFKs[fk.RefTable], reverseFK{
-					SourceTable:  tbl.Name,
-					SourceColumn: fk.Columns[0],
-				})
-			}
-		}
+	if schema.FKGraph == nil {
+		schema.BuildFKGraph()
 	}
 
 	// First pass: collect all table info and track required imports.
@@ -207,17 +193,26 @@ func (g *TSDrizzleGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		}
 
 		// Collect incoming FK relations (many).
-		if refs, ok := reverseFKs[tbl.Name]; ok {
-			needRelations = true
-			ri := ensureRelInfo(tbl.Name, varName)
-			for _, ref := range refs {
-				fieldName := toCamelCase(ref.SourceTable)
+		if edges := schema.FKGraph.Reverse[tbl.Name]; len(edges) > 0 {
+			fkColCount := make(map[string]int)
+			for _, e := range edges {
+				fkColCount[e.FKName]++
+			}
+			seen := make(map[string]bool)
+			for _, e := range edges {
+				if fkColCount[e.FKName] != 1 || seen[e.FKName] {
+					continue
+				}
+				seen[e.FKName] = true
+				needRelations = true
+				ri := ensureRelInfo(tbl.Name, varName)
+				fieldName := toCamelCase(e.FromTable)
 				if !strings.HasSuffix(fieldName, "s") {
 					fieldName += "s"
 				}
 				ri.Manys = append(ri.Manys, manyRelation{
 					FieldName: fieldName,
-					RefVar:    toCamelCase(ref.SourceTable),
+					RefVar:    toCamelCase(e.FromTable),
 				})
 			}
 		}
