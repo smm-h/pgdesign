@@ -117,6 +117,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W017", checkRedundantNullCheck},
 		{"W018", checkDomainCheckDuplicate},
 		{"W019", checkRangeSubsumption},
+		{"I002", checkDeadColumn},
 	}
 
 	for _, r := range rules {
@@ -2108,6 +2109,190 @@ func highBoundCovers(outerHigh *float64, outerIncl bool, innerHigh *float64, inn
 		return true
 	}
 	return !innerIncl
+}
+
+// checkDeadColumn (I002): column not referenced by any constraint, index, policy, or generated column.
+func checkDeadColumn(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		// Build the set of column names for extractColumnRefs context.
+		columnNames := make([]string, len(t.Columns))
+		for i, col := range t.Columns {
+			columnNames[i] = col.Name
+		}
+
+		referenced := make(map[string]bool)
+
+		// PK columns.
+		for _, col := range t.PK {
+			referenced[col] = true
+		}
+
+		// FK source columns.
+		for _, fk := range t.FKs {
+			for _, col := range fk.Columns {
+				referenced[col] = true
+			}
+		}
+
+		// Unique constraint columns.
+		for _, u := range t.Uniques {
+			for _, col := range u.Columns {
+				referenced[col] = true
+			}
+		}
+
+		// Index columns and include columns.
+		for _, idx := range t.Indexes {
+			for _, col := range idx.Columns {
+				referenced[col] = true
+			}
+			for _, col := range idx.Include {
+				referenced[col] = true
+			}
+			// Index WHERE clause.
+			if idx.Where != "" {
+				refs, diag := extractColumnRefs(idx.Where, fmt.Sprintf("index %s WHERE on %s", idx.Name, t.Name))
+				if diag == nil {
+					for _, r := range refs {
+						referenced[r] = true
+					}
+				}
+			}
+		}
+
+		// Exclusion constraint columns and WHERE clauses.
+		for _, excl := range t.Exclusions {
+			for _, elem := range excl.Elements {
+				referenced[elem.Column] = true
+			}
+			if excl.Where != "" {
+				refs, diag := extractColumnRefs(excl.Where, fmt.Sprintf("exclusion %s WHERE on %s", excl.Name, t.Name))
+				if diag == nil {
+					for _, r := range refs {
+						referenced[r] = true
+					}
+				}
+			}
+		}
+
+		// Partition columns.
+		if t.Partitioning != nil {
+			for _, col := range t.Partitioning.Columns {
+				referenced[col] = true
+			}
+		}
+
+		// CHECK constraint expressions.
+		for _, chk := range t.Checks {
+			refs, diag := extractColumnRefs(chk.Expr, fmt.Sprintf("CHECK %s on %s", chk.Name, t.Name))
+			if diag == nil {
+				for _, r := range refs {
+					referenced[r] = true
+				}
+			}
+		}
+
+		// Generated column expressions.
+		for _, col := range t.Columns {
+			if col.Generated != "" {
+				refs, diag := extractColumnRefs(col.Generated, fmt.Sprintf("generated column %s.%s", t.Name, col.Name))
+				if diag == nil {
+					for _, r := range refs {
+						referenced[r] = true
+					}
+				}
+			}
+		}
+
+		// RLS policy expressions.
+		for _, policy := range t.Policies {
+			if policy.Using != "" {
+				refs, diag := extractColumnRefs(policy.Using, fmt.Sprintf("policy %s USING on %s", policy.Name, t.Name))
+				if diag == nil {
+					for _, r := range refs {
+						referenced[r] = true
+					}
+				}
+			}
+			if policy.WithCheck != "" {
+				refs, diag := extractColumnRefs(policy.WithCheck, fmt.Sprintf("policy %s WITH CHECK on %s", policy.Name, t.Name))
+				if diag == nil {
+					for _, r := range refs {
+						referenced[r] = true
+					}
+				}
+			}
+		}
+
+		// Trigger WHEN clauses.
+		for _, trigger := range t.Triggers {
+			if trigger.When != "" {
+				refs, diag := extractColumnRefs(trigger.When, fmt.Sprintf("trigger %s WHEN on %s", trigger.Name, t.Name))
+				if diag == nil {
+					for _, r := range refs {
+						referenced[r] = true
+					}
+				}
+			}
+		}
+
+		// FK references from other tables.
+		for _, other := range schema.Tables {
+			for _, fk := range other.FKs {
+				if fk.RefTable == t.Name {
+					for _, col := range fk.RefColumns {
+						referenced[col] = true
+					}
+				}
+			}
+		}
+
+		// Views referencing this table: mark all columns as referenced.
+		for _, view := range schema.Views {
+			if strings.Contains(view.Query, t.Name) {
+				for _, col := range t.Columns {
+					referenced[col.Name] = true
+				}
+			}
+		}
+
+		// Materialized views referencing this table: mark all columns as referenced.
+		for _, mv := range schema.MaterializedViews {
+			if strings.Contains(mv.Query, t.Name) {
+				for _, col := range t.Columns {
+					referenced[col.Name] = true
+				}
+			}
+		}
+
+		// Functions depending on this table: mark all columns as referenced.
+		for _, fn := range schema.Functions {
+			for _, dep := range fn.DependsOn {
+				if dep == t.Name {
+					for _, col := range t.Columns {
+						referenced[col.Name] = true
+					}
+					break
+				}
+			}
+		}
+
+		// Report unreferenced columns.
+		for _, col := range t.Columns {
+			if !referenced[col.Name] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Info,
+					Code:       "I002",
+					Table:      t.Name,
+					Column:     col.Name,
+					Message:    fmt.Sprintf("column %s.%s is not referenced by any constraint, index, policy, or generated column", t.Name, col.Name),
+					Suggestion: "Verify this column is needed; unreferenced columns may indicate incomplete schema design",
+				})
+			}
+		}
+	}
+	return diags
 }
 
 // --- Helpers ---
