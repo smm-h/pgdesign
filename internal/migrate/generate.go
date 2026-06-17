@@ -237,6 +237,23 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		diags = append(diags, classifyOp(op, risk.OpCreateSequence, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
+	// Functions added.
+	for _, fnName := range d.FunctionsAdded {
+		fn := findFunction(desired, fnName)
+		schema, name := splitQualifiedName(fnName)
+		op := DDLOp{
+			Op:          "create_function",
+			Name:        name,
+			Schema:      schema,
+			FunctionDef: fn,
+			Down: &DownOp{
+				Ops: []DDLOp{{Op: "drop_function", Name: name, Schema: schema, FunctionDef: fn}},
+			},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpCreateFunction, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
 	// Phase 2: Table changes (add columns, alter columns, add constraints).
 	for _, td := range d.TablesChanged {
 		ctx := tableCtx(td.Name)
@@ -840,6 +857,55 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		diags = append(diags, classifyOp(op, risk.OpAlterSequence, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
+	// Function changes.
+	for _, fd := range d.FunctionsChanged {
+		fn := findFunction(desired, fd.Name)
+		schema, name := splitQualifiedName(fd.Name)
+		if fd.SignatureChanged {
+			// Signature change: DROP + CREATE (CREATE OR REPLACE cannot change signature).
+			dropOp := DDLOp{
+				Op:          "drop_function",
+				Name:        name,
+				Schema:      schema,
+				FunctionDef: fn, // need old function for DROP arg types; use new for now
+				Down:        &DownOp{Irreversible: true},
+			}
+			m.DDLOps = append(m.DDLOps, dropOp)
+			diags = append(diags, classifyOp(dropOp, risk.OpDropFunction, risk.OpContext{PGVersion: desired.PGVersion})...)
+
+			// Emit warning about cascade risk.
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Warning,
+				Code:       "FUNCTION_SIGNATURE_CHANGE",
+				Message:    fmt.Sprintf("Function %s signature changed; DROP FUNCTION may CASCADE to dependent triggers, views, or rules", fd.Name),
+				Suggestion: "Review dependents before applying this migration",
+			})
+
+			createOp := DDLOp{
+				Op:          "create_function",
+				Name:        name,
+				Schema:      schema,
+				FunctionDef: fn,
+				Down: &DownOp{
+					Ops: []DDLOp{{Op: "drop_function", Name: name, Schema: schema, FunctionDef: fn}},
+				},
+			}
+			m.DDLOps = append(m.DDLOps, createOp)
+			diags = append(diags, classifyOp(createOp, risk.OpCreateFunction, risk.OpContext{PGVersion: desired.PGVersion})...)
+		} else {
+			// Body-only or attribute change: CREATE OR REPLACE is safe.
+			op := DDLOp{
+				Op:          "create_or_replace_function",
+				Name:        name,
+				Schema:      schema,
+				FunctionDef: fn,
+				Down:        &DownOp{Irreversible: true},
+			}
+			m.DDLOps = append(m.DDLOps, op)
+			diags = append(diags, classifyOp(op, risk.OpCreateOrReplaceFunction, risk.OpContext{PGVersion: desired.PGVersion})...)
+		}
+	}
+
 	// Phase 3: Drops (enums last, tables before enums).
 	for _, tableName := range d.TablesRemoved {
 		ctx := tableCtx(tableName)
@@ -908,6 +974,23 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 		m.DDLOps = append(m.DDLOps, op)
 		diags = append(diags, classifyOp(op, risk.OpDropCompositeType, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
+	// Drop functions.
+	for _, fnName := range d.FunctionsRemoved {
+		fn := findFunction(desired, fnName)
+		// fn may be nil since it's being removed (not in desired). Look in actual.
+		// For DDLOp we still need fn for DROP args. If nil, create minimal.
+		schema, name := splitQualifiedName(fnName)
+		op := DDLOp{
+			Op:          "drop_function",
+			Name:        name,
+			Schema:      schema,
+			FunctionDef: fn,
+			Down:        &DownOp{Irreversible: true},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpDropFunction, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
 	return m, diags
@@ -1261,6 +1344,19 @@ func generateDescription(d *diff.SchemaDiff) string {
 		}
 		parts = append(parts, fmt.Sprintf("Alter composite type %s", strings.Join(names, ", ")))
 	}
+	if len(d.FunctionsAdded) > 0 {
+		parts = append(parts, fmt.Sprintf("Add function %s", strings.Join(d.FunctionsAdded, ", ")))
+	}
+	if len(d.FunctionsRemoved) > 0 {
+		parts = append(parts, fmt.Sprintf("Drop function %s", strings.Join(d.FunctionsRemoved, ", ")))
+	}
+	if len(d.FunctionsChanged) > 0 {
+		names := make([]string, len(d.FunctionsChanged))
+		for i, fd := range d.FunctionsChanged {
+			names[i] = fd.Name
+		}
+		parts = append(parts, fmt.Sprintf("Alter function %s", strings.Join(names, ", ")))
+	}
 	if len(parts) == 0 {
 		return "Schema migration"
 	}
@@ -1387,4 +1483,20 @@ func findCompositeType(schema *model.Schema, qualifiedName string) *model.Compos
 		}
 	}
 	return nil
+}
+
+func findFunction(schema *model.Schema, qualifiedName string) *model.Function {
+	for i := range schema.Functions {
+		if funcKey(schema.Functions[i]) == qualifiedName {
+			return &schema.Functions[i]
+		}
+	}
+	return nil
+}
+
+func funcKey(f model.Function) string {
+	if f.Schema == "" || f.Schema == "public" {
+		return f.Name
+	}
+	return f.Schema + "." + f.Name
 }

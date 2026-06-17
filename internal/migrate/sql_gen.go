@@ -102,6 +102,8 @@ func OpToSQL(op DDLOp) string {
 		return opCreateCompositeType(op)
 	case "drop_composite_type":
 		return opDropCompositeType(op)
+	case "create_or_replace_function":
+		return opCreateOrReplaceFunction(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -414,11 +416,27 @@ func opSetOwner(op DDLOp) string {
 }
 
 func opCreateFunction(op DDLOp) string {
+	if op.FunctionDef != nil {
+		schema := op.Schema
+		if schema == "" {
+			schema = "public"
+		}
+		return sql.CreateFunction(schema, *op.FunctionDef)
+	}
+	// Legacy: append-only deny mutation function.
 	schema, _ := splitQualifiedName(op.Table)
 	return sql.CreateDenyMutationFunction(schema)
 }
 
 func opDropFunction(op DDLOp) string {
+	if op.FunctionDef != nil {
+		schema := op.Schema
+		if schema == "" {
+			schema = "public"
+		}
+		return sql.DropFunction(schema, *op.FunctionDef, false)
+	}
+	// Legacy: append-only deny mutation function.
 	schema, _ := splitQualifiedName(op.Table)
 	qualified := sql.QualifiedName(schema, "pgdesign_deny_mutation")
 	return fmt.Sprintf("DROP FUNCTION IF EXISTS %s();", qualified)
@@ -568,6 +586,18 @@ func opCreateCompositeType(op DDLOp) string {
 		return fmt.Sprintf("-- create_composite_type: missing definition for %s.%s", op.Schema, op.Name)
 	}
 	return fmt.Sprintf("-- create_composite_type: missing definition for %s", op.Name)
+}
+
+func opCreateOrReplaceFunction(op DDLOp) string {
+	if op.FunctionDef != nil {
+		schema := op.Schema
+		if schema == "" {
+			schema = "public"
+		}
+		// sql.CreateFunction already emits CREATE OR REPLACE.
+		return sql.CreateFunction(schema, *op.FunctionDef)
+	}
+	return fmt.Sprintf("-- create_or_replace_function: missing function definition for %s", op.Name)
 }
 
 func opDropCompositeType(op DDLOp) string {
