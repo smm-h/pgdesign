@@ -84,6 +84,9 @@ const (
 	OpCreateMaterializedView  OpType = "create_materialized_view"
 	OpDropMaterializedView    OpType = "drop_materialized_view"
 	OpRefreshMaterializedView OpType = "refresh_materialized_view"
+	OpCreateSequence          OpType = "create_sequence"
+	OpDropSequence            OpType = "drop_sequence"
+	OpAlterSequence           OpType = "alter_sequence"
 )
 
 // OpContext provides context about the operation environment for risk assessment.
@@ -325,6 +328,28 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			LockType:   LockAccessExclusive,
 			Reversible: false,
 			Suggestion: "REFRESH locks the materialized view; consider CONCURRENTLY",
+		}
+
+	case OpCreateSequence:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
+		}
+
+	case OpDropSequence:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockAccessExclusive,
+			Reversible: false,
+			Suggestion: "Dependents (columns using nextval) may break",
+		}
+
+	case OpAlterSequence:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
 		}
 
 	default:
