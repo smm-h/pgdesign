@@ -133,6 +133,16 @@ func Export(schema *model.Schema) ([]byte, error) {
 				return nil, fmt.Errorf("set %s.pk: %w", tblPath, err)
 			}
 		}
+		if t.EnableRLS {
+			if err := doc.SetCreate(tblPath+".enable_rls", true); err != nil {
+				return nil, fmt.Errorf("set %s.enable_rls: %w", tblPath, err)
+			}
+		}
+		if t.ForceRLS {
+			if err := doc.SetCreate(tblPath+".force_rls", true); err != nil {
+				return nil, fmt.Errorf("set %s.force_rls: %w", tblPath, err)
+			}
+		}
 
 		// Columns
 		for _, c := range t.Columns {
@@ -365,6 +375,41 @@ func Export(schema *model.Schema) ([]byte, error) {
 					return nil, fmt.Errorf("set %s.referencing_new: %w", trigPath, err)
 				}
 			}
+		}
+
+		// Policies
+		for _, pol := range t.Policies {
+			polPath := tblPath + ".policies." + pol.Name
+			if err := doc.NewTable(polPath); err != nil {
+				return nil, fmt.Errorf("create policy %s: %w", polPath, err)
+			}
+			if pol.Type != "" && pol.Type != "PERMISSIVE" {
+				if err := doc.SetCreate(polPath+".type", pol.Type); err != nil {
+					return nil, fmt.Errorf("set %s.type: %w", polPath, err)
+				}
+			}
+			if pol.Operation != "" && pol.Operation != "ALL" {
+				if err := doc.SetCreate(polPath+".for", pol.Operation); err != nil {
+					return nil, fmt.Errorf("set %s.for: %w", polPath, err)
+				}
+			}
+			if pol.Role != "" {
+				if err := doc.SetCreate(polPath+".to", pol.Role); err != nil {
+					return nil, fmt.Errorf("set %s.to: %w", polPath, err)
+				}
+			}
+			if pol.Using != "" {
+				if err := doc.SetCreate(polPath+".using", pol.Using); err != nil {
+					return nil, fmt.Errorf("set %s.using: %w", polPath, err)
+				}
+			}
+			if pol.WithCheck != "" {
+				if err := doc.SetCreate(polPath+".with_check", pol.WithCheck); err != nil {
+					return nil, fmt.Errorf("set %s.with_check: %w", polPath, err)
+				}
+			}
+			// NOTE: Do NOT emit error_code or error_message -- these are
+			// pgdesign-only metadata not present in pg_catalog.
 		}
 	}
 
