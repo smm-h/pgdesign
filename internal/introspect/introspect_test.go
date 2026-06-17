@@ -151,6 +151,24 @@ func TestMain(m *testing.M) {
 			WHERE published = true
 			ORDER BY created_at DESC;
 		COMMENT ON MATERIALIZED VIEW ` + testSchema + `.recent_posts IS 'Recent published posts';
+
+		-- RLS: enable RLS on users table and create policies
+		ALTER TABLE ` + testSchema + `.users ENABLE ROW LEVEL SECURITY;
+		ALTER TABLE ` + testSchema + `.users FORCE ROW LEVEL SECURITY;
+
+		CREATE POLICY users_select_policy ON ` + testSchema + `.users
+			FOR SELECT
+			USING (status = 'active');
+
+		CREATE POLICY users_insert_policy ON ` + testSchema + `.users
+			FOR INSERT
+			WITH CHECK (length(name) > 0);
+
+		CREATE POLICY users_restrictive ON ` + testSchema + `.users
+			AS RESTRICTIVE
+			FOR UPDATE
+			USING (id = current_setting('app.user_id')::bigint)
+			WITH CHECK (id = current_setting('app.user_id')::bigint);
 	`
 
 	_, execErr := conn.Exec(ctx, setupSQL)
@@ -1203,6 +1221,113 @@ func TestExportDomains(t *testing.T) {
 	}
 }
 
+func TestIntrospectRLSFlags(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	users := findTable(schema.Tables, "users")
+	if users == nil {
+		t.Fatal("users table not found")
+	}
+
+	if !users.EnableRLS {
+		t.Error("users.EnableRLS = false, want true")
+	}
+	if !users.ForceRLS {
+		t.Error("users.ForceRLS = false, want true")
+	}
+
+	// posts should NOT have RLS enabled.
+	posts := findTable(schema.Tables, "posts")
+	if posts == nil {
+		t.Fatal("posts table not found")
+	}
+	if posts.EnableRLS {
+		t.Error("posts.EnableRLS = true, want false")
+	}
+	if posts.ForceRLS {
+		t.Error("posts.ForceRLS = true, want false")
+	}
+}
+
+func TestIntrospectPolicies(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	users := findTable(schema.Tables, "users")
+	if users == nil {
+		t.Fatal("users table not found")
+	}
+
+	if len(users.Policies) != 3 {
+		names := make([]string, len(users.Policies))
+		for i, p := range users.Policies {
+			names[i] = p.Name
+		}
+		t.Fatalf("len(users.Policies) = %d, want 3; got: %v", len(users.Policies), names)
+	}
+
+	// Policies are ordered by name: users_insert_policy, users_restrictive, users_select_policy
+	insert := users.Policies[0]
+	if insert.Name != "users_insert_policy" {
+		t.Errorf("Policies[0].Name = %q, want %q", insert.Name, "users_insert_policy")
+	}
+	if insert.Operation != "INSERT" {
+		t.Errorf("insert.Operation = %q, want %q", insert.Operation, "INSERT")
+	}
+	if insert.Using != "" {
+		t.Errorf("insert.Using = %q, want empty", insert.Using)
+	}
+	if insert.WithCheck != "(length(name) > 0)" && insert.WithCheck != "length(name) > 0" {
+		// PG may or may not add outer parens
+		t.Errorf("insert.WithCheck = %q, want contains 'length(name) > 0'", insert.WithCheck)
+	}
+	if insert.Type != "" {
+		t.Errorf("insert.Type = %q, want empty (PERMISSIVE default)", insert.Type)
+	}
+	if insert.Role != "" {
+		t.Errorf("insert.Role = %q, want empty (PUBLIC)", insert.Role)
+	}
+
+	restrictive := users.Policies[1]
+	if restrictive.Name != "users_restrictive" {
+		t.Errorf("Policies[1].Name = %q, want %q", restrictive.Name, "users_restrictive")
+	}
+	if restrictive.Type != "RESTRICTIVE" {
+		t.Errorf("restrictive.Type = %q, want %q", restrictive.Type, "RESTRICTIVE")
+	}
+	if restrictive.Operation != "UPDATE" {
+		t.Errorf("restrictive.Operation = %q, want %q", restrictive.Operation, "UPDATE")
+	}
+	if restrictive.Using == "" {
+		t.Error("restrictive.Using is empty, want non-empty")
+	}
+	if restrictive.WithCheck == "" {
+		t.Error("restrictive.WithCheck is empty, want non-empty")
+	}
+
+	selectPol := users.Policies[2]
+	if selectPol.Name != "users_select_policy" {
+		t.Errorf("Policies[2].Name = %q, want %q", selectPol.Name, "users_select_policy")
+	}
+	if selectPol.Operation != "SELECT" {
+		t.Errorf("select.Operation = %q, want %q", selectPol.Operation, "SELECT")
+	}
+
+	// posts should have no policies.
+	posts := findTable(schema.Tables, "posts")
+	if posts == nil {
+		t.Fatal("posts table not found")
+	}
+	if len(posts.Policies) != 0 {
+		t.Errorf("posts.Policies = %d, want 0", len(posts.Policies))
+	}
+}
+
 func TestDecodeTriggerTiming(t *testing.T) {
 	tests := []struct {
 		tgtype int16
@@ -1290,5 +1415,129 @@ func TestExtractTriggerWhen(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("extractTriggerWhen(%q) = %q, want %q", tt.triggerdef, got, tt.want)
 		}
+	}
+}
+
+func TestMapPolCmd(t *testing.T) {
+	tests := []struct {
+		cmd  string
+		want string
+	}{
+		{"*", "ALL"},
+		{"r", "SELECT"},
+		{"a", "INSERT"},
+		{"w", "UPDATE"},
+		{"d", "DELETE"},
+		{"x", "ALL"}, // unknown defaults to ALL
+	}
+	for _, tt := range tests {
+		got := mapPolCmd(tt.cmd)
+		if got != tt.want {
+			t.Errorf("mapPolCmd(%q) = %q, want %q", tt.cmd, got, tt.want)
+		}
+	}
+}
+
+func TestExportRLSPolicies(t *testing.T) {
+	schema := &model.Schema{
+		Name: "test",
+		Tables: []model.Table{{
+			Name:      "items",
+			Comment:   "Test table",
+			EnableRLS: true,
+			ForceRLS:  true,
+			Policies: []model.Policy{
+				{
+					Name:      "items_select",
+					Type:      "RESTRICTIVE",
+					Operation: "SELECT",
+					Role:      "app_user",
+					Using:     "owner_id = current_user_id()",
+				},
+				{
+					Name:      "items_insert",
+					Operation: "INSERT",
+					WithCheck: "owner_id = current_user_id()",
+				},
+			},
+		}},
+	}
+
+	out, err := Export(schema)
+	if err != nil {
+		t.Fatalf("Export failed: %v", err)
+	}
+
+	s := string(out)
+
+	// Check enable_rls and force_rls
+	if !strings.Contains(s, "enable_rls = true") {
+		t.Errorf("expected enable_rls = true in output, got:\n%s", s)
+	}
+	if !strings.Contains(s, "force_rls = true") {
+		t.Errorf("expected force_rls = true in output, got:\n%s", s)
+	}
+
+	// Check policy table headers
+	if !strings.Contains(s, "[tables.items.policies.items_select]") {
+		t.Errorf("expected [tables.items.policies.items_select] in output, got:\n%s", s)
+	}
+	if !strings.Contains(s, "[tables.items.policies.items_insert]") {
+		t.Errorf("expected [tables.items.policies.items_insert] in output, got:\n%s", s)
+	}
+
+	// Check policy fields
+	if !strings.Contains(s, `type = "RESTRICTIVE"`) {
+		t.Errorf("expected type = RESTRICTIVE in output, got:\n%s", s)
+	}
+	if !strings.Contains(s, `for = "SELECT"`) {
+		t.Errorf("expected for = SELECT in output, got:\n%s", s)
+	}
+	if !strings.Contains(s, `to = "app_user"`) {
+		t.Errorf("expected to = app_user in output, got:\n%s", s)
+	}
+	if !strings.Contains(s, `using = "owner_id = current_user_id()"`) {
+		t.Errorf("expected using expr in output, got:\n%s", s)
+	}
+	if !strings.Contains(s, `with_check = "owner_id = current_user_id()"`) {
+		t.Errorf("expected with_check expr in output, got:\n%s", s)
+	}
+
+	// error_code and error_message should NOT be exported
+	if strings.Contains(s, "error_code") {
+		t.Errorf("error_code should not be in output, got:\n%s", s)
+	}
+	if strings.Contains(s, "error_message") {
+		t.Errorf("error_message should not be in output, got:\n%s", s)
+	}
+
+	// A permissive ALL policy should NOT emit type or for
+	schema2 := &model.Schema{
+		Name: "test",
+		Tables: []model.Table{{
+			Name:      "things",
+			Comment:   "Test",
+			EnableRLS: true,
+			Policies: []model.Policy{{
+				Name:  "things_all",
+				Using: "true",
+			}},
+		}},
+	}
+	out2, err := Export(schema2)
+	if err != nil {
+		t.Fatalf("Export failed: %v", err)
+	}
+	s2 := string(out2)
+	if !strings.Contains(s2, "[tables.things.policies.things_all]") {
+		t.Errorf("expected policy header in output, got:\n%s", s2)
+	}
+	// Should NOT contain type or for keys for default values
+	// Check that the policy section doesn't contain "type" or "for" keys
+	if strings.Contains(s2, `type = "PERMISSIVE"`) {
+		t.Errorf("should not emit type = PERMISSIVE (it's the default), got:\n%s", s2)
+	}
+	if strings.Contains(s2, `for = "ALL"`) {
+		t.Errorf("should not emit for = ALL (it's the default), got:\n%s", s2)
 	}
 }
