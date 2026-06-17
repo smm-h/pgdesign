@@ -3252,3 +3252,172 @@ func TestOpToSQL_AlterDomainDropNotNull(t *testing.T) {
 		t.Errorf("expected DROP NOT NULL, got: %q", got)
 	}
 }
+
+func TestGenerateMigration_TriggerOnNewTable(t *testing.T) {
+	d := &diff.SchemaDiff{
+		TablesAdded: []string{"orders"},
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "orders", Schema: "public",
+				Comment: "Order table",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+				},
+				Triggers: []model.Trigger{
+					{Name: "audit_insert", Function: "audit_fn", Events: []string{"INSERT"}, Timing: "AFTER", ForEach: "ROW"},
+				},
+			},
+		},
+	}
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, nil)
+	// Find the create_trigger op.
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_trigger" && op.Name == "audit_insert" {
+			found = true
+			if op.TriggerDef == nil {
+				t.Error("expected TriggerDef to be set")
+			}
+			if op.TriggerDef.Function != "audit_fn" {
+				t.Errorf("expected function audit_fn, got %s", op.TriggerDef.Function)
+			}
+			if op.Table != "orders" {
+				t.Errorf("expected table orders, got %s", op.Table)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected create_trigger op for audit_insert")
+	}
+}
+
+func TestGenerateMigration_TriggerAdded(t *testing.T) {
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "orders",
+				TriggersAdded: []model.Trigger{
+					{Name: "audit_insert", Function: "audit_fn", Events: []string{"INSERT"}, Timing: "AFTER", ForEach: "ROW"},
+				},
+			},
+		},
+	}
+	desired := &model.Schema{PGVersion: 14}
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, nil)
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_trigger" && op.Name == "audit_insert" {
+			found = true
+			if op.TriggerDef == nil {
+				t.Error("expected TriggerDef to be set")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected create_trigger op")
+	}
+}
+
+func TestGenerateMigration_TriggerRemoved(t *testing.T) {
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name:            "orders",
+				TriggersRemoved: []string{"audit_insert"},
+			},
+		},
+	}
+	desired := &model.Schema{PGVersion: 14}
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, nil)
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_trigger" && op.Name == "audit_insert" {
+			found = true
+			if op.Table != "orders" {
+				t.Errorf("expected table orders, got %s", op.Table)
+			}
+		}
+	}
+	if !found {
+		t.Error("expected drop_trigger op")
+	}
+}
+
+func TestGenerateMigration_TriggerChanged(t *testing.T) {
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "orders",
+				TriggersChanged: []diff.TriggerChange{
+					{
+						Name: "audit_insert",
+						Old:  model.Trigger{Name: "audit_insert", Function: "old_fn", Events: []string{"INSERT"}, Timing: "AFTER", ForEach: "ROW"},
+						New:  model.Trigger{Name: "audit_insert", Function: "new_fn", Events: []string{"INSERT", "UPDATE"}, Timing: "AFTER", ForEach: "ROW"},
+					},
+				},
+			},
+		},
+	}
+	desired := &model.Schema{PGVersion: 14}
+	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, nil)
+	// Expect drop_trigger followed by create_trigger.
+	dropFound := false
+	createFound := false
+	for _, op := range m.DDLOps {
+		if op.Op == "drop_trigger" && op.Name == "audit_insert" {
+			dropFound = true
+		}
+		if op.Op == "create_trigger" && op.Name == "audit_insert" {
+			createFound = true
+			if op.TriggerDef == nil {
+				t.Error("expected TriggerDef to be set")
+			} else if op.TriggerDef.Function != "new_fn" {
+				t.Errorf("expected new function new_fn, got %s", op.TriggerDef.Function)
+			}
+		}
+	}
+	if !dropFound {
+		t.Error("expected drop_trigger op for changed trigger")
+	}
+	if !createFound {
+		t.Error("expected create_trigger op for changed trigger")
+	}
+}
+
+func TestOpToSQL_CreateTrigger(t *testing.T) {
+	trig := model.Trigger{
+		Name:     "audit_insert",
+		Function: "audit_fn",
+		Events:   []string{"INSERT"},
+		Timing:   "AFTER",
+		ForEach:  "ROW",
+	}
+	op := DDLOp{
+		Op:         "create_trigger",
+		Table:      "public.orders",
+		Name:       "audit_insert",
+		TriggerDef: &trig,
+	}
+	sql := OpToSQL(op)
+	if sql == "" {
+		t.Fatal("expected non-empty SQL")
+	}
+	if !strings.Contains(sql, "CREATE TRIGGER") {
+		t.Errorf("expected CREATE TRIGGER in SQL, got: %s", sql)
+	}
+	if !strings.Contains(sql, "audit_insert") {
+		t.Errorf("expected trigger name in SQL, got: %s", sql)
+	}
+	if !strings.Contains(sql, "AFTER") {
+		t.Errorf("expected AFTER in SQL, got: %s", sql)
+	}
+	if !strings.Contains(sql, "INSERT") {
+		t.Errorf("expected INSERT in SQL, got: %s", sql)
+	}
+	if !strings.Contains(sql, "audit_fn") {
+		t.Errorf("expected function name in SQL, got: %s", sql)
+	}
+}

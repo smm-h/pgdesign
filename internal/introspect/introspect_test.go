@@ -1202,3 +1202,93 @@ func TestExportDomains(t *testing.T) {
 		t.Errorf("expected default = 0 in output, got:\n%s", out)
 	}
 }
+
+func TestDecodeTriggerTiming(t *testing.T) {
+	tests := []struct {
+		tgtype int16
+		want   string
+	}{
+		{0x02, "BEFORE"},
+		{0x00, "AFTER"},
+		{0x40, "INSTEAD OF"},
+		{0x06, "BEFORE"},
+		{0x44, "INSTEAD OF"},
+	}
+	for _, tt := range tests {
+		got := decodeTriggerTiming(tt.tgtype)
+		if got != tt.want {
+			t.Errorf("decodeTriggerTiming(%#x) = %q, want %q", tt.tgtype, got, tt.want)
+		}
+	}
+}
+
+func TestDecodeTriggerEvents(t *testing.T) {
+	tests := []struct {
+		tgtype int16
+		want   []string
+	}{
+		{0x04, []string{"INSERT"}},
+		{0x08, []string{"DELETE"}},
+		{0x10, []string{"UPDATE"}},
+		{0x20, []string{"TRUNCATE"}},
+		{0x0C, []string{"INSERT", "DELETE"}},
+		{0x14, []string{"INSERT", "UPDATE"}},
+		{0x1C, []string{"INSERT", "DELETE", "UPDATE"}},
+	}
+	for _, tt := range tests {
+		got := decodeTriggerEvents(tt.tgtype)
+		if len(got) != len(tt.want) {
+			t.Errorf("decodeTriggerEvents(%#x) = %v, want %v", tt.tgtype, got, tt.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Errorf("decodeTriggerEvents(%#x)[%d] = %q, want %q", tt.tgtype, i, got[i], tt.want[i])
+			}
+		}
+	}
+}
+
+func TestDecodeTriggerForEach(t *testing.T) {
+	tests := []struct {
+		tgtype int16
+		want   string
+	}{
+		{0x01, "ROW"},
+		{0x00, "STATEMENT"},
+		{0x05, "ROW"},
+		{0x04, "STATEMENT"},
+	}
+	for _, tt := range tests {
+		got := decodeTriggerForEach(tt.tgtype)
+		if got != tt.want {
+			t.Errorf("decodeTriggerForEach(%#x) = %q, want %q", tt.tgtype, got, tt.want)
+		}
+	}
+}
+
+func TestExtractTriggerWhen(t *testing.T) {
+	tests := []struct {
+		triggerdef string
+		want       string
+	}{
+		{
+			triggerdef: `CREATE TRIGGER audit_insert AFTER INSERT ON public.orders FOR EACH ROW WHEN (NEW.status = 'active') EXECUTE FUNCTION audit_fn()`,
+			want:       "NEW.status = 'active'",
+		},
+		{
+			triggerdef: `CREATE TRIGGER simple AFTER INSERT ON public.orders FOR EACH ROW EXECUTE FUNCTION audit_fn()`,
+			want:       "",
+		},
+		{
+			triggerdef: `CREATE TRIGGER nested AFTER INSERT ON public.orders FOR EACH ROW WHEN ((NEW.x > 0) AND (NEW.y < 10)) EXECUTE FUNCTION check_fn()`,
+			want:       "(NEW.x > 0) AND (NEW.y < 10)",
+		},
+	}
+	for _, tt := range tests {
+		got := extractTriggerWhen(tt.triggerdef)
+		if got != tt.want {
+			t.Errorf("extractTriggerWhen(%q) = %q, want %q", tt.triggerdef, got, tt.want)
+		}
+	}
+}
