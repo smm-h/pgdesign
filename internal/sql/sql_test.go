@@ -1665,3 +1665,129 @@ func TestAlterSequence(t *testing.T) {
 		t.Errorf("AlterSequence() =\n  %s\nwant:\n  %s", got, want)
 	}
 }
+
+func TestCreateFunction_Full(t *testing.T) {
+	f := model.Function{
+		Name:       "calc_total",
+		Language:   "plpgsql",
+		ReturnType: "numeric",
+		Args: []model.FunctionArg{
+			{Name: "order_id", Type: "uuid"},
+			{Name: "tax_rate", Type: "numeric", Default: "0.0"},
+		},
+		Body:            "BEGIN\n  RETURN 42;\nEND;",
+		Volatility:      "STABLE",
+		Parallel:        "SAFE",
+		SecurityDefiner: true,
+		Cost:            model.Float64Ptr(100),
+		Rows:            model.Float64Ptr(1000),
+	}
+	got := CreateFunction("app", f)
+	for _, want := range []string{
+		"CREATE OR REPLACE FUNCTION app.calc_total",
+		"order_id uuid",
+		"tax_rate numeric DEFAULT 0.0",
+		"RETURNS numeric",
+		"$pgdesign$",
+		"LANGUAGE plpgsql",
+		"STABLE",
+		"PARALLEL SAFE",
+		"SECURITY DEFINER",
+		"COST 100",
+		"ROWS 1000",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, got)
+		}
+	}
+}
+
+func TestCreateFunction_Minimal(t *testing.T) {
+	f := model.Function{
+		Name:       "get_one",
+		Language:   "sql",
+		ReturnType: "integer",
+		Body:       "SELECT 1;",
+	}
+	got := CreateFunction("public", f)
+	for _, want := range []string{
+		"CREATE OR REPLACE FUNCTION public.get_one()",
+		"RETURNS integer",
+		"SELECT 1;",
+		"LANGUAGE sql",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, got)
+		}
+	}
+	for _, notWant := range []string{
+		"STABLE",
+		"VOLATILE",
+		"PARALLEL",
+		"SECURITY DEFINER",
+		"COST",
+		"ROWS",
+	} {
+		if strings.Contains(got, notWant) {
+			t.Errorf("expected output NOT to contain %q, got:\n%s", notWant, got)
+		}
+	}
+}
+
+func TestCreateFunction_Procedure(t *testing.T) {
+	f := model.Function{
+		Name:     "do_cleanup",
+		Language: "plpgsql",
+		Body:     "DELETE FROM logs;",
+		IsProc:   true,
+	}
+	got := CreateFunction("app", f)
+	for _, want := range []string{
+		"CREATE OR REPLACE PROCEDURE app.do_cleanup()",
+		"LANGUAGE plpgsql",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, got)
+		}
+	}
+	for _, notWant := range []string{
+		"RETURNS",
+		"FUNCTION",
+	} {
+		if strings.Contains(got, notWant) {
+			t.Errorf("expected output NOT to contain %q, got:\n%s", notWant, got)
+		}
+	}
+}
+
+func TestDropFunction(t *testing.T) {
+	f := model.Function{
+		Name: "calc_total",
+		Args: []model.FunctionArg{
+			{Name: "order_id", Type: "uuid"},
+			{Name: "tax_rate", Type: "numeric"},
+		},
+	}
+	got := DropFunction("app", f, false)
+	want := "DROP FUNCTION app.calc_total(uuid, numeric);"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+	gotCascade := DropFunction("app", f, true)
+	wantCascade := "DROP FUNCTION app.calc_total(uuid, numeric) CASCADE;"
+	if gotCascade != wantCascade {
+		t.Errorf("expected %q, got %q", wantCascade, gotCascade)
+	}
+}
+
+func TestDropFunction_Procedure(t *testing.T) {
+	f := model.Function{
+		Name:   "do_cleanup",
+		IsProc: true,
+	}
+	got := DropFunction("app", f, false)
+	want := "DROP PROCEDURE app.do_cleanup();"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}

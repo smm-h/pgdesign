@@ -873,3 +873,58 @@ func TestBuild_SequenceOwnedByIdentityColumn(t *testing.T) {
 		t.Error("expected E124 error for identity column in owned_by")
 	}
 }
+
+func strPtr(s string) *string { return &s }
+
+func TestBuildFunctions(t *testing.T) {
+	lang := "plpgsql"
+	returns := "numeric"
+	body := "SELECT 1;"
+	volatility := "stable"
+
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "test", Version: 1},
+		Functions: []parse.RawFunction{
+			{
+				Name:       "get_total",
+				Language:   &lang,
+				Returns:    &returns,
+				Body:       &body,
+				Volatility: &volatility,
+				Args: []parse.RawFunctionArg{
+					{Name: "id", Type: "uuid"},
+				},
+			},
+		},
+	}
+	reg := semtype.NewBuiltinRegistry()
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schema.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(schema.Functions))
+	}
+	f := schema.Functions[0]
+	if f.Name != "get_total" {
+		t.Errorf("expected name get_total, got %s", f.Name)
+	}
+	if f.Schema != "test" {
+		t.Errorf("expected schema test, got %s", f.Schema)
+	}
+	if f.Language != "plpgsql" {
+		t.Errorf("expected language plpgsql, got %s", f.Language)
+	}
+	if f.ReturnType != "numeric" {
+		t.Errorf("expected return type numeric, got %s", f.ReturnType)
+	}
+	if f.Volatility != "STABLE" {
+		t.Errorf("expected volatility STABLE (uppercased), got %s", f.Volatility)
+	}
+	if len(f.Args) != 1 {
+		t.Fatalf("expected 1 arg, got %d", len(f.Args))
+	}
+	if f.Args[0].Name != "id" || f.Args[0].Type != "uuid" {
+		t.Errorf("expected arg id uuid, got %s %s", f.Args[0].Name, f.Args[0].Type)
+	}
+}

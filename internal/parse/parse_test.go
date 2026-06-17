@@ -1937,6 +1937,298 @@ start = 100
 	}
 }
 
+func TestFunctionParsing_WithBody(t *testing.T) {
+	toml := `
+[meta]
+version = 1
+schema = "test"
+
+[functions.calc_total]
+language = "plpgsql"
+returns = "numeric"
+volatility = "stable"
+parallel = "safe"
+security_definer = true
+cost = 100
+rows = 1000
+comment = "Calculate order total"
+depends_on = ["orders"]
+body = """
+DECLARE
+  total numeric;
+BEGIN
+  SELECT sum(amount) INTO total FROM orders WHERE order_id = $1;
+  RETURN total;
+END;
+"""
+
+[[functions.calc_total.args]]
+name = "order_id"
+type = "uuid"
+
+[[functions.calc_total.args]]
+name = "tax_rate"
+type = "numeric"
+default = "0.0"
+`
+	raw, diags := Bytes([]byte(toml))
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(raw.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(raw.Functions))
+	}
+	f := raw.Functions[0]
+	if f.Name != "calc_total" {
+		t.Errorf("expected name calc_total, got %s", f.Name)
+	}
+	if f.Language == nil || *f.Language != "plpgsql" {
+		t.Errorf("expected language plpgsql, got %v", f.Language)
+	}
+	if f.Returns == nil || *f.Returns != "numeric" {
+		t.Errorf("expected returns numeric, got %v", f.Returns)
+	}
+	if f.Volatility == nil || *f.Volatility != "stable" {
+		t.Errorf("expected volatility stable, got %v", f.Volatility)
+	}
+	if f.Parallel == nil || *f.Parallel != "safe" {
+		t.Errorf("expected parallel safe, got %v", f.Parallel)
+	}
+	if f.SecurityDefiner == nil || !*f.SecurityDefiner {
+		t.Errorf("expected security_definer true, got %v", f.SecurityDefiner)
+	}
+	if f.Cost == nil || *f.Cost != 100 {
+		t.Errorf("expected cost 100, got %v", f.Cost)
+	}
+	if f.Rows == nil || *f.Rows != 1000 {
+		t.Errorf("expected rows 1000, got %v", f.Rows)
+	}
+	if f.Comment == nil || *f.Comment != "Calculate order total" {
+		t.Errorf("expected comment, got %v", f.Comment)
+	}
+	if len(f.DependsOn) != 1 || f.DependsOn[0] != "orders" {
+		t.Errorf("expected depends_on [orders], got %v", f.DependsOn)
+	}
+	if f.Body == nil || *f.Body == "" {
+		t.Fatalf("expected non-empty body")
+	}
+	if len(f.Args) != 2 {
+		t.Fatalf("expected 2 args, got %d", len(f.Args))
+	}
+	if f.Args[0].Name != "order_id" || f.Args[0].Type != "uuid" {
+		t.Errorf("arg 0: expected order_id uuid, got %s %s", f.Args[0].Name, f.Args[0].Type)
+	}
+	if f.Args[1].Name != "tax_rate" || f.Args[1].Type != "numeric" {
+		t.Errorf("arg 1: expected tax_rate numeric, got %s %s", f.Args[1].Name, f.Args[1].Type)
+	}
+	if f.Args[1].Default == nil || *f.Args[1].Default != "0.0" {
+		t.Errorf("arg 1: expected default 0.0, got %v", f.Args[1].Default)
+	}
+}
+
+func TestFunctionParsing_Procedure(t *testing.T) {
+	toml := `
+[meta]
+version = 1
+schema = "test"
+
+[functions.cleanup]
+language = "plpgsql"
+procedure = true
+body = "DELETE FROM logs WHERE created_at < now() - interval '30 days';"
+`
+	raw, diags := Bytes([]byte(toml))
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(raw.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(raw.Functions))
+	}
+	f := raw.Functions[0]
+	if f.Procedure == nil || !*f.Procedure {
+		t.Errorf("expected procedure true")
+	}
+	if f.Returns != nil {
+		t.Errorf("expected returns nil for procedure, got %v", f.Returns)
+	}
+	if len(f.Args) != 0 {
+		t.Errorf("expected 0 args, got %d", len(f.Args))
+	}
+}
+
+func TestFunctionParsing_WithFile(t *testing.T) {
+	dir := t.TempDir()
+	sqlContent := "SELECT 1;"
+	if err := os.WriteFile(filepath.Join(dir, "calc.sql"), []byte(sqlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	toml := `
+[meta]
+version = 1
+schema = "test"
+
+[functions.my_func]
+language = "sql"
+returns = "integer"
+file = "calc.sql"
+`
+	if err := os.WriteFile(filepath.Join(dir, "schema.toml"), []byte(toml), 0644); err != nil {
+		t.Fatal(err)
+	}
+	raw, diags := File(filepath.Join(dir, "schema.toml"))
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(raw.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(raw.Functions))
+	}
+	f := raw.Functions[0]
+	if f.Body == nil || *f.Body != "SELECT 1;" {
+		t.Errorf("expected body 'SELECT 1;', got %v", f.Body)
+	}
+}
+
+func TestFunctionParsing_MissingLanguage(t *testing.T) {
+	toml := `
+[meta]
+version = 1
+schema = "test"
+
+[functions.bad_func]
+returns = "integer"
+body = "SELECT 1;"
+`
+	_, diags := Bytes([]byte(toml))
+	found := false
+	for _, d := range diags {
+		if d.Code == "E011" && d.Severity == diagnostic.Error {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected E011 error for missing language, got %v", diags)
+	}
+}
+
+func TestFunctionParsing_MissingBody(t *testing.T) {
+	toml := `
+[meta]
+version = 1
+schema = "test"
+
+[functions.bad_func]
+language = "sql"
+returns = "integer"
+`
+	_, diags := Bytes([]byte(toml))
+	found := false
+	for _, d := range diags {
+		if d.Code == "E011" && d.Severity == diagnostic.Error {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected E011 error for missing body, got %v", diags)
+	}
+}
+
+func TestFunctionParsing_BothBodyAndFile(t *testing.T) {
+	toml := `
+[meta]
+version = 1
+schema = "test"
+
+[functions.bad_func]
+language = "sql"
+returns = "integer"
+body = "SELECT 1;"
+file = "calc.sql"
+`
+	_, diags := Bytes([]byte(toml))
+	found := false
+	for _, d := range diags {
+		if d.Code == "E010" && d.Severity == diagnostic.Error {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected E010 error for both body and file, got %v", diags)
+	}
+}
+
+func TestFunctionParsing_MissingReturns(t *testing.T) {
+	toml := `
+[meta]
+version = 1
+schema = "test"
+
+[functions.bad_func]
+language = "sql"
+body = "SELECT 1;"
+`
+	_, diags := Bytes([]byte(toml))
+	found := false
+	for _, d := range diags {
+		if d.Code == "E011" && d.Severity == diagnostic.Error {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected E011 error for missing returns, got %v", diags)
+	}
+}
+
+func TestFunctionParsing_ArgsWithDefaults(t *testing.T) {
+	toml := `
+[meta]
+version = 1
+schema = "test"
+
+[functions.with_defaults]
+language = "sql"
+returns = "integer"
+body = "SELECT 1;"
+
+[[functions.with_defaults.args]]
+name = "a"
+type = "integer"
+default = "42"
+
+[[functions.with_defaults.args]]
+name = "b"
+type = "text"
+
+[[functions.with_defaults.args]]
+name = "c"
+type = "boolean"
+default = "true"
+`
+	raw, diags := Bytes([]byte(toml))
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(raw.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(raw.Functions))
+	}
+	f := raw.Functions[0]
+	if len(f.Args) != 3 {
+		t.Fatalf("expected 3 args, got %d", len(f.Args))
+	}
+	if f.Args[0].Default == nil || *f.Args[0].Default != "42" {
+		t.Errorf("arg 0: expected default 42, got %v", f.Args[0].Default)
+	}
+	if f.Args[1].Default != nil {
+		t.Errorf("arg 1: expected no default, got %v", f.Args[1].Default)
+	}
+	if f.Args[2].Default == nil || *f.Args[2].Default != "true" {
+		t.Errorf("arg 2: expected default true, got %v", f.Args[2].Default)
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {
