@@ -4110,3 +4110,148 @@ func TestOpToSQL_CreateTableConsolidated(t *testing.T) {
 		t.Errorf("expected PRIMARY KEY, got: %s", sql)
 	}
 }
+
+func TestBatchSize_TOMLRoundTrip(t *testing.T) {
+	m := &Migration{
+		Description: "Test batched DML",
+		DMLOps: []DMLOp{
+			{
+				Op:        "backfill",
+				SQL:       "UPDATE foo SET bar = 1 WHERE ctid IN (SELECT ctid FROM foo WHERE bar IS NULL LIMIT 5000)",
+				BatchSize: 5000,
+				Down:      &DownOp{Irreversible: true},
+			},
+		},
+	}
+
+	toml := FormatMigration(m)
+
+	// Verify batch_size appears in output.
+	if !strings.Contains(toml, "batch_size = 5000") {
+		t.Fatalf("expected batch_size = 5000 in TOML, got:\n%s", toml)
+	}
+
+	// Parse it back.
+	parsed, err := ParseMigration(toml)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	if len(parsed.DMLOps) != 1 {
+		t.Fatalf("expected 1 DML op, got %d", len(parsed.DMLOps))
+	}
+	if parsed.DMLOps[0].BatchSize != 5000 {
+		t.Errorf("BatchSize = %d, want 5000", parsed.DMLOps[0].BatchSize)
+	}
+}
+
+func TestBatchSize_ZeroNotSerialized(t *testing.T) {
+	m := &Migration{
+		Description: "No batching",
+		DMLOps: []DMLOp{
+			{
+				Op:  "backfill",
+				SQL: "UPDATE foo SET bar = 1",
+			},
+		},
+	}
+
+	toml := FormatMigration(m)
+	if strings.Contains(toml, "batch_size") {
+		t.Fatalf("expected no batch_size in TOML when BatchSize=0, got:\n%s", toml)
+	}
+}
+
+func TestGenerateMigration_VolatileDefault(t *testing.T) {
+	tests := []struct {
+		name       string
+		defaultVal string
+		wantWarn   bool
+	}{
+		{"now()", "now()", true},
+		{"gen_random_uuid()", "gen_random_uuid()", true},
+		{"clock_timestamp()", "clock_timestamp()", true},
+		{"random()", "random()", true},
+		{"nextval", "nextval('my_seq')", true},
+		{"txid_current()", "txid_current()", true},
+		{"statement_timestamp()", "statement_timestamp()", true},
+		{"constant_int", "42", false},
+		{"constant_string", "'hello'", false},
+		{"NOW_uppercase", "NOW()", true}, // case-insensitive
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			desired := &model.Schema{
+				Name: "public",
+				Tables: []model.Table{
+					{
+						Name:   "users",
+						Schema: "public",
+						Columns: []model.Column{
+							{Name: "id", PGType: "bigint", NotNull: true},
+							{Name: "created_at", PGType: "timestamptz", NotNull: true, DefaultExpr: tt.defaultVal},
+						},
+					},
+				},
+			}
+
+			d := &diff.SchemaDiff{
+				TablesChanged: []diff.TableDiff{
+					{
+						Name: "users",
+						ColumnsAdded: []model.Column{
+							{Name: "created_at", PGType: "timestamptz", NotNull: true, DefaultExpr: tt.defaultVal},
+						},
+					},
+				},
+			}
+
+			_, diags := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+
+			found := false
+			for _, diag := range diags {
+				if diag.Code == "VOLATILE_DEFAULT" {
+					found = true
+					break
+				}
+			}
+
+			if tt.wantWarn && !found {
+				t.Errorf("expected VOLATILE_DEFAULT diagnostic for default %q, got none", tt.defaultVal)
+			}
+			if !tt.wantWarn && found {
+				t.Errorf("did not expect VOLATILE_DEFAULT diagnostic for default %q, but got one", tt.defaultVal)
+			}
+		})
+	}
+}
+
+func TestIsVolatileDefault(t *testing.T) {
+	tests := []struct {
+		val    interface{}
+		expect bool
+	}{
+		{nil, false},
+		{"now()", true},
+		{"NOW()", true},
+		{"gen_random_uuid()", true},
+		{"nextval('foo_seq')", true},
+		{"clock_timestamp()", true},
+		{"random()", true},
+		{"txid_current()", true},
+		{"statement_timestamp()", true},
+		{42, false},
+		{"42", false},
+		{"'hello'", false},
+		{"current_timestamp", false}, // not volatile, it's stable
+		{true, false},
+	}
+
+	for _, tt := range tests {
+		got := isVolatileDefault(tt.val)
+		if got != tt.expect {
+			t.Errorf("isVolatileDefault(%v) = %v, want %v", tt.val, got, tt.expect)
+		}
+	}
+}

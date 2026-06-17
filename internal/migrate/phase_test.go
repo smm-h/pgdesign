@@ -249,3 +249,22 @@ func TestHasPhases(t *testing.T) {
 		t.Error("HasPhases should return false when DDLOp has no phase set")
 	}
 }
+
+func TestBatchSize_WithPhaseAnnotation(t *testing.T) {
+	m := &Migration{
+		Description: "Batched backfill with phases",
+		DDLOps: []DDLOp{
+			{Op: "add_column", Table: "users", Column: "email", Type: "text"},
+		},
+		DMLOps: []DMLOp{
+			{Op: "backfill", SQL: "UPDATE users SET email = '' WHERE email IS NULL", BatchSize: 1000},
+		},
+	}
+
+	AnnotatePhases(m, 14)
+
+	// BatchSize should be preserved after phase annotation.
+	if m.DMLOps[0].BatchSize != 1000 {
+		t.Errorf("BatchSize = %d after AnnotatePhases, want 1000", m.DMLOps[0].BatchSize)
+	}
+}
