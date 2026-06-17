@@ -1147,3 +1147,58 @@ func TestParseExclusionDef(t *testing.T) {
 		})
 	}
 }
+
+func TestExportDomains(t *testing.T) {
+	schema := &model.Schema{
+		Name: "test",
+		Domains: []model.Domain{
+			{
+				Name:     "slug",
+				Schema:   "test",
+				BaseType: "text",
+				NotNull:  true,
+				Check:    "VALUE ~ '^[a-z0-9-]+$'",
+				Comment:  "URL-safe identifier",
+			},
+			{
+				Name:     "counter",
+				Schema:   "test",
+				BaseType: "bigint",
+				Default:  "0",
+			},
+		},
+	}
+	data, err := Export(schema)
+	if err != nil {
+		t.Fatalf("Export failed: %v", err)
+	}
+	out := string(data)
+
+	// Check slug domain
+	if !strings.Contains(out, "[types.slug]") {
+		t.Errorf("expected [types.slug] in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `kind = "scalar"`) {
+		t.Errorf("expected kind = scalar in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `base_type = "text"`) {
+		t.Errorf("expected base_type = text in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "not_null = true") {
+		t.Errorf("expected not_null = true in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `check = "VALUE ~ '^[a-z0-9-]+$'"`) {
+		t.Errorf("expected check in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `comment = "URL-safe identifier"`) {
+		t.Errorf("expected comment in output, got:\n%s", out)
+	}
+
+	// Check counter domain
+	if !strings.Contains(out, "[types.counter]") {
+		t.Errorf("expected [types.counter] in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, `default = "0"`) {
+		t.Errorf("expected default = 0 in output, got:\n%s", out)
+	}
+}
