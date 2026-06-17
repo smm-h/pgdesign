@@ -25,22 +25,9 @@ func (g *GoGormGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 		return buf.Bytes(), nil
 	}
 
-	// Build reverse-FK index: for each table, which other tables have single-column
-	// FKs pointing to it.
-	type reverseFK struct {
-		FromTable string // the table that has the FK
-		FKColumn  string // the FK column name in FromTable
-	}
-	reverseFKs := make(map[string][]reverseFK) // key: referenced table name
-	for _, tbl := range schema.Tables {
-		for _, fk := range tbl.FKs {
-			if len(fk.Columns) == 1 {
-				reverseFKs[fk.RefTable] = append(reverseFKs[fk.RefTable], reverseFK{
-					FromTable: tbl.Name,
-					FKColumn:  fk.Columns[0],
-				})
-			}
-		}
+	// Ensure FKGraph is populated (tests may construct schemas without Build).
+	if schema.FKGraph == nil {
+		schema.BuildFKGraph()
 	}
 
 	// Build PK set, unique single-column index map, and non-unique single-column
@@ -163,13 +150,23 @@ func (g *GoGormGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 		}
 
 		// HasMany relationships: other tables' single-column FKs pointing here.
-		if refs, ok := reverseFKs[tbl.Name]; ok {
-			for _, ref := range refs {
-				refType := toPascalCase(ref.FromTable)
+		if edges := schema.FKGraph.Reverse[tbl.Name]; len(edges) > 0 {
+			// Count edges per FK name to filter out multi-column FKs.
+			fkColCount := make(map[string]int)
+			for _, e := range edges {
+				fkColCount[e.FKName]++
+			}
+			seen := make(map[string]bool)
+			for _, e := range edges {
+				if fkColCount[e.FKName] != 1 || seen[e.FKName] {
+					continue
+				}
+				seen[e.FKName] = true
+				refType := toPascalCase(e.FromTable)
 				si.Fields = append(si.Fields, fieldInfo{
 					Name:   refType + "s",
 					GoType: "[]" + refType,
-					Tag:    fmt.Sprintf("`gorm:\"foreignKey:%s\"`", toPascalCase(ref.FKColumn)),
+					Tag:    fmt.Sprintf("`gorm:\"foreignKey:%s\"`", toPascalCase(e.FromColumn)),
 					IsRel:  true,
 				})
 			}
