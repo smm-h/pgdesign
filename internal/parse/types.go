@@ -26,6 +26,7 @@ type RawType struct {
 	Kind       string
 	BaseType   string
 	Values     []string
+	Fields     map[string]string // composite fields: field name -> PG type
 	NotNull    *bool
 	Default    *string
 	DefaultExpr *string

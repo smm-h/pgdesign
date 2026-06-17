@@ -462,6 +462,7 @@ func parseAndBuild(data []byte) (*model.Schema, []diagnostic.Diagnostic) {
 			Kind:   rt.Kind,
 			Base:   rt.BaseType,
 			Values: rt.Values,
+			Fields: rt.Fields,
 		}
 		if rt.NotNull != nil {
 			ut.NotNull = rt.NotNull

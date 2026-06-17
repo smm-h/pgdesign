@@ -226,6 +226,41 @@ func (p *parser) parseTypes() []RawType {
 		}
 	}
 
+	// Second pass: find [types.*.fields] sub-tables and attach to the
+	// corresponding RawType. Build a name->index map for lookup.
+	typeIndex := make(map[string]int, len(types))
+	for i, rt := range types {
+		typeIndex[rt.Name] = i
+	}
+	for _, child := range p.doc.Children {
+		tbl, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl.KeyPath) == 3 && tbl.KeyPath[0] == "types" && tbl.KeyPath[2] == "fields" {
+			typeName := tbl.KeyPath[1]
+			idx, exists := typeIndex[typeName]
+			if !exists {
+				p.warnf("W001", "", "", "[types.%s.fields] has no parent [types.%s] section", typeName, typeName)
+				continue
+			}
+			fields := make(map[string]string)
+			for _, fc := range tbl.Children {
+				kv, ok := fc.(*tomledit.KeyValueNode)
+				if !ok {
+					continue
+				}
+				fieldName := kv.Key.Parts[0]
+				if v, ok := nodeString(kv.Val); ok {
+					fields[fieldName] = v
+				} else {
+					p.errorf("E010", "", "", "[types.%s.fields].%s must be a string", typeName, fieldName)
+				}
+			}
+			types[idx].Fields = fields
+		}
+	}
+
 	return types
 }
 

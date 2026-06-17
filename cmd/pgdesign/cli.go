@@ -306,6 +306,7 @@ func collectUserTypes(raw *parse.RawSchema) []semtype.UserTypeDef {
 			Kind:   rt.Kind,
 			Base:   rt.BaseType,
 			Values: rt.Values,
+			Fields: rt.Fields,
 		}
 		if rt.NotNull != nil {
 			ut.NotNull = rt.NotNull

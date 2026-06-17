@@ -4,6 +4,7 @@ package semtype
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -32,21 +33,28 @@ func (k Kind) String() string {
 	}
 }
 
+// CompositeField represents a single field in a composite type.
+type CompositeField struct {
+	Name   string
+	PGType string
+}
+
 // TypeDef defines a semantic type with its PostgreSQL mapping and constraints.
 type TypeDef struct {
 	Name        string
 	Kind        Kind
-	BaseType    string   // PG type (e.g., "uuid", "text", "bigint")
+	BaseType    string           // PG type (e.g., "uuid", "text", "bigint")
 	NotNull     bool
-	Default     *string  // literal default value
-	DefaultExpr string   // SQL expression default (e.g., "gen_random_uuid()")
-	Check       string   // check constraint expression (VALUE placeholder)
+	Default     *string          // literal default value
+	DefaultExpr string           // SQL expression default (e.g., "gen_random_uuid()")
+	Check       string           // check constraint expression (VALUE placeholder)
 	Unique      bool
 	Comment     string
-	EnumValues  []string // values for enum types
-	Generated   string   // generated expression (e.g., "price * 0.2")
-	Stored      bool     // whether generated column is stored
-	Identity    string   // identity generation: "ALWAYS" or "BY DEFAULT"
+	EnumValues  []string         // values for enum types
+	Fields      []CompositeField // fields for composite types
+	Generated   string           // generated expression (e.g., "price * 0.2")
+	Stored      bool             // whether generated column is stored
+	Identity    string           // identity generation: "ALWAYS" or "BY DEFAULT"
 	Array       bool
 }
 
@@ -116,6 +124,14 @@ func typeDefsEqual(a, b *TypeDef) bool {
 			return false
 		}
 	}
+	if len(a.Fields) != len(b.Fields) {
+		return false
+	}
+	for i := range a.Fields {
+		if a.Fields[i] != b.Fields[i] {
+			return false
+		}
+	}
 	if a.Generated != b.Generated || a.Stored != b.Stored {
 		return false
 	}
@@ -161,6 +177,7 @@ type UserTypeDef struct {
 	Kind        string // "scalar", "enum", "composite"
 	Base        string // PG base type (for scalars)
 	Values      []string // enum values
+	Fields      map[string]string // composite fields: field name -> PG type
 	NotNull     *bool
 	Default     *string
 	DefaultExpr string
@@ -240,11 +257,7 @@ func (r *Registry) LoadUserTypes(types []UserTypeDef) diagnostic.Diagnostics {
 		case KindScalar:
 			diags = append(diags, r.loadScalarType(ut)...)
 		case KindComposite:
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Error,
-				Code:     "E103",
-				Message:  fmt.Sprintf("type %q: composite types are not yet supported", ut.Name),
-			})
+			diags = append(diags, r.loadCompositeType(ut)...)
 		default:
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity: diagnostic.Error,
@@ -306,6 +319,68 @@ func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
 			return diags
 		}
 		td.Default = ut.Default
+	}
+
+	if err := r.Register(td); err != nil {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E105",
+			Message:  fmt.Sprintf("type %q: %s", ut.Name, err.Error()),
+		})
+	}
+
+	return diags
+}
+
+func (r *Registry) loadCompositeType(ut UserTypeDef) diagnostic.Diagnostics {
+	var diags diagnostic.Diagnostics
+
+	if len(ut.Fields) == 0 {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E103",
+			Message:  fmt.Sprintf("composite type %q must have at least one field", ut.Name),
+		})
+		return diags
+	}
+
+	// Sort field names for deterministic output
+	fieldNames := make([]string, 0, len(ut.Fields))
+	for name := range ut.Fields {
+		fieldNames = append(fieldNames, name)
+	}
+	sort.Strings(fieldNames)
+
+	// Validate each field's PG type and build the sorted field list
+	fields := make([]CompositeField, 0, len(ut.Fields))
+	for _, name := range fieldNames {
+		pgType := ut.Fields[name]
+		baseForCheck := strings.ToLower(pgType)
+		if idx := strings.IndexByte(baseForCheck, '('); idx != -1 {
+			baseForCheck = baseForCheck[:idx]
+		}
+		if !pgTypeAllowlist[baseForCheck] && !r.extensionTypes[baseForCheck] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Error,
+				Code:       "E103",
+				Message:    fmt.Sprintf("composite type %q field %q: unknown base type %q", ut.Name, name, pgType),
+				Suggestion: "field type must be a valid PostgreSQL type",
+			})
+			continue
+		}
+		fields = append(fields, CompositeField{Name: name, PGType: pgType})
+	}
+
+	if diags.HasErrors() {
+		return diags
+	}
+
+	td := &TypeDef{
+		Name:     ut.Name,
+		Kind:     KindComposite,
+		BaseType: ut.Name, // composite types use their own name as PG type
+		Fields:   fields,
+		Comment:  ut.Comment,
 	}
 
 	if err := r.Register(td); err != nil {

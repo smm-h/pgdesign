@@ -632,3 +632,204 @@ func TestLoadUserScalarType_RangeTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadUserCompositeType(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "address",
+			Kind: "composite",
+			Fields: map[string]string{
+				"street": "text",
+				"city":   "text",
+				"zip":    "varchar(10)",
+			},
+			Comment: "Mailing address",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("address")
+	if err != nil {
+		t.Fatalf("Resolve(address) error: %v", err)
+	}
+	if td.Kind != KindComposite {
+		t.Errorf("Kind = %v, want KindComposite", td.Kind)
+	}
+	if td.BaseType != "address" {
+		t.Errorf("BaseType = %q, want %q", td.BaseType, "address")
+	}
+	if td.Comment != "Mailing address" {
+		t.Errorf("Comment = %q, want %q", td.Comment, "Mailing address")
+	}
+	if len(td.Fields) != 3 {
+		t.Fatalf("Fields length = %d, want 3", len(td.Fields))
+	}
+	// Fields should be sorted by name: city, street, zip
+	expected := []CompositeField{
+		{Name: "city", PGType: "text"},
+		{Name: "street", PGType: "text"},
+		{Name: "zip", PGType: "varchar(10)"},
+	}
+	for i, f := range td.Fields {
+		if f != expected[i] {
+			t.Errorf("Fields[%d] = %+v, want %+v", i, f, expected[i])
+		}
+	}
+}
+
+func TestLoadUserCompositeType_NoFields(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:   "empty_composite",
+			Kind:   "composite",
+			Fields: map[string]string{},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for composite with no fields, got none")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Code == "E103" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E103 for composite with no fields")
+	}
+}
+
+func TestLoadUserCompositeType_NilFields(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "nil_composite",
+			Kind: "composite",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for composite with nil fields, got none")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Code == "E103" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E103 for composite with nil fields")
+	}
+}
+
+func TestLoadUserCompositeType_InvalidFieldType(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "bad_composite",
+			Kind: "composite",
+			Fields: map[string]string{
+				"good_field": "text",
+				"bad_field":  "not_a_pg_type",
+			},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for composite with invalid field type, got none")
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Code == "E103" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E103 for invalid field type")
+	}
+}
+
+func TestCompositeTypeDefsEqual(t *testing.T) {
+	a := &TypeDef{
+		Name:     "address",
+		Kind:     KindComposite,
+		BaseType: "address",
+		Fields: []CompositeField{
+			{Name: "city", PGType: "text"},
+			{Name: "street", PGType: "text"},
+		},
+	}
+	b := &TypeDef{
+		Name:     "address",
+		Kind:     KindComposite,
+		BaseType: "address",
+		Fields: []CompositeField{
+			{Name: "city", PGType: "text"},
+			{Name: "street", PGType: "text"},
+		},
+	}
+	if !typeDefsEqual(a, b) {
+		t.Error("typeDefsEqual returned false for identical composite types")
+	}
+
+	// Different field count
+	c := &TypeDef{
+		Name:     "address",
+		Kind:     KindComposite,
+		BaseType: "address",
+		Fields: []CompositeField{
+			{Name: "city", PGType: "text"},
+		},
+	}
+	if typeDefsEqual(a, c) {
+		t.Error("typeDefsEqual returned true for composite types with different field counts")
+	}
+
+	// Different field type
+	d := &TypeDef{
+		Name:     "address",
+		Kind:     KindComposite,
+		BaseType: "address",
+		Fields: []CompositeField{
+			{Name: "city", PGType: "varchar"},
+			{Name: "street", PGType: "text"},
+		},
+	}
+	if typeDefsEqual(a, d) {
+		t.Error("typeDefsEqual returned true for composite types with different field types")
+	}
+
+	// Different field name
+	e := &TypeDef{
+		Name:     "address",
+		Kind:     KindComposite,
+		BaseType: "address",
+		Fields: []CompositeField{
+			{Name: "town", PGType: "text"},
+			{Name: "street", PGType: "text"},
+		},
+	}
+	if typeDefsEqual(a, e) {
+		t.Error("typeDefsEqual returned true for composite types with different field names")
+	}
+}
