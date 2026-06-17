@@ -234,3 +234,215 @@ func TestClosure_IsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+// --- BCNFDecompose tests ---
+
+func TestBCNFDecompose_AlreadyBCNF(t *testing.T) {
+	allAttrs := []string{"A", "B", "C"}
+	fds := []FuncDep{
+		{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
+	}
+	components := BCNFDecompose("tbl", allAttrs, fds)
+	if len(components) != 1 {
+		t.Fatalf("expected 1 component, got %d: %+v", len(components), components)
+	}
+	if components[0].Name != "tbl" {
+		t.Errorf("expected name 'tbl', got '%s'", components[0].Name)
+	}
+	if !reflect.DeepEqual(components[0].Attributes, []string{"A", "B", "C"}) {
+		t.Errorf("expected attributes [A B C], got %v", components[0].Attributes)
+	}
+}
+
+func TestBCNFDecompose_SimpleViolation(t *testing.T) {
+	allAttrs := []string{"A", "B", "C"}
+	fds := []FuncDep{
+		{Determinant: []string{"A"}, Dependent: []string{"B"}},
+		{Determinant: []string{"B"}, Dependent: []string{"C"}},
+	}
+	components := BCNFDecompose("tbl", allAttrs, fds)
+	if len(components) < 2 {
+		t.Fatalf("expected at least 2 components, got %d: %+v", len(components), components)
+	}
+	// Verify all original attributes are covered
+	allCovered := make(map[string]bool)
+	for _, comp := range components {
+		for _, attr := range comp.Attributes {
+			allCovered[attr] = true
+		}
+	}
+	for _, attr := range allAttrs {
+		if !allCovered[attr] {
+			t.Errorf("attribute %s not covered by any component", attr)
+		}
+	}
+	// Each component should be in BCNF
+	for _, comp := range components {
+		for _, fd := range comp.FDs {
+			if !IsSuperkey(fd.Determinant, comp.Attributes, comp.FDs) {
+				// Check if trivial (dependent is subset of determinant)
+				trivial := true
+				for _, d := range fd.Dependent {
+					found := false
+					for _, det := range fd.Determinant {
+						if d == det {
+							found = true
+							break
+						}
+					}
+					if !found {
+						trivial = false
+						break
+					}
+				}
+				if !trivial {
+					t.Errorf("component %s has BCNF violation: %v -> %v", comp.Name, fd.Determinant, fd.Dependent)
+				}
+			}
+		}
+	}
+}
+
+func TestBCNFDecompose_LosesDependency(t *testing.T) {
+	allAttrs := []string{"A", "B", "C"}
+	fds := []FuncDep{
+		{Determinant: []string{"A", "B"}, Dependent: []string{"C"}},
+		{Determinant: []string{"C"}, Dependent: []string{"B"}},
+	}
+	components := BCNFDecompose("tbl", allAttrs, fds)
+	if len(components) < 2 {
+		t.Fatalf("expected at least 2 components, got %d: %+v", len(components), components)
+	}
+	// Check that dependency preservation is lost
+	preserved, lost := PreservesDependencies(fds, components)
+	if preserved {
+		t.Error("expected some FDs to be lost in BCNF decomposition of AB->C, C->B")
+	}
+	// AB->C should be lost: C->B is preserved in {B,C}, but AB->C
+	// spans the split (A and B are in different components).
+	foundLost := false
+	for _, l := range lost {
+		if len(l.Determinant) == 2 && l.Determinant[0] == "A" && l.Determinant[1] == "B" {
+			for _, d := range l.Dependent {
+				if d == "C" {
+					foundLost = true
+				}
+			}
+		}
+	}
+	if !foundLost {
+		t.Errorf("expected AB->C to be lost, lost FDs: %+v", lost)
+	}
+}
+
+// --- IsLosslessJoin tests ---
+
+func TestIsLosslessJoin_Valid(t *testing.T) {
+	fds := []FuncDep{
+		{Determinant: []string{"A"}, Dependent: []string{"B"}},
+		{Determinant: []string{"B"}, Dependent: []string{"C"}},
+	}
+	r1 := []string{"B", "C"}
+	r2 := []string{"A", "B"}
+	allAttrs := []string{"A", "B", "C"}
+	if !IsLosslessJoin(r1, r2, allAttrs, fds) {
+		t.Error("expected lossless join for R1={B,C} R2={A,B} with B->C")
+	}
+}
+
+func TestIsLosslessJoin_Invalid(t *testing.T) {
+	fds := []FuncDep{
+		{Determinant: []string{"A"}, Dependent: []string{"B"}},
+	}
+	r1 := []string{"A", "B"}
+	r2 := []string{"B", "C"}
+	allAttrs := []string{"A", "B", "C"}
+	if IsLosslessJoin(r1, r2, allAttrs, fds) {
+		t.Error("expected lossy join for R1={A,B} R2={B,C} with only A->B")
+	}
+}
+
+// --- PreservesDependencies tests ---
+
+func TestPreservesDependencies_AllPreserved(t *testing.T) {
+	original := []FuncDep{
+		{Determinant: []string{"A"}, Dependent: []string{"B"}},
+		{Determinant: []string{"B"}, Dependent: []string{"C"}},
+	}
+	components := []Component{
+		{Name: "t1", Attributes: []string{"A", "B"}, FDs: []FuncDep{{Determinant: []string{"A"}, Dependent: []string{"B"}}}},
+		{Name: "t2", Attributes: []string{"B", "C"}, FDs: []FuncDep{{Determinant: []string{"B"}, Dependent: []string{"C"}}}},
+	}
+	preserved, lost := PreservesDependencies(original, components)
+	if !preserved {
+		t.Errorf("expected all FDs preserved, lost: %+v", lost)
+	}
+}
+
+func TestPreservesDependencies_LostFDs(t *testing.T) {
+	original := []FuncDep{
+		{Determinant: []string{"A", "B"}, Dependent: []string{"C"}},
+		{Determinant: []string{"C"}, Dependent: []string{"B"}},
+	}
+	// Simulate a BCNF decomposition that splits into {B,C} and {A,C}
+	// AB->C needs both A and B which are split across components
+	components := []Component{
+		{Name: "t1", Attributes: []string{"B", "C"}, FDs: []FuncDep{{Determinant: []string{"C"}, Dependent: []string{"B"}}}},
+		{Name: "t2", Attributes: []string{"A", "C"}, FDs: []FuncDep{}},
+	}
+	preserved, lost := PreservesDependencies(original, components)
+	if preserved {
+		t.Error("expected some FDs to be lost")
+	}
+	if len(lost) == 0 {
+		t.Fatal("expected non-empty lost FDs list")
+	}
+	// AB->C should be lost since A and B are never together in a component
+	foundABC := false
+	for _, l := range lost {
+		detKey := joinAttrs(l.Determinant)
+		if detKey == "A,B" {
+			foundABC = true
+		}
+	}
+	if !foundABC {
+		t.Errorf("expected AB->C to be lost, got lost: %+v", lost)
+	}
+}
+
+// --- Unexported helper tests ---
+
+func TestSetDifference(t *testing.T) {
+	got := setDifference([]string{"A", "B", "C"}, []string{"B"})
+	want := []string{"A", "C"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("setDifference = %v, want %v", got, want)
+	}
+}
+
+func TestSetIntersection(t *testing.T) {
+	got := setIntersection([]string{"A", "B", "C"}, []string{"B", "C", "D"})
+	want := []string{"B", "C"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("setIntersection = %v, want %v", got, want)
+	}
+}
+
+func TestItoa(t *testing.T) {
+	tests := []struct {
+		input int
+		want  string
+	}{
+		{0, "0"},
+		{1, "1"},
+		{10, "10"},
+		{42, "42"},
+		{123, "123"},
+	}
+	for _, tt := range tests {
+		got := itoa(tt.input)
+		if got != tt.want {
+			t.Errorf("itoa(%d) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
