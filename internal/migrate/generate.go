@@ -144,9 +144,36 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		diags = append(diags, classifyOp(op, risk.OpCreateDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
-	// Changed domains: alter constraints.
+	// Changed domains: alter constraints, defaults, not-null, base type.
 	for _, dd := range d.DomainsChanged {
 		schema, name := splitQualifiedName(dd.Name)
+
+		// Base type change requires DROP + CREATE (no ALTER DOMAIN SET TYPE).
+		if dd.BaseTypeChanged != nil {
+			dom := findDomain(desired, dd.Name)
+			dropOp := DDLOp{
+				Op:     "drop_domain",
+				Name:   name,
+				Schema: schema,
+				Down:   &DownOp{Irreversible: true},
+			}
+			m.DDLOps = append(m.DDLOps, dropOp)
+			diags = append(diags, classifyOp(dropOp, risk.OpDropDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+
+			createOp := DDLOp{
+				Op:        "create_domain",
+				Name:      name,
+				Schema:    schema,
+				DomainDef: dom,
+				Down: &DownOp{
+					Ops: []DDLOp{{Op: "drop_domain", Name: name, Schema: schema}},
+				},
+			}
+			m.DDLOps = append(m.DDLOps, createOp)
+			diags = append(diags, classifyOp(createOp, risk.OpCreateDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			continue // Skip other changes since we're recreating the domain.
+		}
+
 		if dd.CheckChanged != nil {
 			// Drop old constraint if it existed.
 			if dd.CheckChanged[0] != "" {
@@ -179,6 +206,83 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				}
 				m.DDLOps = append(m.DDLOps, addOp)
 				diags = append(diags, classifyOp(addOp, risk.OpAlterDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			}
+		}
+
+		if dd.DefaultChanged != nil {
+			if dd.DefaultChanged[1] == "" {
+				// Default removed.
+				op := DDLOp{
+					Op:     "alter_domain_drop_default",
+					Name:   name,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{
+							Op:      "alter_domain_set_default",
+							Name:    name,
+							Schema:  schema,
+							Default: dd.DefaultChanged[0],
+						}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				diags = append(diags, classifyOp(op, risk.OpAlterDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			} else {
+				// Default added or changed.
+				op := DDLOp{
+					Op:      "alter_domain_set_default",
+					Name:    name,
+					Schema:  schema,
+					Default: dd.DefaultChanged[1],
+					Down: &DownOp{
+						Ops: []DDLOp{{
+							Op:      "alter_domain_set_default",
+							Name:    name,
+							Schema:  schema,
+							Default: dd.DefaultChanged[0],
+						}},
+					},
+				}
+				if dd.DefaultChanged[0] == "" {
+					// Was no default, down op should drop it.
+					op.Down = &DownOp{
+						Ops: []DDLOp{{
+							Op:     "alter_domain_drop_default",
+							Name:   name,
+							Schema: schema,
+						}},
+					}
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				diags = append(diags, classifyOp(op, risk.OpAlterDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			}
+		}
+
+		if dd.NotNullChanged != nil {
+			if dd.NotNullChanged[1] {
+				// Becoming NOT NULL.
+				op := DDLOp{
+					Op:     "alter_domain_set_not_null",
+					Name:   name,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "alter_domain_drop_not_null", Name: name, Schema: schema}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				diags = append(diags, classifyOp(op, risk.OpAlterDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			} else {
+				// Becoming nullable.
+				op := DDLOp{
+					Op:     "alter_domain_drop_not_null",
+					Name:   name,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "alter_domain_set_not_null", Name: name, Schema: schema}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				diags = append(diags, classifyOp(op, risk.OpAlterDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
 			}
 		}
 	}

@@ -112,6 +112,14 @@ func OpToSQL(op DDLOp) string {
 		return opAlterDomainAddConstraint(op)
 	case "alter_domain_drop_constraint":
 		return opAlterDomainDropConstraint(op)
+	case "alter_domain_set_default":
+		return opAlterDomainSetDefault(op)
+	case "alter_domain_drop_default":
+		return opAlterDomainDropDefault(op)
+	case "alter_domain_set_not_null":
+		return opAlterDomainSetNotNull(op)
+	case "alter_domain_drop_not_null":
+		return opAlterDomainDropNotNull(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -665,4 +673,41 @@ func opAlterDomainDropConstraint(op DDLOp) string {
 	}
 	return fmt.Sprintf("ALTER DOMAIN %s DROP CONSTRAINT %s;",
 		qualified, sql.QuoteIdent(constraintName))
+}
+
+func opAlterDomainSetDefault(op DDLOp) string {
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	qualified := sql.QualifiedName(schema, op.Name)
+	defaultVal := formatDefault(op.Default, op.Type)
+	return fmt.Sprintf("ALTER DOMAIN %s SET DEFAULT %s;", qualified, defaultVal)
+}
+
+func opAlterDomainDropDefault(op DDLOp) string {
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	qualified := sql.QualifiedName(schema, op.Name)
+	return fmt.Sprintf("ALTER DOMAIN %s DROP DEFAULT;", qualified)
+}
+
+func opAlterDomainSetNotNull(op DDLOp) string {
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	qualified := sql.QualifiedName(schema, op.Name)
+	return fmt.Sprintf("ALTER DOMAIN %s SET NOT NULL;", qualified)
+}
+
+func opAlterDomainDropNotNull(op DDLOp) string {
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	qualified := sql.QualifiedName(schema, op.Name)
+	return fmt.Sprintf("ALTER DOMAIN %s DROP NOT NULL;", qualified)
 }
