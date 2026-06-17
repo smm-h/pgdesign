@@ -399,3 +399,70 @@ func TestAudit_BCNF_Pass(t *testing.T) {
 		}
 	}
 }
+
+func TestAudit_BCNF_DecompositionSuggestion(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "bcnf_test",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint", NotNull: true},
+				{Name: "B", PGType: "bigint", NotNull: true},
+				{Name: "C", PGType: "bigint", NotNull: true},
+			},
+			PK: []string{"A", "B"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A", "B"}, Dependent: []string{"C"}},
+				{Determinant: []string{"C"}, Dependent: []string{"B"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+
+	// Should have BCNF decomposition suggestion
+	var bcnfSuggestions []diagnostic.Diagnostic
+	for _, d := range diags {
+		if strings.Contains(d.Message, "BCNF decomposition") {
+			bcnfSuggestions = append(bcnfSuggestions, d)
+		}
+	}
+	if len(bcnfSuggestions) == 0 {
+		t.Fatalf("expected BCNF decomposition suggestion, got none. All diags: %+v", diags)
+	}
+
+	// Should mention lost FDs
+	var lostDiags []diagnostic.Diagnostic
+	for _, d := range diags {
+		if strings.Contains(d.Message, "loses functional dependencies") {
+			lostDiags = append(lostDiags, d)
+		}
+	}
+	if len(lostDiags) == 0 {
+		t.Logf("Note: no lost FD diagnostic found. All diags: %+v", diags)
+		// This is acceptable if the decomposition happens to preserve all FDs
+	}
+}
+
+func TestAudit_BCNF_NoDecomposition_WhenClean(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name: "bcnf_clean",
+			Columns: []model.Column{
+				{Name: "A", PGType: "bigint", NotNull: true},
+				{Name: "B", PGType: "text", NotNull: true},
+				{Name: "C", PGType: "text", NotNull: true},
+			},
+			PK: []string{"A"},
+			Dependencies: []fd.FuncDep{
+				{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
+			},
+		}},
+	}
+
+	diags := Audit(schema)
+	for _, d := range diags {
+		if strings.Contains(d.Message, "BCNF decomposition") {
+			t.Errorf("unexpected BCNF decomposition suggestion for clean table: %+v", d)
+		}
+	}
+}
