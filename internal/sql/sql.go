@@ -214,9 +214,13 @@ func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersi
 
 	// PARTITION BY clause.
 	if table.Partitioning != nil {
+		quotedPartCols := make([]string, len(table.Partitioning.Columns))
+		for i, col := range table.Partitioning.Columns {
+			quotedPartCols[i] = QuoteIdent(col)
+		}
 		sb.WriteString(fmt.Sprintf(" PARTITION BY %s (%s)",
 			strings.ToUpper(table.Partitioning.Strategy),
-			QuoteIdent(table.Partitioning.Column)))
+			strings.Join(quotedPartCols, ", ")))
 	}
 
 	sb.WriteString(";")
