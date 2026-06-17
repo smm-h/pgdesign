@@ -1791,3 +1791,142 @@ func TestDropFunction_Procedure(t *testing.T) {
 		t.Errorf("expected %q, got %q", want, got)
 	}
 }
+
+func TestCreateTrigger_Full(t *testing.T) {
+	trig := model.Trigger{
+		Name:     "audit_changes",
+		Function: "audit_func",
+		Events:   []string{"INSERT", "UPDATE"},
+		Timing:   "AFTER",
+		ForEach:  "ROW",
+		When:     "NEW.status = 'active'",
+	}
+	got := CreateTrigger("app", "orders", trig)
+	for _, want := range []string{
+		"CREATE TRIGGER",
+		"audit_changes",
+		"AFTER",
+		"INSERT OR UPDATE",
+		"app.orders",
+		"FOR EACH ROW",
+		"WHEN (NEW.status = 'active')",
+		"EXECUTE FUNCTION",
+		"app.audit_func()",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, got)
+		}
+	}
+	// Should NOT contain CONSTRAINT, DEFERRABLE, REFERENCING.
+	for _, notWant := range []string{
+		"CONSTRAINT",
+		"DEFERRABLE",
+		"REFERENCING",
+	} {
+		if strings.Contains(got, notWant) {
+			t.Errorf("expected output NOT to contain %q, got:\n%s", notWant, got)
+		}
+	}
+}
+
+func TestCreateTrigger_Minimal(t *testing.T) {
+	trig := model.Trigger{
+		Name:     "simple",
+		Function: "my_func",
+		Events:   []string{"INSERT"},
+		Timing:   "BEFORE",
+		ForEach:  "ROW",
+	}
+	got := CreateTrigger("app", "orders", trig)
+	for _, want := range []string{
+		"CREATE TRIGGER simple BEFORE INSERT ON",
+		"FOR EACH ROW",
+		"EXECUTE FUNCTION",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, got)
+		}
+	}
+	for _, notWant := range []string{
+		"CONSTRAINT",
+		"WHEN",
+		"REFERENCING",
+		"DEFERRABLE",
+	} {
+		if strings.Contains(got, notWant) {
+			t.Errorf("expected output NOT to contain %q, got:\n%s", notWant, got)
+		}
+	}
+}
+
+func TestCreateTrigger_Constraint(t *testing.T) {
+	trig := model.Trigger{
+		Name:              "fk_check",
+		Function:          "check_func",
+		Events:            []string{"INSERT"},
+		Timing:            "AFTER",
+		ForEach:           "ROW",
+		Constraint:        true,
+		Deferrable:        true,
+		InitiallyDeferred: true,
+	}
+	got := CreateTrigger("app", "orders", trig)
+	for _, want := range []string{
+		"CREATE CONSTRAINT TRIGGER",
+		"DEFERRABLE",
+		"INITIALLY DEFERRED",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, got)
+		}
+	}
+}
+
+func TestCreateTrigger_WithReferencing(t *testing.T) {
+	trig := model.Trigger{
+		Name:           "log_changes",
+		Function:       "log_func",
+		Events:         []string{"INSERT"},
+		Timing:         "AFTER",
+		ForEach:        "ROW",
+		ReferencingOld: "old_rows",
+		ReferencingNew: "new_rows",
+	}
+	got := CreateTrigger("app", "orders", trig)
+	if !strings.Contains(got, "REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows") {
+		t.Errorf("expected REFERENCING clause, got:\n%s", got)
+	}
+}
+
+func TestCreateTrigger_Statement(t *testing.T) {
+	trig := model.Trigger{
+		Name:     "batch_notify",
+		Function: "notify_func",
+		Events:   []string{"INSERT", "UPDATE", "DELETE"},
+		Timing:   "AFTER",
+		ForEach:  "STATEMENT",
+	}
+	got := CreateTrigger("app", "orders", trig)
+	for _, want := range []string{
+		"FOR EACH STATEMENT",
+		"INSERT OR UPDATE OR DELETE",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, got)
+		}
+	}
+}
+
+func TestDropTrigger(t *testing.T) {
+	got := DropTrigger("app", "orders", "audit_changes")
+	for _, want := range []string{
+		"DROP TRIGGER",
+		"audit_changes",
+		"ON",
+		"app.orders",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected output to contain %q, got:\n%s", want, got)
+		}
+	}
+}

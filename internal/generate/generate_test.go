@@ -2012,3 +2012,86 @@ func TestExclusionConstraintDDLWithWhere(t *testing.T) {
 		t.Errorf("expected exclusion DDL:\n%s\n\ngot:\n%s", expected, out)
 	}
 }
+
+func TestTriggerGeneration(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Schema:  "app",
+				Comment: "Orders",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+				},
+				PK: []string{"id"},
+				Triggers: []model.Trigger{
+					{
+						Name:     "audit_insert",
+						Function: "audit_func",
+						Events:   []string{"INSERT", "UPDATE"},
+						Timing:   "AFTER",
+						ForEach:  "ROW",
+						When:     "NEW.status = 'active'",
+					},
+					{
+						Name:              "constraint_check",
+						Function:          "check_func",
+						Events:            []string{"INSERT"},
+						Timing:            "AFTER",
+						ForEach:           "ROW",
+						Constraint:        true,
+						Deferrable:        true,
+						InitiallyDeferred: true,
+					},
+				},
+			},
+		},
+	}
+	opts := Options{IncludeComments: true, Format: "sql"}
+	got := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(got, "CREATE TRIGGER audit_insert") {
+		t.Error("expected CREATE TRIGGER audit_insert in output")
+	}
+	if !strings.Contains(got, "CREATE CONSTRAINT TRIGGER constraint_check") {
+		t.Error("expected CREATE CONSTRAINT TRIGGER constraint_check in output")
+	}
+	if !strings.Contains(got, "WHEN (NEW.status = 'active')") {
+		t.Error("expected WHEN clause in output")
+	}
+	if !strings.Contains(got, "DEFERRABLE INITIALLY DEFERRED") {
+		t.Error("expected DEFERRABLE INITIALLY DEFERRED in output")
+	}
+	if !strings.Contains(got, "EXECUTE FUNCTION") {
+		t.Error("expected EXECUTE FUNCTION in output")
+	}
+	// Verify triggers appear AFTER CREATE TABLE.
+	createTableIdx := strings.Index(got, "CREATE TABLE")
+	triggerIdx := strings.Index(got, "CREATE TRIGGER audit_insert")
+	if triggerIdx < createTableIdx {
+		t.Error("triggers should appear after CREATE TABLE")
+	}
+}
+
+func TestTriggerGeneration_NoTriggers(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Schema:  "app",
+				Comment: "Orders",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+	opts := Options{IncludeComments: true, Format: "sql"}
+	got := mustGenerate(t, schema, opts)
+	if strings.Contains(got, "CREATE TRIGGER") {
+		t.Error("expected no CREATE TRIGGER in output without triggers")
+	}
+}

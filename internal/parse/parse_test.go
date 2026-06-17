@@ -2238,3 +2238,233 @@ func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	}
 	return false
 }
+
+func TestTriggerParsing(t *testing.T) {
+	content := `[meta]
+schema = "app"
+version = 1
+
+[tables.orders]
+comment = "Orders table"
+pk = ["id"]
+
+[tables.orders.columns.id]
+type = "integer"
+
+[tables.orders.triggers.audit_insert]
+function = "audit_func"
+events = ["INSERT", "UPDATE"]
+timing = "AFTER"
+for_each = "ROW"
+when = "NEW.status = 'active'"
+comment = "Audit trigger"
+
+[tables.orders.triggers.constraint_check]
+function = "check_func"
+events = ["INSERT"]
+timing = "AFTER"
+constraint = true
+deferrable = true
+initially_deferred = true
+
+[tables.orders.triggers.with_referencing]
+function = "log_changes"
+events = ["INSERT"]
+timing = "AFTER"
+for_each = "ROW"
+referencing_old = "old_rows"
+referencing_new = "new_rows"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+	tbl := schema.Tables[0]
+	if len(tbl.Triggers) != 3 {
+		t.Fatalf("expected 3 triggers, got %d", len(tbl.Triggers))
+	}
+
+	// Check audit_insert trigger.
+	ai, ok := tbl.Triggers["audit_insert"]
+	if !ok {
+		t.Fatal("expected trigger 'audit_insert'")
+	}
+	if ai.Function != "audit_func" {
+		t.Errorf("audit_insert.Function = %q, want %q", ai.Function, "audit_func")
+	}
+	if len(ai.Events) != 2 || ai.Events[0] != "INSERT" || ai.Events[1] != "UPDATE" {
+		t.Errorf("audit_insert.Events = %v, want [INSERT UPDATE]", ai.Events)
+	}
+	if ai.Timing != "AFTER" {
+		t.Errorf("audit_insert.Timing = %q, want %q", ai.Timing, "AFTER")
+	}
+	if ai.ForEach == nil || *ai.ForEach != "ROW" {
+		t.Errorf("audit_insert.ForEach = %v, want ROW", ai.ForEach)
+	}
+	if ai.When == nil || *ai.When != "NEW.status = 'active'" {
+		t.Errorf("audit_insert.When = %v, want \"NEW.status = 'active'\"", ai.When)
+	}
+	if ai.Comment == nil || *ai.Comment != "Audit trigger" {
+		t.Errorf("audit_insert.Comment = %v, want \"Audit trigger\"", ai.Comment)
+	}
+
+	// Check constraint_check trigger.
+	cc, ok := tbl.Triggers["constraint_check"]
+	if !ok {
+		t.Fatal("expected trigger 'constraint_check'")
+	}
+	if cc.Constraint == nil || !*cc.Constraint {
+		t.Errorf("constraint_check.Constraint should be true")
+	}
+	if cc.Deferrable == nil || !*cc.Deferrable {
+		t.Errorf("constraint_check.Deferrable should be true")
+	}
+	if cc.InitiallyDeferred == nil || !*cc.InitiallyDeferred {
+		t.Errorf("constraint_check.InitiallyDeferred should be true")
+	}
+
+	// Check with_referencing trigger.
+	wr, ok := tbl.Triggers["with_referencing"]
+	if !ok {
+		t.Fatal("expected trigger 'with_referencing'")
+	}
+	if wr.ReferencingOld == nil || *wr.ReferencingOld != "old_rows" {
+		t.Errorf("with_referencing.ReferencingOld = %v, want \"old_rows\"", wr.ReferencingOld)
+	}
+	if wr.ReferencingNew == nil || *wr.ReferencingNew != "new_rows" {
+		t.Errorf("with_referencing.ReferencingNew = %v, want \"new_rows\"", wr.ReferencingNew)
+	}
+}
+
+func TestTriggerParsing_MinimalTrigger(t *testing.T) {
+	content := `[meta]
+schema = "app"
+version = 1
+
+[tables.orders]
+comment = "Orders"
+pk = ["id"]
+
+[tables.orders.columns.id]
+type = "integer"
+
+[tables.orders.triggers.simple]
+function = "notify_func"
+events = ["INSERT"]
+timing = "BEFORE"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	tbl := schema.Tables[0]
+	if len(tbl.Triggers) != 1 {
+		t.Fatalf("expected 1 trigger, got %d", len(tbl.Triggers))
+	}
+	tr, ok := tbl.Triggers["simple"]
+	if !ok {
+		t.Fatal("expected trigger 'simple'")
+	}
+	if tr.Function != "notify_func" {
+		t.Errorf("Function = %q, want %q", tr.Function, "notify_func")
+	}
+	if len(tr.Events) != 1 || tr.Events[0] != "INSERT" {
+		t.Errorf("Events = %v, want [INSERT]", tr.Events)
+	}
+	if tr.Timing != "BEFORE" {
+		t.Errorf("Timing = %q, want %q", tr.Timing, "BEFORE")
+	}
+	if tr.ForEach != nil {
+		t.Errorf("ForEach should be nil, got %v", tr.ForEach)
+	}
+	if tr.When != nil {
+		t.Errorf("When should be nil, got %v", tr.When)
+	}
+	if tr.Constraint != nil {
+		t.Errorf("Constraint should be nil, got %v", tr.Constraint)
+	}
+	if tr.Deferrable != nil {
+		t.Errorf("Deferrable should be nil, got %v", tr.Deferrable)
+	}
+	if tr.InitiallyDeferred != nil {
+		t.Errorf("InitiallyDeferred should be nil, got %v", tr.InitiallyDeferred)
+	}
+	if tr.ReferencingOld != nil {
+		t.Errorf("ReferencingOld should be nil, got %v", tr.ReferencingOld)
+	}
+	if tr.ReferencingNew != nil {
+		t.Errorf("ReferencingNew should be nil, got %v", tr.ReferencingNew)
+	}
+}
+
+func TestTriggerParsing_MissingRequired(t *testing.T) {
+	content := `[meta]
+schema = "app"
+version = 1
+
+[tables.orders]
+comment = "Orders"
+pk = ["id"]
+
+[tables.orders.columns.id]
+type = "integer"
+
+[tables.orders.triggers.bad]
+comment = "missing required"
+`
+	_, diags := Bytes([]byte(content))
+
+	// Should have E010 errors for missing function, events, timing.
+	e010Count := 0
+	for _, d := range diags {
+		if d.Code == "E010" && d.Severity == diagnostic.Error {
+			e010Count++
+		}
+	}
+	if e010Count < 3 {
+		t.Errorf("expected at least 3 E010 errors (function, events, timing), got %d; diags: %v", e010Count, diags)
+	}
+}
+
+func TestTriggerParsing_UnknownKey(t *testing.T) {
+	content := `[meta]
+schema = "app"
+version = 1
+
+[tables.orders]
+comment = "Orders"
+pk = ["id"]
+
+[tables.orders.columns.id]
+type = "integer"
+
+[tables.orders.triggers.trg]
+function = "my_func"
+events = ["INSERT"]
+timing = "BEFORE"
+unknown_key = "value"
+`
+	_, diags := Bytes([]byte(content))
+
+	found := false
+	for _, d := range diags {
+		if d.Code == "W001" && d.Severity == diagnostic.Warning {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected W001 warning for unknown key, got: %v", diags)
+	}
+}

@@ -928,3 +928,95 @@ func TestBuildFunctions(t *testing.T) {
 		t.Errorf("expected arg id uuid, got %s %s", f.Args[0].Name, f.Args[0].Type)
 	}
 }
+
+func TestBuildTriggers(t *testing.T) {
+	forEach := "ROW"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "app", Version: 1},
+		Tables: []parse.RawTable{
+			{
+				Name:    "orders",
+				Comment: strPtr("Orders table"),
+				PK:      []string{"id"},
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+				},
+				Triggers: map[string]parse.RawTrigger{
+					"audit_insert": {
+						Name:     "audit_insert",
+						Function: "audit_func",
+						Events:   []string{"INSERT", "UPDATE"},
+						Timing:   "after",
+						ForEach:  &forEach,
+					},
+				},
+			},
+		},
+	}
+	reg := semtype.NewBuiltinRegistry()
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+	table := schema.Tables[0]
+	if len(table.Triggers) != 1 {
+		t.Fatalf("expected 1 trigger, got %d", len(table.Triggers))
+	}
+	trig := table.Triggers[0]
+	if trig.Name != "audit_insert" {
+		t.Errorf("expected trigger name 'audit_insert', got %q", trig.Name)
+	}
+	if trig.Function != "audit_func" {
+		t.Errorf("expected function 'audit_func', got %q", trig.Function)
+	}
+	if trig.Timing != "AFTER" {
+		t.Errorf("expected timing 'AFTER', got %q", trig.Timing)
+	}
+	if trig.ForEach != "ROW" {
+		t.Errorf("expected for_each 'ROW', got %q", trig.ForEach)
+	}
+	if len(trig.Events) != 2 {
+		t.Errorf("expected 2 events, got %d", len(trig.Events))
+	}
+}
+
+func TestBuildTriggers_ConstraintMustBeAfter(t *testing.T) {
+	constraint := true
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "app", Version: 1},
+		Tables: []parse.RawTable{
+			{
+				Name:    "orders",
+				Comment: strPtr("Orders"),
+				PK:      []string{"id"},
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+				},
+				Triggers: map[string]parse.RawTrigger{
+					"bad_constraint": {
+						Name:       "bad_constraint",
+						Function:   "check_func",
+						Events:     []string{"INSERT"},
+						Timing:     "BEFORE",
+						Constraint: &constraint,
+					},
+				},
+			},
+		},
+	}
+	reg := semtype.NewBuiltinRegistry()
+	_, diags := Build(raw, reg)
+	found := false
+	for _, d := range diags {
+		if d.Code == "E126" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected E126 diagnostic for constraint trigger with BEFORE timing")
+	}
+}
