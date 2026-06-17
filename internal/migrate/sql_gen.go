@@ -40,6 +40,10 @@ func OpToSQL(op DDLOp) string {
 		return opAddFK(op)
 	case "drop_fk":
 		return opDropFK(op)
+	case "add_fk_not_valid":
+		return opAddFKNotValid(op)
+	case "validate_constraint":
+		return opValidateConstraint(op)
 	case "create_index", "add_index":
 		return opCreateIndex(op)
 	case "drop_index":
@@ -270,6 +274,26 @@ func opAddFK(op DDLOp) string {
 		stmt += " ON DELETE " + strings.ToUpper(op.OnDelete)
 	}
 	return stmt + ";"
+}
+
+func opAddFKNotValid(op DDLOp) string {
+	localCols := quoteIdentSlice(op.Columns)
+	refCols := quoteIdentSlice(op.RefCols)
+
+	stmt := fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s (%s)",
+		quoteQualified(op.Table), sql.QuoteIdent(op.Name),
+		strings.Join(localCols, ", "),
+		quoteQualified(op.RefTable), strings.Join(refCols, ", "))
+
+	if op.OnDelete != "" {
+		stmt += " ON DELETE " + strings.ToUpper(op.OnDelete)
+	}
+	return stmt + " NOT VALID;"
+}
+
+func opValidateConstraint(op DDLOp) string {
+	return fmt.Sprintf("ALTER TABLE %s VALIDATE CONSTRAINT %s;",
+		quoteQualified(op.Table), sql.QuoteIdent(op.Name))
 }
 
 func opDropFK(op DDLOp) string {
