@@ -26,24 +26,8 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		return buf.Bytes(), nil
 	}
 
-	// reverseFK tracks a single-column FK pointing back to a referenced table.
-	type reverseFK struct {
-		FromTable string // the table that owns the FK
-		FieldName string // the @ManyToOne field name in FromTable's entity
-	}
-
-	// First pass: build reverse-FK map and FK column sets.
-	reverseFKs := make(map[string][]reverseFK) // key: referenced table name
-	for _, tbl := range schema.Tables {
-		for _, fk := range tbl.FKs {
-			if len(fk.Columns) == 1 {
-				fieldName := jpaRelFieldName(fk.Columns[0], fk.RefTable)
-				reverseFKs[fk.RefTable] = append(reverseFKs[fk.RefTable], reverseFK{
-					FromTable: tbl.Name,
-					FieldName: fieldName,
-				})
-			}
-		}
+	if schema.FKGraph == nil {
+		schema.BuildFKGraph()
 	}
 
 	// Collect entity information and imports.
@@ -147,17 +131,27 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		}
 
 		// @OneToMany fields from reverse FK map.
-		if refs, ok := reverseFKs[tbl.Name]; ok {
-			imports["java.util.List"] = true
-			for _, ref := range refs {
-				refType := toPascalCase(ref.FromTable)
+		if edges := schema.FKGraph.Reverse[tbl.Name]; len(edges) > 0 {
+			fkColCount := make(map[string]int)
+			for _, e := range edges {
+				fkColCount[e.FKName]++
+			}
+			seen := make(map[string]bool)
+			for _, e := range edges {
+				if fkColCount[e.FKName] != 1 || seen[e.FKName] {
+					continue
+				}
+				seen[e.FKName] = true
+				imports["java.util.List"] = true
+				refType := toPascalCase(e.FromTable)
+				fieldName := jpaRelFieldName(e.FromColumn, tbl.Name)
 				annotations := []string{
-					fmt.Sprintf("@OneToMany(mappedBy = %q)", ref.FieldName),
+					fmt.Sprintf("@OneToMany(mappedBy = %q)", fieldName),
 				}
 				ei.Fields = append(ei.Fields, fieldInfo{
 					Annotations: annotations,
 					JavaType:    "List<" + refType + ">",
-					Name:        toCamelCase(ref.FromTable),
+					Name:        toCamelCase(e.FromTable),
 					Group:       2,
 				})
 			}
