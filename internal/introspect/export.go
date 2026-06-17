@@ -413,6 +413,84 @@ func Export(schema *model.Schema) ([]byte, error) {
 		}
 	}
 
+	// [functions.*]
+	for _, fn := range schema.Functions {
+		fnPath := "functions." + fn.Name
+		if err := doc.NewTable(fnPath); err != nil {
+			return nil, fmt.Errorf("create function %s: %w", fn.Name, err)
+		}
+		if err := doc.SetCreate(fnPath+".language", fn.Language); err != nil {
+			return nil, fmt.Errorf("set %s.language: %w", fnPath, err)
+		}
+		if fn.ReturnType != "" {
+			if err := doc.SetCreate(fnPath+".return_type", fn.ReturnType); err != nil {
+				return nil, fmt.Errorf("set %s.return_type: %w", fnPath, err)
+			}
+		}
+		if err := doc.SetCreate(fnPath+".body", fn.Body); err != nil {
+			return nil, fmt.Errorf("set %s.body: %w", fnPath, err)
+		}
+		if fn.Comment != "" {
+			if err := doc.SetCreate(fnPath+".comment", fn.Comment); err != nil {
+				return nil, fmt.Errorf("set %s.comment: %w", fnPath, err)
+			}
+		}
+		if fn.Volatility != "" {
+			if err := doc.SetCreate(fnPath+".volatility", fn.Volatility); err != nil {
+				return nil, fmt.Errorf("set %s.volatility: %w", fnPath, err)
+			}
+		}
+		if fn.Parallel != "" {
+			if err := doc.SetCreate(fnPath+".parallel", fn.Parallel); err != nil {
+				return nil, fmt.Errorf("set %s.parallel: %w", fnPath, err)
+			}
+		}
+		if fn.SecurityDefiner {
+			if err := doc.SetCreate(fnPath+".security_definer", true); err != nil {
+				return nil, fmt.Errorf("set %s.security_definer: %w", fnPath, err)
+			}
+		}
+		if fn.IsProc {
+			if err := doc.SetCreate(fnPath+".is_proc", true); err != nil {
+				return nil, fmt.Errorf("set %s.is_proc: %w", fnPath, err)
+			}
+		}
+		if fn.Cost != nil {
+			if err := doc.SetCreate(fnPath+".cost", *fn.Cost); err != nil {
+				return nil, fmt.Errorf("set %s.cost: %w", fnPath, err)
+			}
+		}
+		if fn.Rows != nil {
+			if err := doc.SetCreate(fnPath+".rows", *fn.Rows); err != nil {
+				return nil, fmt.Errorf("set %s.rows: %w", fnPath, err)
+			}
+		}
+		if len(fn.DependsOn) > 0 {
+			if err := doc.SetCreate(fnPath+".depends_on", toAnySlice(fn.DependsOn)); err != nil {
+				return nil, fmt.Errorf("set %s.depends_on: %w", fnPath, err)
+			}
+		}
+		// Args as sub-tables [functions.NAME.args.ARGNAME]
+		for _, arg := range fn.Args {
+			argName := arg.Name
+			if argName == "" {
+				argName = "_unnamed_" + arg.Type
+			}
+			argPath := fnPath + ".args." + argName
+			if err := doc.NewTable(argPath); err != nil {
+				return nil, fmt.Errorf("create arg %s: %w", argPath, err)
+			}
+			if err := doc.SetCreate(argPath+".type", arg.Type); err != nil {
+				return nil, fmt.Errorf("set %s.type: %w", argPath, err)
+			}
+			if arg.Default != "" {
+				if err := doc.SetCreate(argPath+".default", arg.Default); err != nil {
+					return nil, fmt.Errorf("set %s.default: %w", argPath, err)
+				}
+			}
+		}
+	}
+
 	return doc.Format(), nil
 }
 
