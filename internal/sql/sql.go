@@ -426,9 +426,18 @@ func AlterTableAddUnique(schemaName, tableName string, uq *model.UniqueConstrain
 		quotedCols[i] = QuoteIdent(c)
 	}
 
-	stmt := fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s UNIQUE (%s);",
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "ALTER TABLE %s ADD CONSTRAINT %s UNIQUE (%s)",
 		qualified, QuoteIdent(constraintName), strings.Join(quotedCols, ", "))
+	if uq.Deferrable {
+		buf.WriteString(" DEFERRABLE")
+		if uq.InitiallyDeferred {
+			buf.WriteString(" INITIALLY DEFERRED")
+		}
+	}
+	buf.WriteString(";")
 
+	stmt := buf.String()
 	if idempotent {
 		return wrapIdempotentConstraint(constraintName, qualified, stmt)
 	}

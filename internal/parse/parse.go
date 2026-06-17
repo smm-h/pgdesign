@@ -1049,6 +1049,18 @@ func (p *parser) parseUnique(tableName, uqName string, tbl *tomledit.TableNode) 
 			} else {
 				p.errorf("E010", tableName, "", "[tables.%s.unique.%s].columns must be an array of strings", tableName, uqName)
 			}
+		case "deferrable":
+			if v, ok := nodeBool(kv.Val); ok {
+				uq.Deferrable = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.unique.%s].deferrable must be a boolean", tableName, uqName)
+			}
+		case "initially_deferred":
+			if v, ok := nodeBool(kv.Val); ok {
+				uq.InitiallyDeferred = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.unique.%s].initially_deferred must be a boolean", tableName, uqName)
+			}
 		default:
 			p.warnf("W001", tableName, "", "unknown key in [tables.%s.unique.%s]: %q", tableName, uqName, key)
 		}

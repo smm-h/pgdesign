@@ -129,8 +129,10 @@ type RawIndex struct {
 
 // RawUnique holds a unique constraint from [tables.*.unique.*].
 type RawUnique struct {
-	Name    string
-	Columns []string
+	Name              string
+	Columns           []string
+	Deferrable        *bool
+	InitiallyDeferred *bool
 }
 
 // RawCheck holds a check constraint from [tables.*.checks.*].

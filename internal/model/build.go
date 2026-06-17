@@ -345,10 +345,17 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 
 	// Resolve unique constraints.
 	for name, rawUniq := range rt.Uniques {
-		t.Uniques = append(t.Uniques, UniqueConstraint{
+		uq := UniqueConstraint{
 			Name:    name,
 			Columns: rawUniq.Columns,
-		})
+		}
+		if rawUniq.Deferrable != nil {
+			uq.Deferrable = *rawUniq.Deferrable
+		}
+		if rawUniq.InitiallyDeferred != nil {
+			uq.InitiallyDeferred = *rawUniq.InitiallyDeferred
+		}
+		t.Uniques = append(t.Uniques, uq)
 	}
 
 	// Resolve check constraints.

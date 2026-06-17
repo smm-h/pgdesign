@@ -185,8 +185,10 @@ type Index struct {
 
 // UniqueConstraint represents a unique constraint.
 type UniqueConstraint struct {
-	Name    string   `json:"name"`
-	Columns []string `json:"columns"`
+	Name              string   `json:"name"`
+	Columns           []string `json:"columns"`
+	Deferrable        bool     `json:"deferrable,omitempty"`
+	InitiallyDeferred bool     `json:"initially_deferred,omitempty"`
 }
 
 // CheckConstraint represents a check constraint.
