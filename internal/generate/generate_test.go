@@ -685,7 +685,7 @@ func TestPartitionChildrenGeneration(t *testing.T) {
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
-					Column:   "created_at",
+					Columns:  []string{"created_at"},
 					Children: []model.PartitionSpec{
 						{
 							Name:  "events_2024_01",
@@ -740,13 +740,13 @@ func TestPartitionChildrenRecursive(t *testing.T) {
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
-					Column:   "created_at",
+					Columns:  []string{"created_at"},
 					Children: []model.PartitionSpec{
 						{
 							Name:     "events_2024",
 							Bound:    "FROM ('2024-01-01') TO ('2025-01-01')",
 							Strategy: "list",
-							Column:   "region",
+							Columns:  []string{"region"},
 							Children: []model.PartitionSpec{
 								{
 									Name:  "events_2024_us",
@@ -795,7 +795,7 @@ func TestPartmanGeneration(t *testing.T) {
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
-					Column:   "created_at",
+					Columns:  []string{"created_at"},
 				},
 				Maintenance: &model.MaintenanceConfig{
 					Premake:            4,
@@ -854,7 +854,7 @@ func TestPartmanNotEmittedWithoutExtension(t *testing.T) {
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
-					Column:   "created_at",
+					Columns:  []string{"created_at"},
 				},
 				Maintenance: &model.MaintenanceConfig{
 					Premake:            4,
@@ -1290,7 +1290,7 @@ func TestDocFormat(t *testing.T) {
 				},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
-					Column:   "created_at",
+					Columns:  []string{"created_at"},
 				},
 				AppendOnly: true,
 			},
