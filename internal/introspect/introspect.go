@@ -721,24 +721,24 @@ func parseIndexDef(def string) parsedIndex {
 				p.opclasses[colName] = opclassName
 			}
 		}
-			// Collation.
-			if len(elem.Collation) > 0 {
-				var collName string
-				for _, cNode := range elem.Collation {
-					if s := cNode.GetString_(); s != nil {
-						if collName != "" {
-							collName += "."
-						}
-						collName += s.Sval
+		// Collation.
+		if len(elem.Collation) > 0 {
+			var collName string
+			for _, cNode := range elem.Collation {
+				if s := cNode.GetString_(); s != nil {
+					if collName != "" {
+						collName += "."
 					}
-				}
-				if collName != "" {
-					if p.collations == nil {
-						p.collations = make(map[string]string)
-					}
-					p.collations[colName] = collName
+					collName += s.Sval
 				}
 			}
+			if collName != "" {
+				if p.collations == nil {
+					p.collations = make(map[string]string)
+				}
+				p.collations[colName] = collName
+			}
+		}
 	}
 
 	// Omit desc slice if all columns are ASC.
