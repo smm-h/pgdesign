@@ -1163,6 +1163,133 @@ depends_on = ["orders"]
 	}
 }
 
+func TestPartitionSingleColumn(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.events]
+pk = ["id"]
+comment = "Events"
+
+[tables.events.columns.id]
+type = "auto_id"
+
+[tables.events.columns.created_at]
+type = "timestamptz"
+
+[tables.events.partitioning]
+strategy = "range"
+column = "created_at"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+	tbl := schema.Tables[0]
+	if tbl.Partitioning == nil {
+		t.Fatal("expected partitioning to be set")
+	}
+	if tbl.Partitioning.Strategy != "range" {
+		t.Errorf("strategy = %q, want %q", tbl.Partitioning.Strategy, "range")
+	}
+	if tbl.Partitioning.Column != "created_at" {
+		t.Errorf("column = %q, want %q", tbl.Partitioning.Column, "created_at")
+	}
+}
+
+func TestPartitionMultiColumn(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.events]
+pk = ["id"]
+comment = "Events"
+
+[tables.events.columns.id]
+type = "auto_id"
+
+[tables.events.columns.year]
+type = "integer"
+
+[tables.events.columns.region]
+type = "text"
+
+[tables.events.partitioning]
+strategy = "range"
+columns = ["year", "region"]
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+	tbl := schema.Tables[0]
+	if tbl.Partitioning == nil {
+		t.Fatal("expected partitioning to be set")
+	}
+	if tbl.Partitioning.Strategy != "range" {
+		t.Errorf("strategy = %q, want %q", tbl.Partitioning.Strategy, "range")
+	}
+	if len(tbl.Partitioning.Columns) != 2 {
+		t.Fatalf("columns len = %d, want 2", len(tbl.Partitioning.Columns))
+	}
+	if tbl.Partitioning.Columns[0] != "year" || tbl.Partitioning.Columns[1] != "region" {
+		t.Errorf("columns = %v, want [year region]", tbl.Partitioning.Columns)
+	}
+}
+
+func TestPartitionBothColumnAndColumnsError(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.events]
+pk = ["id"]
+comment = "Events"
+
+[tables.events.columns.id]
+type = "auto_id"
+
+[tables.events.columns.created_at]
+type = "timestamptz"
+
+[tables.events.partitioning]
+strategy = "range"
+column = "created_at"
+columns = ["created_at"]
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E010" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected E010 error for both column and columns set, got: %v", diags)
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {
