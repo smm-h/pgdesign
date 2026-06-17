@@ -97,7 +97,7 @@ func (c *Config) Check() error {
 		"python": true, "zig": true, "go": true, "ts": true, "java": true, "kotlin": true,
 	}
 	validModes := map[string]bool{
-		"validators": true, "constants": true, "types": true,
+		"validators": true, "constants": true, "types": true, "constraints": true,
 	}
 	for name, out := range c.Output {
 		if out.Path == "" {

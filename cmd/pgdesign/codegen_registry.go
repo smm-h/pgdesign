@@ -61,6 +61,15 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 		default:
 			return nil, fmt.Errorf("unsupported language for %s mode: %s", mode, lang)
 		}
+	case "constraints":
+		switch lang {
+		case "go":
+			return &codegen.GoConstraintsGenerator{}, nil
+		case "ts":
+			return &codegen.TSConstraintsGenerator{}, nil
+		default:
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: go, ts)", mode, lang)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported codegen mode: %s", mode)
 	}
