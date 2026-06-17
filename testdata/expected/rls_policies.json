@@ -56,24 +56,28 @@
       "policies": [
         {
           "name": "owners_delete",
+          "type": "PERMISSIVE",
           "operation": "DELETE",
           "role": "app_user",
           "using": "owner_id = current_setting('app.user_id')::uuid"
         },
         {
           "name": "owners_insert",
+          "type": "PERMISSIVE",
           "operation": "INSERT",
           "role": "app_user",
           "with_check": "owner_id = current_setting('app.user_id')::uuid"
         },
         {
           "name": "owners_read",
+          "type": "PERMISSIVE",
           "operation": "SELECT",
           "role": "app_user",
           "using": "owner_id = current_setting('app.user_id')::uuid"
         },
         {
           "name": "owners_update",
+          "type": "PERMISSIVE",
           "operation": "UPDATE",
           "role": "app_user",
           "using": "owner_id = current_setting('app.user_id')::uuid",
