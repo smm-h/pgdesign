@@ -48,6 +48,9 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	enrichDiags := enrich(schema)
 	diags = append(diags, enrichDiags...)
 
+	schema.buildTablesByName()
+	schema.BuildFKGraph()
+
 	return schema, diags
 }
 
@@ -109,7 +112,19 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	enrichDiags := enrich(schema)
 	diags = append(diags, enrichDiags...)
 
+	schema.buildTablesByName()
+	schema.BuildFKGraph()
+
 	return schema, diags
+}
+
+// buildTablesByName populates the TablesByName lookup map from the Tables slice.
+func (s *Schema) buildTablesByName() {
+	s.TablesByName = make(map[string]*Table, len(s.Tables))
+	for i := range s.Tables {
+		key := s.Tables[i].Schema + "." + s.Tables[i].Name
+		s.TablesByName[key] = &s.Tables[i]
+	}
 }
 
 // resolve expands semantic types into PG types and builds model structs.

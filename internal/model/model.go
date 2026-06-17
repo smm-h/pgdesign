@@ -39,6 +39,8 @@ type Schema struct {
 	Functions          []Function          `json:"functions,omitempty"`
 	CycleGroups        [][]string          `json:"cycle_groups,omitempty"`
 	PGVersion   int        `json:"pg_version"`
+	TablesByName map[string]*Table `json:"-"`
+	FKGraph      *FKGraph          `json:"-"`
 }
 
 // View represents a resolved view definition.
@@ -69,6 +71,9 @@ func (s *Schema) TableOrder() []Table {
 
 // TableByName looks up a table by schema and name.
 func (s *Schema) TableByName(schema, name string) *Table {
+	if s.TablesByName != nil {
+		return s.TablesByName[schema+"."+name]
+	}
 	for i := range s.Tables {
 		if s.Tables[i].Schema == schema && s.Tables[i].Name == name {
 			return &s.Tables[i]
