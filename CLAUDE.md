@@ -10,27 +10,28 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `model` builds the resolved intermediate representation (tables, views, materialized views); `Schema.Build()` resolves types and dependencies
 - `validate` validates the model and detects anti-patterns
 - `generate` produces DDL and D2 diagram output
-- `audit` checks normal form compliance (1NF/2NF/3NF) using functional dependencies
-- `fd` provides functional dependency primitives (closure, minimal cover, candidate keys)
+- `audit` checks normal form compliance (1NF/2NF/3NF/BCNF) using functional dependencies; FD inference from PK/UNIQUE forces explicit declaration; Armstrong relation counterexamples in violation diagnostics
+- `fd` provides functional dependency primitives (closure, minimal cover, candidate keys, BCNF decomposition, lossless-join verification, dependency-preservation checking, Armstrong relation generation)
 - `discover` discovers functional dependencies from live data using the TANE algorithm
+- `graph` provides generic `TopoSort[T]` used by model (table ordering), generate (view/matview/function ordering), and format
 - `sqlexpr` parses and walks SQL expressions (recursive descent parser with 9 precedence levels, supports arithmetic, comparisons, boolean logic, casts, CASE, EXISTS subqueries); used by validate (E213) and codegen (expression-driven validators)
 - `sqlparse` wraps wasilibs/go-pgquery (WASM-based PostgreSQL parser, no CGo) for proper SQL statement splitting and expression deparsing
 - `sqlutil` provides shared adapter between sqlexpr and diagnostic for consistent parse-error-to-diagnostic conversion
-- `codegen` generates type-safe application code (Go, TS, Java, Kotlin, Python, Zig) from the model
+- `codegen` generates type-safe application code (Go, TS, Java, Kotlin, Python, Zig) from the model; modes: validators, constants, types, constraints (Go/TS), gorm, drizzle, sqlalchemy, jpa, graphql; shared type mapping and enum generation across all 6 languages
 - `diff` compares two models or a model against a live database
 - `migrate` generates migrations with risk classification and safety linting
 - `introspect` reads a live database via pg_catalog into a model
 - `seed` generates type-aware test data for schema tables
 - `serve` exposes the HTTP API and web UI
 - `diagnostic` provides error/warning/hint reporting used across all packages
-- `semtype` defines the semantic type system (builtins + user-defined enums)
+- `semtype` defines the semantic type system (builtins + user-defined enums + scalar types that produce CREATE DOMAIN + composite types)
 - `risk` classifies migration risk levels
 - `sql` contains SQL formatting utilities
 - `format` handles output formatting
 - `extregistry` validates PostgreSQL extension references
 - `config` handles project configuration loading from pgdesign.toml
 
-The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, sqlutil -> validate/codegen, sqlparse -> migrate/generate, discover -> audit/check, seed -> generate, introspect -> serve. Views depend on tables; materialized views depend on tables and views.
+The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -> migrate, sqlexpr -> validate/codegen, sqlutil -> validate/codegen, sqlparse -> migrate/generate/introspect, graph -> model/generate/format, discover -> audit/check, seed -> generate, introspect -> serve. Views depend on tables; materialized views depend on tables and views; functions depend on tables (auto-detected for SQL-language functions); triggers depend on functions.
 
 ## Key conventions
 
@@ -52,14 +53,27 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - `check` command runs registered checks (validation, NF audit, coverage) via strictcli's check framework.
 - `stats` command analyzes live database health: table sizes, index usage, bloat, duplicate indexes.
 - `seed` command generates type-aware test data respecting FK dependencies and semantic types.
-- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Three modes: validators, constants, types.
+- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Modes: `validators` (RLS policy checkers), `constants` (table/column name strings), `types` (native struct/class/interface definitions with enums), `constraints` (client-side validation from CHECK/NOT NULL/enum; Go and TS), `gorm` (Go GORM struct tags), `drizzle` (TS Drizzle schema), `sqlalchemy` (Python SQLAlchemy 2.0 models), `jpa` (Java JPA entity classes).
 - Diff supports three modes: `--live` (against database), `--against` (against another TOML), `--base` (against git ref).
 - `doc` output format generates human-readable schema documentation.
 - Extension-provided types (e.g., `vector` from pgvector) become valid base types when declared via `[[extensions]]` in pgdesign.toml. Undeclared extension types remain hard errors.
 - Index definitions support `with = { key = "value" }` for PostgreSQL storage parameters (e.g., HNSW `m`, `ef_construction`). E216 validates parameters against index method.
 - Views are defined under `[views.*]` with `query`, optional `comment`, and optional `depends_on` for dependency ordering.
 - Materialized views are defined under `[materialized_views.*]` with `query`, optional `comment`, `with_data`, and nested `[materialized_views.*.indexes.*]`.
-- Codegen supports `--mode types` for generating native type definitions from the schema in all 6 languages, in addition to `validators` and `constants`.
+- Scalar types with CHECK constraints produce `CREATE DOMAIN` in the database. Columns reference the domain name instead of the base PG type. Per-column CHECKs are replaced by the domain's own constraint.
+- Composite types are defined under `[types.*]` with `kind = "composite"` and `[types.*.fields]` subsection. Generates `CREATE TYPE ... AS (...)`.
+- Exclusion constraints are defined under `[tables.*.exclusions.*]` with `columns`, `operators`, `method`, `where`, `deferrable`, `initially_deferred`. Validates btree_gist extension requirement. Unique constraints also support `deferrable`/`initially_deferred`.
+- Functions are defined under `[functions.*]` with `language`, `returns`, `body`/`file` (SQL body inline or file-referenced), `args`, `volatility`, `parallel`, `security_definer`, `cost`, `rows`, `depends_on`. DDL uses `CREATE OR REPLACE FUNCTION` with `$pgdesign$` dollar-quoting. Signature changes (arg types, return type) require DROP + CREATE (Dangerous).
+- Triggers are defined under `[tables.*.triggers.*]` with `function`, `events`, `timing`, `for_each`, `when`, `constraint`, `deferrable`, `initially_deferred`, `referencing_old`, `referencing_new`. Supports CONSTRAINT TRIGGER and transition tables (PG 10+).
+- Standalone sequences are defined under `[sequences.*]` with `start`, `increment`, `min_value`, `max_value`, `cache`, `cycle`, `owned_by`, `comment`. Identity-backed sequences are filtered during introspection.
+- Per-column `collation` for COLLATE in DDL. Per-column index collation. Per-column `statistics` for SET STATISTICS.
+- Multi-column partition keys via `columns = ["year", "month"]` (backward compat with single `column`). pg_partman validated for single-column only.
+- Range and multirange types (int4range, tsrange, daterange, etc.) are valid base types.
+- BCNF audit (W103) alongside existing 3NF (W102). BCNF decomposition with lossless-join and dependency-preservation verification. Armstrong relation counterexamples in violation diagnostics. Minimal cover visualization (I100) when declared FDs have redundancy.
+- FD inference from PK/UNIQUE constraints (A100). Inferred FDs must be explicitly declared in `[[dependencies]]` — hard error if undeclared.
+- FD source tracking: `Source` field on FuncDep ("declared", "discovered", "inferred").
+- `graphql` output format generates GraphQL SDL with types, relations, enums, custom scalars (DateTime, JSON).
+- Function dependency auto-detection for `LANGUAGE sql` functions via go-pgquery AST walking. PL/pgSQL requires explicit `depends_on`.
 - PGVersion resolution order: live database (introspect) > `[database].pg_version` in pgdesign.toml > `[meta].version` in schema TOML > 0 (conservative defaults).
 - Generated columns: PG 12-17 only support STORED; PG 18+ supports both STORED and VIRTUAL. When `stored` is omitted from TOML, defaults to true. E218 validates version compatibility. STORED-to-VIRTUAL transition is destructive (DROP + recreate).
 
@@ -76,7 +90,7 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Handler signature: `func(kwargs map[string]interface{}) int` (returns exit code)
 - Global flags: `quiet`
 - `--db` and `--strict-nf` are per-command flags (on check, generate, introspect, diff, serve, stats, migrate subcommands).
-- Commands: `generate`, `check`, `fmt`, `introspect`, `diff`, `seed`, `serve`, `codegen`, `build`, `stats`
+- Commands: `generate`, `validate`, `audit`, `check`, `fmt`, `introspect`, `diff`, `seed`, `serve`, `codegen`, `build`, `stats`
 - Command groups: `migrate` (`plan`, `generate`, `apply`, `rollback`, `status`, `squash`, `test`)
 - `introspect --extensions` discovers extension types, functions, and opclasses from a live database
 
@@ -86,7 +100,7 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - `strictcli`: CLI framework
 - `pgx/v5`: PostgreSQL driver
 - `d2`: diagram rendering (native Go library, no external binary)
-- `go-pgquery`: WASM-based PostgreSQL parser (no CGo); used for SQL statement splitting
+- `go-pgquery`: WASM-based PostgreSQL parser (no CGo); used for SQL statement splitting, index definition parsing, and function dependency extraction
 
 ## Build
 
