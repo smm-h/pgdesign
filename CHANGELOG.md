@@ -2,6 +2,65 @@
 
 # Changelog
 
+## 0.13.0
+
+Schema object expansion, codegen modes, BCNF audit, functions, triggers, domains
+
+<details>
+<summary>Context</summary>
+
+Major feature release adding six new schema object types (domains, exclusion constraints, standalone sequences, composite types, functions/procedures, triggers) with full pipeline support (parse, model, DDL, diff, migrate, introspect). Codegen expanded from 3 modes to 9 (types, constraints, gorm, drizzle, sqlalchemy, jpa added). BCNF audit with decomposition algorithms, Armstrong relation counterexamples, and FD inference from PK/UNIQUE constraints. Scalar types now produce CREATE DOMAIN for database-level enforcement. Generic TopoSort and matchObjects infrastructure reduces code duplication. Multi-column partition keys, per-column collation and statistics, range/multirange types, identity column introspection, and deferrable constraint support round out the release.
+
+</details>
+
+### Breaking
+
+- **Diagnostic code reassignment.** E100-E103 moved to E120-E123, E110 moved to E205, E215 moved to E300 to resolve cross-package collisions. Code allocation ranges now documented.
+- **generate.Generate signature changed.** Now returns diagnostics alongside DDL output.
+- **Scalar types now produce CREATE DOMAIN.** Scalar types with CHECK expressions generate CREATE DOMAIN DDL instead of inline constraints, changing DDL output for all schemas using scalar CHECKs.
+- **PartitionSpec.Column renamed to Columns.** Multi-column partition keys now use a string slice, breaking existing single-column partition definitions in Go API consumers.
+
+### Features
+
+- **FD inference from PK/UNIQUE (A100).** Normal form audit now auto-infers functional dependencies from primary keys and unique constraints, requiring explicit dependency declaration.
+- **BCNF audit check (W103).** Normal form audit now detects Boyce-Codd violations with Armstrong relation counterexamples showing concrete data that breaks the constraint.
+- **BCNF decomposition with verification.** Suggests lossless-join decompositions for BCNF violations, verified for both lossless-join and dependency-preservation properties.
+- **Minimal cover visualization (I100).** Audit now shows the minimal cover of functional dependencies as an informational diagnostic.
+- **FD source tracking.** Functional dependencies now carry their source (declared, discovered, or inferred) through audit diagnostics.
+- **Generic TopoSort and matchObjects infrastructure.** Table, view, and materialized view ordering now uses a shared generic topological sort. Diff object matching uses a shared generic matcher.
+- **Codegen enum generation for all 6 languages.** Enums from the schema are now generated as native enum types (Go iota, TS union, Java enum, Kotlin enum, Python StrEnum, Zig enum) with name sanitization for language-specific keywords.
+- **Constraint validation codegen (--mode constraints).** Generates type-safe CHECK constraint validation functions for Go and TypeScript from schema constraints.
+- **GraphQL schema generation (--format graphql).** New output format generates GraphQL type definitions from the schema model.
+- **SQLAlchemy 2.0 model generation (--mode sqlalchemy).** Generates Python SQLAlchemy declarative models from the schema.
+- **GORM struct tag generation (--mode gorm).** Generates Go structs with GORM-compatible struct tags for ORM integration.
+- **Drizzle schema generation (--mode drizzle).** Generates Drizzle ORM schema definitions in TypeScript.
+- **JPA entity generation (--mode jpa).** Generates Java JPA entity classes with annotations from the schema.
+- **CREATE DOMAIN from scalar types.** Scalar types with CHECK constraints now produce CREATE DOMAIN DDL, enforcing semantic type validations at the database level.
+- **Exclusion constraints.** New [tables.*.exclusions.*] TOML section for defining exclusion constraints with GiST/SP-GiST support, diffing, migration, and E221 btree_gist validation.
+- **Deferrable unique and exclusion constraints.** Unique and exclusion constraints now support DEFERRABLE and INITIALLY DEFERRED attributes across parse, DDL, diff, migrate, and introspect.
+- **Standalone sequences.** New [sequences.*] TOML section for defining standalone sequences with owned_by references, full DDL generation, diffing, migration, and introspection.
+- **Composite types.** New kind=composite type definition with named fields, DDL generation, diffing, migration, introspection, and TOML export.
+- **Functions and procedures.** New [functions.*] TOML section supporting body/file, all PostgreSQL function attributes (LANGUAGE, VOLATILITY, SECURITY, COST, ROWS), diffing, migration, and introspection.
+- **User-defined triggers.** New [tables.*.triggers.*] TOML section with CONSTRAINT, REFERENCING, WHEN support, DDL generation, diffing, migration, and introspection.
+- **Function dependency auto-detection.** LANGUAGE sql functions automatically detect table references via ExtractTableRefs, populating DependsOn without manual declaration.
+- **Multi-column partition keys.** Partition specifications now support columns=["a","b"] for multi-column PARTITION BY clauses, with pg_partman single-column validation.
+- **Per-column collation, index collation, and statistics targets.** Columns support collation override, indexes support per-column collation, and columns support custom statistics targets across DDL, diff, migrate, and introspect.
+- **Range and multirange types.** 12 range/multirange types (int4range, tstzrange, etc.) added to the type allowlist.
+- **Identity column introspection.** Introspect now detects GENERATED ALWAYS/BY DEFAULT AS IDENTITY columns via attidentity.
+- **Shared codegen type mapping infrastructure.** All codegen generators now share a unified TypeMapping system, eliminating duplicated type conversion logic.
+- **Shared SelectGenerator for codegen.** Extracted common generator selection logic to eliminate duplicated switch trees across codegen modes.
+
+### Fixes
+
+- **Scalar type CHECKs no longer silently lost.** CHECK constraints defined on semantic types are now enforced at the database level via generated domains.
+- **E221 validates FD column names.** Functional dependency declarations now error if they reference non-existent columns.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.12.3
 
 Fix CWD-dependent panic and add view/materialized view support
@@ -20,12 +79,6 @@ pgdesign panicked when run from any directory that did not contain .strictcli/ch
 ### Fixes
 
 - **Bug fix.** Fix panic when running pgdesign from outside its own directory.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.12.2
 
