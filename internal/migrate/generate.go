@@ -1175,6 +1175,19 @@ func generateDescription(d *diff.SchemaDiff) string {
 		}
 		parts = append(parts, fmt.Sprintf("Alter materialized view %s", strings.Join(names, ", ")))
 	}
+	if len(d.SequencesAdded) > 0 {
+		parts = append(parts, fmt.Sprintf("Add sequence %s", strings.Join(d.SequencesAdded, ", ")))
+	}
+	if len(d.SequencesRemoved) > 0 {
+		parts = append(parts, fmt.Sprintf("Drop sequence %s", strings.Join(d.SequencesRemoved, ", ")))
+	}
+	if len(d.SequencesChanged) > 0 {
+		names := make([]string, len(d.SequencesChanged))
+		for i, sd := range d.SequencesChanged {
+			names[i] = sd.Name
+		}
+		parts = append(parts, fmt.Sprintf("Alter sequence %s", strings.Join(names, ", ")))
+	}
 	if len(parts) == 0 {
 		return "Schema migration"
 	}
