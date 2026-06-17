@@ -623,6 +623,36 @@ func TestOpToSQL_AddFK(t *testing.T) {
 	}
 }
 
+func TestOpToSQL_AddFKNotValid(t *testing.T) {
+	op := DDLOp{
+		Op:       "add_fk_not_valid",
+		Table:    "public.orders",
+		Name:     "fk_orders_user",
+		Columns:  []string{"user_id"},
+		RefTable: "public.users",
+		RefCols:  []string{"id"},
+		OnDelete: "cascade",
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.orders ADD CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES public.users (id) ON DELETE CASCADE NOT VALID;`
+	if got != want {
+		t.Errorf("OpToSQL(add_fk_not_valid)\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestOpToSQL_ValidateConstraint(t *testing.T) {
+	op := DDLOp{
+		Op:    "validate_constraint",
+		Table: "public.orders",
+		Name:  "fk_orders_user",
+	}
+	got := OpToSQL(op)
+	want := `ALTER TABLE public.orders VALIDATE CONSTRAINT fk_orders_user;`
+	if got != want {
+		t.Errorf("OpToSQL(validate_constraint)\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
 func TestOpToSQL_DropTable(t *testing.T) {
 	op := DDLOp{
 		Op:    "drop_table",
@@ -1326,7 +1356,7 @@ func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
 	}
 }
 
-func TestGenerateMigration_E300_AddFKLargeTable(t *testing.T) {
+func TestGenerateMigration_LargeTableFK_Split(t *testing.T) {
 	desired := &model.Schema{
 		Name:      "game",
 		PGVersion: 17,
@@ -1359,27 +1389,104 @@ func TestGenerateMigration_E300_AddFKLargeTable(t *testing.T) {
 	}
 
 	stats := TableStats{"scores": 50_000}
-	_, diags := GenerateMigration(d, desired, "0.8.0", stats, 10_000, 0, extregistry.NewBuiltinRegistry())
+	m, diags := GenerateMigration(d, desired, "0.8.0", stats, 10_000, 0, extregistry.NewBuiltinRegistry())
 
-	hasE300 := false
+	// No E300 diagnostic should be emitted -- the split replaces the warning.
 	for _, diag := range diags {
 		if diag.Code == "E300" {
-			hasE300 = true
-			if !strings.Contains(diag.Message, "50000") {
-				t.Errorf("E300 message should mention row count, got: %s", diag.Message)
-			}
-			if !strings.Contains(diag.Message, "NOT VALID") {
-				t.Errorf("E300 message should mention NOT VALID, got: %s", diag.Message)
-			}
-			break
+			t.Error("unexpected E300 diagnostic; large-table FK should be auto-split, not warned")
 		}
 	}
-	if !hasE300 {
-		t.Error("expected E300 diagnostic for add_fk on table with >10000 rows")
+
+	// Should produce exactly two ops: add_fk_not_valid + validate_constraint.
+	if len(m.DDLOps) != 2 {
+		t.Fatalf("expected 2 DDL ops, got %d: %v", len(m.DDLOps), opsString(m.DDLOps))
+	}
+
+	if m.DDLOps[0].Op != "add_fk_not_valid" {
+		t.Errorf("DDLOps[0]: got op %q, want %q", m.DDLOps[0].Op, "add_fk_not_valid")
+	}
+	if m.DDLOps[0].Table != "game.scores" {
+		t.Errorf("DDLOps[0]: got table %q, want %q", m.DDLOps[0].Table, "game.scores")
+	}
+	if m.DDLOps[0].Name != "fk_scores_player" {
+		t.Errorf("DDLOps[0]: got name %q, want %q", m.DDLOps[0].Name, "fk_scores_player")
+	}
+
+	if m.DDLOps[1].Op != "validate_constraint" {
+		t.Errorf("DDLOps[1]: got op %q, want %q", m.DDLOps[1].Op, "validate_constraint")
+	}
+	if m.DDLOps[1].Table != "game.scores" {
+		t.Errorf("DDLOps[1]: got table %q, want %q", m.DDLOps[1].Table, "game.scores")
+	}
+	if m.DDLOps[1].Name != "fk_scores_player" {
+		t.Errorf("DDLOps[1]: got name %q, want %q", m.DDLOps[1].Name, "fk_scores_player")
+	}
+
+	// Verify SQL generation.
+	sql0 := OpToSQL(m.DDLOps[0])
+	if !strings.Contains(sql0, "NOT VALID") {
+		t.Errorf("add_fk_not_valid SQL should contain NOT VALID, got: %s", sql0)
+	}
+	sql1 := OpToSQL(m.DDLOps[1])
+	if !strings.Contains(sql1, "VALIDATE CONSTRAINT") {
+		t.Errorf("validate_constraint SQL should contain VALIDATE CONSTRAINT, got: %s", sql1)
 	}
 }
 
-func TestGenerateMigration_NoStats_NoE300_NoEscalation(t *testing.T) {
+func TestGenerateMigration_SmallTableFK_NoSplit(t *testing.T) {
+	desired := &model.Schema{
+		Name:      "game",
+		PGVersion: 17,
+		Tables: []model.Table{
+			{
+				Name:   "scores",
+				Schema: "game",
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "player_id", PGType: "bigint", NotNull: true},
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "game.scores",
+				FKsAdded: []model.FK{
+					{
+						Name:       "fk_scores_player",
+						Columns:    []string{"player_id"},
+						RefTable:   "players",
+						RefColumns: []string{"id"},
+					},
+				},
+			},
+		},
+	}
+
+	// 5000 rows, below the 10_000 threshold -- no split.
+	stats := TableStats{"scores": 5_000}
+	m, _ := GenerateMigration(d, desired, "0.8.0", stats, 10_000, 0, extregistry.NewBuiltinRegistry())
+
+	// Should produce exactly one op: regular add_fk.
+	if len(m.DDLOps) != 1 {
+		t.Fatalf("expected 1 DDL op, got %d: %v", len(m.DDLOps), opsString(m.DDLOps))
+	}
+
+	if m.DDLOps[0].Op != "add_fk" {
+		t.Errorf("DDLOps[0]: got op %q, want %q", m.DDLOps[0].Op, "add_fk")
+	}
+
+	// Verify SQL does NOT contain NOT VALID.
+	sql0 := OpToSQL(m.DDLOps[0])
+	if strings.Contains(sql0, "NOT VALID") {
+		t.Errorf("small-table FK SQL should not contain NOT VALID, got: %s", sql0)
+	}
+}
+
+func TestGenerateMigration_NoStats_NoSplit_NoEscalation(t *testing.T) {
 	desired := &model.Schema{
 		Name:      "game",
 		PGVersion: 17,
@@ -3930,4 +4037,12 @@ func TestOpToSQL_NoForceRLS(t *testing.T) {
 	if !strings.Contains(sql, "NO FORCE ROW LEVEL SECURITY") {
 		t.Errorf("expected NO FORCE ROW LEVEL SECURITY, got: %s", sql)
 	}
+}
+
+func opsString(ops []DDLOp) string {
+	names := make([]string, len(ops))
+	for i, op := range ops {
+		names[i] = op.Op
+	}
+	return strings.Join(names, ", ")
 }
