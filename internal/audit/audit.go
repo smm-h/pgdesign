@@ -48,8 +48,12 @@ func auditTable(tbl *model.Table) []diagnostic.Diagnostic {
 		diags = append(diags, suggestDecomposition(tbl)...)
 	}
 
-	bcnfDiags, _ := checkBCNF(tbl)
+	bcnfDiags, hasBCNFViolation := checkBCNF(tbl)
 	diags = append(diags, bcnfDiags...)
+
+	if hasBCNFViolation {
+		diags = append(diags, suggestBCNFDecomposition(tbl, hasViolation)...)
+	}
 
 	return diags
 }
@@ -281,6 +285,54 @@ func suggestDecomposition(tbl *model.Table) []diagnostic.Diagnostic {
 		Message:    "Decomposition suggestion (Bernstein's synthesis).",
 		Suggestion: suggestion,
 	}}
+}
+
+// suggestBCNFDecomposition applies BCNF decomposition and emits diagnostics.
+// When has3NFViolation is true, the existing 3NF suggestion was already emitted,
+// so this function labels both for comparison.
+func suggestBCNFDecomposition(tbl *model.Table, has3NFViolation bool) []diagnostic.Diagnostic {
+	allAttrs := columnNames(tbl)
+	components := fd.BCNFDecompose(tbl.Name, allAttrs, tbl.Dependencies)
+
+	// Format the decomposition
+	var parts []string
+	for _, comp := range components {
+		parts = append(parts, fmt.Sprintf("%s(%s)", comp.Name, strings.Join(comp.Attributes, ", ")))
+	}
+
+	// Check dependency preservation
+	preserved, lostFDs := fd.PreservesDependencies(tbl.Dependencies, components)
+
+	var diags []diagnostic.Diagnostic
+
+	// Build the suggestion text
+	var suggestion string
+	if has3NFViolation {
+		suggestion = "BCNF decomposition (lossless-join, may lose FDs): " + strings.Join(parts, "; ")
+	} else {
+		suggestion = "Suggested BCNF decomposition: " + strings.Join(parts, "; ")
+	}
+
+	diags = append(diags, diagnostic.Diagnostic{
+		Severity:   diagnostic.Info,
+		Table:      tbl.Name,
+		Message:    "BCNF decomposition suggestion.",
+		Suggestion: suggestion,
+	})
+
+	if !preserved {
+		var lostStrs []string
+		for _, l := range lostFDs {
+			lostStrs = append(lostStrs, fmt.Sprintf("{%s} -> {%s}", formatAttrs(l.Determinant), formatAttrs(l.Dependent)))
+		}
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Info,
+			Table:    tbl.Name,
+			Message:  "BCNF decomposition loses functional dependencies: " + strings.Join(lostStrs, ", "),
+		})
+	}
+
+	return diags
 }
 
 // columnNames returns all column names from a table.
