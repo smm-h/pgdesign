@@ -111,6 +111,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W013", checkCascadeDepth},
 		{"W014", checkCascadeBreadth},
 		{"W015", checkMixedOnDelete},
+		{"I001", checkNaturalKey},
 	}
 
 	for _, r := range rules {
@@ -1495,6 +1496,67 @@ func checkMixedOnDelete(schema *model.Schema, _ *Config) []diagnostic.Diagnostic
 		})
 	}
 	return diags
+}
+
+// checkNaturalKey (I001): surfaces natural key candidates from declared FDs.
+func checkNaturalKey(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if len(t.Dependencies) == 0 {
+			continue
+		}
+		candidates := t.CandidateKeys()
+		for _, key := range candidates {
+			if sameColumns(key, t.PK) {
+				continue
+			}
+			if containsSurrogateCol(t, key) {
+				continue
+			}
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Info,
+				Code:       "I001",
+				Table:      t.Name,
+				Message:    fmt.Sprintf("natural key candidate: (%s) — differs from PK (%s)", strings.Join(key, ", "), strings.Join(t.PK, ", ")),
+				Suggestion: "Consider whether this natural key should be enforced with a UNIQUE constraint",
+			})
+		}
+	}
+	return diags
+}
+
+// sameColumns returns true if a and b contain the same columns (order-independent).
+func sameColumns(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	sa := make([]string, len(a))
+	copy(sa, a)
+	sort.Strings(sa)
+	sb := make([]string, len(b))
+	copy(sb, b)
+	sort.Strings(sb)
+	for i := range sa {
+		if sa[i] != sb[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// containsSurrogateCol returns true if any column in the key has a surrogate semantic type.
+func containsSurrogateCol(t model.Table, key []string) bool {
+	for _, colName := range key {
+		for _, col := range t.Columns {
+			if col.Name == colName {
+				switch col.SemanticTypeName {
+				case "id", "auto_id", "ref":
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // --- Helpers ---
