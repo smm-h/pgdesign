@@ -1,0 +1,1 @@
+{"commits":["307c84e1b76f76ad7db25ff4b5438092cc5a1db1"],"user_facing":true,"description":"**Fix.** Generate migration DDL for changed foreign keys (drop old + add new).","type":"fix"}
