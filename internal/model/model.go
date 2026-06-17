@@ -140,6 +140,7 @@ func (t *Table) CandidateKeys() [][]string {
 type Column struct {
 	Name             string `json:"name"`
 	PGType           string `json:"pg_type"`
+	Collation        string `json:"collation,omitempty"`
 	NotNull          bool   `json:"not_null"`
 	Default          *string `json:"default,omitempty"`
 	DefaultExpr      string `json:"default_expr,omitempty"`
@@ -150,6 +151,7 @@ type Column struct {
 	SemanticTypeName string `json:"semantic_type_name,omitempty"`
 	Array            bool   `json:"array,omitempty"`
 	JSONSchema       string `json:"json_schema,omitempty"`
+	Statistics       *int   `json:"statistics,omitempty"`
 }
 
 // FK represents a resolved foreign key constraint.
@@ -168,7 +170,8 @@ type Index struct {
 	Columns   []string          `json:"columns"`
 	Desc      []bool            `json:"desc,omitempty"` // parallel to Columns; true if DESC
 	Method    string            `json:"method,omitempty"`
-	Opclasses map[string]string `json:"opclasses,omitempty"`
+	Opclasses  map[string]string `json:"opclasses,omitempty"`
+	Collations map[string]string `json:"collations,omitempty"`
 	Where     string            `json:"where,omitempty"`
 	Include   []string          `json:"include,omitempty"`
 	With      map[string]string `json:"with,omitempty"`

@@ -377,6 +377,13 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 		col.JSONSchema = *rc.JSONSchema
 	}
 
+	if rc.Collation != nil {
+		col.Collation = *rc.Collation
+	}
+	if rc.Statistics != nil {
+		col.Statistics = rc.Statistics
+	}
+
 	return col, diags
 }
 
@@ -456,6 +463,17 @@ func resolveIndex(name string, rawIdx parse.RawIndex) Index {
 		idx.Opclasses = make(map[string]string, len(columns))
 		for _, col := range columns {
 			idx.Opclasses[col] = *rawIdx.Opclass
+		}
+	}
+	if rawIdx.CollationMap != nil {
+		idx.Collations = make(map[string]string, len(rawIdx.CollationMap))
+		for k, v := range rawIdx.CollationMap {
+			idx.Collations[k] = v
+		}
+	} else if rawIdx.Collation != nil {
+		idx.Collations = make(map[string]string, len(columns))
+		for _, col := range columns {
+			idx.Collations[col] = *rawIdx.Collation
 		}
 	}
 	if rawIdx.With != nil {

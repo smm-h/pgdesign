@@ -80,6 +80,8 @@ type RawColumn struct {
 	Generated  *string
 	Stored     *bool
 	Array      *bool
+	Collation  *string
+	Statistics *int
 	Comment    *string
 	JSONSchema        *string
 	JSONSchemaContent []byte // populated during File() parse when json_schema file is read successfully
@@ -99,9 +101,11 @@ type RawIndex struct {
 	Name       string
 	Columns    []string
 	Method     *string
-	Opclass    *string            // single opclass (applied to all columns)
-	OpclassMap map[string]string  // per-column opclass map
-	Where      *string
+	Opclass      *string            // single opclass (applied to all columns)
+	OpclassMap   map[string]string  // per-column opclass map
+	Collation    *string            // single collation (applied to all columns)
+	CollationMap map[string]string  // per-column collation map
+	Where        *string
 	Include    []string
 	Unique     *bool
 	With       map[string]string  // storage parameters, e.g. { m = "16", ef_construction = "200" }

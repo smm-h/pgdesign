@@ -616,6 +616,7 @@ func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode)
 		"type": true, "nullable": true, "default": true,
 		"default_expr": true, "generated": true, "stored": true,
 		"array": true, "comment": true, "json_schema": true,
+		"collation": true, "statistics": true,
 	}
 
 	for _, child := range tbl.Children {
@@ -682,6 +683,19 @@ func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode)
 				col.JSONSchema = &v
 			} else {
 				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].json_schema must be a string", tableName, colName)
+			}
+		case "collation":
+			if v, ok := nodeString(kv.Val); ok {
+				col.Collation = &v
+			} else {
+				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].collation must be a string", tableName, colName)
+			}
+		case "statistics":
+			if v, ok := nodeInt(kv.Val); ok {
+				iv := int(v)
+				col.Statistics = &iv
+			} else {
+				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].statistics must be an integer", tableName, colName)
 			}
 		}
 	}
@@ -797,7 +811,7 @@ func (p *parser) parseIndex(tableName, idxName string, tbl *tomledit.TableNode) 
 	idx := RawIndex{Name: idxName}
 
 	knownKeys := map[string]bool{
-		"columns": true, "method": true, "opclass": true,
+		"columns": true, "method": true, "opclass": true, "collation": true,
 		"where": true, "include": true, "unique": true, "with": true,
 	}
 
@@ -831,6 +845,14 @@ func (p *parser) parseIndex(tableName, idxName string, tbl *tomledit.TableNode) 
 				idx.OpclassMap = m
 			} else {
 				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].opclass must be a string or inline table of strings", tableName, idxName)
+			}
+		case "collation":
+			if v, ok := nodeString(kv.Val); ok {
+				idx.Collation = &v
+			} else if m, ok := nodeStringMap(kv.Val); ok {
+				idx.CollationMap = m
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].collation must be a string or inline table of strings", tableName, idxName)
 			}
 		case "where":
 			if v, ok := nodeString(kv.Val); ok {
