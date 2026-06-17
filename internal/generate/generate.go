@@ -67,6 +67,7 @@ func generateJSON(schema *model.Schema) (string, error) {
 		s.Tables[i].Indexes = sortedIndexes(s.Tables[i].Indexes)
 		s.Tables[i].Uniques = sortedUniques(s.Tables[i].Uniques)
 		s.Tables[i].Checks = sortedChecks(s.Tables[i].Checks)
+		s.Tables[i].Exclusions = sortedExclusions(s.Tables[i].Exclusions)
 		s.Tables[i].Policies = sortedPolicies(s.Tables[i].Policies)
 	}
 	data, err := json.MarshalIndent(&s, "", "  ")
@@ -223,6 +224,20 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	}
 	if len(ckStmts) > 0 {
 		sections = append(sections, strings.Join(ckStmts, "\n"))
+	}
+
+	// 8b. ALTER TABLE ADD CONSTRAINT ... EXCLUDE
+	var exclStmts []string
+	for i := range tables {
+		t := &tables[i]
+		excls := sortedExclusions(t.Exclusions)
+		for _, exc := range excls {
+			excCopy := exc
+			exclStmts = append(exclStmts, sql.AlterTableAddExclusion(t.Schema, t.Name, &excCopy, opts.Idempotent))
+		}
+	}
+	if len(exclStmts) > 0 {
+		sections = append(sections, strings.Join(exclStmts, "\n"))
 	}
 
 	// 9. CREATE INDEX (explicit + auto-FK)
@@ -450,6 +465,16 @@ func sortedChecks(cks []model.CheckConstraint) []model.CheckConstraint {
 		return result[i].Name < result[j].Name
 	})
 	return result
+}
+
+// sortedExclusions returns exclusion constraints sorted alphabetically by name.
+func sortedExclusions(excls []model.ExclusionConstraint) []model.ExclusionConstraint {
+	sorted := make([]model.ExclusionConstraint, len(excls))
+	copy(sorted, excls)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Name < sorted[j].Name
+	})
+	return sorted
 }
 
 // sortedIndexes returns indexes sorted alphabetically by name.

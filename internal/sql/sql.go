@@ -132,7 +132,7 @@ func ExprValue(expr string) string {
 
 // ConstraintName generates a constraint name following the convention:
 // pk_<table>, fk_<table>_<ref>, idx_<table>_<cols>, uq_<table>_<col>, ck_<table>_<name>.
-// Kind must be one of: "pk", "fk", "idx", "uq", "ck".
+// Kind must be one of: "pk", "fk", "idx", "uq", "ck", "excl".
 func ConstraintName(table, kind string, refs ...string) string {
 	parts := []string{kind, table}
 	parts = append(parts, refs...)
@@ -424,6 +424,42 @@ func AlterTableAddCheck(schemaName, tableName string, ck *model.CheckConstraint,
 	stmt := fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s CHECK (%s);",
 		qualified, QuoteIdent(constraintName), ck.Expr)
 
+	if idempotent {
+		return wrapIdempotentConstraint(constraintName, qualified, stmt)
+	}
+	return stmt
+}
+
+// AlterTableAddExclusion generates an ALTER TABLE ... ADD CONSTRAINT ... EXCLUDE statement.
+func AlterTableAddExclusion(schemaName, tableName string, exc *model.ExclusionConstraint, idempotent bool) string {
+	qualified := QualifiedName(schemaName, tableName)
+	constraintName := exc.Name
+	if constraintName == "" {
+		constraintName = ConstraintName(tableName, "excl", exc.Elements[0].Column)
+	}
+
+	// Build element list: col1 WITH op1, col2 WITH op2
+	elems := make([]string, len(exc.Elements))
+	for i, e := range exc.Elements {
+		elems[i] = fmt.Sprintf("%s WITH %s", QuoteIdent(e.Column), e.Operator)
+	}
+
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "ALTER TABLE %s ADD CONSTRAINT %s EXCLUDE USING %s (%s)",
+		qualified, QuoteIdent(constraintName), exc.Method, strings.Join(elems, ", "))
+
+	if exc.Where != "" {
+		fmt.Fprintf(&buf, " WHERE (%s)", exc.Where)
+	}
+	if exc.Deferrable {
+		buf.WriteString(" DEFERRABLE")
+		if exc.InitiallyDeferred {
+			buf.WriteString(" INITIALLY DEFERRED")
+		}
+	}
+	buf.WriteString(";")
+
+	stmt := buf.String()
 	if idempotent {
 		return wrapIdempotentConstraint(constraintName, qualified, stmt)
 	}
