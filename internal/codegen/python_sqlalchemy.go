@@ -78,22 +78,8 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 		return buf.Bytes(), nil
 	}
 
-	// Build reverse-FK index: for each referenced table, which tables have
-	// single-column FKs pointing to it.
-	type reverseFK struct {
-		FKTableName  string // the table that has the FK
-		FKColumnName string // the FK column name
-	}
-	reverseFKs := make(map[string][]reverseFK)
-	for _, tbl := range schema.Tables {
-		for _, fk := range tbl.FKs {
-			if len(fk.Columns) == 1 {
-				reverseFKs[fk.RefTable] = append(reverseFKs[fk.RefTable], reverseFK{
-					FKTableName:  tbl.Name,
-					FKColumnName: fk.Columns[0],
-				})
-			}
-		}
+	if schema.FKGraph == nil {
+		schema.BuildFKGraph()
 	}
 
 	// First pass: collect column and relationship info per table, track imports.
@@ -236,13 +222,20 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 
 		// HasMany relationships (one-to-many): other tables' single-column FKs
 		// pointing to this table.
-		if refs, ok := reverseFKs[tbl.Name]; ok {
-			for _, ref := range refs {
-				fkClassName := toPascalCase(ref.FKTableName)
-				fieldName := ref.FKTableName
-				// back_populates points to the many-to-one field on the FK table.
-				// That field is named by stripping _id from the FK column name.
-				backPopulates := ref.FKColumnName
+		if edges := schema.FKGraph.Reverse[tbl.Name]; len(edges) > 0 {
+			fkColCount := make(map[string]int)
+			for _, e := range edges {
+				fkColCount[e.FKName]++
+			}
+			seen := make(map[string]bool)
+			for _, e := range edges {
+				if fkColCount[e.FKName] != 1 || seen[e.FKName] {
+					continue
+				}
+				seen[e.FKName] = true
+				fkClassName := toPascalCase(e.FromTable)
+				fieldName := e.FromTable
+				backPopulates := e.FromColumn
 				if strings.HasSuffix(backPopulates, "_id") {
 					backPopulates = strings.TrimSuffix(backPopulates, "_id")
 				} else {
