@@ -1166,3 +1166,372 @@ func TestRegenFromPattern(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerate_CopyFormat(t *testing.T) {
+	schema := testSchema()
+	rng := rand.New(rand.NewSource(42))
+	cfg := &SeedConfig{Format: "copy"}
+	out, _ := Generate(schema, 3, rng, cfg)
+
+	// Must contain COPY statements for both tables.
+	if !strings.Contains(out, "COPY public.organizations") {
+		t.Error("output does not contain COPY public.organizations")
+	}
+	if !strings.Contains(out, "COPY public.users") {
+		t.Error("output does not contain COPY public.users")
+	}
+
+	// Must NOT contain INSERT INTO.
+	if strings.Contains(out, "INSERT INTO") {
+		t.Error("COPY format output should not contain INSERT INTO")
+	}
+
+	// Each COPY block has FROM stdin; header.
+	orgCopyIdx := strings.Index(out, "COPY public.organizations")
+	if orgCopyIdx < 0 {
+		t.Fatal("missing COPY public.organizations")
+	}
+	orgLine := out[orgCopyIdx : orgCopyIdx+strings.Index(out[orgCopyIdx:], "\n")]
+	if !strings.HasSuffix(orgLine, "FROM stdin;") {
+		t.Errorf("COPY header should end with 'FROM stdin;', got: %s", orgLine)
+	}
+
+	// Each COPY block ends with \.
+	if strings.Count(out, "\\.") < 2 {
+		t.Errorf("expected at least 2 COPY terminators (\\.), got %d", strings.Count(out, "\\."))
+	}
+
+	// Verify tab-separated data lines. Organizations has 3 columns (id, name, created_at).
+	// Find data lines between the COPY header and the terminator.
+	usrCopyIdx := strings.Index(out, "COPY public.users")
+	orgBlock := out[orgCopyIdx:usrCopyIdx]
+	lines := strings.Split(orgBlock, "\n")
+	dataLineCount := 0
+	for _, line := range lines {
+		if line == "" || strings.HasPrefix(line, "COPY ") || line == "\\." {
+			continue
+		}
+		dataLineCount++
+		parts := strings.Split(line, "\t")
+		// organizations has 3 columns: id, name, created_at.
+		if len(parts) != 3 {
+			t.Errorf("expected 3 tab-separated values for organizations, got %d in line: %s", len(parts), line)
+		}
+		// No SQL single quotes around string values in COPY data.
+		for _, p := range parts {
+			if strings.HasPrefix(p, "'") && strings.HasSuffix(p, "'") {
+				t.Errorf("COPY data should not have SQL-quoted values, got: %s", p)
+			}
+		}
+	}
+	if dataLineCount != 3 {
+		t.Errorf("expected 3 data lines for organizations, got %d", dataLineCount)
+	}
+
+	// Verify booleans use t/f. Find users COPY block and look for boolean column (is_active).
+	usrBlock := out[usrCopyIdx:]
+	usrLines := strings.Split(usrBlock, "\n")
+	for _, line := range usrLines {
+		if line == "" || strings.HasPrefix(line, "COPY ") || line == "\\." || strings.HasPrefix(line, "--") || strings.HasPrefix(line, "BEGIN") || strings.HasPrefix(line, "COMMIT") {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		// users columns (excluding generated 'score' and serial-free): id, org_id, email, status, is_active, login_count, slug, bio
+		// is_active is at index 4 in the original column list, but after skipping generated 'score' it stays at index 4.
+		if len(parts) >= 5 {
+			boolVal := parts[4]
+			if boolVal != "t" && boolVal != "f" {
+				t.Errorf("boolean in COPY should be 't' or 'f', got: %s", boolVal)
+			}
+		}
+	}
+
+	// Generated column 'score' must be excluded.
+	if strings.Contains(out, "score") {
+		t.Error("generated column 'score' should not appear in COPY output")
+	}
+}
+
+func TestGenerate_CopyFormat_SkipsSerialColumns(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_serial", Schema: "public",
+				Comment: "Test serial",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "serial", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	cfg := &SeedConfig{Format: "copy"}
+	out, _ := Generate(schema, 3, rng, cfg)
+
+	// The COPY column list should not include 'id' since it's serial.
+	copyIdx := strings.Index(out, "COPY public.test_serial")
+	if copyIdx < 0 {
+		t.Fatal("missing COPY public.test_serial")
+	}
+	headerEnd := strings.Index(out[copyIdx:], "FROM stdin;")
+	if headerEnd < 0 {
+		t.Fatal("cannot find FROM stdin; in COPY header")
+	}
+	header := out[copyIdx : copyIdx+headerEnd]
+	if strings.Contains(header, "id") {
+		t.Error("serial column 'id' should be excluded from COPY column list")
+	}
+	if !strings.Contains(header, "name") {
+		t.Error("non-serial column 'name' should be in COPY column list")
+	}
+}
+
+func TestGenerate_BatchInsert(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_batch", Schema: "public",
+				Comment: "Test batch",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 2500, rng, nil)
+
+	// With 2500 rows and batch size 1000, we expect 3 INSERT statements: 1000 + 1000 + 500.
+	insertCount := strings.Count(out, "INSERT INTO public.test_batch")
+	if insertCount != 3 {
+		t.Errorf("expected 3 INSERT statements for 2500 rows, got %d", insertCount)
+	}
+}
+
+func TestGenerate_CleanFlag(t *testing.T) {
+	schema := testSchema()
+	rng := rand.New(rand.NewSource(42))
+	cfg := &SeedConfig{Clean: true}
+	out, _ := Generate(schema, 3, rng, cfg)
+
+	// Must contain TRUNCATE.
+	if !strings.Contains(out, "TRUNCATE") {
+		t.Fatal("output does not contain TRUNCATE")
+	}
+
+	// TRUNCATE must have CASCADE.
+	truncIdx := strings.Index(out, "TRUNCATE")
+	truncLine := out[truncIdx : truncIdx+strings.Index(out[truncIdx:], "\n")]
+	if !strings.Contains(truncLine, "CASCADE") {
+		t.Error("TRUNCATE should include CASCADE")
+	}
+
+	// TRUNCATE lists tables in reverse dependency order.
+	// TableOrder returns: organizations, users (topo order).
+	// Reverse: users, organizations.
+	usersIdx := strings.Index(truncLine, "users")
+	orgsIdx := strings.Index(truncLine, "organizations")
+	if usersIdx < 0 || orgsIdx < 0 {
+		t.Fatal("TRUNCATE line missing expected table names")
+	}
+	if usersIdx >= orgsIdx {
+		t.Error("TRUNCATE should list users before organizations (reverse dependency order)")
+	}
+
+	// TRUNCATE appears before any INSERT.
+	insertIdx := strings.Index(out, "INSERT INTO")
+	if insertIdx < 0 {
+		t.Fatal("missing INSERT INTO")
+	}
+	if truncIdx >= insertIdx {
+		t.Error("TRUNCATE should appear before INSERT statements")
+	}
+}
+
+func TestGenerate_EdgeCasesMode(t *testing.T) {
+	schema := testSchema()
+	rng := rand.New(rand.NewSource(42))
+	cfg := &SeedConfig{Mode: "edge-cases"}
+	out, _ := Generate(schema, 100, rng, cfg)
+
+	// Only 1 row per table regardless of rowsPerTable setting.
+	orgIdx := strings.Index(out, "INSERT INTO public.organizations")
+	usrIdx := strings.Index(out, "INSERT INTO public.users")
+	if orgIdx < 0 || usrIdx < 0 {
+		t.Fatal("missing expected INSERT statements")
+	}
+
+	orgBlock := out[orgIdx:usrIdx]
+	orgRows := strings.Count(orgBlock, "  (")
+	if orgRows != 1 {
+		t.Errorf("edge-cases mode should produce 1 row for organizations, got %d", orgRows)
+	}
+
+	usrEnd := len(out)
+	// Find end of users block (before deferred updates or COMMIT).
+	if commitIdx := strings.Index(out[usrIdx:], "\nCOMMIT;"); commitIdx >= 0 {
+		usrEnd = usrIdx + commitIdx
+	}
+	usrBlock := out[usrIdx:usrEnd]
+	usrRows := strings.Count(usrBlock, "  (")
+	if usrRows != 1 {
+		t.Errorf("edge-cases mode should produce 1 row for users, got %d", usrRows)
+	}
+
+	// Extract the users row to check specific edge-case values.
+	usrRowStart := strings.Index(usrBlock, "  (")
+	if usrRowStart < 0 {
+		t.Fatal("no user row found")
+	}
+	usrRowEnd := strings.Index(usrBlock[usrRowStart:], ");")
+	if usrRowEnd < 0 {
+		t.Fatal("no user row terminator found")
+	}
+	usrRow := usrBlock[usrRowStart : usrRowStart+usrRowEnd+2]
+	usrRow = strings.TrimPrefix(strings.TrimSpace(usrRow), "(")
+	usrRow = strings.TrimSuffix(usrRow, ");")
+	parts := splitRow(usrRow)
+	// Columns: id, org_id, email, status, is_active, login_count, slug, bio
+	// (score is generated, excluded)
+
+	if len(parts) < 8 {
+		t.Fatalf("expected 8 columns for users edge-case row, got %d", len(parts))
+	}
+
+	// UUID (id) should be zeros.
+	if parts[0] != "'00000000-0000-0000-0000-000000000000'" {
+		t.Errorf("edge-case UUID should be all zeros, got: %s", parts[0])
+	}
+
+	// email (text, semantic "email") should be empty string.
+	if parts[2] != "''" {
+		t.Errorf("edge-case email should be empty string, got: %s", parts[2])
+	}
+
+	// is_active (boolean, semantic "flag") should be true.
+	if parts[4] != "true" {
+		t.Errorf("edge-case boolean should be true, got: %s", parts[4])
+	}
+
+	// login_count (bigint, semantic "counter") should be 0.
+	if parts[5] != "0" {
+		t.Errorf("edge-case counter should be 0, got: %s", parts[5])
+	}
+
+	// bio (nullable text) should be NULL.
+	if parts[7] != "NULL" {
+		t.Errorf("edge-case nullable column should be NULL, got: %s", parts[7])
+	}
+}
+
+func TestGenerate_TransactionWrapping(t *testing.T) {
+	schema := testSchema()
+	rng := rand.New(rand.NewSource(42))
+	out, _ := Generate(schema, 3, rng, nil)
+
+	// Output should contain BEGIN; near the start.
+	if !strings.Contains(out, "BEGIN;") {
+		t.Error("output should contain BEGIN;")
+	}
+	beginIdx := strings.Index(out, "BEGIN;")
+	if beginIdx > 100 {
+		t.Errorf("BEGIN; should appear near the start, found at position %d", beginIdx)
+	}
+
+	// Output should contain COMMIT; at the end.
+	if !strings.Contains(out, "COMMIT;") {
+		t.Error("output should contain COMMIT;")
+	}
+	commitIdx := strings.LastIndex(out, "COMMIT;")
+	if commitIdx < len(out)-20 {
+		// COMMIT; plus trailing newline should be near the end.
+	} else {
+		// Good, it's near the end.
+	}
+
+	// COMMIT; should be the last significant line.
+	afterCommit := strings.TrimSpace(out[commitIdx+len("COMMIT;"):])
+	if afterCommit != "" {
+		t.Errorf("nothing should follow COMMIT;, got: %q", afterCommit)
+	}
+}
+
+func TestGenerate_NoTransactionInApplyMode(t *testing.T) {
+	schema := testSchema()
+	rng := rand.New(rand.NewSource(42))
+	cfg := &SeedConfig{Apply: true}
+	out, _ := Generate(schema, 3, rng, cfg)
+
+	if strings.Contains(out, "BEGIN;") {
+		t.Error("apply mode should not contain BEGIN;")
+	}
+	if strings.Contains(out, "COMMIT;") {
+		t.Error("apply mode should not contain COMMIT;")
+	}
+}
+
+func TestGenerate_CopyFormat_NullValues(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name: "test_copy_nulls", Schema: "public",
+				Comment: "Test copy nulls",
+				PK:      []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "note", PGType: "text", NotNull: false},
+				},
+			},
+		},
+	}
+
+	rng := rand.New(rand.NewSource(77))
+	cfg := &SeedConfig{Format: "copy"}
+	out, _ := Generate(schema, 1000, rng, cfg)
+
+	// Find the COPY block.
+	copyIdx := strings.Index(out, "COPY public.test_copy_nulls")
+	if copyIdx < 0 {
+		t.Fatal("missing COPY public.test_copy_nulls")
+	}
+	block := out[copyIdx:]
+
+	// Look for NULL representation: should be \N, not the word NULL.
+	nullCount := 0
+	totalRows := 0
+	for _, line := range strings.Split(block, "\n") {
+		if line == "" || strings.HasPrefix(line, "COPY ") || line == "\\." || strings.HasPrefix(line, "--") || strings.HasPrefix(line, "BEGIN") || strings.HasPrefix(line, "COMMIT") {
+			continue
+		}
+		totalRows++
+		parts := strings.Split(line, "\t")
+		if len(parts) >= 2 {
+			noteVal := parts[1]
+			if noteVal == `\N` {
+				nullCount++
+			}
+			// The word "NULL" (unescaped) should never appear as a COPY value.
+			if noteVal == "NULL" {
+				t.Errorf("COPY format should use \\N for NULL, not the word NULL, in line: %s", line)
+			}
+		}
+	}
+
+	if totalRows != 1000 {
+		t.Fatalf("expected 1000 rows, got %d", totalRows)
+	}
+
+	if nullCount == 0 {
+		t.Error("expected some \\N values for nullable column in COPY output")
+	}
+	t.Logf("COPY NULL values: %d/%d", nullCount, totalRows)
+}
