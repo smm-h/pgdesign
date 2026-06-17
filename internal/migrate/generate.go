@@ -82,6 +82,51 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 	}
 
+	// Create composite types (before tables, after enums).
+	for _, ctName := range d.CompositeTypesAdded {
+		schema, name := splitQualifiedName(ctName)
+		ct := findCompositeType(desired, ctName)
+		op := DDLOp{
+			Op:               "create_composite_type",
+			Name:             name,
+			Schema:           schema,
+			CompositeTypeDef: ct,
+			Down: &DownOp{
+				Ops: []DDLOp{{Op: "drop_composite_type", Name: name, Schema: schema}},
+			},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpCreateCompositeType, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
+	// Changed composite types (destructive: DROP CASCADE + CREATE).
+	for _, ctDiff := range d.CompositeTypesChanged {
+		schema, name := splitQualifiedName(ctDiff.Name)
+		// Drop old.
+		dropOp := DDLOp{
+			Op:     "drop_composite_type",
+			Name:   name,
+			Schema: schema,
+			Down:   &DownOp{Irreversible: true},
+		}
+		m.DDLOps = append(m.DDLOps, dropOp)
+		diags = append(diags, classifyOp(dropOp, risk.OpDropCompositeType, risk.OpContext{PGVersion: desired.PGVersion})...)
+
+		// Recreate with new definition.
+		ct := findCompositeType(desired, ctDiff.Name)
+		createOp := DDLOp{
+			Op:               "create_composite_type",
+			Name:             name,
+			Schema:           schema,
+			CompositeTypeDef: ct,
+			Down: &DownOp{
+				Ops: []DDLOp{{Op: "drop_composite_type", Name: name, Schema: schema}},
+			},
+		}
+		m.DDLOps = append(m.DDLOps, createOp)
+		diags = append(diags, classifyOp(createOp, risk.OpCreateCompositeType, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
 	for _, tableName := range d.TablesAdded {
 		table := findTable(desired, tableName)
 		ctx := tableCtx(tableName)
@@ -852,6 +897,19 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		m.DDLOps = append(m.DDLOps, op)
 	}
 
+	// Drop composite types.
+	for _, ctName := range d.CompositeTypesRemoved {
+		schema, name := splitQualifiedName(ctName)
+		op := DDLOp{
+			Op:     "drop_composite_type",
+			Name:   name,
+			Schema: schema,
+			Down:   &DownOp{Irreversible: true},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpDropCompositeType, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
 	return m, diags
 }
 
@@ -1188,6 +1246,19 @@ func generateDescription(d *diff.SchemaDiff) string {
 		}
 		parts = append(parts, fmt.Sprintf("Alter sequence %s", strings.Join(names, ", ")))
 	}
+	if len(d.CompositeTypesAdded) > 0 {
+		parts = append(parts, fmt.Sprintf("Add composite type %s", strings.Join(d.CompositeTypesAdded, ", ")))
+	}
+	if len(d.CompositeTypesRemoved) > 0 {
+		parts = append(parts, fmt.Sprintf("Drop composite type %s", strings.Join(d.CompositeTypesRemoved, ", ")))
+	}
+	if len(d.CompositeTypesChanged) > 0 {
+		names := make([]string, len(d.CompositeTypesChanged))
+		for i, ctd := range d.CompositeTypesChanged {
+			names[i] = ctd.Name
+		}
+		parts = append(parts, fmt.Sprintf("Alter composite type %s", strings.Join(names, ", ")))
+	}
 	if len(parts) == 0 {
 		return "Schema migration"
 	}
@@ -1298,4 +1369,20 @@ func typeZeroValue(pgType string) string {
 	default:
 		return "0"
 	}
+}
+
+func compositeTypeKey(ct model.CompositeType) string {
+	if ct.Schema == "" || ct.Schema == "public" {
+		return ct.Name
+	}
+	return ct.Schema + "." + ct.Name
+}
+
+func findCompositeType(schema *model.Schema, qualifiedName string) *model.CompositeType {
+	for i := range schema.CompositeTypes {
+		if compositeTypeKey(schema.CompositeTypes[i]) == qualifiedName {
+			return &schema.CompositeTypes[i]
+		}
+	}
+	return nil
 }

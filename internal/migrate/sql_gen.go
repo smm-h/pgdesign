@@ -98,6 +98,10 @@ func OpToSQL(op DDLOp) string {
 		return opDropSequence(op)
 	case "alter_sequence":
 		return opAlterSequence(op)
+	case "create_composite_type":
+		return opCreateCompositeType(op)
+	case "drop_composite_type":
+		return opDropCompositeType(op)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
@@ -540,4 +544,27 @@ func formatDefault(val interface{}, pgType string) string {
 	default:
 		return fmt.Sprintf("'%v'", v)
 	}
+}
+
+func opCreateCompositeType(op DDLOp) string {
+	if op.CompositeTypeDef != nil {
+		schema := op.Schema
+		if schema == "" {
+			schema = "public"
+		}
+		return sql.CreateCompositeType(schema, *op.CompositeTypeDef)
+	}
+	// Fallback.
+	if op.Schema != "" {
+		return fmt.Sprintf("-- create_composite_type: missing definition for %s.%s", op.Schema, op.Name)
+	}
+	return fmt.Sprintf("-- create_composite_type: missing definition for %s", op.Name)
+}
+
+func opDropCompositeType(op DDLOp) string {
+	schema := op.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	return sql.DropCompositeType(schema, op.Name, true)
 }

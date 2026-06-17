@@ -67,6 +67,7 @@ type DDLOp struct {
 	ViewDef              *model.View              // full view def for create_view/drop_view (not serialized)
 	MaterializedViewDef  *model.MaterializedView  // full matview def for create/drop materialized view (not serialized)
 	SequenceDef          *model.Sequence          // full sequence def for create/alter sequence (not serialized)
+	CompositeTypeDef     *model.CompositeType         // full composite type def (not serialized)
 
 	Down *DownOp
 }
