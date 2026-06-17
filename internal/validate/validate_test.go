@@ -2581,6 +2581,7 @@ func TestI002_AllColumnsReferenced_NoDiag(t *testing.T) {
 				},
 				Indexes: []model.Index{
 					{Name: "idx_name", Columns: []string{"name"}},
+					{Name: "idx_full_name", Columns: []string{"full_name"}},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_age", Expr: "age >= 0"},
