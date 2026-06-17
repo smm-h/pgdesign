@@ -39,7 +39,18 @@ func handleSeed(kwargs map[string]interface{}) int {
 		}
 	}
 	rng := rand.New(rand.NewSource(rngSeed))
-	sql := seed.Generate(schema, rows, rng)
+	sql, seedDiags := seed.Generate(schema, rows, rng, nil)
+	if seedDiags.HasErrors() {
+		for _, d := range seedDiags.Errors() {
+			fmt.Fprintf(os.Stderr, "error: %s\n", d.Message)
+		}
+		return 1
+	}
+	if !quiet {
+		for _, d := range seedDiags.Warnings() {
+			fmt.Fprintf(os.Stderr, "warning: %s\n", d.Message)
+		}
+	}
 
 	if outputPath != "" {
 		if err := os.WriteFile(outputPath, []byte(sql), 0o644); err != nil {
