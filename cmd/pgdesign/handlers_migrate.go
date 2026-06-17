@@ -447,6 +447,27 @@ func handleMigrateRollback(kwargs map[string]interface{}) int {
 	}
 	defer conn.Close(ctx)
 
+	toVersion, _ := kwargs["to"].(string)
+	if toVersion != "" {
+		// Multi-step rollback to a target version.
+		rolledBack, err := migrate.RollbackTo(ctx, conn, dir, toVersion, lockTimeout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			if len(rolledBack) > 0 {
+				fmt.Fprintf(os.Stderr, "Rolled back before failure: %v\n", rolledBack)
+			}
+			return 1
+		}
+		if !kwargs["quiet"].(bool) {
+			fmt.Printf("Rolled back %d migration(s) to %s:\n", len(rolledBack), toVersion)
+			for _, v := range rolledBack {
+				fmt.Printf("  - %s\n", v)
+			}
+		}
+		return 0
+	}
+
+	// Single-step rollback (existing behavior).
 	version, err := migrate.Rollback(ctx, conn, dir, lockTimeout)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)

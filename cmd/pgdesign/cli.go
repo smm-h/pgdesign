@@ -107,6 +107,7 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL"),
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+			strictcli.StringFlag("to", "Target version to rollback to (exclusive — this version stays applied)"),
 		),
 	)
 	mig.Command("status", "Show migration status", handleMigrateStatus,
