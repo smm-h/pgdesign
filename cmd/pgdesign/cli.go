@@ -139,6 +139,9 @@ func main() {
 			strictcli.BoolFlag("apply", "Insert directly into database"),
 			strictcli.StringFlag("db", "PostgreSQL connection URL (required with --apply)", strictcli.Default(nil)),
 			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable(), strictcli.Unique(true), strictcli.Default(nil)),
+			strictcli.StringFlag("format", "Output format for seed data", strictcli.Default("insert"), strictcli.Choices("insert", "copy")),
+			strictcli.BoolFlag("clean", "Emit TRUNCATE before seed data"),
+			strictcli.StringFlag("mode", "Generation mode", strictcli.Default("normal"), strictcli.Choices("normal", "edge-cases")),
 		),
 	)
 

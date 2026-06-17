@@ -23,6 +23,9 @@ func handleSeed(kwargs map[string]interface{}) int {
 	apply := kwargs["apply"].(bool)
 	outputPath, _ := kwargs["output"].(string)
 	dbURL, _ := kwargs["db"].(string)
+	format := kwargs["format"].(string)
+	clean := kwargs["clean"].(bool)
+	mode := kwargs["mode"].(string)
 
 	if apply && dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required when using --apply")
@@ -39,7 +42,13 @@ func handleSeed(kwargs map[string]interface{}) int {
 		}
 	}
 	rng := rand.New(rand.NewSource(rngSeed))
-	sql, seedDiags := seed.Generate(schema, rows, rng, nil)
+	cfg := &seed.SeedConfig{
+		Format: format,
+		Clean:  clean,
+		Mode:   mode,
+		Apply:  apply,
+	}
+	sql, seedDiags := seed.Generate(schema, rows, rng, cfg)
 	if seedDiags.HasErrors() {
 		for _, d := range seedDiags.Errors() {
 			fmt.Fprintf(os.Stderr, "error: %s\n", d.Message)
