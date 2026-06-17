@@ -533,3 +533,318 @@ func TestOutputPath(t *testing.T) {
 		t.Errorf("OutputPath = %q, want %q", got, want)
 	}
 }
+
+func TestSquashMigrations_ConsolidateIntoCreateTable(t *testing.T) {
+	dir := t.TempDir()
+
+	m1 := &Migration{
+		Description: "Create users",
+		DDLOps: []DDLOp{
+			{Op: "create_table", Table: "public.users", PK: []string{"id"}, Comment: "Users table"},
+		},
+	}
+	m2 := &Migration{
+		Description: "Add email and fk",
+		DDLOps: []DDLOp{
+			{Op: "add_column", Table: "public.users", Column: "email", Type: "text"},
+			{Op: "add_fk", Table: "public.users", Name: "fk_users_org", Columns: []string{"org_id"}, RefTable: "public.orgs", RefCols: []string{"id"}, OnDelete: "CASCADE"},
+		},
+	}
+	m3 := &Migration{
+		Description: "Add index, unique, check",
+		DDLOps: []DDLOp{
+			{Op: "create_index", Table: "public.users", Name: "idx_users_email", Columns: []string{"email"}},
+			{Op: "add_unique", Table: "public.users", Name: "uq_users_email", Columns: []string{"email"}},
+			{Op: "add_check", Table: "public.users", Name: "ck_users_email", Expr: `email <> ''`},
+		},
+	}
+
+	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
+	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
+	WriteMigrationFile(filepath.Join(dir, "0.3.0.toml"), m3)
+
+	result, err := SquashMigrations(dir, "0.1.0", "0.3.0")
+	if err != nil {
+		t.Fatalf("SquashMigrations: %v", err)
+	}
+
+	if len(result.Squashed.DDLOps) != 1 {
+		t.Fatalf("DDL ops = %d, want 1", len(result.Squashed.DDLOps))
+	}
+	if result.Squashed.DDLOps[0].Op != "create_table" {
+		t.Errorf("DDL[0].Op = %q, want create_table", result.Squashed.DDLOps[0].Op)
+	}
+	cops := result.Squashed.DDLOps[0].ConsolidatedOps
+	if len(cops) != 5 {
+		t.Fatalf("ConsolidatedOps = %d, want 5", len(cops))
+	}
+	if cops[0].Op != "add_column" || cops[0].Column != "email" {
+		t.Errorf("ConsolidatedOps[0] = %s %s, want add_column email", cops[0].Op, cops[0].Column)
+	}
+	if cops[1].Op != "add_fk" || cops[1].Name != "fk_users_org" {
+		t.Errorf("ConsolidatedOps[1] = %s %s, want add_fk fk_users_org", cops[1].Op, cops[1].Name)
+	}
+	if cops[2].Op != "create_index" || cops[2].Name != "idx_users_email" {
+		t.Errorf("ConsolidatedOps[2] = %s %s, want create_index idx_users_email", cops[2].Op, cops[2].Name)
+	}
+	if cops[3].Op != "add_unique" || cops[3].Name != "uq_users_email" {
+		t.Errorf("ConsolidatedOps[3] = %s %s, want add_unique uq_users_email", cops[3].Op, cops[3].Name)
+	}
+	if cops[4].Op != "add_check" || cops[4].Name != "ck_users_email" {
+		t.Errorf("ConsolidatedOps[4] = %s %s, want add_check ck_users_email", cops[4].Op, cops[4].Name)
+	}
+	if result.ConsolidatedOps != 5 {
+		t.Errorf("ConsolidatedOps count = %d, want 5", result.ConsolidatedOps)
+	}
+}
+
+func TestSquashMigrations_ConsolidateOnlyMatchingTable(t *testing.T) {
+	dir := t.TempDir()
+
+	m1 := &Migration{
+		Description: "Create users",
+		DDLOps: []DDLOp{
+			{Op: "create_table", Table: "public.users", PK: []string{"id"}, Comment: "Users"},
+		},
+	}
+	m2 := &Migration{
+		Description: "Create orders",
+		DDLOps: []DDLOp{
+			{Op: "create_table", Table: "public.orders", PK: []string{"id"}, Comment: "Orders"},
+		},
+	}
+	m3 := &Migration{
+		Description: "Add columns",
+		DDLOps: []DDLOp{
+			{Op: "add_column", Table: "public.users", Column: "email", Type: "text"},
+			{Op: "add_column", Table: "public.orders", Column: "total", Type: "numeric"},
+		},
+	}
+
+	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
+	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
+	WriteMigrationFile(filepath.Join(dir, "0.3.0.toml"), m3)
+
+	result, err := SquashMigrations(dir, "0.1.0", "0.3.0")
+	if err != nil {
+		t.Fatalf("SquashMigrations: %v", err)
+	}
+
+	if len(result.Squashed.DDLOps) != 2 {
+		t.Fatalf("DDL ops = %d, want 2", len(result.Squashed.DDLOps))
+	}
+	if result.Squashed.DDLOps[0].Op != "create_table" {
+		t.Errorf("DDL[0].Op = %q, want create_table", result.Squashed.DDLOps[0].Op)
+	}
+	if result.Squashed.DDLOps[1].Op != "create_table" {
+		t.Errorf("DDL[1].Op = %q, want create_table", result.Squashed.DDLOps[1].Op)
+	}
+
+	var usersOp, ordersOp *DDLOp
+	for i := range result.Squashed.DDLOps {
+		switch result.Squashed.DDLOps[i].Table {
+		case "public.users":
+			usersOp = &result.Squashed.DDLOps[i]
+		case "public.orders":
+			ordersOp = &result.Squashed.DDLOps[i]
+		}
+	}
+	if usersOp == nil {
+		t.Fatal("missing create_table for public.users")
+	}
+	if ordersOp == nil {
+		t.Fatal("missing create_table for public.orders")
+	}
+	if len(usersOp.ConsolidatedOps) != 1 {
+		t.Fatalf("users ConsolidatedOps = %d, want 1", len(usersOp.ConsolidatedOps))
+	}
+	if usersOp.ConsolidatedOps[0].Column != "email" {
+		t.Errorf("users ConsolidatedOps[0].Column = %q, want email", usersOp.ConsolidatedOps[0].Column)
+	}
+	if len(ordersOp.ConsolidatedOps) != 1 {
+		t.Fatalf("orders ConsolidatedOps = %d, want 1", len(ordersOp.ConsolidatedOps))
+	}
+	if ordersOp.ConsolidatedOps[0].Column != "total" {
+		t.Errorf("orders ConsolidatedOps[0].Column = %q, want total", ordersOp.ConsolidatedOps[0].Column)
+	}
+}
+
+func TestSquashMigrations_ConsolidatedRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+
+	m1 := &Migration{
+		Description: "Create items",
+		DDLOps: []DDLOp{
+			{Op: "create_table", Table: "public.items", PK: []string{"id"}, Comment: "Items"},
+		},
+	}
+	m2 := &Migration{
+		Description: "Add price",
+		DDLOps: []DDLOp{
+			{Op: "add_column", Table: "public.items", Column: "price", Type: "numeric(10,2)", NotNull: true},
+		},
+	}
+
+	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
+	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
+
+	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	if err != nil {
+		t.Fatalf("SquashMigrations: %v", err)
+	}
+
+	outPath := filepath.Join(dir, "squashed.toml")
+	if err := WriteMigrationFile(outPath, result.Squashed); err != nil {
+		t.Fatalf("WriteMigrationFile: %v", err)
+	}
+
+	parsed, err := ParseMigrationFile(outPath)
+	if err != nil {
+		t.Fatalf("ParseMigrationFile: %v", err)
+	}
+
+	if len(parsed.DDLOps) != 1 {
+		t.Fatalf("parsed DDL ops = %d, want 1", len(parsed.DDLOps))
+	}
+	if parsed.DDLOps[0].Op != "create_table" {
+		t.Errorf("parsed DDL[0].Op = %q, want create_table", parsed.DDLOps[0].Op)
+	}
+	if len(parsed.DDLOps[0].ConsolidatedOps) != 1 {
+		t.Fatalf("parsed ConsolidatedOps = %d, want 1", len(parsed.DDLOps[0].ConsolidatedOps))
+	}
+	cop := parsed.DDLOps[0].ConsolidatedOps[0]
+	if cop.Op != "add_column" {
+		t.Errorf("cop.Op = %q, want add_column", cop.Op)
+	}
+	if cop.Column != "price" {
+		t.Errorf("cop.Column = %q, want price", cop.Column)
+	}
+	if cop.Type != "numeric(10,2)" {
+		t.Errorf("cop.Type = %q, want numeric(10,2)", cop.Type)
+	}
+	if !cop.NotNull {
+		t.Errorf("cop.NotNull = false, want true")
+	}
+}
+
+func TestSquashMigrations_ConsolidateExclusion(t *testing.T) {
+	dir := t.TempDir()
+
+	m1 := &Migration{
+		Description: "Create bookings",
+		DDLOps: []DDLOp{
+			{Op: "create_table", Table: "public.bookings", PK: []string{"id"}, Comment: "Bookings"},
+		},
+	}
+	m2 := &Migration{
+		Description: "Add exclusion",
+		DDLOps: []DDLOp{
+			{Op: "add_exclusion", Table: "public.bookings", Name: "excl_booking_overlap", Columns: []string{"room_id", "period"}, Operators: []string{"=", "&&"}, Method: "gist"},
+		},
+	}
+
+	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
+	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
+
+	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	if err != nil {
+		t.Fatalf("SquashMigrations: %v", err)
+	}
+
+	if len(result.Squashed.DDLOps) != 1 {
+		t.Fatalf("DDL ops = %d, want 1", len(result.Squashed.DDLOps))
+	}
+	if result.Squashed.DDLOps[0].Op != "create_table" {
+		t.Errorf("DDL[0].Op = %q, want create_table", result.Squashed.DDLOps[0].Op)
+	}
+	if len(result.Squashed.DDLOps[0].ConsolidatedOps) != 1 {
+		t.Fatalf("ConsolidatedOps = %d, want 1", len(result.Squashed.DDLOps[0].ConsolidatedOps))
+	}
+	cop := result.Squashed.DDLOps[0].ConsolidatedOps[0]
+	if cop.Op != "add_exclusion" {
+		t.Errorf("cop.Op = %q, want add_exclusion", cop.Op)
+	}
+	if cop.Name != "excl_booking_overlap" {
+		t.Errorf("cop.Name = %q, want excl_booking_overlap", cop.Name)
+	}
+	if cop.Method != "gist" {
+		t.Errorf("cop.Method = %q, want gist", cop.Method)
+	}
+}
+
+func TestSquashMigrations_StripPhases(t *testing.T) {
+	dir := t.TempDir()
+
+	m1 := &Migration{
+		Description: "Create table",
+		DDLOps: []DDLOp{
+			{Op: "create_table", Table: "public.t", Phase: "expand", PK: []string{"id"}, Comment: "T"},
+		},
+	}
+	m2 := &Migration{
+		Description: "Drop and backfill",
+		DDLOps: []DDLOp{
+			{Op: "drop_column", Table: "public.t", Column: "old", Phase: "contract"},
+		},
+		DMLOps: []DMLOp{
+			{Op: "backfill", SQL: "UPDATE public.t SET x = 1", Phase: "migrate"},
+		},
+	}
+
+	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
+	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
+
+	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	if err != nil {
+		t.Fatalf("SquashMigrations: %v", err)
+	}
+
+	for i, op := range result.Squashed.DDLOps {
+		if op.Phase != "" {
+			t.Errorf("DDLOps[%d].Phase = %q, want empty", i, op.Phase)
+		}
+	}
+	for i, op := range result.Squashed.DMLOps {
+		if op.Phase != "" {
+			t.Errorf("DMLOps[%d].Phase = %q, want empty", i, op.Phase)
+		}
+	}
+}
+
+func TestSquashMigrations_StripPhasesFromConsolidated(t *testing.T) {
+	dir := t.TempDir()
+
+	m1 := &Migration{
+		Description: "Create table",
+		DDLOps: []DDLOp{
+			{Op: "create_table", Table: "public.t", Phase: "expand", PK: []string{"id"}, Comment: "T"},
+		},
+	}
+	m2 := &Migration{
+		Description: "Add column",
+		DDLOps: []DDLOp{
+			{Op: "add_column", Table: "public.t", Column: "col", Type: "text", Phase: "expand"},
+		},
+	}
+
+	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
+	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
+
+	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	if err != nil {
+		t.Fatalf("SquashMigrations: %v", err)
+	}
+
+	if len(result.Squashed.DDLOps) != 1 {
+		t.Fatalf("DDL ops = %d, want 1", len(result.Squashed.DDLOps))
+	}
+	if result.Squashed.DDLOps[0].Phase != "" {
+		t.Errorf("DDLOps[0].Phase = %q, want empty", result.Squashed.DDLOps[0].Phase)
+	}
+	if len(result.Squashed.DDLOps[0].ConsolidatedOps) != 1 {
+		t.Fatalf("ConsolidatedOps = %d, want 1", len(result.Squashed.DDLOps[0].ConsolidatedOps))
+	}
+	if result.Squashed.DDLOps[0].ConsolidatedOps[0].Phase != "" {
+		t.Errorf("ConsolidatedOps[0].Phase = %q, want empty", result.Squashed.DDLOps[0].ConsolidatedOps[0].Phase)
+	}
+}

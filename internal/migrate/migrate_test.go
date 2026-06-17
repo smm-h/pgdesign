@@ -4072,3 +4072,41 @@ func opsString(ops []DDLOp) string {
 	}
 	return strings.Join(names, ", ")
 }
+
+func TestOpToSQL_CreateTableConsolidated(t *testing.T) {
+	op := DDLOp{
+		Op:      "create_table",
+		Table:   "public.users",
+		PK:      []string{"id"},
+		Comment: "Users table",
+		ConsolidatedOps: []DDLOp{
+			{Op: "add_column", Table: "public.users", Column: "email", Type: "text", NotNull: true},
+			{Op: "add_column", Table: "public.users", Column: "name", Type: "varchar(100)"},
+			{Op: "add_fk", Table: "public.users", Name: "fk_users_org", Columns: []string{"org_id"}, RefTable: "public.orgs", RefCols: []string{"id"}, OnDelete: "CASCADE"},
+		},
+	}
+	sql := OpToSQL(op)
+	if !strings.Contains(sql, "CREATE TABLE") {
+		t.Errorf("expected CREATE TABLE, got: %s", sql)
+	}
+	if !strings.Contains(sql, "email") {
+		t.Errorf("expected email column, got: %s", sql)
+	}
+	if !strings.Contains(sql, "text") {
+		t.Errorf("expected text type, got: %s", sql)
+	}
+	if !strings.Contains(sql, "NOT NULL") {
+		t.Errorf("expected NOT NULL, got: %s", sql)
+	}
+	if !strings.Contains(sql, "name") {
+		t.Errorf("expected name column, got: %s", sql)
+	}
+	if !strings.Contains(sql, "varchar(100)") {
+		t.Errorf("expected varchar(100) type, got: %s", sql)
+	}
+	// FKs are emitted as separate ALTER TABLE statements (cycle-safe DDL),
+	// not inline in CREATE TABLE. Verify the PK constraint is present instead.
+	if !strings.Contains(sql, "PRIMARY KEY") {
+		t.Errorf("expected PRIMARY KEY, got: %s", sql)
+	}
+}
