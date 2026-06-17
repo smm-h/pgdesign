@@ -118,6 +118,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W018", checkDomainCheckDuplicate},
 		{"W019", checkRangeSubsumption},
 		{"I002", checkDeadColumn},
+		{"I003", checkRowSize},
 	}
 
 	for _, r := range rules {
@@ -2290,6 +2291,296 @@ func checkDeadColumn(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 					Suggestion: "Verify this column is needed; unreferenced columns may indicate incomplete schema design",
 				})
 			}
+		}
+	}
+	return diags
+}
+
+// --- Row size estimation ---
+
+// pgTypeInfo holds the storage length and alignment for a PostgreSQL type.
+type pgTypeInfo struct {
+	Len   int  // bytes; -1 = varlena (variable length)
+	Align byte // 'c' = char(1), 's' = short(2), 'i' = int(4), 'd' = double(8)
+}
+
+var pgTypeWidths = map[string]pgTypeInfo{
+	"boolean":           {1, 'c'},
+	"bool":              {1, 'c'},
+	"smallint":          {2, 's'},
+	"int2":              {2, 's'},
+	"integer":           {4, 'i'},
+	"int":               {4, 'i'},
+	"int4":              {4, 'i'},
+	"bigint":            {8, 'd'},
+	"int8":              {8, 'd'},
+	"real":              {4, 'i'},
+	"float4":            {4, 'i'},
+	"float8":            {8, 'd'},
+	"double precision":  {8, 'd'},
+	"date":              {4, 'i'},
+	"time":              {8, 'd'},
+	"timetz":            {12, 'd'},
+	"timestamp":         {8, 'd'},
+	"timestamptz":       {8, 'd'},
+	"uuid":              {16, 'c'},
+	"text":              {-1, 'i'},
+	"varchar":           {-1, 'i'},
+	"char":              {-1, 'i'},
+	"jsonb":             {-1, 'i'},
+	"json":              {-1, 'i'},
+	"numeric":           {-1, 'i'},
+	"decimal":           {-1, 'i'},
+	"bytea":             {-1, 'i'},
+	"interval":          {16, 'd'},
+	"inet":              {-1, 'i'},
+	"cidr":              {-1, 'i'},
+	"macaddr":           {6, 'i'},
+	"macaddr8":          {8, 'd'},
+	"bit":               {-1, 'i'},
+	"varbit":            {-1, 'i'},
+	"point":             {16, 'd'},
+	"line":              {24, 'd'},
+	"lseg":              {32, 'd'},
+	"box":               {32, 'd'},
+	"path":              {-1, 'i'},
+	"polygon":           {-1, 'i'},
+	"circle":            {24, 'd'},
+	"money":             {8, 'd'},
+	"oid":               {4, 'i'},
+	"xml":               {-1, 'i'},
+	"tsquery":           {-1, 'i'},
+	"tsvector":          {-1, 'i'},
+	"int4range":         {-1, 'i'},
+	"int8range":         {-1, 'i'},
+	"numrange":          {-1, 'i'},
+	"tsrange":           {-1, 'i'},
+	"tstzrange":         {-1, 'i'},
+	"daterange":         {-1, 'i'},
+	"int4multirange":    {-1, 'i'},
+	"int8multirange":    {-1, 'i'},
+	"nummultirange":     {-1, 'i'},
+	"tsmultirange":      {-1, 'i'},
+	"tstzmultirange":    {-1, 'i'},
+	"datemultirange":    {-1, 'i'},
+}
+
+// estimateVarlenaSize returns the estimated average byte size for a varlena column type.
+func estimateVarlenaSize(pgType string) int {
+	lower := strings.ToLower(pgType)
+	// varchar(N) -> N/2 + 4 (4 bytes varlena header + average half-fill)
+	if strings.HasPrefix(lower, "varchar(") || strings.HasPrefix(lower, "character varying(") {
+		s := strings.TrimPrefix(lower, "varchar(")
+		if s == lower {
+			s = strings.TrimPrefix(lower, "character varying(")
+		}
+		s = strings.TrimSuffix(s, ")")
+		if n, err := strconv.Atoi(s); err == nil {
+			return n/2 + 4
+		}
+	}
+	// char(N) -> N + 4
+	if strings.HasPrefix(lower, "char(") || strings.HasPrefix(lower, "character(") {
+		s := strings.TrimPrefix(lower, "char(")
+		if s == lower {
+			s = strings.TrimPrefix(lower, "character(")
+		}
+		s = strings.TrimSuffix(s, ")")
+		if n, err := strconv.Atoi(s); err == nil {
+			return n + 4
+		}
+	}
+	switch {
+	case lower == "jsonb":
+		return 64
+	case lower == "json":
+		return 64
+	case lower == "bytea":
+		return 32
+	case lower == "numeric" || lower == "decimal":
+		return 16
+	default:
+		return 32 // generic varlena estimate for text, etc.
+	}
+}
+
+// alignTo returns offset padded to the given alignment.
+func alignTo(offset int, align byte) int {
+	var a int
+	switch align {
+	case 'c':
+		a = 1
+	case 's':
+		a = 2
+	case 'i':
+		a = 4
+	case 'd':
+		a = 8
+	default:
+		a = 4
+	}
+	if offset%a == 0 {
+		return offset
+	}
+	return offset + (a - offset%a)
+}
+
+// lookupTypeInfo returns the pgTypeInfo for a column, using the type lookup table.
+func lookupTypeInfo(col model.Column) pgTypeInfo {
+	if col.Array {
+		return pgTypeInfo{-1, 'i'} // arrays are varlena
+	}
+	pgType := strings.ToLower(col.PGType)
+	if info, ok := pgTypeWidths[pgType]; ok {
+		return info
+	}
+	// Strip parenthesized suffix: varchar(255) -> varchar
+	if idx := strings.Index(pgType, "("); idx != -1 {
+		base := pgType[:idx]
+		if info, ok := pgTypeWidths[base]; ok {
+			return info
+		}
+	}
+	// Unknown type: assume varlena
+	return pgTypeInfo{-1, 'i'}
+}
+
+// rawDataSize computes the sum of column data sizes without alignment padding.
+func rawDataSize(columns []model.Column) int {
+	total := 0
+	for _, col := range columns {
+		info := lookupTypeInfo(col)
+		if info.Len > 0 {
+			total += info.Len
+		} else {
+			total += estimateVarlenaSize(col.PGType)
+		}
+	}
+	return total
+}
+
+// estimateRowSize computes the estimated byte size for a table row.
+// It returns (estimatedSize, paddingWaste) following PostgreSQL's storage rules.
+func estimateRowSize(columns []model.Column) (size int, padding int) {
+	// HeapTupleHeaderData is 23 bytes, MAXALIGN to 24
+	offset := 24
+
+	// Null bitmap: ceil(ncols/8) bytes if any column is nullable
+	hasNullable := false
+	for _, col := range columns {
+		if !col.NotNull {
+			hasNullable = true
+			break
+		}
+	}
+	if hasNullable {
+		bitmapBytes := (len(columns) + 7) / 8
+		offset += bitmapBytes
+		// MAXALIGN the header+bitmap
+		if offset%8 != 0 {
+			offset += 8 - offset%8
+		}
+	}
+
+	headerEnd := offset
+
+	for _, col := range columns {
+		info := lookupTypeInfo(col)
+		var colSize int
+		if info.Len > 0 {
+			colSize = info.Len
+		} else {
+			colSize = estimateVarlenaSize(col.PGType)
+		}
+		aligned := alignTo(offset, info.Align)
+		offset = aligned + colSize
+	}
+
+	// Plus 4 bytes ItemIdData per tuple
+	totalSize := offset + 4
+	totalPadding := totalSize - headerEnd - rawDataSize(columns)
+	return totalSize, totalPadding
+}
+
+// estimateRowSizeOptimal computes the row size with columns sorted by alignment
+// descending (d, i, s, c) to minimize padding waste.
+func estimateRowSizeOptimal(columns []model.Column) int {
+	sorted := make([]model.Column, len(columns))
+	copy(sorted, columns)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		ai := lookupTypeInfo(sorted[i])
+		aj := lookupTypeInfo(sorted[j])
+		oi := alignOrder(ai.Align)
+		oj := alignOrder(aj.Align)
+		if oi != oj {
+			return oi < oj // lower order = higher alignment = first
+		}
+		si := ai.Len
+		if si < 0 {
+			si = estimateVarlenaSize(sorted[i].PGType)
+		}
+		sj := aj.Len
+		if sj < 0 {
+			sj = estimateVarlenaSize(sorted[j].PGType)
+		}
+		return si > sj
+	})
+	size, _ := estimateRowSize(sorted)
+	return size
+}
+
+func alignOrder(a byte) int {
+	switch a {
+	case 'd':
+		return 0
+	case 'i':
+		return 1
+	case 's':
+		return 2
+	case 'c':
+		return 3
+	default:
+		return 4
+	}
+}
+
+// checkRowSize (I003/W021/I004): estimates row size and warns about oversized or poorly ordered rows.
+func checkRowSize(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if len(t.Columns) == 0 {
+			continue
+		}
+		currentSize, _ := estimateRowSize(t.Columns)
+
+		if currentSize > 8192 {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Warning,
+				Code:       "W021",
+				Table:      t.Name,
+				Message:    fmt.Sprintf("estimated row size %d bytes exceeds page size (8192); rows require TOAST storage", currentSize),
+				Suggestion: "Consider splitting wide columns into a separate table or using TOAST-friendly types",
+			})
+		} else if currentSize > 2048 {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Info,
+				Code:       "I003",
+				Table:      t.Name,
+				Message:    fmt.Sprintf("estimated row size %d bytes exceeds TOAST threshold (2048)", currentSize),
+				Suggestion: "Large rows reduce cache efficiency; consider whether all columns belong in this table",
+			})
+		}
+
+		// Check column ordering optimization
+		optimalSize := estimateRowSizeOptimal(t.Columns)
+		if currentSize-optimalSize > 16 {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Info,
+				Code:       "I004",
+				Table:      t.Name,
+				Message:    fmt.Sprintf("column reordering could save %d bytes per row (current: %d, optimal: %d)", currentSize-optimalSize, currentSize, optimalSize),
+				Suggestion: "Reorder columns by alignment (8-byte, 4-byte, 2-byte, 1-byte) to minimize padding",
+			})
 		}
 	}
 	return diags
