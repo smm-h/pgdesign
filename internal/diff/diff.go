@@ -63,6 +63,11 @@ type TableDiff struct {
 	TriggersAdded   []model.Trigger `json:"triggers_added,omitempty"`
 	TriggersRemoved []string        `json:"triggers_removed,omitempty"`
 	TriggersChanged []TriggerChange `json:"triggers_changed,omitempty"`
+	PoliciesAdded    []model.Policy `json:"policies_added,omitempty"`
+	PoliciesRemoved  []string       `json:"policies_removed,omitempty"`
+	PoliciesChanged  []PolicyDiff   `json:"policies_changed,omitempty"`
+	EnableRLSChanged *[2]bool       `json:"enable_rls_changed,omitempty"`
+	ForceRLSChanged  *[2]bool       `json:"force_rls_changed,omitempty"`
 	CommentChanged      *[2]string               `json:"comment_changed"`                // [old, new]
 	PKChanged           *[2][]string             `json:"pk_changed"`                     // [old, new]
 	OwnerChanged        *[2]string               `json:"owner_changed"`
@@ -201,6 +206,17 @@ type TriggerChange struct {
 	New  model.Trigger `json:"new"`
 }
 
+// PolicyDiff describes changes to a single RLS policy.
+type PolicyDiff struct {
+	Name                string     `json:"name"`
+	TypeChanged         *[2]string `json:"type_changed,omitempty"`
+	RoleChanged         *[2]string `json:"role_changed,omitempty"`
+	UsingChanged        *[2]string `json:"using_changed,omitempty"`
+	WithCheckChanged    *[2]string `json:"with_check_changed,omitempty"`
+	ErrorCodeChanged    *[2]string `json:"error_code_changed,omitempty"`
+	ErrorMessageChanged *[2]string `json:"error_message_changed,omitempty"`
+}
+
 // PartitionDiff describes changes to a table's partitioning configuration.
 type PartitionDiff struct {
 	StrategyChanged *[2]string `json:"strategy_changed,omitempty"`
@@ -254,14 +270,18 @@ func (d *SchemaDiff) Summary() string {
 		parts = append(parts, fmt.Sprintf("%d table(s) removed", n))
 	}
 	if n := len(d.TablesChanged); n > 0 {
-		// Count total column changes across all changed tables.
-		totalCols := 0
+		// Count total column and policy changes across all changed tables.
+		var totalCols, totalPolicies int
 		for _, td := range d.TablesChanged {
 			totalCols += len(td.ColumnsAdded) + len(td.ColumnsRemoved) + len(td.ColumnsChanged)
+			totalPolicies += len(td.PoliciesAdded) + len(td.PoliciesRemoved) + len(td.PoliciesChanged)
 		}
 		s := fmt.Sprintf("%d table(s) changed", n)
 		if totalCols > 0 {
 			s += fmt.Sprintf(" (%d column(s) modified)", totalCols)
+		}
+		if totalPolicies > 0 {
+			s += fmt.Sprintf(" (%d policy/policies modified)", totalPolicies)
 		}
 		parts = append(parts, s)
 	}
@@ -394,6 +414,7 @@ func diffTable(desired, actual *model.Table) TableDiff {
 	diffChecks(&td, desired, actual)
 	diffExclusions(&td, desired, actual)
 	diffTriggers(&td, desired, actual)
+	diffPolicies(&td, desired, actual)
 
 	// Comment
 	if desired.Comment != actual.Comment {
@@ -418,6 +439,16 @@ func diffTable(desired, actual *model.Table) TableDiff {
 		td.AppendOnlyChanged = &[2]bool{actual.AppendOnly, desired.AppendOnly}
 	}
 
+	// EnableRLS
+	if desired.EnableRLS != actual.EnableRLS {
+		td.EnableRLSChanged = &[2]bool{actual.EnableRLS, desired.EnableRLS}
+	}
+
+	// ForceRLS
+	if desired.ForceRLS != actual.ForceRLS {
+		td.ForceRLSChanged = &[2]bool{actual.ForceRLS, desired.ForceRLS}
+	}
+
 	return td
 }
 
@@ -440,6 +471,11 @@ func isTableDiffEmpty(td *TableDiff) bool {
 		len(td.TriggersAdded) == 0 &&
 		len(td.TriggersRemoved) == 0 &&
 		len(td.TriggersChanged) == 0 &&
+		len(td.PoliciesAdded) == 0 &&
+		len(td.PoliciesRemoved) == 0 &&
+		len(td.PoliciesChanged) == 0 &&
+		td.EnableRLSChanged == nil &&
+		td.ForceRLSChanged == nil &&
 		td.CommentChanged == nil &&
 		td.PKChanged == nil &&
 		td.OwnerChanged == nil &&
@@ -897,6 +933,60 @@ func triggerEqual(a, b *model.Trigger) bool {
 		a.InitiallyDeferred == b.InitiallyDeferred &&
 		a.ReferencingOld == b.ReferencingOld &&
 		a.ReferencingNew == b.ReferencingNew
+}
+
+// diffPolicies matches policies by name.
+func diffPolicies(td *TableDiff, desired, actual *model.Table) {
+	added, removed, matched := matchObjects(desired.Policies, actual.Policies, func(p model.Policy) string {
+		return p.Name
+	})
+	for _, p := range added {
+		td.PoliciesAdded = append(td.PoliciesAdded, p)
+	}
+	for _, p := range removed {
+		td.PoliciesRemoved = append(td.PoliciesRemoved, p.Name)
+	}
+	for _, p := range matched {
+		pd := diffPolicy(&p.Desired, &p.Actual)
+		if pd != nil {
+			td.PoliciesChanged = append(td.PoliciesChanged, *pd)
+		}
+	}
+}
+
+func diffPolicy(desired, actual *model.Policy) *PolicyDiff {
+	pd := PolicyDiff{Name: desired.Name}
+	changed := false
+
+	if desired.Type != actual.Type {
+		pd.TypeChanged = &[2]string{actual.Type, desired.Type}
+		changed = true
+	}
+	if desired.Role != actual.Role {
+		pd.RoleChanged = &[2]string{actual.Role, desired.Role}
+		changed = true
+	}
+	if desired.Using != actual.Using {
+		pd.UsingChanged = &[2]string{actual.Using, desired.Using}
+		changed = true
+	}
+	if desired.WithCheck != actual.WithCheck {
+		pd.WithCheckChanged = &[2]string{actual.WithCheck, desired.WithCheck}
+		changed = true
+	}
+	if desired.ErrorCode != actual.ErrorCode {
+		pd.ErrorCodeChanged = &[2]string{actual.ErrorCode, desired.ErrorCode}
+		changed = true
+	}
+	if desired.ErrorMessage != actual.ErrorMessage {
+		pd.ErrorMessageChanged = &[2]string{actual.ErrorMessage, desired.ErrorMessage}
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return &pd
 }
 
 // diffPartitioning compares partitioning configuration between two tables.

@@ -379,6 +379,47 @@ func formatTableDiff(b *strings.Builder, td *TableDiff) {
 		fmt.Fprintf(b, "  %s~ trigger %s%s\n", colorYellow, tc.Name, colorReset)
 	}
 
+	// Policies
+	for _, pol := range td.PoliciesAdded {
+		fmt.Fprintf(b, "  %s+ policy %s%s\n", colorGreen, pol.Name, colorReset)
+	}
+	for _, name := range td.PoliciesRemoved {
+		fmt.Fprintf(b, "  %s- policy %s%s\n", colorRed, name, colorReset)
+	}
+	for _, pd := range td.PoliciesChanged {
+		fmt.Fprintf(b, "  %s~ policy %s%s\n", colorYellow, pd.Name, colorReset)
+		if pd.TypeChanged != nil {
+			fmt.Fprintf(b, "    type: %s -> %s\n", pd.TypeChanged[0], pd.TypeChanged[1])
+		}
+		if pd.RoleChanged != nil {
+			fmt.Fprintf(b, "    role: %q -> %q\n", pd.RoleChanged[0], pd.RoleChanged[1])
+		}
+		if pd.UsingChanged != nil {
+			fmt.Fprintf(b, "    using: %q -> %q\n", pd.UsingChanged[0], pd.UsingChanged[1])
+		}
+		if pd.WithCheckChanged != nil {
+			fmt.Fprintf(b, "    with_check: %q -> %q\n", pd.WithCheckChanged[0], pd.WithCheckChanged[1])
+		}
+		if pd.ErrorCodeChanged != nil {
+			fmt.Fprintf(b, "    error_code: %q -> %q\n", pd.ErrorCodeChanged[0], pd.ErrorCodeChanged[1])
+		}
+		if pd.ErrorMessageChanged != nil {
+			fmt.Fprintf(b, "    error_message: %q -> %q\n", pd.ErrorMessageChanged[0], pd.ErrorMessageChanged[1])
+		}
+	}
+
+	// EnableRLS
+	if td.EnableRLSChanged != nil {
+		fmt.Fprintf(b, "  %s~ enable_rls: %s -> %s%s\n", colorYellow,
+			boolStr(td.EnableRLSChanged[0]), boolStr(td.EnableRLSChanged[1]), colorReset)
+	}
+
+	// ForceRLS
+	if td.ForceRLSChanged != nil {
+		fmt.Fprintf(b, "  %s~ force_rls: %s -> %s%s\n", colorYellow,
+			boolStr(td.ForceRLSChanged[0]), boolStr(td.ForceRLSChanged[1]), colorReset)
+	}
+
 	// Partitioning
 	if pd := td.PartitioningChanged; pd != nil {
 		if pd.StrategyChanged != nil {
