@@ -683,7 +683,7 @@ func TestMapPartStrategy(t *testing.T) {
 	}
 }
 
-func TestResolvePartColumn(t *testing.T) {
+func TestResolvePartColumns(t *testing.T) {
 	columns := []model.Column{
 		{Name: "id"},
 		{Name: "created_at"},
@@ -693,19 +693,24 @@ func TestResolvePartColumn(t *testing.T) {
 	tests := []struct {
 		name     string
 		attNums  []int32
-		want     string
+		want     []string
 	}{
-		{"single column", []int32{2}, "created_at"},
-		{"first column", []int32{1}, "id"},
-		{"multi column", []int32{1, 2}, "id, created_at"},
-		{"expression key", []int32{0}, "(expression)"},
-		{"unknown attnum", []int32{99}, "attnum_99"},
+		{"single column", []int32{2}, []string{"created_at"}},
+		{"first column", []int32{1}, []string{"id"}},
+		{"multi column", []int32{1, 2}, []string{"id", "created_at"}},
+		{"expression key", []int32{0}, []string{"(expression)"}},
+		{"unknown attnum", []int32{99}, []string{"attnum_99"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := resolvePartColumn(tt.attNums, columns)
-			if got != tt.want {
-				t.Errorf("resolvePartColumn(%v) = %q, want %q", tt.attNums, got, tt.want)
+			got := resolvePartColumns(tt.attNums, columns)
+			if len(got) != len(tt.want) {
+				t.Fatalf("resolvePartColumns(%v) returned %d items, want %d", tt.attNums, len(got), len(tt.want))
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("resolvePartColumns(%v)[%d] = %q, want %q", tt.attNums, i, got[i], tt.want[i])
+				}
 			}
 		})
 	}
@@ -732,22 +737,22 @@ func TestIntrospectRangePartitioning(t *testing.T) {
 	if ps.Strategy != "range" {
 		t.Errorf("Strategy = %q, want %q", ps.Strategy, "range")
 	}
-	if ps.Column != "created_at" {
-		t.Errorf("Column = %q, want %q", ps.Column, "created_at")
+	if len(ps.Columns) != 1 || ps.Columns[0] != "created_at" {
+		t.Errorf("Columns = %v, want [created_at]", ps.Columns)
 	}
 	if len(ps.Children) != 2 {
 		t.Fatalf("len(Children) = %d, want 2", len(ps.Children))
 	}
 
 	// Children are ordered by name.
-	if ps.Children[0].Strategy != "events_2024" {
-		t.Errorf("Children[0].Strategy = %q, want %q", ps.Children[0].Strategy, "events_2024")
+	if ps.Children[0].Name != "events_2024" {
+		t.Errorf("Children[0].Name = %q, want %q", ps.Children[0].Name, "events_2024")
 	}
-	if ps.Children[0].Column == "" {
-		t.Error("Children[0].Column (bound expr) is empty")
+	if ps.Children[0].Bound == "" {
+		t.Error("Children[0].Bound (bound expr) is empty")
 	}
-	if ps.Children[1].Strategy != "events_2025" {
-		t.Errorf("Children[1].Strategy = %q, want %q", ps.Children[1].Strategy, "events_2025")
+	if ps.Children[1].Name != "events_2025" {
+		t.Errorf("Children[1].Name = %q, want %q", ps.Children[1].Name, "events_2025")
 	}
 }
 
@@ -770,8 +775,8 @@ func TestIntrospectListPartitioning(t *testing.T) {
 	if ps.Strategy != "list" {
 		t.Errorf("Strategy = %q, want %q", ps.Strategy, "list")
 	}
-	if ps.Column != "region" {
-		t.Errorf("Column = %q, want %q", ps.Column, "region")
+	if len(ps.Columns) != 1 || ps.Columns[0] != "region" {
+		t.Errorf("Columns = %v, want [region]", ps.Columns)
 	}
 	if len(ps.Children) != 2 {
 		t.Fatalf("len(Children) = %d, want 2", len(ps.Children))
