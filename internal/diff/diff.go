@@ -31,6 +31,9 @@ type SchemaDiff struct {
 	SequencesAdded   []string       `json:"sequences_added,omitempty"`
 	SequencesRemoved []string       `json:"sequences_removed,omitempty"`
 	SequencesChanged []SequenceDiff `json:"sequences_changed,omitempty"`
+	CompositeTypesAdded   []string            `json:"composite_types_added,omitempty"`
+	CompositeTypesRemoved []string            `json:"composite_types_removed,omitempty"`
+	CompositeTypesChanged []CompositeTypeDiff `json:"composite_types_changed,omitempty"`
 }
 
 // TableDiff describes the differences within a single table.
@@ -125,6 +128,22 @@ type SequenceDiff struct {
 	CommentChanged   *[2]string `json:"comment_changed,omitempty"`
 }
 
+// CompositeTypeDiff describes changes to a composite type.
+// Composite type changes are destructive (DROP + CREATE CASCADE).
+type CompositeTypeDiff struct {
+	Name           string                 `json:"name"`
+	FieldsAdded    []model.CompositeField `json:"fields_added,omitempty"`
+	FieldsRemoved  []string               `json:"fields_removed,omitempty"`
+	FieldsChanged  []CompositeFieldChange `json:"fields_changed,omitempty"`
+	CommentChanged *[2]string             `json:"comment_changed,omitempty"`
+}
+
+// CompositeFieldChange describes a change to a composite type field.
+type CompositeFieldChange struct {
+	Name        string     `json:"name"`
+	TypeChanged *[2]string `json:"type_changed,omitempty"` // [old, new]
+}
+
 // FKChange describes a changed foreign key constraint.
 type FKChange struct {
 	Name string   `json:"name"`
@@ -165,7 +184,10 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.MaterializedViewsChanged) == 0 &&
 		len(d.SequencesAdded) == 0 &&
 		len(d.SequencesRemoved) == 0 &&
-		len(d.SequencesChanged) == 0
+		len(d.SequencesChanged) == 0 &&
+		len(d.CompositeTypesAdded) == 0 &&
+		len(d.CompositeTypesRemoved) == 0 &&
+		len(d.CompositeTypesChanged) == 0
 }
 
 // Summary returns a human-readable summary of the diff.
@@ -236,6 +258,15 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.SequencesChanged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d sequence(s) changed", n))
 	}
+	if n := len(d.CompositeTypesAdded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d composite type(s) added", n))
+	}
+	if n := len(d.CompositeTypesRemoved); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d composite type(s) removed", n))
+	}
+	if n := len(d.CompositeTypesChanged); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d composite type(s) changed", n))
+	}
 
 	return strings.Join(parts, ", ")
 }
@@ -252,6 +283,7 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 	diffViews(d, desired, actual)
 	diffMaterializedViews(d, desired, actual)
 	diffSequences(d, desired, actual)
+	diffCompositeTypes(d, desired, actual)
 
 	return d
 }
@@ -1208,4 +1240,71 @@ func int64PtrEqual(a, b *int64) bool {
 		return false
 	}
 	return *a == *b
+}
+
+// diffCompositeTypes matches composite types by schema-qualified name.
+func diffCompositeTypes(d *SchemaDiff, desired, actual *model.Schema) {
+	added, removed, matched := matchObjects(desired.CompositeTypes, actual.CompositeTypes, func(ct model.CompositeType) string {
+		return compositeTypeKey(&ct)
+	})
+	for _, ct := range added {
+		d.CompositeTypesAdded = append(d.CompositeTypesAdded, compositeTypeKey(&ct))
+	}
+	for _, ct := range removed {
+		d.CompositeTypesRemoved = append(d.CompositeTypesRemoved, compositeTypeKey(&ct))
+	}
+	for _, p := range matched {
+		ctd := diffCompositeType(&p.Desired, &p.Actual)
+		if ctd != nil {
+			d.CompositeTypesChanged = append(d.CompositeTypesChanged, *ctd)
+		}
+	}
+}
+
+func compositeTypeKey(ct *model.CompositeType) string {
+	if ct.Schema == "" || ct.Schema == "public" {
+		return ct.Name
+	}
+	return ct.Schema + "." + ct.Name
+}
+
+// diffCompositeType compares two matched composite types and returns nil if identical.
+func diffCompositeType(desired, actual *model.CompositeType) *CompositeTypeDiff {
+	ctd := &CompositeTypeDiff{Name: compositeTypeKey(desired)}
+	changed := false
+
+	// Match fields by name.
+	added, removed, matched := matchObjects(desired.Fields, actual.Fields, func(f model.CompositeField) string {
+		return f.Name
+	})
+	for _, f := range added {
+		ctd.FieldsAdded = append(ctd.FieldsAdded, f)
+		changed = true
+	}
+	for _, f := range removed {
+		ctd.FieldsRemoved = append(ctd.FieldsRemoved, f.Name)
+		changed = true
+	}
+	for _, p := range matched {
+		dt := normalizeType(p.Desired.PGType)
+		at := normalizeType(p.Actual.PGType)
+		if dt != at {
+			ctd.FieldsChanged = append(ctd.FieldsChanged, CompositeFieldChange{
+				Name:        p.Desired.Name,
+				TypeChanged: &[2]string{p.Actual.PGType, p.Desired.PGType},
+			})
+			changed = true
+		}
+	}
+
+	// Comment comparison.
+	if desired.Comment != actual.Comment {
+		ctd.CommentChanged = &[2]string{actual.Comment, desired.Comment}
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return ctd
 }

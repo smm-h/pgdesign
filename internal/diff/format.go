@@ -123,6 +123,31 @@ func FormatTerminal(d *SchemaDiff) string {
 		}
 	}
 
+	// Composite Types
+	for _, name := range d.CompositeTypesAdded {
+		fmt.Fprintf(&b, "%s+ composite type %s%s\n", colorGreen, name, colorReset)
+	}
+	for _, name := range d.CompositeTypesRemoved {
+		fmt.Fprintf(&b, "%s- composite type %s%s\n", colorRed, name, colorReset)
+	}
+	for _, ctd := range d.CompositeTypesChanged {
+		fmt.Fprintf(&b, "%s~ composite type %s%s\n", colorYellow, ctd.Name, colorReset)
+		for _, f := range ctd.FieldsAdded {
+			fmt.Fprintf(&b, "  %s+ field %s %s%s\n", colorGreen, f.Name, f.PGType, colorReset)
+		}
+		for _, name := range ctd.FieldsRemoved {
+			fmt.Fprintf(&b, "  %s- field %s%s\n", colorRed, name, colorReset)
+		}
+		for _, fc := range ctd.FieldsChanged {
+			if fc.TypeChanged != nil {
+				fmt.Fprintf(&b, "  %s~ field %s: %s -> %s%s\n", colorYellow, fc.Name, fc.TypeChanged[0], fc.TypeChanged[1], colorReset)
+			}
+		}
+		if ctd.CommentChanged != nil {
+			fmt.Fprintf(&b, "  %s~ comment: %q -> %q%s\n", colorYellow, ctd.CommentChanged[0], ctd.CommentChanged[1], colorReset)
+		}
+	}
+
 	return b.String()
 }
 

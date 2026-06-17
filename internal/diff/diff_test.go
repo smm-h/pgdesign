@@ -2463,3 +2463,316 @@ func TestDiff_ExclusionChanged(t *testing.T) {
 		t.Fatalf("expected 1 exclusion added (new version), got %d", len(td.ExclusionsAdded))
 	}
 }
+
+func TestDiff_SequenceAdded(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Sequences: []model.Sequence{{
+			Name:   "order_seq",
+			Schema: "public",
+			Start:  model.Int64Ptr(100),
+		}},
+	}
+	actual := &model.Schema{
+		Name: "public",
+	}
+
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff when sequence is added")
+	}
+	if len(d.SequencesAdded) != 1 {
+		t.Fatalf("expected 1 sequence added, got %d", len(d.SequencesAdded))
+	}
+	if d.SequencesAdded[0] != "order_seq" {
+		t.Errorf("SequencesAdded[0] = %q, want %q", d.SequencesAdded[0], "order_seq")
+	}
+}
+
+func TestDiff_SequenceRemoved(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+	}
+	actual := &model.Schema{
+		Name: "public",
+		Sequences: []model.Sequence{{
+			Name:   "order_seq",
+			Schema: "public",
+			Start:  model.Int64Ptr(1),
+		}},
+	}
+
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff when sequence is removed")
+	}
+	if len(d.SequencesRemoved) != 1 {
+		t.Fatalf("expected 1 sequence removed, got %d", len(d.SequencesRemoved))
+	}
+	if d.SequencesRemoved[0] != "order_seq" {
+		t.Errorf("SequencesRemoved[0] = %q, want %q", d.SequencesRemoved[0], "order_seq")
+	}
+}
+
+func TestDiff_SequenceChanged(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Sequences: []model.Sequence{{
+			Name:   "order_seq",
+			Schema: "public",
+			Start:  model.Int64Ptr(200),
+			Cache:  model.Int64Ptr(20),
+		}},
+	}
+	actual := &model.Schema{
+		Name: "public",
+		Sequences: []model.Sequence{{
+			Name:   "order_seq",
+			Schema: "public",
+			Start:  model.Int64Ptr(100),
+			Cache:  model.Int64Ptr(10),
+		}},
+	}
+
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff when sequence parameters changed")
+	}
+	if len(d.SequencesChanged) != 1 {
+		t.Fatalf("expected 1 sequence changed, got %d", len(d.SequencesChanged))
+	}
+	sc := d.SequencesChanged[0]
+	if sc.Name != "order_seq" {
+		t.Errorf("changed sequence name = %q, want %q", sc.Name, "order_seq")
+	}
+	if sc.StartChanged == nil {
+		t.Error("expected StartChanged to be non-nil")
+	} else {
+		if sc.StartChanged[0] == nil || *sc.StartChanged[0] != 100 {
+			t.Errorf("StartChanged[0] (actual) = %v, want 100", sc.StartChanged[0])
+		}
+		if sc.StartChanged[1] == nil || *sc.StartChanged[1] != 200 {
+			t.Errorf("StartChanged[1] (desired) = %v, want 200", sc.StartChanged[1])
+		}
+	}
+	if sc.CacheChanged == nil {
+		t.Error("expected CacheChanged to be non-nil")
+	} else {
+		if sc.CacheChanged[0] == nil || *sc.CacheChanged[0] != 10 {
+			t.Errorf("CacheChanged[0] (actual) = %v, want 10", sc.CacheChanged[0])
+		}
+		if sc.CacheChanged[1] == nil || *sc.CacheChanged[1] != 20 {
+			t.Errorf("CacheChanged[1] (desired) = %v, want 20", sc.CacheChanged[1])
+		}
+	}
+}
+
+func TestDiff_SequenceUnchanged(t *testing.T) {
+	schema := &model.Schema{
+		Name: "public",
+		Sequences: []model.Sequence{{
+			Name:   "order_seq",
+			Schema: "public",
+			Start:  model.Int64Ptr(100),
+			Cache:  model.Int64Ptr(10),
+		}},
+	}
+
+	d := Diff(schema, schema)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff when sequences are identical, got: %s", d.Summary())
+	}
+}
+
+func TestCompositeTypeAdded(t *testing.T) {
+	desired := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+				{Name: "city", PGType: "text"},
+			}},
+		},
+	}
+	actual := &model.Schema{}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.CompositeTypesAdded) != 1 || d.CompositeTypesAdded[0] != "address" {
+		t.Errorf("expected address added, got: %v", d.CompositeTypesAdded)
+	}
+	if !strings.Contains(d.Summary(), "composite type(s) added") {
+		t.Errorf("summary should mention composite types added: %q", d.Summary())
+	}
+}
+
+func TestCompositeTypeRemoved(t *testing.T) {
+	desired := &model.Schema{}
+	actual := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.CompositeTypesRemoved) != 1 || d.CompositeTypesRemoved[0] != "address" {
+		t.Errorf("expected address removed, got: %v", d.CompositeTypesRemoved)
+	}
+}
+
+func TestCompositeTypeFieldAdded(t *testing.T) {
+	desired := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+				{Name: "city", PGType: "text"},
+				{Name: "zip", PGType: "text"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+				{Name: "city", PGType: "text"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.CompositeTypesChanged) != 1 {
+		t.Fatalf("expected 1 composite type changed, got %d", len(d.CompositeTypesChanged))
+	}
+	ctd := d.CompositeTypesChanged[0]
+	if ctd.Name != "address" {
+		t.Errorf("expected name address, got %q", ctd.Name)
+	}
+	if len(ctd.FieldsAdded) != 1 || ctd.FieldsAdded[0].Name != "zip" {
+		t.Errorf("expected zip field added, got: %v", ctd.FieldsAdded)
+	}
+}
+
+func TestCompositeTypeFieldRemoved(t *testing.T) {
+	desired := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+				{Name: "city", PGType: "text"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.CompositeTypesChanged) != 1 {
+		t.Fatalf("expected 1 composite type changed, got %d", len(d.CompositeTypesChanged))
+	}
+	ctd := d.CompositeTypesChanged[0]
+	if len(ctd.FieldsRemoved) != 1 || ctd.FieldsRemoved[0] != "city" {
+		t.Errorf("expected city removed, got: %v", ctd.FieldsRemoved)
+	}
+}
+
+func TestCompositeTypeFieldTypeChanged(t *testing.T) {
+	desired := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "varchar(200)"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.CompositeTypesChanged) != 1 {
+		t.Fatalf("expected 1 composite type changed, got %d", len(d.CompositeTypesChanged))
+	}
+	ctd := d.CompositeTypesChanged[0]
+	if len(ctd.FieldsChanged) != 1 {
+		t.Fatalf("expected 1 field changed, got %d", len(ctd.FieldsChanged))
+	}
+	fc := ctd.FieldsChanged[0]
+	if fc.Name != "street" {
+		t.Errorf("expected field name street, got %q", fc.Name)
+	}
+	if fc.TypeChanged == nil {
+		t.Fatal("expected TypeChanged to be set")
+	}
+	if fc.TypeChanged[0] != "text" || fc.TypeChanged[1] != "varchar(200)" {
+		t.Errorf("expected [text, varchar(200)], got [%s, %s]", fc.TypeChanged[0], fc.TypeChanged[1])
+	}
+}
+
+func TestCompositeTypeUnchanged(t *testing.T) {
+	schema := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+				{Name: "city", PGType: "text"},
+			}},
+		},
+	}
+	d := Diff(schema, schema)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for identical composite types, got: %s", d.Summary())
+	}
+}
+
+func TestCompositeTypeCommentChanged(t *testing.T) {
+	desired := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+			}, Comment: "New comment"},
+		},
+	}
+	actual := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+			}, Comment: "Old comment"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.CompositeTypesChanged) != 1 {
+		t.Fatalf("expected 1 composite type changed, got %d", len(d.CompositeTypesChanged))
+	}
+	ctd := d.CompositeTypesChanged[0]
+	if ctd.CommentChanged == nil {
+		t.Fatal("expected CommentChanged to be set")
+	}
+	if ctd.CommentChanged[0] != "Old comment" || ctd.CommentChanged[1] != "New comment" {
+		t.Errorf("expected [Old comment, New comment], got [%q, %q]", ctd.CommentChanged[0], ctd.CommentChanged[1])
+	}
+}
+
+func TestCompositeTypeSchemaQualified(t *testing.T) {
+	desired := &model.Schema{
+		CompositeTypes: []model.CompositeType{
+			{Name: "address", Schema: "custom", Fields: []model.CompositeField{
+				{Name: "street", PGType: "text"},
+			}},
+		},
+	}
+	actual := &model.Schema{}
+	d := Diff(desired, actual)
+	if len(d.CompositeTypesAdded) != 1 || d.CompositeTypesAdded[0] != "custom.address" {
+		t.Errorf("expected 'custom.address', got: %v", d.CompositeTypesAdded)
+	}
+}
