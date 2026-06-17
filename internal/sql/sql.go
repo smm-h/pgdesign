@@ -668,6 +668,12 @@ func AlterTableEnableRLS(schemaName, tableName string) string {
 	return fmt.Sprintf("ALTER TABLE %s ENABLE ROW LEVEL SECURITY;", QualifiedName(schemaName, tableName))
 }
 
+// AlterTableForceRLS generates an ALTER TABLE ... FORCE ROW LEVEL SECURITY statement.
+// This causes RLS policies to apply even to table owners.
+func AlterTableForceRLS(schemaName, tableName string) string {
+	return fmt.Sprintf("ALTER TABLE %s FORCE ROW LEVEL SECURITY;", QualifiedName(schemaName, tableName))
+}
+
 // CreatePolicy generates a CREATE POLICY statement for row-level security.
 // The FOR clause is omitted when operation is "ALL" (the PostgreSQL default).
 // The TO clause is omitted when role is empty (defaults to PUBLIC).
@@ -677,6 +683,12 @@ func CreatePolicy(schemaName, tableName string, p model.Policy) string {
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("CREATE POLICY %s ON %s", QuoteIdent(p.Name), qualified))
+
+	// AS RESTRICTIVE is only emitted when explicitly set. PERMISSIVE is the
+	// PostgreSQL default and is omitted for brevity (same as FOR ALL).
+	if p.Type == "RESTRICTIVE" {
+		sb.WriteString(" AS RESTRICTIVE")
+	}
 
 	if p.Operation != "" && strings.ToUpper(p.Operation) != "ALL" {
 		sb.WriteString(fmt.Sprintf(" FOR %s", strings.ToUpper(p.Operation)))

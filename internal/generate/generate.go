@@ -396,6 +396,18 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		sections = append(sections, strings.Join(enableRLSStmts, "\n"))
 	}
 
+	// 12b. ALTER TABLE FORCE ROW LEVEL SECURITY
+	var forceRLSStmts []string
+	for i := range tables {
+		t := &tables[i]
+		if t.ForceRLS {
+			forceRLSStmts = append(forceRLSStmts, sql.AlterTableForceRLS(t.Schema, t.Name))
+		}
+	}
+	if len(forceRLSStmts) > 0 {
+		sections = append(sections, strings.Join(forceRLSStmts, "\n"))
+	}
+
 	// 13. CREATE POLICY
 	var policyStmts []string
 	for i := range tables {

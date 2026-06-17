@@ -148,7 +148,11 @@ func generateDoc(schema *model.Schema) string {
 
 		// RLS
 		if t.EnableRLS {
-			b.WriteString("\n**Row Level Security:** enabled\n")
+			if t.ForceRLS {
+				b.WriteString("\n**Row Level Security:** enabled (forced)\n")
+			} else {
+				b.WriteString("\n**Row Level Security:** enabled\n")
+			}
 		}
 
 		// Append Only
