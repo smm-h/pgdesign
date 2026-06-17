@@ -89,6 +89,8 @@ const (
 	OpCreateSequence          OpType = "create_sequence"
 	OpDropSequence            OpType = "drop_sequence"
 	OpAlterSequence           OpType = "alter_sequence"
+	OpCreateCompositeType     OpType = "create_composite_type"
+	OpDropCompositeType       OpType = "drop_composite_type"
 )
 
 // OpContext provides context about the operation environment for risk assessment.
@@ -367,6 +369,22 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			RiskLevel:  Safe,
 			LockType:   LockNone,
 			Reversible: true,
+		}
+
+	case OpCreateCompositeType:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
+		}
+
+	case OpDropCompositeType:
+		return Classification{
+			RiskLevel:  Dangerous,
+			LockType:   LockAccessExclusive,
+			Reversible: false,
+			DataLoss:   true,
+			Suggestion: "Dropping a composite type with CASCADE affects all columns using this type",
 		}
 
 	default:
