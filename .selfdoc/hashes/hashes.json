@@ -67,6 +67,10 @@
     "content": "6d2bdcd4408020606897d6faaf9cd3dffd82d2dd8167878793d7d39b7d1b4a5e",
     "description": "23e527dcd5e6ba0dc596763ed7fddbc7561341ec7d8152b3284b71222c43f9a0"
   },
+  "en/design-intelligence.md": {
+    "content": "b6767e39947ad99b9e29e55b0c3b593515b5c88a17cc9e187ba1d3e26566ebfa",
+    "description": "1494c5c0a5e0f7ac731655e8b7f0ae1fa166221d1ab8e4a71fdfce362550a2ba"
+  },
   "en/diagnostic.md": {
     "content": "1bf823bbed2c3fb3b85485e29c6dfcb405e83b82540923d8e861999abca055b5",
     "description": "70e328e5e35e7945347291b0213b91300dce191bee1520f59baaa2928a8766c2"
@@ -229,6 +233,10 @@
   "en/risk.md": {
     "content": "611154ddd9f75dc06bb330fa4b4fe3fa255c50692c8a771ce9f0a565d86047ec",
     "description": "b38d8b91c14cc23905fc6105c9056c6be73554f5b02d9506e4ac7df4f030f343"
+  },
+  "en/seed-generation.md": {
+    "content": "17b88ad280dc9786b7cd6fe720efada56445a659ab0f8d8ccde5110ef56c101e",
+    "description": "22e12713f8ab93a2fee681aac2de1a0496f5016f395ae88e9948b3f4eed376af"
   },
   "en/semantic-types.md": {
     "content": "7eb45d31bc1a0039e0242352e87413f42707b918dfaeb26a8588363622f1844f",
