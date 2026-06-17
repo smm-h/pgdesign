@@ -324,6 +324,10 @@ var designCodes = map[string]bool{
 	"W017": true, // Redundant IS NOT NULL CHECK
 	"W018": true, // Domain CHECK duplicate
 	"W019": true, // Range subsumption
+	"I002": true, // Dead column
+	"I003": true, // Row size TOAST threshold
+	"W021": true, // Row size exceeds page
+	"I004": true, // Column reordering savings
 }
 
 func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {

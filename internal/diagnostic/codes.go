@@ -101,10 +101,15 @@ package diagnostic
 // W017  NOT NULL column with CHECK (col IS NOT NULL) (redundant)
 // W018  Domain CHECK + identical column CHECK (redundant)
 // W019  Range CHECK subsumed by wider range CHECK
+// W020  (reserved for dead column escalation with pg_stats null_frac=1.0)
+// W021  Estimated row size exceeds page size (8192 bytes)
 //
 // === Info diagnostics (I001-I099) ===
 //
 // I001  Natural key candidate detected (from FD-derived candidate keys)
+// I002  Dead column (not referenced by any constraint, index, policy, or generated column)
+// I003  Estimated row size exceeds TOAST threshold (2048 bytes)
+// I004  Column reordering could save significant padding
 //
 // === Normal form audit warnings (W100-W199) ===
 //
