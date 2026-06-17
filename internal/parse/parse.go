@@ -157,6 +157,7 @@ func (p *parser) walk() *RawSchema {
 	schema.Views = p.parseViews()
 	schema.MaterializedViews = p.parseMaterializedViews()
 	schema.Sequences = p.parseSequences()
+	schema.Functions = p.parseFunctions()
 	return schema
 }
 
@@ -622,6 +623,224 @@ func (p *parser) parseSequence(name string, tbl *tomledit.TableNode) RawSequence
 	}
 
 	return rs
+}
+
+// parseFunctions extracts all [functions.*] sections in source order.
+func (p *parser) parseFunctions() []RawFunction {
+	var funcs []RawFunction
+
+	for _, child := range p.doc.Children {
+		tbl, ok := child.(*tomledit.TableNode)
+		if !ok {
+			continue
+		}
+		if len(tbl.KeyPath) == 2 && tbl.KeyPath[0] == "functions" {
+			funcName := tbl.KeyPath[1]
+			rf := p.parseFunction(funcName, tbl)
+			funcs = append(funcs, rf)
+		}
+	}
+
+	return funcs
+}
+
+func (p *parser) parseFunction(name string, tbl *tomledit.TableNode) RawFunction {
+	rf := RawFunction{Name: name}
+
+	knownKeys := map[string]bool{
+		"language": true, "returns": true, "body": true, "file": true,
+		"comment": true, "volatility": true, "parallel": true,
+		"security_definer": true, "procedure": true, "cost": true,
+		"rows": true, "depends_on": true,
+	}
+
+	for _, child := range tbl.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		key := kv.Key.Parts[0]
+		if !knownKeys[key] {
+			p.warnf("W001", "", "", "unknown key in [functions.%s]: %q", name, key)
+			continue
+		}
+		switch key {
+		case "language":
+			if v, ok := nodeString(kv.Val); ok {
+				rf.Language = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].language must be a string", name)
+			}
+		case "returns":
+			if v, ok := nodeString(kv.Val); ok {
+				rf.Returns = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].returns must be a string", name)
+			}
+		case "body":
+			if v, ok := nodeString(kv.Val); ok {
+				rf.Body = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].body must be a string", name)
+			}
+		case "file":
+			if v, ok := nodeString(kv.Val); ok {
+				rf.File = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].file must be a string", name)
+			}
+		case "comment":
+			if v, ok := nodeString(kv.Val); ok {
+				rf.Comment = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].comment must be a string", name)
+			}
+		case "volatility":
+			if v, ok := nodeString(kv.Val); ok {
+				rf.Volatility = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].volatility must be a string", name)
+			}
+		case "parallel":
+			if v, ok := nodeString(kv.Val); ok {
+				rf.Parallel = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].parallel must be a string", name)
+			}
+		case "security_definer":
+			if v, ok := nodeBool(kv.Val); ok {
+				rf.SecurityDefiner = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].security_definer must be a boolean", name)
+			}
+		case "procedure":
+			if v, ok := nodeBool(kv.Val); ok {
+				rf.Procedure = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].procedure must be a boolean", name)
+			}
+		case "cost":
+			if v, ok := nodeFloat(kv.Val); ok {
+				rf.Cost = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].cost must be a number", name)
+			}
+		case "rows":
+			if v, ok := nodeFloat(kv.Val); ok {
+				rf.Rows = &v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].rows must be a number", name)
+			}
+		case "depends_on":
+			if v, ok := nodeStringSlice(kv.Val); ok {
+				rf.DependsOn = v
+			} else {
+				p.errorf("E010", "", "", "[functions.%s].depends_on must be an array of strings", name)
+			}
+		}
+	}
+
+	// Validate required fields.
+	isProcedure := rf.Procedure != nil && *rf.Procedure
+
+	if rf.Language == nil {
+		p.errorf("E011", "", "", "function %q is missing required field \"language\"", name)
+	}
+
+	if rf.Body == nil && rf.File == nil {
+		p.errorf("E011", "", "", "function %q is missing required field \"body\" or \"file\"", name)
+	} else if rf.Body != nil && rf.File != nil {
+		p.errorf("E010", "", "", "function %q cannot set both \"body\" and \"file\"", name)
+	}
+
+	if !isProcedure && rf.Returns == nil {
+		p.errorf("E011", "", "", "function %q is missing required field \"returns\"", name)
+	}
+
+	// File reference handling: read file content at parse time.
+	if rf.File != nil && rf.Body == nil && p.file != "<bytes>" {
+		schemaDir := filepath.Dir(p.file)
+		filePath := filepath.Join(schemaDir, *rf.File)
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				p.errorf("E012", "", "", "function %q file not found: %s", name, filePath)
+			} else {
+				p.errorf("E010", "", "", "function %q cannot read file %s: %v", name, filePath, err)
+			}
+		} else {
+			body := string(data)
+			rf.Body = &body
+		}
+	}
+
+	// Parse args
+	rf.Args = p.parseFunctionArgs(name)
+
+	return rf
+}
+
+// parseFunctionArgs extracts [[functions.<name>.args]] array-of-tables.
+func (p *parser) parseFunctionArgs(funcName string) []RawFunctionArg {
+	var args []RawFunctionArg
+	target := []string{"functions", funcName, "args"}
+
+	for _, child := range p.doc.Children {
+		at, ok := child.(*tomledit.ArrayTableNode)
+		if !ok {
+			continue
+		}
+		if pathsEqual(at.KeyPath, target) {
+			arg := RawFunctionArg{}
+
+			knownKeys := map[string]bool{
+				"name": true, "type": true, "default": true,
+			}
+
+			for _, child := range at.Children {
+				kv, ok := child.(*tomledit.KeyValueNode)
+				if !ok {
+					continue
+				}
+				key := kv.Key.Parts[0]
+				if !knownKeys[key] {
+					p.warnf("W001", "", "", "unknown key in [[functions.%s.args]]: %q", funcName, key)
+					continue
+				}
+				switch key {
+				case "name":
+					if v, ok := nodeString(kv.Val); ok {
+						arg.Name = v
+					} else {
+						p.errorf("E010", "", "", "[[functions.%s.args]].name must be a string", funcName)
+					}
+				case "type":
+					if v, ok := nodeString(kv.Val); ok {
+						arg.Type = v
+					} else {
+						p.errorf("E010", "", "", "[[functions.%s.args]].type must be a string", funcName)
+					}
+				case "default":
+					if v, ok := nodeString(kv.Val); ok {
+						arg.Default = &v
+					} else {
+						p.errorf("E010", "", "", "[[functions.%s.args]].default must be a string", funcName)
+					}
+				}
+			}
+
+			if arg.Name == "" {
+				p.errorf("E011", "", "", "[[functions.%s.args]] is missing required field \"name\"", funcName)
+			}
+			if arg.Type == "" {
+				p.errorf("E011", "", "", "[[functions.%s.args]] is missing required field \"type\"", funcName)
+			}
+
+			args = append(args, arg)
+		}
+	}
+
+	return args
 }
 
 func (p *parser) parseTable(name string) RawTable {
@@ -1527,6 +1746,22 @@ func nodeBool(n tomledit.Node) (bool, bool) {
 		return b.Val, true
 	}
 	return false, false
+}
+
+// nodeFloat extracts a float64 value from a Node.
+// Accepts both FloatNode and IntegerNode (integers are valid floats).
+func nodeFloat(n tomledit.Node) (float64, bool) {
+	if n == nil {
+		return 0, false
+	}
+	if f, ok := n.(*tomledit.FloatNode); ok {
+		return f.Val, true
+	}
+	// Accept integer values as floats (cost = 100 is valid TOML).
+	if i, ok := n.(*tomledit.IntegerNode); ok {
+		return float64(i.Val), true
+	}
+	return 0, false
 }
 
 // nodeStringSlice extracts a []string from an ArrayNode.
