@@ -84,6 +84,20 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 		default:
 			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: ts)", mode, lang)
 		}
+	case "sqlalchemy":
+		switch lang {
+		case "python":
+			return &codegen.PythonSQLAlchemyGenerator{}, nil
+		default:
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: python)", mode, lang)
+		}
+	case "jpa":
+		switch lang {
+		case "java":
+			return &codegen.JavaJPAGenerator{}, nil
+		default:
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: java)", mode, lang)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported codegen mode: %s", mode)
 	}
