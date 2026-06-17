@@ -7,11 +7,12 @@ import (
 
 // SquashResult holds the result of a squash operation.
 type SquashResult struct {
-	Squashed       *Migration // The combined migration
-	OriginalPaths  []string   // Paths of original migration files that were squashed
-	OriginalCount  int        // Number of migrations squashed
-	CancelledPairs int        // Number of inverse pairs cancelled
-	MergedOps      int        // Number of ops merged (e.g., sequential type changes)
+	Squashed        *Migration // The combined migration
+	OriginalPaths   []string   // Paths of original migration files that were squashed
+	OriginalCount   int        // Number of migrations squashed
+	CancelledPairs  int        // Number of inverse pairs cancelled
+	MergedOps       int        // Number of ops merged (e.g., sequential type changes)
+	ConsolidatedOps int        // Number of ops folded into CREATE TABLE
 }
 
 // SquashMigrations squashes all migrations in the given directory from version
@@ -72,8 +73,9 @@ func SquashMigrations(dir, from, to string) (*SquashResult, error) {
 		allDML = append(allDML, m.DMLOps...)
 	}
 
-	// Optimize: cancel inverse pairs and merge sequential type changes.
-	optimizedDDL, cancelledPairs, mergedOps := optimizeDDLOps(allDDL)
+	// Optimize: cancel inverse pairs, merge sequential type changes,
+	// and consolidate ops into CREATE TABLE.
+	optimizedDDL, cancelledPairs, mergedOps, consolidatedOps := optimizeDDLOps(allDDL)
 
 	// Build combined down ops.
 	squashedDown := buildSquashedDown(optimizedDDL, allDML)
@@ -93,19 +95,22 @@ func SquashMigrations(dir, from, to string) (*SquashResult, error) {
 	}
 
 	return &SquashResult{
-		Squashed:       squashed,
-		OriginalPaths:  originalPaths,
-		OriginalCount:  len(inRange),
-		CancelledPairs: cancelledPairs,
-		MergedOps:      mergedOps,
+		Squashed:        squashed,
+		OriginalPaths:   originalPaths,
+		OriginalCount:   len(inRange),
+		CancelledPairs:  cancelledPairs,
+		MergedOps:       mergedOps,
+		ConsolidatedOps: consolidatedOps,
 	}, nil
 }
 
-// optimizeDDLOps cancels inverse pairs and merges sequential type changes.
-// Returns the optimized ops, the number of cancelled pairs, and the number of merged ops.
-func optimizeDDLOps(ops []DDLOp) ([]DDLOp, int, int) {
+// optimizeDDLOps cancels inverse pairs, merges sequential type changes, and
+// consolidates add/FK/index/constraint ops into preceding create_table ops.
+// Returns the optimized ops and counts of each optimization applied.
+func optimizeDDLOps(ops []DDLOp) ([]DDLOp, int, int, int) {
 	cancelledPairs := 0
 	mergedOps := 0
+	consolidatedCount := 0
 
 	// Build a list tracking which ops are cancelled.
 	cancelled := make([]bool, len(ops))
@@ -166,7 +171,42 @@ func optimizeDDLOps(ops []DDLOp) ([]DDLOp, int, int) {
 		}
 	}
 
-	return final, cancelledPairs, mergedOps
+	// Pass 3: Consolidate add_column, add_fk, create_index, add_unique,
+	// add_check, add_exclusion into a preceding create_table on the same table.
+	consolidatable := map[string]bool{
+		"add_column": true, "add_fk": true, "create_index": true,
+		"add_unique": true, "add_check": true, "add_exclusion": true,
+	}
+
+	consolidated := make([]bool, len(final))
+	for i := 0; i < len(final); i++ {
+		if final[i].Op != "create_table" {
+			continue
+		}
+		for j := i + 1; j < len(final); j++ {
+			if consolidated[j] {
+				continue
+			}
+			if !consolidatable[final[j].Op] {
+				continue
+			}
+			if final[j].Table != final[i].Table {
+				continue
+			}
+			final[i].ConsolidatedOps = append(final[i].ConsolidatedOps, final[j])
+			consolidated[j] = true
+			consolidatedCount++
+		}
+	}
+
+	var afterConsolidate []DDLOp
+	for i, op := range final {
+		if !consolidated[i] {
+			afterConsolidate = append(afterConsolidate, op)
+		}
+	}
+
+	return afterConsolidate, cancelledPairs, mergedOps, consolidatedCount
 }
 
 // isInversePair returns true if op2 undoes op1.

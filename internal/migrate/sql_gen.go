@@ -157,8 +157,116 @@ func opCreateTable(op DDLOp) string {
 		return sql.CreateTable(op.TableDef, schema, false, 0, nil)
 	}
 
+	// Consolidation path: build a table from the create_table op's fields
+	// plus any ops absorbed during squash consolidation.
+	if len(op.ConsolidatedOps) > 0 {
+		return opCreateTableConsolidated(op)
+	}
+
 	// Fallback: generate from op fields (no full table def available).
 	return fmt.Sprintf("CREATE TABLE %s ();", quoteQualified(op.Table))
+}
+
+// opCreateTableConsolidated builds a model.Table from a create_table op and
+// its consolidated ops, then generates a complete CREATE TABLE statement.
+func opCreateTableConsolidated(op DDLOp) string {
+	schema, tableName := splitQualifiedName(op.Table)
+
+	tbl := &model.Table{
+		Name:    tableName,
+		Schema:  schema,
+		Comment: op.Comment,
+		PK:      op.PK,
+	}
+
+	for _, cop := range op.ConsolidatedOps {
+		switch cop.Op {
+		case "add_column":
+			col := model.Column{
+				Name:      cop.Column,
+				PGType:    cop.Type,
+				Collation: cop.Collation,
+				NotNull:   cop.NotNull,
+				Generated: cop.Generated,
+				Stored:    cop.Stored,
+			}
+			if cop.Default != nil {
+				d := formatDefault(cop.Default, cop.Type)
+				col.Default = &d
+			}
+			tbl.Columns = append(tbl.Columns, col)
+
+		case "add_fk":
+			refSchema, refTable := splitQualifiedName(cop.RefTable)
+			fk := model.FK{
+				Name:       cop.Name,
+				Columns:    cop.Columns,
+				RefSchema:  refSchema,
+				RefTable:   refTable,
+				RefColumns: cop.RefCols,
+				OnDelete:   cop.OnDelete,
+			}
+			tbl.FKs = append(tbl.FKs, fk)
+
+		case "create_index":
+			idx := model.Index{
+				Name:       cop.Name,
+				Columns:    cop.Columns,
+				Desc:       cop.Desc,
+				Method:     cop.Method,
+				Opclasses:  cop.Opclasses,
+				Collations: cop.Collations,
+				Where:      cop.Where,
+				Include:    cop.Include,
+				With:       cop.With,
+			}
+			tbl.Indexes = append(tbl.Indexes, idx)
+
+		case "add_unique":
+			uc := model.UniqueConstraint{
+				Name:              cop.Name,
+				Columns:           cop.Columns,
+				Deferrable:        cop.Deferrable,
+				InitiallyDeferred: cop.InitiallyDeferred,
+			}
+			tbl.Uniques = append(tbl.Uniques, uc)
+
+		case "add_check":
+			cc := model.CheckConstraint{
+				Name: cop.Name,
+				Expr: cop.Expr,
+			}
+			tbl.Checks = append(tbl.Checks, cc)
+
+		case "add_exclusion":
+			elems := make([]model.ExclusionElement, len(cop.Columns))
+			for i, col := range cop.Columns {
+				operator := "&&"
+				if i < len(cop.Operators) {
+					operator = cop.Operators[i]
+				}
+				elems[i] = model.ExclusionElement{
+					Column:   col,
+					Operator: operator,
+				}
+			}
+			method := cop.Method
+			if method == "" {
+				method = "gist"
+			}
+			ec := model.ExclusionConstraint{
+				Name:              cop.Name,
+				Method:            method,
+				Elements:          elems,
+				Where:             cop.Where,
+				Deferrable:        cop.Deferrable,
+				InitiallyDeferred: cop.InitiallyDeferred,
+			}
+			tbl.Exclusions = append(tbl.Exclusions, ec)
+		}
+	}
+
+	return sql.CreateTable(tbl, schema, false, 0, nil)
 }
 
 func opCreatePartition(op DDLOp) string {

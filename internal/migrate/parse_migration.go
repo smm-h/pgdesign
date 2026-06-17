@@ -48,6 +48,7 @@ type tomlDDL struct {
 	Operators         []string `toml:"operators,omitempty"`
 	Deferrable        bool     `toml:"deferrable,omitempty"`
 	InitiallyDeferred bool     `toml:"initially_deferred,omitempty"`
+	Consolidated []tomlDDL `toml:"consolidated,omitempty"`
 	Down     *tomlDown   `toml:"down,omitempty"`
 }
 
@@ -180,6 +181,13 @@ func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 				op.Collations[k] = s
 			}
 		}
+	}
+	for _, ctd := range td.Consolidated {
+		cop, err := convertTomlDDL(ctd)
+		if err != nil {
+			return DDLOp{}, fmt.Errorf("consolidated op: %w", err)
+		}
+		op.ConsolidatedOps = append(op.ConsolidatedOps, cop)
 	}
 	if td.Down != nil {
 		op.Down = convertTomlDown(td.Down)
@@ -391,8 +399,18 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 		b.WriteString(fmt.Sprintf("expr = %q\n", op.Expr))
 	}
 
+	// Down must be written before consolidated: [[ddl.consolidated]] changes
+	// the TOML scope so subsequent keys would be under the last consolidated
+	// entry, not the parent [[ddl]].
 	if op.Down != nil {
 		writeDownOp(b, op.Down)
+	}
+
+	if len(op.ConsolidatedOps) > 0 {
+		for i := range op.ConsolidatedOps {
+			b.WriteString("\n[[ddl.consolidated]]\n")
+			writeDDLOp(b, &op.ConsolidatedOps[i])
+		}
 	}
 }
 

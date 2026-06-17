@@ -613,6 +613,9 @@ func handleMigrateSquash(kwargs map[string]interface{}) int {
 		if result.MergedOps > 0 {
 			fmt.Printf("  Merged ops: %d\n", result.MergedOps)
 		}
+		if result.ConsolidatedOps > 0 {
+			fmt.Printf("  Consolidated into CREATE TABLE: %d\n", result.ConsolidatedOps)
+		}
 	}
 
 	return 0

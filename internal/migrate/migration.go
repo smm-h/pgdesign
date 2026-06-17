@@ -74,6 +74,8 @@ type DDLOp struct {
 	TriggerDef           *model.Trigger               // full trigger def for create/drop trigger (not serialized)
 	PolicyDef            *model.Policy                // full policy def for create/drop policy (not serialized)
 
+	ConsolidatedOps []DDLOp // ops absorbed into create_table during squash consolidation
+
 	Down *DownOp
 }
 

@@ -64,21 +64,27 @@ func TestSquashMigrations_Basic(t *testing.T) {
 	if result.Squashed.Description != "Squashed from 0.1.0 to 0.3.0" {
 		t.Errorf("Description = %q, want %q", result.Squashed.Description, "Squashed from 0.1.0 to 0.3.0")
 	}
-	// Should have 3 DDL ops (create_table + 2 add_column).
-	if len(result.Squashed.DDLOps) != 3 {
-		t.Fatalf("DDL ops = %d, want 3", len(result.Squashed.DDLOps))
+	// Consolidation folds the 2 add_column ops into the create_table.
+	if len(result.Squashed.DDLOps) != 1 {
+		t.Fatalf("DDL ops = %d, want 1", len(result.Squashed.DDLOps))
 	}
 	if result.Squashed.DDLOps[0].Op != "create_table" {
 		t.Errorf("DDL[0].Op = %q, want create_table", result.Squashed.DDLOps[0].Op)
 	}
-	if result.Squashed.DDLOps[1].Op != "add_column" {
-		t.Errorf("DDL[1].Op = %q, want add_column", result.Squashed.DDLOps[1].Op)
+	if len(result.Squashed.DDLOps[0].ConsolidatedOps) != 2 {
+		t.Fatalf("ConsolidatedOps = %d, want 2", len(result.Squashed.DDLOps[0].ConsolidatedOps))
 	}
-	if result.Squashed.DDLOps[2].Op != "add_column" {
-		t.Errorf("DDL[2].Op = %q, want add_column", result.Squashed.DDLOps[2].Op)
+	if result.Squashed.DDLOps[0].ConsolidatedOps[0].Column != "email" {
+		t.Errorf("ConsolidatedOps[0].Column = %q, want email", result.Squashed.DDLOps[0].ConsolidatedOps[0].Column)
+	}
+	if result.Squashed.DDLOps[0].ConsolidatedOps[1].Column != "name" {
+		t.Errorf("ConsolidatedOps[1].Column = %q, want name", result.Squashed.DDLOps[0].ConsolidatedOps[1].Column)
 	}
 	if result.CancelledPairs != 0 {
 		t.Errorf("CancelledPairs = %d, want 0", result.CancelledPairs)
+	}
+	if result.ConsolidatedOps != 2 {
+		t.Errorf("ConsolidatedOps = %d, want 2", result.ConsolidatedOps)
 	}
 }
 
@@ -497,13 +503,16 @@ func TestOptimizeDDLOps(t *testing.T) {
 		{Op: "alter_column_type", Table: "t", Column: "name", Type: "varchar(255)"},
 	}
 
-	result, cancelled, merged := optimizeDDLOps(ops)
+	result, cancelled, merged, consolidated := optimizeDDLOps(ops)
 
 	if cancelled != 1 {
 		t.Errorf("cancelled = %d, want 1", cancelled)
 	}
 	if merged != 1 {
 		t.Errorf("merged = %d, want 1", merged)
+	}
+	if consolidated != 0 {
+		t.Errorf("consolidated = %d, want 0", consolidated)
 	}
 	// Should have: add_column(email) + alter_column_type(name, varchar(255))
 	if len(result) != 2 {
