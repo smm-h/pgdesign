@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/smm-h/pgdesign/internal/workload"
 )
 
 const testConnStr = "postgres:///pgdesign_test"
@@ -265,7 +266,7 @@ func TestPoolConfigApplied(t *testing.T) {
 func TestFindDuplicateIndexes(t *testing.T) {
 	tests := []struct {
 		name    string
-		indexes []indexStat
+		indexes []workload.IndexInfo
 		want    int
 	}{
 		{
@@ -275,34 +276,34 @@ func TestFindDuplicateIndexes(t *testing.T) {
 		},
 		{
 			name: "no duplicates",
-			indexes: []indexStat{
-				{IndexName: "idx_a", Columns: []string{"x", "y"}},
-				{IndexName: "idx_b", Columns: []string{"z"}},
+			indexes: []workload.IndexInfo{
+				{Schema: "public", Table: "t", Name: "idx_a", Columns: []string{"x", "y"}},
+				{Schema: "public", Table: "t", Name: "idx_b", Columns: []string{"z"}},
 			},
 			want: 0,
 		},
 		{
 			name: "prefix duplicate",
-			indexes: []indexStat{
-				{IndexName: "idx_a", Columns: []string{"x"}},
-				{IndexName: "idx_b", Columns: []string{"x", "y"}},
+			indexes: []workload.IndexInfo{
+				{Schema: "public", Table: "t", Name: "idx_a", Columns: []string{"x"}},
+				{Schema: "public", Table: "t", Name: "idx_b", Columns: []string{"x", "y"}},
 			},
 			want: 1,
 		},
 		{
 			name: "exact same columns not duplicate",
-			indexes: []indexStat{
-				{IndexName: "idx_a", Columns: []string{"x", "y"}},
-				{IndexName: "idx_b", Columns: []string{"x", "y"}},
+			indexes: []workload.IndexInfo{
+				{Schema: "public", Table: "t", Name: "idx_a", Columns: []string{"x", "y"}},
+				{Schema: "public", Table: "t", Name: "idx_b", Columns: []string{"x", "y"}},
 			},
 			want: 0,
 		},
 		{
 			name: "multiple duplicates",
-			indexes: []indexStat{
-				{IndexName: "idx_a", Columns: []string{"x"}},
-				{IndexName: "idx_b", Columns: []string{"x", "y"}},
-				{IndexName: "idx_c", Columns: []string{"x", "y", "z"}},
+			indexes: []workload.IndexInfo{
+				{Schema: "public", Table: "t", Name: "idx_a", Columns: []string{"x"}},
+				{Schema: "public", Table: "t", Name: "idx_b", Columns: []string{"x", "y"}},
+				{Schema: "public", Table: "t", Name: "idx_c", Columns: []string{"x", "y", "z"}},
 			},
 			want: 3,
 		},
@@ -310,9 +311,9 @@ func TestFindDuplicateIndexes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := findDuplicateIndexes(tt.indexes)
+			got := workload.FindDuplicateIndexes(tt.indexes)
 			if len(got) != tt.want {
-				t.Errorf("findDuplicateIndexes() returned %d pairs, want %d", len(got), tt.want)
+				t.Errorf("FindDuplicateIndexes() returned %d pairs, want %d", len(got), tt.want)
 			}
 		})
 	}

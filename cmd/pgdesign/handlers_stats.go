@@ -10,67 +10,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/workload"
 )
-
-// IndexInfo contains the minimal index information needed for duplicate detection.
-type IndexInfo struct {
-	Schema  string
-	Table   string
-	Name    string
-	Columns []string
-}
-
-// DuplicateIndex describes a pair of indexes where one is a prefix of the other.
-type DuplicateIndex struct {
-	Schema        string `json:"schema"`
-	Table         string `json:"table"`
-	Index         string `json:"index"`
-	SupersetIndex string `json:"superset_index"`
-}
-
-// isPrefix returns true if a is a leading prefix of b.
-func isPrefix(a, b []string) bool {
-	if len(a) > len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// FindDuplicateIndexes detects indexes where one is a leading-column prefix of another.
-// Only strict prefixes count (same columns is not a duplicate).
-func FindDuplicateIndexes(indexes []IndexInfo) []DuplicateIndex {
-	type key struct{ schema, table string }
-	groups := make(map[key][]IndexInfo)
-	for _, idx := range indexes {
-		k := key{idx.Schema, idx.Table}
-		groups[k] = append(groups[k], idx)
-	}
-
-	var result []DuplicateIndex
-	for _, idxs := range groups {
-		for i, a := range idxs {
-			for j, b := range idxs {
-				if i == j {
-					continue
-				}
-				if isPrefix(a.Columns, b.Columns) && len(a.Columns) < len(b.Columns) {
-					result = append(result, DuplicateIndex{
-						Schema:        a.Schema,
-						Table:         a.Table,
-						Index:         a.Name,
-						SupersetIndex: b.Name,
-					})
-				}
-			}
-		}
-	}
-	return result
-}
 
 // formatNumber formats an integer with comma separators.
 func formatNumber(n int64) string {
@@ -111,7 +52,7 @@ type statsOutput struct {
 	Tables           []tableStats       `json:"tables"`
 	UnusedIndexes    []unusedIndex      `json:"unused_indexes"`
 	VacuumCandidates []vacuumCandidate  `json:"vacuum_candidates"`
-	DuplicateIndexes []DuplicateIndex   `json:"duplicate_indexes"`
+	DuplicateIndexes []workload.DuplicateIndex   `json:"duplicate_indexes"`
 }
 
 type tableStats struct {
@@ -279,9 +220,9 @@ func handleStats(kwargs map[string]interface{}) int {
 		fmt.Fprintf(os.Stderr, "error: query index columns: %v\n", err)
 		return 1
 	}
-	var indexInfos []IndexInfo
+	var indexInfos []workload.IndexInfo
 	for indexColRows.Next() {
-		var info IndexInfo
+		var info workload.IndexInfo
 		var columns []string
 		if err := indexColRows.Scan(&info.Schema, &info.Table, &info.Name, &columns); err != nil {
 			indexColRows.Close()
@@ -329,7 +270,7 @@ func handleStats(kwargs map[string]interface{}) int {
 	}
 
 	// Analyze: duplicate indexes
-	duplicates := FindDuplicateIndexes(indexInfos)
+	duplicates := workload.FindDuplicateIndexes(indexInfos)
 
 	// Build table stats for output
 	var tableOutput []tableStats
@@ -375,7 +316,7 @@ func handleStats(kwargs map[string]interface{}) int {
 		vacuumCands = []vacuumCandidate{}
 	}
 	if duplicates == nil {
-		duplicates = []DuplicateIndex{}
+		duplicates = []workload.DuplicateIndex{}
 	}
 
 	// Output

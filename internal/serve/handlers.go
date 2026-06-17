@@ -23,6 +23,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/validate"
+	"github.com/smm-h/pgdesign/internal/workload"
 )
 
 // writeJSON writes a JSON response with the given status code.
@@ -284,9 +285,29 @@ func (s *Server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 	if indexes == nil {
 		indexes = []indexStat{}
 	}
-	duplicates := findDuplicateIndexes(indexes)
-	if duplicates == nil {
-		duplicates = []duplicateIndexPair{}
+	// Convert to workload.IndexInfo for consolidated duplicate detection.
+	var wkInfos []workload.IndexInfo
+	parts := strings.SplitN(table, ".", 2)
+	schemaName, tableName := parts[0], parts[1]
+	for _, idx := range indexes {
+		wkInfos = append(wkInfos, workload.IndexInfo{
+			Schema:  schemaName,
+			Table:   tableName,
+			Name:    idx.IndexName,
+			Columns: idx.Columns,
+		})
+	}
+	wkDups := workload.FindDuplicateIndexes(wkInfos)
+	type duplicateIndexPair struct {
+		Redundant string `json:"redundant"`
+		CoveredBy string `json:"covered_by"`
+	}
+	duplicates := make([]duplicateIndexPair, len(wkDups))
+	for i, d := range wkDups {
+		duplicates[i] = duplicateIndexPair{
+			Redundant: d.Index,
+			CoveredBy: d.SupersetIndex,
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"table":      table,
@@ -503,44 +524,6 @@ func parseAndBuild(data []byte) (*model.Schema, []diagnostic.Diagnostic) {
 	}
 
 	return schema, allDiags
-}
-
-// duplicateIndexPair represents a pair of indexes where one is a leading prefix of the other.
-type duplicateIndexPair struct {
-	Redundant string `json:"redundant"`
-	CoveredBy string `json:"covered_by"`
-}
-
-// findDuplicateIndexes detects indexes where one's columns are a leading prefix of another's.
-func findDuplicateIndexes(indexes []indexStat) []duplicateIndexPair {
-	var pairs []duplicateIndexPair
-	for i, a := range indexes {
-		for j, b := range indexes {
-			if i == j {
-				continue
-			}
-			if isPrefix(a.Columns, b.Columns) && len(a.Columns) < len(b.Columns) {
-				pairs = append(pairs, duplicateIndexPair{
-					Redundant: a.IndexName,
-					CoveredBy: b.IndexName,
-				})
-			}
-		}
-	}
-	return pairs
-}
-
-// isPrefix returns true if a is a prefix of b.
-func isPrefix(a, b []string) bool {
-	if len(a) > len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // diagsToJSON converts diagnostics to a JSON-friendly slice of maps.

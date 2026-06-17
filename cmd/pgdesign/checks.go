@@ -14,6 +14,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/validate"
+	"github.com/smm-h/pgdesign/internal/workload"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
@@ -428,5 +429,107 @@ func checkCoverage(ctx strictcli.CheckContext) strictcli.CheckResult {
 	return strictcli.CheckResult{
 		Status:  "pass",
 		Message: "all coverage checks passed",
+	}
+}
+
+func checkStructural(ctx strictcli.CheckContext) strictcli.CheckResult {
+	root := ctx.ProjectRoot()
+	paths, err := loadSchemaForCheck(root)
+	if err != nil {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
+		}
+	}
+	schema, exitCode := parseAndBuild(paths)
+	if exitCode != 0 {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: "schema parse/build failed",
+		}
+	}
+
+	var allDiags []diagnostic.Diagnostic
+	allDiags = append(allDiags, workload.StructuralRecommendations(schema)...)
+	allDiags = append(allDiags, workload.DetectLowSelectivityIndexes(schema)...)
+	allDiags = append(allDiags, workload.DetectExcessiveIndexes(schema)...)
+
+	if len(allDiags) == 0 {
+		return strictcli.CheckResult{
+			Status:  "pass",
+			Message: "no structural issues found",
+		}
+	}
+	return strictcli.CheckResult{
+		Status:  "warn",
+		Message: fmt.Sprintf("%d structural issue(s) found", len(allDiags)),
+		Details: diagDetails(allDiags),
+	}
+}
+
+func checkWorkload(ctx strictcli.CheckContext) strictcli.CheckResult {
+	root := ctx.ProjectRoot()
+	paths, err := loadSchemaForCheck(root)
+	if err != nil {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
+		}
+	}
+	schema, exitCode := parseAndBuild(paths)
+	if exitCode != 0 {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: "schema parse/build failed",
+		}
+	}
+
+	cfg := loadProjectConfig(root)
+	dbURL := resolveDBURL(cfg)
+	if dbURL == "" {
+		return strictcli.CheckResult{
+			Status:  "skip",
+			Message: "no database URL configured (set database.url in pgdesign.toml or PGDESIGN_DB env)",
+		}
+	}
+
+	bgCtx := context.Background()
+	conn, connErr := pgx.Connect(bgCtx, dbURL)
+	if connErr != nil {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: fmt.Sprintf("cannot connect to database: %v", connErr),
+		}
+	}
+	defer conn.Close(bgCtx)
+
+	var allDiags []diagnostic.Diagnostic
+
+	// pg_stat_statements analysis + N+1 detection
+	stmtStats, stmtErr := workload.QueryStatements(bgCtx, conn, 100)
+	if stmtErr == nil && schema.FKGraph != nil {
+		allDiags = append(allDiags, workload.DetectNPlusOne(schema.FKGraph, stmtStats)...)
+	}
+
+	// Sequential scan analysis
+	schemaNames := configSchemaNames(cfg)
+	if len(schemaNames) == 0 {
+		schemaNames = []string{"public"}
+	}
+	scanStats, scanErr := workload.QueryTableScanStats(bgCtx, conn, schemaNames)
+	if scanErr == nil {
+		allDiags = append(allDiags, workload.DetectSeqScanHeavy(scanStats)...)
+	}
+
+	if len(allDiags) == 0 {
+		return strictcli.CheckResult{
+			Status:  "pass",
+			Message: "no workload issues found",
+		}
+	}
+	return strictcli.CheckResult{
+		Status:  "warn",
+		Message: fmt.Sprintf("%d workload issue(s) found", len(allDiags)),
+		Details: diagDetails(allDiags),
 	}
 }

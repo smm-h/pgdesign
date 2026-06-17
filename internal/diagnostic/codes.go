@@ -103,6 +103,11 @@ package diagnostic
 // W019  Range CHECK subsumed by wider range CHECK
 // W020  (reserved for dead column escalation with pg_stats null_frac=1.0)
 // W021  Estimated row size exceeds page size (8192 bytes)
+// W022  JSONB column without GIN index (workload)
+// W023  Array column without GIN index (workload)
+// W024  tsvector column without GIN index (workload)
+// W025  Potential N+1 query pattern (workload)
+// W026  Sequential scan heavy table (workload)
 //
 // === Info diagnostics (I001-I099) ===
 //
@@ -110,6 +115,9 @@ package diagnostic
 // I002  Dead column (not referenced by any constraint, index, policy, or generated column)
 // I003  Estimated row size exceeds TOAST threshold (2048 bytes)
 // I004  Column reordering could save significant padding
+// I005  Timestamp on append-only table without BRIN index (workload)
+// I006  Boolean column with dedicated index (low selectivity) (workload)
+// I007  Table with 10+ indexes (write overhead) (workload)
 //
 // === Normal form audit warnings (W100-W199) ===
 //

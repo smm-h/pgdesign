@@ -36,6 +36,8 @@ func main() {
 	app.RegisterCheck("nf", checkNF)
 	app.RegisterCheck("coverage", checkCoverage)
 	app.RegisterCheck("design", checkDesign)
+	app.RegisterCheck("structural", checkStructural)
+	app.RegisterCheck("workload", checkWorkload)
 
 	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output"))
 
@@ -125,10 +127,12 @@ func main() {
 		),
 	)
 	mig.Command("test", "Test migrations against a staging database", handleMigrateTest,
+		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) or directory (required with --shadow)", strictcli.Variadic(), strictcli.ArgRequired(false))),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "Staging database connection URL"),
 			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
 			strictcli.IntFlag("timeout", "Timeout in seconds", strictcli.Default(60)),
+			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema"),
 		),
 	)
 
