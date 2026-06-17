@@ -1102,7 +1102,7 @@ func TestPartitioningGained(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
 				Strategy: "range",
-				Column:   "created_at",
+				Columns:  []string{"created_at"},
 			}},
 		},
 	}
@@ -1144,7 +1144,7 @@ func TestPartitioningLost(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
 				Strategy: "range",
-				Column:   "created_at",
+				Columns:  []string{"created_at"},
 			}},
 		},
 	}
@@ -1169,7 +1169,7 @@ func TestPartitioningStrategyChanged(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
 				Strategy: "hash",
-				Column:   "id",
+				Columns:  []string{"id"},
 			}},
 		},
 	}
@@ -1177,7 +1177,7 @@ func TestPartitioningStrategyChanged(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
 				Strategy: "range",
-				Column:   "id",
+				Columns:  []string{"id"},
 			}},
 		},
 	}
@@ -1206,10 +1206,10 @@ func TestPartitionChildrenAdded(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
 				Strategy: "range",
-				Column:   "created_at",
+				Columns:  []string{"created_at"},
 				Children: []model.PartitionSpec{
-					{Strategy: "events_2024", Column: "2024-01-01"},
-					{Strategy: "events_2025", Column: "2025-01-01"},
+					{Name: "events_2024", Bound: "2024-01-01"},
+					{Name: "events_2025", Bound: "2025-01-01"},
 				},
 			}},
 		},
@@ -1218,9 +1218,9 @@ func TestPartitionChildrenAdded(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
 				Strategy: "range",
-				Column:   "created_at",
+				Columns:  []string{"created_at"},
 				Children: []model.PartitionSpec{
-					{Strategy: "events_2024", Column: "2024-01-01"},
+					{Name: "events_2024", Bound: "2024-01-01"},
 				},
 			}},
 		},
@@ -1251,9 +1251,9 @@ func TestPartitionChildrenAdded(t *testing.T) {
 func TestPartitioningUnchanged(t *testing.T) {
 	spec := &model.PartitionSpec{
 		Strategy: "range",
-		Column:   "created_at",
+		Columns:  []string{"created_at"},
 		Children: []model.PartitionSpec{
-			{Strategy: "events_2024", Column: "2024-01-01"},
+			{Name: "events_2024", Bound: "2024-01-01"},
 		},
 	}
 	desired := &model.Schema{
