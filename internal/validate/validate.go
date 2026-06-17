@@ -95,6 +95,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W008", checkCircularFK},
 		{"W010", checkAppendOnlyUpdatedAt},
 		{"E220", checkDependsOnResolvable},
+		{"E221", checkExclusionBtreeGist},
 	}
 
 	for _, r := range rules {
@@ -1258,6 +1259,41 @@ func checkDependsOnResolvable(schema *model.Schema, _ *Config) []diagnostic.Diag
 					Table:      mv.Name,
 					Message:    fmt.Sprintf("materialized view %q depends_on %q which does not exist", mv.Name, dep),
 					Suggestion: "Check the depends_on list for typos or missing definitions",
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// checkExclusionBtreeGist checks whether exclusion constraints using non-range
+// operators require the btree_gist extension.
+func checkExclusionBtreeGist(s *model.Schema, config *Config) []diagnostic.Diagnostic {
+	// Build a set of declared extensions.
+	extSet := make(map[string]bool, len(config.Extensions))
+	for _, ext := range config.Extensions {
+		extSet[ext] = true
+	}
+
+	var diags []diagnostic.Diagnostic
+	for _, t := range s.Tables {
+		for _, exc := range t.Exclusions {
+			needsBtreeGist := false
+			for _, elem := range exc.Elements {
+				// The && operator is native to GiST for range types.
+				// All other operators (=, <>, <, >, etc.) on scalar types
+				// require btree_gist to provide GiST operator classes.
+				if elem.Operator != "&&" {
+					needsBtreeGist = true
+					break
+				}
+			}
+			if needsBtreeGist && !extSet["btree_gist"] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E221",
+					Table:    t.Name,
+					Message:  fmt.Sprintf("exclusion constraint %q uses non-range operators; declare btree_gist in [[extensions]]", exc.Name),
 				})
 			}
 		}
