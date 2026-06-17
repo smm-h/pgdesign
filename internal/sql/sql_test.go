@@ -160,6 +160,27 @@ func TestCreateTable_WithPartitioning(t *testing.T) {
 	}
 }
 
+func TestCreateTable_WithMultiColumnPartitioning(t *testing.T) {
+	table := &model.Table{
+		Name:   "events",
+		Schema: "public",
+		Columns: []model.Column{
+			{Name: "id", PGType: "bigint", NotNull: true},
+			{Name: "year", PGType: "integer", NotNull: true},
+			{Name: "region", PGType: "text", NotNull: true},
+		},
+		PK: []string{"id"},
+		Partitioning: &model.PartitionSpec{
+			Strategy: "range",
+			Columns:  []string{"year", "region"},
+		},
+	}
+	got := CreateTable(table, "public", false, 0, nil)
+	if !strings.Contains(got, `PARTITION BY RANGE (year, region)`) {
+		t.Errorf("expected multi-column PARTITION BY, got:\n%s", got)
+	}
+}
+
 func TestCreateTable_GeneratedColumn(t *testing.T) {
 	table := &model.Table{
 		Name:   "products",
