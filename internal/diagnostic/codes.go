@@ -92,9 +92,23 @@ package diagnostic
 // W008  Circular FK dependency
 // W009  RLS policy error_code not snake_case
 // W010  Append-only table has update-suggesting column
+// W011  RLS enabled without policies
+// W012  RLS operation gap (missing policy for some operations)
+// W013  CASCADE depth exceeds threshold
+// W014  Single DELETE cascades to too many tables
+// W015  Mixed ON DELETE actions on incoming FKs
+// W016  PK columns in UNIQUE constraint (redundant)
+// W017  NOT NULL column with CHECK (col IS NOT NULL) (redundant)
+// W018  Domain CHECK + identical column CHECK (redundant)
+// W019  Range CHECK subsumed by wider range CHECK
+//
+// === Info diagnostics (I001-I099) ===
+//
+// I001  Natural key candidate detected (from FD-derived candidate keys)
 //
 // === Normal form audit warnings (W100-W199) ===
 //
 // W100  1NF violation (repeating group)
 // W101  2NF violation (partial dependency)
 // W102  3NF violation (transitive dependency)
+// W103  BCNF violation
