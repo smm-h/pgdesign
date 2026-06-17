@@ -133,9 +133,10 @@ type RawPolicy struct {
 // RawPartitioning holds partition configuration from [tables.*.partitioning].
 type RawPartitioning struct {
 	Strategy   string
-	Column     string
-	Name       string             // child partition table name
-	Bound      string             // bound expression, e.g. "FROM ('2024-01-01') TO ('2024-02-01')"
+	Column     string   // single column (backward compat): column = "x"
+	Columns    []string // multi-column: columns = ["x", "y"]
+	Name       string   // child partition table name
+	Bound      string   // bound expression, e.g. "FROM ('2024-01-01') TO ('2024-02-01')"
 	Partitions []RawPartitioning
 }
 

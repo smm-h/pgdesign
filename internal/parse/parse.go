@@ -1051,7 +1051,20 @@ func (p *parser) parsePartitioningNode(tableName string, tbl *tomledit.TableNode
 			if v, ok := nodeString(kv.Val); ok {
 				part.Column = v
 			}
+		case "columns":
+			if v, ok := nodeStringSlice(kv.Val); ok {
+				part.Columns = v
+			}
 		}
+	}
+
+	// Validate column/columns mutual exclusivity.
+	if part.Column != "" && len(part.Columns) > 0 {
+		p.errorf("E010", tableName, "", "[tables.%s.partitioning] cannot set both column and columns", tableName)
+	}
+	// Parent-level partitioning must specify a column.
+	if part.Column == "" && len(part.Columns) == 0 {
+		p.errorf("E010", tableName, "", "[tables.%s.partitioning] requires column or columns", tableName)
 	}
 
 	// Look for [[tables.<name>.partitioning.partitions]] array-of-tables
@@ -1087,6 +1100,10 @@ func (p *parser) parsePartitioningFromArrayTable(tableName string, at *tomledit.
 		case "column":
 			if v, ok := nodeString(kv.Val); ok {
 				part.Column = v
+			}
+		case "columns":
+			if v, ok := nodeStringSlice(kv.Val); ok {
+				part.Columns = v
 			}
 		case "name":
 			if v, ok := nodeString(kv.Val); ok {

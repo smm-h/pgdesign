@@ -557,9 +557,14 @@ func parseIndexColumns(raw []string) ([]string, []bool) {
 func resolvePartitioning(raw *parse.RawPartitioning) *PartitionSpec {
 	ps := &PartitionSpec{
 		Strategy: raw.Strategy,
-		Column:   raw.Column,
 		Name:     raw.Name,
 		Bound:    raw.Bound,
+	}
+	// Resolve columns: single Column wraps to slice, Columns used directly.
+	if len(raw.Columns) > 0 {
+		ps.Columns = raw.Columns
+	} else if raw.Column != "" {
+		ps.Columns = []string{raw.Column}
 	}
 	for _, child := range raw.Partitions {
 		childCopy := child
