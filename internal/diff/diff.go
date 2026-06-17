@@ -28,6 +28,9 @@ type SchemaDiff struct {
 	MaterializedViewsAdded   []string               `json:"materialized_views_added,omitempty"`
 	MaterializedViewsRemoved []string               `json:"materialized_views_removed,omitempty"`
 	MaterializedViewsChanged []MaterializedViewDiff `json:"materialized_views_changed,omitempty"`
+	SequencesAdded   []string       `json:"sequences_added,omitempty"`
+	SequencesRemoved []string       `json:"sequences_removed,omitempty"`
+	SequencesChanged []SequenceDiff `json:"sequences_changed,omitempty"`
 }
 
 // TableDiff describes the differences within a single table.
@@ -107,6 +110,19 @@ type MaterializedViewDiff struct {
 	IndexesChanged  []IndexChange `json:"indexes_changed,omitempty"`
 }
 
+// SequenceDiff describes changes to a sequence.
+type SequenceDiff struct {
+	Name             string     `json:"name"`
+	StartChanged     *[2]*int64 `json:"start_changed,omitempty"`
+	IncrementChanged *[2]*int64 `json:"increment_changed,omitempty"`
+	MinValueChanged  *[2]*int64 `json:"min_value_changed,omitempty"`
+	MaxValueChanged  *[2]*int64 `json:"max_value_changed,omitempty"`
+	CacheChanged     *[2]*int64 `json:"cache_changed,omitempty"`
+	CycleChanged     *[2]bool   `json:"cycle_changed,omitempty"`
+	OwnedByChanged   *[2]string `json:"owned_by_changed,omitempty"`
+	CommentChanged   *[2]string `json:"comment_changed,omitempty"`
+}
+
 // FKChange describes a changed foreign key constraint.
 type FKChange struct {
 	Name string   `json:"name"`
@@ -144,7 +160,10 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.ViewsChanged) == 0 &&
 		len(d.MaterializedViewsAdded) == 0 &&
 		len(d.MaterializedViewsRemoved) == 0 &&
-		len(d.MaterializedViewsChanged) == 0
+		len(d.MaterializedViewsChanged) == 0 &&
+		len(d.SequencesAdded) == 0 &&
+		len(d.SequencesRemoved) == 0 &&
+		len(d.SequencesChanged) == 0
 }
 
 // Summary returns a human-readable summary of the diff.
@@ -206,6 +225,15 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.MaterializedViewsChanged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d materialized view(s) changed", n))
 	}
+	if n := len(d.SequencesAdded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d sequence(s) added", n))
+	}
+	if n := len(d.SequencesRemoved); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d sequence(s) removed", n))
+	}
+	if n := len(d.SequencesChanged); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d sequence(s) changed", n))
+	}
 
 	return strings.Join(parts, ", ")
 }
@@ -221,6 +249,7 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 	diffExtensions(d, desired, actual)
 	diffViews(d, desired, actual)
 	diffMaterializedViews(d, desired, actual)
+	diffSequences(d, desired, actual)
 
 	return d
 }
@@ -1052,6 +1081,87 @@ func sliceEqual(a, b []string) bool {
 // intPtrEqual returns true if two *int pointers represent the same value.
 // nil and nil are equal; nil and non-nil are not.
 func intPtrEqual(a, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+// diffSequences matches sequences by schema-qualified name.
+func diffSequences(d *SchemaDiff, desired, actual *model.Schema) {
+	added, removed, matched := matchObjects(desired.Sequences, actual.Sequences, func(s model.Sequence) string {
+		return seqKey(&s)
+	})
+	for _, s := range added {
+		d.SequencesAdded = append(d.SequencesAdded, seqKey(&s))
+	}
+	for _, s := range removed {
+		d.SequencesRemoved = append(d.SequencesRemoved, seqKey(&s))
+	}
+	for _, p := range matched {
+		sd := diffSequence(&p.Desired, &p.Actual)
+		if sd != nil {
+			d.SequencesChanged = append(d.SequencesChanged, *sd)
+		}
+	}
+}
+
+func seqKey(s *model.Sequence) string {
+	if s.Schema == "" || s.Schema == "public" {
+		return s.Name
+	}
+	return s.Schema + "." + s.Name
+}
+
+// diffSequence compares two matched sequences and returns nil if identical.
+func diffSequence(desired, actual *model.Sequence) *SequenceDiff {
+	sd := &SequenceDiff{Name: seqKey(desired)}
+	changed := false
+
+	if !int64PtrEqual(desired.Start, actual.Start) {
+		sd.StartChanged = &[2]*int64{actual.Start, desired.Start}
+		changed = true
+	}
+	if !int64PtrEqual(desired.Increment, actual.Increment) {
+		sd.IncrementChanged = &[2]*int64{actual.Increment, desired.Increment}
+		changed = true
+	}
+	if !int64PtrEqual(desired.MinValue, actual.MinValue) {
+		sd.MinValueChanged = &[2]*int64{actual.MinValue, desired.MinValue}
+		changed = true
+	}
+	if !int64PtrEqual(desired.MaxValue, actual.MaxValue) {
+		sd.MaxValueChanged = &[2]*int64{actual.MaxValue, desired.MaxValue}
+		changed = true
+	}
+	if !int64PtrEqual(desired.Cache, actual.Cache) {
+		sd.CacheChanged = &[2]*int64{actual.Cache, desired.Cache}
+		changed = true
+	}
+	if desired.Cycle != actual.Cycle {
+		sd.CycleChanged = &[2]bool{actual.Cycle, desired.Cycle}
+		changed = true
+	}
+	if desired.OwnedBy != actual.OwnedBy {
+		sd.OwnedByChanged = &[2]string{actual.OwnedBy, desired.OwnedBy}
+		changed = true
+	}
+	if desired.Comment != actual.Comment {
+		sd.CommentChanged = &[2]string{actual.Comment, desired.Comment}
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return sd
+}
+
+// int64PtrEqual returns true if two *int64 pointers represent the same value.
+func int64PtrEqual(a, b *int64) bool {
 	if a == nil && b == nil {
 		return true
 	}
