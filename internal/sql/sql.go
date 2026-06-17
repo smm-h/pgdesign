@@ -268,6 +268,10 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	}
 	parts = append(parts, QuoteIdent(col.Name), pgType)
 
+	if col.Collation != "" {
+		parts = append(parts, fmt.Sprintf("COLLATE %s", QuoteIdent(col.Collation)))
+	}
+
 	if col.NotNull {
 		parts = append(parts, "NOT NULL")
 	}
@@ -435,6 +439,9 @@ func CreateIndex(schemaName string, index *model.Index, tableName string, idempo
 	colExprs := make([]string, len(index.Columns))
 	for i, c := range index.Columns {
 		expr := QuoteIdent(c)
+		if coll, ok := index.Collations[c]; ok && coll != "" {
+			expr += " COLLATE " + QuoteIdent(coll)
+		}
 		if oc, ok := index.Opclasses[c]; ok && oc != "" {
 			expr += " " + oc
 		}

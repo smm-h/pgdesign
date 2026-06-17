@@ -278,6 +278,22 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		}
 	}
 
+	// 10b. ALTER TABLE ALTER COLUMN SET STATISTICS
+	var statsStmts []string
+	for i := range tables {
+		t := &tables[i]
+		for _, col := range t.Columns {
+			if col.Statistics != nil {
+				qualified := sql.QualifiedName(t.Schema, t.Name)
+				statsStmts = append(statsStmts, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET STATISTICS %d;",
+					qualified, sql.QuoteIdent(col.Name), *col.Statistics))
+			}
+		}
+	}
+	if len(statsStmts) > 0 {
+		sections = append(sections, strings.Join(statsStmts, "\n"))
+	}
+
 	// 11. ALTER TABLE OWNER TO
 	var ownerStmts []string
 	for i := range tables {
