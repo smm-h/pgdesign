@@ -478,6 +478,13 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 		t.EnableRLS = true
 	}
 
+	// Resolve triggers.
+	for name, rawTrig := range rt.Triggers {
+		trig, trigDiags := resolveTrigger(name, rawTrig, rt.Name)
+		diags = append(diags, trigDiags...)
+		t.Triggers = append(t.Triggers, trig)
+	}
+
 	// Resolve append-only.
 	if rt.AppendOnly != nil && *rt.AppendOnly {
 		t.AppendOnly = true
@@ -758,6 +765,134 @@ func resolvePolicy(name string, rawPol parse.RawPolicy, tableName string) (Polic
 	}
 
 	return pol, diags
+}
+
+// resolveTrigger converts a raw trigger definition to a model Trigger with validation.
+func resolveTrigger(name string, raw parse.RawTrigger, tableName string) (Trigger, diagnostic.Diagnostics) {
+	var diags diagnostic.Diagnostics
+
+	t := Trigger{
+		Name:     name,
+		Function: raw.Function,
+		Timing:   strings.ToUpper(raw.Timing),
+		ForEach:  "ROW", // default
+	}
+
+	// Copy events, uppercased.
+	for _, ev := range raw.Events {
+		t.Events = append(t.Events, strings.ToUpper(ev))
+	}
+
+	if raw.ForEach != nil {
+		t.ForEach = strings.ToUpper(*raw.ForEach)
+	}
+	if raw.When != nil {
+		t.When = *raw.When
+	}
+	if raw.Constraint != nil {
+		t.Constraint = *raw.Constraint
+	}
+	if raw.Deferrable != nil {
+		t.Deferrable = *raw.Deferrable
+	}
+	if raw.InitiallyDeferred != nil {
+		t.InitiallyDeferred = *raw.InitiallyDeferred
+	}
+	if raw.ReferencingOld != nil {
+		t.ReferencingOld = *raw.ReferencingOld
+	}
+	if raw.ReferencingNew != nil {
+		t.ReferencingNew = *raw.ReferencingNew
+	}
+	if raw.Comment != nil {
+		t.Comment = *raw.Comment
+	}
+
+	// Validate timing.
+	validTimings := map[string]bool{
+		"BEFORE": true, "AFTER": true, "INSTEAD OF": true,
+	}
+	if t.Timing == "" {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E125",
+			Table:    tableName,
+			Message:  fmt.Sprintf("trigger %q missing required field \"timing\"", name),
+		})
+	} else if !validTimings[t.Timing] {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E125",
+			Table:    tableName,
+			Message:  fmt.Sprintf("trigger %q has invalid timing %q; must be BEFORE, AFTER, or INSTEAD OF", name, t.Timing),
+		})
+	}
+
+	// Validate events.
+	validEvents := map[string]bool{
+		"INSERT": true, "UPDATE": true, "DELETE": true, "TRUNCATE": true,
+	}
+	if len(t.Events) == 0 {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E125",
+			Table:    tableName,
+			Message:  fmt.Sprintf("trigger %q missing required field \"events\"", name),
+		})
+	}
+	for _, ev := range t.Events {
+		if !validEvents[ev] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E125",
+				Table:    tableName,
+				Message:  fmt.Sprintf("trigger %q has invalid event %q; must be INSERT, UPDATE, DELETE, or TRUNCATE", name, ev),
+			})
+		}
+	}
+
+	// Validate for_each.
+	validForEach := map[string]bool{"ROW": true, "STATEMENT": true}
+	if !validForEach[t.ForEach] {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E125",
+			Table:    tableName,
+			Message:  fmt.Sprintf("trigger %q has invalid for_each %q; must be ROW or STATEMENT", name, t.ForEach),
+		})
+	}
+
+	// Constraint triggers must be AFTER.
+	if t.Constraint && t.Timing != "AFTER" {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E126",
+			Table:    tableName,
+			Message:  fmt.Sprintf("constraint trigger %q must use timing AFTER, got %q", name, t.Timing),
+		})
+	}
+
+	// REFERENCING requires AFTER + ROW (PostgreSQL restriction).
+	if (t.ReferencingOld != "" || t.ReferencingNew != "") && (t.Timing != "AFTER" || t.ForEach != "ROW") {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E127",
+			Table:    tableName,
+			Message:  fmt.Sprintf("trigger %q uses REFERENCING but timing must be AFTER and for_each must be ROW", name),
+		})
+	}
+
+	// Function is required.
+	if t.Function == "" {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E125",
+			Table:    tableName,
+			Message:  fmt.Sprintf("trigger %q missing required field \"function\"", name),
+		})
+	}
+
+	return t, diags
 }
 
 func resolveExclusion(name string, raw parse.RawExclusion) ExclusionConstraint {
