@@ -30,6 +30,7 @@ type Schema struct {
 	Name        string     `json:"name"`
 	Extensions  []string   `json:"extensions"`
 	Enums       []Enum     `json:"enums"`
+	Domains     []Domain   `json:"domains,omitempty"`
 	Tables      []Table    `json:"tables"`
 	Views              []View              `json:"views,omitempty"`
 	MaterializedViews  []MaterializedView  `json:"materialized_views,omitempty"`
@@ -208,6 +209,18 @@ type Enum struct {
 	Name    string   `json:"name"`
 	Values  []string `json:"values"`
 	Comment string   `json:"comment,omitempty"`
+}
+
+// Domain represents a resolved PostgreSQL domain type.
+type Domain struct {
+	Name        string `json:"name"`
+	Schema      string `json:"schema,omitempty"`
+	BaseType    string `json:"base_type"`
+	NotNull     bool   `json:"not_null,omitempty"`
+	Default     string `json:"default,omitempty"`
+	DefaultExpr string `json:"default_expr,omitempty"`
+	Check       string `json:"check,omitempty"`
+	Comment     string `json:"comment,omitempty"`
 }
 
 // PartitionSpec represents partitioning configuration.
