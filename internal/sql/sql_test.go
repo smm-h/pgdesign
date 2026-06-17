@@ -1065,6 +1065,62 @@ func TestCreatePolicy_SchemaQualified(t *testing.T) {
 	}
 }
 
+func TestCreatePolicy_RestrictiveType(t *testing.T) {
+	p := model.Policy{
+		Name:      "deny_all",
+		Type:      "RESTRICTIVE",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "false",
+	}
+
+	got := CreatePolicy("app", "documents", p)
+
+	if !strings.Contains(got, "AS RESTRICTIVE") {
+		t.Errorf("expected AS RESTRICTIVE, got:\n%s", got)
+	}
+	// Verify ordering: AS RESTRICTIVE should come before FOR SELECT.
+	restrictivePos := strings.Index(got, "AS RESTRICTIVE")
+	forPos := strings.Index(got, "FOR SELECT")
+	if restrictivePos >= forPos {
+		t.Errorf("AS RESTRICTIVE should come before FOR SELECT, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_PermissiveOmitted(t *testing.T) {
+	p := model.Policy{
+		Name:      "allow_read",
+		Type:      "PERMISSIVE",
+		Operation: "SELECT",
+		Using:     "true",
+	}
+
+	got := CreatePolicy("app", "documents", p)
+
+	if strings.Contains(got, "AS PERMISSIVE") {
+		t.Errorf("should not contain AS PERMISSIVE (it's the default), got:\n%s", got)
+	}
+	if strings.Contains(got, "RESTRICTIVE") {
+		t.Errorf("should not contain RESTRICTIVE, got:\n%s", got)
+	}
+}
+
+func TestAlterTableForceRLS(t *testing.T) {
+	got := AlterTableForceRLS("app", "secrets")
+	expected := "ALTER TABLE app.secrets FORCE ROW LEVEL SECURITY;"
+	if got != expected {
+		t.Errorf("AlterTableForceRLS = %q, want %q", got, expected)
+	}
+}
+
+func TestAlterTableForceRLS_ReservedName(t *testing.T) {
+	got := AlterTableForceRLS("public", "user")
+	expected := `ALTER TABLE public."user" FORCE ROW LEVEL SECURITY;`
+	if got != expected {
+		t.Errorf("AlterTableForceRLS = %q, want %q", got, expected)
+	}
+}
+
 func TestAlterTableAddCheck_Idempotent(t *testing.T) {
 	ck := &model.CheckConstraint{
 		Name: "ck_orders_positive_amount",

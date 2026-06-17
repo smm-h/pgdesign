@@ -1091,6 +1091,130 @@ func TestRLSPolicyAllOperation(t *testing.T) {
 	}
 }
 
+func TestForceRLSGeneration(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "secrets",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "data", PGType: "text", NotNull: true},
+				},
+				PK:        []string{"id"},
+				EnableRLS: true,
+				ForceRLS:  true,
+				Policies: []model.Policy{
+					{
+						Name:      "owner_only",
+						Type:      "PERMISSIVE",
+						Operation: "SELECT",
+						Role:      "app_user",
+						Using:     "owner_id = current_user_id()",
+					},
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	// ENABLE RLS must be present.
+	if !strings.Contains(out, "ALTER TABLE app.secrets ENABLE ROW LEVEL SECURITY;") {
+		t.Errorf("expected ENABLE RLS, got:\n%s", out)
+	}
+
+	// FORCE RLS must be present.
+	if !strings.Contains(out, "ALTER TABLE app.secrets FORCE ROW LEVEL SECURITY;") {
+		t.Errorf("expected FORCE RLS, got:\n%s", out)
+	}
+
+	// Ordering: ENABLE RLS < FORCE RLS < CREATE POLICY.
+	enablePos := strings.Index(out, "ENABLE ROW LEVEL SECURITY")
+	forcePos := strings.Index(out, "FORCE ROW LEVEL SECURITY")
+	policyPos := strings.Index(out, "CREATE POLICY")
+	if enablePos < 0 || forcePos < 0 || policyPos < 0 {
+		t.Fatalf("missing RLS statements in output:\n%s", out)
+	}
+	if enablePos >= forcePos {
+		t.Errorf("ENABLE RLS should come before FORCE RLS")
+	}
+	if forcePos >= policyPos {
+		t.Errorf("FORCE RLS should come before CREATE POLICY")
+	}
+}
+
+func TestRestrictivePolicyGeneration(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "data",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+				},
+				PK:        []string{"id"},
+				EnableRLS: true,
+				Policies: []model.Policy{
+					{
+						Name:      "allow_read",
+						Type:      "PERMISSIVE",
+						Operation: "SELECT",
+						Using:     "true",
+					},
+					{
+						Name:      "deny_sensitive",
+						Type:      "RESTRICTIVE",
+						Operation: "SELECT",
+						Role:      "app_user",
+						Using:     "sensitivity_level < 5",
+					},
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	// PERMISSIVE policy should NOT have AS clause.
+	if strings.Contains(out, "AS PERMISSIVE") {
+		t.Errorf("should not contain AS PERMISSIVE, got:\n%s", out)
+	}
+
+	// RESTRICTIVE policy should have AS RESTRICTIVE.
+	if !strings.Contains(out, "deny_sensitive ON app.data AS RESTRICTIVE FOR SELECT") {
+		t.Errorf("expected AS RESTRICTIVE in deny_sensitive policy, got:\n%s", out)
+	}
+}
+
+func TestForceRLSDocOutput(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:      "secrets",
+				Schema:    "app",
+				Comment:   "Secret data",
+				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				PK:        []string{"id"},
+				EnableRLS: true,
+				ForceRLS:  true,
+			},
+		},
+	}
+
+	opts := Options{Format: "doc"}
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "enabled (forced)") {
+		t.Errorf("expected 'enabled (forced)' in doc output, got:\n%s", out)
+	}
+}
+
 func TestAppendOnlyTrigger(t *testing.T) {
 	schema := &model.Schema{
 		Name: "app",
