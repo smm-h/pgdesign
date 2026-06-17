@@ -452,7 +452,7 @@ func TestBuild_MaterializedViewIndexes(t *testing.T) {
 	}
 }
 
-func TestBuild_SemanticTypeCheckConstraints(t *testing.T) {
+func TestBuild_DomainResolution(t *testing.T) {
 	reg := semtype.NewBuiltinRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -481,46 +481,166 @@ func TestBuild_SemanticTypeCheckConstraints(t *testing.T) {
 
 	tbl := schema.Tables[0]
 
-	// Should have 3 semantic type CHECKs: slug, email, short_text (x2)
-	// Verify each by looking for the constraint name and checking the expression.
-	checksByName := make(map[string]string)
-	for _, ck := range tbl.Checks {
-		checksByName[ck.Name] = ck.Expr
+	// Semantic type CHECKs should NOT be on the table (domains carry them now).
+	if len(tbl.Checks) != 0 {
+		t.Errorf("expected 0 table CHECK constraints, got %d: %v", len(tbl.Checks), tbl.Checks)
 	}
 
-	// slug: handle ~ '^[a-z0-9-]+$'
-	if expr, ok := checksByName["chk_profiles_handle"]; !ok {
-		t.Error("missing CHECK constraint chk_profiles_handle for slug type")
-	} else if expr != "handle ~ '^[a-z0-9-]+$'" {
-		t.Errorf("chk_profiles_handle expr = %q, want %q", expr, "handle ~ '^[a-z0-9-]+$'")
-	}
-
-	// email: contact ~ '^[^@]+@[^@]+\.[^@]+$'
-	if expr, ok := checksByName["chk_profiles_contact"]; !ok {
-		t.Error("missing CHECK constraint chk_profiles_contact for email type")
-	} else if expr != "contact ~ '^[^@]+@[^@]+\\.[^@]+$'" {
-		t.Errorf("chk_profiles_contact expr = %q, want %q", expr, "contact ~ '^[^@]+@[^@]+\\.[^@]+$'")
-	}
-
-	// short_text: LENGTH(bio) <= 255
-	if expr, ok := checksByName["chk_profiles_bio"]; !ok {
-		t.Error("missing CHECK constraint chk_profiles_bio for short_text type")
-	} else if expr != "LENGTH(bio) <= 255" {
-		t.Errorf("chk_profiles_bio expr = %q, want %q", expr, "LENGTH(bio) <= 255")
-	}
-
-	// short_text: LENGTH(name) <= 255
-	if expr, ok := checksByName["chk_profiles_name"]; !ok {
-		t.Error("missing CHECK constraint chk_profiles_name for short_text type")
-	} else if expr != "LENGTH(name) <= 255" {
-		t.Errorf("chk_profiles_name expr = %q, want %q", expr, "LENGTH(name) <= 255")
-	}
-
-	// Types without checks (id, ref, timestamp, etc.) should NOT generate CHECK constraints.
-	for _, ck := range tbl.Checks {
-		if ck.Name == "chk_profiles_id" {
-			t.Error("id type should not produce a CHECK constraint")
+	// Columns should use domain names as PGType.
+	findCol := func(name string) *Column {
+		for i := range tbl.Columns {
+			if tbl.Columns[i].Name == name {
+				return &tbl.Columns[i]
+			}
 		}
+		return nil
+	}
+
+	if col := findCol("id"); col == nil {
+		t.Fatal("id column not found")
+	} else if col.PGType != "uuid" {
+		t.Errorf("id.PGType = %q, want %q", col.PGType, "uuid")
+	}
+
+	if col := findCol("handle"); col == nil {
+		t.Fatal("handle column not found")
+	} else if col.PGType != "slug" {
+		t.Errorf("handle.PGType = %q, want %q", col.PGType, "slug")
+	}
+
+	if col := findCol("contact"); col == nil {
+		t.Fatal("contact column not found")
+	} else if col.PGType != "email" {
+		t.Errorf("contact.PGType = %q, want %q", col.PGType, "email")
+	}
+
+	if col := findCol("bio"); col == nil {
+		t.Fatal("bio column not found")
+	} else if col.PGType != "short_text" {
+		t.Errorf("bio.PGType = %q, want %q", col.PGType, "short_text")
+	}
+
+	if col := findCol("name"); col == nil {
+		t.Fatal("name column not found")
+	} else if col.PGType != "short_text" {
+		t.Errorf("name.PGType = %q, want %q", col.PGType, "short_text")
+	}
+
+	// Domains should be built for slug, email, short_text (3 unique types).
+	if len(schema.Domains) != 3 {
+		t.Fatalf("expected 3 domains, got %d", len(schema.Domains))
+	}
+
+	domainsByName := make(map[string]Domain)
+	for _, d := range schema.Domains {
+		domainsByName[d.Name] = d
+	}
+
+	// slug domain.
+	if d, ok := domainsByName["slug"]; !ok {
+		t.Error("missing domain for slug")
+	} else {
+		if d.BaseType != "text" {
+			t.Errorf("slug domain BaseType = %q, want %q", d.BaseType, "text")
+		}
+		if d.Check != "VALUE ~ '^[a-z0-9-]+$'" {
+			t.Errorf("slug domain Check = %q, want %q", d.Check, "VALUE ~ '^[a-z0-9-]+$'")
+		}
+		if d.Schema != "public" {
+			t.Errorf("slug domain Schema = %q, want %q", d.Schema, "public")
+		}
+	}
+
+	// email domain.
+	if d, ok := domainsByName["email"]; !ok {
+		t.Error("missing domain for email")
+	} else {
+		if d.BaseType != "text" {
+			t.Errorf("email domain BaseType = %q, want %q", d.BaseType, "text")
+		}
+		if d.Check != "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'" {
+			t.Errorf("email domain Check = %q, want %q", d.Check, "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'")
+		}
+	}
+
+	// short_text domain (only one, despite two columns using it).
+	if d, ok := domainsByName["short_text"]; !ok {
+		t.Error("missing domain for short_text")
+	} else {
+		if d.BaseType != "text" {
+			t.Errorf("short_text domain BaseType = %q, want %q", d.BaseType, "text")
+		}
+		if d.Check != "LENGTH(VALUE) <= 255" {
+			t.Errorf("short_text domain Check = %q, want %q", d.Check, "LENGTH(VALUE) <= 255")
+		}
+	}
+
+	// Types without checks (id, ref, timestamp, etc.) should NOT produce domains.
+	for _, d := range schema.Domains {
+		if d.Name == "id" || d.Name == "uuid" {
+			t.Errorf("id/uuid type should not produce a domain, got domain %q", d.Name)
+		}
+	}
+}
+
+func TestBuild_DomainResolution_ExplicitChecksPreserved(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{
+				Name: "products",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "name", Type: "short_text"},
+					{Name: "price", Type: "money"},
+				},
+				Checks: map[string]parse.RawCheck{
+					"ck_products_positive_price": {Expr: "price > 0"},
+				},
+			},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	tbl := schema.Tables[0]
+
+	// Explicit check from TOML should be preserved.
+	if len(tbl.Checks) != 1 {
+		t.Fatalf("expected 1 explicit CHECK constraint, got %d: %v", len(tbl.Checks), tbl.Checks)
+	}
+	if tbl.Checks[0].Name != "ck_products_positive_price" {
+		t.Errorf("check name = %q, want %q", tbl.Checks[0].Name, "ck_products_positive_price")
+	}
+	if tbl.Checks[0].Expr != "price > 0" {
+		t.Errorf("check expr = %q, want %q", tbl.Checks[0].Expr, "price > 0")
+	}
+
+	// name column should use short_text domain (has CHECK).
+	var nameCol *Column
+	for i := range tbl.Columns {
+		if tbl.Columns[i].Name == "name" {
+			nameCol = &tbl.Columns[i]
+			break
+		}
+	}
+	if nameCol == nil {
+		t.Fatal("name column not found")
+	}
+	if nameCol.PGType != "short_text" {
+		t.Errorf("name.PGType = %q, want %q", nameCol.PGType, "short_text")
+	}
+
+	// Domain should be created for short_text.
+	if len(schema.Domains) != 1 {
+		t.Fatalf("expected 1 domain (short_text), got %d", len(schema.Domains))
+	}
+	if schema.Domains[0].Name != "short_text" {
+		t.Errorf("domain name = %q, want %q", schema.Domains[0].Name, "short_text")
 	}
 }
 
