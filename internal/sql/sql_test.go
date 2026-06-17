@@ -1464,6 +1464,89 @@ func TestCreateDomain(t *testing.T) {
 	}
 }
 
+func TestCreateCompositeType(t *testing.T) {
+	ct := model.CompositeType{
+		Name:   "address",
+		Schema: "public",
+		Fields: []model.CompositeField{
+			{Name: "city", PGType: "text"},
+			{Name: "state", PGType: "text"},
+			{Name: "street", PGType: "text"},
+			{Name: "zip", PGType: "text"},
+		},
+	}
+	got := CreateCompositeType("public", ct)
+	if !strings.Contains(got, "CREATE TYPE") {
+		t.Errorf("missing CREATE TYPE: %s", got)
+	}
+	if !strings.Contains(got, "AS (") {
+		t.Errorf("missing AS (: %s", got)
+	}
+	if !strings.Contains(got, "city text") {
+		t.Errorf("missing field definition: %s", got)
+	}
+	// Verify all fields are present.
+	for _, f := range ct.Fields {
+		if !strings.Contains(got, f.Name+" "+f.PGType) {
+			t.Errorf("missing field %q: %s", f.Name, got)
+		}
+	}
+	// Verify schema qualification.
+	if !strings.Contains(got, "public.address") {
+		t.Errorf("missing schema-qualified name: %s", got)
+	}
+}
+
+func TestCreateCompositeType_ReservedFieldName(t *testing.T) {
+	ct := model.CompositeType{
+		Name:   "meta",
+		Schema: "app",
+		Fields: []model.CompositeField{
+			{Name: "user", PGType: "text"},
+			{Name: "value", PGType: "integer"},
+		},
+	}
+	got := CreateCompositeType("app", ct)
+	// "user" is a reserved word and should be quoted.
+	if !strings.Contains(got, `"user" text`) {
+		t.Errorf("reserved field name should be quoted: %s", got)
+	}
+}
+
+func TestDropCompositeType(t *testing.T) {
+	tests := []struct {
+		name    string
+		schema  string
+		typName string
+		cascade bool
+		want    string
+	}{
+		{
+			name:    "without_cascade",
+			schema:  "public",
+			typName: "address",
+			cascade: false,
+			want:    "DROP TYPE public.address;",
+		},
+		{
+			name:    "with_cascade",
+			schema:  "app",
+			typName: "point3d",
+			cascade: true,
+			want:    "DROP TYPE app.point3d CASCADE;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := DropCompositeType(tt.schema, tt.typName, tt.cascade)
+			if got != tt.want {
+				t.Errorf("DropCompositeType() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDropDomain(t *testing.T) {
 	tests := []struct {
 		name    string

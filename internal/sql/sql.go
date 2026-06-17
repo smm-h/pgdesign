@@ -201,6 +201,30 @@ func CreateDomain(schemaName string, d model.Domain) string {
 	return sb.String()
 }
 
+// CreateCompositeType generates a CREATE TYPE ... AS statement for a composite type.
+// Emits: CREATE TYPE [schema.]name AS (field1 type1, field2 type2, ...)
+func CreateCompositeType(schemaName string, ct model.CompositeType) string {
+	qualified := QualifiedName(schemaName, ct.Name)
+
+	fieldDefs := make([]string, len(ct.Fields))
+	for i, f := range ct.Fields {
+		fieldDefs[i] = fmt.Sprintf("%s %s", QuoteIdent(f.Name), f.PGType)
+	}
+
+	return fmt.Sprintf("CREATE TYPE %s AS (\n    %s\n);",
+		qualified, strings.Join(fieldDefs, ",\n    "))
+}
+
+// DropCompositeType generates a DROP TYPE statement for a composite type.
+func DropCompositeType(schemaName, name string, cascade bool) string {
+	qualified := QualifiedName(schemaName, name)
+	cascadeStr := ""
+	if cascade {
+		cascadeStr = " CASCADE"
+	}
+	return fmt.Sprintf("DROP TYPE %s%s;", qualified, cascadeStr)
+}
+
 // DropDomain generates a DROP DOMAIN statement.
 func DropDomain(schemaName, name string, cascade bool) string {
 	qualified := QualifiedName(schemaName, name)

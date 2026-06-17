@@ -60,6 +60,11 @@ func generateJSON(schema *model.Schema) (string, error) {
 	sort.Slice(s.Domains, func(i, j int) bool {
 		return s.Domains[i].Name < s.Domains[j].Name
 	})
+	s.CompositeTypes = make([]model.CompositeType, len(schema.CompositeTypes))
+	copy(s.CompositeTypes, schema.CompositeTypes)
+	sort.Slice(s.CompositeTypes, func(i, j int) bool {
+		return s.CompositeTypes[i].Name < s.CompositeTypes[j].Name
+	})
 	s.Sequences = make([]model.Sequence, len(schema.Sequences))
 	copy(s.Sequences, schema.Sequences)
 	sort.Slice(s.Sequences, func(i, j int) bool {
@@ -106,6 +111,12 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 				schemaStmts = append(schemaStmts, sql.CreateSchema(e.Schema, opts.Idempotent))
 			}
 		}
+		for _, ct := range schema.CompositeTypes {
+			if ct.Schema != "" && !seen[ct.Schema] {
+				seen[ct.Schema] = true
+				schemaStmts = append(schemaStmts, sql.CreateSchema(ct.Schema, opts.Idempotent))
+			}
+		}
 		if len(schemaStmts) > 0 {
 			sections = append(sections, strings.Join(schemaStmts, "\n"))
 		}
@@ -145,6 +156,15 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			domainStmts = append(domainStmts, sql.CreateDomain(d.Schema, d))
 		}
 		sections = append(sections, strings.Join(domainStmts, "\n"))
+	}
+
+	// 3c. CREATE TYPE AS (composite types)
+	if len(schema.CompositeTypes) > 0 {
+		var ctStmts []string
+		for _, ct := range schema.CompositeTypes {
+			ctStmts = append(ctStmts, sql.CreateCompositeType(ct.Schema, ct))
+		}
+		sections = append(sections, strings.Join(ctStmts, "\n"))
 	}
 
 	tables := schema.TableOrder()
