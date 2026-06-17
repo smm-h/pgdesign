@@ -98,6 +98,9 @@ const (
 	OpCreateFunction          OpType = "create_function"
 	OpDropFunction            OpType = "drop_function"
 	OpCreateOrReplaceFunction OpType = "create_or_replace_function"
+
+	OpCreateTrigger OpType = "create_trigger"
+	OpDropTrigger   OpType = "drop_trigger"
 )
 
 // OpContext provides context about the operation environment for risk assessment.
@@ -437,6 +440,20 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			RiskLevel:  Safe,
 			LockType:   LockNone,
 			Reversible: true,
+		}
+
+	case OpCreateTrigger:
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockShareRowExclusive,
+			Reversible: true,
+		}
+
+	case OpDropTrigger:
+		return Classification{
+			RiskLevel:  Caution,
+			LockType:   LockShareRowExclusive,
+			Reversible: false,
 		}
 
 	default:
