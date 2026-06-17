@@ -6,6 +6,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
+	"github.com/smm-h/pgdesign/internal/fd"
 	"github.com/smm-h/pgdesign/internal/model"
 )
 
@@ -2021,6 +2022,511 @@ func TestW012_NoPolicies_NoDiag(t *testing.T) {
 	for _, d := range diags {
 		if d.Code == "W012" {
 			t.Fatalf("unexpected W012 when no policies exist (W011 handles this case): %v", d)
+		}
+	}
+}
+
+// --- W013: CASCADE depth exceeds threshold ---
+
+func TestW013_CascadeDepthExceedsThreshold(t *testing.T) {
+	// Chain: a -> b -> c -> d -> e, all CASCADE. CascadeDepth(a) = 4 > 3.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{Name: "a", Schema: "public", Comment: "A", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "b_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "b", Schema: "public", Comment: "B", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "c_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "c", Schema: "public", Comment: "C", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "d_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "d", Schema: "public", Comment: "D", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "e_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_e", Columns: []string{"e_id"}, RefSchema: "public", RefTable: "e", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "e", Schema: "public", Comment: "E", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+		},
+	}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W013")
+	if len(found) == 0 {
+		t.Fatal("expected W013 for cascade depth > 3")
+	}
+	foundA := false
+	for _, d := range found {
+		if d.Table == "a" {
+			foundA = true
+			if !strings.Contains(d.Message, "4") {
+				t.Errorf("expected depth 4 in message, got: %s", d.Message)
+			}
+		}
+	}
+	if !foundA {
+		t.Error("expected W013 on table 'a'")
+	}
+}
+
+func TestW013_CascadeDepthAtThreshold_NoDiag(t *testing.T) {
+	// Chain: a -> b -> c -> d, all CASCADE. CascadeDepth(a) = 3 = threshold. No trigger.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{Name: "a", Schema: "public", Comment: "A", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "b_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "b", Schema: "public", Comment: "B", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "c_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "c", Schema: "public", Comment: "C", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "d_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "d", Schema: "public", Comment: "D", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+		},
+	}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W013" && d.Table == "a" {
+			t.Fatalf("unexpected W013 for table 'a' when cascade depth equals threshold: %v", d)
+		}
+	}
+}
+
+// --- W014: CASCADE breadth exceeds threshold ---
+
+func TestW014_CascadeBreadthExceedsThreshold(t *testing.T) {
+	// Table "hub" has CASCADE FKs to 5 leaf tables. CascadeBreadth(hub) = 5 >= 5.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{Name: "hub", Schema: "public", Comment: "Hub", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "a_id", PGType: "uuid", NotNull: true},
+					{Name: "b_id", PGType: "uuid", NotNull: true},
+					{Name: "c_id", PGType: "uuid", NotNull: true},
+					{Name: "d_id", PGType: "uuid", NotNull: true},
+					{Name: "e_id", PGType: "uuid", NotNull: true},
+				},
+				FKs: []model.FK{
+					{Name: "fk_a", Columns: []string{"a_id"}, RefSchema: "public", RefTable: "leaf_a", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+					{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "leaf_b", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+					{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "leaf_c", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+					{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "leaf_d", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+					{Name: "fk_e", Columns: []string{"e_id"}, RefSchema: "public", RefTable: "leaf_e", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				}},
+			{Name: "leaf_a", Schema: "public", Comment: "A", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "leaf_b", Schema: "public", Comment: "B", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "leaf_c", Schema: "public", Comment: "C", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "leaf_d", Schema: "public", Comment: "D", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "leaf_e", Schema: "public", Comment: "E", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+		},
+	}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W014")
+	if len(found) == 0 {
+		t.Fatal("expected W014 for cascade breadth >= 5")
+	}
+	foundHub := false
+	for _, d := range found {
+		if d.Table == "hub" {
+			foundHub = true
+		}
+	}
+	if !foundHub {
+		t.Error("expected W014 on table 'hub'")
+	}
+}
+
+func TestW014_CascadeBreadthBelowThreshold_NoDiag(t *testing.T) {
+	// Table "hub" cascades to 3 leaf tables. CascadeBreadth(hub) = 3 < 5. No trigger.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{Name: "hub", Schema: "public", Comment: "Hub", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "a_id", PGType: "uuid", NotNull: true},
+					{Name: "b_id", PGType: "uuid", NotNull: true},
+					{Name: "c_id", PGType: "uuid", NotNull: true},
+				},
+				FKs: []model.FK{
+					{Name: "fk_a", Columns: []string{"a_id"}, RefSchema: "public", RefTable: "leaf_a", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+					{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "leaf_b", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+					{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "leaf_c", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				}},
+			{Name: "leaf_a", Schema: "public", Comment: "A", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "leaf_b", Schema: "public", Comment: "B", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "leaf_c", Schema: "public", Comment: "C", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+		},
+	}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W014" && d.Table == "hub" {
+			t.Fatalf("unexpected W014 for table 'hub' with breadth 3 < 5: %v", d)
+		}
+	}
+}
+
+// --- W015: Mixed ON DELETE actions ---
+
+func TestW015_MixedOnDeleteActions(t *testing.T) {
+	// Table "target" referenced by two FKs with different ON DELETE actions.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{Name: "target", Schema: "public", Comment: "Target", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "child_a", Schema: "public", Comment: "Child A", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "target_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "child_b", Schema: "public", Comment: "Child B", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "target_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "RESTRICT"}}},
+		},
+	}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W015")
+	if len(found) == 0 {
+		t.Fatal("expected W015 for mixed ON DELETE actions on table 'target'")
+	}
+	if found[0].Table != "target" {
+		t.Errorf("expected W015 on table 'target', got %q", found[0].Table)
+	}
+	if !strings.Contains(found[0].Message, "CASCADE") || !strings.Contains(found[0].Message, "RESTRICT") {
+		t.Errorf("expected message to mention both CASCADE and RESTRICT, got: %s", found[0].Message)
+	}
+}
+
+func TestW015_ConsistentOnDelete_NoDiag(t *testing.T) {
+	// All incoming FKs to "target" use CASCADE. No W015.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{Name: "target", Schema: "public", Comment: "Target", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "child_a", Schema: "public", Comment: "Child A", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "target_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "child_b", Schema: "public", Comment: "Child B", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "target_id", PGType: "uuid", NotNull: true}},
+				FKs: []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+		},
+	}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W015" && d.Table == "target" {
+			t.Fatalf("unexpected W015 when all incoming FKs use CASCADE: %v", d)
+		}
+	}
+}
+
+// --- I001: Natural key candidate ---
+
+func TestI001_NaturalKeyCandidate(t *testing.T) {
+	// Table with PK [id] and FDs declaring [email] as a candidate key.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "users", Schema: "public", Comment: "Users", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email"},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+				Dependencies: []fd.FuncDep{
+					{Determinant: []string{"id"}, Dependent: []string{"email", "name"}, Source: "declared"},
+					{Determinant: []string{"email"}, Dependent: []string{"id", "name"}, Source: "declared"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "I001")
+	if len(found) == 0 {
+		t.Fatal("expected I001 for natural key candidate [email]")
+	}
+	if !strings.Contains(found[0].Message, "email") {
+		t.Errorf("expected I001 message to mention email, got: %s", found[0].Message)
+	}
+	if found[0].Severity != diagnostic.Info {
+		t.Errorf("expected Info severity, got %v", found[0].Severity)
+	}
+}
+
+func TestI001_OnlySurrogateKeys_NoDiag(t *testing.T) {
+	// All candidate keys contain surrogate columns (id/auto_id/ref). No I001.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
+					{Name: "ref_code", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+				Dependencies: []fd.FuncDep{
+					{Determinant: []string{"id"}, Dependent: []string{"ref_code", "name"}, Source: "declared"},
+					{Determinant: []string{"ref_code"}, Dependent: []string{"id", "name"}, Source: "declared"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "I001" {
+			t.Fatalf("unexpected I001 when all candidate keys contain surrogate columns: %v", d)
+		}
+	}
+}
+
+func TestI001_NoDependencies_NoDiag(t *testing.T) {
+	// Table has no declared functional dependencies. No I001.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "simple", Schema: "public", Comment: "Simple", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "I001" {
+			t.Fatalf("unexpected I001 when no dependencies declared: %v", d)
+		}
+	}
+}
+
+// --- W016: PK subsumes UNIQUE ---
+
+func TestW016_PKSubsumesUnique(t *testing.T) {
+	// UNIQUE constraint on [id] which is already the PK.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "docs", Schema: "public", Comment: "Docs", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "title", PGType: "text", NotNull: true},
+				},
+				Uniques: []model.UniqueConstraint{
+					{Name: "uq_id", Columns: []string{"id"}},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W016")
+	if len(found) == 0 {
+		t.Fatal("expected W016 for UNIQUE on PK columns")
+	}
+	if found[0].Table != "docs" {
+		t.Errorf("expected W016 on table 'docs', got %q", found[0].Table)
+	}
+	if !strings.Contains(found[0].Message, "uq_id") {
+		t.Errorf("expected message to mention constraint name 'uq_id', got: %s", found[0].Message)
+	}
+}
+
+func TestW016_UniqueOnDifferentColumns_NoDiag(t *testing.T) {
+	// UNIQUE on [email] while PK is [id]. No W016.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "users", Schema: "public", Comment: "Users", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true},
+				},
+				Uniques: []model.UniqueConstraint{
+					{Name: "uq_email", Columns: []string{"email"}},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W016" {
+			t.Fatalf("unexpected W016 when UNIQUE is on different columns than PK: %v", d)
+		}
+	}
+}
+
+// --- W017: Redundant IS NOT NULL CHECK ---
+
+func TestW017_RedundantIsNotNullCheck(t *testing.T) {
+	// Column "name" is NOT NULL with CHECK "name IS NOT NULL".
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_name_not_null", Expr: "name IS NOT NULL"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W017")
+	if len(found) == 0 {
+		t.Fatal("expected W017 for redundant IS NOT NULL CHECK on NOT NULL column")
+	}
+	if !strings.Contains(found[0].Message, "name") {
+		t.Errorf("expected message to mention column 'name', got: %s", found[0].Message)
+	}
+}
+
+func TestW017_NullableColumn_NoDiag(t *testing.T) {
+	// Column "name" is nullable, so CHECK "name IS NOT NULL" is not redundant.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "name", PGType: "text", NotNull: false},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_name_not_null", Expr: "name IS NOT NULL"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W017" {
+			t.Fatalf("unexpected W017 when column is nullable: %v", d)
+		}
+	}
+}
+
+// --- W018: Domain CHECK duplicate ---
+
+func TestW018_DomainCheckDuplicate(t *testing.T) {
+	// Domain "email_type" has CHECK "VALUE ~ '^.+@.+$'".
+	// Column of semantic type "email_type" has column-level CHECK with same expression.
+	schema := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "email_type", BaseType: "text", Check: "VALUE ~ '^.+@.+$'"},
+		},
+		Tables: []model.Table{
+			{
+				Name: "users", Schema: "public", Comment: "Users", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email_type"},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_email", Expr: "email ~ '^.+@.+$'"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W018")
+	if len(found) == 0 {
+		t.Fatal("expected W018 for column CHECK identical to domain CHECK")
+	}
+	if !strings.Contains(found[0].Message, "email") {
+		t.Errorf("expected message to mention column 'email', got: %s", found[0].Message)
+	}
+	if !strings.Contains(found[0].Message, "email_type") {
+		t.Errorf("expected message to mention domain 'email_type', got: %s", found[0].Message)
+	}
+}
+
+func TestW018_DifferentCheck_NoDiag(t *testing.T) {
+	// Domain CHECK and column CHECK differ. No W018.
+	schema := &model.Schema{
+		Domains: []model.Domain{
+			{Name: "email_type", BaseType: "text", Check: "VALUE ~ '^.+@.+$'"},
+		},
+		Tables: []model.Table{
+			{
+				Name: "users", Schema: "public", Comment: "Users", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email_type"},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_email_len", Expr: "length(email) > 5"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W018" {
+			t.Fatalf("unexpected W018 when domain and column CHECKs differ: %v", d)
+		}
+	}
+}
+
+// --- W019: Range CHECK subsumption ---
+
+func TestW019_RangeSubsumption(t *testing.T) {
+	// Two CHECKs on same column: [0,200] subsumes [1,50]. The narrower is reported redundant.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "people", Schema: "public", Comment: "People", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "age", PGType: "integer", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_age_wide", Expr: "age >= 0 AND age <= 200"},
+					{Name: "chk_age_narrow", Expr: "age >= 1 AND age <= 50"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W019")
+	if len(found) == 0 {
+		t.Fatal("expected W019 for range subsumption")
+	}
+	// The wider range [0,200] subsumes the narrower [1,50], so chk_age_narrow is reported redundant.
+	if !strings.Contains(found[0].Message, "chk_age_narrow") {
+		t.Errorf("expected message to mention 'chk_age_narrow' as redundant, got: %s", found[0].Message)
+	}
+	if !strings.Contains(found[0].Message, "chk_age_wide") {
+		t.Errorf("expected message to mention 'chk_age_wide' as the subsumer, got: %s", found[0].Message)
+	}
+}
+
+func TestW019_NoOverlap_NoDiag(t *testing.T) {
+	// CHECKs on different columns. No subsumption possible.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "products", Schema: "public", Comment: "Products", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "price", PGType: "numeric", NotNull: true},
+					{Name: "quantity", PGType: "integer", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_price", Expr: "price >= 0"},
+					{Name: "chk_qty", Expr: "quantity >= 0"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W019" {
+			t.Fatalf("unexpected W019 when CHECKs are on different columns: %v", d)
 		}
 	}
 }
