@@ -53,10 +53,11 @@ type tomlDDL struct {
 }
 
 type tomlDML struct {
-	Op    string    `toml:"op"`
-	Phase string    `toml:"phase,omitempty"`
-	SQL  string    `toml:"sql"`
-	Down *tomlDown `toml:"down,omitempty"`
+	Op        string    `toml:"op"`
+	Phase     string    `toml:"phase,omitempty"`
+	SQL       string    `toml:"sql"`
+	BatchSize int       `toml:"batch_size,omitempty"`
+	Down      *tomlDown `toml:"down,omitempty"`
 }
 
 type tomlDown struct {
@@ -102,9 +103,10 @@ func ParseMigration(data string) (*Migration, error) {
 
 	for _, td := range tm.DML {
 		op := DMLOp{
-			Op:    td.Op,
-			Phase: td.Phase,
-			SQL:   td.SQL,
+			Op:        td.Op,
+			Phase:     td.Phase,
+			SQL:       td.SQL,
+			BatchSize: td.BatchSize,
 		}
 		if td.Down != nil {
 			op.Down = convertTomlDown(td.Down)
@@ -420,6 +422,9 @@ func writeDMLOp(b *strings.Builder, op *DMLOp) {
 		b.WriteString(fmt.Sprintf("phase = %q\n", op.Phase))
 	}
 	b.WriteString(fmt.Sprintf("sql = %q\n", op.SQL))
+	if op.BatchSize > 0 {
+		b.WriteString(fmt.Sprintf("batch_size = %d\n", op.BatchSize))
+	}
 	if op.Down != nil {
 		writeDownOp(b, op.Down)
 	}
