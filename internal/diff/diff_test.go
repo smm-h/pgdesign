@@ -2320,3 +2320,146 @@ func TestIndexCollationUnchanged(t *testing.T) {
 		t.Errorf("expected empty diff when index collation is unchanged, got: %s", d.Summary())
 	}
 }
+
+func TestDiff_ExclusionAdded(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Comment: "Room bookings",
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "room_id", PGType: "integer", NotNull: true},
+				{Name: "during", PGType: "tsrange", NotNull: true},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "room_id", Operator: "="},
+					{Column: "during", Operator: "&&"},
+				},
+			}},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Comment: "Room bookings",
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "room_id", PGType: "integer", NotNull: true},
+				{Name: "during", PGType: "tsrange", NotNull: true},
+			},
+		}},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table change, got %d", len(d.TablesChanged))
+	}
+	td := d.TablesChanged[0]
+	if len(td.ExclusionsAdded) != 1 {
+		t.Fatalf("expected 1 exclusion added, got %d", len(td.ExclusionsAdded))
+	}
+	if td.ExclusionsAdded[0].Name != "no_overlap" {
+		t.Errorf("expected exclusion name 'no_overlap', got %q", td.ExclusionsAdded[0].Name)
+	}
+}
+
+func TestDiff_ExclusionRemoved(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Comment: "Room bookings",
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "room_id", PGType: "integer", NotNull: true},
+				{Name: "during", PGType: "tsrange", NotNull: true},
+			},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Comment: "Room bookings",
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "room_id", PGType: "integer", NotNull: true},
+				{Name: "during", PGType: "tsrange", NotNull: true},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "room_id", Operator: "="},
+					{Column: "during", Operator: "&&"},
+				},
+			}},
+		}},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	td := d.TablesChanged[0]
+	if len(td.ExclusionsRemoved) != 1 {
+		t.Fatalf("expected 1 exclusion removed, got %d", len(td.ExclusionsRemoved))
+	}
+	if td.ExclusionsRemoved[0] != "no_overlap" {
+		t.Errorf("expected exclusion name 'no_overlap', got %q", td.ExclusionsRemoved[0])
+	}
+}
+
+func TestDiff_ExclusionChanged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Comment: "Room bookings",
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "room_id", PGType: "integer", NotNull: true},
+				{Name: "during", PGType: "tsrange", NotNull: true},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "during", Operator: "&&"},
+				},
+			}},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Comment: "Room bookings",
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "room_id", PGType: "integer", NotNull: true},
+				{Name: "during", PGType: "tsrange", NotNull: true},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "room_id", Operator: "="},
+					{Column: "during", Operator: "&&"},
+				},
+			}},
+		}},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("expected non-empty diff")
+	}
+	td := d.TablesChanged[0]
+	// Changed = removed old + added new
+	if len(td.ExclusionsRemoved) != 1 {
+		t.Fatalf("expected 1 exclusion removed (old version), got %d", len(td.ExclusionsRemoved))
+	}
+	if len(td.ExclusionsAdded) != 1 {
+		t.Fatalf("expected 1 exclusion added (new version), got %d", len(td.ExclusionsAdded))
+	}
+}
