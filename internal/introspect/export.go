@@ -78,6 +78,45 @@ func Export(schema *model.Schema) ([]byte, error) {
 		}
 	}
 
+	// [types.*] for domains
+	for _, dom := range schema.Domains {
+		path := "types." + dom.Name
+		if err := doc.NewTable(path); err != nil {
+			return nil, fmt.Errorf("create type %s: %w", dom.Name, err)
+		}
+		if err := doc.SetCreate(path+".kind", "scalar"); err != nil {
+			return nil, fmt.Errorf("set %s.kind: %w", path, err)
+		}
+		if err := doc.SetCreate(path+".base_type", dom.BaseType); err != nil {
+			return nil, fmt.Errorf("set %s.base_type: %w", path, err)
+		}
+		if dom.Check != "" {
+			if err := doc.SetCreate(path+".check", dom.Check); err != nil {
+				return nil, fmt.Errorf("set %s.check: %w", path, err)
+			}
+		}
+		if dom.Default != "" {
+			if err := doc.SetCreate(path+".default", dom.Default); err != nil {
+				return nil, fmt.Errorf("set %s.default: %w", path, err)
+			}
+		}
+		if dom.DefaultExpr != "" {
+			if err := doc.SetCreate(path+".default_expr", dom.DefaultExpr); err != nil {
+				return nil, fmt.Errorf("set %s.default_expr: %w", path, err)
+			}
+		}
+		if dom.NotNull {
+			if err := doc.SetCreate(path+".not_null", true); err != nil {
+				return nil, fmt.Errorf("set %s.not_null: %w", path, err)
+			}
+		}
+		if dom.Comment != "" {
+			if err := doc.SetCreate(path+".comment", dom.Comment); err != nil {
+				return nil, fmt.Errorf("set %s.comment: %w", path, err)
+			}
+		}
+	}
+
 	// [tables.*]
 	for _, t := range schema.Tables {
 		tblPath := "tables." + t.Name

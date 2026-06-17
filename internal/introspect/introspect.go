@@ -70,6 +70,15 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		schema.CompositeTypes = append(schema.CompositeTypes, cts...)
 	}
 
+	// Extract domains from all requested schemas.
+	for _, sn := range schemaNames {
+		domains, err := queryDomains(ctx, conn, sn)
+		if err != nil {
+			return nil, nil, fmt.Errorf("domains for schema %q: %w", sn, err)
+		}
+		schema.Domains = append(schema.Domains, domains...)
+	}
+
 	// Extract tables from all requested schemas.
 	for _, sn := range schemaNames {
 		tables, tableDiags, err := queryTables(ctx, conn, sn, pgVersion)
@@ -247,6 +256,67 @@ func queryCompositeTypes(ctx context.Context, conn *pgx.Conn, schemaName string)
 		cts = append(cts, ct)
 	}
 	return cts, rows.Err()
+}
+
+// queryDomains returns user-defined domain types in the given schema.
+func queryDomains(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.Domain, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT t.typname,
+		       format_type(t.typbasetype, t.typtypmod) AS base_type,
+		       t.typnotnull,
+		       pg_get_expr(t.typdefaultbin, 0) AS default_expr,
+		       t.typdefault,
+		       (SELECT pg_get_constraintdef(c.oid)
+		        FROM pg_constraint c
+		        WHERE c.contypid = t.oid
+		          AND c.contype = 'c'
+		        LIMIT 1) AS check_def,
+		       d.description
+		FROM pg_type t
+		JOIN pg_namespace n ON t.typnamespace = n.oid
+		LEFT JOIN pg_description d ON d.objoid = t.oid
+		WHERE t.typtype = 'd'
+		  AND n.nspname = $1
+		ORDER BY t.typname
+	`, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var domains []model.Domain
+	for rows.Next() {
+		var name, baseType string
+		var notNull bool
+		var defaultExpr, defaultLit, checkDef, comment *string
+		if err := rows.Scan(&name, &baseType, &notNull, &defaultExpr, &defaultLit, &checkDef, &comment); err != nil {
+			return nil, err
+		}
+		dom := model.Domain{
+			Name:     name,
+			Schema:   schemaName,
+			BaseType: baseType,
+			NotNull:  notNull,
+		}
+		if defaultExpr != nil && *defaultExpr != "" {
+			dom.DefaultExpr = *defaultExpr
+		} else if defaultLit != nil && *defaultLit != "" {
+			dom.Default = *defaultLit
+		}
+		if checkDef != nil && *checkDef != "" {
+			// pg_get_constraintdef returns "CHECK (expr)", strip the wrapper.
+			check := *checkDef
+			if len(check) > 7 && check[:6] == "CHECK " {
+				check = check[7 : len(check)-1] // Remove "CHECK (" prefix and ")" suffix
+			}
+			dom.Check = check
+		}
+		if comment != nil {
+			dom.Comment = *comment
+		}
+		domains = append(domains, dom)
+	}
+	return domains, rows.Err()
 }
 
 // queryTables returns all tables (regular + partitioned) in the given schema.
