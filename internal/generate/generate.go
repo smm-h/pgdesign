@@ -79,6 +79,7 @@ func generateJSON(schema *model.Schema) (string, error) {
 		s.Tables[i].Checks = sortedChecks(s.Tables[i].Checks)
 		s.Tables[i].Exclusions = sortedExclusions(s.Tables[i].Exclusions)
 		s.Tables[i].Policies = sortedPolicies(s.Tables[i].Policies)
+		s.Tables[i].Triggers = sortedTriggers(s.Tables[i].Triggers)
 	}
 	s.Functions = make([]model.Function, len(schema.Functions))
 	copy(s.Functions, schema.Functions)
@@ -518,6 +519,19 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		}
 	}
 
+	// 17. CREATE TRIGGER (user-defined triggers)
+	var triggerStmts []string
+	for i := range tables {
+		t := &tables[i]
+		triggers := sortedTriggers(t.Triggers)
+		for _, trig := range triggers {
+			triggerStmts = append(triggerStmts, sql.CreateTrigger(t.Schema, t.Name, trig))
+		}
+	}
+	if len(triggerStmts) > 0 {
+		sections = append(sections, strings.Join(triggerStmts, "\n"))
+	}
+
 	return strings.Join(sections, "\n\n") + "\n", diags
 }
 
@@ -575,6 +589,16 @@ func sortedIndexes(idxs []model.Index) []model.Index {
 func sortedPolicies(pols []model.Policy) []model.Policy {
 	result := make([]model.Policy, len(pols))
 	copy(result, pols)
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+// sortedTriggers returns triggers sorted alphabetically by name.
+func sortedTriggers(trigs []model.Trigger) []model.Trigger {
+	result := make([]model.Trigger, len(trigs))
+	copy(result, trigs)
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Name < result[j].Name
 	})
