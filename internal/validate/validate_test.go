@@ -1653,6 +1653,104 @@ func TestE217_UnknownMethod(t *testing.T) {
 	}
 }
 
+func TestE221_ExclusionBtreeGistMissing(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Schema:  "public",
+			Comment: "Room bookings",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer"},
+				{Name: "room_id", PGType: "integer"},
+				{Name: "during", PGType: "tsrange"},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "room_id", Operator: "="},
+					{Column: "during", Operator: "&&"},
+				},
+			}},
+		}},
+	}
+
+	diags, _ := Validate(schema, &Config{
+		Extensions: nil, // btree_gist NOT declared
+	})
+	found := findByCode(diags, "E221")
+	if len(found) == 0 {
+		t.Fatal("expected E221 when exclusion uses = operator without btree_gist")
+	}
+	if found[0].Table != "bookings" {
+		t.Errorf("expected table 'bookings', got %q", found[0].Table)
+	}
+}
+
+func TestE221_ExclusionBtreeGistPresent(t *testing.T) {
+	schema := &model.Schema{
+		Extensions: []string{"btree_gist"},
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Schema:  "public",
+			Comment: "Room bookings",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer"},
+				{Name: "room_id", PGType: "integer"},
+				{Name: "during", PGType: "tsrange"},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "room_id", Operator: "="},
+					{Column: "during", Operator: "&&"},
+				},
+			}},
+		}},
+	}
+
+	diags, _ := Validate(schema, &Config{
+		Extensions: schema.Extensions,
+	})
+	found := findByCode(diags, "E221")
+	if len(found) > 0 {
+		t.Fatalf("expected no E221 when btree_gist is declared, got: %s", found[0].Message)
+	}
+}
+
+func TestE221_ExclusionRangeOperatorOnly(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "bookings",
+			Schema:  "public",
+			Comment: "Room bookings",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "integer"},
+				{Name: "during", PGType: "tsrange"},
+			},
+			Exclusions: []model.ExclusionConstraint{{
+				Name:   "no_time_overlap",
+				Method: "gist",
+				Elements: []model.ExclusionElement{
+					{Column: "during", Operator: "&&"},
+				},
+			}},
+		}},
+	}
+
+	diags, _ := Validate(schema, &Config{
+		Extensions: nil, // no btree_gist needed
+	})
+	found := findByCode(diags, "E221")
+	if len(found) > 0 {
+		t.Fatalf("expected no E221 when only && operator is used, got: %s", found[0].Message)
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {
