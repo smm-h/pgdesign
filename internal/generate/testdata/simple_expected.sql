@@ -2,10 +2,13 @@ CREATE SCHEMA shop;
 
 CREATE EXTENSION pgcrypto;
 
+CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);
+CREATE DOMAIN shop.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\.[^@]+$');
+
 CREATE TABLE shop.customers (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    name text NOT NULL,
-    email text NOT NULL,
+    name short_text NOT NULL,
+    email email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_customers PRIMARY KEY (id)
 );
@@ -22,8 +25,6 @@ ALTER TABLE shop.orders ADD CONSTRAINT fk_orders_customers FOREIGN KEY (customer
 
 ALTER TABLE shop.customers ADD CONSTRAINT uq_customers_email UNIQUE (email);
 
-ALTER TABLE shop.customers ADD CONSTRAINT chk_customers_email CHECK (email ~ '^[^@]+@[^@]+\.[^@]+$');
-ALTER TABLE shop.customers ADD CONSTRAINT chk_customers_name CHECK (LENGTH(name) <= 255);
 ALTER TABLE shop.orders ADD CONSTRAINT ck_orders_positive_total CHECK (total >= 0);
 
 CREATE INDEX idx_orders_status ON shop.orders (customer_id);

@@ -2,6 +2,14 @@
   "name": "public",
   "extensions": null,
   "enums": [],
+  "domains": [
+    {
+      "name": "email",
+      "schema": "public",
+      "base_type": "text",
+      "check": "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'"
+    }
+  ],
   "tables": [
     {
       "name": "users",
@@ -17,7 +25,7 @@
         },
         {
           "name": "email",
-          "pg_type": "text",
+          "pg_type": "email",
           "not_null": true,
           "semantic_type_name": "email"
         },
@@ -35,12 +43,7 @@
       "fks": [],
       "indexes": [],
       "uniques": [],
-      "checks": [
-        {
-          "name": "chk_users_email",
-          "expr": "email ~ '^[^@]+@[^@]+\\.[^@]+$'"
-        }
-      ],
+      "checks": [],
       "exclusions": []
     }
   ],

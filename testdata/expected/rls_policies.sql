@@ -2,15 +2,15 @@ CREATE SCHEMA secure;
 
 CREATE EXTENSION pgcrypto;
 
+CREATE DOMAIN secure.short_text AS text CHECK (LENGTH(VALUE) <= 255);
+
 CREATE TABLE secure.documents (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     owner_id uuid NOT NULL,
-    title text NOT NULL,
+    title short_text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_documents PRIMARY KEY (id)
 );
-
-ALTER TABLE secure.documents ADD CONSTRAINT chk_documents_title CHECK (LENGTH(title) <= 255);
 
 COMMENT ON TABLE secure.documents IS 'User documents with row-level security';
 

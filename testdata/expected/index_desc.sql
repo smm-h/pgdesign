@@ -1,14 +1,14 @@
 CREATE SCHEMA chat;
 
+CREATE DOMAIN chat.short_text AS text CHECK (LENGTH(VALUE) <= 255);
+
 CREATE TABLE chat.messages (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    channel text NOT NULL,
+    channel short_text NOT NULL,
     sent_at timestamptz NOT NULL DEFAULT now(),
     score bigint NOT NULL DEFAULT 0,
     CONSTRAINT pk_messages PRIMARY KEY (id)
 );
-
-ALTER TABLE chat.messages ADD CONSTRAINT chk_messages_channel CHECK (LENGTH(channel) <= 255);
 
 CREATE INDEX idx_messages_channel_sent ON chat.messages (channel, sent_at DESC);
 CREATE INDEX idx_messages_plain ON chat.messages (channel);

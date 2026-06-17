@@ -1,12 +1,12 @@
 CREATE SCHEMA public;
 
+CREATE DOMAIN public.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\.[^@]+$');
+
 CREATE TABLE public.users (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    email text NOT NULL,
+    email email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_users PRIMARY KEY (id)
 );
-
-ALTER TABLE public.users ADD CONSTRAINT chk_users_email CHECK (email ~ '^[^@]+@[^@]+\.[^@]+$');
 
 COMMENT ON TABLE public.users IS 'User accounts';

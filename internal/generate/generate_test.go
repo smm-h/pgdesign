@@ -1875,25 +1875,36 @@ func TestDomainDDL(t *testing.T) {
 	}
 }
 
-func TestSemanticTypeCheckInDDL(t *testing.T) {
-	// End-to-end test: parse a TOML with slug/email columns, build,
-	// generate DDL, and verify CHECK constraints appear.
+func TestDomainResolution_DDL(t *testing.T) {
+	// End-to-end test: schema with domains and tables referencing them.
+	// Verifies CREATE DOMAIN appears, columns reference domain names,
+	// and no spurious CHECK constraints exist.
 	schema := &model.Schema{
 		Name: "app",
+		Domains: []model.Domain{
+			{
+				Name:     "slug",
+				Schema:   "app",
+				BaseType: "text",
+				Check:    "VALUE ~ '^[a-z0-9-]+$'",
+			},
+			{
+				Name:     "email",
+				Schema:   "app",
+				BaseType: "text",
+				Check:    "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'",
+			},
+		},
 		Tables: []model.Table{
 			{
 				Name:   "profiles",
 				Schema: "app",
 				Columns: []model.Column{
 					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "handle", PGType: "text", NotNull: true, SemanticTypeName: "slug"},
-					{Name: "contact", PGType: "text", NotNull: true, SemanticTypeName: "email"},
+					{Name: "handle", PGType: "slug", NotNull: true, SemanticTypeName: "slug"},
+					{Name: "contact", PGType: "email", NotNull: true, SemanticTypeName: "email"},
 				},
 				PK: []string{"id"},
-				Checks: []model.CheckConstraint{
-					{Name: "chk_profiles_handle", Expr: "handle ~ '^[a-z0-9-]+$'"},
-					{Name: "chk_profiles_contact", Expr: "contact ~ '^[^@]+@[^@]+\\.[^@]+$'"},
-				},
 			},
 		},
 	}
@@ -1901,11 +1912,41 @@ func TestSemanticTypeCheckInDDL(t *testing.T) {
 	opts := Options{Format: "sql"}
 	out := mustGenerate(t, schema, opts)
 
-	if !strings.Contains(out, "chk_profiles_handle CHECK (handle ~ '^[a-z0-9-]+$')") {
-		t.Errorf("expected CHECK for slug handle, got:\n%s", out)
+	// CREATE DOMAIN should appear.
+	if !strings.Contains(out, "CREATE DOMAIN app.slug AS text CHECK (VALUE ~ '^[a-z0-9-]+$');") {
+		t.Errorf("expected CREATE DOMAIN for slug, got:\n%s", out)
 	}
-	if !strings.Contains(out, "chk_profiles_contact CHECK (contact ~ '^[^@]+@[^@]+\\.[^@]+$')") {
-		t.Errorf("expected CHECK for email contact, got:\n%s", out)
+	if !strings.Contains(out, "CREATE DOMAIN app.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\\.[^@]+$');") {
+		t.Errorf("expected CREATE DOMAIN for email, got:\n%s", out)
+	}
+
+	// Columns should reference domain names, not base types.
+	if !strings.Contains(out, "handle slug NOT NULL") {
+		t.Errorf("expected column to use domain name 'slug', got:\n%s", out)
+	}
+	if !strings.Contains(out, "contact email NOT NULL") {
+		t.Errorf("expected column to use domain name 'email', got:\n%s", out)
+	}
+
+	// No semantic CHECK constraints on the table.
+	if strings.Contains(out, "chk_profiles_handle") {
+		t.Errorf("unexpected semantic CHECK constraint chk_profiles_handle in output:\n%s", out)
+	}
+	if strings.Contains(out, "chk_profiles_contact") {
+		t.Errorf("unexpected semantic CHECK constraint chk_profiles_contact in output:\n%s", out)
+	}
+
+	// CREATE DOMAIN should appear before CREATE TABLE.
+	domainPos := strings.Index(out, "CREATE DOMAIN")
+	tablePos := strings.Index(out, "CREATE TABLE")
+	if domainPos < 0 {
+		t.Fatal("missing CREATE DOMAIN in output")
+	}
+	if tablePos < 0 {
+		t.Fatal("missing CREATE TABLE in output")
+	}
+	if domainPos > tablePos {
+		t.Errorf("CREATE DOMAIN should appear before CREATE TABLE, domain=%d table=%d", domainPos, tablePos)
 	}
 }
 

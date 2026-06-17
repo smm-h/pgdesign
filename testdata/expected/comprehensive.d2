@@ -2,15 +2,15 @@ projects: {
   shape: sql_table
   id: uuid {constraint: primary_key}
   owner_id: uuid
-  name: text
-  description: text
+  name: short_text
+  description: short_text
   created_at: timestamptz
 }
 tasks: {
   shape: sql_table
   id: uuid {constraint: primary_key}
   project_id: uuid {constraint: foreign_key}
-  title: text
+  title: short_text
   priority: priority
   estimated_hours: bigint
   hourly_rate: bigint
@@ -22,7 +22,7 @@ audit_log: {
   id: uuid {constraint: primary_key}
   project_id: uuid {constraint: foreign_key}
   actor_id: uuid
-  action: text
+  action: short_text
   metadata: jsonb
   created_at: timestamptz
 }
@@ -30,7 +30,7 @@ events: {
   shape: sql_table
   id: uuid {constraint: primary_key}
   project_id: uuid {constraint: foreign_key}
-  event_type: text
+  event_type: short_text
   payload: jsonb
   occurred_at: timestamptz {constraint: primary_key}
 }
@@ -39,8 +39,8 @@ comments: {
   id: uuid {constraint: primary_key}
   task_id: uuid {constraint: foreign_key}
   author_id: uuid
-  body: text
-  tags: text
+  body: short_text
+  tags: short_text
   created_at: timestamptz
 }
 tasks.project_id -> projects.id: CASCADE

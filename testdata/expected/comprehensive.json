@@ -17,6 +17,14 @@
       "comment": "Task priority level"
     }
   ],
+  "domains": [
+    {
+      "name": "short_text",
+      "schema": "app",
+      "base_type": "text",
+      "check": "LENGTH(VALUE) \u003c= 255"
+    }
+  ],
   "tables": [
     {
       "name": "projects",
@@ -39,13 +47,13 @@
         },
         {
           "name": "name",
-          "pg_type": "text",
+          "pg_type": "short_text",
           "not_null": true,
           "semantic_type_name": "short_text"
         },
         {
           "name": "description",
-          "pg_type": "text",
+          "pg_type": "short_text",
           "not_null": false,
           "semantic_type_name": "short_text"
         },
@@ -63,16 +71,7 @@
       "fks": [],
       "indexes": [],
       "uniques": [],
-      "checks": [
-        {
-          "name": "chk_projects_description",
-          "expr": "LENGTH(description) \u003c= 255"
-        },
-        {
-          "name": "chk_projects_name",
-          "expr": "LENGTH(name) \u003c= 255"
-        }
-      ],
+      "checks": [],
       "exclusions": [],
       "policies": [
         {
@@ -123,7 +122,7 @@
         },
         {
           "name": "title",
-          "pg_type": "text",
+          "pg_type": "short_text",
           "not_null": true,
           "semantic_type_name": "short_text"
         },
@@ -214,10 +213,6 @@
       ],
       "checks": [
         {
-          "name": "chk_tasks_title",
-          "expr": "LENGTH(title) \u003c= 255"
-        },
-        {
           "name": "ck_tasks_positive_hours",
           "expr": "estimated_hours \u003e= 0"
         }
@@ -250,7 +245,7 @@
         },
         {
           "name": "action",
-          "pg_type": "text",
+          "pg_type": "short_text",
           "not_null": true,
           "semantic_type_name": "short_text"
         },
@@ -305,10 +300,6 @@
       "uniques": [],
       "checks": [
         {
-          "name": "chk_audit_log_action",
-          "expr": "LENGTH(action) \u003c= 255"
-        },
-        {
           "name": "ck_metadata_title_type",
           "expr": "metadata ? 'title' AND jsonb_typeof(metadata-\u003e'title') = 'string'"
         },
@@ -340,7 +331,7 @@
         },
         {
           "name": "event_type",
-          "pg_type": "text",
+          "pg_type": "short_text",
           "not_null": true,
           "semantic_type_name": "short_text"
         },
@@ -393,12 +384,7 @@
         }
       ],
       "uniques": [],
-      "checks": [
-        {
-          "name": "chk_events_event_type",
-          "expr": "LENGTH(event_type) \u003c= 255"
-        }
-      ],
+      "checks": [],
       "exclusions": [],
       "partitioning": {
         "strategy": "range",
@@ -454,13 +440,13 @@
         },
         {
           "name": "body",
-          "pg_type": "text",
+          "pg_type": "short_text",
           "not_null": true,
           "semantic_type_name": "short_text"
         },
         {
           "name": "tags",
-          "pg_type": "text",
+          "pg_type": "short_text",
           "not_null": true,
           "semantic_type_name": "short_text",
           "array": true
@@ -506,16 +492,7 @@
         }
       ],
       "uniques": [],
-      "checks": [
-        {
-          "name": "chk_comments_body",
-          "expr": "LENGTH(body) \u003c= 255"
-        },
-        {
-          "name": "chk_comments_tags",
-          "expr": "LENGTH(tags) \u003c= 255"
-        }
-      ],
+      "checks": [],
       "exclusions": []
     }
   ],

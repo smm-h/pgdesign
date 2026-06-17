@@ -2,6 +2,14 @@
   "name": "chat",
   "extensions": null,
   "enums": [],
+  "domains": [
+    {
+      "name": "short_text",
+      "schema": "chat",
+      "base_type": "text",
+      "check": "LENGTH(VALUE) \u003c= 255"
+    }
+  ],
   "tables": [
     {
       "name": "messages",
@@ -17,7 +25,7 @@
         },
         {
           "name": "channel",
-          "pg_type": "text",
+          "pg_type": "short_text",
           "not_null": true,
           "semantic_type_name": "short_text"
         },
@@ -75,12 +83,7 @@
         }
       ],
       "uniques": [],
-      "checks": [
-        {
-          "name": "chk_messages_channel",
-          "expr": "LENGTH(channel) \u003c= 255"
-        }
-      ],
+      "checks": [],
       "exclusions": []
     }
   ],
