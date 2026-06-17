@@ -10,6 +10,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/fd"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
 // Build constructs a resolved Schema from raw parse output and a type registry.
@@ -250,6 +251,12 @@ func resolveFunctions(raw *parse.RawSchema) []Function {
 	var funcs []Function
 	for _, rf := range raw.Functions {
 		f := resolveFunction(rf, raw.Meta.Schema)
+		// Auto-populate DependsOn for LANGUAGE sql functions.
+		if len(f.DependsOn) == 0 && strings.EqualFold(f.Language, "sql") && f.Body != "" {
+			if refs, err := sqlparse.ExtractTableRefs(f.Body); err == nil && len(refs) > 0 {
+				f.DependsOn = refs
+			}
+		}
 		funcs = append(funcs, f)
 	}
 	return funcs

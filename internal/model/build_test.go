@@ -929,6 +929,100 @@ func TestBuildFunctions(t *testing.T) {
 	}
 }
 
+func TestBuild_FunctionAutoDepends_SQL(t *testing.T) {
+	lang := "sql"
+	returns := "bigint"
+	body := "SELECT count(*) FROM users WHERE active = true"
+
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Functions: []parse.RawFunction{
+			{
+				Name:     "count_active_users",
+				Language: &lang,
+				Returns:  &returns,
+				Body:     &body,
+			},
+		},
+	}
+	reg := semtype.NewBuiltinRegistry()
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schema.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(schema.Functions))
+	}
+	f := schema.Functions[0]
+	if len(f.DependsOn) != 1 {
+		t.Fatalf("expected 1 DependsOn entry, got %d: %v", len(f.DependsOn), f.DependsOn)
+	}
+	if f.DependsOn[0] != "users" {
+		t.Errorf("expected DependsOn[0] = %q, got %q", "users", f.DependsOn[0])
+	}
+}
+
+func TestBuild_FunctionAutoDepends_PLpgSQL(t *testing.T) {
+	lang := "plpgsql"
+	returns := "void"
+	body := "BEGIN INSERT INTO users (name) VALUES ('test'); END;"
+
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Functions: []parse.RawFunction{
+			{
+				Name:     "add_test_user",
+				Language: &lang,
+				Returns:  &returns,
+				Body:     &body,
+			},
+		},
+	}
+	reg := semtype.NewBuiltinRegistry()
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schema.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(schema.Functions))
+	}
+	f := schema.Functions[0]
+	if len(f.DependsOn) != 0 {
+		t.Errorf("expected empty DependsOn for plpgsql function, got %v", f.DependsOn)
+	}
+}
+
+func TestBuild_FunctionAutoDepends_ExplicitNotOverwritten(t *testing.T) {
+	lang := "sql"
+	returns := "bigint"
+	body := "SELECT count(*) FROM users WHERE active = true"
+
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Functions: []parse.RawFunction{
+			{
+				Name:      "count_active_users",
+				Language:  &lang,
+				Returns:   &returns,
+				Body:      &body,
+				DependsOn: []string{"custom_dep"},
+			},
+		},
+	}
+	reg := semtype.NewBuiltinRegistry()
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schema.Functions) != 1 {
+		t.Fatalf("expected 1 function, got %d", len(schema.Functions))
+	}
+	f := schema.Functions[0]
+	if len(f.DependsOn) != 1 || f.DependsOn[0] != "custom_dep" {
+		t.Errorf("expected DependsOn = [custom_dep], got %v", f.DependsOn)
+	}
+}
+
 func TestBuildTriggers(t *testing.T) {
 	forEach := "ROW"
 	raw := &parse.RawSchema{
