@@ -340,6 +340,40 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				m.DDLOps = append(m.DDLOps, trigOp)
 				diags = append(diags, classifyOp(trigOp, risk.OpCreateTrigger, ctx)...)
 			}
+			// Enable RLS for new tables.
+			if table.EnableRLS {
+				schema, _ := splitQualifiedName(tableName)
+				rlsOp := DDLOp{
+					Op:    "enable_rls",
+					Table: tableName,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "disable_rls", Table: tableName, Schema: schema}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, rlsOp)
+				diags = append(diags, classifyOp(rlsOp, risk.OpEnableRLS, ctx)...)
+			}
+			// Force RLS for new tables.
+			if table.ForceRLS {
+				schema, _ := splitQualifiedName(tableName)
+				forceOp := DDLOp{
+					Op:    "force_rls",
+					Table: tableName,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "no_force_rls", Table: tableName, Schema: schema}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, forceOp)
+				diags = append(diags, classifyOp(forceOp, risk.OpForceRLS, ctx)...)
+			}
+			// Policies for new tables.
+			for _, pol := range table.Policies {
+				polOp := makePolicyOp(tableName, pol)
+				m.DDLOps = append(m.DDLOps, polOp)
+				diags = append(diags, classifyOp(polOp, risk.OpCreatePolicy, ctx)...)
+			}
 		}
 	}
 
@@ -940,6 +974,117 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			m.DDLOps = append(m.DDLOps, createOp)
 			diags = append(diags, classifyOp(createOp, risk.OpCreateTrigger, ctx)...)
 		}
+
+		// EnableRLS changes.
+		if td.EnableRLSChanged != nil {
+			schema, _ := splitQualifiedName(td.Name)
+			if td.EnableRLSChanged[1] {
+				// false -> true: enable RLS.
+				op := DDLOp{
+					Op:     "enable_rls",
+					Table:  td.Name,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "disable_rls", Table: td.Name, Schema: schema}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				diags = append(diags, classifyOp(op, risk.OpEnableRLS, ctx)...)
+			} else {
+				// true -> false: disable RLS.
+				op := DDLOp{
+					Op:     "disable_rls",
+					Table:  td.Name,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "enable_rls", Table: td.Name, Schema: schema}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				diags = append(diags, classifyOp(op, risk.OpDisableRLS, ctx)...)
+			}
+		}
+
+		// ForceRLS changes.
+		if td.ForceRLSChanged != nil {
+			schema, _ := splitQualifiedName(td.Name)
+			if td.ForceRLSChanged[1] {
+				// false -> true: force RLS.
+				op := DDLOp{
+					Op:     "force_rls",
+					Table:  td.Name,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "no_force_rls", Table: td.Name, Schema: schema}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				diags = append(diags, classifyOp(op, risk.OpForceRLS, ctx)...)
+			} else {
+				// true -> false: no force RLS.
+				op := DDLOp{
+					Op:     "no_force_rls",
+					Table:  td.Name,
+					Schema: schema,
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "force_rls", Table: td.Name, Schema: schema}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, op)
+				diags = append(diags, classifyOp(op, risk.OpNoForceRLS, ctx)...)
+			}
+		}
+
+		// Added policies.
+		for _, pol := range td.PoliciesAdded {
+			polOp := makePolicyOp(td.Name, pol)
+			m.DDLOps = append(m.DDLOps, polOp)
+			diags = append(diags, classifyOp(polOp, risk.OpCreatePolicy, ctx)...)
+		}
+
+		// Removed policies.
+		for _, polName := range td.PoliciesRemoved {
+			schema, _ := splitQualifiedName(td.Name)
+			op := DDLOp{
+				Op:     "drop_policy",
+				Table:  td.Name,
+				Name:   polName,
+				Schema: schema,
+				Down:   &DownOp{Irreversible: true},
+			}
+			m.DDLOps = append(m.DDLOps, op)
+			diags = append(diags, classifyOp(op, risk.OpDropPolicy, ctx)...)
+		}
+
+		// Changed policies: DROP old + CREATE new.
+		for _, pd := range td.PoliciesChanged {
+			schema, _ := splitQualifiedName(td.Name)
+			dropOp := DDLOp{
+				Op:     "drop_policy",
+				Table:  td.Name,
+				Name:   pd.Name,
+				Schema: schema,
+			}
+			m.DDLOps = append(m.DDLOps, dropOp)
+			diags = append(diags, classifyOp(dropOp, risk.OpDropPolicy, ctx)...)
+
+			// Find the new policy from desired schema.
+			var newPol model.Policy
+			if desired != nil {
+				table := findTable(desired, td.Name)
+				if table != nil {
+					for _, p := range table.Policies {
+						if p.Name == pd.Name {
+							newPol = p
+							break
+						}
+					}
+				}
+			}
+			createOp := makePolicyOp(td.Name, newPol)
+			m.DDLOps = append(m.DDLOps, createOp)
+			diags = append(diags, classifyOp(createOp, risk.OpCreatePolicy, ctx)...)
+		}
 	}
 
 	// View changes.
@@ -1330,6 +1475,20 @@ func makeTriggerOp(tableName string, trig model.Trigger) DDLOp {
 		TriggerDef: &trig,
 		Down: &DownOp{
 			Ops: []DDLOp{{Op: "drop_trigger", Table: tableName, Name: trig.Name}},
+		},
+	}
+}
+
+func makePolicyOp(tableName string, pol model.Policy) DDLOp {
+	schema, _ := splitQualifiedName(tableName)
+	return DDLOp{
+		Op:        "create_policy",
+		Table:     tableName,
+		Name:      pol.Name,
+		Schema:    schema,
+		PolicyDef: &pol,
+		Down: &DownOp{
+			Ops: []DDLOp{{Op: "drop_policy", Table: tableName, Name: pol.Name, Schema: schema}},
 		},
 	}
 }

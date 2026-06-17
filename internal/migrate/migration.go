@@ -71,6 +71,7 @@ type DDLOp struct {
 	DomainDef            *model.Domain                // full domain def (not serialized)
 	FunctionDef          *model.Function              // full function def for create/drop function (not serialized)
 	TriggerDef           *model.Trigger               // full trigger def for create/drop trigger (not serialized)
+	PolicyDef            *model.Policy                // full policy def for create/drop policy (not serialized)
 
 	Down *DownOp
 }
