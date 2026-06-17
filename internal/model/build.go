@@ -189,11 +189,23 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 	}
 
 	// Resolve columns.
+	type colCheck struct {
+		colName   string
+		checkExpr string
+	}
+	var semanticChecks []colCheck
+
 	for _, rc := range rt.Columns {
-		col, colDiags := resolveColumn(rc, rt.Name, reg)
+		col, checkExpr, colDiags := resolveColumn(rc, rt.Name, reg)
 		diags = append(diags, colDiags...)
 		if col != nil {
 			t.Columns = append(t.Columns, *col)
+			if checkExpr != "" {
+				semanticChecks = append(semanticChecks, colCheck{
+					colName:   col.Name,
+					checkExpr: checkExpr,
+				})
+			}
 		}
 	}
 
@@ -245,6 +257,17 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 		}
 		checks := jsonSchemaToChecks(col.Name, content)
 		t.Checks = append(t.Checks, checks...)
+	}
+
+	// Generate CHECK constraints from semantic type CHECK expressions.
+	for _, sc := range semanticChecks {
+		// Replace VALUE placeholder with actual column name.
+		expr := strings.ReplaceAll(sc.checkExpr, "VALUE", sc.colName)
+		name := constraintName(rt.Name, "chk", sc.colName)
+		t.Checks = append(t.Checks, CheckConstraint{
+			Name: name,
+			Expr: expr,
+		})
 	}
 
 	// Resolve policies.
@@ -325,7 +348,7 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 }
 
 // resolveColumn resolves a single raw column into a model Column.
-func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) (*Column, diagnostic.Diagnostics) {
+func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) (*Column, string, diagnostic.Diagnostics) {
 	var diags diagnostic.Diagnostics
 
 	resolved, err := reg.ResolveColumn(rc.Type, rc.Nullable, rc.Default, rc.DefaultExpr, rc.Array)
@@ -337,7 +360,7 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 			Column:   rc.Name,
 			Message:  fmt.Sprintf("cannot resolve type %q: %s", rc.Type, err.Error()),
 		})
-		return nil, diags
+		return nil, "", diags
 	}
 
 	col := &Column{
@@ -384,7 +407,7 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 		col.Statistics = rc.Statistics
 	}
 
-	return col, diags
+	return col, resolved.Check, diags
 }
 
 // resolvePK applies the id/pk precedence rule.
