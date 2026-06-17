@@ -1510,6 +1510,175 @@ statistics = 1000
 	}
 }
 
+func TestParseExclusion(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.bookings]
+comment = "Room bookings"
+pk = ["id"]
+
+[tables.bookings.columns.id]
+type = "integer"
+
+[tables.bookings.columns.room_id]
+type = "integer"
+
+[tables.bookings.columns.during]
+type = "tsrange"
+
+[tables.bookings.exclusions.no_overlap]
+columns = ["room_id", "during"]
+operators = ["=", "&&"]
+method = "gist"
+where = "active = true"
+deferrable = true
+initially_deferred = true
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(schema.Tables))
+	}
+	tbl := schema.Tables[0]
+
+	if len(tbl.Exclusions) != 1 {
+		t.Fatalf("expected 1 exclusion, got %d", len(tbl.Exclusions))
+	}
+
+	exc, ok := tbl.Exclusions["no_overlap"]
+	if !ok {
+		t.Fatal("expected exclusion 'no_overlap'")
+	}
+	if exc.Name != "no_overlap" {
+		t.Errorf("Name = %q, want %q", exc.Name, "no_overlap")
+	}
+	if len(exc.Columns) != 2 || exc.Columns[0] != "room_id" || exc.Columns[1] != "during" {
+		t.Errorf("Columns = %v, want [room_id during]", exc.Columns)
+	}
+	if len(exc.Operators) != 2 || exc.Operators[0] != "=" || exc.Operators[1] != "&&" {
+		t.Errorf("Operators = %v, want [= &&]", exc.Operators)
+	}
+	if exc.Method == nil {
+		t.Fatal("expected Method to be set")
+	}
+	if *exc.Method != "gist" {
+		t.Errorf("Method = %q, want %q", *exc.Method, "gist")
+	}
+	if exc.Where == nil {
+		t.Fatal("expected Where to be set")
+	}
+	if *exc.Where != "active = true" {
+		t.Errorf("Where = %q, want %q", *exc.Where, "active = true")
+	}
+	if exc.Deferrable == nil {
+		t.Fatal("expected Deferrable to be set")
+	}
+	if *exc.Deferrable != true {
+		t.Errorf("Deferrable = %v, want true", *exc.Deferrable)
+	}
+	if exc.InitiallyDeferred == nil {
+		t.Fatal("expected InitiallyDeferred to be set")
+	}
+	if *exc.InitiallyDeferred != true {
+		t.Errorf("InitiallyDeferred = %v, want true", *exc.InitiallyDeferred)
+	}
+}
+
+func TestParseExclusionLengthMismatch(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.bookings]
+comment = "Room bookings"
+pk = ["id"]
+
+[tables.bookings.columns.id]
+type = "integer"
+
+[tables.bookings.columns.room_id]
+type = "integer"
+
+[tables.bookings.columns.during]
+type = "tsrange"
+
+[tables.bookings.exclusions.no_overlap]
+columns = ["room_id", "during"]
+operators = ["="]
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+
+	found := false
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error && d.Code == "E010" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected E010 error for mismatched columns/operators lengths, got: %v", diags)
+	}
+}
+
+func TestParseExclusionDefaults(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[tables.bookings]
+comment = "Room bookings"
+pk = ["id"]
+
+[tables.bookings.columns.id]
+type = "integer"
+
+[tables.bookings.columns.room_id]
+type = "integer"
+
+[tables.bookings.columns.during]
+type = "tsrange"
+
+[tables.bookings.exclusions.no_overlap]
+columns = ["room_id", "during"]
+operators = ["=", "&&"]
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	exc, ok := schema.Tables[0].Exclusions["no_overlap"]
+	if !ok {
+		t.Fatal("expected exclusion 'no_overlap'")
+	}
+	if exc.Method != nil {
+		t.Errorf("Method = %v, want nil", exc.Method)
+	}
+	if exc.Where != nil {
+		t.Errorf("Where = %v, want nil", exc.Where)
+	}
+	if exc.Deferrable != nil {
+		t.Errorf("Deferrable = %v, want nil", exc.Deferrable)
+	}
+	if exc.InitiallyDeferred != nil {
+		t.Errorf("InitiallyDeferred = %v, want nil", exc.InitiallyDeferred)
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {
