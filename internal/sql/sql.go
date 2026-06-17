@@ -175,6 +175,42 @@ func CreateEnum(schema, name string, values []string, idempotent bool) string {
 		ifne, qualified, strings.Join(quotedValues, ", "))
 }
 
+// CreateDomain generates a CREATE DOMAIN statement.
+// Emits: CREATE DOMAIN [schema.]name AS basetype [NOT NULL] [DEFAULT ...] [CHECK (...)].
+func CreateDomain(schemaName string, d model.Domain) string {
+	qualified := QualifiedName(schemaName, d.Name)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("CREATE DOMAIN %s AS %s", qualified, d.BaseType))
+
+	if d.NotNull {
+		sb.WriteString(" NOT NULL")
+	}
+
+	if d.DefaultExpr != "" {
+		sb.WriteString(" DEFAULT " + ExprValue(d.DefaultExpr))
+	} else if d.Default != "" {
+		sb.WriteString(" DEFAULT " + LiteralValue(d.Default, d.BaseType))
+	}
+
+	if d.Check != "" {
+		sb.WriteString(fmt.Sprintf(" CHECK (%s)", d.Check))
+	}
+
+	sb.WriteString(";")
+	return sb.String()
+}
+
+// DropDomain generates a DROP DOMAIN statement.
+func DropDomain(schemaName, name string, cascade bool) string {
+	qualified := QualifiedName(schemaName, name)
+	cascadeStr := ""
+	if cascade {
+		cascadeStr = " CASCADE"
+	}
+	return fmt.Sprintf("DROP DOMAIN %s%s;", qualified, cascadeStr)
+}
+
 // CreateTable generates a CREATE TABLE statement with columns, inline PK, and
 // PARTITION BY. Foreign keys are NOT included (they use ALTER TABLE for cycle safety).
 // pgVersion controls version-specific DDL: when > 0 and < 10, identity columns

@@ -55,6 +55,11 @@ func generateJSON(schema *model.Schema) (string, error) {
 	sort.Slice(s.Enums, func(i, j int) bool {
 		return s.Enums[i].Name < s.Enums[j].Name
 	})
+	s.Domains = make([]model.Domain, len(schema.Domains))
+	copy(s.Domains, schema.Domains)
+	sort.Slice(s.Domains, func(i, j int) bool {
+		return s.Domains[i].Name < s.Domains[j].Name
+	})
 	s.Tables = make([]model.Table, len(schema.Tables))
 	copy(s.Tables, schema.Tables)
 	for i := range s.Tables {
@@ -116,6 +121,15 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			enumStmts = append(enumStmts, sql.CreateEnum(e.Schema, e.Name, e.Values, opts.Idempotent))
 		}
 		sections = append(sections, strings.Join(enumStmts, "\n"))
+	}
+
+	// 3b. CREATE DOMAIN
+	if len(schema.Domains) > 0 {
+		var domainStmts []string
+		for _, d := range schema.Domains {
+			domainStmts = append(domainStmts, sql.CreateDomain(d.Schema, d))
+		}
+		sections = append(sections, strings.Join(domainStmts, "\n"))
 	}
 
 	tables := schema.TableOrder()
