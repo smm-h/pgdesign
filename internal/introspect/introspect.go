@@ -108,6 +108,15 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		schema.Sequences = append(schema.Sequences, seqs...)
 	}
 
+	// Extract functions from all requested schemas.
+	for _, sn := range schemaNames {
+		fns, err := queryFunctions(ctx, conn, sn)
+		if err != nil {
+			return nil, nil, fmt.Errorf("functions for schema %q: %w", sn, err)
+		}
+		schema.Functions = append(schema.Functions, fns...)
+	}
+
 	return schema, diags, nil
 }
 
@@ -1453,4 +1462,228 @@ func querySequences(ctx context.Context, conn *pgx.Conn, schemaName string) ([]m
 	}
 
 	return seqs, rows.Err()
+}
+
+// queryFunctions returns user-defined functions and procedures in the given schema.
+// Filters out: aggregate functions, window functions, internal functions,
+// and pgdesign-generated trigger functions (pgdesign_deny_mutation).
+func queryFunctions(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.Function, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT
+			p.proname,
+			l.lanname,
+			pg_get_function_result(p.oid) AS return_type,
+			pg_get_function_arguments(p.oid) AS args_str,
+			pg_get_functiondef(p.oid) AS funcdef,
+			p.provolatile,
+			p.proparallel,
+			p.prosecdef,
+			CASE WHEN p.prokind = 'p' THEN true ELSE false END AS is_proc,
+			p.procost,
+			p.prorows,
+			d.description
+		FROM pg_proc p
+		JOIN pg_namespace n ON n.oid = p.pronamespace
+		JOIN pg_language l ON l.oid = p.prolang
+		LEFT JOIN pg_description d ON d.objoid = p.oid AND d.classoid = 'pg_proc'::regclass
+		WHERE n.nspname = $1
+			AND p.prokind IN ('f', 'p')
+			AND NOT p.proisagg
+			AND NOT p.prorettype = 'trigger'::regtype
+			AND p.proname != 'pgdesign_deny_mutation'
+		ORDER BY p.proname
+	`, schemaName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var functions []model.Function
+	for rows.Next() {
+		var (
+			name       string
+			language   string
+			returnType *string
+			argsStr    string
+			funcdef    *string
+			volatile   string
+			parallel   string
+			secdef     bool
+			isProc     bool
+			cost       float64
+			prorows    float64
+			comment    *string
+		)
+		if err := rows.Scan(&name, &language, &returnType, &argsStr, &funcdef, &volatile, &parallel, &secdef, &isProc, &cost, &prorows, &comment); err != nil {
+			return nil, err
+		}
+
+		f := model.Function{
+			Name:            name,
+			Schema:          schemaName,
+			Language:        language,
+			SecurityDefiner: secdef,
+			IsProc:          isProc,
+		}
+
+		if returnType != nil {
+			f.ReturnType = *returnType
+		}
+
+		// Volatility
+		switch volatile {
+		case "i":
+			f.Volatility = "IMMUTABLE"
+		case "s":
+			f.Volatility = "STABLE"
+		case "v":
+			f.Volatility = "VOLATILE"
+		}
+
+		// Parallel safety
+		switch parallel {
+		case "s":
+			f.Parallel = "SAFE"
+		case "r":
+			f.Parallel = "RESTRICTED"
+		case "u":
+			f.Parallel = "UNSAFE"
+		}
+
+		// Cost (only store non-default)
+		if cost != 100 { // PostgreSQL default cost
+			c := cost
+			f.Cost = &c
+		}
+
+		// Rows (only store non-default for set-returning functions)
+		if prorows != 0 && prorows != 1000 { // PostgreSQL default rows for SRFs
+			r := prorows
+			f.Rows = &r
+		}
+
+		if comment != nil {
+			f.Comment = *comment
+		}
+
+		// Parse args from pg_get_function_arguments()
+		f.Args = parseFunctionArgs(argsStr)
+
+		// Extract body from pg_get_functiondef()
+		if funcdef != nil {
+			f.Body = extractFunctionBody(*funcdef)
+		}
+
+		functions = append(functions, f)
+	}
+	return functions, rows.Err()
+}
+
+// parseFunctionArgs parses the output of pg_get_function_arguments().
+// Format: "order_id uuid, tax_rate numeric DEFAULT 0.0" or empty string.
+func parseFunctionArgs(argsStr string) []model.FunctionArg {
+	argsStr = strings.TrimSpace(argsStr)
+	if argsStr == "" {
+		return nil
+	}
+
+	var args []model.FunctionArg
+	// Split on commas, but respect parentheses for types like numeric(10,2).
+	parts := splitArgList(argsStr)
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		arg := parseOneArg(part)
+		args = append(args, arg)
+	}
+	return args
+}
+
+// splitArgList splits a function argument list on commas, respecting parentheses.
+func splitArgList(s string) []string {
+	var parts []string
+	depth := 0
+	start := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				parts = append(parts, s[start:i])
+				start = i + 1
+			}
+		}
+	}
+	parts = append(parts, s[start:])
+	return parts
+}
+
+// parseOneArg parses a single function argument like "order_id uuid DEFAULT 0".
+func parseOneArg(s string) model.FunctionArg {
+	s = strings.TrimSpace(s)
+
+	// Strip mode keywords (IN, OUT, INOUT, VARIADIC) from the beginning.
+	for _, mode := range []string{"INOUT ", "IN ", "OUT ", "VARIADIC "} {
+		if strings.HasPrefix(strings.ToUpper(s), mode) {
+			s = strings.TrimSpace(s[len(mode):])
+			break
+		}
+	}
+
+	// Check for DEFAULT
+	var defaultVal string
+	upperS := strings.ToUpper(s)
+	if idx := strings.Index(upperS, " DEFAULT "); idx >= 0 {
+		defaultVal = strings.TrimSpace(s[idx+9:])
+		s = strings.TrimSpace(s[:idx])
+	}
+
+	// Now s is "name type" or just "type" (unnamed args).
+	// PostgreSQL argument format from pg_get_function_arguments is always "name type".
+	// If no name, it's just "type".
+	parts := strings.SplitN(s, " ", 2)
+	var arg model.FunctionArg
+	if len(parts) == 2 {
+		arg.Name = parts[0]
+		arg.Type = parts[1]
+	} else {
+		// Unnamed argument: just the type.
+		arg.Type = parts[0]
+	}
+	arg.Default = defaultVal
+	return arg
+}
+
+// extractFunctionBody extracts the body from the full function definition
+// returned by pg_get_functiondef(). The body is between dollar-quote delimiters.
+func extractFunctionBody(funcdef string) string {
+	// Look for $$ or $tag$ delimiters.
+	// Find the first dollar-quote.
+	idx := strings.Index(funcdef, "$")
+	if idx < 0 {
+		return ""
+	}
+	// Find the closing dollar of the opening tag.
+	endTag := strings.Index(funcdef[idx+1:], "$")
+	if endTag < 0 {
+		return ""
+	}
+	tag := funcdef[idx : idx+1+endTag+1] // e.g., "$$" or "$func$"
+
+	// Find the body between the two tags.
+	bodyStart := idx + len(tag)
+	bodyEnd := strings.LastIndex(funcdef, tag)
+	if bodyEnd <= bodyStart {
+		return ""
+	}
+	body := funcdef[bodyStart:bodyEnd]
+	// Trim leading/trailing newlines but preserve internal formatting.
+	body = strings.TrimPrefix(body, "\n")
+	body = strings.TrimSuffix(body, "\n")
+	return body
 }
