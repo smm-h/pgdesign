@@ -4,9 +4,26 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/smm-h/pgdesign/internal/model"
 )
+
+var wordList = []string{"alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"}
+
+func randomWord(rng *rand.Rand) string {
+	return wordList[rng.Intn(len(wordList))]
+}
+
+func randomDate(rng *rand.Rand) string {
+	base := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	d := base.AddDate(0, 0, -rng.Intn(365))
+	return d.Format("2006-01-02")
+}
+
+func randomTimestamp(rng *rand.Rand) string {
+	return fmt.Sprintf("%s %02d:%02d:%02d", randomDate(rng), rng.Intn(24), rng.Intn(60), rng.Intn(60))
+}
 
 // Generate produces INSERT statements with type-aware test data for all tables
 // in the schema. Tables are processed in TableOrder() (topological) order so
@@ -85,6 +102,11 @@ func Generate(schema *model.Schema, rowsPerTable int, rng *rand.Rand) string {
 }
 
 func generateValue(col model.Column, table model.Table, rowIdx int, rng *rand.Rand, enumValues map[string][]string, generatedValues map[string]map[string][]string) string {
+	// NULL injection for nullable columns.
+	if !col.NotNull && rng.Float64() < 0.10 {
+		return "NULL"
+	}
+
 	// Check semantic type first.
 	if col.SemanticTypeName != "" {
 		switch col.SemanticTypeName {
@@ -136,12 +158,116 @@ func generateValue(col model.Column, table model.Table, rowIdx int, rng *rand.Ra
 		return "false"
 	case "integer", "bigint", "smallint":
 		return fmt.Sprintf("%d", rng.Intn(10000))
+	case "serial", "bigserial", "smallserial":
+		return "DEFAULT"
+	case "numeric":
+		return fmt.Sprintf("'%d.%02d'", rng.Intn(10000), rng.Intn(100))
+	case "real", "float4":
+		return fmt.Sprintf("%f", rng.Float32()*1000)
+	case "float8":
+		return fmt.Sprintf("%f", rng.Float64()*1000)
 	case "uuid":
 		return generateUUID(rng)
+	case "text", "citext":
+		return fmt.Sprintf("'sample_%s_%s_%d'", table.Name, col.Name, rowIdx)
+	case "varchar", "char":
+		return fmt.Sprintf("'txt_%s_%d'", col.Name, rowIdx)
+	case "bytea":
+		var b [8]byte
+		rng.Read(b[:])
+		return fmt.Sprintf("'\\x%02x%02x%02x%02x%02x%02x%02x%02x'", b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7])
+	case "date":
+		return fmt.Sprintf("'%s'", randomDate(rng))
+	case "time":
+		return fmt.Sprintf("'%02d:%02d:%02d'", rng.Intn(24), rng.Intn(60), rng.Intn(60))
+	case "timetz":
+		return fmt.Sprintf("'%02d:%02d:%02d+00'", rng.Intn(24), rng.Intn(60), rng.Intn(60))
+	case "timestamp":
+		return fmt.Sprintf("'%s'", randomTimestamp(rng))
+	case "timestamptz":
+		return fmt.Sprintf("'%s'", randomTimestamp(rng))
+	case "interval":
+		return fmt.Sprintf("'%d days %d hours %d minutes'", rng.Intn(30), rng.Intn(24), rng.Intn(60))
 	case "jsonb":
 		return "'{}'::jsonb"
-	case "text":
-		return fmt.Sprintf("'sample_%s_%s_%d'", table.Name, col.Name, rowIdx)
+	case "json":
+		return "'{}'::json"
+	case "xml":
+		return fmt.Sprintf("'<val>item_%d</val>'", rowIdx)
+	case "inet":
+		return fmt.Sprintf("'%d.%d.%d.%d'", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
+	case "cidr":
+		return fmt.Sprintf("'%d.%d.%d.0/24'", rng.Intn(256), rng.Intn(256), rng.Intn(256))
+	case "macaddr":
+		return fmt.Sprintf("'%02x:%02x:%02x:%02x:%02x:%02x'", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
+	case "tsvector":
+		return fmt.Sprintf("'%s %s'::tsvector", randomWord(rng), randomWord(rng))
+	case "tsquery":
+		return fmt.Sprintf("'%s & %s'::tsquery", randomWord(rng), randomWord(rng))
+	case "oid":
+		return fmt.Sprintf("%d", rng.Intn(100000)+1)
+	case "int4range":
+		lo := rng.Intn(1000)
+		return fmt.Sprintf("'[%d,%d)'", lo, lo+rng.Intn(100)+1)
+	case "int8range":
+		lo := rng.Intn(1000)
+		return fmt.Sprintf("'[%d,%d)'", lo, lo+rng.Intn(100)+1)
+	case "numrange":
+		lo := rng.Intn(1000)
+		hi := lo + rng.Intn(100) + 1
+		return fmt.Sprintf("'[%d.00,%d.00)'", lo, hi)
+	case "daterange":
+		d1 := randomDate(rng)
+		d2 := randomDate(rng)
+		if d1 > d2 {
+			d1, d2 = d2, d1
+		}
+		return fmt.Sprintf("'[%s,%s)'", d1, d2)
+	case "tsrange":
+		t1 := randomTimestamp(rng)
+		t2 := randomTimestamp(rng)
+		if t1 > t2 {
+			t1, t2 = t2, t1
+		}
+		return fmt.Sprintf("'[%s,%s)'", t1, t2)
+	case "tstzrange":
+		t1 := randomTimestamp(rng)
+		t2 := randomTimestamp(rng)
+		if t1 > t2 {
+			t1, t2 = t2, t1
+		}
+		return fmt.Sprintf("'[%s,%s)'", t1, t2)
+	case "int4multirange":
+		lo := rng.Intn(1000)
+		return fmt.Sprintf("'{[%d,%d)}'", lo, lo+rng.Intn(100)+1)
+	case "int8multirange":
+		lo := rng.Intn(1000)
+		return fmt.Sprintf("'{[%d,%d)}'", lo, lo+rng.Intn(100)+1)
+	case "nummultirange":
+		lo := rng.Intn(1000)
+		hi := lo + rng.Intn(100) + 1
+		return fmt.Sprintf("'{[%d.00,%d.00)}'", lo, hi)
+	case "datemultirange":
+		d1 := randomDate(rng)
+		d2 := randomDate(rng)
+		if d1 > d2 {
+			d1, d2 = d2, d1
+		}
+		return fmt.Sprintf("'{[%s,%s)}'", d1, d2)
+	case "tsmultirange":
+		t1 := randomTimestamp(rng)
+		t2 := randomTimestamp(rng)
+		if t1 > t2 {
+			t1, t2 = t2, t1
+		}
+		return fmt.Sprintf("'{[%s,%s)}'", t1, t2)
+	case "tstzmultirange":
+		t1 := randomTimestamp(rng)
+		t2 := randomTimestamp(rng)
+		if t1 > t2 {
+			t1, t2 = t2, t1
+		}
+		return fmt.Sprintf("'{[%s,%s)}'", t1, t2)
 	}
 
 	// Array types get empty array literal.
@@ -149,7 +275,8 @@ func generateValue(col model.Column, table model.Table, rowIdx int, rng *rand.Ra
 		return "'{}'"
 	}
 
-	return "'sample'"
+	// Unknown types get a NULL cast so SQL still executes and the gap is visible.
+	return fmt.Sprintf("NULL::%s /* unsupported seed type */", col.PGType)
 }
 
 func generateRef(col model.Column, table model.Table, rng *rand.Rand, generatedValues map[string]map[string][]string) string {
