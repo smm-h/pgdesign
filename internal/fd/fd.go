@@ -7,6 +7,34 @@ import "sort"
 type FuncDep struct {
 	Determinant []string
 	Dependent   []string
+	Source      string // "declared", "discovered", "inferred", or "" (unspecified)
+}
+
+// String formats the FD as "{A, B} -> {C, D}".
+func (f FuncDep) String() string {
+	lhs := make([]string, len(f.Determinant))
+	copy(lhs, f.Determinant)
+	sort.Strings(lhs)
+	rhs := make([]string, len(f.Dependent))
+	copy(rhs, f.Dependent)
+	sort.Strings(rhs)
+
+	result := "{"
+	for i, a := range lhs {
+		if i > 0 {
+			result += ", "
+		}
+		result += a
+	}
+	result += "} -> {"
+	for i, a := range rhs {
+		if i > 0 {
+			result += ", "
+		}
+		result += a
+	}
+	result += "}"
+	return result
 }
 
 // Closure computes the attribute closure of attrs under fds using Armstrong's axioms.
@@ -467,6 +495,90 @@ func PreservesDependencies(original []FuncDep, components []Component) (preserve
 	})
 
 	return false, lost
+}
+
+// ArmstrongRelation generates a small counterexample table showing redundancy
+// for a specific FD X->A in relation to the full attribute set. Two rows agree
+// on X (and A, since X determines A) but differ on other attributes, making
+// the redundancy visible. Cap at 10 rows.
+func ArmstrongRelation(allAttrs []string, fds []FuncDep, violating FuncDep) []map[string]string {
+	sorted := make([]string, len(allAttrs))
+	copy(sorted, allAttrs)
+	sort.Strings(sorted)
+
+	// Compute what the violating determinant determines
+	closure := Closure(violating.Determinant, fds)
+
+	// Build two rows that agree on everything in X+ (the closure of the
+	// determinant) and differ on everything else. This shows redundancy:
+	// X values are the same, A values are the same (determined by X),
+	// but non-determined attributes differ.
+	row1 := make(map[string]string, len(sorted))
+	row2 := make(map[string]string, len(sorted))
+
+	for _, attr := range sorted {
+		if contains(closure, attr) {
+			// Attributes determined by X: same in both rows
+			row1[attr] = attr + "1"
+			row2[attr] = attr + "1"
+		} else {
+			// Attributes NOT determined by X: differ between rows
+			row1[attr] = attr + "1"
+			row2[attr] = attr + "2"
+		}
+	}
+
+	// Add a third row with different determinant values to show
+	// that the FD holds (different X -> can have different A).
+	row3 := make(map[string]string, len(sorted))
+	for _, attr := range sorted {
+		row3[attr] = attr + "3"
+	}
+
+	return []map[string]string{row1, row2, row3}
+}
+
+// FormatRelation formats rows as a text table for diagnostic output.
+func FormatRelation(allAttrs []string, rows []map[string]string) string {
+	sorted := make([]string, len(allAttrs))
+	copy(sorted, allAttrs)
+	sort.Strings(sorted)
+
+	// Cap at 10 rows
+	truncated := false
+	displayRows := rows
+	if len(displayRows) > 10 {
+		displayRows = displayRows[:10]
+		truncated = true
+	}
+
+	// Build header
+	result := "  |"
+	for _, attr := range sorted {
+		result += " " + attr + " |"
+	}
+	result += "\n"
+
+	// Build rows
+	for _, row := range displayRows {
+		result += "  |"
+		for _, attr := range sorted {
+			val := row[attr]
+			// Pad to match header column width
+			width := len(attr)
+			for len(val) < width {
+				val += " "
+			}
+			result += " " + val + " |"
+		}
+		result += "\n"
+	}
+
+	if truncated {
+		result += "  (truncated to 10 rows)\n"
+	}
+
+	return result
 }
 
 // itoa converts a small non-negative integer to its string representation
