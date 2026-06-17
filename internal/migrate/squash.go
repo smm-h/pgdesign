@@ -87,6 +87,17 @@ func SquashMigrations(dir, from, to string) (*SquashResult, error) {
 		}
 	}
 
+	// Strip phase annotations: squashed output is end-state DDL.
+	for i := range optimizedDDL {
+		optimizedDDL[i].Phase = ""
+		for j := range optimizedDDL[i].ConsolidatedOps {
+			optimizedDDL[i].ConsolidatedOps[j].Phase = ""
+		}
+	}
+	for i := range allDML {
+		allDML[i].Phase = ""
+	}
+
 	squashed := &Migration{
 		Version:     to,
 		Description: fmt.Sprintf("Squashed from %s to %s", from, to),
