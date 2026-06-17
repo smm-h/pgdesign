@@ -24,10 +24,11 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	}
 
 	// Phase 1: resolve
-	tables, enums, compositeTypes, resolveDiags := resolve(raw, reg)
+	tables, enums, compositeTypes, domains, resolveDiags := resolve(raw, reg)
 	diags = append(diags, resolveDiags...)
 	schema.Enums = enums
 	schema.CompositeTypes = compositeTypes
+	schema.Domains = domains
 	schema.Views = resolveViews(raw)
 	schema.MaterializedViews = resolveMaterializedViews(raw)
 
@@ -79,10 +80,11 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	// Phase 1: resolve all schemas.
 	var allTables []Table
 	for _, raw := range raws {
-		tables, enums, compositeTypes, resolveDiags := resolve(raw, reg)
+		tables, enums, compositeTypes, domains, resolveDiags := resolve(raw, reg)
 		diags = append(diags, resolveDiags...)
 		schema.Enums = append(schema.Enums, enums...)
 		schema.CompositeTypes = append(schema.CompositeTypes, compositeTypes...)
+		schema.Domains = append(schema.Domains, domains...)
 		allTables = append(allTables, tables...)
 		schema.Views = append(schema.Views, resolveViews(raw)...)
 		schema.MaterializedViews = append(schema.MaterializedViews, resolveMaterializedViews(raw)...)
@@ -108,7 +110,7 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 }
 
 // resolve expands semantic types into PG types and builds model structs.
-func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []CompositeType, diagnostic.Diagnostics) {
+func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []CompositeType, []Domain, diagnostic.Diagnostics) {
 	var diags diagnostic.Diagnostics
 	var tables []Table
 	var enums []Enum
@@ -165,7 +167,30 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 		}
 	}
 
-	return tables, enums, compositeTypes, diags
+	// Build domains from scalar types with CHECK expressions.
+	var domains []Domain
+	seen := make(map[string]bool)
+	for _, t := range tables {
+		for _, col := range t.Columns {
+			if col.SemanticTypeName == "" || seen[col.SemanticTypeName] {
+				continue
+			}
+			td, err := reg.Resolve(col.SemanticTypeName)
+			if err != nil || td.Kind != semtype.KindScalar || td.Check == "" {
+				continue
+			}
+			seen[col.SemanticTypeName] = true
+			domains = append(domains, Domain{
+				Name:     td.Name,
+				Schema:   raw.Meta.Schema,
+				BaseType: td.BaseType,
+				Check:    td.Check,
+				Comment:  td.Comment,
+			})
+		}
+	}
+
+	return tables, enums, compositeTypes, domains, diags
 }
 
 // resolveViews converts raw views into model Views.
@@ -308,23 +333,11 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 	}
 
 	// Resolve columns.
-	type colCheck struct {
-		colName   string
-		checkExpr string
-	}
-	var semanticChecks []colCheck
-
 	for _, rc := range rt.Columns {
-		col, checkExpr, colDiags := resolveColumn(rc, rt.Name, reg)
+		col, _, colDiags := resolveColumn(rc, rt.Name, reg)
 		diags = append(diags, colDiags...)
 		if col != nil {
 			t.Columns = append(t.Columns, *col)
-			if checkExpr != "" {
-				semanticChecks = append(semanticChecks, colCheck{
-					colName:   col.Name,
-					checkExpr: checkExpr,
-				})
-			}
 		}
 	}
 
@@ -383,17 +396,6 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (
 		}
 		checks := jsonSchemaToChecks(col.Name, content)
 		t.Checks = append(t.Checks, checks...)
-	}
-
-	// Generate CHECK constraints from semantic type CHECK expressions.
-	for _, sc := range semanticChecks {
-		// Replace VALUE placeholder with actual column name.
-		expr := strings.ReplaceAll(sc.checkExpr, "VALUE", sc.colName)
-		name := constraintName(rt.Name, "chk", sc.colName)
-		t.Checks = append(t.Checks, CheckConstraint{
-			Name: name,
-			Expr: expr,
-		})
 	}
 
 	// Resolve exclusion constraints.
@@ -506,6 +508,12 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 		Identity:         resolved.Identity,
 		SemanticTypeName: rc.Type,
 		Array:            resolved.Array,
+	}
+
+	// If the semantic type has a CHECK expression, the column uses a domain.
+	// Set PGType to the domain name (= semantic type name) instead of the base PG type.
+	if resolved.Check != "" {
+		col.PGType = rc.Type
 	}
 
 	// Apply column-level generated override.
