@@ -417,6 +417,13 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersi
 		}
 		t.Exclusions = excls
 
+		// Triggers
+		trigs, err := queryTriggers(ctx, conn, ti.oid)
+		if err != nil {
+			return nil, nil, fmt.Errorf("triggers for %s.%s: %w", schemaName, ti.name, err)
+		}
+		t.Triggers = trigs
+
 		// Partition metadata (only for partitioned tables).
 		if ti.relkind == "p" {
 			ps, err := queryPartitionSpec(ctx, conn, ti.oid, t.Columns, pgVersion)
@@ -1130,6 +1137,141 @@ func splitExclusionElements(s string) []string {
 		parts = append(parts, s[start:])
 	}
 	return parts
+}
+
+// queryTriggers returns user-defined triggers for a table OID.
+// Filters out internal triggers, foreign-key constraint triggers, and
+// pgdesign_deny_mutation triggers (managed by append_only).
+func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model.Trigger, error) {
+	rows, err := conn.Query(ctx, `
+		SELECT
+			t.tgname,
+			p.proname AS func_name,
+			t.tgtype,
+			t.tgconstraint != 0 AS is_constraint,
+			t.tgdeferrable,
+			t.tginitdeferred,
+			COALESCE(t.tgoldtable, '') AS old_table,
+			COALESCE(t.tgnewtable, '') AS new_table,
+			pg_get_triggerdef(t.oid) AS triggerdef
+		FROM pg_trigger t
+		JOIN pg_proc p ON t.tgfoid = p.oid
+		WHERE t.tgrelid = $1
+		  AND NOT t.tgisinternal
+		  AND t.tgconstrrelid = 0
+		  AND p.proname != 'pgdesign_deny_mutation'
+		ORDER BY t.tgname
+	`, tableOID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var triggers []model.Trigger
+	for rows.Next() {
+		var (
+			name         string
+			funcName     string
+			tgtype       int16
+			isConstraint bool
+			deferrable   bool
+			initDeferred bool
+			oldTable     string
+			newTable     string
+			triggerdef   string
+		)
+		if err := rows.Scan(&name, &funcName, &tgtype, &isConstraint, &deferrable, &initDeferred, &oldTable, &newTable, &triggerdef); err != nil {
+			return nil, err
+		}
+
+		trig := model.Trigger{
+			Name:              name,
+			Function:          funcName,
+			Events:            decodeTriggerEvents(tgtype),
+			Timing:            decodeTriggerTiming(tgtype),
+			ForEach:           decodeTriggerForEach(tgtype),
+			Constraint:        isConstraint,
+			Deferrable:        deferrable,
+			InitiallyDeferred: initDeferred,
+			ReferencingOld:    oldTable,
+			ReferencingNew:    newTable,
+			When:              extractTriggerWhen(triggerdef),
+		}
+		triggers = append(triggers, trig)
+	}
+	return triggers, rows.Err()
+}
+
+// decodeTriggerTiming extracts the timing (BEFORE/AFTER/INSTEAD OF) from tgtype bitmask.
+// Bit 1 (0x02) = BEFORE (row-level), Bit 6 (0x40) = INSTEAD OF.
+// If neither BEFORE nor INSTEAD OF, it's AFTER.
+func decodeTriggerTiming(tgtype int16) string {
+	if tgtype&(1<<6) != 0 {
+		return "INSTEAD OF"
+	}
+	if tgtype&(1<<1) != 0 {
+		return "BEFORE"
+	}
+	return "AFTER"
+}
+
+// decodeTriggerEvents extracts the event list from tgtype bitmask.
+// Bit 2 (0x04) = INSERT, Bit 3 (0x08) = DELETE, Bit 4 (0x10) = UPDATE, Bit 5 (0x20) = TRUNCATE.
+func decodeTriggerEvents(tgtype int16) []string {
+	var events []string
+	if tgtype&(1<<2) != 0 {
+		events = append(events, "INSERT")
+	}
+	if tgtype&(1<<3) != 0 {
+		events = append(events, "DELETE")
+	}
+	if tgtype&(1<<4) != 0 {
+		events = append(events, "UPDATE")
+	}
+	if tgtype&(1<<5) != 0 {
+		events = append(events, "TRUNCATE")
+	}
+	return events
+}
+
+// decodeTriggerForEach extracts FOR EACH ROW vs FOR EACH STATEMENT from tgtype.
+// Bit 0 (0x01) = FOR EACH ROW.
+func decodeTriggerForEach(tgtype int16) string {
+	if tgtype&1 != 0 {
+		return "ROW"
+	}
+	return "STATEMENT"
+}
+
+// extractTriggerWhen extracts the WHEN condition from pg_get_triggerdef output.
+// The format is: CREATE TRIGGER ... WHEN (condition) EXECUTE ...
+func extractTriggerWhen(triggerdef string) string {
+	// Find " WHEN (" and extract up to ") EXECUTE"
+	whenIdx := strings.Index(strings.ToUpper(triggerdef), " WHEN (")
+	if whenIdx < 0 {
+		return ""
+	}
+	// Start after " WHEN ("
+	start := whenIdx + 7
+	// Find matching closing paren before EXECUTE.
+	// We need to handle nested parens.
+	depth := 1
+	i := start
+	for i < len(triggerdef) && depth > 0 {
+		switch triggerdef[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		}
+		if depth > 0 {
+			i++
+		}
+	}
+	if depth == 0 {
+		return triggerdef[start:i]
+	}
+	return ""
 }
 
 // mapPartStrategy maps a pg_partitioned_table.partstrat character to a strategy name.
