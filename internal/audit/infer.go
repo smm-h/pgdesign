@@ -39,7 +39,7 @@ func inferFDs(tbl *model.Table) []diagnostic.Diagnostic {
 					Table:    tbl.Name,
 					Severity: diagnostic.Error,
 					Message: fmt.Sprintf(
-						"implied FD {%s} -> {%s} from primary key is not declared in [[dependencies]]",
+						"inferred FD {%s} -> {%s} from primary key is not declared in [[dependencies]]",
 						formatAttrs(tbl.PK), formatAttrs(undeclared),
 					),
 				})
@@ -96,7 +96,7 @@ func inferFDs(tbl *model.Table) []diagnostic.Diagnostic {
 				Table:    tbl.Name,
 				Severity: diagnostic.Error,
 				Message: fmt.Sprintf(
-					"implied FD {%s} -> {%s} from unique constraint is not declared in [[dependencies]]",
+					"inferred FD {%s} -> {%s} from unique constraint is not declared in [[dependencies]]",
 					formatAttrs(uniq.Columns), formatAttrs(missing),
 				),
 			})

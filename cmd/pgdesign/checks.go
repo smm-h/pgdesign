@@ -171,6 +171,9 @@ func checkNF(ctx strictcli.CheckContext) strictcli.CheckResult {
 				continue
 			}
 			if len(fds) > 0 {
+				for j := range fds {
+					fds[j].Source = "discovered"
+				}
 				schema.Tables[i].Dependencies = fds
 			}
 		}
