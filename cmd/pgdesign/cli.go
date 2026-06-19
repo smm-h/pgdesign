@@ -204,6 +204,13 @@ func main() {
 			strictcli.StringFlag("older-than", "Drop databases older than this duration (e.g., 2h, 30m)"),
 		),
 	)
+	tdb.Command("init", "Generate test database wrappers for consumer projects", handleTestdbInit,
+		strictcli.WithFlags(
+			strictcli.StringFlag("language", "Target language(s)", strictcli.Repeatable()),
+			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Default(nil)),
+			strictcli.BoolFlag("force", "Overwrite existing files"),
+		),
+	)
 
 	app.Run()
 }

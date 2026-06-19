@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
@@ -132,5 +135,151 @@ func handleTestdbGC(kwargs map[string]interface{}) int {
 	if failures > 0 {
 		return 1
 	}
+	return 0
+}
+
+func handleTestdbInit(kwargs map[string]interface{}) int {
+	// Extract --language repeatable flag.
+	var languages []string
+	if raw, ok := kwargs["language"].([]interface{}); ok {
+		for _, v := range raw {
+			if s, ok := v.(string); ok {
+				languages = append(languages, s)
+			}
+		}
+	}
+	if len(languages) == 0 {
+		fmt.Fprintln(os.Stderr, "error: at least one --language is required")
+		return 1
+	}
+
+	// Validate languages.
+	supported := make(map[string]bool)
+	for _, lang := range testdb.SupportedLanguages() {
+		supported[lang] = true
+	}
+	for _, lang := range languages {
+		if !supported[lang] {
+			fmt.Fprintf(os.Stderr, "error: unsupported language %q (supported: %s)\n",
+				lang, strings.Join(testdb.SupportedLanguages(), ", "))
+			return 1
+		}
+	}
+
+	force, _ := kwargs["force"].(bool)
+	outputName, _ := kwargs["output"].(string)
+
+	// Find pgdesign.toml.
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: get working directory: %v\n", err)
+		return 1
+	}
+
+	configPath, found := config.FindConfig(cwd)
+	if !found {
+		fmt.Fprintln(os.Stderr, "error: pgdesign.toml not found in current directory")
+		return 1
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: load config: %v\n", err)
+		return 1
+	}
+
+	// Find the SQL output section.
+	var sqlOutputName string
+	var sqlOutput config.OutputConfig
+	var sqlOutputNames []string
+	for name, out := range cfg.Output {
+		if out.Format == "sql" {
+			sqlOutputNames = append(sqlOutputNames, name)
+		}
+	}
+	sort.Strings(sqlOutputNames)
+
+	switch {
+	case len(sqlOutputNames) == 0:
+		fmt.Fprintln(os.Stderr, "error: no SQL output section found in pgdesign.toml")
+		return 1
+	case len(sqlOutputNames) == 1:
+		sqlOutputName = sqlOutputNames[0]
+		sqlOutput = cfg.Output[sqlOutputName]
+	case outputName != "":
+		out, ok := cfg.Output[outputName]
+		if !ok {
+			fmt.Fprintf(os.Stderr, "error: output section %q not found in pgdesign.toml\n", outputName)
+			return 1
+		}
+		if out.Format != "sql" {
+			fmt.Fprintf(os.Stderr, "error: output section %q has format %q, expected sql\n", outputName, out.Format)
+			return 1
+		}
+		sqlOutputName = outputName
+		sqlOutput = out
+	default:
+		fmt.Fprintf(os.Stderr, "error: multiple SQL output sections found: %s\n", strings.Join(sqlOutputNames, ", "))
+		fmt.Fprintln(os.Stderr, "  use --output to specify which one")
+		return 1
+	}
+	_ = sqlOutputName
+
+	// Resolve DDL path: the .split.json companion file.
+	splitJSONPath := sqlOutput.Path + ".split.json"
+
+	// Get the base URL from config.
+	baseURL := cfg.Database.URL
+	if baseURL == "" {
+		fmt.Fprintln(os.Stderr, "error: [database].url is not set in pgdesign.toml")
+		return 1
+	}
+
+	// Parse base database name from the URL.
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: parse database URL: %v\n", err)
+		return 1
+	}
+	baseName := strings.TrimPrefix(u.Path, "/")
+	if baseName == "" {
+		fmt.Fprintln(os.Stderr, "error: database URL has no database name")
+		return 1
+	}
+
+	// Generate wrappers for each language.
+	for _, lang := range languages {
+		relPath := testdb.WrapperOutputPath(lang)
+		absPath := filepath.Join(cwd, relPath)
+
+		// Check if file exists.
+		if _, err := os.Stat(absPath); err == nil && !force {
+			fmt.Fprintf(os.Stderr, "error: %s already exists (use --force to overwrite)\n", relPath)
+			return 1
+		}
+
+		// Render template.
+		content, err := testdb.RenderTemplate(lang, splitJSONPath, baseURL, baseName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: render template for %s: %v\n", lang, err)
+			return 1
+		}
+
+		// Create parent directories.
+		dir := filepath.Dir(absPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "error: create directory %s: %v\n", dir, err)
+			return 1
+		}
+
+		// Write the file.
+		if err := os.WriteFile(absPath, content, 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "error: write %s: %v\n", relPath, err)
+			return 1
+		}
+
+		fmt.Fprintf(os.Stderr, "wrote %s\n", relPath)
+	}
+
 	return 0
 }
