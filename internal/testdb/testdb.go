@@ -11,12 +11,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/smm-h/pgdesign/internal/dbutil"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
 const (
@@ -65,6 +67,11 @@ func NewManager(baseURL string) (*Manager, error) {
 		maintenanceURL: maintenanceURL,
 		baseName:       baseName,
 	}, nil
+}
+
+// connectMaintenance opens a connection to the maintenance database.
+func (m *Manager) connectMaintenance(ctx context.Context) (*pgx.Conn, error) {
+	return pgx.Connect(ctx, m.maintenanceURL)
 }
 
 // EphemeralDB represents a created ephemeral test database.
@@ -119,22 +126,272 @@ func ParseName(name string) (baseName string, created time.Time, random string, 
 
 // Create creates a new ephemeral test database.
 func (m *Manager) Create(ctx context.Context, opts CreateOptions) (*EphemeralDB, error) {
-	panic("not implemented")
+	if err := opts.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid options: %w", err)
+	}
+
+	conn, err := pgx.Connect(ctx, m.maintenanceURL)
+	if err != nil {
+		return nil, fmt.Errorf("connect to maintenance database: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	// Detect PG version on first call.
+	var versionErr error
+	m.pgVersionOnce.Do(func() {
+		var versionStr string
+		err := conn.QueryRow(ctx, "SHOW server_version_num").Scan(&versionStr)
+		if err != nil {
+			versionErr = fmt.Errorf("detect PG version: %w", err)
+			return
+		}
+		v, err := strconv.Atoi(versionStr)
+		if err != nil {
+			versionErr = fmt.Errorf("parse PG version %q: %w", versionStr, err)
+			return
+		}
+		m.pgVersion = v
+	})
+	if versionErr != nil {
+		return nil, versionErr
+	}
+
+	name := GenerateName(m.baseName)
+	sanitized := pgx.Identifier{name}.Sanitize()
+
+	_, err = conn.Exec(ctx, "CREATE DATABASE "+sanitized)
+	if err != nil {
+		return nil, fmt.Errorf("create database %s: %w", name, err)
+	}
+
+	if opts.DDL != nil {
+		if err := m.ApplyDDL(ctx, name, opts.DDL); err != nil {
+			// Best-effort cleanup: drop the database we just created.
+			dropConn, dropErr := pgx.Connect(ctx, m.maintenanceURL)
+			if dropErr == nil {
+				_, _ = dropConn.Exec(ctx, "DROP DATABASE IF EXISTS "+sanitized)
+				dropConn.Close(ctx)
+			}
+			return nil, fmt.Errorf("apply DDL: %w", err)
+		}
+	}
+
+	dbURL, err := dbutil.SwapDatabase(m.maintenanceURL, name)
+	if err != nil {
+		return nil, fmt.Errorf("derive ephemeral DB URL: %w", err)
+	}
+
+	return &EphemeralDB{
+		Name:      name,
+		URL:       dbURL,
+		CreatedAt: time.Now(),
+		manager:   m,
+	}, nil
 }
 
 // Drop destroys an ephemeral test database and closes tracked connections.
 func (m *Manager) Drop(ctx context.Context, db *EphemeralDB) error {
-	panic("not implemented")
+	// Close all tracked connections and pools.
+	db.mu.Lock()
+	for i := len(db.pools) - 1; i >= 0; i-- {
+		db.pools[i].Close()
+	}
+	db.pools = nil
+	for i := len(db.conns) - 1; i >= 0; i-- {
+		db.conns[i].Close(ctx)
+	}
+	db.conns = nil
+	db.mu.Unlock()
+
+	conn, err := pgx.Connect(ctx, m.maintenanceURL)
+	if err != nil {
+		return fmt.Errorf("connect to maintenance database: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	sanitized := pgx.Identifier{db.Name}.Sanitize()
+
+	if m.pgVersion >= 130000 {
+		_, err = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+sanitized+" WITH (FORCE)")
+		if err != nil {
+			return fmt.Errorf("drop database %s: %w", db.Name, err)
+		}
+		return nil
+	}
+
+	// Pre-PG13: terminate backends and retry.
+	for attempt := 0; attempt < 3; attempt++ {
+		_, _ = conn.Exec(ctx,
+			"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid != pg_backend_pid()",
+			db.Name,
+		)
+		_, err = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+sanitized)
+		if err == nil {
+			return nil
+		}
+		if !strings.Contains(err.Error(), "is being accessed by other users") {
+			return fmt.Errorf("drop database %s: %w", db.Name, err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("drop database %s after 3 retries: %w", db.Name, err)
 }
 
 // Connect opens a tracked connection to the ephemeral database.
 func (db *EphemeralDB) Connect(ctx context.Context) (*pgx.Conn, error) {
-	panic("not implemented")
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	conn, err := pgx.Connect(ctx, db.URL)
+	if err != nil {
+		return nil, fmt.Errorf("connect to %s: %w", db.Name, err)
+	}
+	db.conns = append(db.conns, conn)
+	return conn, nil
 }
 
 // Pool opens a tracked connection pool to the ephemeral database.
 func (db *EphemeralDB) Pool(ctx context.Context) (*pgxpool.Pool, error) {
-	panic("not implemented")
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	pool, err := pgxpool.New(ctx, db.URL)
+	if err != nil {
+		return nil, fmt.Errorf("create pool for %s: %w", db.Name, err)
+	}
+	db.pools = append(db.pools, pool)
+	return pool, nil
+}
+
+// ApplyDDL connects to the named database and executes DDL statements from the reader.
+func (m *Manager) ApplyDDL(ctx context.Context, dbName string, ddl io.Reader) error {
+	dbURL, err := dbutil.SwapDatabase(m.maintenanceURL, dbName)
+	if err != nil {
+		return fmt.Errorf("derive database URL: %w", err)
+	}
+
+	conn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		return fmt.Errorf("connect to %s: %w", dbName, err)
+	}
+	defer conn.Close(ctx)
+
+	data, err := io.ReadAll(ddl)
+	if err != nil {
+		return fmt.Errorf("read DDL: %w", err)
+	}
+
+	stmts, err := sqlparse.SplitStatements(string(data))
+	if err != nil {
+		return fmt.Errorf("split DDL statements: %w", err)
+	}
+
+	for i, stmt := range stmts {
+		_, err := conn.Exec(ctx, stmt)
+		if err != nil {
+			preview := stmt
+			if len(preview) > 100 {
+				preview = preview[:100] + "..."
+			}
+			errMsg := fmt.Sprintf("statement %d failed: %s\n  SQL: %s", i+1, err, preview)
+			upper := strings.ToUpper(strings.TrimSpace(stmt))
+			if strings.HasPrefix(upper, "CREATE EXTENSION") {
+				errMsg += "\n  Note: CREATE EXTENSION requires superuser privileges or the extension must be available"
+			}
+			return fmt.Errorf("%s", errMsg)
+		}
+	}
+	return nil
+}
+
+// ListOrphans finds ephemeral databases that were created longer than olderThan ago.
+func (m *Manager) ListOrphans(ctx context.Context, olderThan time.Duration) ([]*EphemeralDB, error) {
+	conn, err := pgx.Connect(ctx, m.maintenanceURL)
+	if err != nil {
+		return nil, fmt.Errorf("connect to maintenance database: %w", err)
+	}
+	defer conn.Close(ctx)
+
+	pattern := m.baseName + NamePrefix + "%"
+	rows, err := conn.Query(ctx, "SELECT datname FROM pg_database WHERE datname LIKE $1", pattern)
+	if err != nil {
+		return nil, fmt.Errorf("query pg_database: %w", err)
+	}
+	defer rows.Close()
+
+	var orphans []*EphemeralDB
+	for rows.Next() {
+		var datname string
+		if err := rows.Scan(&datname); err != nil {
+			return nil, fmt.Errorf("scan datname: %w", err)
+		}
+
+		_, created, _, ok := ParseName(datname)
+		if !ok {
+			continue
+		}
+
+		if time.Since(created) <= olderThan {
+			continue
+		}
+
+		var connCount int
+		err := conn.QueryRow(ctx,
+			"SELECT count(*) FROM pg_stat_activity WHERE datname = $1",
+			datname,
+		).Scan(&connCount)
+		if err != nil {
+			return nil, fmt.Errorf("count connections to %s: %w", datname, err)
+		}
+
+		dbURL, err := dbutil.SwapDatabase(m.maintenanceURL, datname)
+		if err != nil {
+			return nil, fmt.Errorf("derive URL for %s: %w", datname, err)
+		}
+
+		orphans = append(orphans, &EphemeralDB{
+			Name:      datname,
+			URL:       dbURL,
+			CreatedAt: created,
+			manager:   m,
+		})
+		_ = connCount // available for future use (e.g., filtering)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate pg_database: %w", err)
+	}
+
+	return orphans, nil
+}
+
+// SetupForTest creates an ephemeral database for a test and registers cleanup.
+func (m *Manager) SetupForTest(t testing.TB, opts CreateOptions) *EphemeralDB {
+	t.Helper()
+	SkipIfNoPostgres(t)
+
+	db, err := m.Create(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("create ephemeral database: %v", err)
+	}
+
+	t.Cleanup(func() {
+		db.mu.Lock()
+		for i := len(db.pools) - 1; i >= 0; i-- {
+			db.pools[i].Close()
+		}
+		db.pools = nil
+		for i := len(db.conns) - 1; i >= 0; i-- {
+			db.conns[i].Close(context.Background())
+		}
+		db.conns = nil
+		db.mu.Unlock()
+
+		if err := m.Drop(context.Background(), db); err != nil {
+			t.Logf("cleanup: drop ephemeral database %s: %v", db.Name, err)
+		}
+	})
+
+	return db
 }
 
 // truncateRuneSafe truncates s to at most maxBytes bytes without splitting
