@@ -186,6 +186,25 @@ func main() {
 		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) for cross-reference", strictcli.Variadic(), strictcli.ArgRequired(false))),
 	)
 
+	tdb := app.Group("testdb", "Ephemeral test database management")
+	tdb.Command("setup", "Create an ephemeral test database and apply DDL", handleTestdbSetup,
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
+			strictcli.StringFlag("ddl", "Path to SQL DDL file"),
+		),
+	)
+	tdb.Command("teardown", "Drop an ephemeral test database", handleTestdbTeardown,
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
+		),
+	)
+	tdb.Command("gc", "Drop orphaned test databases", handleTestdbGC,
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL"),
+			strictcli.StringFlag("older-than", "Drop databases older than this duration (e.g., 2h, 30m)"),
+		),
+	)
+
 	app.Run()
 }
 

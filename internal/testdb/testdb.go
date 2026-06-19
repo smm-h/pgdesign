@@ -237,6 +237,13 @@ func (m *Manager) Drop(ctx context.Context, db *EphemeralDB) error {
 	return fmt.Errorf("drop database %s after 3 retries: %w", db.Name, err)
 }
 
+// DropByName drops an ephemeral database by name without requiring a full
+// EphemeralDB struct. This is useful for CLI teardown and GC operations where
+// the database was not created by this Manager instance.
+func (m *Manager) DropByName(ctx context.Context, name string) error {
+	return m.Drop(ctx, &EphemeralDB{Name: name})
+}
+
 // Connect opens a tracked connection to the ephemeral database.
 func (db *EphemeralDB) Connect(ctx context.Context) (*pgx.Conn, error) {
 	db.mu.Lock()
