@@ -10,95 +10,58 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/fd"
+	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
-const testConnStr = "postgres:///pgdesign_test"
-const testSchema = "pgdesign_discover_test"
+// ephemeralURL is set by TestMain to point at the ephemeral database.
+var ephemeralURL string
 
-// canSetup connects to the test database and verifies we can create schemas.
-func canSetup() *pgx.Conn {
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, testConnStr)
-	if err != nil {
-		return nil
+func testBaseURL() string {
+	if u := os.Getenv("PGDESIGN_DB"); u != "" {
+		return u
 	}
-	_, err = conn.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS pgdesign_discover_probe_test")
-	if err != nil {
-		conn.Close(ctx)
-		return nil
-	}
-	conn.Exec(ctx, "DROP SCHEMA IF EXISTS pgdesign_discover_probe_test")
-	return conn
+	return "postgres://localhost:5432/postgres?sslmode=disable"
 }
 
 func TestMain(m *testing.M) {
-	conn := canSetup()
-	if conn == nil {
+	ctx := context.Background()
+
+	manager, err := testdb.NewManager(testBaseURL())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "skipping discover tests: %v\n", err)
 		os.Exit(0)
 	}
 
-	ctx := context.Background()
-
-	// Create test schema and tables.
-	conn.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS "+testSchema)
-	conn.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".fd_test CASCADE")
-	conn.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".wide_test CASCADE")
-
-	setupSQL := `
-		CREATE TABLE ` + testSchema + `.fd_test (
-			a int NOT NULL,
-			b int NOT NULL,
-			c int NOT NULL,
-			d int NOT NULL
-		);
-
-		-- Insert data where A->B and B->C hold.
-		-- a=1 -> b=10, a=2 -> b=20, a=3 -> b=30
-		-- b=10 -> c=100, b=20 -> c=200, b=30 -> c=300
-		-- d is independent (varies freely).
-		INSERT INTO ` + testSchema + `.fd_test (a, b, c, d) VALUES
-			(1, 10, 100, 1),
-			(1, 10, 100, 2),
-			(1, 10, 100, 3),
-			(2, 20, 200, 1),
-			(2, 20, 200, 4),
-			(2, 20, 200, 5),
-			(3, 30, 300, 2),
-			(3, 30, 300, 6),
-			(3, 30, 300, 7),
-			(1, 10, 100, 8),
-			(2, 20, 200, 9),
-			(3, 30, 300, 10);
-	`
-
-	_, err := conn.Exec(ctx, setupSQL)
+	ddl, err := os.Open("testdata/setup.sql")
 	if err != nil {
-		conn.Close(ctx)
-		panic("test setup failed: " + err.Error())
+		fmt.Fprintf(os.Stderr, "open testdata/setup.sql: %v\n", err)
+		os.Exit(1)
 	}
-	conn.Close(ctx)
+
+	db, err := manager.Create(ctx, testdb.CreateOptions{DDL: ddl})
+	ddl.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "skipping discover tests: %v\n", err)
+		os.Exit(0)
+	}
+
+	ephemeralURL = db.URL
 
 	code := m.Run()
 
-	// Teardown.
-	conn2, err := pgx.Connect(ctx, testConnStr)
-	if err == nil {
-		conn2.Exec(ctx, "DROP SCHEMA IF EXISTS "+testSchema+" CASCADE")
-		conn2.Close(ctx)
-	}
-
+	_ = manager.Drop(ctx, db)
 	os.Exit(code)
 }
 
 func TestDiscoverBasicFDs(t *testing.T) {
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, testConnStr)
+	conn, err := pgx.Connect(ctx, ephemeralURL)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
 	defer conn.Close(ctx)
 
-	fds, diags, err := Discover(conn, testSchema, "fd_test", Options{
+	fds, diags, err := Discover(conn, "public", "fd_test", Options{
 		SampleSize: 5000,
 		MaxColumns: 20,
 	})
@@ -134,14 +97,14 @@ func TestDiscoverBasicFDs(t *testing.T) {
 
 func TestDiscoverMaxColumnsSkip(t *testing.T) {
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, testConnStr)
+	conn, err := pgx.Connect(ctx, ephemeralURL)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
 	defer conn.Close(ctx)
 
 	// fd_test has 4 columns; set MaxColumns to 3 to trigger the skip.
-	fds, diags, err := Discover(conn, testSchema, "fd_test", Options{
+	fds, diags, err := Discover(conn, "public", "fd_test", Options{
 		SampleSize: 5000,
 		MaxColumns: 3,
 	})
@@ -164,20 +127,20 @@ func TestDiscoverMaxColumnsSkip(t *testing.T) {
 
 func TestDiscoverEmptyTable(t *testing.T) {
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, testConnStr)
+	conn, err := pgx.Connect(ctx, ephemeralURL)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
 	defer conn.Close(ctx)
 
 	// Create an empty table for this test.
-	_, err = conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS "+testSchema+".empty_test (x int, y int)")
+	_, err = conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS empty_test (x int, y int)")
 	if err != nil {
 		t.Fatalf("create empty_test: %v", err)
 	}
-	defer conn.Exec(ctx, "DROP TABLE IF EXISTS "+testSchema+".empty_test")
+	defer conn.Exec(ctx, "DROP TABLE IF EXISTS empty_test")
 
-	fds, diags, err := Discover(conn, testSchema, "empty_test", Options{})
+	fds, diags, err := Discover(conn, "public", "empty_test", Options{})
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
@@ -308,7 +271,7 @@ func TestBuildPartition(t *testing.T) {
 
 func TestWideTableCreatedAndSkipped(t *testing.T) {
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, testConnStr)
+	conn, err := pgx.Connect(ctx, ephemeralURL)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -320,15 +283,15 @@ func TestWideTableCreatedAndSkipped(t *testing.T) {
 		colDefs = append(colDefs, fmt.Sprintf("c%d int", i))
 	}
 	createSQL := fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s.wide_test (%s)",
-		testSchema, strings.Join(colDefs, ", "),
+		"CREATE TABLE IF NOT EXISTS wide_test (%s)",
+		strings.Join(colDefs, ", "),
 	)
 	_, err = conn.Exec(ctx, createSQL)
 	if err != nil {
 		t.Fatalf("create wide_test: %v", err)
 	}
 
-	fds, diags, err := Discover(conn, testSchema, "wide_test", Options{
+	fds, diags, err := Discover(conn, "public", "wide_test", Options{
 		MaxColumns: 20,
 	})
 	if err != nil {
