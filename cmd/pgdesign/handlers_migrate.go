@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/dbutil"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -1037,12 +1037,7 @@ func handleMigrateTestShadow(kwargs map[string]interface{}) int {
 
 // buildShadowURL takes a PostgreSQL connection URL and swaps the database name.
 func buildShadowURL(dbURL, shadowDB string) (string, error) {
-	u, err := url.Parse(dbURL)
-	if err != nil {
-		return "", fmt.Errorf("parse connection URL: %w", err)
-	}
-	u.Path = "/" + shadowDB
-	return u.String(), nil
+	return dbutil.SwapDatabase(dbURL, shadowDB)
 }
 
 // printSchemaDiffSummary prints a human-readable summary of schema differences.
