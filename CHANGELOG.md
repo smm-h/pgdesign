@@ -2,6 +2,53 @@
 
 # Changelog
 
+## 0.14.0
+
+RLS full parity, seed overhaul, FK graph, design intelligence, migration intelligence, workload analysis, ephemeral test databases
+
+<details>
+<summary>Context</summary>
+
+Major feature release spanning seven areas: RLS policies gain PERMISSIVE/RESTRICTIVE types and full diff/migrate/introspect support; seed generation covers all 42 PG types with CHECK/UNIQUE awareness and multiple output formats; FK graph provides O(1) lookups and cascade walkers used by all codegen backends; design intelligence adds cascade, subsumption, dead column, and row size checks; migration intelligence adds phase annotations, NOT VALID auto-split, batched DML, shadow testing, volatile default detection, squash consolidation, and multi-step rollback; workload analysis integrates pg_stat_statements with N+1 and slow query detection; ephemeral test databases (`testdb` commands) with native wrapper generation for 6 languages prevent tests from destroying production data.
+
+</details>
+
+### Breaking
+
+- **Breaking.** `seed.Generate` signature changed: accepts `SeedConfig` struct, returns diagnostics instead of error.
+- **Breaking.** Diagnostic code E300 replaced by concrete NOT VALID + VALIDATE CONSTRAINT migration operations.
+
+### Features
+
+- **RLS full parity.** PERMISSIVE/RESTRICTIVE policy types, FORCE ROW LEVEL SECURITY, policy diff/migrate/introspect, PG 10+ version gate (E222), operation gap warnings (W011/W012).
+- **Seed overhaul.** All 42 PG types covered, `--seed` flag, CHECK constraint awareness (regex generation), UNIQUE tracking, Zipf/log-normal distributions, array/JSONB population, per-table row counts, FK cycle handling, NULL injection, COPY format, batch INSERT, `--clean`, `--mode edge-cases`, BEGIN/COMMIT wrapping.
+- **FK graph on Schema.** Persistent forward/reverse adjacency lists, `TablesByName` O(1) lookup, CASCADE walkers (depth/breadth/chain). All codegen backends refactored to use `FKGraph.Reverse`.
+- **Design intelligence (`--tag design`).** CASCADE warnings W013-W015, natural key surfacing I001, constraint subsumption W016-W019, dead column detection I002, row size estimation I003/W021/I004.
+- **Migration phase annotations.** Expand/migrate/contract phase classification, safe-only collapse, phase-by-phase apply, phase grouping in plan output.
+- **NOT VALID + VALIDATE auto-split.** Large-table FK additions automatically split into non-blocking NOT VALID constraint followed by VALIDATE CONSTRAINT.
+- **Batched DML.** Configurable `batch_size` for DML operations with execution loop.
+- **Shadow database testing.** `migrate test --shadow` replays migrations against a temporary database, introspects the result, and diffs against the schema.
+- **Volatile default detection.** `migrate` detects volatile defaults (e.g., `now()`, `random()`) in add_column operations and warns about table rewrites.
+- **Squash CREATE TABLE consolidation.** `migrate squash` consolidates add_column/add_index operations into CREATE TABLE statements, strips phase annotations from squashed output.
+- **Applied migration safety check.** `migrate squash` refuses to squash applied migrations when `--db` is provided.
+- **Multi-step rollback.** `migrate rollback --to` rolls back to a specific migration version.
+- **Workload analysis (`--tag workload`).** Structural index recommendations W022-W024/I005, pg_stat_statements integration, N+1 detection W025, slow query patterns W026/I006/I007, duplicate index consolidation.
+- **Ephemeral test databases.** `testdb setup` creates a randomly-named database, applies DDL, and prints the connection URL. `testdb teardown` drops it. `testdb gc` cleans up orphaned test databases by age.
+- **Test wrapper code generation.** `testdb init --language go --language python` generates native test helpers for 6 languages (Go, Python, TypeScript, Java, Kotlin, Zig) that create ephemeral databases using each language's PG driver. No pgdesign binary needed at test runtime.
+- **Pre-split DDL for language wrappers.** `build` auto-generates a `.split.json` companion file alongside SQL outputs, containing DDL split into individual statements via the PostgreSQL parser. Language wrappers read this instead of raw SQL, avoiding the need for a SQL parser in each language.
+
+### Fixes
+
+- **Fix.** Generate migration DDL for changed foreign keys (drop old + add new).
+- **Fix.** Render functions, sequences, exclusions, triggers, collation, statistics, domains, and composites in `FormatTerminal` diff output.
+- **Fix.** Add regex operators (`~`, `~*`, `!~`, `!~*`) to sqlexpr parser.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.13.0
 
 Schema object expansion, codegen modes, BCNF audit, functions, triggers, domains
@@ -54,12 +101,6 @@ Major feature release adding six new schema object types (domains, exclusion con
 
 - **Scalar type CHECKs no longer silently lost.** CHECK constraints defined on semantic types are now enforced at the database level via generated domains.
 - **E221 validates FD column names.** Functional dependency declarations now error if they reference non-existent columns.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.12.3
 
