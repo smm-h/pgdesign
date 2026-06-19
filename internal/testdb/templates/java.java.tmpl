@@ -182,11 +182,11 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
         String maintUrl = swapDB(connUrl, "postgres");
         try (Connection conn = DriverManager.getConnection(toJdbcUrl(maintUrl))) {
             conn.setAutoCommit(true);
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute(
+            try (java.sql.PreparedStatement ps = conn.prepareStatement(
                     "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                    + "WHERE datname = '" + dbName.replace("'", "''") + "' "
-                    + "AND pid != pg_backend_pid()");
+                    + "WHERE datname = ? AND pid != pg_backend_pid()")) {
+                ps.setString(1, dbName);
+                ps.execute();
             }
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("DROP DATABASE IF EXISTS " + escapeIdentifier(dbName));
