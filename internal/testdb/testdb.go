@@ -41,7 +41,8 @@ var nameRegex = regexp.MustCompile(`^(.+)_test_(\d{10,})_([a-z0-9]{8})$`)
 type Manager struct {
 	maintenanceURL string
 	baseName       string
-	pgVersion      int // detected lazily, 0 = not yet detected
+	pgVersion      int   // detected lazily, 0 = not yet detected
+	pgVersionErr   error // non-nil if version detection failed
 	pgVersionOnce  sync.Once
 }
 
@@ -137,23 +138,22 @@ func (m *Manager) Create(ctx context.Context, opts CreateOptions) (*EphemeralDB,
 	defer conn.Close(ctx)
 
 	// Detect PG version on first call.
-	var versionErr error
 	m.pgVersionOnce.Do(func() {
 		var versionStr string
 		err := conn.QueryRow(ctx, "SHOW server_version_num").Scan(&versionStr)
 		if err != nil {
-			versionErr = fmt.Errorf("detect PG version: %w", err)
+			m.pgVersionErr = fmt.Errorf("detect PG version: %w", err)
 			return
 		}
 		v, err := strconv.Atoi(versionStr)
 		if err != nil {
-			versionErr = fmt.Errorf("parse PG version %q: %w", versionStr, err)
+			m.pgVersionErr = fmt.Errorf("parse PG version %q: %w", versionStr, err)
 			return
 		}
 		m.pgVersion = v
 	})
-	if versionErr != nil {
-		return nil, versionErr
+	if m.pgVersionErr != nil {
+		return nil, m.pgVersionErr
 	}
 
 	name := GenerateName(m.baseName)
