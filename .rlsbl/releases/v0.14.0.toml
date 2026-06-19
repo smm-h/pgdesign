@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "RLS full parity, seed overhaul, FK graph, design intelligence, migration intelligence, workload analysis, ephemeral test databases"
+# Optional context explaining why these changes were made
+context = "Major feature release spanning seven areas: RLS policies gain PERMISSIVE/RESTRICTIVE types and full diff/migrate/introspect support; seed generation covers all 42 PG types with CHECK/UNIQUE awareness and multiple output formats; FK graph provides O(1) lookups and cascade walkers used by all codegen backends; design intelligence adds cascade, subsumption, dead column, and row size checks; migration intelligence adds phase annotations, NOT VALID auto-split, batched DML, shadow testing, volatile default detection, squash consolidation, and multi-step rollback; workload analysis integrates pg_stat_statements with N+1 and slow query detection; ephemeral test databases (`testdb` commands) with native wrapper generation for 6 languages prevent tests from destroying production data."
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
