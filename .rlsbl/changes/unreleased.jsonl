@@ -30,3 +30,4 @@
 {"commits":["7e9ef4b49c8445d04ba857cf1e088801b026feee"],"user_facing":true,"description":"**Pre-split DDL for language wrappers.** `build` auto-generates a `.split.json` companion file alongside SQL outputs, containing DDL split into individual statements via the PostgreSQL parser. Language wrappers read this instead of raw SQL, avoiding the need for a SQL parser in each language.","type":"feature"}
 {"commits":["17b24fc79770ffc62be40183ca91d55e07f2422f"],"user_facing":false}
 {"commits":["9f5d6bad219dd08d4553efdd8e883badd1f89b82","0f1f416c94c799df4a8399ecdb1d7c6a18375b17","b47ba44f5c984d0ff0989f5daebd78f82f447e5c","05573ccae2c8f69062524a4220d2198546f9d816","edc197a227add02fe8ae41f1dba8c506e824d5f7"],"user_facing":false}
+{"commits":["ccf9c76c81f195db39aa71a3ca3bffca2b22a08d","d1a60f94b3babb5d48657ae7e868acf61a0cc64b"],"user_facing":false}
