@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
 // --- Unit tests (no DB required) ---
@@ -1054,31 +1054,33 @@ func TestGenerateMigration_ViewQueryChanged(t *testing.T) {
 
 // --- Integration tests (require local PostgreSQL) ---
 
-func getTestConnStr() string {
-	connStr := os.Getenv("PGDESIGN_TEST_DB")
-	if connStr == "" {
-		connStr = "postgres://localhost:5432/pgdesign_test?sslmode=disable"
+func testManager(t *testing.T) *testdb.Manager {
+	t.Helper()
+	dbURL := os.Getenv("PGDESIGN_DB")
+	if dbURL == "" {
+		dbURL = "postgres://localhost:5432/pgdesign?sslmode=disable"
 	}
-	return connStr
+	mgr, err := testdb.NewManager(dbURL)
+	if err != nil {
+		t.Fatalf("create testdb manager: %v", err)
+	}
+	return mgr
 }
 
-func connectTestDB(t *testing.T) *pgx.Conn {
+func setupEphemeralDB(t *testing.T) *testdb.EphemeralDB {
 	t.Helper()
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, getTestConnStr())
-	if err != nil {
-		t.Skipf("Skipping integration test: cannot connect to PostgreSQL: %v", err)
-	}
-	return conn
+	mgr := testManager(t)
+	return mgr.SetupForTest(t, testdb.CreateOptions{})
 }
 
 func TestIntegration_StateTracking(t *testing.T) {
-	conn := connectTestDB(t)
+	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
-	defer conn.Close(ctx)
 
-	// Clean up before test.
-	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_migrations")
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
 
 	// Ensure table.
 	if err := EnsureMigrationsTable(ctx, conn); err != nil {
@@ -1125,15 +1127,16 @@ func TestIntegration_StateTracking(t *testing.T) {
 	if len(versions) != 1 || versions[0] != "0.1.0" {
 		t.Errorf("versions = %v, want [0.1.0]", versions)
 	}
-
-	// Clean up.
-	conn.Exec(ctx, "DROP TABLE pgdesign_migrations")
 }
 
 func TestIntegration_AdvisoryLock(t *testing.T) {
-	conn := connectTestDB(t)
+	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
-	defer conn.Close(ctx)
+
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
 
 	acquired, err := AcquireAdvisoryLock(ctx, conn)
 	if err != nil {
@@ -1150,13 +1153,13 @@ func TestIntegration_AdvisoryLock(t *testing.T) {
 }
 
 func TestIntegration_ApplyAndRollback(t *testing.T) {
-	conn := connectTestDB(t)
+	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
-	defer conn.Close(ctx)
 
-	// Clean up.
-	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_test_table")
-	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_migrations")
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
 
 	// Create a migrations directory with one migration.
 	dir := t.TempDir()
@@ -1210,19 +1213,16 @@ down = { op = "drop_table", table = "public.pgdesign_test_table" }
 	if exists {
 		t.Error("expected pgdesign_test_table to be gone after rollback")
 	}
-
-	// Clean up.
-	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_migrations")
 }
 
 func TestIntegration_ApplyIdempotent(t *testing.T) {
-	conn := connectTestDB(t)
+	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
-	defer conn.Close(ctx)
 
-	// Clean up.
-	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_test_table2")
-	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_migrations")
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
 
 	dir := t.TempDir()
 	migration := `description = "Create test table 2"
@@ -1252,10 +1252,6 @@ down = { op = "drop_table", table = "public.pgdesign_test_table2" }
 	if len(applied2) != 0 {
 		t.Errorf("apply 2: applied = %v, want []", applied2)
 	}
-
-	// Clean up.
-	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_test_table2")
-	conn.Exec(ctx, "DROP TABLE IF EXISTS pgdesign_migrations")
 }
 
 func TestAppendOnlyMigration(t *testing.T) {
