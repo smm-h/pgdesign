@@ -1,3 +1,7 @@
+---
+description: "How pgdesign generates safe, phased migrations with risk classification, NOT VALID auto-split, batched DML, and squash consolidation."
+---
+
 # Migration Intelligence
 
 How pgdesign generates safe, phased migrations with risk classification.
