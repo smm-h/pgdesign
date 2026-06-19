@@ -10,48 +10,53 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/smm-h/pgdesign/internal/testdb"
 	"github.com/smm-h/pgdesign/internal/workload"
 )
 
-const testConnStr = "postgres:///pgdesign_test"
+var (
+	testMgr *testdb.Manager
+	testDB  *testdb.EphemeralDB
+)
 
 // setupServer creates a Server backed by a real pgxpool for integration tests.
-// Returns nil if the database is unavailable.
 func setupServer(t *testing.T) *Server {
 	t.Helper()
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, testConnStr)
+	pool, err := testDB.Pool(ctx)
 	if err != nil {
-		return nil
-	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil
+		t.Fatalf("create pool from ephemeral DB: %v", err)
 	}
 	t.Cleanup(func() { pool.Close() })
 	return NewFromPool(pool, []string{"public"}, "")
 }
 
 func TestMain(m *testing.M) {
-	// Quick connectivity check; if PG is unavailable, skip all tests.
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, testConnStr)
+	dbURL := os.Getenv("PGDESIGN_DB")
+	if dbURL == "" {
+		dbURL = "postgres://localhost:5432/pgdesign?sslmode=disable"
+	}
+
+	var err error
+	testMgr, err = testdb.NewManager(dbURL)
 	if err != nil {
 		os.Exit(0)
 	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
+
+	ctx := context.Background()
+	testDB, err = testMgr.Create(ctx, testdb.CreateOptions{})
+	if err != nil {
 		os.Exit(0)
 	}
-	pool.Close()
-	os.Exit(m.Run())
+
+	code := m.Run()
+
+	_ = testMgr.Drop(ctx, testDB)
+	os.Exit(code)
 }
 
 func TestGetExtensions(t *testing.T) {
 	srv := setupServer(t)
-	if srv == nil {
-		t.Skip("database unavailable")
-	}
 
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
@@ -78,9 +83,6 @@ func TestGetExtensions(t *testing.T) {
 
 func TestGetStats(t *testing.T) {
 	srv := setupServer(t)
-	if srv == nil {
-		t.Skip("database unavailable")
-	}
 
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
@@ -106,9 +108,6 @@ func TestGetStats(t *testing.T) {
 
 func TestGetSchema(t *testing.T) {
 	srv := setupServer(t)
-	if srv == nil {
-		t.Skip("database unavailable")
-	}
 
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
@@ -134,9 +133,6 @@ func TestGetSchema(t *testing.T) {
 
 func TestPostValidateValid(t *testing.T) {
 	srv := setupServer(t)
-	if srv == nil {
-		t.Skip("database unavailable")
-	}
 
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
@@ -177,9 +173,6 @@ type = "short_text"
 
 func TestPostValidateInvalid(t *testing.T) {
 	srv := setupServer(t)
-	if srv == nil {
-		t.Skip("database unavailable")
-	}
 
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
@@ -221,8 +214,9 @@ pk = ["id"]
 func TestPoolConfigApplied(t *testing.T) {
 	// Verify that PoolConfig values are applied to pgxpool.Config when non-zero,
 	// and pgxpool defaults are preserved when zero.
+	connStr := testDB.URL
 	poolCfg := PoolConfig{MaxConns: 20, MinConns: 3}
-	pgxCfg, err := pgxpool.ParseConfig(testConnStr)
+	pgxCfg, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		t.Fatalf("ParseConfig: %v", err)
 	}
@@ -245,7 +239,7 @@ func TestPoolConfigApplied(t *testing.T) {
 
 	// Verify zero values preserve defaults.
 	zeroCfg := PoolConfig{}
-	pgxCfg2, err := pgxpool.ParseConfig(testConnStr)
+	pgxCfg2, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		t.Fatalf("ParseConfig: %v", err)
 	}
