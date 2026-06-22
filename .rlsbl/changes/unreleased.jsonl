@@ -4,3 +4,4 @@
 {"commits":["16035a0142b9a4101362356f15d63f5255394b92"],"user_facing":true,"description":"**CI workflow generation.** `testdb init --ci github-actions` generates a GitHub Actions workflow with a Postgres service container, per-language toolchain setup, and `PGDESIGN_DB` configuration.","type":"feature"}
 {"commits":["23b0d51b3cab615a26df49caeceaa8daa4f4e19b","70215a80542854b4aa5c006049732901fca6ceca"],"user_facing":false}
 {"commits":["2ae087fc2b6c2ebceb7b196cdb020728c90ad517","8b7f1ac8d394ce8222cba44ba19ef6cdd6eccf12"],"user_facing":false}
+{"commits":["57b98a6d97db67db0b348d58e0222beb5ec537cc"],"user_facing":false}
