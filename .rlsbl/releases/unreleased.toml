@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Wrapper template hardening, versioned .split.json, CI workflow generation, consumer documentation"
+# Optional context explaining why these changes were made
+context = "Follow-up to v0.14.0's ephemeral test database feature. Fixes SQL interpolation and modulo bias in wrapper templates, adds a versioned .split.json format for future-proofing, generates GitHub Actions CI workflows via --ci flag, adds consumer-facing documentation and selfdoc coverage for new packages."
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
