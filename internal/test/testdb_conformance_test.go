@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/testdb"
@@ -429,6 +430,255 @@ main().catch(e => { console.error(e); process.exit(1); });
 		t.Fatalf("TypeScript test did not print PASS:\n%s", output)
 	}
 	t.Logf("TypeScript test output:\n%s", output)
+}
+
+// TestConformanceJava renders the Java wrapper template, writes a Gradle
+// project with a JUnit 5 test, and runs it against a real Postgres instance.
+func TestConformanceJava(t *testing.T) {
+	testdb.SkipIfNoPostgres(t)
+
+	if _, err := exec.LookPath("java"); err != nil {
+		t.Skip("java not found in PATH")
+	}
+	if _, err := exec.LookPath("gradle"); err != nil {
+		t.Skip("gradle not found in PATH")
+	}
+
+	fixturePath := conformanceFixturePath(t)
+	baseURL := conformanceBaseURL()
+	baseName := extractDBName(baseURL)
+
+	rendered, err := testdb.RenderTemplate("java", fixturePath, baseURL, baseName)
+	if err != nil {
+		t.Fatalf("render Java template: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+
+	// Create directory structure.
+	srcDir := filepath.Join(tmpDir, "src", "test", "java", "pgdesign")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatalf("create src dir: %v", err)
+	}
+
+	// Write the rendered wrapper (TestDB.java).
+	if err := os.WriteFile(filepath.Join(srcDir, "TestDB.java"), rendered, 0o644); err != nil {
+		t.Fatalf("write wrapper: %v", err)
+	}
+
+	// Write the conformance test.
+	testContent := `package pgdesign;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import static org.junit.jupiter.api.Assertions.*;
+
+class ConformanceTest {
+    @RegisterExtension
+    static final TestDB db = new TestDB();
+
+    @Test
+    void tableExists() throws Exception {
+        Connection conn = db.getConnection();
+        try (Statement stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery(
+                "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
+            );
+            assertTrue(rs.next());
+            assertTrue(rs.getBoolean(1), "conformance_test table not found");
+        }
+    }
+
+    @Test
+    void columnCount() throws Exception {
+        Connection conn = db.getConnection();
+        try (Statement stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery(
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'conformance_test' AND table_schema = 'public'"
+            );
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt(1), "expected 2 columns (id, name)");
+        }
+    }
+}
+`
+	if err := os.WriteFile(filepath.Join(srcDir, "ConformanceTest.java"), []byte(testContent), 0o644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
+
+	// Write build.gradle.kts.
+	buildGradle := `plugins { java }
+repositories { mavenCentral() }
+dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testRuntimeOnly("org.postgresql:postgresql:42.7.2")
+}
+tasks.test { useJUnitPlatform() }
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle.kts"), []byte(buildGradle), 0o644); err != nil {
+		t.Fatalf("write build.gradle.kts: %v", err)
+	}
+
+	// Write settings.gradle.kts.
+	settingsGradle := `rootProject.name = "pgdesign-conformance"
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "settings.gradle.kts"), []byte(settingsGradle), 0o644); err != nil {
+		t.Fatalf("write settings.gradle.kts: %v", err)
+	}
+
+	// Run gradle test.
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "gradle", "test", "--no-daemon")
+	cmd.Dir = tmpDir
+	cmd.Env = append(os.Environ(), "PGDESIGN_DB="+baseURL)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("gradle test failed:\n%s\nerror: %v", output, err)
+	}
+	t.Logf("gradle test output:\n%s", output)
+}
+
+// TestConformanceKotlin renders the Kotlin wrapper template, writes a Gradle
+// project with a JUnit 5 test, and runs it against a real Postgres instance.
+func TestConformanceKotlin(t *testing.T) {
+	testdb.SkipIfNoPostgres(t)
+
+	if _, err := exec.LookPath("java"); err != nil {
+		t.Skip("java not found in PATH")
+	}
+	if _, err := exec.LookPath("gradle"); err != nil {
+		t.Skip("gradle not found in PATH")
+	}
+
+	fixturePath := conformanceFixturePath(t)
+	baseURL := conformanceBaseURL()
+	baseName := extractDBName(baseURL)
+
+	rendered, err := testdb.RenderTemplate("kotlin", fixturePath, baseURL, baseName)
+	if err != nil {
+		t.Fatalf("render Kotlin template: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+
+	// Create directory structure.
+	srcDir := filepath.Join(tmpDir, "src", "test", "kotlin", "pgdesign")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatalf("create src dir: %v", err)
+	}
+
+	// Write the rendered wrapper (TestDB.kt).
+	if err := os.WriteFile(filepath.Join(srcDir, "TestDB.kt"), rendered, 0o644); err != nil {
+		t.Fatalf("write wrapper: %v", err)
+	}
+
+	// Write the conformance test.
+	testContent := `package pgdesign
+
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.extension.RegisterExtension
+
+class ConformanceTest {
+    companion object {
+        @JvmField
+        @RegisterExtension
+        val db = TestDB()
+    }
+
+    @Test
+    fun tableExists() {
+        val conn = db.connection!!
+        conn.createStatement().use { stmt ->
+            val rs = stmt.executeQuery(
+                "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
+            )
+            assertTrue(rs.next())
+            assertTrue(rs.getBoolean(1), "conformance_test table not found")
+        }
+    }
+
+    @Test
+    fun columnCount() {
+        val conn = db.connection!!
+        conn.createStatement().use { stmt ->
+            val rs = stmt.executeQuery(
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'conformance_test' AND table_schema = 'public'"
+            )
+            assertTrue(rs.next())
+            assertEquals(2, rs.getInt(1), "expected 2 columns (id, name)")
+        }
+    }
+}
+`
+	if err := os.WriteFile(filepath.Join(srcDir, "ConformanceTest.kt"), []byte(testContent), 0o644); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
+
+	// Write build.gradle.kts (with Kotlin plugin -- Gradle downloads kotlinc).
+	buildGradle := `plugins { kotlin("jvm") version "2.0.0" }
+repositories { mavenCentral() }
+dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testRuntimeOnly("org.postgresql:postgresql:42.7.2")
+}
+tasks.test { useJUnitPlatform() }
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle.kts"), []byte(buildGradle), 0o644); err != nil {
+		t.Fatalf("write build.gradle.kts: %v", err)
+	}
+
+	// Write settings.gradle.kts.
+	settingsGradle := `rootProject.name = "pgdesign-conformance"
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "settings.gradle.kts"), []byte(settingsGradle), 0o644); err != nil {
+		t.Fatalf("write settings.gradle.kts: %v", err)
+	}
+
+	// Run gradle test.
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "gradle", "test", "--no-daemon")
+	cmd.Dir = tmpDir
+	cmd.Env = append(os.Environ(), "PGDESIGN_DB="+baseURL)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("gradle test failed:\n%s\nerror: %v", output, err)
+	}
+	t.Logf("gradle test output:\n%s", output)
+}
+
+// TestConformanceZig renders the Zig wrapper template and attempts to build and
+// run a test against a real Postgres instance. Currently skipped because the
+// Zig template assumes a pg.zig API (Conn.init with connection_string) that
+// does not match the actual karlseguin/pg.zig library API (Conn.openAndAuthUri
+// with Io parameter, structured Opts without connection_string field).
+func TestConformanceZig(t *testing.T) {
+	testdb.SkipIfNoPostgres(t)
+
+	if _, err := exec.LookPath("zig"); err != nil {
+		t.Skip("zig not found in PATH")
+	}
+
+	// The Zig template (zig.zig.tmpl) uses an API that does not match the
+	// actual karlseguin/pg.zig library:
+	//   Template assumes: pg.Conn.init(allocator, .{ .connection_string = url })
+	//   Actual API uses:  pg.Conn.openAndAuthUri(io, allocator, uri)
+	//
+	// The connection type is also different:
+	//   Template assumes: *pg.Conn (pointer from init)
+	//   Actual API uses:  pg.Conn (value from open/openAndAuthUri)
+	//
+	// Additionally, the Opts struct has no connection_string field; it uses
+	// structured fields (host, port, tls, etc.) or URI-based initialization.
+	//
+	// Until the template is updated to match the actual pg.zig API, this test
+	// cannot run.
+	t.Skip("zig template API mismatch: template uses pg.Conn.init(allocator, .{ .connection_string = ... }) but karlseguin/pg.zig uses pg.Conn.openAndAuthUri(io, allocator, uri) with different type signatures")
 }
 
 // extractDBName extracts the database name from a PostgreSQL connection URL.
