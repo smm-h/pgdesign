@@ -1,0 +1,1 @@
+{"commits":["27ce5fb079f23de825aa9f91111c8e02a444c375"],"user_facing":true,"description":"**Fix.** CLI no longer panics on startup. The `testdb init --language` flag was missing a required strictcli configuration, causing every `pgdesign` invocation to crash since v0.14.0.","type":"fix"}
