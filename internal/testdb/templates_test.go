@@ -136,6 +136,42 @@ func TestRenderCITemplateUnsupportedProvider(t *testing.T) {
 	}
 }
 
+func TestTemplateTruncationUTF8Safe(t *testing.T) {
+	// 36 'a' + 2 'é' (each 2 bytes in UTF-8) = 40 bytes total.
+	// maxBase is 38. Character-based truncation at position 38 takes all 38
+	// characters = 40 bytes (over limit). Byte-based truncation at 38 splits
+	// the second 'é'. Correct truncation: 36 'a' + 1 'é' = 38 bytes.
+	baseName := strings.Repeat("a", 36) + "éé"
+
+	checks := map[string][]string{
+		"go": {"0xC0", "0x80"},
+		"python": {"encode", "decode", "ignore"},
+		"ts": {"Buffer.from", "subarray", "0xC0", "0x80"},
+		"java": {"0xC0", "0x80"},
+		"kotlin": {"0xC0", "0x80"},
+		"zig": {"0xC0", "0x80"},
+	}
+
+	for _, lang := range SupportedLanguages() {
+		t.Run(lang, func(t *testing.T) {
+			out, err := RenderTemplate(lang, "schema.sql.split.json", "postgres://localhost/db", baseName)
+			if err != nil {
+				t.Fatalf("RenderTemplate(%q): %v", lang, err)
+			}
+			s := string(out)
+			patterns, ok := checks[lang]
+			if !ok {
+				t.Fatalf("no truncation patterns defined for %q", lang)
+			}
+			for _, pat := range patterns {
+				if !strings.Contains(s, pat) {
+					t.Errorf("rendered %s template missing UTF-8 truncation pattern %q", lang, pat)
+				}
+			}
+		})
+	}
+}
+
 func TestSupportedLanguages(t *testing.T) {
 	langs := SupportedLanguages()
 	if len(langs) != 6 {
