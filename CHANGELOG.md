@@ -2,6 +2,33 @@
 
 # Changelog
 
+## 0.14.2
+
+Critical panic fix, UTF-8-safe truncation, DDL error diagnostics, selfdoc coverage
+
+<details>
+<summary>Context</summary>
+
+Fixes a critical bug where the pgdesign binary panicked on every invocation since v0.14.0 due to a missing strictcli flag configuration. Also fixes UTF-8 truncation in wrapper templates, adds SQL previews to DDL error messages, and adds selfdoc documentation for 6 previously undocumented packages.
+
+</details>
+
+### Features
+
+- **DDL error diagnostics.** Wrapper template error messages now include the first line of the failing SQL statement (capped at 120 chars) alongside the statement index.
+- **selfdoc coverage.** Added documentation for 6 previously undocumented packages: codegen, graph, seed, sqlparse, sqlutil, workload.
+
+### Fixes
+
+- **Fix.** CLI no longer panics on startup. The `testdb init --language` flag was missing a required strictcli configuration, causing every `pgdesign` invocation to crash since v0.14.0.
+- **Fix.** Wrapper templates now truncate database names at valid UTF-8 character boundaries instead of splitting multi-byte sequences.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.14.1
 
 Wrapper template hardening, versioned .split.json, CI workflow generation, consumer documentation
@@ -22,12 +49,6 @@ Follow-up to v0.14.0's ephemeral test database feature. Fixes SQL interpolation 
 ### Fixes
 
 - **Wrapper template hardening.** Zig terminate query uses parameterized `$1` instead of string interpolation. TypeScript and Zig random name generation uses rejection sampling to eliminate modulo bias. Go template adds post-truncation 63-byte assertion.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.14.0
 
