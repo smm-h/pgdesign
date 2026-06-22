@@ -103,8 +103,16 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
         long ts = System.currentTimeMillis() / 1000;
         int maxBase = MAX_NAME_LEN - SUFFIX_LEN;
         String base = BASE_NAME;
-        if (base.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxBase) {
-            base = base.substring(0, maxBase);
+        byte[] baseBytes = base.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        if (baseBytes.length > maxBase) {
+            // Truncate at a valid UTF-8 character boundary. Walk backward
+            // from maxBase while the byte is a continuation byte (0x80..0xBF)
+            // to find the start of any split character, then truncate there.
+            int end = maxBase;
+            while (end > 0 && (baseBytes[end] & 0xC0) == 0x80) {
+                end--;
+            }
+            base = new String(baseBytes, 0, end, java.nio.charset.StandardCharsets.UTF_8);
         }
         String result = base + "_test_" + ts + "_" + suffix;
         if (result.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_NAME_LEN) {

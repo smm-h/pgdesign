@@ -25,8 +25,10 @@ def _generate_name():
     # Fixed suffix: _test_ (6) + timestamp (10) + _ (1) + random (8) = 25
     max_base = 63 - 25
     base = BASE_NAME
-    if len(base.encode()) > max_base:
-        base = base[:max_base]
+    if len(base.encode("utf-8")) > max_base:
+        # Truncate by bytes at a valid UTF-8 boundary: encode to bytes,
+        # slice at the byte limit, decode back dropping any partial character.
+        base = base.encode("utf-8")[:max_base].decode("utf-8", errors="ignore")
     name = f"{base}_test_{ts}_{suffix}"
     assert len(name.encode()) <= 63, f"database name exceeds 63 bytes: {name}"
     return name

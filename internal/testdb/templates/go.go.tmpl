@@ -93,17 +93,14 @@ func generateName() string {
 		maxBase := 63 - 25
 		truncated := baseName
 		if len(truncated) > maxBase {
-			truncated = truncated[:maxBase]
-			// Walk backward past any UTF-8 continuation bytes (0x80..0xBF)
-			// to avoid splitting a multi-byte character.
-			for len(truncated) > 0 && truncated[len(truncated)-1]&0xC0 == 0x80 {
-				truncated = truncated[:len(truncated)-1]
+			// Truncate at a valid UTF-8 character boundary. Walk backward
+			// from maxBase while the byte is a continuation byte (0x80..0xBF)
+			// to find the start of any split character, then truncate there.
+			end := maxBase
+			for end > 0 && truncated[end]&0xC0 == 0x80 {
+				end--
 			}
-			// If we stopped at a multi-byte leading byte, drop it too
-			// (it lost its continuation bytes).
-			if len(truncated) > 0 && truncated[len(truncated)-1]&0x80 != 0 {
-				truncated = truncated[:len(truncated)-1]
-			}
+			truncated = truncated[:end]
 		}
 		name = fmt.Sprintf("%s_test_%d_%s", truncated, time.Now().Unix(), suffix)
 	}

@@ -99,8 +99,16 @@ class TestDB : BeforeAllCallback, AfterAllCallback {
             val ts = System.currentTimeMillis() / 1000
             val maxBase = MAX_NAME_LEN - SUFFIX_LEN
             var base = BASE_NAME
-            if (base.toByteArray(StandardCharsets.UTF_8).size > maxBase) {
-                base = base.substring(0, maxBase)
+            val baseBytes = base.toByteArray(StandardCharsets.UTF_8)
+            if (baseBytes.size > maxBase) {
+                // Truncate at a valid UTF-8 character boundary. Walk backward
+                // from maxBase while the byte is a continuation byte (0x80..0xBF)
+                // to find the start of any split character, then truncate there.
+                var end = maxBase
+                while (end > 0 && (baseBytes[end].toInt() and 0xC0) == 0x80) {
+                    end--
+                }
+                base = String(baseBytes, 0, end, StandardCharsets.UTF_8)
             }
             val result = "${base}_test_${ts}_$suffix"
             check(result.toByteArray(StandardCharsets.UTF_8).size <= MAX_NAME_LEN) {

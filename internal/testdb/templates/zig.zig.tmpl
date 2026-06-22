@@ -100,7 +100,14 @@ fn generateName(allocator: std.mem.Allocator) ![]u8 {
 
     var base: []const u8 = BASE_NAME;
     if (base.len > max_base) {
-        base = base[0..max_base];
+        // Truncate at a valid UTF-8 character boundary. Walk backward
+        // from max_base while the byte is a continuation byte (0x80..0xBF)
+        // to find the start of any split character, then truncate there.
+        var end = max_base;
+        while (end > 0 and (base[end] & 0xC0) == 0x80) {
+            end -= 1;
+        }
+        base = base[0..end];
     }
 
     const name = try std.fmt.allocPrint(allocator, "{s}_test_{d}_{s}", .{ base, ts, suffix[0..] });

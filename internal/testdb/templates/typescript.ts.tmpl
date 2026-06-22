@@ -35,7 +35,15 @@ function generateName(): string {
   const maxBase = 63 - 25;
   let base = BASE_NAME;
   if (Buffer.byteLength(base) > maxBase) {
-    base = base.substring(0, maxBase);
+    // Truncate at a valid UTF-8 character boundary. Walk backward from
+    // maxBase while the byte is a continuation byte (0x80..0xBF) to find
+    // the start of any split character, then truncate there.
+    const buf = Buffer.from(base, "utf-8");
+    let end = maxBase;
+    while (end > 0 && (buf[end] & 0xC0) === 0x80) {
+      end--;
+    }
+    base = buf.subarray(0, end).toString("utf-8");
   }
   const name = `${base}_test_${ts}_${suffix.join("")}`;
   if (Buffer.byteLength(name) > 63) {
