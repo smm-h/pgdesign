@@ -12,6 +12,7 @@ order: 90
 
 - [internal/audit](internal-audit.html)
 - [internal/config](internal-config.html)
+- [internal/dbutil](internal-dbutil.html)
 - [internal/diagnostic](internal-diagnostic.html)
 - [internal/diff](internal-diff.html)
 - [internal/discover](internal-discover.html)
@@ -28,4 +29,5 @@ order: 90
 - [internal/serve](internal-serve.html)
 - [internal/sql](internal-sql.html)
 - [internal/sqlexpr](internal-sqlexpr.html)
+- [internal/testdb](internal-testdb.html)
 - [internal/validate](internal-validate.html)

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "pgdesign",
   "slug": "pgdesign",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": null,
   "language": "go",
   "base_url": "https://pgdesign.smmh.dev",
@@ -93,6 +93,11 @@
       "type": "doc"
     },
     {
+      "path": "internal-dbutil.md",
+      "title": "internal/dbutil",
+      "type": "doc"
+    },
+    {
       "path": "internal-diagnostic.md",
       "title": "internal/diagnostic",
       "type": "doc"
@@ -173,6 +178,11 @@
       "type": "doc"
     },
     {
+      "path": "internal-testdb.md",
+      "title": "internal/testdb",
+      "type": "doc"
+    },
+    {
       "path": "internal-validate.md",
       "title": "internal/validate",
       "type": "doc"
@@ -203,6 +213,11 @@
       "type": "doc"
     },
     {
+      "path": "testdb-guide.md",
+      "title": "Ephemeral Test Databases",
+      "type": "doc"
+    },
+    {
       "path": "validation-rules.md",
       "title": "Validation Rules",
       "type": "doc"
@@ -214,5 +229,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-19T18:29:53.866162+00:00"
+  "last_gen": "2026-06-22T09:45:22.209823+00:00"
 }
