@@ -163,7 +163,26 @@ fn applyDDL(conn: *pg.Conn, allocator: std.mem.Allocator) !void {
 
     for (parsed.value.statements, 0..) |stmt, i| {
         _ = conn.exec(stmt, .{}) catch |err| {
-            std.log.err("pgdesign testdb: statement {d} failed: {}", .{ i + 1, err });
+            // Extract first non-empty line for preview.
+            var preview: []const u8 = "";
+            var line_start: usize = 0;
+            for (stmt, 0..) |c, j| {
+                if (c == '\n') {
+                    const line = std.mem.trim(u8, stmt[line_start..j], " \t\r");
+                    if (line.len > 0) {
+                        preview = if (line.len > 120) line[0..120] else line;
+                        break;
+                    }
+                    line_start = j + 1;
+                }
+            }
+            if (preview.len == 0) {
+                // No newline found or all lines before first newline were empty; use whole stmt trimmed.
+                const trimmed = std.mem.trim(u8, stmt[line_start..], " \t\r\n");
+                preview = if (trimmed.len > 120) trimmed[0..120] else trimmed;
+            }
+            const ellipsis: []const u8 = if (preview.len >= 120) "..." else "";
+            std.log.err("pgdesign testdb: statement {d} failed ({s}{s}): {}", .{ i + 1, preview, ellipsis, err });
             return err;
         };
     }

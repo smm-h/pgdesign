@@ -94,6 +94,16 @@ func generateName() string {
 		truncated := baseName
 		if len(truncated) > maxBase {
 			truncated = truncated[:maxBase]
+			// Walk backward past any UTF-8 continuation bytes (0x80..0xBF)
+			// to avoid splitting a multi-byte character.
+			for len(truncated) > 0 && truncated[len(truncated)-1]&0xC0 == 0x80 {
+				truncated = truncated[:len(truncated)-1]
+			}
+			// If we stopped at a multi-byte leading byte, drop it too
+			// (it lost its continuation bytes).
+			if len(truncated) > 0 && truncated[len(truncated)-1]&0x80 != 0 {
+				truncated = truncated[:len(truncated)-1]
+			}
 		}
 		name = fmt.Sprintf("%s_test_%d_%s", truncated, time.Now().Unix(), suffix)
 	}
@@ -145,7 +155,17 @@ func applyDDL(ctx context.Context, conn *pgx.Conn) error {
 
 	for i, stmt := range stmts {
 		if _, err := conn.Exec(ctx, stmt); err != nil {
-			return fmt.Errorf("statement %d: %w", i+1, err)
+			preview := ""
+			for _, line := range strings.Split(stmt, "\n") {
+				if trimmed := strings.TrimSpace(line); trimmed != "" {
+					preview = trimmed
+					break
+				}
+			}
+			if len(preview) > 120 {
+				preview = preview[:120] + "..."
+			}
+			return fmt.Errorf("statement %d failed (%s): %w", i+1, preview, err)
 		}
 	}
 	return nil

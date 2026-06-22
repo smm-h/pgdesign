@@ -171,8 +171,18 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
                 try {
                     st.execute(stmts.get(i));
                 } catch (SQLException e) {
+                    String preview = "";
+                    for (String line : stmts.get(i).split("\n")) {
+                        if (!line.trim().isEmpty()) {
+                            preview = line.trim();
+                            break;
+                        }
+                    }
+                    if (preview.length() > 120) {
+                        preview = preview.substring(0, 120) + "...";
+                    }
                     throw new SQLException(
-                        "pgdesign testdb: statement " + (i + 1) + " failed: " + e.getMessage(), e);
+                        "pgdesign testdb: statement " + (i + 1) + " failed (" + preview + "): " + e.getMessage(), e);
                 }
             }
         }

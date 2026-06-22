@@ -49,8 +49,13 @@ def _apply_ddl(db_url):
             try:
                 conn.execute(stmt)
             except Exception as exc:
+                first_line = next(
+                    (l for l in stmt.split("\n") if l.strip()), ""
+                ).strip()
+                if len(first_line) > 120:
+                    first_line = first_line[:120] + "..."
                 raise RuntimeError(
-                    f"pgdesign testdb: statement {i + 1} failed: {exc}"
+                    f"pgdesign testdb: statement {i + 1} failed ({first_line}): {exc}"
                 ) from exc
         conn.commit()
 

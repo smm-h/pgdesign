@@ -156,8 +156,13 @@ class TestDB : BeforeAllCallback, AfterAllCallback {
                     try {
                         st.execute(sql)
                     } catch (e: java.sql.SQLException) {
+                        var preview = sql.trim().lines().toList()
+                            .firstOrNull { it.trim().isNotEmpty() }?.trim() ?: ""
+                        if (preview.length > 120) {
+                            preview = preview.take(120) + "..."
+                        }
                         throw java.sql.SQLException(
-                            "pgdesign testdb: statement ${i + 1} failed: ${e.message}", e
+                            "pgdesign testdb: statement ${i + 1} failed ($preview): ${e.message}", e
                         )
                     }
                 }
