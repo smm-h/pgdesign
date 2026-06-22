@@ -6,9 +6,14 @@ import (
 	"testing"
 )
 
+// splitJSONPayload mirrors the versioned .split.json format used by the build handler.
+type splitJSONPayload struct {
+	Version    int      `json:"version"`
+	Statements []string `json:"statements"`
+}
+
 // TestSplitStatementsToJSON verifies that SplitStatements output can be
-// marshaled to a valid JSON array, as used by the build handler's .split.json
-// companion file generation.
+// marshaled to the versioned .split.json format used by the build handler.
 func TestSplitStatementsToJSON(t *testing.T) {
 	t.Run("multi-statement DDL", func(t *testing.T) {
 		ddl := "CREATE TABLE t (id int);\nCREATE INDEX idx ON t (id);"
@@ -20,24 +25,28 @@ func TestSplitStatementsToJSON(t *testing.T) {
 			t.Fatalf("expected 2 statements, got %d: %v", len(stmts), stmts)
 		}
 
-		data, err := json.MarshalIndent(stmts, "", "  ")
+		payload := splitJSONPayload{Version: 1, Statements: stmts}
+		data, err := json.MarshalIndent(payload, "", "  ")
 		if err != nil {
 			t.Fatalf("json.MarshalIndent: %v", err)
 		}
 
-		// Verify it's valid JSON.
-		var parsed []string
+		// Verify it's a valid versioned JSON object.
+		var parsed splitJSONPayload
 		if err := json.Unmarshal(data, &parsed); err != nil {
 			t.Fatalf("round-trip unmarshal: %v", err)
 		}
-		if len(parsed) != 2 {
-			t.Fatalf("expected 2 elements after round-trip, got %d", len(parsed))
+		if parsed.Version != 1 {
+			t.Errorf("expected version 1, got %d", parsed.Version)
 		}
-		if parsed[0] != "CREATE TABLE t (id int);" {
-			t.Errorf("stmt[0]: expected %q, got %q", "CREATE TABLE t (id int);", parsed[0])
+		if len(parsed.Statements) != 2 {
+			t.Fatalf("expected 2 statements after round-trip, got %d", len(parsed.Statements))
 		}
-		if parsed[1] != "CREATE INDEX idx ON t (id);" {
-			t.Errorf("stmt[1]: expected %q, got %q", "CREATE INDEX idx ON t (id);", parsed[1])
+		if parsed.Statements[0] != "CREATE TABLE t (id int);" {
+			t.Errorf("stmt[0]: expected %q, got %q", "CREATE TABLE t (id int);", parsed.Statements[0])
+		}
+		if parsed.Statements[1] != "CREATE INDEX idx ON t (id);" {
+			t.Errorf("stmt[1]: expected %q, got %q", "CREATE INDEX idx ON t (id);", parsed.Statements[1])
 		}
 	})
 
@@ -56,17 +65,21 @@ func TestSplitStatementsToJSON(t *testing.T) {
 			t.Fatalf("expected 2 statements, got %d: %v", len(stmts), stmts)
 		}
 
-		data, err := json.MarshalIndent(stmts, "", "  ")
+		payload := splitJSONPayload{Version: 1, Statements: stmts}
+		data, err := json.MarshalIndent(payload, "", "  ")
 		if err != nil {
 			t.Fatalf("json.MarshalIndent: %v", err)
 		}
 
-		var parsed []string
+		var parsed splitJSONPayload
 		if err := json.Unmarshal(data, &parsed); err != nil {
 			t.Fatalf("round-trip unmarshal: %v", err)
 		}
-		if len(parsed) != 2 {
-			t.Fatalf("expected 2 elements, got %d", len(parsed))
+		if parsed.Version != 1 {
+			t.Errorf("expected version 1, got %d", parsed.Version)
+		}
+		if len(parsed.Statements) != 2 {
+			t.Fatalf("expected 2 statements, got %d", len(parsed.Statements))
 		}
 	})
 
@@ -86,24 +99,28 @@ CREATE TABLE u (id int);`
 			t.Fatalf("expected 3 statements, got %d: %v", len(stmts), stmts)
 		}
 
-		data, err := json.MarshalIndent(stmts, "", "  ")
+		payload := splitJSONPayload{Version: 1, Statements: stmts}
+		data, err := json.MarshalIndent(payload, "", "  ")
 		if err != nil {
 			t.Fatalf("json.MarshalIndent: %v", err)
 		}
 
-		var parsed []string
+		var parsed splitJSONPayload
 		if err := json.Unmarshal(data, &parsed); err != nil {
 			t.Fatalf("round-trip unmarshal: %v", err)
 		}
-		if len(parsed) != 3 {
-			t.Fatalf("expected 3 elements, got %d", len(parsed))
+		if parsed.Version != 1 {
+			t.Errorf("expected version 1, got %d", parsed.Version)
 		}
-		if !strings.HasPrefix(parsed[1], "CREATE FUNCTION") {
-			t.Errorf("stmt[1] should be the function, got %q", parsed[1])
+		if len(parsed.Statements) != 3 {
+			t.Fatalf("expected 3 statements, got %d", len(parsed.Statements))
+		}
+		if !strings.HasPrefix(parsed.Statements[1], "CREATE FUNCTION") {
+			t.Errorf("stmt[1] should be the function, got %q", parsed.Statements[1])
 		}
 	})
 
-	t.Run("empty DDL produces null JSON", func(t *testing.T) {
+	t.Run("empty DDL produces empty statements", func(t *testing.T) {
 		stmts, err := SplitStatements("")
 		if err != nil {
 			t.Fatalf("SplitStatements: %v", err)
@@ -112,12 +129,21 @@ CREATE TABLE u (id int);`
 			t.Fatalf("expected nil, got %v", stmts)
 		}
 
-		data, err := json.MarshalIndent(stmts, "", "  ")
+		payload := splitJSONPayload{Version: 1, Statements: stmts}
+		data, err := json.MarshalIndent(payload, "", "  ")
 		if err != nil {
 			t.Fatalf("json.MarshalIndent: %v", err)
 		}
-		if string(data) != "null" {
-			t.Errorf("expected %q, got %q", "null", string(data))
+
+		var parsed splitJSONPayload
+		if err := json.Unmarshal(data, &parsed); err != nil {
+			t.Fatalf("round-trip unmarshal: %v", err)
+		}
+		if parsed.Version != 1 {
+			t.Errorf("expected version 1, got %d", parsed.Version)
+		}
+		if parsed.Statements != nil {
+			t.Errorf("expected nil statements for empty DDL, got %v", parsed.Statements)
 		}
 	})
 }

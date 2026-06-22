@@ -165,7 +165,7 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
             Files.readAllBytes(Paths.get(DDL_PATH)),
             java.nio.charset.StandardCharsets.UTF_8
         );
-        List<String> stmts = parseJsonStringArray(data);
+        List<String> stmts = parseJsonStringArray(extractStatementsArray(data));
         try (Statement st = conn.createStatement()) {
             for (int i = 0; i < stmts.size(); i++) {
                 try {
@@ -194,6 +194,62 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
         } catch (SQLException e) {
             // Best-effort cleanup.
         }
+    }
+
+    /**
+     * Extract the "statements" JSON array from a versioned split.json object.
+     * Expects input of the form: {"version": 1, "statements": [...]}
+     * Returns the array substring including brackets.
+     */
+    private static String extractStatementsArray(String json) {
+        String key = "\"statements\"";
+        int keyIdx = json.indexOf(key);
+        if (keyIdx < 0) {
+            throw new IllegalArgumentException(
+                "pgdesign testdb: missing \"statements\" key in " + DDL_PATH);
+        }
+        // Find the colon after the key.
+        int colonIdx = json.indexOf(':', keyIdx + key.length());
+        if (colonIdx < 0) {
+            throw new IllegalArgumentException(
+                "pgdesign testdb: malformed JSON in " + DDL_PATH);
+        }
+        // Find the opening bracket.
+        int bracketStart = json.indexOf('[', colonIdx + 1);
+        if (bracketStart < 0) {
+            throw new IllegalArgumentException(
+                "pgdesign testdb: missing statements array in " + DDL_PATH);
+        }
+        // Find the matching closing bracket (handling nested strings with brackets).
+        int depth = 0;
+        boolean inString = false;
+        boolean escape = false;
+        for (int i = bracketStart; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            if (c == '\\' && inString) {
+                escape = true;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+            if (!inString) {
+                if (c == '[') depth++;
+                else if (c == ']') {
+                    depth--;
+                    if (depth == 0) {
+                        return json.substring(bracketStart, i + 1);
+                    }
+                }
+            }
+        }
+        throw new IllegalArgumentException(
+            "pgdesign testdb: unterminated statements array in " + DDL_PATH);
     }
 
     /**

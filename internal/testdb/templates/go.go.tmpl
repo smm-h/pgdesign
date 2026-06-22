@@ -135,10 +135,13 @@ func applyDDL(ctx context.Context, conn *pgx.Conn) error {
 		return fmt.Errorf("read %s: %w", ddlPath, err)
 	}
 
-	var stmts []string
-	if err := json.Unmarshal(data, &stmts); err != nil {
+	var parsed struct {
+		Statements []string `json:"statements"`
+	}
+	if err := json.Unmarshal(data, &parsed); err != nil {
 		return fmt.Errorf("parse %s: %w", ddlPath, err)
 	}
+	stmts := parsed.Statements
 
 	for i, stmt := range stmts {
 		if _, err := conn.Exec(ctx, stmt); err != nil {

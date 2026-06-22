@@ -42,7 +42,8 @@ def _swap_db(conn_url, db_name):
 def _apply_ddl(db_url):
     """Read the .split.json file and execute each SQL statement."""
     ddl_file = Path(DDL_PATH)
-    stmts = json.loads(ddl_file.read_text(encoding="utf-8"))
+    data = json.loads(ddl_file.read_text(encoding="utf-8"))
+    stmts = data["statements"]
     with psycopg.connect(db_url) as conn:
         for i, stmt in enumerate(stmts):
             try:

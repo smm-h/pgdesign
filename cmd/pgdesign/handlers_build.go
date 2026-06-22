@@ -204,7 +204,12 @@ func handleBuild(kwargs map[string]interface{}) int {
 			if splitErr != nil {
 				fmt.Fprintf(os.Stderr, "warning: split.json for %q: %v\n", name, splitErr)
 			} else {
-				splitJSON, jsonErr := json.MarshalIndent(stmts, "", "  ")
+				type splitJSONPayload struct {
+					Version    int      `json:"version"`
+					Statements []string `json:"statements"`
+				}
+				payload := splitJSONPayload{Version: 1, Statements: stmts}
+				splitJSON, jsonErr := json.MarshalIndent(payload, "", "  ")
 				if jsonErr != nil {
 					fmt.Fprintf(os.Stderr, "warning: split.json for %q: %v\n", name, jsonErr)
 				} else {

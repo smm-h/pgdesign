@@ -153,11 +153,15 @@ fn applyDDL(conn: *pg.Conn, allocator: std.mem.Allocator) !void {
     const data = try std.fs.cwd().readFileAlloc(allocator, DDL_PATH, 10 * 1024 * 1024);
     defer allocator.free(data);
 
-    // Parse JSON array of strings.
-    const parsed = try std.json.parseFromSlice([]const []const u8, allocator, data, .{});
+    // Parse versioned split.json object.
+    const SplitJSON = struct {
+        version: u32,
+        statements: []const []const u8,
+    };
+    const parsed = try std.json.parseFromSlice(SplitJSON, allocator, data, .{});
     defer parsed.deinit();
 
-    for (parsed.value, 0..) |stmt, i| {
+    for (parsed.value.statements, 0..) |stmt, i| {
         _ = conn.exec(stmt, .{}) catch |err| {
             std.log.err("pgdesign testdb: statement {d} failed: {}", .{ i + 1, err });
             return err;
