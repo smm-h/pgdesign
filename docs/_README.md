@@ -1,6 +1,6 @@
 # pgdesign
 
-A PostgreSQL schema compiler. Declarative schema definitions in TOML, compiled to SQL DDL with strict enforcement of database design principles.
+A PostgreSQL schema compiler. Declarative schema definitions in TOML, compiled to SQL DDL with strict enforcement of database design principles. Includes migration generation, normal form auditing, codegen for 6 languages, ephemeral test databases, and schema visualization.
 
 ## Installation
 
@@ -43,6 +43,10 @@ pip install pgdesign
 | `migrate status` | Show migration status |
 | `migrate squash` | Squash a range of migrations into one |
 | `migrate test` | Test migrations against a staging database |
+| `testdb setup` | Create an ephemeral test database and apply DDL |
+| `testdb teardown` | Drop an ephemeral test database |
+| `testdb gc` | Clean up orphaned test databases |
+| `testdb init` | Generate test database wrappers for consumer projects |
 
 ## Documentation
 
