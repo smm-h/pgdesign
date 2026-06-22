@@ -11,6 +11,10 @@
       "language": "go"
     },
     {
+      "path": "internal/codegen",
+      "language": "go"
+    },
+    {
       "path": "internal/config",
       "language": "go"
     },
@@ -47,6 +51,10 @@
       "language": "go"
     },
     {
+      "path": "internal/graph",
+      "language": "go"
+    },
+    {
       "path": "internal/introspect",
       "language": "go"
     },
@@ -67,6 +75,10 @@
       "language": "go"
     },
     {
+      "path": "internal/seed",
+      "language": "go"
+    },
+    {
       "path": "internal/semtype",
       "language": "go"
     },
@@ -83,11 +95,23 @@
       "language": "go"
     },
     {
+      "path": "internal/sqlparse",
+      "language": "go"
+    },
+    {
+      "path": "internal/sqlutil",
+      "language": "go"
+    },
+    {
       "path": "internal/testdb",
       "language": "go"
     },
     {
       "path": "internal/validate",
+      "language": "go"
+    },
+    {
+      "path": "internal/workload",
       "language": "go"
     }
   ],
