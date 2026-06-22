@@ -12,6 +12,18 @@
         "coverage"
       ]
     },
+    "design": {
+      "depends_on": [
+        "validation"
+      ],
+      "fast": true,
+      "needs_network": false,
+      "pure": true,
+      "severity": "warn",
+      "tags": [
+        "design"
+      ]
+    },
     "nf": {
       "depends_on": [],
       "fast": false,
@@ -22,6 +34,18 @@
         "nf"
       ]
     },
+    "structural": {
+      "depends_on": [
+        "validation"
+      ],
+      "fast": true,
+      "needs_network": false,
+      "pure": true,
+      "severity": "warn",
+      "tags": [
+        "design"
+      ]
+    },
     "validation": {
       "depends_on": [],
       "fast": true,
@@ -30,6 +54,18 @@
       "severity": "error",
       "tags": [
         "validation"
+      ]
+    },
+    "workload": {
+      "depends_on": [
+        "validation"
+      ],
+      "fast": false,
+      "needs_network": true,
+      "pure": false,
+      "severity": "warn",
+      "tags": [
+        "workload"
       ]
     }
   },
@@ -145,7 +181,8 @@
           "choices": [
             "validators",
             "constants",
-            "types"
+            "types",
+            "constraints"
           ],
           "default": "validators",
           "help": "Codegen mode",
@@ -266,7 +303,8 @@
             "json",
             "d2",
             "svg",
-            "doc"
+            "doc",
+            "graphql"
           ],
           "default": "sql",
           "help": "Output format",
@@ -331,6 +369,11 @@
           "type": "int"
         },
         {
+          "help": "RNG seed for reproducibility",
+          "name": "seed",
+          "type": "int"
+        },
+        {
           "help": "Output file path (default: stdout)",
           "name": "output",
           "type": "str"
@@ -353,6 +396,33 @@
           "repeatable": true,
           "type": "str",
           "unique": true
+        },
+        {
+          "choices": [
+            "insert",
+            "copy"
+          ],
+          "default": "insert",
+          "help": "Output format for seed data",
+          "name": "format",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Emit TRUNCATE before seed data",
+          "name": "clean",
+          "negatable": true,
+          "type": "bool"
+        },
+        {
+          "choices": [
+            "normal",
+            "edge-cases"
+          ],
+          "default": "normal",
+          "help": "Generation mode",
+          "name": "mode",
+          "type": "str"
         }
       ],
       "help": "Generate type-aware test data",
@@ -568,6 +638,11 @@
               "help": "Migrations directory",
               "name": "dir",
               "type": "str"
+            },
+            {
+              "help": "Target version to rollback to (exclusive — this version stays applied)",
+              "name": "to",
+              "type": "str"
             }
           ],
           "help": "Rollback the last migration",
@@ -589,6 +664,11 @@
               "default": "migrations",
               "help": "Migrations directory",
               "name": "dir",
+              "type": "str"
+            },
+            {
+              "help": "PostgreSQL connection URL for safety check",
+              "name": "db",
               "type": "str"
             }
           ],
@@ -613,6 +693,14 @@
           "name": "status"
         },
         "test": {
+          "args": [
+            {
+              "help": "Schema file(s) or directory (required with --shadow)",
+              "name": "path",
+              "required": false,
+              "variadic": true
+            }
+          ],
           "flags": [
             {
               "help": "Staging database connection URL",
@@ -630,6 +718,13 @@
               "help": "Timeout in seconds",
               "name": "timeout",
               "type": "int"
+            },
+            {
+              "default": false,
+              "help": "Test by replaying migrations into a shadow database and diffing against TOML schema",
+              "name": "shadow",
+              "negatable": true,
+              "type": "bool"
             }
           ],
           "help": "Test migrations against a staging database",
@@ -638,10 +733,90 @@
       },
       "help": "Database migration commands",
       "name": "migrate"
+    },
+    "testdb": {
+      "commands": {
+        "gc": {
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "help": "Drop databases older than this duration (e.g., 2h, 30m)",
+              "name": "older-than",
+              "type": "str"
+            }
+          ],
+          "help": "Drop orphaned test databases",
+          "name": "gc"
+        },
+        "init": {
+          "flags": [
+            {
+              "default": [],
+              "help": "Target language(s)",
+              "name": "language",
+              "repeatable": true,
+              "type": "str",
+              "unique": true
+            },
+            {
+              "help": "Name of the SQL output section (for disambiguation)",
+              "name": "output",
+              "type": "str"
+            },
+            {
+              "default": false,
+              "help": "Overwrite existing files",
+              "name": "force",
+              "negatable": true,
+              "type": "bool"
+            },
+            {
+              "help": "CI provider for workflow generation (e.g., github-actions)",
+              "name": "ci",
+              "type": "str"
+            }
+          ],
+          "help": "Generate test database wrappers for consumer projects",
+          "name": "init"
+        },
+        "setup": {
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "help": "Path to SQL DDL file",
+              "name": "ddl",
+              "type": "str"
+            }
+          ],
+          "help": "Create an ephemeral test database and apply DDL",
+          "name": "setup"
+        },
+        "teardown": {
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL",
+              "name": "db",
+              "type": "str"
+            }
+          ],
+          "help": "Drop an ephemeral test database",
+          "name": "teardown"
+        }
+      },
+      "help": "Ephemeral test database management",
+      "name": "testdb"
     }
   },
   "help": "PostgreSQL schema compiler",
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
-  "version": "0.12.3"
+  "version": ""
 }
