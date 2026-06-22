@@ -97,6 +97,9 @@ func generateName() string {
 		}
 		name = fmt.Sprintf("%s_test_%d_%s", truncated, time.Now().Unix(), suffix)
 	}
+	if len(name) > 63 {
+		panic(fmt.Sprintf("pgdesign testdb: generated name exceeds 63 bytes: %q (%d bytes)", name, len(name)))
+	}
 	return name
 }
 

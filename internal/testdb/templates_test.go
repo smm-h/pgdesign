@@ -41,6 +41,20 @@ func TestRenderTemplate(t *testing.T) {
 	}
 }
 
+func TestRenderTemplateGoNameAssertion(t *testing.T) {
+	out, err := RenderTemplate("go", "schema.sql.split.json", "postgres://localhost/mydb", "mydb")
+	if err != nil {
+		t.Fatalf("RenderTemplate(go): %v", err)
+	}
+	s := string(out)
+	if !strings.Contains(s, "panic(") {
+		t.Error("Go template missing panic call for name length assertion")
+	}
+	if !strings.Contains(s, "exceeds 63 bytes") {
+		t.Error("Go template missing 'exceeds 63 bytes' assertion message")
+	}
+}
+
 func TestRenderTemplateUnsupportedLang(t *testing.T) {
 	_, err := RenderTemplate("ruby", "x.sql", "postgres://localhost/db", "db")
 	if err == nil {
