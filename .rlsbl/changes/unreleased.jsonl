@@ -3,3 +3,4 @@
 {"commits":["44b3ce16cbf4a93f04040ed48f7f165f1015619b"],"user_facing":true,"description":"**`testdb gc` shows active connections.** `ListOrphans` now exposes the active connection count per database. The `gc` command prints it alongside each dropped database name.","type":"feature"}
 {"commits":["16035a0142b9a4101362356f15d63f5255394b92"],"user_facing":true,"description":"**CI workflow generation.** `testdb init --ci github-actions` generates a GitHub Actions workflow with a Postgres service container, per-language toolchain setup, and `PGDESIGN_DB` configuration.","type":"feature"}
 {"commits":["23b0d51b3cab615a26df49caeceaa8daa4f4e19b","70215a80542854b4aa5c006049732901fca6ceca"],"user_facing":false}
+{"commits":["2ae087fc2b6c2ebceb7b196cdb020728c90ad517","8b7f1ac8d394ce8222cba44ba19ef6cdd6eccf12"],"user_facing":false}
