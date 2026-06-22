@@ -296,7 +296,8 @@
           "help": "Schema name to introspect",
           "name": "schema",
           "repeatable": true,
-          "type": "str"
+          "type": "str",
+          "unique": true
         },
         {
           "help": "Output file path (default: stdout)",
@@ -350,7 +351,8 @@
           "help": "Schema name",
           "name": "schema",
           "repeatable": true,
-          "type": "str"
+          "type": "str",
+          "unique": true
         }
       ],
       "help": "Generate type-aware test data",
@@ -374,7 +376,8 @@
           "help": "Schema name to serve",
           "name": "schema",
           "repeatable": true,
-          "type": "str"
+          "type": "str",
+          "unique": true
         },
         {
           "default": 30,
@@ -413,7 +416,8 @@
           "help": "Schema name",
           "name": "schema",
           "repeatable": true,
-          "type": "str"
+          "type": "str",
+          "unique": true
         }
       ],
       "help": "Database statistics and health analysis",
@@ -436,21 +440,25 @@
     "command": {
       "args": [],
       "flags": [],
-      "passthrough": false
+      "passthrough": false,
+      "tags": []
     },
     "flag": {
       "choices": null,
       "default": null,
       "env": null,
+      "env_separator": null,
       "hidden": false,
       "negatable": null,
       "repeatable": false,
-      "short": null
+      "short": null,
+      "unique": false
     },
     "group": {
       "commands": {},
       "deprecated": {},
-      "groups": {}
+      "groups": {},
+      "tags": []
     }
   },
   "global_flags": [
@@ -635,5 +643,5 @@
   "help": "PostgreSQL schema compiler",
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
-  "version": ""
+  "version": "0.12.3"
 }
