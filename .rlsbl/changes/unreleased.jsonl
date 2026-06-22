@@ -3,3 +3,4 @@
 {"commits":["b7f6c33b36a4b5a1f96c43a125e20064f74bc597"],"user_facing":true,"description":"**DDL error diagnostics.** Wrapper template error messages now include the first line of the failing SQL statement (capped at 120 chars) alongside the statement index.","type":"feature"}
 {"commits":["fbdf64025917ab2952158b67815d2d2a0ac297ad"],"user_facing":true,"description":"**selfdoc coverage.** Added documentation for 6 previously undocumented packages: codegen, graph, seed, sqlparse, sqlutil, workload.","type":"feature"}
 {"commits":["2e704284877d4d2a8d3fd8a7f4419a1f8641fd92","770e99df40e118a2352bcd2a238a4876af199b5d","b2ca0bf75dad8c03fa21a73c08f9f714d53ff6f9","1167b0f0ee22eb2673900ee912b59b90bdf20f8f","419054de84857f668f93ea49d396db2ca03274f6","c10476d6bc84683a1439b41a484bdb7db3db03a4"],"user_facing":false}
+{"commits":["530f9171f23a36b4632c4ffde0018634bb254184"],"user_facing":false}
