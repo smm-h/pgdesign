@@ -28,3 +28,4 @@ PostgreSQL schema compiler
 ## Command Groups
 
 - [migrate](cli-migrate.html) -- Database migration commands
+- [testdb](cli-testdb.html) -- Ephemeral test database management

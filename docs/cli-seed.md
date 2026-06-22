@@ -16,10 +16,14 @@ Generate type-aware test data
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--rows` |  | int | 10 |  | Rows per table |
+| `--seed` |  | int |  |  | RNG seed for reproducibility |
 | `--output` |  | str |  |  | Output file path (default: stdout) |
 | `--apply` |  | bool |  |  | Insert directly into database |
 | `--db` |  | str |  |  | PostgreSQL connection URL (required with --apply) |
 | `--schema` |  | str |  |  | Schema name |
+| `--format` |  | str | insert |  | Output format for seed data |
+| `--clean` |  | bool |  |  | Emit TRUNCATE before seed data |
+| `--mode` |  | str | normal |  | Generation mode |
 
 ## Arguments
 

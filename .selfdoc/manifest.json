@@ -68,6 +68,11 @@
       "type": "doc"
     },
     {
+      "path": "cli-testdb.md",
+      "title": "pgdesign testdb",
+      "type": "doc"
+    },
+    {
       "path": "design-intelligence.md",
       "title": "Design Intelligence",
       "type": "doc"
@@ -85,6 +90,11 @@
     {
       "path": "internal-audit.md",
       "title": "internal/audit",
+      "type": "doc"
+    },
+    {
+      "path": "internal-codegen.md",
+      "title": "internal/codegen",
       "type": "doc"
     },
     {
@@ -133,6 +143,11 @@
       "type": "doc"
     },
     {
+      "path": "internal-graph.md",
+      "title": "internal/graph",
+      "type": "doc"
+    },
+    {
       "path": "internal-introspect.md",
       "title": "internal/introspect",
       "type": "doc"
@@ -158,6 +173,11 @@
       "type": "doc"
     },
     {
+      "path": "internal-seed.md",
+      "title": "internal/seed",
+      "type": "doc"
+    },
+    {
       "path": "internal-semtype.md",
       "title": "internal/semtype",
       "type": "doc"
@@ -178,6 +198,16 @@
       "type": "doc"
     },
     {
+      "path": "internal-sqlparse.md",
+      "title": "internal/sqlparse",
+      "type": "doc"
+    },
+    {
+      "path": "internal-sqlutil.md",
+      "title": "internal/sqlutil",
+      "type": "doc"
+    },
+    {
       "path": "internal-testdb.md",
       "title": "internal/testdb",
       "type": "doc"
@@ -185,6 +215,11 @@
     {
       "path": "internal-validate.md",
       "title": "internal/validate",
+      "type": "doc"
+    },
+    {
+      "path": "internal-workload.md",
+      "title": "internal/workload",
       "type": "doc"
     },
     {
@@ -229,5 +264,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-22T10:54:36.961175+00:00"
+  "last_gen": "2026-06-22T11:40:19.142991+00:00"
 }

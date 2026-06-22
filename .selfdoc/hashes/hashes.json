@@ -36,7 +36,7 @@
     "description": "b30465bb7c233a09ba7403c9aa115660f78db3e181c8ab9ff658e021329aebd0"
   },
   "en/cli-index.md": {
-    "content": "9321f6859a47640901f8c47701b54dd2cc1107c81bad57c51c11d008a9c33c37",
+    "content": "e47d9ebd7e27c0618ff75b7d36f8932dcd18f9d271744871bbe632bc8ec07af7",
     "description": "21ea011b2e49377a6fb312d304039b369ad173fc2c521da6668369e573bff900"
   },
   "en/cli-introspect.md": {
@@ -44,11 +44,11 @@
     "description": "1a99db90102a65a1567c98b6eeba97192156325e57b3434abb2be322416ab779"
   },
   "en/cli-migrate.md": {
-    "content": "312e11b7216f8447585bbfdd528f945fbb8aa28259e1a6efdb583d994373d699",
+    "content": "31a39272c1e9a642fe50c6b5362277b76dbe4f345b73cb1869759bf560eb66ef",
     "description": "1a3026fbd049706b0487173a0dfe7740951aa2e722e32d9fab0258136c7c3071"
   },
   "en/cli-seed.md": {
-    "content": "423bf74a455eb66ae7de01fa1d5cf5c3c5c2e0b92f2bec425d8c162db41f3df3",
+    "content": "1e64d14edc9076b9e3a50e4c0944f719bc72796f8061a2f77bd17f5065517bcf",
     "description": "4936f84bc75be5be3f5ccdd8bebbd4e9db29f7a8c827e60219a6c1a8a0824917"
   },
   "en/cli-serve.md": {
@@ -58,6 +58,10 @@
   "en/cli-stats.md": {
     "content": "28dd46b6ab1904460ea84b70411e2ffd07cb61af3d49a1f1ed25855ae58e09a5",
     "description": "83a3ccfe151098c7422a467282ed1543f4e1f7657b55644c74661159e94c1750"
+  },
+  "en/cli-testdb.md": {
+    "content": "1dccf98c1c9f9cb06b347c1d1479b63b58519502f1ad4fb3acb00a103a876c3d",
+    "description": "a36774cd005afcc41489ad080193db22d4c26bf43ed7b47bc983d1abacaf528f"
   },
   "en/cli-validate.md": {
     "content": "be71d78be11e3e6279b1a616206189a025b086d9c6bd00ebc11228ee5d7fe5bb",
@@ -100,7 +104,7 @@
     "description": "628a0e8017b4d8d6832a311c56c0c57bd8470a1bbb63490d008fe2415b209fed"
   },
   "en/gen-index.md": {
-    "content": "2056f90a42b6b7d74b7323c74bcab14e2c172121c8d1c7fc81b0fdc5c0d365e0",
+    "content": "ec5ae5ad327eb9ef954eede3e72373c45e48b7e92229df2da2e3e1092f902253",
     "description": "bb3cd9d34f014c0674a9285c25ee14b5b4abc5cf941f0d83594c301405e8f3b6"
   },
   "en/generate.md": {
@@ -110,6 +114,10 @@
   "en/internal-audit.md": {
     "content": "e0f481050a8537b946b8e49b10a0df09cf3278dc9b1a3c99a94bbe8b08d19e5a",
     "description": "52f7978f3267738413d75bdd2080187e98ae42774da52ed2402c2bd8feb464cd"
+  },
+  "en/internal-codegen.md": {
+    "content": "a35dd983b0cc37df5a742a853002a045beaa6a6802b264b4c6d513019dac9a3a",
+    "description": "3a9b9b2b0664cf3119b4f0c821b860aad3b1d5e470968d73c815e3934580522c"
   },
   "en/internal-config.md": {
     "content": "22af75015f107bf2f57fd3783ef1009a06073b410ce6621eef6496d341cb857f",
@@ -147,6 +155,10 @@
     "content": "3498b852b7e69882915d26e21d8cd08f9c101b5ad30dfd33d6d1987131a41990",
     "description": "87c5994a672cffd7aff21c955d4154587f8bcdb0a31fcaafce135519413fa59a"
   },
+  "en/internal-graph.md": {
+    "content": "f8338b46859a65fbffb3be977b8de891b791c596b305deb4d65fe3a696031aee",
+    "description": "ed9d2dd526dd7c5fc397e716ebb1d9f0c0b86503283581ffcaf005ff563e3cbb"
+  },
   "en/internal-introspect.md": {
     "content": "ae09c7bbc7e48abf4deed5c6a822af17c807b7686e1b483265064dc1112e17ec",
     "description": "a6ecca6d13ab8f3fdfa1bc5a650e96e14991798f5070e2da1a0eb323961b6c49"
@@ -167,6 +179,10 @@
     "content": "6521128d866fb124c9f333de187bebb40f05bce0fa86936d248eedaa717e9bc5",
     "description": "b38d8b91c14cc23905fc6105c9056c6be73554f5b02d9506e4ac7df4f030f343"
   },
+  "en/internal-seed.md": {
+    "content": "79fa56087e2bd5fdb1fa3e83abdc9b8438249378b1cf51c8a97ac88faa8e9601",
+    "description": "2f0aa9d95bfea637c0d613936852c18bb22901aac837f9bdd426b34a67f18f93"
+  },
   "en/internal-semtype.md": {
     "content": "274be24cefca3fa20277248c21b6cc2daf8ec7b424a675108c912a950410b237",
     "description": "04e6d108a40dee07091148d1992705b83076278239a242c59e74d4761d081e3b"
@@ -183,6 +199,14 @@
     "content": "b5e801fa2ac2e1a1b809c3a550707a43f90541658fa3298c6ac154f6b3ff8950",
     "description": "c00f45af701989d0c3f7443fc3f557e60faae31e07e7b3f57dc7719eda81641d"
   },
+  "en/internal-sqlparse.md": {
+    "content": "531e23d72a4cd4039a6a484f6f848c0bb50321a4de4ba54a32d519aacd46e1ed",
+    "description": "f43780787db6ba9b31708a5d4d6813be03927d90918dbca949ed75d196c88e3a"
+  },
+  "en/internal-sqlutil.md": {
+    "content": "1cb7529dd1f564f4bfddeb21bd444ec06b6fd8553c44f88943fe53ce4cdc396f",
+    "description": "04f0a2b5476dfc09cc670057bacd70bebc6be8738bc3774e64efb739de46a5ae"
+  },
   "en/internal-testdb.md": {
     "content": "9404bf9b892dac0cdd45864dc3f5619a9be0f217d3d936b2e45f00c68c30306c",
     "description": "fad308dedbc590c96b7c55cfe8c559947e9252144762fb6d5f6c5ca7c01d74d0"
@@ -190,6 +214,10 @@
   "en/internal-validate.md": {
     "content": "ab32898d75f0e34312b17c6f4c5a1caa2629ddd68aef799e7aacc9ddc8cf3f1f",
     "description": "31f4db2666a46525d34dc6c0412b2153f917d0a51159a2431cadd5b41a27c6e3"
+  },
+  "en/internal-workload.md": {
+    "content": "c35e2be17d163bd008aa489c6a84b10d341e708f907d34794b44a757c1f0750c",
+    "description": "a9f991bea19c9340c752e989b8bccdbd0b5f7c8b5b826f219b59d58697ab9e62"
   },
   "en/introspect.md": {
     "content": "48603ed55c27baa9e8d6f75b78b2730e967e08aed805b93a70e54453fe472a4c",

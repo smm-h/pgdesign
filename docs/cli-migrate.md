@@ -69,6 +69,7 @@ Rollback the last migration
 | --- | --- | --- | --- | --- | --- |
 | `--db` |  | str |  |  | PostgreSQL connection URL |
 | `--dir` |  | str | migrations |  | Migrations directory |
+| `--to` |  | str |  |  | Target version to rollback to (exclusive — this version stays applied) |
 
 ## migrate squash
 
@@ -81,6 +82,7 @@ Squash a range of migrations into one
 | `--from` |  | str |  |  | Start version (inclusive) |
 | `--to` |  | str |  |  | End version (inclusive) |
 | `--dir` |  | str | migrations |  | Migrations directory |
+| `--db` |  | str |  |  | PostgreSQL connection URL for safety check |
 
 ## migrate status
 
@@ -104,3 +106,10 @@ Test migrations against a staging database
 | `--db` |  | str |  |  | Staging database connection URL |
 | `--dir` |  | str | migrations |  | Migrations directory |
 | `--timeout` |  | int | 60 |  | Timeout in seconds |
+| `--shadow` |  | bool |  |  | Test by replaying migrations into a shadow database and diffing against TOML schema |
+
+### Arguments
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `path` | no | Schema file(s) or directory (required with --shadow) |
