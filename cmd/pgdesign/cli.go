@@ -209,6 +209,7 @@ func main() {
 			strictcli.StringFlag("language", "Target language(s)", strictcli.Repeatable()),
 			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Default(nil)),
 			strictcli.BoolFlag("force", "Overwrite existing files"),
+			strictcli.StringFlag("ci", "CI provider for workflow generation (e.g., github-actions)", strictcli.Default(nil)),
 		),
 	)
 

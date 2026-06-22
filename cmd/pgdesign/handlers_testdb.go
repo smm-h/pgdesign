@@ -172,6 +172,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 
 	force, _ := kwargs["force"].(bool)
 	outputName, _ := kwargs["output"].(string)
+	ciProvider, _ := kwargs["ci"].(string)
 
 	// Find pgdesign.toml.
 	cwd, err := os.Getwd()
@@ -283,6 +284,41 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 		}
 
 		fmt.Fprintf(os.Stderr, "wrote %s\n", relPath)
+	}
+
+	// Generate CI workflow if --ci is set.
+	if ciProvider != "" {
+		pgVersion := "16"
+		if cfg.Database.PGVersion != 0 {
+			pgVersion = fmt.Sprintf("%d", cfg.Database.PGVersion)
+		}
+
+		content, err := testdb.RenderCITemplate(ciProvider, pgVersion, languages)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: render CI template: %v\n", err)
+			return 1
+		}
+
+		ciRelPath := ".github/workflows/pgdesign-testdb.yml"
+		ciAbsPath := filepath.Join(cwd, ciRelPath)
+
+		if _, err := os.Stat(ciAbsPath); err == nil && !force {
+			fmt.Fprintf(os.Stderr, "error: %s already exists (use --force to overwrite)\n", ciRelPath)
+			return 1
+		}
+
+		dir := filepath.Dir(ciAbsPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "error: create directory %s: %v\n", dir, err)
+			return 1
+		}
+
+		if err := os.WriteFile(ciAbsPath, content, 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "error: write %s: %v\n", ciRelPath, err)
+			return 1
+		}
+
+		fmt.Fprintf(os.Stderr, "wrote %s\n", ciRelPath)
 	}
 
 	return 0

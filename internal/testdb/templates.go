@@ -9,6 +9,9 @@ import (
 //go:embed templates/*.tmpl
 var TemplateFS embed.FS
 
+//go:embed templates/ci/*.tmpl
+var CITemplateFS embed.FS
+
 // langTemplates maps language names to template filenames.
 var langTemplates = map[string]string{
 	"go":     "go.go.tmpl",
@@ -57,4 +60,29 @@ func RenderTemplate(lang, ddlPath, baseURL, baseName string) ([]byte, error) {
 // WrapperOutputPath returns the conventional path for a language's test wrapper.
 func WrapperOutputPath(lang string) string {
 	return langOutputPaths[lang]
+}
+
+// ciTemplates maps CI provider names to template filenames.
+var ciTemplates = map[string]string{
+	"github-actions": "github-actions.yml.tmpl",
+}
+
+// RenderCITemplate reads a CI workflow template for the given provider and
+// substitutes placeholders. Only "github-actions" is supported.
+func RenderCITemplate(provider, pgVersion string, languages []string) ([]byte, error) {
+	filename, ok := ciTemplates[provider]
+	if !ok {
+		return nil, fmt.Errorf("unsupported CI provider %q (supported: github-actions)", provider)
+	}
+
+	data, err := CITemplateFS.ReadFile("templates/ci/" + filename)
+	if err != nil {
+		return nil, fmt.Errorf("read CI template for %s: %w", provider, err)
+	}
+
+	s := string(data)
+	s = strings.ReplaceAll(s, "{{PG_VERSION}}", pgVersion)
+	s = strings.ReplaceAll(s, "{{LANGUAGES}}", strings.Join(languages, ", "))
+
+	return []byte(s), nil
 }
