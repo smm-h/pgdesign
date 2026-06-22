@@ -15,6 +15,10 @@
       "language": "go"
     },
     {
+      "path": "internal/dbutil",
+      "language": "go"
+    },
+    {
       "path": "internal/diagnostic",
       "language": "go"
     },
@@ -76,6 +80,10 @@
     },
     {
       "path": "internal/sqlexpr",
+      "language": "go"
+    },
+    {
+      "path": "internal/testdb",
       "language": "go"
     },
     {
