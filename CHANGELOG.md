@@ -2,6 +2,33 @@
 
 # Changelog
 
+## 0.14.1
+
+Wrapper template hardening, versioned .split.json, CI workflow generation, consumer documentation
+
+<details>
+<summary>Context</summary>
+
+Follow-up to v0.14.0's ephemeral test database feature. Fixes SQL interpolation and modulo bias in wrapper templates, adds a versioned .split.json format for future-proofing, generates GitHub Actions CI workflows via --ci flag, adds consumer-facing documentation and selfdoc coverage for new packages.
+
+</details>
+
+### Features
+
+- **Versioned `.split.json` format.** The companion DDL file now uses `{"version": 1, "statements": [...]}` instead of a bare array, enabling format evolution without breaking existing wrappers.
+- **`testdb gc` shows active connections.** `ListOrphans` now exposes the active connection count per database. The `gc` command prints it alongside each dropped database name.
+- **CI workflow generation.** `testdb init --ci github-actions` generates a GitHub Actions workflow with a Postgres service container, per-language toolchain setup, and `PGDESIGN_DB` configuration.
+
+### Fixes
+
+- **Wrapper template hardening.** Zig terminate query uses parameterized `$1` instead of string interpolation. TypeScript and Zig random name generation uses rejection sampling to eliminate modulo bias. Go template adds post-truncation 63-byte assertion.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.14.0
 
 RLS full parity, seed overhaul, FK graph, design intelligence, migration intelligence, workload analysis, ephemeral test databases
@@ -42,12 +69,6 @@ Major feature release spanning seven areas: RLS policies gain PERMISSIVE/RESTRIC
 - **Fix.** Generate migration DDL for changed foreign keys (drop old + add new).
 - **Fix.** Render functions, sequences, exclusions, triggers, collation, statistics, domains, and composites in `FormatTerminal` diff output.
 - **Fix.** Add regex operators (`~`, `~*`, `!~`, `!~*`) to sqlexpr parser.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.13.0
 
