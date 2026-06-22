@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "statements": [
+    "CREATE TABLE conformance_test (id integer PRIMARY KEY, name text NOT NULL);"
+  ]
+}
