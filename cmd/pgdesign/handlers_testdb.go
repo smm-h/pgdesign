@@ -127,7 +127,11 @@ func handleTestdbGC(kwargs map[string]interface{}) int {
 			fmt.Fprintf(os.Stderr, "error: drop %s: %v\n", orphan.Name, err)
 			failures++
 		} else {
-			fmt.Fprintf(os.Stderr, "dropped %s\n", orphan.Name)
+			conns := ""
+			if orphan.ActiveConnections != nil {
+				conns = fmt.Sprintf(" (%d active connections)", *orphan.ActiveConnections)
+			}
+			fmt.Fprintf(os.Stderr, "  dropped %s%s\n", orphan.Name, conns)
 		}
 	}
 

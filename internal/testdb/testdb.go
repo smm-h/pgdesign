@@ -77,10 +77,11 @@ func (m *Manager) connectMaintenance(ctx context.Context) (*pgx.Conn, error) {
 
 // EphemeralDB represents a created ephemeral test database.
 type EphemeralDB struct {
-	Name      string
-	URL       string
-	CreatedAt time.Time
-	manager   *Manager
+	Name              string
+	URL               string
+	CreatedAt         time.Time
+	ActiveConnections *int // nil = not queried, non-nil = count from pg_stat_activity
+	manager           *Manager
 	// mu protects conns and pools.
 	mu    sync.Mutex
 	conns []*pgx.Conn
@@ -357,12 +358,12 @@ func (m *Manager) ListOrphans(ctx context.Context, olderThan time.Duration) ([]*
 		}
 
 		orphans = append(orphans, &EphemeralDB{
-			Name:      datname,
-			URL:       dbURL,
-			CreatedAt: created,
-			manager:   m,
+			Name:              datname,
+			URL:               dbURL,
+			CreatedAt:         created,
+			ActiveConnections: &connCount,
+			manager:           m,
 		})
-		_ = connCount // available for future use (e.g., filtering)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate pg_database: %w", err)

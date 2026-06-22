@@ -308,15 +308,25 @@ func TestListOrphans(t *testing.T) {
 		t.Fatalf("list orphans: %v", err)
 	}
 
-	found := make(map[string]bool)
+	found := make(map[string]*EphemeralDB)
 	for _, o := range orphans {
-		found[o.Name] = true
+		found[o.Name] = o
 	}
-	if !found[db1.Name] {
+	if found[db1.Name] == nil {
 		t.Fatalf("db1 %s not found in orphans", db1.Name)
 	}
-	if !found[db2.Name] {
+	if found[db2.Name] == nil {
 		t.Fatalf("db2 %s not found in orphans", db2.Name)
+	}
+
+	// Verify ActiveConnections is populated (non-nil) for each orphan.
+	for _, o := range orphans {
+		if o.ActiveConnections == nil {
+			t.Fatalf("orphan %s has nil ActiveConnections", o.Name)
+		}
+		if *o.ActiveConnections < 0 {
+			t.Fatalf("orphan %s has negative ActiveConnections: %d", o.Name, *o.ActiveConnections)
+		}
 	}
 }
 
