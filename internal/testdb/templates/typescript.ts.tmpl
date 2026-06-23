@@ -78,7 +78,8 @@ async function applyDDL(client: Client): Promise<void> {
         preview = preview.substring(0, 120) + "...";
       }
       throw new Error(
-        `pgdesign testdb: statement ${i + 1} failed (${preview}): ${err instanceof Error ? err.message : err}`
+        `pgdesign testdb: statement ${i + 1} failed (${preview}): ${err instanceof Error ? err.message : err}`,
+        { cause: err }
       );
     }
   }

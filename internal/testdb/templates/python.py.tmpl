@@ -30,7 +30,8 @@ def _generate_name():
         # slice at the byte limit, decode back dropping any partial character.
         base = base.encode("utf-8")[:max_base].decode("utf-8", errors="ignore")
     name = f"{base}_test_{ts}_{suffix}"
-    assert len(name.encode()) <= 63, f"database name exceeds 63 bytes: {name}"
+    if len(name.encode()) > 63:
+        raise ValueError(f"database name exceeds 63 bytes: {name}")
     return name
 
 
