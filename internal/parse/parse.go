@@ -260,9 +260,131 @@ func (p *parser) parseTypes() []RawType {
 			}
 			types[idx].Fields = fields
 		}
+		// [types.*.states.*] sub-tables (4-element keypaths)
+		if len(tbl.KeyPath) == 4 && tbl.KeyPath[0] == "types" && tbl.KeyPath[2] == "states" {
+			typeName := tbl.KeyPath[1]
+			stateName := tbl.KeyPath[3]
+			idx, exists := typeIndex[typeName]
+			if !exists {
+				p.warnf("W001", "", "", "[types.%s.states.%s] has no parent [types.%s] section", typeName, stateName, typeName)
+				continue
+			}
+			if types[idx].States == nil {
+				types[idx].States = make(map[string]RawSMState)
+			}
+			state := RawSMState{}
+			for _, fc := range tbl.Children {
+				kv, ok := fc.(*tomledit.KeyValueNode)
+				if !ok {
+					continue
+				}
+				key := kv.Key.Parts[0]
+				switch key {
+				case "terminal":
+					if v, ok := nodeBool(kv.Val); ok {
+						state.Terminal = &v
+					} else {
+						p.errorf("E010", "", "", "[types.%s.states.%s].terminal must be a boolean", typeName, stateName)
+					}
+				case "comment":
+					if v, ok := nodeString(kv.Val); ok {
+						state.Comment = &v
+					} else {
+						p.errorf("E010", "", "", "[types.%s.states.%s].comment must be a string", typeName, stateName)
+					}
+				default:
+					p.warnf("W001", "", "", "unknown key in [types.%s.states.%s]: %q", typeName, stateName, key)
+				}
+			}
+			types[idx].States[stateName] = state
+		}
+	}
+
+	// Third pass: find [[types.*.transitions]] array-of-tables.
+	for _, child := range p.doc.Children {
+		at, ok := child.(*tomledit.ArrayTableNode)
+		if !ok {
+			continue
+		}
+		if len(at.KeyPath) == 3 && at.KeyPath[0] == "types" && at.KeyPath[2] == "transitions" {
+			typeName := at.KeyPath[1]
+			idx, exists := typeIndex[typeName]
+			if !exists {
+				p.warnf("W001", "", "", "[[types.%s.transitions]] has no parent [types.%s] section", typeName, typeName)
+				continue
+			}
+			tr := p.parseTypeTransition(typeName, at)
+			types[idx].Transitions = append(types[idx].Transitions, tr)
+		}
 	}
 
 	return types
+}
+
+// parseTypeTransition parses a single [[types.<name>.transitions]] entry.
+func (p *parser) parseTypeTransition(typeName string, at *tomledit.ArrayTableNode) RawSMTransition {
+	tr := RawSMTransition{}
+
+	knownKeys := map[string]bool{
+		"name": true, "from": true, "to": true, "requires": true, "comment": true,
+	}
+
+	for _, child := range at.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		key := kv.Key.Parts[0]
+		if !knownKeys[key] {
+			p.warnf("W001", "", "", "unknown key in [[types.%s.transitions]]: %q", typeName, key)
+			continue
+		}
+		switch key {
+		case "name":
+			if v, ok := nodeString(kv.Val); ok {
+				tr.Name = v
+			} else {
+				p.errorf("E010", "", "", "[[types.%s.transitions]].name must be a string", typeName)
+			}
+		case "from":
+			if v, ok := nodeStringSlice(kv.Val); ok {
+				tr.From = v
+			} else {
+				p.errorf("E010", "", "", "[[types.%s.transitions]].from must be an array of strings", typeName)
+			}
+		case "to":
+			if v, ok := nodeString(kv.Val); ok {
+				tr.To = v
+			} else {
+				p.errorf("E010", "", "", "[[types.%s.transitions]].to must be a string", typeName)
+			}
+		case "requires":
+			if m, ok := nodeStringMap(kv.Val); ok {
+				tr.Requires = m
+			} else {
+				p.errorf("E010", "", "", "[[types.%s.transitions]].requires must be an inline table of strings", typeName)
+			}
+		case "comment":
+			if v, ok := nodeString(kv.Val); ok {
+				tr.Comment = &v
+			} else {
+				p.errorf("E010", "", "", "[[types.%s.transitions]].comment must be a string", typeName)
+			}
+		}
+	}
+
+	// Validate required fields.
+	if tr.Name == "" {
+		p.errorf("E011", "", "", "[[types.%s.transitions]] is missing required field \"name\"", typeName)
+	}
+	if len(tr.From) == 0 {
+		p.errorf("E011", "", "", "[[types.%s.transitions]] is missing required field \"from\"", typeName)
+	}
+	if tr.To == "" {
+		p.errorf("E011", "", "", "[[types.%s.transitions]] is missing required field \"to\"", typeName)
+	}
+
+	return tr
 }
 
 func (p *parser) parseType(name string, tbl *tomledit.TableNode) RawType {
@@ -272,6 +394,7 @@ func (p *parser) parseType(name string, tbl *tomledit.TableNode) RawType {
 		"kind": true, "base_type": true, "values": true,
 		"not_null": true, "default": true, "default_expr": true,
 		"check": true, "unique": true, "array": true, "comment": true,
+		"initial": true, "enforce": true,
 	}
 
 	for _, child := range tbl.Children {
@@ -344,6 +467,18 @@ func (p *parser) parseType(name string, tbl *tomledit.TableNode) RawType {
 				rt.Comment = &v
 			} else {
 				p.errorf("E010", "", "", "[types.%s].comment must be a string", name)
+			}
+		case "initial":
+			if v, ok := nodeString(kv.Val); ok {
+				rt.InitialState = &v
+			} else {
+				p.errorf("E010", "", "", "[types.%s].initial must be a string", name)
+			}
+		case "enforce":
+			if v, ok := nodeBool(kv.Val); ok {
+				rt.EnforceTrigger = &v
+			} else {
+				p.errorf("E010", "", "", "[types.%s].enforce must be a boolean", name)
 			}
 		}
 	}

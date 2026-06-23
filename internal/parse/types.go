@@ -21,6 +21,21 @@ type RawMeta struct {
 	Extensions []string
 }
 
+// RawSMState holds a state in a state machine type from [types.*.states.*].
+type RawSMState struct {
+	Terminal *bool
+	Comment  *string
+}
+
+// RawSMTransition holds a transition in a state machine type from [[types.*.transitions]].
+type RawSMTransition struct {
+	Name     string
+	From     []string
+	To       string
+	Requires map[string]string
+	Comment  *string
+}
+
 // RawType holds a user-defined type from [types.*].
 type RawType struct {
 	Name       string
@@ -28,6 +43,10 @@ type RawType struct {
 	BaseType   string
 	Values     []string
 	Fields     map[string]string // composite fields: field name -> PG type
+	States         map[string]RawSMState  // state machine states: state name -> definition
+	Transitions    []RawSMTransition      // state machine transitions
+	InitialState   *string                // state machine initial state
+	EnforceTrigger *bool                  // state machine: generate enforcement trigger
 	NotNull    *bool
 	Default    *string
 	DefaultExpr *string
