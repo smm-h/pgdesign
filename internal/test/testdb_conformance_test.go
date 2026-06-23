@@ -652,11 +652,9 @@ tasks.test { useJUnitPlatform() }
 	t.Logf("gradle test output:\n%s", output)
 }
 
-// TestConformanceZig renders the Zig wrapper template and attempts to build and
-// run a test against a real Postgres instance. Currently skipped because the
-// Zig template assumes a pg.zig API (Conn.init with connection_string) that
-// does not match the actual karlseguin/pg.zig library API (Conn.openAndAuthUri
-// with Io parameter, structured Opts without connection_string field).
+// TestConformanceZig renders the Zig wrapper template and verifies it can be
+// rendered without error. Full build+run conformance requires zig and the
+// pg.zig dependency to be available, which is not typical in CI.
 func TestConformanceZig(t *testing.T) {
 	testdb.SkipIfNoPostgres(t)
 
@@ -664,21 +662,37 @@ func TestConformanceZig(t *testing.T) {
 		t.Skip("zig not found in PATH")
 	}
 
-	// The Zig template (zig.zig.tmpl) uses an API that does not match the
-	// actual karlseguin/pg.zig library:
-	//   Template assumes: pg.Conn.init(allocator, .{ .connection_string = url })
-	//   Actual API uses:  pg.Conn.openAndAuthUri(io, allocator, uri)
-	//
-	// The connection type is also different:
-	//   Template assumes: *pg.Conn (pointer from init)
-	//   Actual API uses:  pg.Conn (value from open/openAndAuthUri)
-	//
-	// Additionally, the Opts struct has no connection_string field; it uses
-	// structured fields (host, port, tls, etc.) or URI-based initialization.
-	//
-	// Until the template is updated to match the actual pg.zig API, this test
-	// cannot run.
-	t.Skip("zig template API mismatch: template uses pg.Conn.init(allocator, .{ .connection_string = ... }) but karlseguin/pg.zig uses pg.Conn.openAndAuthUri(io, allocator, uri) with different type signatures")
+	fixturePath := conformanceFixturePath(t)
+	baseURL := conformanceBaseURL()
+	baseName := extractDBName(baseURL)
+
+	// Verify the template renders without error.
+	rendered, err := testdb.RenderTemplate("zig", fixturePath, baseURL, baseName)
+	if err != nil {
+		t.Fatalf("render Zig template: %v", err)
+	}
+	if len(rendered) == 0 {
+		t.Fatal("rendered Zig template is empty")
+	}
+
+	// Verify key API patterns are present in the rendered output.
+	output := string(rendered)
+	for _, pattern := range []string{
+		"pg.Conn.openAndAuthUri",
+		"std.Uri.parse",
+		"std.posix.clock_gettime",
+		"std.crypto.random.bytes",
+		"std.Io.Threaded",
+	} {
+		if !strings.Contains(output, pattern) {
+			t.Errorf("rendered template missing expected pattern: %s", pattern)
+		}
+	}
+
+	// Full build conformance requires pg.zig as a zig dependency, which
+	// cannot be verified without a zig project with build.zig.zon that
+	// fetches the dependency. Skip the build step.
+	t.Skip("pg.zig dependency not available for build conformance (template renders correctly)")
 }
 
 // extractDBName extracts the database name from a PostgreSQL connection URL.
