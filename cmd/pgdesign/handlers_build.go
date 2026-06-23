@@ -170,6 +170,11 @@ func handleBuild(kwargs map[string]interface{}) int {
 				return 1
 			}
 
+			// Configure backend selection for query-layer generators.
+			if qlg, ok := gen.(*codegen.PythonQueryLayerGenerator); ok && len(out.Backends) > 0 {
+				qlg.Backends = out.Backends
+			}
+
 			// MultiFileGenerator: write multiple files into a directory.
 			if mfg, ok := gen.(codegen.MultiFileGenerator); ok {
 				files, diags := mfg.GenerateFiles(outputSchema)

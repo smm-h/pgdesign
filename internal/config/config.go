@@ -66,6 +66,7 @@ type OutputConfig struct {
 	Lang       string   `toml:"lang"`       // for codegen: python, zig, go, ts, java, kotlin
 	Mode       string   `toml:"mode"`       // for codegen: validators, constants
 	Groups     []string `toml:"groups"`     // restrict output to tables in these groups
+	Backends   []string `toml:"backends"`   // for query-layer: ["pg"], ["memory"], or both (default: both)
 	Idempotent bool     `toml:"idempotent"` // for sql: add IF NOT EXISTS
 	Comments   *bool    `toml:"comments"`   // for sql: include COMMENT ON (default true)
 }
@@ -190,6 +191,13 @@ func decodeOutput(raw map[string]any) (map[string]OutputConfig, error) {
 			for _, item := range arr {
 				if s, ok := item.(string); ok {
 					oc.Groups = append(oc.Groups, s)
+				}
+			}
+		}
+		if arr, ok := m["backends"].([]any); ok {
+			for _, item := range arr {
+				if s, ok := item.(string); ok {
+					oc.Backends = append(oc.Backends, s)
 				}
 			}
 		}
