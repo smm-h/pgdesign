@@ -27,6 +27,25 @@
   "private": false,
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": []
+    "exclusions": [
+      {
+        "reason": "**New feature.** State machine types (`kind = \"state_machine\"`) with states, transitions, initial state, and enforcement trigger generation. Includes PG enum creation, validation checks (W027/W028/E223/E224/E226), D2 state diagrams, and PL/pgSQL trigger enforcement.",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 5
+          }
+        ]
+      },
+      {
+        "reason": "**New feature.** Python query-layer codegen mode (`--mode query-layer`) with protocol-based backends (PgBackend, InMemoryBackend), per-table delegates, declarative constraint registry, and composite file organization.",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 10
+          }
+        ]
+      }
+    ]
   }
 }
