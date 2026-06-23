@@ -61,12 +61,13 @@ type MigrateConfig struct {
 
 // OutputConfig holds an [output.<name>] section describing a build output target.
 type OutputConfig struct {
-	Format     string `toml:"format"`     // sql, d2, json, svg, doc, graphql, codegen
-	Path       string `toml:"path"`       // relative to project root
-	Lang       string `toml:"lang"`       // for codegen: python, zig, go, ts, java, kotlin
-	Mode       string `toml:"mode"`       // for codegen: validators, constants
-	Idempotent bool   `toml:"idempotent"` // for sql: add IF NOT EXISTS
-	Comments   *bool  `toml:"comments"`   // for sql: include COMMENT ON (default true)
+	Format     string   `toml:"format"`     // sql, d2, json, svg, doc, graphql, codegen
+	Path       string   `toml:"path"`       // relative to project root
+	Lang       string   `toml:"lang"`       // for codegen: python, zig, go, ts, java, kotlin
+	Mode       string   `toml:"mode"`       // for codegen: validators, constants
+	Groups     []string `toml:"groups"`     // restrict output to tables in these groups
+	Idempotent bool     `toml:"idempotent"` // for sql: add IF NOT EXISTS
+	Comments   *bool    `toml:"comments"`   // for sql: include COMMENT ON (default true)
 }
 
 // ExtensionConfig holds [[extensions]] array-of-tables entries.
@@ -184,6 +185,13 @@ func decodeOutput(raw map[string]any) (map[string]OutputConfig, error) {
 		}
 		if s, ok := m["mode"].(string); ok {
 			oc.Mode = s
+		}
+		if arr, ok := m["groups"].([]any); ok {
+			for _, item := range arr {
+				if s, ok := item.(string); ok {
+					oc.Groups = append(oc.Groups, s)
+				}
+			}
 		}
 		if b, ok := m["idempotent"].(bool); ok {
 			oc.Idempotent = b
