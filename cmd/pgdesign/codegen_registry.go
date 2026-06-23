@@ -2,9 +2,35 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/smm-h/pgdesign/internal/codegen"
 )
+
+// SupportedModes returns a map of codegen mode to the languages it supports.
+func SupportedModes() map[string][]string {
+	return map[string][]string{
+		"validators":  {"go", "java", "kotlin", "python", "ts", "zig"},
+		"constants":   {"go", "java", "kotlin", "python", "ts", "zig"},
+		"types":       {"go", "java", "kotlin", "python", "ts", "zig"},
+		"constraints": {"go", "ts"},
+		"gorm":        {"go"},
+		"drizzle":     {"ts"},
+		"sqlalchemy":  {"python"},
+		"jpa":         {"java"},
+	}
+}
+
+// SupportedModeNames returns a sorted list of valid codegen mode names.
+func SupportedModeNames() []string {
+	modes := SupportedModes()
+	names := make([]string, 0, len(modes))
+	for m := range modes {
+		names = append(names, m)
+	}
+	sort.Strings(names)
+	return names
+}
 
 // SelectGenerator returns the codegen.Generator for the given language and mode.
 // It returns a descriptive error if the combination is unsupported.
@@ -101,4 +127,13 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 	default:
 		return nil, fmt.Errorf("unsupported codegen mode: %s", mode)
 	}
+}
+
+// toInterfaceSlice converts a string slice to an interface slice for variadic calls.
+func toInterfaceSlice(ss []string) []interface{} {
+	result := make([]interface{}, len(ss))
+	for i, s := range ss {
+		result[i] = s
+	}
+	return result
 }

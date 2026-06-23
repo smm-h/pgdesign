@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	tomledit "github.com/smm-h/go-toml-edit"
 )
@@ -76,6 +78,11 @@ type ExtensionConfig struct {
 	IndexMethods []string `toml:"index_methods"`
 }
 
+// CodegenModes maps codegen mode names to the languages each mode supports.
+// Set by the main package to enable mode and lang-mode pair validation.
+// When nil, only hardcoded mode names are checked.
+var CodegenModes map[string][]string
+
 // Check checks the Config for semantic errors that TOML parsing alone
 // cannot catch (e.g., cross-field constraints).
 func (c *Config) Check() error {
@@ -96,8 +103,16 @@ func (c *Config) Check() error {
 	validLangs := map[string]bool{
 		"python": true, "zig": true, "go": true, "ts": true, "java": true, "kotlin": true,
 	}
-	validModes := map[string]bool{
-		"validators": true, "constants": true, "types": true, "constraints": true,
+	// Build validModes from CodegenModes if available, otherwise hardcoded fallback.
+	validModes := map[string]bool{}
+	if CodegenModes != nil {
+		for mode := range CodegenModes {
+			validModes[mode] = true
+		}
+	} else {
+		for _, m := range []string{"validators", "constants", "types", "constraints", "gorm", "drizzle", "sqlalchemy", "jpa"} {
+			validModes[m] = true
+		}
 	}
 	for name, out := range c.Output {
 		if out.Path == "" {
@@ -118,7 +133,26 @@ func (c *Config) Check() error {
 			errs = append(errs, fmt.Errorf("output.%s: invalid lang %q (must be one of: python, zig, go, ts, java, kotlin)", name, out.Lang))
 		}
 		if out.Mode != "" && !validModes[out.Mode] {
-			errs = append(errs, fmt.Errorf("output.%s: invalid mode %q (must be one of: validators, constants, types)", name, out.Mode))
+			modeNames := make([]string, 0, len(validModes))
+			for m := range validModes {
+				modeNames = append(modeNames, m)
+			}
+			sort.Strings(modeNames)
+			errs = append(errs, fmt.Errorf("output.%s: invalid mode %q (must be one of: %s)", name, out.Mode, strings.Join(modeNames, ", ")))
+		}
+		// Validate lang-mode pair when CodegenModes is available.
+		if CodegenModes != nil && out.Mode != "" && out.Lang != "" && validModes[out.Mode] && validLangs[out.Lang] {
+			supportedLangs := CodegenModes[out.Mode]
+			found := false
+			for _, l := range supportedLangs {
+				if l == out.Lang {
+					found = true
+					break
+				}
+			}
+			if !found {
+				errs = append(errs, fmt.Errorf("output.%s: language %q is not supported for mode %q (supported: %s)", name, out.Lang, out.Mode, strings.Join(supportedLangs, ", ")))
+			}
 		}
 	}
 
