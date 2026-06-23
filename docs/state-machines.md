@@ -1,3 +1,8 @@
+---
+title: "State Machines"
+description: "How pgdesign defines state machine types with enforced transitions via database triggers, D2 state diagrams, diff and migration support, and codegen transition maps."
+---
+
 # State Machines
 
 pgdesign supports state machine types that enforce valid state transitions at the database level via triggers, generate D2 state diagrams, and produce transition methods in codegen output.

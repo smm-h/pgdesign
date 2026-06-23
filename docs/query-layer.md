@@ -1,3 +1,8 @@
+---
+title: "Python Query Layer"
+description: "How pgdesign generates a complete type-safe Python query layer with protocols, dual backends (PgBackend and InMemoryBackend), and a declarative constraint registry."
+---
+
 # Python Query Layer
 
 The `--mode query-layer --lang python` codegen mode generates a complete type-safe query layer with protocols, dual backends, and a constraint registry. The generated code is async-first and uses Python's Protocol typing for structural subtyping.
