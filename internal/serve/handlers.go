@@ -68,7 +68,7 @@ func (s *Server) handleSchemaD2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d2 := generate.GenerateD2(schema)
+	d2 := generate.GenerateD2(schema, nil)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(d2))
@@ -82,7 +82,7 @@ func (s *Server) handleSchemaSVG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d2Source := generate.GenerateD2(schema)
+	d2Source := generate.GenerateD2(schema, nil)
 	svg, err := generate.RenderSVG(d2Source)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("render SVG: %v", err))

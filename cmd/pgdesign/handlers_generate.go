@@ -11,7 +11,7 @@ import (
 
 func handleGenerate(kwargs map[string]interface{}) int {
 	paths := extractPaths(kwargs)
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -38,6 +38,7 @@ func handleGenerate(kwargs map[string]interface{}) int {
 		IncludeComments: !kwargs["no_comments"].(bool),
 		Format:          kwargs["format"].(string),
 		PGVersion:       pgVersion,
+		TypeRegistry:    typeReg,
 	}
 
 	out, genDiags, err := generate.Generate(schema, opts)

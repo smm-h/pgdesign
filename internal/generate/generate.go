@@ -10,6 +10,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/graph"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sql"
 )
 
@@ -19,6 +20,7 @@ type Options struct {
 	IncludeComments bool
 	Format          string // "sql", "json", "d2", "svg", "doc", "graphql"
 	PGVersion       int
+	TypeRegistry    *semtype.Registry // optional: enables state machine trigger generation and D2 state diagrams
 }
 
 // Generate produces DDL output for the given schema according to opts.
@@ -28,12 +30,12 @@ func Generate(schema *model.Schema, opts Options) (string, []diagnostic.Diagnost
 		out, diags := generateSQL(schema, opts)
 		return out, diags, nil
 	case "d2":
-		return GenerateD2(schema), nil, nil
+		return GenerateD2(schema, opts.TypeRegistry), nil, nil
 	case "json":
 		out, err := generateJSON(schema)
 		return out, nil, err
 	case "svg":
-		d2Source := GenerateD2(schema)
+		d2Source := GenerateD2(schema, opts.TypeRegistry)
 		svg, err := RenderSVG(d2Source)
 		if err != nil {
 			return "", nil, fmt.Errorf("svg render: %w", err)
@@ -328,6 +330,30 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		}
 	}
 
+	// 9c. State machine enforcement triggers
+	if opts.TypeRegistry != nil {
+		var smTriggerStmts []string
+		for i := range tables {
+			t := &tables[i]
+			for _, col := range t.Columns {
+				if !model.IsStateMachineColumn(col, opts.TypeRegistry) {
+					continue
+				}
+				td, err := opts.TypeRegistry.Resolve(col.SemanticTypeName)
+				if err != nil || !td.EnforceTrigger {
+					continue
+				}
+				smTriggerStmts = append(smTriggerStmts,
+					sql.CreateStateMachineTriggerFunction(t.Schema, t.Name, col.Name, td.Transitions))
+				smTriggerStmts = append(smTriggerStmts,
+					sql.CreateStateMachineTrigger(t.Schema, t.Name, col.Name))
+			}
+		}
+		if len(smTriggerStmts) > 0 {
+			sections = append(sections, strings.Join(smTriggerStmts, "\n"))
+		}
+	}
+
 	// 10. COMMENT ON TABLE + COMMENT ON COLUMN
 	if opts.IncludeComments {
 		var commentStmts []string
@@ -533,12 +559,15 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		}
 	}
 
-	// 17. CREATE TRIGGER (user-defined triggers)
+	// 17. CREATE TRIGGER (user-defined triggers, excluding SM triggers)
 	var triggerStmts []string
 	for i := range tables {
 		t := &tables[i]
 		triggers := sortedTriggers(t.Triggers)
 		for _, trig := range triggers {
+			if strings.HasPrefix(trig.Name, "_pgdesign_sm_") {
+				continue
+			}
 			triggerStmts = append(triggerStmts, sql.CreateTrigger(t.Schema, t.Name, trig))
 		}
 	}

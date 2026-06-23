@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/semtype"
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
 	"oss.terrastruct.com/d2/d2lib"
@@ -19,7 +20,8 @@ import (
 // GenerateD2 produces D2 diagram language text from a resolved schema.
 // Each table is rendered as a sql_table shape with columns listed,
 // and FK relationships appear as labeled edges with the ON DELETE action.
-func GenerateD2(schema *model.Schema) string {
+// When reg is non-nil, state machine types are rendered as state diagrams.
+func GenerateD2(schema *model.Schema, reg *semtype.Registry) string {
 	var sections []string
 
 	tables := schema.TableOrder()
@@ -61,7 +63,48 @@ func GenerateD2(schema *model.Schema) string {
 		}
 	}
 
+	// Render state machine state diagrams.
+	if reg != nil {
+		for _, td := range reg.StateMachineTypes() {
+			sections = append(sections, renderD2StateMachine(td))
+		}
+	}
+
 	return strings.Join(sections, "\n") + "\n"
+}
+
+// renderD2StateMachine produces a D2 container with oval state nodes and
+// directed transition edges for a state machine type.
+func renderD2StateMachine(td *semtype.TypeDef) string {
+	var b strings.Builder
+	b.WriteString(td.Name)
+	b.WriteString(": {\n")
+	fmt.Fprintf(&b, "  label: \"<<state machine>>\\n%s\"\n", td.Name)
+
+	// Render each state as an oval.
+	for _, s := range td.States {
+		b.WriteString("  ")
+		b.WriteString(s.Name)
+		b.WriteString(": {\n")
+		b.WriteString("    shape: oval\n")
+		if s.Name == td.InitialState {
+			b.WriteString("    style.bold: true\n")
+		}
+		if s.Terminal {
+			b.WriteString("    style.stroke-width: 3\n")
+		}
+		b.WriteString("  }\n")
+	}
+
+	// Render transition edges.
+	for _, tr := range td.Transitions {
+		for _, from := range tr.From {
+			fmt.Fprintf(&b, "  %s -> %s: %s\n", from, tr.To, tr.Name)
+		}
+	}
+
+	b.WriteString("}")
+	return b.String()
 }
 
 // renderD2Table produces a D2 sql_table block for a single table.
