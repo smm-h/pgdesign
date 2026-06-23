@@ -38,6 +38,7 @@ type tomlDDL struct {
 	Where    string      `toml:"where,omitempty"`
 	Opclass       interface{} `toml:"opclass,omitempty"`
 	IdxCollation  interface{} `toml:"collations,omitempty"`
+	Desc     []bool            `toml:"desc,omitempty"`
 	Include  []string          `toml:"include,omitempty"`
 	With     map[string]string `toml:"with,omitempty"`
 	Comment  string            `toml:"comment,omitempty"`
@@ -138,6 +139,7 @@ func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 		OnDelete:   td.OnDelete,
 		Method:     td.Method,
 		Where:      td.Where,
+		Desc:       td.Desc,
 		Include:    td.Include,
 		With:       td.With,
 		Comment:    td.Comment,
@@ -208,11 +210,14 @@ func convertTomlDown(td *tomlDown) *DownOp {
 	// Single inline down op (op/table/column/name directly on down).
 	if td.Op != "" {
 		singleOp := DDLOp{
-			Op:      td.Op,
-			Table:   td.Table,
-			Column:  td.Column,
-			Name:    td.Name,
-			Columns: td.Columns,
+			Op:                td.Op,
+			Table:             td.Table,
+			Column:            td.Column,
+			Name:              td.Name,
+			Columns:           td.Columns,
+			Operators:         td.Operators,
+			Deferrable:        td.Deferrable,
+			InitiallyDeferred: td.InitiallyDeferred,
 		}
 		down.Ops = append(down.Ops, singleOp)
 	}
@@ -291,6 +296,9 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	}
 	if len(op.Columns) > 0 {
 		b.WriteString(fmt.Sprintf("columns = %s\n", formatStringSlice(op.Columns)))
+	}
+	if len(op.Desc) > 0 {
+		b.WriteString(fmt.Sprintf("desc = %s\n", formatBoolSlice(op.Desc)))
 	}
 	if op.RefTable != "" {
 		b.WriteString(fmt.Sprintf("ref_table = %q\n", op.RefTable))
@@ -400,6 +408,15 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	if op.Expr != "" {
 		b.WriteString(fmt.Sprintf("expr = %q\n", op.Expr))
 	}
+	if len(op.Operators) > 0 {
+		b.WriteString(fmt.Sprintf("operators = %s\n", formatStringSlice(op.Operators)))
+	}
+	if op.Deferrable {
+		b.WriteString("deferrable = true\n")
+	}
+	if op.InitiallyDeferred {
+		b.WriteString("initially_deferred = true\n")
+	}
 
 	// Down must be written before consolidated: [[ddl.consolidated]] changes
 	// the TOML scope so subsequent keys would be under the last consolidated
@@ -449,6 +466,18 @@ func writeDownOp(b *strings.Builder, down *DownOp) {
 		if op.Name != "" {
 			parts = append(parts, fmt.Sprintf("name = %q", op.Name))
 		}
+		if len(op.Columns) > 0 {
+			parts = append(parts, fmt.Sprintf("columns = %s", formatStringSlice(op.Columns)))
+		}
+		if len(op.Operators) > 0 {
+			parts = append(parts, fmt.Sprintf("operators = %s", formatStringSlice(op.Operators)))
+		}
+		if op.Deferrable {
+			parts = append(parts, "deferrable = true")
+		}
+		if op.InitiallyDeferred {
+			parts = append(parts, "initially_deferred = true")
+		}
 		b.WriteString(fmt.Sprintf("down = { %s }\n", strings.Join(parts, ", ")))
 		return
 	}
@@ -482,4 +511,12 @@ func formatStringSlice(s []string) string {
 		quoted[i] = fmt.Sprintf("%q", v)
 	}
 	return "[" + strings.Join(quoted, ", ") + "]"
+}
+
+func formatBoolSlice(s []bool) string {
+	parts := make([]string, len(s))
+	for i, v := range s {
+		parts[i] = fmt.Sprintf("%v", v)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
 }

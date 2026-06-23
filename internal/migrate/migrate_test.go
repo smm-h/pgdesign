@@ -547,6 +547,150 @@ func TestParseMigrationRoundtrip(t *testing.T) {
 	}
 }
 
+func TestMigrationRoundTrip_Desc(t *testing.T) {
+	original := &Migration{
+		Description: "Add index with desc columns",
+		DDLOps: []DDLOp{
+			{
+				Op:      "create_index",
+				Table:   "public.events",
+				Name:    "idx_events_ts",
+				Columns: []string{"created_at", "id"},
+				Desc:    []bool{true, false},
+				Down: &DownOp{
+					Ops: []DDLOp{{Op: "drop_index", Name: "idx_events_ts"}},
+				},
+			},
+		},
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "desc.toml")
+	if err := WriteMigrationFile(path, original); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	parsed, err := ParseMigrationFile(path)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	if len(parsed.DDLOps) != 1 {
+		t.Fatalf("DDL ops count = %d, want 1", len(parsed.DDLOps))
+	}
+	op := parsed.DDLOps[0]
+	if len(op.Desc) != 2 {
+		t.Fatalf("Desc length = %d, want 2", len(op.Desc))
+	}
+	if !op.Desc[0] {
+		t.Error("Desc[0] should be true")
+	}
+	if op.Desc[1] {
+		t.Error("Desc[1] should be false")
+	}
+}
+
+func TestMigrationRoundTrip_Operators(t *testing.T) {
+	original := &Migration{
+		Description: "Add exclusion constraint",
+		DDLOps: []DDLOp{
+			{
+				Op:                "add_exclusion",
+				Table:             "public.reservations",
+				Name:              "excl_reservation",
+				Columns:           []string{"room_id", "during"},
+				Operators:         []string{"=", "&&"},
+				Deferrable:        true,
+				InitiallyDeferred: true,
+				Down: &DownOp{
+					Ops: []DDLOp{{Op: "drop_constraint", Table: "public.reservations", Name: "excl_reservation"}},
+				},
+			},
+		},
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "exclusion.toml")
+	if err := WriteMigrationFile(path, original); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	parsed, err := ParseMigrationFile(path)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	if len(parsed.DDLOps) != 1 {
+		t.Fatalf("DDL ops count = %d, want 1", len(parsed.DDLOps))
+	}
+	op := parsed.DDLOps[0]
+	if len(op.Operators) != 2 || op.Operators[0] != "=" || op.Operators[1] != "&&" {
+		t.Errorf("Operators = %v, want [= &&]", op.Operators)
+	}
+	if !op.Deferrable {
+		t.Error("Deferrable should be true")
+	}
+	if !op.InitiallyDeferred {
+		t.Error("InitiallyDeferred should be true")
+	}
+}
+
+func TestMigrationRoundTrip_DownInline_Columns(t *testing.T) {
+	original := &Migration{
+		Description: "Drop exclusion with inline down",
+		DDLOps: []DDLOp{
+			{
+				Op:   "drop_constraint",
+				Table: "public.reservations",
+				Name: "excl_reservation",
+				Down: &DownOp{
+					Ops: []DDLOp{{
+						Op:                "add_exclusion",
+						Table:             "public.reservations",
+						Name:              "excl_reservation",
+						Columns:           []string{"room_id", "during"},
+						Operators:         []string{"=", "&&"},
+						Deferrable:        true,
+						InitiallyDeferred: true,
+					}},
+				},
+			},
+		},
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "down_inline.toml")
+	if err := WriteMigrationFile(path, original); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	parsed, err := ParseMigrationFile(path)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	if len(parsed.DDLOps) != 1 {
+		t.Fatalf("DDL ops count = %d, want 1", len(parsed.DDLOps))
+	}
+	downOps := parsed.DDLOps[0].Down.Ops
+	if len(downOps) != 1 {
+		t.Fatalf("down ops count = %d, want 1", len(downOps))
+	}
+	dop := downOps[0]
+	if len(dop.Columns) != 2 || dop.Columns[0] != "room_id" {
+		t.Errorf("down Columns = %v, want [room_id during]", dop.Columns)
+	}
+	if len(dop.Operators) != 2 || dop.Operators[0] != "=" {
+		t.Errorf("down Operators = %v, want [= &&]", dop.Operators)
+	}
+	if !dop.Deferrable {
+		t.Error("down Deferrable should be true")
+	}
+	if !dop.InitiallyDeferred {
+		t.Error("down InitiallyDeferred should be true")
+	}
+}
+
 func TestOpToSQL_CreateTable(t *testing.T) {
 	table := &model.Table{
 		Name:   "players",
