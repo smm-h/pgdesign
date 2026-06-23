@@ -10,15 +10,16 @@ import (
 // SupportedModes returns a map of codegen mode to the languages it supports.
 func SupportedModes() map[string][]string {
 	return map[string][]string{
-		"validators":  {"go", "java", "kotlin", "python", "ts", "zig"},
-		"constants":   {"go", "java", "kotlin", "python", "ts", "zig"},
-		"types":       {"go", "java", "kotlin", "python", "ts", "zig"},
-		"constraints": {"go", "java", "kotlin", "python", "ts"},
-		"gorm":        {"go"},
-		"drizzle":     {"ts"},
-		"sqlalchemy":  {"python"},
-		"jpa":         {"java"},
-		"ddl":         {"python"},
+		"validators":   {"go", "java", "kotlin", "python", "ts", "zig"},
+		"constants":    {"go", "java", "kotlin", "python", "ts", "zig"},
+		"types":        {"go", "java", "kotlin", "python", "ts", "zig"},
+		"constraints":  {"go", "java", "kotlin", "python", "ts"},
+		"gorm":         {"go"},
+		"drizzle":      {"ts"},
+		"sqlalchemy":   {"python"},
+		"jpa":          {"java"},
+		"ddl":          {"python"},
+		"query-layer":  {"python"},
 	}
 }
 
@@ -135,6 +136,13 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 		switch lang {
 		case "python":
 			return &codegen.PythonDDLGenerator{}, nil
+		default:
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: python)", mode, lang)
+		}
+	case "query-layer":
+		switch lang {
+		case "python":
+			return &codegen.PythonQueryLayerGenerator{}, nil
 		default:
 			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: python)", mode, lang)
 		}
