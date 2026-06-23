@@ -43,6 +43,24 @@ func (g *PythonQueryLayerGenerator) GenerateFiles(schema *model.Schema) (map[str
 	diags = append(diags, protoDiags...)
 	files["protocols.py"] = protocols
 
+	files["_constraints.py"] = generateConstraintsFile(schema)
+
+	tables := schema.TableOrder()
+	if len(tables) == 0 {
+		return files, diags
+	}
+
+	smMap := buildSMTypeMap(schema)
+
+	// Per-table PG delegate files.
+	for _, tbl := range tables {
+		fileName := fmt.Sprintf("_%s_pg.py", tbl.Name)
+		files[fileName] = generatePerTablePgFile(&tbl, schema, smMap)
+	}
+
+	// Composite PgBackend file.
+	files["pg_backend.py"] = generatePgBackendFile(tables, schema, smMap)
+
 	return files, diags
 }
 
