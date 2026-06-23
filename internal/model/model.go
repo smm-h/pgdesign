@@ -37,6 +37,7 @@ type Schema struct {
 	MaterializedViews  []MaterializedView  `json:"materialized_views,omitempty"`
 	Sequences          []Sequence          `json:"sequences,omitempty"`
 	Functions          []Function          `json:"functions,omitempty"`
+	Groups             map[string][]string `json:"groups,omitempty"`
 	CycleGroups        [][]string          `json:"cycle_groups,omitempty"`
 	PGVersion   int        `json:"pg_version"`
 	TablesByName map[string]*Table `json:"-"`
@@ -80,6 +81,36 @@ func (s *Schema) TableByName(schema, name string) *Table {
 		}
 	}
 	return nil
+}
+
+// FilterByGroups returns a shallow copy of the schema containing only tables
+// that belong to at least one of the named groups. Other schema fields
+// (enums, views, etc.) are preserved as-is. If groupNames is empty, the
+// original schema is returned unchanged.
+func (s *Schema) FilterByGroups(groupNames []string) *Schema {
+	if len(groupNames) == 0 {
+		return s
+	}
+
+	// Collect all table names from the requested groups.
+	include := make(map[string]bool)
+	for _, g := range groupNames {
+		for _, tbl := range s.Groups[g] {
+			include[tbl] = true
+		}
+	}
+
+	filtered := *s
+	filtered.Tables = nil
+	for _, t := range s.Tables {
+		if include[t.Name] {
+			filtered.Tables = append(filtered.Tables, t)
+		}
+	}
+
+	// Rebuild lookup map for the filtered set.
+	filtered.buildTablesByName()
+	return &filtered
 }
 
 // Table represents a resolved table definition.
