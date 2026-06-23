@@ -1114,3 +1114,184 @@ func TestBuildTriggers_ConstraintMustBeAfter(t *testing.T) {
 		t.Error("expected E126 diagnostic for constraint trigger with BEFORE timing")
 	}
 }
+
+func TestBuild_StateMachineCreatesEnum(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	smType := semtype.UserTypeDef{
+		Name: "order_status",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
+			{Name: "pending"},
+			{Name: "confirmed"},
+			{Name: "shipped"},
+			{Name: "delivered", Terminal: true},
+		},
+		Transitions: []semtype.UserSMTransition{
+			{Name: "confirm", From: []string{"pending"}, To: "confirmed"},
+			{Name: "ship", From: []string{"confirmed"}, To: "shipped"},
+			{Name: "deliver", From: []string{"shipped"}, To: "delivered"},
+		},
+		InitialState: "pending",
+	}
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{smType})
+	if diags.HasErrors() {
+		t.Fatalf("failed to load SM type: %v", diags)
+	}
+
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Types: []parse.RawType{
+			{Name: "order_status", Kind: "state_machine"},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name: "orders",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "status", Type: "order_status"},
+				},
+			},
+		},
+	}
+
+	schema, buildDiags := Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+
+	// SM should produce an enum.
+	if len(schema.Enums) != 1 {
+		t.Fatalf("expected 1 enum, got %d", len(schema.Enums))
+	}
+	e := schema.Enums[0]
+	if e.Name != "order_status" {
+		t.Errorf("enum name = %q, want %q", e.Name, "order_status")
+	}
+	if e.Schema != "public" {
+		t.Errorf("enum schema = %q, want %q", e.Schema, "public")
+	}
+	expected := []string{"pending", "confirmed", "shipped", "delivered"}
+	if len(e.Values) != len(expected) {
+		t.Fatalf("enum values = %v, want %v", e.Values, expected)
+	}
+	for i, v := range expected {
+		if e.Values[i] != v {
+			t.Errorf("enum values[%d] = %q, want %q", i, e.Values[i], v)
+		}
+	}
+
+	// Column PGType should be the enum name.
+	var statusCol *Column
+	for i := range schema.Tables[0].Columns {
+		if schema.Tables[0].Columns[i].Name == "status" {
+			statusCol = &schema.Tables[0].Columns[i]
+			break
+		}
+	}
+	if statusCol == nil {
+		t.Fatal("status column not found")
+	}
+	if statusCol.PGType != "order_status" {
+		t.Errorf("status.PGType = %q, want %q", statusCol.PGType, "order_status")
+	}
+}
+
+func TestBuildMulti_StateMachineEnumDedup(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	smType := semtype.UserTypeDef{
+		Name: "ticket_status",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
+			{Name: "open"},
+			{Name: "closed", Terminal: true},
+		},
+		Transitions: []semtype.UserSMTransition{
+			{Name: "close", From: []string{"open"}, To: "closed"},
+		},
+		InitialState: "open",
+	}
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{smType})
+	if diags.HasErrors() {
+		t.Fatalf("failed to load SM type: %v", diags)
+	}
+
+	// Two raw schemas both declaring the same SM type.
+	raw1 := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Types: []parse.RawType{
+			{Name: "ticket_status", Kind: "state_machine"},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name: "tickets",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "status", Type: "ticket_status"},
+				},
+			},
+		},
+	}
+	raw2 := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Types: []parse.RawType{
+			{Name: "ticket_status", Kind: "state_machine"},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name: "ticket_comments",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "ticket_status", Type: "ticket_status"},
+				},
+			},
+		},
+	}
+
+	schema, buildDiags := BuildMulti([]*parse.RawSchema{raw1, raw2}, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+
+	// Should only have one enum after dedup.
+	if len(schema.Enums) != 1 {
+		t.Fatalf("expected 1 enum (deduped), got %d: %v", len(schema.Enums), schema.Enums)
+	}
+	if schema.Enums[0].Name != "ticket_status" {
+		t.Errorf("enum name = %q, want %q", schema.Enums[0].Name, "ticket_status")
+	}
+}
+
+func TestIsStateMachineColumn(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	smType := semtype.UserTypeDef{
+		Name: "task_state",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
+			{Name: "todo"},
+			{Name: "done", Terminal: true},
+		},
+		Transitions: []semtype.UserSMTransition{
+			{Name: "complete", From: []string{"todo"}, To: "done"},
+		},
+		InitialState: "todo",
+	}
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{smType})
+	if diags.HasErrors() {
+		t.Fatalf("failed to load SM type: %v", diags)
+	}
+
+	smCol := Column{Name: "state", PGType: "task_state", SemanticTypeName: "task_state"}
+	if !IsStateMachineColumn(smCol, reg) {
+		t.Error("expected IsStateMachineColumn = true for SM column")
+	}
+
+	regularCol := Column{Name: "name", PGType: "text", SemanticTypeName: "short_text"}
+	if IsStateMachineColumn(regularCol, reg) {
+		t.Error("expected IsStateMachineColumn = false for regular column")
+	}
+
+	noTypeCol := Column{Name: "bare", PGType: "text"}
+	if IsStateMachineColumn(noTypeCol, reg) {
+		t.Error("expected IsStateMachineColumn = false for column with no semantic type")
+	}
+}
