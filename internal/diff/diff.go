@@ -5,6 +5,7 @@ package diff
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -40,6 +41,21 @@ type SchemaDiff struct {
 	FunctionsAdded        []string            `json:"functions_added,omitempty"`
 	FunctionsRemoved      []string            `json:"functions_removed,omitempty"`
 	FunctionsChanged      []FunctionDiff      `json:"functions_changed,omitempty"`
+	SMTransitionsChanged  []SMTransitionDiff  `json:"sm_transitions_changed,omitempty"`
+}
+
+// SMTransitionDiff describes changes to a state machine type's transitions.
+// Enum value changes (states added/removed) are tracked separately in EnumsChanged.
+type SMTransitionDiff struct {
+	TypeName            string           `json:"type_name"`
+	TransitionsAdded    []SMTransitionRef `json:"transitions_added,omitempty"`
+	TransitionsRemoved  []SMTransitionRef `json:"transitions_removed,omitempty"`
+}
+
+// SMTransitionRef identifies a single directed transition edge (from -> to).
+type SMTransitionRef struct {
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 // TableDiff describes the differences within a single table.
@@ -252,7 +268,8 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.DomainsChanged) == 0 &&
 		len(d.FunctionsAdded) == 0 &&
 		len(d.FunctionsRemoved) == 0 &&
-		len(d.FunctionsChanged) == 0
+		len(d.FunctionsChanged) == 0 &&
+		len(d.SMTransitionsChanged) == 0
 }
 
 // Summary returns a human-readable summary of the diff.
@@ -354,6 +371,9 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.FunctionsChanged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d function(s) changed", n))
 	}
+	if n := len(d.SMTransitionsChanged); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d state machine(s) transitions changed", n))
+	}
 
 	return strings.Join(parts, ", ")
 }
@@ -373,6 +393,7 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 	diffCompositeTypes(d, desired, actual)
 	diffDomains(d, desired, actual)
 	diffFunctions(d, desired, actual)
+	diffSMTransitions(d, desired, actual)
 
 	return d
 }
@@ -899,9 +920,13 @@ func exclusionEqual(a, b model.ExclusionConstraint) bool {
 	return true
 }
 
-// diffTriggers matches triggers by name.
+// diffTriggers matches triggers by name, excluding pgdesign-managed state
+// machine triggers (_pgdesign_sm_*) to prevent phantom diffs.
 func diffTriggers(td *TableDiff, desired, actual *model.Table) {
-	added, removed, matched := matchObjects(desired.Triggers, actual.Triggers, func(trig model.Trigger) string {
+	desiredFiltered := filterNonSMTriggers(desired.Triggers)
+	actualFiltered := filterNonSMTriggers(actual.Triggers)
+
+	added, removed, matched := matchObjects(desiredFiltered, actualFiltered, func(trig model.Trigger) string {
 		return trig.Name
 	})
 	for _, trig := range added {
@@ -919,6 +944,19 @@ func diffTriggers(td *TableDiff, desired, actual *model.Table) {
 			})
 		}
 	}
+}
+
+// filterNonSMTriggers returns triggers that are not pgdesign-managed state
+// machine triggers. SM triggers use the _pgdesign_sm_ prefix and are managed
+// by the SM diff/migrate path, not the generic trigger diff.
+func filterNonSMTriggers(triggers []model.Trigger) []model.Trigger {
+	var result []model.Trigger
+	for _, t := range triggers {
+		if !strings.HasPrefix(t.Name, "_pgdesign_sm_") {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 func triggerEqual(a, b *model.Trigger) bool {
@@ -1724,4 +1762,103 @@ func diffDomain(desired, actual *model.Domain) *DomainDiff {
 		return nil
 	}
 	return dd
+}
+
+// diffSMTransitions compares state machine transition maps between two schemas.
+// State changes (enum values added/removed) are handled by diffEnums; this
+// function detects changes to the transition edges themselves.
+func diffSMTransitions(d *SchemaDiff, desired, actual *model.Schema) {
+	desiredByName := make(map[string]*model.SMTransitionMap, len(desired.StateMachineTransitions))
+	for i := range desired.StateMachineTransitions {
+		smt := &desired.StateMachineTransitions[i]
+		desiredByName[smt.TypeName] = smt
+	}
+	actualByName := make(map[string]*model.SMTransitionMap, len(actual.StateMachineTransitions))
+	for i := range actual.StateMachineTransitions {
+		smt := &actual.StateMachineTransitions[i]
+		actualByName[smt.TypeName] = smt
+	}
+
+	// Check all desired SMs for changes vs actual.
+	var names []string
+	for name := range desiredByName {
+		names = append(names, name)
+	}
+	// Also check actual SMs not present in desired (removed SM types).
+	for name := range actualByName {
+		if _, ok := desiredByName[name]; !ok {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		desiredSMT := desiredByName[name]
+		actualSMT := actualByName[name]
+
+		if desiredSMT == nil || actualSMT == nil {
+			// SM type entirely added or removed -- transitions are part of enum
+			// add/remove, not tracked as transition-only diff.
+			continue
+		}
+
+		smDiff := diffSMTransitionMap(name, desiredSMT, actualSMT)
+		if smDiff != nil {
+			d.SMTransitionsChanged = append(d.SMTransitionsChanged, *smDiff)
+		}
+	}
+}
+
+// diffSMTransitionMap compares two SMTransitionMaps and returns nil if identical.
+func diffSMTransitionMap(typeName string, desired, actual *model.SMTransitionMap) *SMTransitionDiff {
+	// Build sets of transition edges for each side.
+	desiredEdges := smTransitionEdges(desired)
+	actualEdges := smTransitionEdges(actual)
+
+	var added, removed []SMTransitionRef
+	for edge := range desiredEdges {
+		if !actualEdges[edge] {
+			added = append(added, edge)
+		}
+	}
+	for edge := range actualEdges {
+		if !desiredEdges[edge] {
+			removed = append(removed, edge)
+		}
+	}
+
+	if len(added) == 0 && len(removed) == 0 {
+		return nil
+	}
+
+	// Sort for deterministic output.
+	sortSMTransitionRefs(added)
+	sortSMTransitionRefs(removed)
+
+	return &SMTransitionDiff{
+		TypeName:           typeName,
+		TransitionsAdded:   added,
+		TransitionsRemoved: removed,
+	}
+}
+
+// smTransitionEdges extracts the set of directed edges from a transition map.
+func smTransitionEdges(smt *model.SMTransitionMap) map[SMTransitionRef]bool {
+	edges := make(map[SMTransitionRef]bool)
+	for from, tos := range smt.Transitions {
+		for _, to := range tos {
+			edges[SMTransitionRef{From: from, To: to}] = true
+		}
+	}
+	return edges
+}
+
+// sortSMTransitionRefs sorts transition references by From, then To.
+func sortSMTransitionRefs(refs []SMTransitionRef) {
+	sort.Slice(refs, func(i, j int) bool {
+		if refs[i].From != refs[j].From {
+			return refs[i].From < refs[j].From
+		}
+		return refs[i].To < refs[j].To
+	})
 }

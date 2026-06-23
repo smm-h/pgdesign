@@ -217,6 +217,17 @@ func FormatTerminal(d *SchemaDiff) string {
 		}
 	}
 
+	// State machine transitions
+	for _, smtd := range d.SMTransitionsChanged {
+		fmt.Fprintf(&b, "%s~ state machine %s transitions%s\n", colorYellow, smtd.TypeName, colorReset)
+		for _, tr := range smtd.TransitionsAdded {
+			fmt.Fprintf(&b, "  %s+ %s -> %s%s\n", colorGreen, tr.From, tr.To, colorReset)
+		}
+		for _, tr := range smtd.TransitionsRemoved {
+			fmt.Fprintf(&b, "  %s- %s -> %s%s\n", colorRed, tr.From, tr.To, colorReset)
+		}
+	}
+
 	// Functions
 	for _, name := range d.FunctionsAdded {
 		fmt.Fprintf(&b, "%s+ function %s%s\n", colorGreen, name, colorReset)

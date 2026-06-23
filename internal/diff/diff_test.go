@@ -3838,3 +3838,321 @@ func TestPolicySummary(t *testing.T) {
 		t.Errorf("expected summary to mention policy/policies modified, got: %s", summary)
 	}
 }
+
+// --- State machine transition diff tests ---
+
+func TestSMTransitionAdded(t *testing.T) {
+	desired := &model.Schema{
+		StateMachineTransitions: []model.SMTransitionMap{
+			{
+				TypeName: "order_status",
+				Transitions: map[string][]string{
+					"pending":   {"active", "cancelled"},
+					"active":    {"suspended", "completed"},
+					"suspended": {"active"},
+				},
+				States: []string{"pending", "active", "suspended", "cancelled", "completed"},
+			},
+		},
+	}
+	actual := &model.Schema{
+		StateMachineTransitions: []model.SMTransitionMap{
+			{
+				TypeName: "order_status",
+				Transitions: map[string][]string{
+					"pending": {"active", "cancelled"},
+					"active":  {"suspended", "completed"},
+				},
+				States: []string{"pending", "active", "suspended", "cancelled", "completed"},
+			},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.SMTransitionsChanged) != 1 {
+		t.Fatalf("expected 1 SM transition changed, got %d", len(d.SMTransitionsChanged))
+	}
+	smDiff := d.SMTransitionsChanged[0]
+	if smDiff.TypeName != "order_status" {
+		t.Errorf("expected TypeName=order_status, got %q", smDiff.TypeName)
+	}
+	if len(smDiff.TransitionsAdded) != 1 {
+		t.Fatalf("expected 1 transition added, got %d", len(smDiff.TransitionsAdded))
+	}
+	tr := smDiff.TransitionsAdded[0]
+	if tr.From != "suspended" || tr.To != "active" {
+		t.Errorf("expected suspended -> active, got %s -> %s", tr.From, tr.To)
+	}
+	if len(smDiff.TransitionsRemoved) != 0 {
+		t.Errorf("expected 0 transitions removed, got %d", len(smDiff.TransitionsRemoved))
+	}
+}
+
+func TestSMTransitionRemoved(t *testing.T) {
+	desired := &model.Schema{
+		StateMachineTransitions: []model.SMTransitionMap{
+			{
+				TypeName: "order_status",
+				Transitions: map[string][]string{
+					"pending": {"active"},
+				},
+				States: []string{"pending", "active", "cancelled"},
+			},
+		},
+	}
+	actual := &model.Schema{
+		StateMachineTransitions: []model.SMTransitionMap{
+			{
+				TypeName: "order_status",
+				Transitions: map[string][]string{
+					"pending": {"active", "cancelled"},
+				},
+				States: []string{"pending", "active", "cancelled"},
+			},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.SMTransitionsChanged) != 1 {
+		t.Fatalf("expected 1 SM transition changed, got %d", len(d.SMTransitionsChanged))
+	}
+	smDiff := d.SMTransitionsChanged[0]
+	if len(smDiff.TransitionsRemoved) != 1 {
+		t.Fatalf("expected 1 transition removed, got %d", len(smDiff.TransitionsRemoved))
+	}
+	tr := smDiff.TransitionsRemoved[0]
+	if tr.From != "pending" || tr.To != "cancelled" {
+		t.Errorf("expected pending -> cancelled removed, got %s -> %s", tr.From, tr.To)
+	}
+	if len(smDiff.TransitionsAdded) != 0 {
+		t.Errorf("expected 0 transitions added, got %d", len(smDiff.TransitionsAdded))
+	}
+}
+
+func TestSMStateAddedShowsInEnumDiff(t *testing.T) {
+	// When a state is added, it shows up in the enum diff path as a new value.
+	// The SM transition diff only tracks transition edge changes.
+	desired := &model.Schema{
+		Enums: []model.Enum{
+			{Name: "order_status", Values: []string{"pending", "active", "suspended"}},
+		},
+		StateMachineTransitions: []model.SMTransitionMap{
+			{
+				TypeName: "order_status",
+				Transitions: map[string][]string{
+					"pending": {"active"},
+					"active":  {"suspended"},
+				},
+				States: []string{"pending", "active", "suspended"},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Enums: []model.Enum{
+			{Name: "order_status", Values: []string{"pending", "active"}},
+		},
+		StateMachineTransitions: []model.SMTransitionMap{
+			{
+				TypeName: "order_status",
+				Transitions: map[string][]string{
+					"pending": {"active"},
+				},
+				States: []string{"pending", "active"},
+			},
+		},
+	}
+	d := Diff(desired, actual)
+
+	// Enum diff should show suspended added.
+	if len(d.EnumsChanged) != 1 {
+		t.Fatalf("expected 1 enum changed, got %d", len(d.EnumsChanged))
+	}
+	if len(d.EnumsChanged[0].ValuesAdded) != 1 || d.EnumsChanged[0].ValuesAdded[0] != "suspended" {
+		t.Errorf("expected enum value 'suspended' added, got %v", d.EnumsChanged[0].ValuesAdded)
+	}
+
+	// SM transition diff should show the new transition edge.
+	if len(d.SMTransitionsChanged) != 1 {
+		t.Fatalf("expected 1 SM transition changed, got %d", len(d.SMTransitionsChanged))
+	}
+	smDiff := d.SMTransitionsChanged[0]
+	if len(smDiff.TransitionsAdded) != 1 {
+		t.Fatalf("expected 1 transition added, got %d", len(smDiff.TransitionsAdded))
+	}
+	if smDiff.TransitionsAdded[0].From != "active" || smDiff.TransitionsAdded[0].To != "suspended" {
+		t.Errorf("expected active -> suspended, got %s -> %s",
+			smDiff.TransitionsAdded[0].From, smDiff.TransitionsAdded[0].To)
+	}
+}
+
+func TestSMNoChange(t *testing.T) {
+	smt := model.SMTransitionMap{
+		TypeName: "order_status",
+		Transitions: map[string][]string{
+			"pending": {"active", "cancelled"},
+			"active":  {"completed"},
+		},
+		States: []string{"pending", "active", "cancelled", "completed"},
+	}
+	desired := &model.Schema{
+		StateMachineTransitions: []model.SMTransitionMap{smt},
+	}
+	actual := &model.Schema{
+		StateMachineTransitions: []model.SMTransitionMap{smt},
+	}
+	d := Diff(desired, actual)
+	if len(d.SMTransitionsChanged) != 0 {
+		t.Errorf("expected 0 SM transitions changed, got %d", len(d.SMTransitionsChanged))
+	}
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff, got: %s", d.Summary())
+	}
+}
+
+func TestSMTransitionDiffSummary(t *testing.T) {
+	d := &SchemaDiff{
+		SMTransitionsChanged: []SMTransitionDiff{
+			{TypeName: "order_status"},
+		},
+	}
+	summary := d.Summary()
+	if !strings.Contains(summary, "state machine") {
+		t.Errorf("expected 'state machine' in summary, got: %q", summary)
+	}
+}
+
+func TestSMTransitionFormatTerminal(t *testing.T) {
+	d := &SchemaDiff{
+		SMTransitionsChanged: []SMTransitionDiff{
+			{
+				TypeName: "order_status",
+				TransitionsAdded: []SMTransitionRef{
+					{From: "active", To: "suspended"},
+				},
+				TransitionsRemoved: []SMTransitionRef{
+					{From: "pending", To: "cancelled"},
+				},
+			},
+		},
+	}
+	out := FormatTerminal(d)
+	if !strings.Contains(out, "state machine order_status") {
+		t.Errorf("expected 'state machine order_status' in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "active -> suspended") {
+		t.Errorf("expected 'active -> suspended' in output, got:\n%s", out)
+	}
+	if !strings.Contains(out, "pending -> cancelled") {
+		t.Errorf("expected 'pending -> cancelled' in output, got:\n%s", out)
+	}
+}
+
+func TestPhantomDiffPrevention_SMTriggerFiltered(t *testing.T) {
+	// If a table has an _pgdesign_sm_ trigger in both desired and actual
+	// with different contents, it should NOT appear in the trigger diff
+	// because SM triggers are managed by the SM diff path.
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "public",
+				Triggers: []model.Trigger{
+					{
+						Name:     "_pgdesign_sm_orders_status",
+						Function: "_pgdesign_sm_orders_status",
+						Events:   []string{"UPDATE"},
+						Timing:   "BEFORE",
+						ForEach:  "ROW",
+					},
+					{
+						Name:     "user_trigger",
+						Function: "notify_fn",
+						Events:   []string{"INSERT"},
+						Timing:   "AFTER",
+						ForEach:  "ROW",
+					},
+				},
+			},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "public",
+				Triggers: []model.Trigger{
+					{
+						Name:     "_pgdesign_sm_orders_status",
+						Function: "_pgdesign_sm_orders_status_old",
+						Events:   []string{"UPDATE"},
+						Timing:   "BEFORE",
+						ForEach:  "ROW",
+					},
+					{
+						Name:     "user_trigger",
+						Function: "notify_fn",
+						Events:   []string{"INSERT"},
+						Timing:   "AFTER",
+						ForEach:  "ROW",
+					},
+				},
+			},
+		},
+	}
+	d := Diff(desired, actual)
+	// The SM trigger difference should be filtered out.
+	if !d.IsEmpty() {
+		// If there are table changes, they should not contain SM triggers.
+		for _, td := range d.TablesChanged {
+			for _, trig := range td.TriggersAdded {
+				if strings.HasPrefix(trig.Name, "_pgdesign_sm_") {
+					t.Errorf("SM trigger %s should be filtered from TriggersAdded", trig.Name)
+				}
+			}
+			for _, name := range td.TriggersRemoved {
+				if strings.HasPrefix(name, "_pgdesign_sm_") {
+					t.Errorf("SM trigger %s should be filtered from TriggersRemoved", name)
+				}
+			}
+			for _, tc := range td.TriggersChanged {
+				if strings.HasPrefix(tc.Name, "_pgdesign_sm_") {
+					t.Errorf("SM trigger %s should be filtered from TriggersChanged", tc.Name)
+				}
+			}
+		}
+	}
+}
+
+func TestPhantomDiffPrevention_SMTriggerOnlyInActual(t *testing.T) {
+	// An _pgdesign_sm_ trigger only in actual should not appear as removed.
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public"},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "public",
+				Triggers: []model.Trigger{
+					{
+						Name:     "_pgdesign_sm_orders_status",
+						Function: "_pgdesign_sm_orders_status",
+						Events:   []string{"UPDATE"},
+						Timing:   "BEFORE",
+						ForEach:  "ROW",
+					},
+				},
+			},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		for _, td := range d.TablesChanged {
+			for _, name := range td.TriggersRemoved {
+				if strings.HasPrefix(name, "_pgdesign_sm_") {
+					t.Errorf("SM trigger %s should be filtered from TriggersRemoved", name)
+				}
+			}
+		}
+	}
+}
