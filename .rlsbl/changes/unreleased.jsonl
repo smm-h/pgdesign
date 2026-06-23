@@ -11,3 +11,4 @@
 {"commits":["4a86102f727c254b3931ccd6a83b6702b8e35ae3","1d9a04cefc1e95ead754a9d570edd77fad357d4f","2b93172ab808f2f1812750acc6d5b3f28f258b0a","0434ede422fb6865b24ff443e4838b3ead159553"],"user_facing":true,"description":"**New feature.** Constraint codegen for Python, Java, and Kotlin (5 languages total: Go, TS, Python, Java, Kotlin).","type":"feature"}
 {"commits":["e12767dfc5568ca3ef3800bef33dbd88723be41e"],"user_facing":true,"description":"**New feature.** `MultiFileGenerator` interface for codegen modes that produce multiple output files.","type":"feature"}
 {"commits":["7e92d8e899dd40728a0abeee3bef76b94968e780"],"user_facing":true,"description":"**New feature.** `CAST(x AS type)` syntax support in sqlexpr parser.","type":"feature"}
+{"commits":["73757d2d5d04804770485a5a5f7d4a2d73c35796"],"user_facing":true,"description":"**New feature.** Zig testdb template rewritten against pg.zig 0.16 API.","type":"feature"}
