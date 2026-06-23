@@ -108,6 +108,13 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		buf.WriteString(enumBlock)
 	}
 
+	// Write state machine transition maps.
+	smBlock := GenerateTransitionMaps(schema.StateMachineTransitions, LangGo)
+	if smBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(smBlock)
+	}
+
 	// Write structs.
 	for _, si := range structs {
 		buf.WriteString("\n")

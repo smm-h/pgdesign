@@ -55,6 +55,12 @@ func (g *JavaTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		records = append(records, ri)
 	}
 
+	// Add Map/Set imports when transition maps are present.
+	if len(schema.StateMachineTransitions) > 0 {
+		imports["java.util.Map"] = true
+		imports["java.util.Set"] = true
+	}
+
 	// Separate stdlib and third-party imports.
 	var stdlibImports, thirdPartyImports []string
 	for imp := range imports {
@@ -81,6 +87,20 @@ func (g *JavaTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		for _, imp := range thirdPartyImports {
 			fmt.Fprintf(&buf, "import %s;\n", imp)
 		}
+	}
+
+	// Write enums.
+	enumBlock := GenerateEnums(schema.Enums, LangJava)
+	if enumBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(enumBlock)
+	}
+
+	// Write state machine transition maps.
+	smBlock := GenerateTransitionMaps(schema.StateMachineTransitions, LangJava)
+	if smBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(smBlock)
 	}
 
 	for _, ri := range records {

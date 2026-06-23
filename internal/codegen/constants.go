@@ -12,6 +12,7 @@ import (
 // ConstantsLang captures the formatting differences between target languages
 // for the constants generator.
 type ConstantsLang struct {
+	Lang            Lang
 	CommentPrefix  string
 	TableConstFmt  func(name, fqn string) string
 	ColumnsConstFmt func(name, joined string) string
@@ -27,6 +28,7 @@ type PythonConstantsGenerator struct{}
 // for every table in the schema.
 func (g *PythonConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
 	return generateConstants(schema, ConstantsLang{
+		Lang:          LangPython,
 		CommentPrefix: "# ",
 		TableConstFmt: func(name, fqn string) string {
 			return fmt.Sprintf("TABLE_%s = %q\n", name, fqn)
@@ -49,6 +51,7 @@ type ZigConstantsGenerator struct{}
 // for every table in the schema.
 func (g *ZigConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
 	return generateConstants(schema, ConstantsLang{
+		Lang:          LangZig,
 		CommentPrefix: "// ",
 		TableConstFmt: func(name, fqn string) string {
 			return fmt.Sprintf("pub const table_%s = %q;\n", name, fqn)
@@ -83,6 +86,7 @@ type TSConstantsGenerator struct{}
 // for every table in the schema.
 func (g *TSConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
 	return generateConstants(schema, ConstantsLang{
+		Lang:          LangTS,
 		CommentPrefix: "// ",
 		TableConstFmt: func(name, fqn string) string {
 			return fmt.Sprintf("export const TABLE_%s = %q\n", name, fqn)
@@ -105,6 +109,7 @@ type JavaConstantsGenerator struct{}
 // for every table in the schema.
 func (g *JavaConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
 	return generateConstants(schema, ConstantsLang{
+		Lang:          LangJava,
 		CommentPrefix: "// ",
 		TableConstFmt: func(name, fqn string) string {
 			return fmt.Sprintf("public static final String TABLE_%s = %q;\n", name, fqn)
@@ -127,6 +132,7 @@ type KotlinConstantsGenerator struct{}
 // for every table in the schema.
 func (g *KotlinConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
 	return generateConstants(schema, ConstantsLang{
+		Lang:          LangKotlin,
 		CommentPrefix: "// ",
 		TableConstFmt: func(name, fqn string) string {
 			return fmt.Sprintf("const val TABLE_%s = %q\n", name, fqn)
@@ -149,6 +155,7 @@ type GoConstantsGenerator struct{}
 // for every table in the schema.
 func (g *GoConstantsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
 	return generateConstants(schema, ConstantsLang{
+		Lang:          LangGo,
 		CommentPrefix: "// ",
 		TableConstFmt: func(name, fqn string) string {
 			return fmt.Sprintf("const Table%s = %q\n", name, fqn)
@@ -199,6 +206,13 @@ func generateConstants(schema *model.Schema, lang ConstantsLang) ([]byte, []diag
 			colName := lang.CaseFn(col.Name)
 			buf.WriteString(lang.ColConstFmt(name, colName, col.Name))
 		}
+	}
+
+	// Write state machine transition maps as constants.
+	smBlock := GenerateConstantsTransitionMaps(schema.StateMachineTransitions, lang)
+	if smBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(smBlock)
 	}
 
 	return buf.Bytes(), nil

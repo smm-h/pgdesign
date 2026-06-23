@@ -67,6 +67,9 @@ func (g *PythonTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnos
 	if imports["Decimal"] {
 		buf.WriteString("from decimal import Decimal\n")
 	}
+	if len(schema.Enums) > 0 {
+		buf.WriteString("from enum import Enum\n")
+	}
 
 	needAny := imports["Any"]
 	needOptional := imports["Optional"]
@@ -80,6 +83,20 @@ func (g *PythonTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnos
 
 	if imports["UUID"] {
 		buf.WriteString("from uuid import UUID\n")
+	}
+
+	// Write enums.
+	enumBlock := GenerateEnums(schema.Enums, LangPython)
+	if enumBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(enumBlock)
+	}
+
+	// Write state machine transition maps.
+	smBlock := GenerateTransitionMaps(schema.StateMachineTransitions, LangPython)
+	if smBlock != "" {
+		buf.WriteString("\n\n")
+		buf.WriteString(smBlock)
 	}
 
 	// Write classes.

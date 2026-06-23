@@ -52,6 +52,20 @@ func (g *TSTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 	// Second pass: write output.
 	buf.WriteString(header)
 
+	// Write enum types for state machines (TS uses string literal unions).
+	enumBlock := GenerateEnums(schema.Enums, LangTS)
+	if enumBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(enumBlock)
+	}
+
+	// Write state machine transition maps.
+	smBlock := GenerateTransitionMaps(schema.StateMachineTransitions, LangTS)
+	if smBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(smBlock)
+	}
+
 	for i, ii := range interfaces {
 		if i > 0 {
 			buf.WriteString("\n")

@@ -24,6 +24,20 @@ func (g *ZigTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic
 
 	buf.WriteString(header)
 
+	// Write enum constants.
+	enumBlock := GenerateEnums(schema.Enums, LangZig)
+	if enumBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(enumBlock)
+	}
+
+	// Write state machine transition maps.
+	smBlock := GenerateTransitionMaps(schema.StateMachineTransitions, LangZig)
+	if smBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(smBlock)
+	}
+
 	for i, tbl := range schema.Tables {
 		if i > 0 {
 			buf.WriteString("\n")

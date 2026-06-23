@@ -72,6 +72,20 @@ func (g *KotlinTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnos
 		}
 	}
 
+	// Write enums.
+	enumBlock := GenerateEnums(schema.Enums, LangKotlin)
+	if enumBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(enumBlock)
+	}
+
+	// Write state machine transition maps.
+	smBlock := GenerateTransitionMaps(schema.StateMachineTransitions, LangKotlin)
+	if smBlock != "" {
+		buf.WriteString("\n")
+		buf.WriteString(smBlock)
+	}
+
 	for _, ci := range classes {
 		buf.WriteString("\n")
 		fmt.Fprintf(&buf, "/** Represents the %s table. */\n", ci.TableName)
