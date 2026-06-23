@@ -270,6 +270,10 @@
     "content": "13110f22a431c02585d52ad24a2e129b5cf2c22d6cccf896fd5f4ab8c6dc697b",
     "description": "d6ce38ae707c27b942cfbb8d06a0cb9da3c2e24394a177428f9ca0bac9aa4e0b"
   },
+  "en/query-layer.md": {
+    "content": "7db55fd82dfe4896652fc4bd45520cc05c0f4571a1b5de405bcc6eb2148ff1d6",
+    "description": "210f7d7f6305504eccebe0e91acc1a4b3029b1d16e9660cb4e2c29d17b25b3ea"
+  },
   "en/quickstart.md": {
     "content": "2568a60fa6f2c4ca4ab6fc7d5d2975e0e3f89ec6185d97ad18b2d72c77cd02b3",
     "description": "4e8baab2f7f34464dd51949235b62295675b637526c093a64d4343c7d9ce453b"
@@ -297,6 +301,10 @@
   "en/sql.md": {
     "content": "2f9995d5f189977723d6f3c297ff4bbb35a724acc2e5ea5950a1d9d056f4ca46",
     "description": "360b66c1ee2cd8e98be1e9e04c585845851ab199828fa8337e3add2c1b0c1e81"
+  },
+  "en/state-machines.md": {
+    "content": "31ba6521bdc337d4e83d6606410a2459bba7ce32c36697631a15172ec4b77415",
+    "description": "29be78bfe869f9107d9e58fb25940a6405fe2195622cfc4f8b38f4ee63e48c31"
   },
   "en/testdb-guide.md": {
     "content": "cfd6bfce1b8ebebd74d88048c38b9fa4448c8f250de7219691820c0a398a3645",
