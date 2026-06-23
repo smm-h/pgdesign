@@ -51,6 +51,10 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	schema.buildTablesByName()
 	schema.BuildFKGraph()
 
+	// Validate and copy groups.
+	groupDiags := resolveGroups(schema, raw.Groups)
+	diags = append(diags, groupDiags...)
+
 	return schema, diags
 }
 
@@ -96,6 +100,9 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 		schema.Functions = append(schema.Functions, resolveFunctions(raw)...)
 	}
 
+	// Deduplicate enums (same SM or enum type declared in multiple files).
+	schema.Enums = deduplicateEnums(schema.Enums)
+
 	// Phase 2: order all tables together (topo sort sees cross-schema deps).
 	sorted, cycles := topoSort(allTables)
 	schema.Tables = sorted
@@ -115,7 +122,27 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	schema.buildTablesByName()
 	schema.BuildFKGraph()
 
+	// Merge and validate groups from all schemas.
+	merged := mergeGroups(raws)
+	groupDiags := resolveGroups(schema, merged)
+	diags = append(diags, groupDiags...)
+
 	return schema, diags
+}
+
+// mergeGroups combines groups from multiple raw schemas. If the same group name
+// appears in multiple schemas, table lists are concatenated.
+func mergeGroups(raws []*parse.RawSchema) map[string][]string {
+	var merged map[string][]string
+	for _, raw := range raws {
+		for name, tables := range raw.Groups {
+			if merged == nil {
+				merged = make(map[string][]string)
+			}
+			merged[name] = append(merged[name], tables...)
+		}
+	}
+	return merged
 }
 
 // buildTablesByName populates the TablesByName lookup map from the Tables slice.
@@ -125,6 +152,38 @@ func (s *Schema) buildTablesByName() {
 		key := s.Tables[i].Schema + "." + s.Tables[i].Name
 		s.TablesByName[key] = &s.Tables[i]
 	}
+}
+
+// resolveGroups validates that every table name in groups refers to a table that
+// exists in the schema, and copies the validated groups onto the schema.
+func resolveGroups(schema *Schema, groups map[string][]string) diagnostic.Diagnostics {
+	if len(groups) == 0 {
+		return nil
+	}
+
+	// Build a set of known table names (bare, not schema-qualified).
+	known := make(map[string]bool, len(schema.Tables))
+	for i := range schema.Tables {
+		known[schema.Tables[i].Name] = true
+	}
+
+	var diags diagnostic.Diagnostics
+	for groupName, tables := range groups {
+		for _, tbl := range tables {
+			if !known[tbl] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E227",
+					Message:  fmt.Sprintf("[groups].%s references unknown table %q", groupName, tbl),
+				})
+			}
+		}
+	}
+
+	if !diags.HasErrors() {
+		schema.Groups = groups
+	}
+	return diags
 }
 
 // resolve expands semantic types into PG types and builds model structs.
@@ -173,6 +232,23 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 				})
 			}
 			compositeTypes = append(compositeTypes, ct)
+		}
+	}
+
+	// Build enums from state machine types (states become PG enum values).
+	for _, rt := range raw.Types {
+		if strings.EqualFold(rt.Kind, "state_machine") {
+			td, err := reg.Resolve(rt.Name)
+			if err != nil {
+				continue
+			}
+			e := Enum{
+				Schema:  raw.Meta.Schema,
+				Name:    td.Name,
+				Values:  td.EnumValues,
+				Comment: td.Comment,
+			}
+			enums = append(enums, e)
 		}
 	}
 
@@ -1033,6 +1109,33 @@ func constraintName(table, kind string, refs ...string) string {
 	parts := []string{kind, table}
 	parts = append(parts, refs...)
 	return strings.Join(parts, "_")
+}
+
+// IsStateMachineColumn returns true if the column's semantic type is a state machine.
+func IsStateMachineColumn(col Column, reg *semtype.Registry) bool {
+	if col.SemanticTypeName == "" {
+		return false
+	}
+	td, err := reg.Resolve(col.SemanticTypeName)
+	if err != nil {
+		return false
+	}
+	return td.Kind == semtype.KindStateMachine
+}
+
+// deduplicateEnums removes duplicate enums by schema+name key, keeping the first occurrence.
+func deduplicateEnums(enums []Enum) []Enum {
+	seen := make(map[string]bool, len(enums))
+	var result []Enum
+	for _, e := range enums {
+		key := e.Schema + "." + e.Name
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		result = append(result, e)
+	}
+	return result
 }
 
 // enrich materializes auto-indexes for FK columns that lack index coverage.
