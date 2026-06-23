@@ -3,6 +3,8 @@
 const std = @import("std");
 const pg = @import("pg");
 
+const Io = std.Io;
+
 const DDL_PATH = "{{DDL_PATH}}";
 const BASE_URL = "{{BASE_URL}}";
 const BASE_NAME = "{{BASE_NAME}}";
@@ -13,16 +15,17 @@ const MAX_NAME_LEN = 63;
 const SUFFIX_LEN = 25;
 
 pub const TestDB = struct {
-    conn: *pg.Conn,
+    conn: pg.Conn,
     name: []const u8,
     url: []const u8,
     allocator: std.mem.Allocator,
+    io: Io,
     // Tracks allocated strings for cleanup.
     name_buf: []u8,
     url_buf: []u8,
 
     /// Create an ephemeral test database, apply DDL, and return a connection.
-    pub fn setup(allocator: std.mem.Allocator) !TestDB {
+    pub fn setup(io: Io, allocator: std.mem.Allocator) !TestDB {
         const name = try generateName(allocator);
         errdefer allocator.free(name);
 
@@ -32,7 +35,8 @@ pub const TestDB = struct {
         const maint_url = try swapDB(allocator, base_url, "postgres");
         defer allocator.free(maint_url);
 
-        var maint_conn = try pg.Conn.init(allocator, .{ .connection_string = maint_url });
+        const maint_uri = try std.Uri.parse(maint_url);
+        var maint_conn = try pg.Conn.openAndAuthUri(io, allocator, maint_uri);
         defer maint_conn.deinit();
 
         // Build CREATE DATABASE statement with escaped identifier.
@@ -47,15 +51,16 @@ pub const TestDB = struct {
         const db_url = try swapDB(allocator, base_url, name);
         errdefer allocator.free(db_url);
 
-        var conn = try pg.Conn.init(allocator, .{ .connection_string = db_url });
+        const db_uri = try std.Uri.parse(db_url);
+        var conn = try pg.Conn.openAndAuthUri(io, allocator, db_uri);
         errdefer {
             conn.deinit();
-            dropDB(allocator, base_url, name);
+            dropDB(io, allocator, base_url, name);
         }
 
-        applyDDL(conn, allocator) catch |err| {
+        applyDDL(&conn, allocator) catch |err| {
             conn.deinit();
-            dropDB(allocator, base_url, name);
+            dropDB(io, allocator, base_url, name);
             return err;
         };
 
@@ -64,6 +69,7 @@ pub const TestDB = struct {
             .name = name,
             .url = db_url,
             .allocator = allocator,
+            .io = io,
             .name_buf = name,
             .url_buf = db_url,
         };
@@ -74,7 +80,7 @@ pub const TestDB = struct {
         self.conn.deinit();
 
         const base_url = std.posix.getenv("PGDESIGN_DB") orelse BASE_URL;
-        dropDB(self.allocator, base_url, self.name);
+        dropDB(self.io, self.allocator, base_url, self.name);
 
         self.allocator.free(self.url_buf);
         self.allocator.free(self.name_buf);
@@ -95,7 +101,11 @@ fn generateName(allocator: std.mem.Allocator) ![]u8 {
         b.* = CHARSET[b.* % CHARSET.len];
     }
 
-    const ts: u64 = @intCast(std.time.timestamp());
+    // Get wall-clock epoch seconds via CLOCK_REALTIME.
+    const ts_spec = std.posix.clock_gettime(.REALTIME) catch {
+        return error.ClockUnavailable;
+    };
+    const ts: u64 = @intCast(ts_spec.sec);
     const max_base = MAX_NAME_LEN - SUFFIX_LEN;
 
     var base: []const u8 = BASE_NAME;
@@ -157,7 +167,7 @@ fn swapDB(allocator: std.mem.Allocator, conn_url: []const u8, db_name: []const u
 
 /// Read the .split.json file and execute each SQL statement.
 fn applyDDL(conn: *pg.Conn, allocator: std.mem.Allocator) !void {
-    const data = try std.fs.cwd().readFileAlloc(allocator, DDL_PATH, 10 * 1024 * 1024);
+    const data = try std.fs.cwd().readFileAlloc(allocator, DDL_PATH, std.math.maxInt(usize));
     defer allocator.free(data);
 
     // Parse versioned split.json object.
@@ -196,18 +206,20 @@ fn applyDDL(conn: *pg.Conn, allocator: std.mem.Allocator) !void {
 }
 
 /// Terminate connections and drop the named database. Best-effort.
-fn dropDB(allocator: std.mem.Allocator, base_url: []const u8, name: []const u8) void {
+fn dropDB(io: Io, allocator: std.mem.Allocator, base_url: []const u8, name: []const u8) void {
     const maint_url = swapDB(allocator, base_url, "postgres") catch return;
     defer allocator.free(maint_url);
 
-    var conn = pg.Conn.init(allocator, .{ .connection_string = maint_url }) catch return;
+    const maint_uri = std.Uri.parse(maint_url) catch return;
+    var conn = pg.Conn.openAndAuthUri(io, allocator, maint_uri) catch return;
     defer conn.deinit();
 
     // Terminate other connections.
-    _ = conn.exec(
+    const result = conn.query(
         "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid != pg_backend_pid()",
         .{name},
-    ) catch {};
+    ) catch null;
+    if (result) |r| r.deinit();
 
     // Drop the database.
     const drop_sql = escapeIdentifierFmt(allocator, "DROP DATABASE IF EXISTS ", name, "") catch return;
@@ -258,10 +270,18 @@ fn escapeIdentifierFmt(allocator: std.mem.Allocator, prefix: []const u8, name: [
 //   const testdb = @import("testdb");
 //
 //   test "example" {
-//       var db = try testdb.TestDB.setup(std.testing.allocator);
+//       // Obtain an Io instance for pg.zig's networking.
+//       var threaded: std.Io.Threaded = .init_single_threaded;
+//       const io = threaded.io();
+//
+//       var db = try testdb.TestDB.setup(io, std.testing.allocator);
 //       defer db.teardown();
 //
-//       // Use db.conn for queries.
-//       const result = try db.conn.queryRow("SELECT 1", .{});
-//       try std.testing.expectEqual(@as(i32, 1), result.get(i32, 0));
+//       // Use db.conn for queries (conn is pg.Conn value type, pass pointer).
+//       var result = try db.conn.query("SELECT 1 AS val", .{});
+//       defer result.deinit();
+//       if (try result.next()) |row| {
+//           const val = try row.get(i32, 0);
+//           try std.testing.expectEqual(@as(i32, 1), val);
+//       }
 //   }
