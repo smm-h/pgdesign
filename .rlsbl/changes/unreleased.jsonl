@@ -1,0 +1,1 @@
+{"commits":["769e7249ec4eb9046fd43fc92c6a0c71c0a3bc5d"],"user_facing":true,"description":"**Breaking.** Unknown type `kind` values now produce a hard error (E104) instead of silently defaulting to scalar.","type":"breaking"}
