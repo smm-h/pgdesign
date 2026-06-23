@@ -2,6 +2,49 @@
 
 # Changelog
 
+## 0.15.0
+
+State machine types, Python query-layer codegen, table groups, and constraint codegen for 3 new languages
+
+<details>
+<summary>Context</summary>
+
+This release introduces state machine types (kind = "state_machine") as a first-class schema concept with PG enum creation, PL/pgSQL enforcement triggers, D2 state diagrams, diff/migration support, and codegen transition maps for all 6 languages. Python codegen gains two new modes: DDL-as-data (pure tuples with a section executor) and query-layer (protocol-based PgBackend and InMemoryBackend with declarative constraint registry). Constraint codegen expands from 2 to 5 languages (adding Python, Java, Kotlin). Table groups enable config-based output filtering. Breaking: unknown type kind values now error instead of silently defaulting to scalar.
+
+</details>
+
+### Breaking
+
+- **Breaking.** Unknown type `kind` values now produce a hard error (E104) instead of silently defaulting to scalar.
+
+### Features
+
+- **New feature.** State machine types (`kind = "state_machine"`) with states, transitions, initial state, and enforcement trigger generation. Includes PG enum creation, validation checks (W027/W028/E223/E224/E226), D2 state diagrams, and PL/pgSQL trigger enforcement.
+- **New feature.** State machine diff and migration support: transition changes trigger regeneration operations with phantom trigger prevention.
+- **New feature.** State machine transition maps in codegen types and constants output for all 6 languages.
+- **New feature.** Table groups (`[groups]` in schema TOML) with config-based output filtering and group table reference validation (E227).
+- **New feature.** Python DDL codegen mode (`--mode ddl`) with pure data tuples and decomposed section executor, using MultiFileGenerator interface.
+- **New feature.** Python query-layer codegen mode (`--mode query-layer`) with protocol-based backends (PgBackend, InMemoryBackend), per-table delegates, declarative constraint registry, and composite file organization.
+- **New feature.** Constraint codegen for Python, Java, and Kotlin (5 languages total: Go, TS, Python, Java, Kotlin).
+- **New feature.** `MultiFileGenerator` interface for codegen modes that produce multiple output files.
+- **New feature.** `CAST(x AS type)` syntax support in sqlexpr parser.
+- **New feature.** Zig testdb template rewritten against pg.zig 0.16 API.
+- **New feature.** Config `validModes` derived from codegen registry for lang-mode pair validation.
+- **New feature.** `ExtractConstraints` now includes domain-backed CHECK constraints via `DomainBaseTypes` mapping.
+- **New feature.** Introspect filters out `_pgdesign_sm_` triggers (generated state machine enforcement).
+
+### Fixes
+
+- **Fix.** W019 now correctly flags the wider range constraint as redundant (was incorrectly flagging the stricter one).
+- **Fix.** Migration TOML serialization now round-trips `Desc`, `Operators`, `Deferrable`, and `InitiallyDeferred` fields correctly.
+- **Fix.** TypeScript testdb template adds error cause chaining; Python template replaces `assert` with `raise ValueError`.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.14.2
 
 Critical panic fix, UTF-8-safe truncation, DDL error diagnostics, selfdoc coverage
@@ -22,12 +65,6 @@ Fixes a critical bug where the pgdesign binary panicked on every invocation sinc
 
 - **Fix.** CLI no longer panics on startup. The `testdb init --language` flag was missing a required strictcli configuration, causing every `pgdesign` invocation to crash since v0.14.0.
 - **Fix.** Wrapper templates now truncate database names at valid UTF-8 character boundaries instead of splitting multi-byte sequences.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.14.1
 
