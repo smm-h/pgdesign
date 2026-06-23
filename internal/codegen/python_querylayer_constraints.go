@@ -61,6 +61,14 @@ func generateConstraintsFile(schema *model.Schema) []byte {
 		writeTableConstraints(&buf, &tbl, schema, smMap)
 	}
 
+	// ALL_CONSTRAINTS dict mapping table name -> constraint list.
+	buf.WriteString("\n\nALL_CONSTRAINTS: dict[str, list[Constraint]] = {\n")
+	for _, tbl := range tables {
+		varName := strings.ToUpper(tbl.Name) + "_CONSTRAINTS"
+		fmt.Fprintf(&buf, "    %q: %s,\n", tbl.Name, varName)
+	}
+	buf.WriteString("}\n")
+
 	// ConstraintEngine class.
 	buf.WriteString("\n\n# --- Constraint Engine ---\n")
 	writeConstraintEngine(&buf)
