@@ -12,6 +12,7 @@ type RawSchema struct {
 	MaterializedViews []RawMaterializedView
 	Sequences         []RawSequence
 	Functions         []RawFunction
+	Groups            map[string][]string
 }
 
 // RawMeta holds the [meta] section values.

@@ -158,6 +158,7 @@ func (p *parser) walk() *RawSchema {
 	schema.MaterializedViews = p.parseMaterializedViews()
 	schema.Sequences = p.parseSequences()
 	schema.Functions = p.parseFunctions()
+	schema.Groups = p.parseGroups()
 	return schema
 }
 
@@ -976,6 +977,34 @@ func (p *parser) parseFunctionArgs(funcName string) []RawFunctionArg {
 	}
 
 	return args
+}
+
+// parseGroups extracts the [groups] section: a flat table mapping group names
+// to string arrays of table names.
+func (p *parser) parseGroups() map[string][]string {
+	groupsTable := p.findTable("groups")
+	if groupsTable == nil {
+		return nil
+	}
+
+	groups := make(map[string][]string)
+	for _, child := range groupsTable.Children {
+		kv, ok := child.(*tomledit.KeyValueNode)
+		if !ok {
+			continue
+		}
+		name := kv.Key.Parts[0]
+		if tables, ok := nodeStringSlice(kv.Val); ok {
+			groups[name] = tables
+		} else {
+			p.errorf("E010", "", "", "[groups].%s must be an array of strings", name)
+		}
+	}
+
+	if len(groups) == 0 {
+		return nil
+	}
+	return groups
 }
 
 func (p *parser) parseTable(name string) RawTable {
