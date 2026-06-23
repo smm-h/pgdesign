@@ -162,12 +162,51 @@ func handleBuild(kwargs map[string]interface{}) int {
 			if !ok {
 				return 1
 			}
+
+			// MultiFileGenerator: write multiple files into a directory.
+			if mfg, ok := gen.(codegen.MultiFileGenerator); ok {
+				files, diags := mfg.GenerateFiles(schema)
+				for _, d := range diags {
+					fmt.Fprintf(os.Stderr, "%s: %s\n", d.Severity, d.Message)
+				}
+				if dryRun {
+					for relPath, data := range files {
+						fmt.Fprintf(os.Stderr, "would write %s (%d bytes)\n", filepath.Join(outPath, relPath), len(data))
+					}
+					continue
+				}
+				if err := os.MkdirAll(outPath, 0o755); err != nil {
+					fmt.Fprintf(os.Stderr, "build: output %q: %v\n", name, err)
+					return 1
+				}
+				for relPath, data := range files {
+					fp := filepath.Join(outPath, relPath)
+					if err := os.MkdirAll(filepath.Dir(fp), 0o755); err != nil {
+						fmt.Fprintf(os.Stderr, "build: output %q: %v\n", name, err)
+						return 1
+					}
+					if err := os.WriteFile(fp, data, 0o644); err != nil {
+						fmt.Fprintf(os.Stderr, "build: output %q: %v\n", name, err)
+						return 1
+					}
+					if !quiet {
+						fmt.Fprintf(os.Stderr, "wrote %s (%d bytes)\n", fp, len(data))
+					}
+					writtenFiles = append(writtenFiles, fp)
+				}
+				continue
+			}
+
 			result, diags := gen.Generate(schema)
 			for _, d := range diags {
 				fmt.Fprintf(os.Stderr, "%s: %s\n", d.Severity, d.Message)
 			}
 			header := codegenHeader(out.Lang)
-			content = append([]byte(header), result...)
+			if hasCommentHeader(result) {
+				content = result
+			} else {
+				content = append([]byte(header), result...)
+			}
 
 		default:
 			fmt.Fprintf(os.Stderr, "build: output %q: unsupported format %q\n", name, out.Format)
@@ -262,4 +301,11 @@ func codegenHeader(lang string) string {
 	default:
 		return ""
 	}
+}
+
+// hasCommentHeader reports whether the generated output already starts with
+// a comment marker (// or #), indicating the generator manages its own header.
+func hasCommentHeader(data []byte) bool {
+	s := strings.TrimLeft(string(data), " \t\n\r")
+	return strings.HasPrefix(s, "//") || strings.HasPrefix(s, "#")
 }

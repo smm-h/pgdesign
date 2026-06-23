@@ -19,6 +19,13 @@ type Generator interface {
 	Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic)
 }
 
+// MultiFileGenerator generates multiple output files from a resolved schema.
+// Generators that implement this interface produce a map of relative file paths
+// to file contents, where each file manages its own header.
+type MultiFileGenerator interface {
+	GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic)
+}
+
 // PolicyContext holds the data needed to generate a validator for one policy.
 type PolicyContext struct {
 	SchemaName   string
