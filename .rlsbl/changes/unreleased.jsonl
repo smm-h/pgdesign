@@ -1,3 +1,4 @@
 {"commits":["769e7249ec4eb9046fd43fc92c6a0c71c0a3bc5d"],"user_facing":true,"description":"**Breaking.** Unknown type `kind` values now produce a hard error (E104) instead of silently defaulting to scalar.","type":"breaking"}
 {"commits":["987164dd31629942447f8b445b4ef996727f19ab"],"user_facing":true,"description":"**Fix.** W019 now correctly flags the wider range constraint as redundant (was incorrectly flagging the stricter one).","type":"fix"}
 {"commits":["ecd32a4affab9901113862dc38fc60400eb6946f"],"user_facing":true,"description":"**Fix.** Migration TOML serialization now round-trips `Desc`, `Operators`, `Deferrable`, and `InitiallyDeferred` fields correctly.","type":"fix"}
+{"commits":["7a18251640c39f1fc5f1ca691e78ba27eb3ba456"],"user_facing":true,"description":"**Fix.** TypeScript testdb template adds error cause chaining; Python template replaces `assert` with `raise ValueError`.","type":"fix"}
