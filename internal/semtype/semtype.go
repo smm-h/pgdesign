@@ -249,7 +249,15 @@ func (r *Registry) LoadUserTypes(types []UserTypeDef) diagnostic.Diagnostics {
 			continue
 		}
 
-		kind := parseKind(ut.Kind)
+		kind, err := parseKind(ut.Kind)
+		if err != nil {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E104",
+				Message:  fmt.Sprintf("type %q: %s", ut.Name, err.Error()),
+			})
+			continue
+		}
 
 		switch kind {
 		case KindEnum:
@@ -258,12 +266,6 @@ func (r *Registry) LoadUserTypes(types []UserTypeDef) diagnostic.Diagnostics {
 			diags = append(diags, r.loadScalarType(ut)...)
 		case KindComposite:
 			diags = append(diags, r.loadCompositeType(ut)...)
-		default:
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Error,
-				Code:     "E104",
-				Message:  fmt.Sprintf("type %q: unknown kind %q", ut.Name, ut.Kind),
-			})
 		}
 	}
 
@@ -480,15 +482,16 @@ func (r *Registry) loadScalarType(ut UserTypeDef) diagnostic.Diagnostics {
 	return diags
 }
 
-func parseKind(s string) Kind {
+func parseKind(s string) (Kind, error) {
 	switch strings.ToLower(s) {
+	case "", "scalar":
+		return KindScalar, nil
 	case "enum":
-		return KindEnum
+		return KindEnum, nil
 	case "composite":
-		return KindComposite
+		return KindComposite, nil
 	default:
-		// Default to scalar for empty or "scalar" kind
-		return KindScalar
+		return 0, fmt.Errorf("unrecognized kind %q", s)
 	}
 }
 
