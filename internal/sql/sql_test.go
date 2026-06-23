@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 func TestQuoteIdent(t *testing.T) {
@@ -1882,6 +1883,123 @@ func TestCreateTrigger_Full(t *testing.T) {
 		if strings.Contains(got, notWant) {
 			t.Errorf("expected output NOT to contain %q, got:\n%s", notWant, got)
 		}
+	}
+}
+
+func TestStateMachineTriggerFuncName(t *testing.T) {
+	got := StateMachineTriggerFuncName("orders", "status")
+	want := "_pgdesign_sm_orders_status"
+	if got != want {
+		t.Errorf("StateMachineTriggerFuncName = %q, want %q", got, want)
+	}
+}
+
+func TestCreateStateMachineTriggerFunction(t *testing.T) {
+	transitions := []semtype.SMTransitionDef{
+		{
+			Name: "activate",
+			From: []string{"pending"},
+			To:   "active",
+		},
+		{
+			Name: "suspend",
+			From: []string{"active"},
+			To:   "suspended",
+			Requires: map[string]string{
+				"suspended_reason": "text",
+			},
+		},
+		{
+			Name: "reactivate",
+			From: []string{"suspended"},
+			To:   "active",
+		},
+		{
+			Name: "close",
+			From: []string{"active", "suspended"},
+			To:   "closed",
+		},
+	}
+
+	got := CreateStateMachineTriggerFunction("app", "orders", "status", transitions)
+
+	// Check function header.
+	if !strings.Contains(got, "CREATE OR REPLACE FUNCTION app._pgdesign_sm_orders_status() RETURNS trigger AS $pgdesign$") {
+		t.Errorf("expected function header, got:\n%s", got)
+	}
+	if !strings.Contains(got, "$pgdesign$ LANGUAGE plpgsql;") {
+		t.Errorf("expected language footer, got:\n%s", got)
+	}
+
+	// Check IS DISTINCT FROM guard.
+	if !strings.Contains(got, "OLD.status IS DISTINCT FROM NEW.status") {
+		t.Errorf("expected IS DISTINCT FROM, got:\n%s", got)
+	}
+
+	// Check valid transition lines (sorted by from-state).
+	if !strings.Contains(got, "OLD.status = 'active' AND NEW.status IN ('closed', 'suspended')") {
+		t.Errorf("expected active->closed,suspended transition, got:\n%s", got)
+	}
+	if !strings.Contains(got, "OLD.status = 'pending' AND NEW.status IN ('active')") {
+		t.Errorf("expected pending->active transition, got:\n%s", got)
+	}
+	if !strings.Contains(got, "OLD.status = 'suspended' AND NEW.status IN ('active', 'closed')") {
+		t.Errorf("expected suspended->active,closed transition, got:\n%s", got)
+	}
+
+	// Check invalid transition exception.
+	if !strings.Contains(got, "RAISE EXCEPTION 'invalid state transition: %s -> %s'") {
+		t.Errorf("expected invalid transition exception, got:\n%s", got)
+	}
+
+	// Check requires check for suspend transition.
+	if !strings.Contains(got, "OLD.status = 'active' AND NEW.status = 'suspended' AND NEW.suspended_reason IS NULL") {
+		t.Errorf("expected requires check for suspended_reason, got:\n%s", got)
+	}
+	if !strings.Contains(got, "RAISE EXCEPTION 'transition suspend requires non-null suspended_reason'") {
+		t.Errorf("expected requires exception message, got:\n%s", got)
+	}
+
+	// Check RETURN NEW.
+	if !strings.Contains(got, "RETURN NEW;") {
+		t.Errorf("expected RETURN NEW, got:\n%s", got)
+	}
+}
+
+func TestCreateStateMachineTriggerFunction_NoRequires(t *testing.T) {
+	transitions := []semtype.SMTransitionDef{
+		{Name: "start", From: []string{"draft"}, To: "active"},
+		{Name: "finish", From: []string{"active"}, To: "done"},
+	}
+
+	got := CreateStateMachineTriggerFunction("myapp", "tasks", "state", transitions)
+
+	// Should have valid transition check but no requires checks.
+	if !strings.Contains(got, "OLD.state = 'active' AND NEW.state IN ('done')") {
+		t.Errorf("expected active->done transition, got:\n%s", got)
+	}
+	if !strings.Contains(got, "OLD.state = 'draft' AND NEW.state IN ('active')") {
+		t.Errorf("expected draft->active transition, got:\n%s", got)
+	}
+	// No requires checks.
+	if strings.Contains(got, "IS NULL") {
+		t.Errorf("expected no requires checks, got:\n%s", got)
+	}
+}
+
+func TestCreateStateMachineTrigger(t *testing.T) {
+	got := CreateStateMachineTrigger("app", "orders", "status")
+	want := "CREATE TRIGGER _pgdesign_sm_orders_status BEFORE UPDATE OF status ON app.orders FOR EACH ROW EXECUTE FUNCTION app._pgdesign_sm_orders_status();"
+	if got != want {
+		t.Errorf("CreateStateMachineTrigger =\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestCreateStateMachineTrigger_ReservedColumnName(t *testing.T) {
+	got := CreateStateMachineTrigger("app", "items", "type")
+	// "type" is a reserved word and should be quoted.
+	if !strings.Contains(got, `UPDATE OF "type"`) {
+		t.Errorf("expected quoted column name, got:\n%s", got)
 	}
 }
 

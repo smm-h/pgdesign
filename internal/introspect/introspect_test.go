@@ -1412,3 +1412,51 @@ func TestExportRLSPolicies(t *testing.T) {
 		t.Errorf("should not emit for = ALL (it's the default), got:\n%s", s2)
 	}
 }
+
+func TestIntrospectTriggerFilter_StateMachine(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	users := findTable(schema.Tables, "users")
+	if users == nil {
+		t.Fatal("users table not found")
+	}
+
+	// _pgdesign_sm_users_status trigger should be filtered out.
+	for _, trig := range users.Triggers {
+		if strings.HasPrefix(trig.Name, "_pgdesign_sm_") {
+			t.Errorf("introspect should filter _pgdesign_sm_ triggers, found: %s", trig.Name)
+		}
+		if trig.Function == "pgdesign_deny_mutation" {
+			t.Errorf("introspect should filter pgdesign_deny_mutation triggers, found: %s", trig.Name)
+		}
+	}
+
+	// The normal user_audit trigger should still be present.
+	found := false
+	for _, trig := range users.Triggers {
+		if trig.Name == "user_audit" {
+			found = true
+		}
+	}
+	if !found {
+		names := make([]string, len(users.Triggers))
+		for i, trig := range users.Triggers {
+			names[i] = trig.Name
+		}
+		t.Errorf("expected user_audit trigger in introspected users table, got triggers: %v", names)
+	}
+
+	// Verify posts table also filters deny_mutation.
+	posts := findTable(schema.Tables, "posts")
+	if posts == nil {
+		t.Fatal("posts table not found")
+	}
+	for _, trig := range posts.Triggers {
+		if trig.Function == "pgdesign_deny_mutation" {
+			t.Errorf("introspect should filter pgdesign_deny_mutation triggers on posts, found: %s", trig.Name)
+		}
+	}
+}

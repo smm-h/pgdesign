@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 func TestGenerateD2TwoTables(t *testing.T) {
@@ -45,7 +46,7 @@ func TestGenerateD2TwoTables(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema)
+	out := GenerateD2(schema, nil)
 
 	// Both table shapes must be present.
 	if !strings.Contains(out, "users: {") {
@@ -76,7 +77,7 @@ func TestGenerateD2SQLTableShape(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema)
+	out := GenerateD2(schema, nil)
 
 	if !strings.Contains(out, "shape: sql_table") {
 		t.Errorf("expected sql_table shape, got:\n%s", out)
@@ -117,7 +118,7 @@ func TestGenerateD2FKEdgeLabelOnDelete(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema)
+	out := GenerateD2(schema, nil)
 
 	// The edge label must include the ON DELETE action.
 	if !strings.Contains(out, "children.parent_id -> parents.id: SET NULL") {
@@ -159,7 +160,7 @@ func TestGenerateD2DefaultOnDelete(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema)
+	out := GenerateD2(schema, nil)
 
 	// When OnDelete is empty, should default to "NO ACTION".
 	if !strings.Contains(out, "b.a_id -> a.id: NO ACTION") {
@@ -183,7 +184,7 @@ func TestGenerateD2PrimaryKeyConstraint(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema)
+	out := GenerateD2(schema, nil)
 
 	if !strings.Contains(out, "id: uuid {constraint: primary_key}") {
 		t.Errorf("expected primary_key constraint on id, got:\n%s", out)
@@ -228,7 +229,7 @@ func TestGenerateD2ForeignKeyConstraint(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema)
+	out := GenerateD2(schema, nil)
 
 	if !strings.Contains(out, "user_id: uuid {constraint: foreign_key}") {
 		t.Errorf("expected foreign_key constraint on user_id, got:\n%s", out)
@@ -315,7 +316,7 @@ func TestGenerateD2_Views(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema)
+	out := GenerateD2(schema, nil)
 
 	// View shape must be a rectangle, not sql_table.
 	if !strings.Contains(out, "active_users: {") {
@@ -357,5 +358,102 @@ func TestGenerateSVGFormat(t *testing.T) {
 
 	if !strings.Contains(out, "<svg") {
 		t.Errorf("Generate with format=svg should produce SVG output, got prefix:\n%s", out[:min(200, len(out))])
+	}
+}
+
+func TestGenerateD2_StateMachine(t *testing.T) {
+	reg := semtype.NewRegistry()
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{
+		{
+			Name: "order_status",
+			Kind: "state_machine",
+			States: []semtype.UserSMState{
+				{Name: "pending"},
+				{Name: "active"},
+				{Name: "closed", Terminal: true},
+			},
+			Transitions: []semtype.UserSMTransition{
+				{Name: "activate", From: []string{"pending"}, To: "active"},
+				{Name: "close", From: []string{"active"}, To: "closed"},
+			},
+			InitialState:   "pending",
+			EnforceTrigger: true,
+		},
+	})
+	if diags.HasErrors() {
+		t.Fatalf("LoadUserTypes errors: %v", diags)
+	}
+
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	out := GenerateD2(schema, reg)
+
+	// Check the SM container.
+	if !strings.Contains(out, "order_status: {") {
+		t.Errorf("expected order_status container, got:\n%s", out)
+	}
+	if !strings.Contains(out, `label: "<<state machine>>\norder_status"`) {
+		t.Errorf("expected state machine label, got:\n%s", out)
+	}
+
+	// Check states.
+	if !strings.Contains(out, "pending: {") {
+		t.Errorf("expected pending state, got:\n%s", out)
+	}
+	if !strings.Contains(out, "shape: oval") {
+		t.Errorf("expected oval shape for states, got:\n%s", out)
+	}
+
+	// Check initial state has bold.
+	if !strings.Contains(out, "style.bold: true") {
+		t.Errorf("expected bold style for initial state, got:\n%s", out)
+	}
+
+	// Check terminal state has thick stroke.
+	if !strings.Contains(out, "style.stroke-width: 3") {
+		t.Errorf("expected thick stroke for terminal state, got:\n%s", out)
+	}
+
+	// Check transitions.
+	if !strings.Contains(out, "pending -> active: activate") {
+		t.Errorf("expected activate transition edge, got:\n%s", out)
+	}
+	if !strings.Contains(out, "active -> closed: close") {
+		t.Errorf("expected close transition edge, got:\n%s", out)
+	}
+}
+
+func TestGenerateD2_NilRegistry(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "integer", NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	// Should not panic with nil registry.
+	out := GenerateD2(schema, nil)
+	if !strings.Contains(out, "items: {") {
+		t.Errorf("expected items table, got:\n%s", out)
 	}
 }

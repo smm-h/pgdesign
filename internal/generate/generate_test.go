@@ -2219,3 +2219,177 @@ func TestTriggerGeneration_NoTriggers(t *testing.T) {
 		t.Error("expected no CREATE TRIGGER in output without triggers")
 	}
 }
+
+func TestStateMachineTriggerGeneration(t *testing.T) {
+	reg := semtype.NewRegistry()
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{
+		{
+			Name: "order_status",
+			Kind: "state_machine",
+			States: []semtype.UserSMState{
+				{Name: "pending"},
+				{Name: "active"},
+				{Name: "closed", Terminal: true},
+			},
+			Transitions: []semtype.UserSMTransition{
+				{Name: "activate", From: []string{"pending"}, To: "active"},
+				{Name: "close", From: []string{"active"}, To: "closed"},
+			},
+			InitialState:   "pending",
+			EnforceTrigger: true,
+		},
+	})
+	if diags.HasErrors() {
+		t.Fatalf("LoadUserTypes errors: %v", diags)
+	}
+
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql", TypeRegistry: reg}
+	got := mustGenerate(t, schema, opts)
+
+	// Trigger function should be present.
+	if !strings.Contains(got, "CREATE OR REPLACE FUNCTION app._pgdesign_sm_orders_status()") {
+		t.Errorf("expected SM trigger function, got:\n%s", got)
+	}
+	// Trigger should be present.
+	if !strings.Contains(got, "CREATE TRIGGER _pgdesign_sm_orders_status BEFORE UPDATE OF status ON app.orders") {
+		t.Errorf("expected SM trigger, got:\n%s", got)
+	}
+	// Should appear after CREATE TABLE.
+	tableIdx := strings.Index(got, "CREATE TABLE")
+	trigIdx := strings.Index(got, "CREATE OR REPLACE FUNCTION app._pgdesign_sm_orders_status()")
+	if trigIdx < tableIdx {
+		t.Errorf("SM trigger function should appear after CREATE TABLE")
+	}
+}
+
+func TestStateMachineTriggerGeneration_EnforceFalse(t *testing.T) {
+	reg := semtype.NewRegistry()
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{
+		{
+			Name: "task_state",
+			Kind: "state_machine",
+			States: []semtype.UserSMState{
+				{Name: "draft"},
+				{Name: "done", Terminal: true},
+			},
+			Transitions: []semtype.UserSMTransition{
+				{Name: "finish", From: []string{"draft"}, To: "done"},
+			},
+			InitialState:   "draft",
+			EnforceTrigger: false,
+		},
+	})
+	if diags.HasErrors() {
+		t.Fatalf("LoadUserTypes errors: %v", diags)
+	}
+
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "tasks",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "state", PGType: "task_state", NotNull: true, SemanticTypeName: "task_state"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql", TypeRegistry: reg}
+	got := mustGenerate(t, schema, opts)
+
+	// With EnforceTrigger=false, no SM trigger should be emitted.
+	if strings.Contains(got, "_pgdesign_sm_") {
+		t.Errorf("expected no SM trigger when EnforceTrigger=false, got:\n%s", got)
+	}
+}
+
+func TestStateMachineTriggerGeneration_FilterFromSection17(t *testing.T) {
+	reg := semtype.NewRegistry()
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{
+		{
+			Name: "order_status",
+			Kind: "state_machine",
+			States: []semtype.UserSMState{
+				{Name: "pending"},
+				{Name: "active"},
+			},
+			Transitions: []semtype.UserSMTransition{
+				{Name: "activate", From: []string{"pending"}, To: "active"},
+			},
+			InitialState:   "pending",
+			EnforceTrigger: true,
+		},
+	})
+	if diags.HasErrors() {
+		t.Fatalf("LoadUserTypes errors: %v", diags)
+	}
+
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				},
+				PK: []string{"id"},
+				Triggers: []model.Trigger{
+					// A user-defined trigger with the SM prefix (should be filtered from section 17).
+					{
+						Name:     "_pgdesign_sm_orders_status",
+						Function: "_pgdesign_sm_orders_status",
+						Events:   []string{"UPDATE"},
+						Timing:   "BEFORE",
+						ForEach:  "ROW",
+					},
+					// A normal user-defined trigger (should appear).
+					{
+						Name:     "audit_changes",
+						Function: "audit_func",
+						Events:   []string{"INSERT"},
+						Timing:   "AFTER",
+						ForEach:  "ROW",
+					},
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql", TypeRegistry: reg}
+	got := mustGenerate(t, schema, opts)
+
+	// The user-defined audit trigger should be present.
+	if !strings.Contains(got, "CREATE TRIGGER audit_changes") {
+		t.Errorf("expected audit_changes trigger, got:\n%s", got)
+	}
+
+	// The SM trigger from the model's Triggers list should NOT appear via section 17
+	// (it's emitted by section 9c instead).
+	// Count occurrences of "CREATE TRIGGER _pgdesign_sm_orders_status" -- should be exactly 1
+	// (from section 9c, not from section 17).
+	count := strings.Count(got, "CREATE TRIGGER _pgdesign_sm_orders_status")
+	if count != 1 {
+		t.Errorf("expected exactly 1 SM trigger statement (from section 9c), got %d:\n%s", count, got)
+	}
+}

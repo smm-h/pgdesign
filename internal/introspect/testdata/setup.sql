@@ -119,3 +119,43 @@ CREATE POLICY users_restrictive ON users
     FOR UPDATE
     USING (id = current_setting('app.user_id')::bigint)
     WITH CHECK (id = current_setting('app.user_id')::bigint);
+
+-- Append-only trigger (should be filtered by pgdesign_deny_mutation check)
+CREATE OR REPLACE FUNCTION pgdesign_deny_mutation() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'table %s is append-only', TG_TABLE_NAME;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON posts
+    FOR EACH ROW EXECUTE FUNCTION pgdesign_deny_mutation();
+
+-- State machine trigger (should be filtered by _pgdesign_sm_ prefix check)
+CREATE OR REPLACE FUNCTION _pgdesign_sm_users_status() RETURNS trigger AS $pgdesign$
+BEGIN
+  IF OLD.status IS DISTINCT FROM NEW.status THEN
+    IF NOT (
+      (OLD.status = 'active' AND NEW.status IN ('banned', 'inactive')) OR
+      (OLD.status = 'inactive' AND NEW.status IN ('active'))
+    ) THEN
+      RAISE EXCEPTION 'invalid state transition: % -> %', OLD.status, NEW.status
+        USING ERRCODE = 'P0001';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$pgdesign$ LANGUAGE plpgsql;
+
+CREATE TRIGGER _pgdesign_sm_users_status BEFORE UPDATE OF status ON users
+    FOR EACH ROW EXECUTE FUNCTION _pgdesign_sm_users_status();
+
+-- A normal user-defined trigger (should NOT be filtered)
+CREATE OR REPLACE FUNCTION audit_user_changes() RETURNS trigger AS $$
+BEGIN
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_audit AFTER UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION audit_user_changes();
