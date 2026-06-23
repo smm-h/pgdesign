@@ -13,7 +13,7 @@ func SupportedModes() map[string][]string {
 		"validators":  {"go", "java", "kotlin", "python", "ts", "zig"},
 		"constants":   {"go", "java", "kotlin", "python", "ts", "zig"},
 		"types":       {"go", "java", "kotlin", "python", "ts", "zig"},
-		"constraints": {"go", "ts"},
+		"constraints": {"go", "java", "kotlin", "python", "ts"},
 		"gorm":        {"go"},
 		"drizzle":     {"ts"},
 		"sqlalchemy":  {"python"},
@@ -91,10 +91,16 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 		switch lang {
 		case "go":
 			return &codegen.GoConstraintsGenerator{}, nil
+		case "java":
+			return &codegen.JavaConstraintsGenerator{}, nil
+		case "kotlin":
+			return &codegen.KotlinConstraintsGenerator{}, nil
+		case "python":
+			return &codegen.PythonConstraintsGenerator{}, nil
 		case "ts":
 			return &codegen.TSConstraintsGenerator{}, nil
 		default:
-			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: go, ts)", mode, lang)
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: go, java, kotlin, python, ts)", mode, lang)
 		}
 	case "gorm":
 		switch lang {
