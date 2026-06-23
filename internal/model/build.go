@@ -51,6 +51,9 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	schema.buildTablesByName()
 	schema.BuildFKGraph()
 
+	// Extract state machine transition maps from the registry.
+	schema.StateMachineTransitions = resolveStateMachineTransitions(raw, reg)
+
 	// Validate and copy groups.
 	groupDiags := resolveGroups(schema, raw.Groups)
 	diags = append(diags, groupDiags...)
@@ -121,6 +124,13 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 
 	schema.buildTablesByName()
 	schema.BuildFKGraph()
+
+	// Extract state machine transition maps from all schemas.
+	for _, raw := range raws {
+		smts := resolveStateMachineTransitions(raw, reg)
+		schema.StateMachineTransitions = append(schema.StateMachineTransitions, smts...)
+	}
+	schema.StateMachineTransitions = deduplicateSMTransitions(schema.StateMachineTransitions)
 
 	// Merge and validate groups from all schemas.
 	merged := mergeGroups(raws)
@@ -1121,6 +1131,64 @@ func IsStateMachineColumn(col Column, reg *semtype.Registry) bool {
 		return false
 	}
 	return td.Kind == semtype.KindStateMachine
+}
+
+// resolveStateMachineTransitions extracts transition maps from state machine
+// types declared in the raw schema.
+func resolveStateMachineTransitions(raw *parse.RawSchema, reg *semtype.Registry) []SMTransitionMap {
+	var result []SMTransitionMap
+	for _, rt := range raw.Types {
+		if !strings.EqualFold(rt.Kind, "state_machine") {
+			continue
+		}
+		td, err := reg.Resolve(rt.Name)
+		if err != nil {
+			continue
+		}
+
+		// Build from-state -> []to-state map.
+		transMap := make(map[string][]string)
+		for _, tr := range td.Transitions {
+			for _, from := range tr.From {
+				transMap[from] = append(transMap[from], tr.To)
+			}
+		}
+
+		// Deduplicate and sort target states for deterministic output.
+		for from, tos := range transMap {
+			seen := make(map[string]bool, len(tos))
+			var deduped []string
+			for _, to := range tos {
+				if !seen[to] {
+					seen[to] = true
+					deduped = append(deduped, to)
+				}
+			}
+			sort.Strings(deduped)
+			transMap[from] = deduped
+		}
+
+		result = append(result, SMTransitionMap{
+			TypeName:    td.Name,
+			Transitions: transMap,
+			States:      td.EnumValues,
+		})
+	}
+	return result
+}
+
+// deduplicateSMTransitions removes duplicate SM transition maps by type name.
+func deduplicateSMTransitions(smts []SMTransitionMap) []SMTransitionMap {
+	seen := make(map[string]bool, len(smts))
+	var result []SMTransitionMap
+	for _, smt := range smts {
+		if seen[smt.TypeName] {
+			continue
+		}
+		seen[smt.TypeName] = true
+		result = append(result, smt)
+	}
+	return result
 }
 
 // deduplicateEnums removes duplicate enums by schema+name key, keeping the first occurrence.

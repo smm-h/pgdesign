@@ -25,6 +25,14 @@ import (
 	"github.com/smm-h/pgdesign/internal/fd"
 )
 
+// SMTransitionMap holds the allowed transitions for a state machine type.
+// Keys are source state names, values are the set of reachable target states.
+type SMTransitionMap struct {
+	TypeName    string              // PascalCase-friendly type name (e.g., "order_status")
+	Transitions map[string][]string // from-state -> []to-state, sorted deterministically
+	States      []string            // all states in declaration order
+}
+
 // Schema is the top-level resolved schema.
 type Schema struct {
 	Name        string     `json:"name"`
@@ -42,6 +50,9 @@ type Schema struct {
 	PGVersion   int        `json:"pg_version"`
 	TablesByName map[string]*Table `json:"-"`
 	FKGraph      *FKGraph          `json:"-"`
+	// StateMachineTransitions maps type names to their transition maps.
+	// Populated during Build() from the semtype registry for KindStateMachine types.
+	StateMachineTransitions []SMTransitionMap `json:"state_machine_transitions,omitempty"`
 }
 
 // View represents a resolved view definition.
