@@ -9,15 +9,16 @@ import (
 
 // ConstraintSet holds extracted constraint information for a single table.
 type ConstraintSet struct {
-	NotNullFields []string            // column names that are NOT NULL (excludes PK/identity/generated)
-	EnumFields    map[string][]string // column name -> valid enum values
-	CheckExprs    map[string]string   // column name -> CHECK expression (single-column checks only)
-	JSONSchemas   map[string]string   // column name -> JSON schema file path
+	NotNullFields  []string            // column names that are NOT NULL (excludes PK/identity/generated)
+	EnumFields     map[string][]string // column name -> valid enum values
+	CheckExprs     map[string]string   // column name -> CHECK expression (single-column checks only)
+	JSONSchemas    map[string]string   // column name -> JSON schema file path
+	DomainBaseTypes map[string]string  // domain-backed column name -> base PG type (for numeric comparison type-mapping)
 }
 
 // HasConstraints reports whether any constraints were extracted.
 func (cs ConstraintSet) HasConstraints() bool {
-	return len(cs.NotNullFields) > 0 || len(cs.EnumFields) > 0 || len(cs.CheckExprs) > 0 || len(cs.JSONSchemas) > 0
+	return len(cs.NotNullFields) > 0 || len(cs.EnumFields) > 0 || len(cs.CheckExprs) > 0 || len(cs.JSONSchemas) > 0 || len(cs.DomainBaseTypes) > 0
 }
 
 // ExtractConstraints collects constraint metadata from a table for code generation.
@@ -25,9 +26,10 @@ func (cs ConstraintSet) HasConstraints() bool {
 // enum-typed columns, single-column CHECK constraints, and JSON schema annotations.
 func ExtractConstraints(table model.Table, schema model.Schema) ConstraintSet {
 	cs := ConstraintSet{
-		EnumFields:  make(map[string][]string),
-		CheckExprs:  make(map[string]string),
-		JSONSchemas: make(map[string]string),
+		EnumFields:      make(map[string][]string),
+		CheckExprs:      make(map[string]string),
+		JSONSchemas:     make(map[string]string),
+		DomainBaseTypes: make(map[string]string),
 	}
 
 	// Build set of PK column names for exclusion.
@@ -42,6 +44,12 @@ func ExtractConstraints(table model.Table, schema model.Schema) ConstraintSet {
 		enumMap[strings.ToLower(e.Name)] = e.Values
 	}
 
+	// Build map of domain names (lowercased) to their definitions.
+	domainMap := make(map[string]model.Domain, len(schema.Domains))
+	for _, d := range schema.Domains {
+		domainMap[strings.ToLower(d.Name)] = d
+	}
+
 	for _, col := range table.Columns {
 		// NOT NULL: exclude PK columns, identity columns, and generated columns.
 		if col.NotNull && !pkSet[col.Name] && col.Identity == "" && col.Generated == "" {
@@ -51,6 +59,14 @@ func ExtractConstraints(table model.Table, schema model.Schema) ConstraintSet {
 		// Enum: match column type against declared enums (case-insensitive).
 		if vals, ok := enumMap[strings.ToLower(col.PGType)]; ok {
 			cs.EnumFields[col.Name] = vals
+		}
+
+		// Domain: match column type against declared domains (case-insensitive).
+		if domain, ok := domainMap[strings.ToLower(col.PGType)]; ok {
+			if domain.Check != "" {
+				cs.CheckExprs[col.Name] = domain.Check
+			}
+			cs.DomainBaseTypes[col.Name] = domain.BaseType
 		}
 
 		// JSON schema annotation.
