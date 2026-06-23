@@ -2736,3 +2736,78 @@ unknown_key = "value"
 		t.Errorf("expected W001 warning for unknown key, got: %v", diags)
 	}
 }
+
+func TestParseGroups(t *testing.T) {
+	content := `
+[meta]
+version = 1
+schema = "public"
+
+[tables.users]
+comment = "Users table"
+[tables.users.columns]
+id = "id"
+name = "short_text"
+
+[tables.orders]
+comment = "Orders table"
+[tables.orders.columns]
+id = "id"
+total = "money"
+
+[tables.products]
+comment = "Products table"
+[tables.products.columns]
+id = "id"
+name = "short_text"
+
+[groups]
+core = ["users", "orders"]
+catalog = ["products"]
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if schema.Groups == nil {
+		t.Fatal("expected groups, got nil")
+	}
+	if len(schema.Groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d", len(schema.Groups))
+	}
+	core := schema.Groups["core"]
+	if len(core) != 2 || core[0] != "users" || core[1] != "orders" {
+		t.Errorf("core group = %v, want [users orders]", core)
+	}
+	catalog := schema.Groups["catalog"]
+	if len(catalog) != 1 || catalog[0] != "products" {
+		t.Errorf("catalog group = %v, want [products]", catalog)
+	}
+}
+
+func TestParseGroupsEmpty(t *testing.T) {
+	content := `
+[meta]
+version = 1
+schema = "public"
+
+[tables.users]
+comment = "Users"
+[tables.users.columns]
+id = "id"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if schema.Groups != nil {
+		t.Errorf("expected nil groups when no [groups] section, got %v", schema.Groups)
+	}
+}

@@ -1082,3 +1082,101 @@ func TestBuild_ForceRLSImpliesEnableRLS(t *testing.T) {
 		t.Error("expected EnableRLS = true when ForceRLS is set")
 	}
 }
+
+func TestBuild_GroupsValid(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{Name: "users", Columns: []parse.RawColumn{{Name: "id", Type: "id"}}},
+			{Name: "orders", Columns: []parse.RawColumn{{Name: "id", Type: "id"}}},
+			{Name: "products", Columns: []parse.RawColumn{{Name: "id", Type: "id"}}},
+		},
+		Groups: map[string][]string{
+			"core":    {"users", "orders"},
+			"catalog": {"products"},
+		},
+	}
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if schema.Groups == nil {
+		t.Fatal("expected groups on schema, got nil")
+	}
+	if len(schema.Groups["core"]) != 2 {
+		t.Errorf("core group len = %d, want 2", len(schema.Groups["core"]))
+	}
+	if len(schema.Groups["catalog"]) != 1 {
+		t.Errorf("catalog group len = %d, want 1", len(schema.Groups["catalog"]))
+	}
+}
+
+func TestBuild_GroupsUnknownTable(t *testing.T) {
+	reg := testRegistry()
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Tables: []parse.RawTable{
+			{Name: "users", Columns: []parse.RawColumn{{Name: "id", Type: "id"}}},
+		},
+		Groups: map[string][]string{
+			"core": {"users", "nonexistent"},
+		},
+	}
+
+	_, diags := Build(raw, reg)
+	found := false
+	for _, d := range diags {
+		if d.Code == "E227" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected E227 for unknown table in group, got: %v", diags)
+	}
+}
+
+func TestFilterByGroups(t *testing.T) {
+	schema := &Schema{
+		Tables: []Table{
+			{Name: "users", Schema: "public"},
+			{Name: "orders", Schema: "public"},
+			{Name: "products", Schema: "public"},
+		},
+		Groups: map[string][]string{
+			"core":    {"users", "orders"},
+			"catalog": {"products"},
+		},
+	}
+	schema.buildTablesByName()
+
+	filtered := schema.FilterByGroups([]string{"core"})
+	if len(filtered.Tables) != 2 {
+		t.Fatalf("expected 2 tables, got %d", len(filtered.Tables))
+	}
+	names := make(map[string]bool)
+	for _, tbl := range filtered.Tables {
+		names[tbl.Name] = true
+	}
+	if !names["users"] || !names["orders"] {
+		t.Errorf("expected users and orders, got %v", names)
+	}
+	if names["products"] {
+		t.Errorf("products should not be in filtered result")
+	}
+}
+
+func TestFilterByGroupsEmpty(t *testing.T) {
+	schema := &Schema{
+		Tables: []Table{
+			{Name: "users", Schema: "public"},
+		},
+	}
+	// Empty group list returns original schema.
+	result := schema.FilterByGroups(nil)
+	if result != schema {
+		t.Error("expected same schema pointer when groupNames is empty")
+	}
+}

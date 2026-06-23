@@ -669,3 +669,41 @@ schemas = ["schema.toml"]
 		t.Errorf("suppress[audit_log.W001] = %q, want %q", v, "audit tables are expected to be large")
 	}
 }
+
+func TestLoadOutputGroups(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.core_sql]
+format = "sql"
+path = "core.sql"
+groups = ["core", "auth"]
+
+[output.full_sql]
+format = "sql"
+path = "full.sql"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	coreSql := cfg.Output["core_sql"]
+	if len(coreSql.Groups) != 2 {
+		t.Fatalf("expected 2 groups on core_sql output, got %d", len(coreSql.Groups))
+	}
+	if coreSql.Groups[0] != "core" || coreSql.Groups[1] != "auth" {
+		t.Errorf("core_sql groups = %v, want [core auth]", coreSql.Groups)
+	}
+
+	fullSql := cfg.Output["full_sql"]
+	if len(fullSql.Groups) != 0 {
+		t.Errorf("expected no groups on full_sql output, got %v", fullSql.Groups)
+	}
+}
