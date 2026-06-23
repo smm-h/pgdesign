@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "pgdesign",
   "slug": "pgdesign",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": null,
   "language": "go",
   "base_url": "https://pgdesign.smmh.dev",
@@ -233,6 +233,11 @@
       "type": "doc"
     },
     {
+      "path": "query-layer.md",
+      "title": "Python Query Layer",
+      "type": "doc"
+    },
+    {
       "path": "quickstart.md",
       "title": "Quickstart",
       "type": "doc"
@@ -245,6 +250,11 @@
     {
       "path": "semantic-types.md",
       "title": "Semantic Types",
+      "type": "doc"
+    },
+    {
+      "path": "state-machines.md",
+      "title": "State Machines",
       "type": "doc"
     },
     {
@@ -264,5 +274,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-22T11:51:41.054504+00:00"
+  "last_gen": "2026-06-23T10:40:35.154808+00:00"
 }

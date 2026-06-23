@@ -8,8 +8,8 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 
 - `parse` parses TOML schemas (uses go-toml-edit for comment preservation)
 - `model` builds the resolved intermediate representation (tables, views, materialized views); `Schema.Build()` resolves types and dependencies
-- `validate` validates the model and detects anti-patterns; includes design intelligence checks (cascade analysis, constraint subsumption, dead columns, row size estimation, natural key surfacing)
-- `generate` produces DDL and D2 diagram output
+- `validate` validates the model and detects anti-patterns; includes design intelligence checks (cascade analysis, constraint subsumption, dead columns, row size estimation, natural key surfacing); state machine reachability validation
+- `generate` produces DDL and D2 diagram output; state machine trigger generation (BEFORE UPDATE) and D2 state diagrams
 - `audit` checks normal form compliance (1NF/2NF/3NF/BCNF) using functional dependencies; FD inference from PK/UNIQUE forces explicit declaration; Armstrong relation counterexamples in violation diagnostics
 - `fd` provides functional dependency primitives (closure, minimal cover, candidate keys, BCNF decomposition, lossless-join verification, dependency-preservation checking, Armstrong relation generation)
 - `discover` discovers functional dependencies from live data using the TANE algorithm
@@ -17,14 +17,14 @@ PostgreSQL schema compiler. TOML schemas to SQL DDL with normal form auditing, m
 - `sqlexpr` parses and walks SQL expressions (recursive descent parser with 9 precedence levels, supports arithmetic, comparisons, boolean logic, casts, CASE, EXISTS subqueries); used by validate (E213) and codegen (expression-driven validators)
 - `sqlparse` wraps wasilibs/go-pgquery (WASM-based PostgreSQL parser, no CGo) for proper SQL statement splitting and expression deparsing
 - `sqlutil` provides shared adapter between sqlexpr and diagnostic for consistent parse-error-to-diagnostic conversion
-- `codegen` generates type-safe application code (Go, TS, Java, Kotlin, Python, Zig) from the model; modes: validators, constants, types, constraints (Go/TS), gorm, drizzle, sqlalchemy, jpa, graphql; shared type mapping and enum generation across all 6 languages
-- `diff` compares two models or a model against a live database
-- `migrate` generates migrations with risk classification and safety linting; expand/migrate/contract phasing, NOT VALID + VALIDATE auto-split for large tables, batched DML, volatile default detection, squash consolidation (inverse pair cancellation, type change merging, CREATE TABLE folding), multi-step rollback with reversibility pre-check
+- `codegen` generates type-safe application code (Go, TS, Java, Kotlin, Python, Zig) from the model; modes: validators, constants, types, constraints (Go/TS/Python/Java/Kotlin), gorm, drizzle, sqlalchemy, jpa, graphql, ddl (Python), query-layer (Python); shared type mapping and enum generation across all 6 languages; state machine transition codegen for all languages; MultiFileGenerator interface for multi-file output
+- `diff` compares two models or a model against a live database; state machine type changes detected and diffed
+- `migrate` generates migrations with risk classification and safety linting; expand/migrate/contract phasing, NOT VALID + VALIDATE auto-split for large tables, batched DML, volatile default detection, squash consolidation (inverse pair cancellation, type change merging, CREATE TABLE folding), multi-step rollback with reversibility pre-check; state machine trigger migrations
 - `introspect` reads a live database via pg_catalog into a model
 - `seed` generates type-aware test data for schema tables; supports all 42 PG types, Zipf/log-normal distributions, regex generation from CHECK patterns, FK cycle handling (two-pass NULL then UPDATE), COPY and batch INSERT formats, edge-case boundary values, CHECK/UNIQUE constraint awareness
 - `serve` exposes the HTTP API and web UI
 - `diagnostic` provides error/warning/hint reporting used across all packages
-- `semtype` defines the semantic type system (builtins + user-defined enums + scalar types that produce CREATE DOMAIN + composite types)
+- `semtype` defines the semantic type system (builtins + user-defined enums + scalar types that produce CREATE DOMAIN + composite types + state machine types with states/transitions/initial)
 - `risk` classifies migration risk levels
 - `sql` contains SQL formatting utilities
 - `format` handles output formatting
@@ -54,7 +54,7 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - `check` command runs registered checks (validation, NF audit, coverage) via strictcli's check framework.
 - `stats` command analyzes live database health: table sizes, index usage, bloat, duplicate indexes.
 - `seed` command generates type-aware test data respecting FK dependencies and semantic types.
-- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Modes: `validators` (RLS policy checkers), `constants` (table/column name strings), `types` (native struct/class/interface definitions with enums), `constraints` (client-side validation from CHECK/NOT NULL/enum; Go and TS), `gorm` (Go GORM struct tags), `drizzle` (TS Drizzle schema), `sqlalchemy` (Python SQLAlchemy 2.0 models), `jpa` (Java JPA entity classes).
+- Codegen supports six languages: Go, TypeScript, Java, Kotlin, Python, Zig. Modes: `validators` (RLS policy checkers), `constants` (table/column name strings), `types` (native struct/class/interface definitions with enums), `constraints` (client-side validation from CHECK/NOT NULL/enum; Go/TS/Python/Java/Kotlin), `gorm` (Go GORM struct tags), `drizzle` (TS Drizzle schema), `sqlalchemy` (Python SQLAlchemy 2.0 models), `jpa` (Java JPA entity classes), `ddl` (Python DDL tuples + executor), `query-layer` (Python protocols + PgBackend + InMemoryBackend).
 - Diff supports three modes: `--live` (against database), `--against` (against another TOML), `--base` (against git ref).
 - `doc` output format generates human-readable schema documentation.
 - Extension-provided types (e.g., `vector` from pgvector) become valid base types when declared via `[[extensions]]` in pgdesign.toml. Undeclared extension types remain hard errors.
@@ -83,6 +83,12 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Migration intelligence: phase-annotated expand/migrate/contract (single-file, safe ops collapse to single transaction), NOT VALID + VALIDATE CONSTRAINT auto-split for FK/CHECK on large tables (>10K rows), batched DML with configurable batch size (MVCC-aware), volatile default detection (risk escalation for gen_random_uuid/now), squash consolidation (12 inverse pair types, sequential type merging, CREATE TABLE folding), multi-step rollback with reversibility pre-check.
 - Workload analysis (`check --tag workload`): structural index recommendations W022 (JSONB no GIN), W023 (array no GIN), W024 (tsvector no GIN), I005 (append-only BRIN candidate); live analysis via pg_stat_statements for N+1 detection W025 (call ratio >= 100x), sequential scan detection W026 (seq_scan > 10x idx_scan); I006 boolean index low selectivity, I007 excessive indexes (10+).
 - Seed generation: `--seed` for deterministic output, `--format copy|insert` (COPY 5-10x faster, psql-only), `--clean` emits TRUNCATE CASCADE, `--mode edge-cases` generates boundary values, `--counts table=N` for per-table row counts. Distributions: Zipf (s=1.5) for FK references, log-normal for money. Regex generation from CHECK patterns via regexp/syntax AST walk. FK cycles use two-pass NULL-then-UPDATE (S001 if cycle column is NOT NULL). Batch INSERT (1000 rows/statement). CHECK hint extraction for range/length/regex constraints, UNIQUE enforcement with 100 retries.
+- State machines: `[types.*]` with `kind = "state_machine"`, `states`, `transitions`, and `initial`. Produces CHECK constraints for valid states, trigger-enforced transitions (BEFORE UPDATE), D2 state diagrams, and codegen transition methods. Reachability validation ensures all states are reachable from the initial state.
+- Table groups: `[groups]` in schema TOML maps group names to table lists. Config-based group filtering for selective code generation.
+- Python DDL codegen: `--mode ddl --lang python`. Pure data tuples for DDL definitions plus a decomposed section executor for applying DDL programmatically.
+- Python query-layer codegen: `--mode query-layer --lang python`. Generates Protocol definitions (Backend, per-table Writer/Reader), Row dataclasses, PgBackend (asyncpg parameterized queries), InMemoryBackend (constraint registry enforcement). Context+delegate+forwarding architecture avoids MRO complexity. Dual-backend conformance tested at codegen level.
+- Constraint codegen for Python/Java/Kotlin: Python uses `_constraints.py` with ConstraintKind enum, per-table constraint lists, and ConstraintEngine class. Java and Kotlin generate constraint validators; Kotlin uses extension functions.
+- MultiFileGenerator interface for codegen modes that produce multiple output files (Python DDL, Python query-layer). Returns `map[string][]byte` of relative file paths to contents.
 
 ## Testing
 
