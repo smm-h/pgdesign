@@ -15,3 +15,4 @@
 {"commits":["4fc5b81e5ba89f461f4bb872ef4e4ca335e98cd9"],"user_facing":true,"description":"**New feature.** Config `validModes` derived from codegen registry for lang-mode pair validation.","type":"feature"}
 {"commits":["a6b4b4a7947828488d90013dc8b6e7e75bb954c9"],"user_facing":true,"description":"**New feature.** `ExtractConstraints` now includes domain-backed CHECK constraints via `DomainBaseTypes` mapping.","type":"feature"}
 {"commits":["5c46ca706230e5870cd995c75a60f03531f379f1"],"user_facing":true,"description":"**New feature.** Introspect filters out `_pgdesign_sm_` triggers (generated state machine enforcement).","type":"feature"}
+{"commits":["84a3522e555f1a674d73f0404e8b26f79ca957b9"],"user_facing":false}
