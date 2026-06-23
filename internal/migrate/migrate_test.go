@@ -4395,3 +4395,179 @@ func TestIsVolatileDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateMigration_SMTransitionChangeRegeneratesTrigger(t *testing.T) {
+	desired := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				PK:     []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				},
+				Comment: "Orders table",
+			},
+		},
+		StateMachineTransitions: []model.SMTransitionMap{
+			{
+				TypeName: "order_status",
+				Transitions: map[string][]string{
+					"pending":   {"active", "cancelled"},
+					"active":    {"suspended", "completed"},
+					"suspended": {"active"},
+				},
+				States:         []string{"pending", "active", "suspended", "cancelled", "completed"},
+				EnforceTrigger: true,
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		SMTransitionsChanged: []diff.SMTransitionDiff{
+			{
+				TypeName: "order_status",
+				TransitionsAdded: []diff.SMTransitionRef{
+					{From: "suspended", To: "active"},
+				},
+			},
+		},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	// Should have 3 ops: drop_trigger, create_sm_trigger_function, create_sm_trigger.
+	var dropTrig, createFunc, createTrig bool
+	for _, op := range m.DDLOps {
+		switch op.Op {
+		case "drop_trigger":
+			if op.Name == "_pgdesign_sm_orders_status" && op.Table == "app.orders" {
+				dropTrig = true
+			}
+		case "create_sm_trigger_function":
+			if op.Name == "_pgdesign_sm_orders_status" && op.Table == "app.orders" {
+				createFunc = true
+				if op.RawSQL == "" {
+					t.Error("create_sm_trigger_function should have RawSQL")
+				}
+				if !strings.Contains(op.RawSQL, "CREATE OR REPLACE FUNCTION") {
+					t.Error("RawSQL should contain CREATE OR REPLACE FUNCTION")
+				}
+				if !strings.Contains(op.RawSQL, "suspended") {
+					t.Error("RawSQL should reference the 'suspended' state")
+				}
+			}
+		case "create_sm_trigger":
+			if op.Name == "_pgdesign_sm_orders_status" && op.Table == "app.orders" {
+				createTrig = true
+				if op.RawSQL == "" {
+					t.Error("create_sm_trigger should have RawSQL")
+				}
+				if !strings.Contains(op.RawSQL, "CREATE TRIGGER") {
+					t.Error("RawSQL should contain CREATE TRIGGER")
+				}
+			}
+		}
+	}
+	if !dropTrig {
+		t.Error("expected drop_trigger op for _pgdesign_sm_orders_status")
+	}
+	if !createFunc {
+		t.Error("expected create_sm_trigger_function op for _pgdesign_sm_orders_status")
+	}
+	if !createTrig {
+		t.Error("expected create_sm_trigger op for _pgdesign_sm_orders_status")
+	}
+}
+
+func TestGenerateMigration_SMTransitionChangeNoEnforceTrigger(t *testing.T) {
+	// When EnforceTrigger is false, no trigger ops should be generated.
+	desired := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				PK:     []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				},
+				Comment: "Orders table",
+			},
+		},
+		StateMachineTransitions: []model.SMTransitionMap{
+			{
+				TypeName: "order_status",
+				Transitions: map[string][]string{
+					"pending": {"active"},
+					"active":  {"completed"},
+				},
+				States:         []string{"pending", "active", "completed"},
+				EnforceTrigger: false,
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		SMTransitionsChanged: []diff.SMTransitionDiff{
+			{
+				TypeName: "order_status",
+				TransitionsAdded: []diff.SMTransitionRef{
+					{From: "active", To: "completed"},
+				},
+			},
+		},
+	}
+
+	m, _ := GenerateMigration(d, desired, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if m == nil {
+		t.Fatal("expected non-nil migration")
+	}
+
+	for _, op := range m.DDLOps {
+		if op.Op == "create_sm_trigger_function" || op.Op == "create_sm_trigger" {
+			t.Errorf("should not generate SM trigger ops when EnforceTrigger=false, got %s", op.Op)
+		}
+	}
+}
+
+func TestGenerateMigration_SMTransitionChangeOpToSQL(t *testing.T) {
+	// Verify OpToSQL correctly renders SM trigger ops.
+	funcOp := DDLOp{
+		Op:     "create_sm_trigger_function",
+		Table:  "app.orders",
+		Name:   "_pgdesign_sm_orders_status",
+		RawSQL: "CREATE OR REPLACE FUNCTION app._pgdesign_sm_orders_status() RETURNS trigger AS $pgdesign$ BEGIN RETURN NEW; END; $pgdesign$ LANGUAGE plpgsql;",
+	}
+	sql := OpToSQL(funcOp)
+	if sql != funcOp.RawSQL {
+		t.Errorf("OpToSQL should return RawSQL for create_sm_trigger_function, got: %s", sql)
+	}
+
+	trigOp := DDLOp{
+		Op:     "create_sm_trigger",
+		Table:  "app.orders",
+		Name:   "_pgdesign_sm_orders_status",
+		RawSQL: "CREATE TRIGGER _pgdesign_sm_orders_status BEFORE UPDATE OF status ON app.orders FOR EACH ROW EXECUTE FUNCTION app._pgdesign_sm_orders_status();",
+	}
+	sql = OpToSQL(trigOp)
+	if sql != trigOp.RawSQL {
+		t.Errorf("OpToSQL should return RawSQL for create_sm_trigger, got: %s", sql)
+	}
+
+	// Without RawSQL, should produce a comment.
+	emptyOp := DDLOp{
+		Op:   "create_sm_trigger_function",
+		Name: "test",
+	}
+	sql = OpToSQL(emptyOp)
+	if !strings.Contains(sql, "missing pre-rendered SQL") {
+		t.Errorf("expected fallback comment for missing RawSQL, got: %s", sql)
+	}
+}

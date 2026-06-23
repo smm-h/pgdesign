@@ -75,6 +75,7 @@ type DDLOp struct {
 	PolicyDef            *model.Policy                // full policy def for create/drop policy (not serialized)
 
 	ConsolidatedOps []DDLOp // ops absorbed into create_table during squash consolidation
+	RawSQL          string  // pre-rendered SQL for ops that generate complex DDL (e.g., SM triggers)
 
 	Down *DownOp
 }

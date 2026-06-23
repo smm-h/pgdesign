@@ -6,11 +6,15 @@ import (
 	"slices"
 	"strings"
 
+	"sort"
+
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/risk"
+	"github.com/smm-h/pgdesign/internal/semtype"
+	pgsql "github.com/smm-h/pgdesign/internal/sql"
 )
 
 // GenerateMigration converts a SchemaDiff into a Migration with DDL/DML ops
@@ -1314,6 +1318,13 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 	}
 
+	// State machine transition changes: regenerate enforcement triggers.
+	// When transitions change for an SM type with EnforceTrigger, we need to
+	// drop the old trigger, recreate the function with updated transitions,
+	// and recreate the trigger. State additions are handled by the enum diff
+	// path (alter_enum_add_value).
+	generateSMTriggerOps(m, d, desired)
+
 	// Phase 3: Drops (enums last, tables before enums).
 	for _, tableName := range d.TablesRemoved {
 		ctx := tableCtx(tableName)
@@ -2013,4 +2024,121 @@ func domainKey(d model.Domain) string {
 		return d.Name
 	}
 	return d.Schema + "." + d.Name
+}
+
+// generateSMTriggerOps emits drop_trigger + create_sm_trigger_function +
+// create_sm_trigger ops for each table/column that uses a state machine type
+// whose transitions changed. Only applies when the SM type has
+// EnforceTrigger = true.
+func generateSMTriggerOps(m *Migration, d *diff.SchemaDiff, desired *model.Schema) {
+	if len(d.SMTransitionsChanged) == 0 {
+		return
+	}
+
+	// Build a lookup from SM type name to its desired transition map.
+	smByName := make(map[string]*model.SMTransitionMap, len(desired.StateMachineTransitions))
+	for i := range desired.StateMachineTransitions {
+		smt := &desired.StateMachineTransitions[i]
+		smByName[smt.TypeName] = smt
+	}
+
+	for _, smDiff := range d.SMTransitionsChanged {
+		smt, ok := smByName[smDiff.TypeName]
+		if !ok || !smt.EnforceTrigger {
+			continue
+		}
+
+		// Convert model transitions to semtype transitions for SQL generation.
+		transitions := smTransitionMapToSMTransitionDefs(smt)
+
+		// Find all table/column pairs that use this SM type.
+		for _, t := range desired.Tables {
+			for _, col := range t.Columns {
+				if col.SemanticTypeName != smDiff.TypeName {
+					continue
+				}
+				tableName := migrateTableKey(t)
+				trigFuncName := pgsql.StateMachineTriggerFuncName(t.Name, col.Name)
+
+				// Drop the existing trigger.
+				dropTrig := DDLOp{
+					Op:    "drop_trigger",
+					Table: tableName,
+					Name:  trigFuncName,
+					Down:  &DownOp{Irreversible: true},
+				}
+				m.DDLOps = append(m.DDLOps, dropTrig)
+
+				// Recreate the function with updated transitions.
+				createFunc := DDLOp{
+					Op:     "create_sm_trigger_function",
+					Table:  tableName,
+					Name:   trigFuncName,
+					Column: col.Name,
+					Schema: t.Schema,
+					RawSQL: pgsql.CreateStateMachineTriggerFunction(t.Schema, t.Name, col.Name, transitions),
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "drop_function", Table: tableName, Name: trigFuncName}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, createFunc)
+
+				// Recreate the trigger.
+				createTrig := DDLOp{
+					Op:     "create_sm_trigger",
+					Table:  tableName,
+					Name:   trigFuncName,
+					Column: col.Name,
+					Schema: t.Schema,
+					RawSQL: pgsql.CreateStateMachineTrigger(t.Schema, t.Name, col.Name),
+					Down: &DownOp{
+						Ops: []DDLOp{{Op: "drop_trigger", Table: tableName, Name: trigFuncName}},
+					},
+				}
+				m.DDLOps = append(m.DDLOps, createTrig)
+			}
+		}
+	}
+}
+
+// smTransitionMapToSMTransitionDefs converts the model's transition map format
+// to the semtype's SMTransitionDef format needed by SQL generation.
+func smTransitionMapToSMTransitionDefs(smt *model.SMTransitionMap) []semtype.SMTransitionDef {
+	// Build from-state -> []to-state, then create one SMTransitionDef per
+	// unique (from, to) pair. Named transitions are preferred when available.
+	if len(smt.NamedTransitions) > 0 {
+		defs := make([]semtype.SMTransitionDef, 0, len(smt.NamedTransitions))
+		for _, nt := range smt.NamedTransitions {
+			def := semtype.SMTransitionDef{
+				Name: nt.Name,
+				From: nt.From,
+				To:   nt.To,
+			}
+			if len(nt.Requires) > 0 {
+				def.Requires = make(map[string]string, len(nt.Requires))
+				for k, v := range nt.Requires {
+					def.Requires[k] = v
+				}
+			}
+			defs = append(defs, def)
+		}
+		return defs
+	}
+
+	// Fallback: build from the raw transition map.
+	var defs []semtype.SMTransitionDef
+	var froms []string
+	for from := range smt.Transitions {
+		froms = append(froms, from)
+	}
+	sort.Strings(froms)
+	for _, from := range froms {
+		for _, to := range smt.Transitions[from] {
+			defs = append(defs, semtype.SMTransitionDef{
+				From: []string{from},
+				To:   to,
+			})
+		}
+	}
+	return defs
 }

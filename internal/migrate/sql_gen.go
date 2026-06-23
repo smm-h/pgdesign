@@ -136,6 +136,12 @@ func OpToSQL(op DDLOp) string {
 		return opForceRLS(op)
 	case "no_force_rls":
 		return opNoForceRLS(op)
+	case "create_sm_trigger_function", "create_sm_trigger":
+		// SM trigger ops carry pre-rendered SQL.
+		if op.RawSQL != "" {
+			return op.RawSQL
+		}
+		return fmt.Sprintf("-- %s: missing pre-rendered SQL for %s", op.Op, op.Name)
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
