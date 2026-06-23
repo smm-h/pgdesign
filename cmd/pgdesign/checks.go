@@ -67,7 +67,7 @@ func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -87,6 +87,7 @@ func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
 		Suppress:      cfg.Suppress,
 		Extensions:    schema.Extensions,
 		ExtRegistry:   extReg,
+		TypeRegistry:  typeReg,
 	}
 
 	diags, _ := validate.Validate(schema, valCfg)
@@ -134,7 +135,7 @@ func checkNF(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -329,6 +330,11 @@ var designCodes = map[string]bool{
 	"I003": true, // Row size TOAST threshold
 	"W021": true, // Row size exceeds page
 	"I004": true, // Column reordering savings
+	"W027": true, // SM unreachable state
+	"W028": true, // SM dead-end state
+	"E223": true, // SM requires column missing
+	"E224": true, // SM default mismatch
+	"E226": true, // SM reserved trigger prefix
 }
 
 func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
@@ -342,7 +348,7 @@ func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -362,6 +368,7 @@ func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
 		Suppress:      cfg.Suppress,
 		Extensions:    schema.Extensions,
 		ExtRegistry:   extReg,
+		TypeRegistry:  typeReg,
 	}
 
 	diags, _ := validate.Validate(schema, valCfg)
@@ -399,7 +406,7 @@ func checkCoverage(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -441,7 +448,7 @@ func checkStructural(ctx strictcli.CheckContext) strictcli.CheckResult {
 			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
 		}
 	}
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -476,7 +483,7 @@ func checkWorkload(ctx strictcli.CheckContext) strictcli.CheckResult {
 			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
 		}
 	}
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",

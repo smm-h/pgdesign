@@ -9,6 +9,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/fd"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 func TestE201_FKMissingOnDelete(t *testing.T) {
@@ -2939,6 +2940,444 @@ func TestEstimateRowSize_KnownSchema(t *testing.T) {
 	}
 	if padding != 8 {
 		t.Errorf("expected padding 8, got %d", padding)
+	}
+}
+
+// --- State machine validation tests ---
+
+// newSMRegistry creates a semtype registry with a state machine type registered.
+func newSMRegistry(t *testing.T) *semtype.Registry {
+	t.Helper()
+	reg := semtype.NewBuiltinRegistry()
+	smType := semtype.UserTypeDef{
+		Name: "order_status",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
+			{Name: "pending"},
+			{Name: "confirmed"},
+			{Name: "shipped"},
+			{Name: "delivered", Terminal: true},
+		},
+		Transitions: []semtype.UserSMTransition{
+			{Name: "confirm", From: []string{"pending"}, To: "confirmed"},
+			{Name: "ship", From: []string{"confirmed"}, To: "shipped"},
+			{Name: "deliver", From: []string{"shipped"}, To: "delivered"},
+		},
+		InitialState: "pending",
+	}
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{smType})
+	if diags.HasErrors() {
+		t.Fatalf("failed to load SM type: %v", diags)
+	}
+	return reg
+}
+
+func TestW027_SMUnreachableState(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	// SM with an unreachable state "orphan".
+	smType := semtype.UserTypeDef{
+		Name: "flow_status",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
+			{Name: "start"},
+			{Name: "middle"},
+			{Name: "orphan"},
+			{Name: "end", Terminal: true},
+		},
+		Transitions: []semtype.UserSMTransition{
+			{Name: "advance", From: []string{"start"}, To: "middle"},
+			{Name: "finish", From: []string{"middle"}, To: "end"},
+			// No transition leads to "orphan".
+		},
+		InitialState: "start",
+	}
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{smType})
+	if diags.HasErrors() {
+		t.Fatalf("failed to load SM type: %v", diags)
+	}
+
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "items",
+			Schema:  "public",
+			Comment: "Items table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "flow_status", NotNull: true, SemanticTypeName: "flow_status"},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "W027")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 W027 for unreachable state, got %d: %v", len(found), found)
+	}
+	if !strings.Contains(found[0].Message, "orphan") {
+		t.Errorf("expected message to mention 'orphan', got %q", found[0].Message)
+	}
+}
+
+func TestW027_SMNoUnreachableState(t *testing.T) {
+	reg := newSMRegistry(t)
+
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "W027")
+	if len(found) != 0 {
+		t.Errorf("expected no W027 for fully reachable SM, got %d: %v", len(found), found)
+	}
+}
+
+func TestW028_SMDeadEndState(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	// SM with non-terminal "stuck" state that has no outgoing transitions.
+	smType := semtype.UserTypeDef{
+		Name: "task_status",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
+			{Name: "open"},
+			{Name: "stuck"}, // not terminal, no outgoing transitions
+			{Name: "done", Terminal: true},
+		},
+		Transitions: []semtype.UserSMTransition{
+			{Name: "block", From: []string{"open"}, To: "stuck"},
+			{Name: "complete", From: []string{"open"}, To: "done"},
+			// No transition FROM stuck.
+		},
+		InitialState: "open",
+	}
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{smType})
+	if diags.HasErrors() {
+		t.Fatalf("failed to load SM type: %v", diags)
+	}
+
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "tasks",
+			Schema:  "public",
+			Comment: "Tasks table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "task_status", NotNull: true, SemanticTypeName: "task_status"},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "W028")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 W028 for dead-end state, got %d: %v", len(found), found)
+	}
+	if !strings.Contains(found[0].Message, "stuck") {
+		t.Errorf("expected message to mention 'stuck', got %q", found[0].Message)
+	}
+}
+
+func TestW028_SMNoDeadEnd(t *testing.T) {
+	reg := newSMRegistry(t)
+
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "W028")
+	if len(found) != 0 {
+		t.Errorf("expected no W028 for SM with no dead-end states, got %d: %v", len(found), found)
+	}
+}
+
+func TestE223_SMRequiresColumnMissing(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	smType := semtype.UserTypeDef{
+		Name: "payment_status",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
+			{Name: "pending"},
+			{Name: "paid", Terminal: true},
+		},
+		Transitions: []semtype.UserSMTransition{
+			{Name: "pay", From: []string{"pending"}, To: "paid", Requires: map[string]string{
+				"payment_method": "IS NOT NULL",
+			}},
+		},
+		InitialState: "pending",
+	}
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{smType})
+	if diags.HasErrors() {
+		t.Fatalf("failed to load SM type: %v", diags)
+	}
+
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "payments",
+			Schema:  "public",
+			Comment: "Payments table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "payment_status", NotNull: true, SemanticTypeName: "payment_status"},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				// payment_method column is MISSING.
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "E223")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 E223 for missing requires column, got %d: %v", len(found), found)
+	}
+	if !strings.Contains(found[0].Message, "payment_method") {
+		t.Errorf("expected message to mention 'payment_method', got %q", found[0].Message)
+	}
+}
+
+func TestE223_SMRequiresColumnPresent(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	smType := semtype.UserTypeDef{
+		Name: "payment_status",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
+			{Name: "pending"},
+			{Name: "paid", Terminal: true},
+		},
+		Transitions: []semtype.UserSMTransition{
+			{Name: "pay", From: []string{"pending"}, To: "paid", Requires: map[string]string{
+				"payment_method": "IS NOT NULL",
+			}},
+		},
+		InitialState: "pending",
+	}
+	diags := reg.LoadUserTypes([]semtype.UserTypeDef{smType})
+	if diags.HasErrors() {
+		t.Fatalf("failed to load SM type: %v", diags)
+	}
+
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "payments",
+			Schema:  "public",
+			Comment: "Payments table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "payment_status", NotNull: true, SemanticTypeName: "payment_status"},
+				{Name: "payment_method", PGType: "text"},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "E223")
+	if len(found) != 0 {
+		t.Errorf("expected no E223 when required column exists, got %d: %v", len(found), found)
+	}
+}
+
+func TestE224_SMDefaultMismatch(t *testing.T) {
+	reg := newSMRegistry(t)
+
+	wrongDefault := "confirmed"
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status", Default: &wrongDefault},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "E224")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 E224 for default mismatch, got %d: %v", len(found), found)
+	}
+	if !strings.Contains(found[0].Message, "confirmed") {
+		t.Errorf("expected message to mention 'confirmed', got %q", found[0].Message)
+	}
+	if !strings.Contains(found[0].Message, "pending") {
+		t.Errorf("expected message to mention initial state 'pending', got %q", found[0].Message)
+	}
+}
+
+func TestE224_SMDefaultMatchesInitial(t *testing.T) {
+	reg := newSMRegistry(t)
+
+	correctDefault := "pending"
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status", Default: &correctDefault},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "E224")
+	if len(found) != 0 {
+		t.Errorf("expected no E224 when default matches initial state, got %d: %v", len(found), found)
+	}
+}
+
+func TestE224_SMNoDefault(t *testing.T) {
+	reg := newSMRegistry(t)
+
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	config := &Config{TypeRegistry: reg}
+	result, _ := Validate(schema, config)
+	found := findByCode(result, "E224")
+	if len(found) != 0 {
+		t.Errorf("expected no E224 when no default set, got %d: %v", len(found), found)
+	}
+}
+
+func TestE226_SMReservedTriggerPrefix(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+			Triggers: []model.Trigger{
+				{
+					Name:     "_pgdesign_sm_enforce_status",
+					Function: "some_func",
+					Events:   []string{"UPDATE"},
+					Timing:   "BEFORE",
+					ForEach:  "ROW",
+				},
+			},
+		}},
+	}
+
+	result, _ := Validate(schema, nil)
+	found := findByCode(result, "E226")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 E226 for reserved trigger prefix, got %d: %v", len(found), found)
+	}
+	if !strings.Contains(found[0].Message, "_pgdesign_sm_") {
+		t.Errorf("expected message to mention reserved prefix, got %q", found[0].Message)
+	}
+}
+
+func TestE226_SMNoReservedPrefix(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+			Triggers: []model.Trigger{
+				{
+					Name:     "audit_log",
+					Function: "audit_func",
+					Events:   []string{"INSERT"},
+					Timing:   "AFTER",
+					ForEach:  "ROW",
+				},
+			},
+		}},
+	}
+
+	result, _ := Validate(schema, nil)
+	found := findByCode(result, "E226")
+	if len(found) != 0 {
+		t.Errorf("expected no E226 for normal trigger name, got %d: %v", len(found), found)
+	}
+}
+
+func TestSM_NilRegistrySkipsChecks(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			},
+		}},
+	}
+
+	// No TypeRegistry set (nil) -- SM checks should silently skip.
+	config := &Config{}
+	result, _ := Validate(schema, config)
+	for _, d := range result {
+		if d.Code == "W027" || d.Code == "W028" || d.Code == "E223" || d.Code == "E224" {
+			t.Errorf("unexpected SM diagnostic %s when TypeRegistry is nil: %s", d.Code, d.Message)
+		}
 	}
 }
 

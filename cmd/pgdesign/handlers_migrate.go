@@ -21,7 +21,7 @@ import (
 
 func handleMigratePlan(kwargs map[string]interface{}) int {
 	paths := extractPaths(kwargs)
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -180,7 +180,7 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 
 func handleMigrateGenerate(kwargs map[string]interface{}) int {
 	paths := extractPaths(kwargs)
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -890,7 +890,7 @@ func handleMigrateTestShadow(kwargs map[string]interface{}) int {
 	}
 
 	// Build desired schema from TOML.
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}

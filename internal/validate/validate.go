@@ -12,6 +12,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sqlexpr"
 	"github.com/smm-h/pgdesign/internal/sqlutil"
 )
@@ -26,6 +27,7 @@ type Config struct {
 	CascadeMaxBreadth int                   // default 5
 	Extensions        []string              // declared extensions (from meta)
 	ExtRegistry       *extregistry.Registry
+	TypeRegistry      *semtype.Registry     // semantic type registry (for state machine checks)
 }
 
 // SuppressedDiagnostic pairs a diagnostic with the reason it was suppressed.
@@ -119,6 +121,11 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W019", checkRangeSubsumption},
 		{"I002", checkDeadColumn},
 		{"I003", checkRowSize},
+		{"W027", checkSMUnreachableState},
+		{"W028", checkSMDeadEndState},
+		{"E223", checkSMRequiresColumn},
+		{"E224", checkSMDefaultMismatch},
+		{"E226", checkSMReservedTriggerPrefix},
 	}
 
 	for _, r := range rules {
@@ -2581,6 +2588,207 @@ func checkRowSize(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 				Message:    fmt.Sprintf("column reordering could save %d bytes per row (current: %d, optimal: %d)", currentSize-optimalSize, currentSize, optimalSize),
 				Suggestion: "Reorder columns by alignment (8-byte, 4-byte, 2-byte, 1-byte) to minimize padding",
 			})
+		}
+	}
+	return diags
+}
+
+// --- State machine checks ---
+
+// smColumnsForTable returns (column, typeDef) pairs for SM columns on a table.
+func smColumnsForTable(t model.Table, config *Config) []struct {
+	Col model.Column
+	TD  *semtype.TypeDef
+} {
+	if config.TypeRegistry == nil {
+		return nil
+	}
+	var result []struct {
+		Col model.Column
+		TD  *semtype.TypeDef
+	}
+	for _, col := range t.Columns {
+		if model.IsStateMachineColumn(col, config.TypeRegistry) {
+			td, _ := config.TypeRegistry.Resolve(col.SemanticTypeName)
+			result = append(result, struct {
+				Col model.Column
+				TD  *semtype.TypeDef
+			}{col, td})
+		}
+	}
+	return result
+}
+
+// checkSMUnreachableState (W027): state not reachable from initial state via transitions.
+func checkSMUnreachableState(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	if config.TypeRegistry == nil {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+
+	// Collect unique SM types to avoid checking the same type multiple times.
+	checked := make(map[string]bool)
+
+	for _, t := range schema.Tables {
+		for _, pair := range smColumnsForTable(t, config) {
+			td := pair.TD
+			if checked[td.Name] {
+				continue
+			}
+			checked[td.Name] = true
+
+			// BFS from initial state.
+			reachable := make(map[string]bool)
+			queue := []string{td.InitialState}
+			reachable[td.InitialState] = true
+			for len(queue) > 0 {
+				current := queue[0]
+				queue = queue[1:]
+				for _, tr := range td.Transitions {
+					for _, from := range tr.From {
+						if from == current && !reachable[tr.To] {
+							reachable[tr.To] = true
+							queue = append(queue, tr.To)
+						}
+					}
+				}
+			}
+
+			// Report unreachable states.
+			for _, s := range td.States {
+				if !reachable[s.Name] {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Warning,
+						Code:       "W027",
+						Message:    fmt.Sprintf("state machine %q: state %q is unreachable from initial state %q", td.Name, s.Name, td.InitialState),
+						Suggestion: "Add a transition leading to this state, or remove it",
+					})
+				}
+			}
+		}
+	}
+	return diags
+}
+
+// checkSMDeadEndState (W028): non-terminal state has no outgoing transitions.
+func checkSMDeadEndState(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	if config.TypeRegistry == nil {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+
+	checked := make(map[string]bool)
+
+	for _, t := range schema.Tables {
+		for _, pair := range smColumnsForTable(t, config) {
+			td := pair.TD
+			if checked[td.Name] {
+				continue
+			}
+			checked[td.Name] = true
+
+			// Build set of states that appear in From of some transition.
+			hasOutgoing := make(map[string]bool)
+			for _, tr := range td.Transitions {
+				for _, from := range tr.From {
+					hasOutgoing[from] = true
+				}
+			}
+
+			for _, s := range td.States {
+				if s.Terminal {
+					continue
+				}
+				if !hasOutgoing[s.Name] {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Warning,
+						Code:       "W028",
+						Message:    fmt.Sprintf("state machine %q: non-terminal state %q has no outgoing transitions", td.Name, s.Name),
+						Suggestion: "Mark this state as terminal, or add a transition from it",
+					})
+				}
+			}
+		}
+	}
+	return diags
+}
+
+// checkSMRequiresColumn (E223): transition requires a column that doesn't exist on the table.
+func checkSMRequiresColumn(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	if config.TypeRegistry == nil {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+
+	for _, t := range schema.Tables {
+		colSet := make(map[string]bool, len(t.Columns))
+		for _, col := range t.Columns {
+			colSet[col.Name] = true
+		}
+
+		for _, pair := range smColumnsForTable(t, config) {
+			td := pair.TD
+			for _, tr := range td.Transitions {
+				for reqCol := range tr.Requires {
+					if !colSet[reqCol] {
+						diags = append(diags, diagnostic.Diagnostic{
+							Severity:   diagnostic.Error,
+							Code:       "E223",
+							Table:      t.Name,
+							Message:    fmt.Sprintf("state machine %q transition %q requires column %q which does not exist on table %q", td.Name, tr.Name, reqCol, t.Name),
+							Suggestion: "Add the required column to the table, or remove it from the transition requires",
+						})
+					}
+				}
+			}
+		}
+	}
+	return diags
+}
+
+// checkSMDefaultMismatch (E224): column default doesn't match the SM's initial state.
+func checkSMDefaultMismatch(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	if config.TypeRegistry == nil {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+
+	for _, t := range schema.Tables {
+		for _, pair := range smColumnsForTable(t, config) {
+			col := pair.Col
+			td := pair.TD
+			if col.Default == nil {
+				continue
+			}
+			if *col.Default != td.InitialState {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E224",
+					Table:      t.Name,
+					Column:     col.Name,
+					Message:    fmt.Sprintf("column default %q does not match state machine %q initial state %q", *col.Default, td.Name, td.InitialState),
+					Suggestion: fmt.Sprintf("Set the default to %q, or change the initial state", td.InitialState),
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// checkSMReservedTriggerPrefix (E226): user trigger uses reserved SM prefix.
+func checkSMReservedTriggerPrefix(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		for _, trig := range t.Triggers {
+			if strings.HasPrefix(trig.Name, "_pgdesign_sm_") {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E226",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("trigger %q uses reserved prefix \"_pgdesign_sm_\"", trig.Name),
+					Suggestion: "Rename the trigger to avoid the reserved prefix",
+				})
+			}
 		}
 	}
 	return diags

@@ -378,11 +378,11 @@ func collectUserTypes(raw *parse.RawSchema) []semtype.UserTypeDef {
 
 // parseAndBuild is a shared helper for commands that need a resolved schema.
 // It accepts one or more paths (files or a directory) and returns the built schema.
-func parseAndBuild(paths []string) (*model.Schema, int) {
+func parseAndBuild(paths []string) (*model.Schema, *semtype.Registry, int) {
 	resolvedPaths, err := resolveSchemaPaths(paths)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return nil, 1
+		return nil, nil, 1
 	}
 
 	var raws []*parse.RawSchema
@@ -402,7 +402,7 @@ func parseAndBuild(paths []string) (*model.Schema, int) {
 
 	if len(raws) == 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(parseDiags, true))
-		return nil, 1
+		return nil, nil, 1
 	}
 
 	// Print parse warnings/info but continue.
@@ -426,7 +426,7 @@ func parseAndBuild(paths []string) (*model.Schema, int) {
 			loadDiags := reg.LoadUserTypes(userTypes)
 			if loadDiags.HasErrors() {
 				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(loadDiags, true))
-				return nil, 1
+				return nil, nil, 1
 			}
 		}
 	}
@@ -442,7 +442,7 @@ func parseAndBuild(paths []string) (*model.Schema, int) {
 
 	if buildDiags.HasErrors() {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(buildDiags, true))
-		return nil, 1
+		return nil, nil, 1
 	}
 
 	warnings := buildDiags.Warnings()
@@ -450,7 +450,7 @@ func parseAndBuild(paths []string) (*model.Schema, int) {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(warnings, true))
 	}
 
-	return schema, 0
+	return schema, reg, 0
 }
 
 // nfViolationCodes are the audit diagnostic codes for normal form violations.

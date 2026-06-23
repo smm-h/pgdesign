@@ -20,7 +20,7 @@ import (
 
 func handleDiff(kwargs map[string]interface{}) int {
 	paths := extractPaths(kwargs)
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -115,7 +115,8 @@ func diffLive(paths []string, schema *model.Schema, dbURL string) (*model.Schema
 
 // diffAgainst parses a TOML schema from the --against path and returns the "actual" schema.
 func diffAgainst(againstPath string) (*model.Schema, int) {
-	return parseAndBuild([]string{againstPath})
+	schema, _, exitCode := parseAndBuild([]string{againstPath})
+	return schema, exitCode
 }
 
 // diffBase extracts schema files from a git ref and returns the parsed/built "actual" schema.

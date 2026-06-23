@@ -13,7 +13,7 @@ import (
 
 func handleSeed(kwargs map[string]interface{}) int {
 	paths := extractPaths(kwargs)
-	schema, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
