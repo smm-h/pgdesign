@@ -233,6 +233,24 @@ func (r *Registry) Resolve(name string) (*TypeDef, error) {
 	return td, nil
 }
 
+// StateMachineTypes returns all registered state machine type definitions,
+// sorted by name for deterministic output.
+func (r *Registry) StateMachineTypes() []*TypeDef {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var result []*TypeDef
+	for _, td := range r.types {
+		if td.Kind == KindStateMachine {
+			result = append(result, td)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
 // UserSMState represents a state in a user-defined state machine type.
 type UserSMState struct {
 	Name     string

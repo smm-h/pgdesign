@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 // reservedWords is a set of common PostgreSQL reserved words that require quoting.
@@ -901,6 +902,123 @@ func CreateAppendOnlyTrigger(schemaName, tableName string) string {
 	qualifiedFunc := QualifiedName(schemaName, "pgdesign_deny_mutation")
 	return fmt.Sprintf("CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
 		qualifiedTable, qualifiedFunc)
+}
+
+// StateMachineTriggerFuncName returns the reserved function name for a state machine
+// enforcement trigger: _pgdesign_sm_<table>_<col>.
+func StateMachineTriggerFuncName(tableName, colName string) string {
+	return "_pgdesign_sm_" + tableName + "_" + colName
+}
+
+// CreateStateMachineTriggerFunction generates a PL/pgSQL function that enforces
+// state machine transitions on a column. It checks that each UPDATE of the column
+// follows a valid transition and that any required columns are non-null.
+func CreateStateMachineTriggerFunction(schemaName, tableName, colName string, transitions []semtype.SMTransitionDef) string {
+	funcName := StateMachineTriggerFuncName(tableName, colName)
+	qualifiedFunc := QualifiedName(schemaName, funcName)
+	quotedCol := QuoteIdent(colName)
+
+	// Group transitions by from-state: from -> set of to-states.
+	type fromGroup struct {
+		toStates []string
+	}
+	fromMap := make(map[string]*fromGroup)
+	var fromOrder []string
+	for _, tr := range transitions {
+		for _, from := range tr.From {
+			g, ok := fromMap[from]
+			if !ok {
+				g = &fromGroup{}
+				fromMap[from] = g
+				fromOrder = append(fromOrder, from)
+			}
+			// Add to-state if not already present.
+			found := false
+			for _, ts := range g.toStates {
+				if ts == tr.To {
+					found = true
+					break
+				}
+			}
+			if !found {
+				g.toStates = append(g.toStates, tr.To)
+			}
+		}
+	}
+	sort.Strings(fromOrder)
+
+	// Build the valid-transition check lines.
+	var transitionLines []string
+	for _, from := range fromOrder {
+		g := fromMap[from]
+		sort.Strings(g.toStates)
+		quotedTo := make([]string, len(g.toStates))
+		for i, ts := range g.toStates {
+			quotedTo[i] = "'" + strings.ReplaceAll(ts, "'", "''") + "'"
+		}
+		escapedFrom := strings.ReplaceAll(from, "'", "''")
+		transitionLines = append(transitionLines,
+			fmt.Sprintf("      (OLD.%s = '%s' AND NEW.%s IN (%s))",
+				quotedCol, escapedFrom, quotedCol, strings.Join(quotedTo, ", ")))
+	}
+
+	// Build the requires-column checks.
+	var requiresChecks []string
+	for _, tr := range transitions {
+		if len(tr.Requires) == 0 {
+			continue
+		}
+		// Sort required columns for deterministic output.
+		reqCols := make([]string, 0, len(tr.Requires))
+		for col := range tr.Requires {
+			reqCols = append(reqCols, col)
+		}
+		sort.Strings(reqCols)
+		for _, reqCol := range reqCols {
+			for _, from := range tr.From {
+				escapedFrom := strings.ReplaceAll(from, "'", "''")
+				escapedTo := strings.ReplaceAll(tr.To, "'", "''")
+				escapedName := strings.ReplaceAll(tr.Name, "'", "''")
+				requiresChecks = append(requiresChecks,
+					fmt.Sprintf("    IF OLD.%s = '%s' AND NEW.%s = '%s' AND NEW.%s IS NULL THEN\n"+
+						"      RAISE EXCEPTION 'transition %s requires non-null %s'\n"+
+						"        USING ERRCODE = 'P0001';\n"+
+						"    END IF;",
+						quotedCol, escapedFrom, quotedCol, escapedTo,
+						QuoteIdent(reqCol), escapedName, reqCol))
+			}
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s() RETURNS trigger AS $pgdesign$\n", qualifiedFunc))
+	sb.WriteString("BEGIN\n")
+	sb.WriteString(fmt.Sprintf("  IF OLD.%s IS DISTINCT FROM NEW.%s THEN\n", quotedCol, quotedCol))
+	sb.WriteString("    IF NOT (\n")
+	sb.WriteString(strings.Join(transitionLines, " OR\n"))
+	sb.WriteString("\n    ) THEN\n")
+	sb.WriteString(fmt.Sprintf("      RAISE EXCEPTION 'invalid state transition: %%s -> %%s', OLD.%s, NEW.%s\n", quotedCol, quotedCol))
+	sb.WriteString("        USING ERRCODE = 'P0001';\n")
+	sb.WriteString("    END IF;\n")
+	for _, check := range requiresChecks {
+		sb.WriteString(check)
+		sb.WriteString("\n")
+	}
+	sb.WriteString("  END IF;\n")
+	sb.WriteString("  RETURN NEW;\n")
+	sb.WriteString("END;\n")
+	sb.WriteString("$pgdesign$ LANGUAGE plpgsql;")
+	return sb.String()
+}
+
+// CreateStateMachineTrigger generates a CREATE TRIGGER statement that fires BEFORE
+// UPDATE OF <col> to enforce state machine transitions.
+func CreateStateMachineTrigger(schemaName, tableName, colName string) string {
+	trigName := StateMachineTriggerFuncName(tableName, colName)
+	qualifiedTable := QualifiedName(schemaName, tableName)
+	qualifiedFunc := QualifiedName(schemaName, trigName)
+	return fmt.Sprintf("CREATE TRIGGER %s BEFORE UPDATE OF %s ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
+		QuoteIdent(trigName), QuoteIdent(colName), qualifiedTable, qualifiedFunc)
 }
 
 // CreateTrigger generates a CREATE [CONSTRAINT] TRIGGER statement for a user-defined trigger.
