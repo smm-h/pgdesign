@@ -1,0 +1,50 @@
+[meta]
+version = 1
+schema = "shop"
+extensions = ["pgcrypto"]
+
+[tables.customers]
+comment = "Registered customers"
+
+[tables.customers.columns.id]
+type = "id"
+
+[tables.customers.columns.name]
+type = "short_text"
+comment = "Full name"
+
+[tables.customers.columns.email]
+type = "email"
+
+[tables.customers.columns.created_at]
+type = "timestamp"
+
+[tables.customers.unique.uq_customers_email]
+columns = ["email"]
+
+[tables.orders]
+comment = "Customer orders"
+
+[tables.orders.columns.id]
+type = "id"
+
+[tables.orders.columns.customer_id]
+type = "ref"
+
+[tables.orders.columns.total]
+type = "money"
+
+[tables.orders.columns.created_at]
+type = "timestamp"
+
+[tables.orders.fks.fk_orders_customers]
+columns = ["customer_id"]
+ref_table = "customers"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.orders.checks.ck_orders_positive_total]
+expr = "total >= 0"
+
+[tables.orders.indexes.idx_orders_customer]
+columns = ["customer_id"]
