@@ -2497,12 +2497,120 @@ func TestW019_RangeSubsumption(t *testing.T) {
 	if len(found) == 0 {
 		t.Fatal("expected W019 for range subsumption")
 	}
-	// The wider range [0,200] subsumes the narrower [1,50], so chk_age_narrow is reported redundant.
-	if !strings.Contains(found[0].Message, "chk_age_narrow") {
-		t.Errorf("expected message to mention 'chk_age_narrow' as redundant, got: %s", found[0].Message)
-	}
+	// The wider range [0,200] is redundant because the stricter [1,50] already enforces the range.
 	if !strings.Contains(found[0].Message, "chk_age_wide") {
-		t.Errorf("expected message to mention 'chk_age_wide' as the subsumer, got: %s", found[0].Message)
+		t.Errorf("expected message to mention 'chk_age_wide' as redundant, got: %s", found[0].Message)
+	}
+	if !strings.Contains(found[0].Message, "chk_age_narrow") {
+		t.Errorf("expected message to mention 'chk_age_narrow' as the stricter constraint, got: %s", found[0].Message)
+	}
+}
+
+func TestW019_OpenEndedRange(t *testing.T) {
+	// age >= 0 (open-ended high) subsumes age >= 0 AND age <= 200.
+	// The open-ended constraint is wider and should be flagged redundant.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "people", Schema: "public", Comment: "People", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "age", PGType: "integer", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_age_positive", Expr: "age >= 0"},
+					{Name: "chk_age_bounded", Expr: "age >= 0 AND age <= 200"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W019")
+	if len(found) == 0 {
+		t.Fatal("expected W019 for open-ended range subsumption")
+	}
+	if !strings.Contains(found[0].Message, "chk_age_positive") {
+		t.Errorf("expected open-ended 'chk_age_positive' to be flagged as wider/redundant, got: %s", found[0].Message)
+	}
+}
+
+func TestW019_NonInclusiveBounds(t *testing.T) {
+	// age > 0 AND age < 100 is subsumed by age >= 0 AND age <= 100 (wider).
+	// The wider constraint should be flagged redundant.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "score", PGType: "integer", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_score_wide", Expr: "score >= 0 AND score <= 100"},
+					{Name: "chk_score_strict", Expr: "score > 0 AND score < 100"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W019")
+	if len(found) == 0 {
+		t.Fatal("expected W019 for non-inclusive bound subsumption")
+	}
+	if !strings.Contains(found[0].Message, "chk_score_wide") {
+		t.Errorf("expected 'chk_score_wide' to be flagged as wider/redundant, got: %s", found[0].Message)
+	}
+}
+
+func TestW019_NegativeNumbers(t *testing.T) {
+	// balance >= -1000 AND balance <= 1000 subsumes balance >= -500 AND balance <= 500.
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "accounts", Schema: "public", Comment: "Accounts", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "balance", PGType: "numeric", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_balance_wide", Expr: "balance >= -1000 AND balance <= 1000"},
+					{Name: "chk_balance_narrow", Expr: "balance >= -500 AND balance <= 500"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W019")
+	if len(found) == 0 {
+		t.Fatal("expected W019 for negative number range subsumption")
+	}
+	if !strings.Contains(found[0].Message, "chk_balance_wide") {
+		t.Errorf("expected 'chk_balance_wide' to be flagged as wider/redundant, got: %s", found[0].Message)
+	}
+}
+
+func TestW019_EqualRanges_NoRedundancy(t *testing.T) {
+	// Two constraints with identical bounds are not redundant (neither is strictly wider).
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "qty", PGType: "integer", NotNull: true},
+				},
+				Checks: []model.CheckConstraint{
+					{Name: "chk_qty_a", Expr: "qty >= 0 AND qty <= 100"},
+					{Name: "chk_qty_b", Expr: "qty >= 0 AND qty <= 100"},
+				},
+			},
+		},
+	}
+	diags, _ := Validate(schema, nil)
+	for _, d := range diags {
+		if d.Code == "W019" {
+			t.Fatalf("unexpected W019 for equal ranges: %v", d)
+		}
 	}
 }
 

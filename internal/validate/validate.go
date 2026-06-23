@@ -1867,8 +1867,8 @@ func checkRangeSubsumption(schema *model.Schema, _ *Config) []diagnostic.Diagnos
 						Severity:   diagnostic.Warning,
 						Code:       "W019",
 						Table:      t.Name,
-						Message:    fmt.Sprintf("redundant CHECK %q: subsumed by %q on column %q", rj.name, ri.name, ri.rng.Column),
-						Suggestion: "Drop the narrower constraint or merge the checks",
+						Message:    fmt.Sprintf("redundant CHECK %q: wider range subsumed by stricter %q on column %q", ri.name, rj.name, ri.rng.Column),
+						Suggestion: "Drop the wider constraint; the stricter one already enforces the range",
 					})
 				}
 			}
