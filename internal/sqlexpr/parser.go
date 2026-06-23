@@ -42,13 +42,12 @@
 //
 // The following keywords are recognized (case-insensitive): OR, AND, NOT, IS,
 // NULL, DISTINCT, FROM, IN, BETWEEN, LIKE, ILIKE, EXISTS, SELECT, WHERE, CASE,
-// WHEN, THEN, ELSE, END, TRUE, FALSE.
+// WHEN, THEN, ELSE, END, TRUE, FALSE, CAST, AS.
 //
 // # Limitations
 //
 //   - No full SELECT statements; only simple SELECT inside EXISTS with FROM and
 //     optional WHERE.
-//   - No CAST(x AS type) syntax; only the :: cast operator.
 //   - No window functions, CTEs (WITH), or aggregate DISTINCT (e.g.,
 //     COUNT(DISTINCT x)).
 //   - No ORDER BY, GROUP BY, HAVING, or LIMIT.
@@ -395,6 +394,36 @@ func (p *parser) parseCast() (Node, error) {
 	return node, nil
 }
 
+// parseCastFunc parses CAST(expr AS type) syntax.
+func (p *parser) parseCastFunc() (Node, error) {
+	p.advance() // consume CAST
+
+	if _, err := p.expect(tokenLParen); err != nil {
+		return nil, &ParseError{Pos: p.current().pos, Token: p.current().value, Msg: "expected '(' after CAST"}
+	}
+
+	inner, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	if !p.isKeyword("AS") {
+		return nil, &ParseError{Pos: p.current().pos, Token: p.current().value, Msg: "expected AS in CAST expression"}
+	}
+	p.advance() // consume AS
+
+	typeTok, err := p.expect(tokenIdent)
+	if err != nil {
+		return nil, &ParseError{Pos: p.current().pos, Token: p.current().value, Msg: "expected type name after AS in CAST"}
+	}
+
+	if _, err := p.expect(tokenRParen); err != nil {
+		return nil, &ParseError{Pos: p.current().pos, Token: p.current().value, Msg: "expected ')' to close CAST"}
+	}
+
+	return &Cast{Expr: inner, TypeName: typeTok.value}, nil
+}
+
 func (p *parser) parsePrimary() (Node, error) {
 	tok := p.current()
 
@@ -465,6 +494,11 @@ func (p *parser) parsePrimary() (Node, error) {
 		// CASE
 		if lower == "case" {
 			return p.parseCaseExpr()
+		}
+
+		// CAST(expr AS type)
+		if lower == "cast" {
+			return p.parseCastFunc()
 		}
 
 		// identifier: could be column ref, qualified name, or function call

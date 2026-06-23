@@ -306,6 +306,58 @@ func TestParseCast(t *testing.T) {
 		c := assertCast(t, node, "uuid")
 		assertColumnRef(t, c.Expr, "x")
 	})
+
+	t.Run("CAST_text", func(t *testing.T) {
+		node, err := Parse("CAST(x AS text)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := assertCast(t, node, "text")
+		assertColumnRef(t, c.Expr, "x")
+	})
+
+	t.Run("CAST_integer", func(t *testing.T) {
+		node, err := Parse("CAST(price AS integer)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := assertCast(t, node, "integer")
+		assertColumnRef(t, c.Expr, "price")
+	})
+
+	t.Run("CAST_lowercase", func(t *testing.T) {
+		node, err := Parse("cast(x as uuid)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := assertCast(t, node, "uuid")
+		assertColumnRef(t, c.Expr, "x")
+	})
+
+	t.Run("CAST_nested_expr", func(t *testing.T) {
+		node, err := Parse("CAST(x + 1 AS integer)")
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := assertCast(t, node, "integer")
+		if _, ok := c.Expr.(*BinaryOp); !ok {
+			t.Fatalf("expected *BinaryOp inside CAST, got %T", c.Expr)
+		}
+	})
+
+	t.Run("CAST_missing_paren", func(t *testing.T) {
+		_, err := Parse("CAST x AS text)")
+		if err == nil {
+			t.Fatal("expected error for missing '(' after CAST")
+		}
+	})
+
+	t.Run("CAST_missing_AS", func(t *testing.T) {
+		_, err := Parse("CAST(x text)")
+		if err == nil {
+			t.Fatal("expected error for missing AS in CAST")
+		}
+	})
 }
 
 func TestParseFuncCall(t *testing.T) {
