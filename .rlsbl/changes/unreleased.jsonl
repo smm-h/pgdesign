@@ -13,3 +13,4 @@
 {"commits":["7e92d8e899dd40728a0abeee3bef76b94968e780"],"user_facing":true,"description":"**New feature.** `CAST(x AS type)` syntax support in sqlexpr parser.","type":"feature"}
 {"commits":["73757d2d5d04804770485a5a5f7d4a2d73c35796"],"user_facing":true,"description":"**New feature.** Zig testdb template rewritten against pg.zig 0.16 API.","type":"feature"}
 {"commits":["4fc5b81e5ba89f461f4bb872ef4e4ca335e98cd9"],"user_facing":true,"description":"**New feature.** Config `validModes` derived from codegen registry for lang-mode pair validation.","type":"feature"}
+{"commits":["a6b4b4a7947828488d90013dc8b6e7e75bb954c9"],"user_facing":true,"description":"**New feature.** `ExtractConstraints` now includes domain-backed CHECK constraints via `DomainBaseTypes` mapping.","type":"feature"}
