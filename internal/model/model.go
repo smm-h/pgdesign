@@ -25,12 +25,23 @@ import (
 	"github.com/smm-h/pgdesign/internal/fd"
 )
 
+// NamedTransition holds a single named state machine transition with its
+// metadata. Used by codegen to generate per-transition methods.
+type NamedTransition struct {
+	Name     string            // transition name (e.g., "suspend")
+	From     []string          // source states
+	To       string            // target state
+	Requires map[string]string // required params: field name -> PG type
+}
+
 // SMTransitionMap holds the allowed transitions for a state machine type.
 // Keys are source state names, values are the set of reachable target states.
 type SMTransitionMap struct {
-	TypeName    string              // PascalCase-friendly type name (e.g., "order_status")
-	Transitions map[string][]string // from-state -> []to-state, sorted deterministically
-	States      []string            // all states in declaration order
+	TypeName          string              // PascalCase-friendly type name (e.g., "order_status")
+	Transitions       map[string][]string // from-state -> []to-state, sorted deterministically
+	States            []string            // all states in declaration order
+	NamedTransitions  []NamedTransition   // named transitions with metadata (for codegen)
+	EnforceTrigger    bool                // whether to generate transition-enforcement trigger
 }
 
 // Schema is the top-level resolved schema.

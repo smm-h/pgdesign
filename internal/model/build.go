@@ -1168,10 +1168,32 @@ func resolveStateMachineTransitions(raw *parse.RawSchema, reg *semtype.Registry)
 			transMap[from] = deduped
 		}
 
+		// Build named transitions for codegen.
+		var namedTrans []NamedTransition
+		for _, tr := range td.Transitions {
+			nt := NamedTransition{
+				Name: tr.Name,
+				From: tr.From,
+				To:   tr.To,
+			}
+			if len(tr.Requires) > 0 {
+				nt.Requires = make(map[string]string, len(tr.Requires))
+				for k, v := range tr.Requires {
+					nt.Requires[k] = v
+				}
+			}
+			namedTrans = append(namedTrans, nt)
+		}
+		sort.Slice(namedTrans, func(i, j int) bool {
+			return namedTrans[i].Name < namedTrans[j].Name
+		})
+
 		result = append(result, SMTransitionMap{
-			TypeName:    td.Name,
-			Transitions: transMap,
-			States:      td.EnumValues,
+			TypeName:         td.Name,
+			Transitions:      transMap,
+			States:           td.EnumValues,
+			NamedTransitions: namedTrans,
+			EnforceTrigger:   td.EnforceTrigger,
 		})
 	}
 	return result
