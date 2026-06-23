@@ -213,6 +213,39 @@ func collectUserTypes(raw *parse.RawSchema) []semtype.UserTypeDef {
 		if rt.Comment != nil {
 			ut.Comment = *rt.Comment
 		}
+		// State machine fields
+		if rt.InitialState != nil {
+			ut.InitialState = *rt.InitialState
+		}
+		if rt.EnforceTrigger != nil {
+			ut.EnforceTrigger = *rt.EnforceTrigger
+		}
+		if len(rt.States) > 0 {
+			for name, s := range rt.States {
+				us := semtype.UserSMState{Name: name}
+				if s.Terminal != nil {
+					us.Terminal = *s.Terminal
+				}
+				if s.Comment != nil {
+					us.Comment = *s.Comment
+				}
+				ut.States = append(ut.States, us)
+			}
+		}
+		for _, tr := range rt.Transitions {
+			utTr := semtype.UserSMTransition{
+				Name: tr.Name,
+				From: tr.From,
+				To:   tr.To,
+			}
+			if tr.Requires != nil {
+				utTr.Requires = tr.Requires
+			}
+			if tr.Comment != nil {
+				utTr.Comment = *tr.Comment
+			}
+			ut.Transitions = append(ut.Transitions, utTr)
+		}
 		userTypes = append(userTypes, ut)
 	}
 	return userTypes
