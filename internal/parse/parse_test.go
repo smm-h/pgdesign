@@ -2326,6 +2326,177 @@ default = "true"
 	}
 }
 
+func TestStateMachineTypeParsing(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[types.order_status]
+kind = "state_machine"
+initial = "pending"
+enforce = true
+
+[types.order_status.states.pending]
+comment = "Order created"
+
+[types.order_status.states.processing]
+
+[types.order_status.states.shipped]
+
+[types.order_status.states.delivered]
+terminal = true
+
+[types.order_status.states.cancelled]
+terminal = true
+comment = "Order was cancelled"
+
+[[types.order_status.transitions]]
+name = "start_processing"
+from = ["pending"]
+to = "processing"
+
+[[types.order_status.transitions]]
+name = "ship"
+from = ["processing"]
+to = "shipped"
+
+[[types.order_status.transitions]]
+name = "deliver"
+from = ["shipped"]
+to = "delivered"
+
+[[types.order_status.transitions]]
+name = "cancel"
+from = ["pending", "processing"]
+to = "cancelled"
+requires = { reason = "text" }
+comment = "Cancel the order"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	if len(schema.Types) != 1 {
+		t.Fatalf("expected 1 type, got %d", len(schema.Types))
+	}
+
+	rt := schema.Types[0]
+	if rt.Name != "order_status" {
+		t.Errorf("type name = %q, want %q", rt.Name, "order_status")
+	}
+	if rt.Kind != "state_machine" {
+		t.Errorf("type kind = %q, want %q", rt.Kind, "state_machine")
+	}
+	if rt.InitialState == nil || *rt.InitialState != "pending" {
+		t.Errorf("initial = %v, want %q", rt.InitialState, "pending")
+	}
+	if rt.EnforceTrigger == nil || !*rt.EnforceTrigger {
+		t.Errorf("enforce = %v, want true", rt.EnforceTrigger)
+	}
+
+	// States
+	if len(rt.States) != 5 {
+		t.Fatalf("states count = %d, want 5", len(rt.States))
+	}
+	pendingState, ok := rt.States["pending"]
+	if !ok {
+		t.Fatal("expected state 'pending'")
+	}
+	if pendingState.Comment == nil || *pendingState.Comment != "Order created" {
+		t.Errorf("pending.comment = %v, want %q", pendingState.Comment, "Order created")
+	}
+	if pendingState.Terminal != nil {
+		t.Errorf("pending.terminal should be nil, got %v", pendingState.Terminal)
+	}
+
+	deliveredState, ok := rt.States["delivered"]
+	if !ok {
+		t.Fatal("expected state 'delivered'")
+	}
+	if deliveredState.Terminal == nil || !*deliveredState.Terminal {
+		t.Errorf("delivered.terminal = %v, want true", deliveredState.Terminal)
+	}
+
+	cancelledState, ok := rt.States["cancelled"]
+	if !ok {
+		t.Fatal("expected state 'cancelled'")
+	}
+	if cancelledState.Terminal == nil || !*cancelledState.Terminal {
+		t.Errorf("cancelled.terminal = %v, want true", cancelledState.Terminal)
+	}
+	if cancelledState.Comment == nil || *cancelledState.Comment != "Order was cancelled" {
+		t.Errorf("cancelled.comment = %v, want %q", cancelledState.Comment, "Order was cancelled")
+	}
+
+	// Transitions
+	if len(rt.Transitions) != 4 {
+		t.Fatalf("transitions count = %d, want 4", len(rt.Transitions))
+	}
+	tr0 := rt.Transitions[0]
+	if tr0.Name != "start_processing" {
+		t.Errorf("transitions[0].name = %q, want %q", tr0.Name, "start_processing")
+	}
+	if len(tr0.From) != 1 || tr0.From[0] != "pending" {
+		t.Errorf("transitions[0].from = %v, want [pending]", tr0.From)
+	}
+	if tr0.To != "processing" {
+		t.Errorf("transitions[0].to = %q, want %q", tr0.To, "processing")
+	}
+
+	tr3 := rt.Transitions[3]
+	if tr3.Name != "cancel" {
+		t.Errorf("transitions[3].name = %q, want %q", tr3.Name, "cancel")
+	}
+	if len(tr3.From) != 2 || tr3.From[0] != "pending" || tr3.From[1] != "processing" {
+		t.Errorf("transitions[3].from = %v, want [pending processing]", tr3.From)
+	}
+	if tr3.To != "cancelled" {
+		t.Errorf("transitions[3].to = %q, want %q", tr3.To, "cancelled")
+	}
+	if tr3.Requires == nil || tr3.Requires["reason"] != "text" {
+		t.Errorf("transitions[3].requires = %v, want {reason: text}", tr3.Requires)
+	}
+	if tr3.Comment == nil || *tr3.Comment != "Cancel the order" {
+		t.Errorf("transitions[3].comment = %v, want %q", tr3.Comment, "Cancel the order")
+	}
+}
+
+func TestStateMachineTypeParsing_TransitionMissingRequired(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "test"
+
+[types.bad_sm]
+kind = "state_machine"
+initial = "a"
+
+[types.bad_sm.states.a]
+[types.bad_sm.states.b]
+
+[[types.bad_sm.transitions]]
+comment = "missing name, from, to"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+
+	// Should have E011 errors for missing name, from, to.
+	e011Count := 0
+	for _, d := range diags {
+		if d.Code == "E011" && d.Severity == diagnostic.Error {
+			e011Count++
+		}
+	}
+	if e011Count < 3 {
+		t.Errorf("expected at least 3 E011 errors (name, from, to), got %d; diags: %v", e011Count, diags)
+	}
+}
+
 // hasFatalErrors returns true if any diagnostic is an error (not warning/info).
 func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {

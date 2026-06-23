@@ -833,3 +833,403 @@ func TestCompositeTypeDefsEqual(t *testing.T) {
 		t.Error("typeDefsEqual returned true for composite types with different field names")
 	}
 }
+
+func TestLoadStateMachineType(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "order_status",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "pending", Comment: "Order created"},
+				{Name: "processing"},
+				{Name: "shipped"},
+				{Name: "delivered", Terminal: true},
+				{Name: "cancelled", Terminal: true},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "start_processing", From: []string{"pending"}, To: "processing"},
+				{Name: "ship", From: []string{"processing"}, To: "shipped"},
+				{Name: "deliver", From: []string{"shipped"}, To: "delivered"},
+				{Name: "cancel", From: []string{"pending", "processing"}, To: "cancelled",
+					Requires: map[string]string{"reason": "text"}, Comment: "Cancel with reason"},
+			},
+			InitialState:   "pending",
+			EnforceTrigger: true,
+			Comment:        "Order lifecycle",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("order_status")
+	if err != nil {
+		t.Fatalf("Resolve(order_status) error: %v", err)
+	}
+	if td.Kind != KindStateMachine {
+		t.Errorf("Kind = %v, want KindStateMachine", td.Kind)
+	}
+	if td.BaseType != "order_status" {
+		t.Errorf("BaseType = %q, want %q", td.BaseType, "order_status")
+	}
+	if td.InitialState != "pending" {
+		t.Errorf("InitialState = %q, want %q", td.InitialState, "pending")
+	}
+	if !td.EnforceTrigger {
+		t.Error("EnforceTrigger = false, want true")
+	}
+	if td.Comment != "Order lifecycle" {
+		t.Errorf("Comment = %q, want %q", td.Comment, "Order lifecycle")
+	}
+
+	// EnumValues should be populated from state names.
+	expectedValues := []string{"pending", "processing", "shipped", "delivered", "cancelled"}
+	if len(td.EnumValues) != len(expectedValues) {
+		t.Fatalf("EnumValues length = %d, want %d", len(td.EnumValues), len(expectedValues))
+	}
+	for i, v := range expectedValues {
+		if td.EnumValues[i] != v {
+			t.Errorf("EnumValues[%d] = %q, want %q", i, td.EnumValues[i], v)
+		}
+	}
+
+	// States should be populated.
+	if len(td.States) != 5 {
+		t.Fatalf("States length = %d, want 5", len(td.States))
+	}
+	if td.States[0].Name != "pending" || td.States[0].Comment != "Order created" {
+		t.Errorf("States[0] = %+v, want name=pending comment=Order created", td.States[0])
+	}
+	if !td.States[3].Terminal {
+		t.Error("States[3] (delivered) Terminal = false, want true")
+	}
+
+	// Transitions should be populated.
+	if len(td.Transitions) != 4 {
+		t.Fatalf("Transitions length = %d, want 4", len(td.Transitions))
+	}
+	cancel := td.Transitions[3]
+	if cancel.Name != "cancel" {
+		t.Errorf("Transitions[3].Name = %q, want %q", cancel.Name, "cancel")
+	}
+	if len(cancel.From) != 2 {
+		t.Fatalf("Transitions[3].From length = %d, want 2", len(cancel.From))
+	}
+	if cancel.To != "cancelled" {
+		t.Errorf("Transitions[3].To = %q, want %q", cancel.To, "cancelled")
+	}
+	if cancel.Requires["reason"] != "text" {
+		t.Errorf("Transitions[3].Requires[reason] = %q, want %q", cancel.Requires["reason"], "text")
+	}
+	if cancel.Comment != "Cancel with reason" {
+		t.Errorf("Transitions[3].Comment = %q, want %q", cancel.Comment, "Cancel with reason")
+	}
+
+	// NotNull should default to true.
+	if !td.NotNull {
+		t.Error("NotNull = false, want true (default)")
+	}
+}
+
+func TestLoadStateMachineType_MissingInitialState(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "bad_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "a"},
+				{Name: "b"},
+			},
+			// InitialState not set
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for missing initial state, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E112" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E112 for missing initial state")
+	}
+}
+
+func TestLoadStateMachineType_InvalidInitialState(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "bad_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "a"},
+				{Name: "b"},
+			},
+			InitialState: "nonexistent",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for invalid initial state, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E112" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E112 for invalid initial state")
+	}
+}
+
+func TestLoadStateMachineType_InvalidTransitionTarget(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "bad_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "a"},
+				{Name: "b"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "go", From: []string{"a"}, To: "nonexistent"},
+			},
+			InitialState: "a",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for invalid transition target, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E113" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E113 for invalid transition target")
+	}
+}
+
+func TestLoadStateMachineType_InvalidTransitionFrom(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "bad_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "a"},
+				{Name: "b"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "go", From: []string{"nonexistent"}, To: "b"},
+			},
+			InitialState: "a",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for invalid transition from-state, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E113" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E113 for invalid transition from-state")
+	}
+}
+
+func TestLoadStateMachineType_DuplicateStates(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "bad_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "a"},
+				{Name: "b"},
+				{Name: "a"}, // duplicate
+			},
+			InitialState: "a",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for duplicate state names, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E111" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E111 for duplicate state names")
+	}
+}
+
+func TestLoadStateMachineType_EmptyStates(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:         "bad_sm",
+			Kind:         "state_machine",
+			InitialState: "a",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for empty states, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E111" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E111 for empty states")
+	}
+}
+
+func TestStateMachineTypeDefsEqual(t *testing.T) {
+	a := &TypeDef{
+		Name:         "order_status",
+		Kind:         KindStateMachine,
+		BaseType:     "order_status",
+		InitialState: "pending",
+		States: []SMStateDef{
+			{Name: "pending"},
+			{Name: "done", Terminal: true},
+		},
+		Transitions: []SMTransitionDef{
+			{Name: "finish", From: []string{"pending"}, To: "done",
+				Requires: map[string]string{"note": "text"}},
+		},
+	}
+	b := &TypeDef{
+		Name:         "order_status",
+		Kind:         KindStateMachine,
+		BaseType:     "order_status",
+		InitialState: "pending",
+		States: []SMStateDef{
+			{Name: "pending"},
+			{Name: "done", Terminal: true},
+		},
+		Transitions: []SMTransitionDef{
+			{Name: "finish", From: []string{"pending"}, To: "done",
+				Requires: map[string]string{"note": "text"}},
+		},
+	}
+	if !typeDefsEqual(a, b) {
+		t.Error("typeDefsEqual returned false for identical state machine types")
+	}
+
+	// Different initial state
+	c := &TypeDef{
+		Name:         "order_status",
+		Kind:         KindStateMachine,
+		BaseType:     "order_status",
+		InitialState: "done",
+		States:       a.States,
+		Transitions:  a.Transitions,
+	}
+	if typeDefsEqual(a, c) {
+		t.Error("typeDefsEqual returned true for state machine types with different initial state")
+	}
+
+	// Different enforce trigger
+	d := &TypeDef{
+		Name:           "order_status",
+		Kind:           KindStateMachine,
+		BaseType:       "order_status",
+		InitialState:   "pending",
+		EnforceTrigger: true,
+		States:         a.States,
+		Transitions:    a.Transitions,
+	}
+	if typeDefsEqual(a, d) {
+		t.Error("typeDefsEqual returned true for state machine types with different enforce trigger")
+	}
+
+	// Different number of states
+	e := &TypeDef{
+		Name:         "order_status",
+		Kind:         KindStateMachine,
+		BaseType:     "order_status",
+		InitialState: "pending",
+		States: []SMStateDef{
+			{Name: "pending"},
+		},
+		Transitions: a.Transitions,
+	}
+	if typeDefsEqual(a, e) {
+		t.Error("typeDefsEqual returned true for state machine types with different state count")
+	}
+}
+
+func TestLoadStateMachineType_TransitionMissingName(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "bad_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "a"},
+				{Name: "b"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "", From: []string{"a"}, To: "b"},
+			},
+			InitialState: "a",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for transition missing name, got none")
+	}
+	found := false
+	for _, d := range diags {
+		if d.Code == "E113" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected diagnostic code E113 for transition missing name")
+	}
+}
