@@ -15,9 +15,10 @@ import (
 type Kind int
 
 const (
-	KindScalar    Kind = iota
-	KindEnum      Kind = iota
-	KindComposite Kind = iota
+	KindScalar       Kind = iota
+	KindEnum         Kind = iota
+	KindComposite    Kind = iota
+	KindStateMachine Kind = iota
 )
 
 func (k Kind) String() string {
@@ -28,6 +29,8 @@ func (k Kind) String() string {
 		return "enum"
 	case KindComposite:
 		return "composite"
+	case KindStateMachine:
+		return "state_machine"
 	default:
 		return "unknown"
 	}
@@ -37,6 +40,22 @@ func (k Kind) String() string {
 type CompositeField struct {
 	Name   string
 	PGType string
+}
+
+// SMStateDef represents a state in a state machine type definition.
+type SMStateDef struct {
+	Name     string
+	Terminal bool
+	Comment  string
+}
+
+// SMTransitionDef represents a transition in a state machine type definition.
+type SMTransitionDef struct {
+	Name     string
+	From     []string
+	To       string
+	Requires map[string]string
+	Comment  string
 }
 
 // TypeDef defines a semantic type with its PostgreSQL mapping and constraints.
@@ -52,6 +71,10 @@ type TypeDef struct {
 	Comment     string
 	EnumValues  []string         // values for enum types
 	Fields      []CompositeField // fields for composite types
+	States         []SMStateDef     // states for state machine types
+	Transitions    []SMTransitionDef // transitions for state machine types
+	InitialState   string           // initial state for state machine types
+	EnforceTrigger bool             // whether to generate transition-enforcement trigger
 	Generated   string           // generated expression (e.g., "price * 0.2")
 	Stored      bool             // whether generated column is stored
 	Identity    string           // identity generation: "ALWAYS" or "BY DEFAULT"
@@ -141,6 +164,45 @@ func typeDefsEqual(a, b *TypeDef) bool {
 	if a.Array != b.Array {
 		return false
 	}
+	// State machine fields
+	if a.InitialState != b.InitialState || a.EnforceTrigger != b.EnforceTrigger {
+		return false
+	}
+	if len(a.States) != len(b.States) {
+		return false
+	}
+	for i := range a.States {
+		if a.States[i].Name != b.States[i].Name ||
+			a.States[i].Terminal != b.States[i].Terminal ||
+			a.States[i].Comment != b.States[i].Comment {
+			return false
+		}
+	}
+	if len(a.Transitions) != len(b.Transitions) {
+		return false
+	}
+	for i := range a.Transitions {
+		at, bt := a.Transitions[i], b.Transitions[i]
+		if at.Name != bt.Name || at.To != bt.To || at.Comment != bt.Comment {
+			return false
+		}
+		if len(at.From) != len(bt.From) {
+			return false
+		}
+		for j := range at.From {
+			if at.From[j] != bt.From[j] {
+				return false
+			}
+		}
+		if len(at.Requires) != len(bt.Requires) {
+			return false
+		}
+		for k, v := range at.Requires {
+			if bt.Requires[k] != v {
+				return false
+			}
+		}
+	}
 	return true
 }
 
@@ -171,13 +233,33 @@ func (r *Registry) Resolve(name string) (*TypeDef, error) {
 	return td, nil
 }
 
+// UserSMState represents a state in a user-defined state machine type.
+type UserSMState struct {
+	Name     string
+	Terminal bool
+	Comment  string
+}
+
+// UserSMTransition represents a transition in a user-defined state machine type.
+type UserSMTransition struct {
+	Name     string
+	From     []string
+	To       string
+	Requires map[string]string
+	Comment  string
+}
+
 // UserTypeDef represents a user-defined type loaded from configuration.
 type UserTypeDef struct {
 	Name        string
-	Kind        string // "scalar", "enum", "composite"
+	Kind        string // "scalar", "enum", "composite", "state_machine"
 	Base        string // PG base type (for scalars)
 	Values      []string // enum values
 	Fields      map[string]string // composite fields: field name -> PG type
+	States         []UserSMState    // state machine states
+	Transitions    []UserSMTransition // state machine transitions
+	InitialState   string           // state machine initial state
+	EnforceTrigger bool             // state machine: generate enforcement trigger
 	NotNull     *bool
 	Default     *string
 	DefaultExpr string
@@ -266,6 +348,8 @@ func (r *Registry) LoadUserTypes(types []UserTypeDef) diagnostic.Diagnostics {
 			diags = append(diags, r.loadScalarType(ut)...)
 		case KindComposite:
 			diags = append(diags, r.loadCompositeType(ut)...)
+		case KindStateMachine:
+			diags = append(diags, r.loadStateMachineType(ut)...)
 		}
 	}
 
@@ -482,6 +566,154 @@ func (r *Registry) loadScalarType(ut UserTypeDef) diagnostic.Diagnostics {
 	return diags
 }
 
+func (r *Registry) loadStateMachineType(ut UserTypeDef) diagnostic.Diagnostics {
+	var diags diagnostic.Diagnostics
+
+	// Must have at least one state.
+	if len(ut.States) == 0 {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E111",
+			Message:  fmt.Sprintf("state machine type %q must have at least one state", ut.Name),
+		})
+		return diags
+	}
+
+	// Build set of valid state names and check for duplicates.
+	stateSet := make(map[string]bool, len(ut.States))
+	for _, s := range ut.States {
+		if stateSet[s.Name] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E111",
+				Message:  fmt.Sprintf("state machine type %q: duplicate state name %q", ut.Name, s.Name),
+			})
+		}
+		stateSet[s.Name] = true
+	}
+	if diags.HasErrors() {
+		return diags
+	}
+
+	// InitialState must reference a valid state.
+	if ut.InitialState == "" {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E112",
+			Message:  fmt.Sprintf("state machine type %q: initial state is required", ut.Name),
+		})
+		return diags
+	}
+	if !stateSet[ut.InitialState] {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E112",
+			Message:  fmt.Sprintf("state machine type %q: initial state %q is not a declared state", ut.Name, ut.InitialState),
+		})
+		return diags
+	}
+
+	// Validate transitions: from/to must reference valid state names.
+	for _, tr := range ut.Transitions {
+		if tr.Name == "" {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E113",
+				Message:  fmt.Sprintf("state machine type %q: transition missing name", ut.Name),
+			})
+			continue
+		}
+		for _, from := range tr.From {
+			if !stateSet[from] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E113",
+					Message:  fmt.Sprintf("state machine type %q: transition %q references unknown from-state %q", ut.Name, tr.Name, from),
+				})
+			}
+		}
+		if !stateSet[tr.To] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E113",
+				Message:  fmt.Sprintf("state machine type %q: transition %q references unknown to-state %q", ut.Name, tr.Name, tr.To),
+			})
+		}
+	}
+	if diags.HasErrors() {
+		return diags
+	}
+
+	// Build EnumValues from state names (for DDL: the column is an enum).
+	enumValues := make([]string, len(ut.States))
+	for i, s := range ut.States {
+		enumValues[i] = s.Name
+	}
+
+	// Build internal state and transition defs.
+	states := make([]SMStateDef, len(ut.States))
+	for i, s := range ut.States {
+		states[i] = SMStateDef{
+			Name:     s.Name,
+			Terminal: s.Terminal,
+			Comment:  s.Comment,
+		}
+	}
+	transitions := make([]SMTransitionDef, len(ut.Transitions))
+	for i, tr := range ut.Transitions {
+		requires := make(map[string]string, len(tr.Requires))
+		for k, v := range tr.Requires {
+			requires[k] = v
+		}
+		transitions[i] = SMTransitionDef{
+			Name:     tr.Name,
+			From:     tr.From,
+			To:       tr.To,
+			Requires: requires,
+			Comment:  tr.Comment,
+		}
+	}
+
+	td := &TypeDef{
+		Name:           ut.Name,
+		Kind:           KindStateMachine,
+		BaseType:       ut.Name, // state machines use their own name as PG type (enum)
+		NotNull:        true,
+		EnumValues:     enumValues,
+		States:         states,
+		Transitions:    transitions,
+		InitialState:   ut.InitialState,
+		EnforceTrigger: ut.EnforceTrigger,
+		Comment:        ut.Comment,
+	}
+
+	if ut.NotNull != nil {
+		td.NotNull = *ut.NotNull
+	}
+	if ut.Default != nil {
+		// Validate default is a valid state name.
+		if !stateSet[*ut.Default] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E109",
+				Message:  fmt.Sprintf("state machine type %q default %q is not a declared state (valid: %s)", ut.Name, *ut.Default, strings.Join(enumValues, ", ")),
+			})
+			return diags
+		}
+		td.Default = ut.Default
+	}
+
+	if err := r.Register(td); err != nil {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E105",
+			Message:  fmt.Sprintf("type %q: %s", ut.Name, err.Error()),
+		})
+	}
+
+	return diags
+}
+
 func parseKind(s string) (Kind, error) {
 	switch strings.ToLower(s) {
 	case "", "scalar":
@@ -490,6 +722,8 @@ func parseKind(s string) (Kind, error) {
 		return KindEnum, nil
 	case "composite":
 		return KindComposite, nil
+	case "state_machine":
+		return KindStateMachine, nil
 	default:
 		return 0, fmt.Errorf("unrecognized kind %q", s)
 	}
