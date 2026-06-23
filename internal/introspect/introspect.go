@@ -1172,6 +1172,7 @@ func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]mode
 		  AND NOT t.tgisinternal
 		  AND t.tgconstrrelid = 0
 		  AND p.proname != 'pgdesign_deny_mutation'
+		  AND p.proname NOT LIKE '_pgdesign_sm_%'
 		ORDER BY t.tgname
 	`, tableOID)
 	if err != nil {
