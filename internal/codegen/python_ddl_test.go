@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -318,4 +319,234 @@ func TestPythonDDL_SingleTable(t *testing.T) {
 	if !strings.Contains(output, `("users",)`) {
 		t.Error("single-element TABLE_NAMES tuple should have trailing comma")
 	}
+}
+
+// -- Phase 11: MultiFileGenerator and executor tests --
+
+func TestPythonDDL_GenerateFiles_TwoFiles(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, diags := gen.GenerateFiles(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(files))
+	}
+	if _, ok := files["schema_ddl.py"]; !ok {
+		t.Error("missing schema_ddl.py")
+	}
+	if _, ok := files["schema_executor.py"]; !ok {
+		t.Error("missing schema_executor.py")
+	}
+}
+
+func TestPythonDDL_GenerateFiles_DDLMatchesGenerate(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+
+	singleFile, diags1 := gen.Generate(schema)
+	files, diags2 := gen.GenerateFiles(schema)
+
+	if len(diags1) != len(diags2) {
+		t.Fatalf("diagnostic count mismatch: Generate=%d, GenerateFiles=%d", len(diags1), len(diags2))
+	}
+
+	ddlFile := files["schema_ddl.py"]
+	if string(singleFile) != string(ddlFile) {
+		t.Error("schema_ddl.py from GenerateFiles should match Generate output")
+	}
+}
+
+func TestPythonDDL_Executor_SectionCount(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	// The test schema has phases: 1 (schemas), 2 (extensions), 3 (domains),
+	// 4 (tables), 6 (fks), 7 (uniques), 8 (checks), 9 (indexes), 10 (comments).
+	// That's 9 sections.
+	sectionCount := strings.Count(executor, "Section(")
+	// Subtract 1 for the class definition "class Section:".
+	// Actually Section( only appears in SECTIONS list entries.
+	expected := 9
+	if sectionCount != expected {
+		t.Errorf("section count = %d, want %d", sectionCount, expected)
+	}
+}
+
+func TestPythonDDL_Executor_HasExecuteFunction(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "async def execute(") {
+		t.Error("executor missing execute function")
+	}
+}
+
+func TestPythonDDL_Executor_HasAsyncConnectionProtocol(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "class AsyncConnection(Protocol)") {
+		t.Error("executor missing AsyncConnection protocol")
+	}
+}
+
+func TestPythonDDL_Executor_HasDDLOpNamedtuple(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, `DDLOp = namedtuple("DDLOp", ["sql", "idempotent_sql", "name"])`) {
+		t.Error("executor missing DDLOp namedtuple definition")
+	}
+}
+
+func TestPythonDDL_Executor_HasConvenienceFunctions(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "async def create_schema(") {
+		t.Error("executor missing create_schema convenience function")
+	}
+	if !strings.Contains(executor, "async def ensure_schema(") {
+		t.Error("executor missing ensure_schema convenience function")
+	}
+}
+
+func TestPythonDDL_Executor_HasVerifyFunction(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "async def verify(") {
+		t.Error("executor missing verify function")
+	}
+}
+
+func TestPythonDDL_Executor_HasExistsMethod(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "async def exists(self, conn") {
+		t.Error("executor missing Section.exists method")
+	}
+}
+
+func TestPythonDDL_Executor_TransactionalSections(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	// All sections in the test schema should be transactional (no CONCURRENTLY
+	// indexes or ALTER TYPE ADD VALUE).
+	if strings.Contains(executor, "transactional=False") {
+		t.Error("test schema should have no non-transactional sections")
+	}
+}
+
+func TestPythonDDL_Executor_EmptySchema(t *testing.T) {
+	schema := &model.Schema{}
+	gen := &PythonDDLGenerator{}
+	files, diags := gen.GenerateFiles(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	executor := string(files["schema_executor.py"])
+
+	// Empty schema should produce SECTIONS = [] with no Section entries.
+	if !strings.Contains(executor, "SECTIONS: list[Section] = [\n]") {
+		t.Error("empty schema should produce empty SECTIONS list")
+	}
+
+	// But should still have the protocol, DDLOp, and functions.
+	if !strings.Contains(executor, "class AsyncConnection(Protocol)") {
+		t.Error("empty executor missing AsyncConnection protocol")
+	}
+	if !strings.Contains(executor, "DDLOp = namedtuple") {
+		t.Error("empty executor missing DDLOp")
+	}
+	if !strings.Contains(executor, "async def execute(") {
+		t.Error("empty executor missing execute function")
+	}
+}
+
+func TestPythonDDL_Executor_IdempotentSQL(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	// Schemas, extensions, tables, indexes all have idempotent variants.
+	// Check that IF NOT EXISTS appears in the executor.
+	if !strings.Contains(executor, "IF NOT EXISTS") {
+		t.Error("executor should contain IF NOT EXISTS idempotent SQL")
+	}
+
+	// Domains and composites have no idempotent variant; they should have None.
+	// Check for at least one DDLOp with None as idempotent_sql.
+	if !strings.Contains(executor, ", None, ") {
+		t.Error("executor should contain ops with None idempotent_sql (domains, etc.)")
+	}
+}
+
+func TestPythonDDL_Executor_SectionKinds(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	expectedKinds := []string{
+		"schemas", "extensions", "types", "tables",
+		"foreign_keys", "unique_constraints", "check_constraints",
+		"indexes", "comments",
+	}
+	for _, kind := range expectedKinds {
+		if !strings.Contains(executor, fmt.Sprintf("kind=%q", kind)) {
+			t.Errorf("executor missing section kind %q", kind)
+		}
+	}
+}
+
+func TestPythonDDL_Executor_ExistenceChecks(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	// Verify the existence checker queries reference the right catalog tables.
+	checks := map[string]string{
+		"schemas":            "information_schema.schemata",
+		"tables":             "information_schema.tables",
+		"indexes":            "pg_indexes",
+		"types":              "pg_type",
+		"foreign_keys":       "pg_constraint",
+		"unique_constraints": "pg_constraint",
+		"check_constraints":  "pg_constraint",
+	}
+	for kind, catalog := range checks {
+		if !strings.Contains(executor, catalog) {
+			t.Errorf("existence check for %q should reference %s", kind, catalog)
+		}
+	}
+}
+
+func TestPythonDDL_MultiFileGenerator_Interface(t *testing.T) {
+	// Verify PythonDDLGenerator satisfies MultiFileGenerator at compile time.
+	var _ MultiFileGenerator = &PythonDDLGenerator{}
 }

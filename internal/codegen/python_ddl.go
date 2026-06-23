@@ -20,23 +20,31 @@ type PythonDDLGenerator struct{}
 
 // ddlTuple holds one DDL statement with its metadata.
 type ddlTuple struct {
-	SQL   string
-	Kind  string
-	Table string // empty string means None
-	Phase int
+	SQL           string
+	IdempotentSQL string // empty means no idempotent variant available
+	Kind          string
+	Name          string // human-readable name for the DDL op (e.g. table name, constraint name)
+	Table         string // empty string means None
+	Phase         int
+	Transactional bool // false for CONCURRENTLY indexes, ALTER TYPE ADD VALUE
 }
 
-// Generate produces a Python file with all DDL statements as data tuples.
-func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
+// buildTuples collects all DDL statements from the schema into a flat list of
+// ddlTuples. Each tuple has both normal and idempotent SQL (when available),
+// a human-readable name, and transactional metadata.
+func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.Diagnostic) {
 	var tuples []ddlTuple
 	var diags []diagnostic.Diagnostic
 
 	// 1. CREATE SCHEMA (phase 1)
 	if schema.Name != "" {
 		tuples = append(tuples, ddlTuple{
-			SQL:   sql.CreateSchema(schema.Name, false),
-			Kind:  "schema",
-			Phase: 1,
+			SQL:           sql.CreateSchema(schema.Name, false),
+			IdempotentSQL: sql.CreateSchema(schema.Name, true),
+			Kind:          "schema",
+			Name:          schema.Name,
+			Phase:         1,
+			Transactional: true,
 		})
 	} else {
 		seen := make(map[string]bool)
@@ -44,9 +52,12 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 			if t.Schema != "" && !seen[t.Schema] {
 				seen[t.Schema] = true
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CreateSchema(t.Schema, false),
-					Kind:  "schema",
-					Phase: 1,
+					SQL:           sql.CreateSchema(t.Schema, false),
+					IdempotentSQL: sql.CreateSchema(t.Schema, true),
+					Kind:          "schema",
+					Name:          t.Schema,
+					Phase:         1,
+					Transactional: true,
 				})
 			}
 		}
@@ -54,9 +65,12 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 			if e.Schema != "" && !seen[e.Schema] {
 				seen[e.Schema] = true
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CreateSchema(e.Schema, false),
-					Kind:  "schema",
-					Phase: 1,
+					SQL:           sql.CreateSchema(e.Schema, false),
+					IdempotentSQL: sql.CreateSchema(e.Schema, true),
+					Kind:          "schema",
+					Name:          e.Schema,
+					Phase:         1,
+					Transactional: true,
 				})
 			}
 		}
@@ -64,9 +78,12 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 			if ct.Schema != "" && !seen[ct.Schema] {
 				seen[ct.Schema] = true
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CreateSchema(ct.Schema, false),
-					Kind:  "schema",
-					Phase: 1,
+					SQL:           sql.CreateSchema(ct.Schema, false),
+					IdempotentSQL: sql.CreateSchema(ct.Schema, true),
+					Kind:          "schema",
+					Name:          ct.Schema,
+					Phase:         1,
+					Transactional: true,
 				})
 			}
 		}
@@ -75,45 +92,58 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 	// 2. CREATE EXTENSION (phase 2)
 	for _, ext := range schema.Extensions {
 		tuples = append(tuples, ddlTuple{
-			SQL:   sql.CreateExtension(ext, false),
-			Kind:  "extension",
-			Phase: 2,
+			SQL:           sql.CreateExtension(ext, false),
+			IdempotentSQL: sql.CreateExtension(ext, true),
+			Kind:          "extension",
+			Name:          ext,
+			Phase:         2,
+			Transactional: true,
 		})
 	}
 
 	// 2b. CREATE SEQUENCE (phase 2)
 	for i := range schema.Sequences {
+		seq := &schema.Sequences[i]
 		tuples = append(tuples, ddlTuple{
-			SQL:   sql.CreateSequence(schema.Sequences[i].Schema, &schema.Sequences[i]),
-			Kind:  "sequence",
-			Phase: 2,
+			SQL:           sql.CreateSequence(seq.Schema, seq),
+			Kind:          "sequence",
+			Name:          seq.Name,
+			Phase:         2,
+			Transactional: true,
 		})
 	}
 
 	// 3. CREATE TYPE AS ENUM (phase 3)
 	for _, e := range schema.Enums {
 		tuples = append(tuples, ddlTuple{
-			SQL:   sql.CreateEnum(e.Schema, e.Name, e.Values, false),
-			Kind:  "enum",
-			Phase: 3,
+			SQL:           sql.CreateEnum(e.Schema, e.Name, e.Values, false),
+			IdempotentSQL: sql.CreateEnum(e.Schema, e.Name, e.Values, true),
+			Kind:          "enum",
+			Name:          e.Name,
+			Phase:         3,
+			Transactional: true,
 		})
 	}
 
 	// 3b. CREATE DOMAIN (phase 3)
 	for _, d := range schema.Domains {
 		tuples = append(tuples, ddlTuple{
-			SQL:   sql.CreateDomain(d.Schema, d),
-			Kind:  "domain",
-			Phase: 3,
+			SQL:           sql.CreateDomain(d.Schema, d),
+			Kind:          "domain",
+			Name:          d.Name,
+			Phase:         3,
+			Transactional: true,
 		})
 	}
 
 	// 3c. CREATE TYPE AS (composite) (phase 3)
 	for _, ct := range schema.CompositeTypes {
 		tuples = append(tuples, ddlTuple{
-			SQL:   sql.CreateCompositeType(ct.Schema, ct),
-			Kind:  "composite",
-			Phase: 3,
+			SQL:           sql.CreateCompositeType(ct.Schema, ct),
+			Kind:          "composite",
+			Name:          ct.Name,
+			Phase:         3,
+			Transactional: true,
 		})
 	}
 
@@ -122,10 +152,13 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 	// 4. CREATE TABLE (phase 4)
 	for i := range tables {
 		tuples = append(tuples, ddlTuple{
-			SQL:   sql.CreateTable(&tables[i], tables[i].Schema, false, schema.PGVersion, schema.Enums),
-			Kind:  "table",
-			Table: tables[i].Name,
-			Phase: 4,
+			SQL:           sql.CreateTable(&tables[i], tables[i].Schema, false, schema.PGVersion, schema.Enums),
+			IdempotentSQL: sql.CreateTable(&tables[i], tables[i].Schema, true, schema.PGVersion, schema.Enums),
+			Kind:          "table",
+			Name:          tables[i].Name,
+			Table:         tables[i].Name,
+			Phase:         4,
+			Transactional: true,
 		})
 	}
 
@@ -151,17 +184,21 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 				continue
 			}
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CreatePartmanParent(t.Schema, t.Name, t.Partitioning.Columns[0], t.Maintenance.Retention, t.Maintenance.Premake),
-				Kind:  "partman",
-				Table: t.Name,
-				Phase: 5,
+				SQL:           sql.CreatePartmanParent(t.Schema, t.Name, t.Partitioning.Columns[0], t.Maintenance.Retention, t.Maintenance.Premake),
+				Kind:          "partman",
+				Name:          t.Name,
+				Table:         t.Name,
+				Phase:         5,
+				Transactional: true,
 			})
 			if t.Maintenance.Retention != "" {
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.UpdatePartmanConfig(t.Schema, t.Name, t.Maintenance.Retention, t.Maintenance.RetentionKeepTable),
-					Kind:  "partman",
-					Table: t.Name,
-					Phase: 5,
+					SQL:           sql.UpdatePartmanConfig(t.Schema, t.Name, t.Maintenance.Retention, t.Maintenance.RetentionKeepTable),
+					Kind:          "partman",
+					Name:          t.Name + "_config",
+					Table:         t.Name,
+					Phase:         5,
+					Transactional: true,
 				})
 			}
 		}
@@ -173,11 +210,18 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		fks := sortedFKs(t.FKs)
 		for _, fk := range fks {
 			fkCopy := fk
+			constraintName := fk.Name
+			if constraintName == "" {
+				constraintName = sql.ConstraintName(t.Name, "fk", fk.RefTable)
+			}
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.AlterTableAddFK(t.Schema, t, &fkCopy, false),
-				Kind:  "fk",
-				Table: t.Name,
-				Phase: 6,
+				SQL:           sql.AlterTableAddFK(t.Schema, t, &fkCopy, false),
+				IdempotentSQL: sql.AlterTableAddFK(t.Schema, t, &fkCopy, true),
+				Kind:          "fk",
+				Name:          constraintName,
+				Table:         t.Name,
+				Phase:         6,
+				Transactional: true,
 			})
 		}
 	}
@@ -188,11 +232,18 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		uqs := sortedUniques(t.Uniques)
 		for _, uq := range uqs {
 			uqCopy := uq
+			constraintName := uq.Name
+			if constraintName == "" {
+				constraintName = sql.ConstraintName(t.Name, "uq", uq.Columns...)
+			}
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.AlterTableAddUnique(t.Schema, t.Name, &uqCopy, false),
-				Kind:  "unique",
-				Table: t.Name,
-				Phase: 7,
+				SQL:           sql.AlterTableAddUnique(t.Schema, t.Name, &uqCopy, false),
+				IdempotentSQL: sql.AlterTableAddUnique(t.Schema, t.Name, &uqCopy, true),
+				Kind:          "unique",
+				Name:          constraintName,
+				Table:         t.Name,
+				Phase:         7,
+				Transactional: true,
 			})
 		}
 	}
@@ -203,11 +254,18 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		cks := sortedChecks(t.Checks)
 		for _, ck := range cks {
 			ckCopy := ck
+			constraintName := ck.Name
+			if constraintName == "" {
+				constraintName = sql.ConstraintName(t.Name, "ck")
+			}
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.AlterTableAddCheck(t.Schema, t.Name, &ckCopy, false),
-				Kind:  "check",
-				Table: t.Name,
-				Phase: 8,
+				SQL:           sql.AlterTableAddCheck(t.Schema, t.Name, &ckCopy, false),
+				IdempotentSQL: sql.AlterTableAddCheck(t.Schema, t.Name, &ckCopy, true),
+				Kind:          "check",
+				Name:          constraintName,
+				Table:         t.Name,
+				Phase:         8,
+				Transactional: true,
 			})
 		}
 	}
@@ -218,11 +276,18 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		excls := sortedExclusions(t.Exclusions)
 		for _, exc := range excls {
 			excCopy := exc
+			constraintName := exc.Name
+			if constraintName == "" {
+				constraintName = sql.ConstraintName(t.Name, "excl", exc.Elements[0].Column)
+			}
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.AlterTableAddExclusion(t.Schema, t.Name, &excCopy, false),
-				Kind:  "exclusion",
-				Table: t.Name,
-				Phase: 8,
+				SQL:           sql.AlterTableAddExclusion(t.Schema, t.Name, &excCopy, false),
+				IdempotentSQL: sql.AlterTableAddExclusion(t.Schema, t.Name, &excCopy, true),
+				Kind:          "exclusion",
+				Name:          constraintName,
+				Table:         t.Name,
+				Phase:         8,
+				Transactional: true,
 			})
 		}
 	}
@@ -233,11 +298,18 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		idxs := sortedIndexes(t.Indexes)
 		for _, idx := range idxs {
 			idxCopy := idx
+			idxName := idx.Name
+			if idxName == "" {
+				idxName = sql.ConstraintName(t.Name, "idx", idx.Columns...)
+			}
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CreateIndex(t.Schema, &idxCopy, t.Name, false, false),
-				Kind:  "index",
-				Table: t.Name,
-				Phase: 9,
+				SQL:           sql.CreateIndex(t.Schema, &idxCopy, t.Name, false, false),
+				IdempotentSQL: sql.CreateIndex(t.Schema, &idxCopy, t.Name, true, false),
+				Kind:          "index",
+				Name:          idxName,
+				Table:         t.Name,
+				Phase:         9,
+				Transactional: true,
 			})
 		}
 	}
@@ -258,19 +330,23 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 			sort.Strings(schemaNames)
 			for _, s := range schemaNames {
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CreateDenyMutationFunction(s),
-					Kind:  "append_only_trigger",
-					Phase: 9,
+					SQL:           sql.CreateDenyMutationFunction(s),
+					Kind:          "append_only_trigger",
+					Name:          s + ".pgdesign_deny_mutation",
+					Phase:         9,
+					Transactional: true,
 				})
 			}
 			for i := range tables {
 				t := &tables[i]
 				if t.AppendOnly {
 					tuples = append(tuples, ddlTuple{
-						SQL:   sql.CreateAppendOnlyTrigger(t.Schema, t.Name),
-						Kind:  "append_only_trigger",
-						Table: t.Name,
-						Phase: 9,
+						SQL:           sql.CreateAppendOnlyTrigger(t.Schema, t.Name),
+						Kind:          "append_only_trigger",
+						Name:          t.Name + ".deny_mutation",
+						Table:         t.Name,
+						Phase:         9,
+						Transactional: true,
 					})
 				}
 			}
@@ -283,20 +359,24 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		if t.Comment != "" {
 			qualified := sql.QualifiedName(t.Schema, t.Name)
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CommentOn("TABLE", qualified, t.Comment),
-				Kind:  "comment",
-				Table: t.Name,
-				Phase: 10,
+				SQL:           sql.CommentOn("TABLE", qualified, t.Comment),
+				Kind:          "comment",
+				Name:          "table." + t.Name,
+				Table:         t.Name,
+				Phase:         10,
+				Transactional: true,
 			})
 		}
 		for _, col := range t.Columns {
 			if col.Comment != "" {
 				qualified := sql.QualifiedName(t.Schema, t.Name) + "." + sql.QuoteIdent(col.Name)
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CommentOn("COLUMN", qualified, col.Comment),
-					Kind:  "comment",
-					Table: t.Name,
-					Phase: 10,
+					SQL:           sql.CommentOn("COLUMN", qualified, col.Comment),
+					Kind:          "comment",
+					Name:          "column." + t.Name + "." + col.Name,
+					Table:         t.Name,
+					Phase:         10,
+					Transactional: true,
 				})
 			}
 		}
@@ -306,9 +386,11 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		if seq.Comment != "" {
 			qualified := sql.QualifiedName(seq.Schema, seq.Name)
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CommentOn("SEQUENCE", qualified, seq.Comment),
-				Kind:  "comment",
-				Phase: 10,
+				SQL:           sql.CommentOn("SEQUENCE", qualified, seq.Comment),
+				Kind:          "comment",
+				Name:          "sequence." + seq.Name,
+				Phase:         10,
+				Transactional: true,
 			})
 		}
 	}
@@ -320,10 +402,12 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 			if col.Statistics != nil {
 				qualified := sql.QualifiedName(t.Schema, t.Name)
 				tuples = append(tuples, ddlTuple{
-					SQL:   fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET STATISTICS %d;", qualified, sql.QuoteIdent(col.Name), *col.Statistics),
-					Kind:  "statistics",
-					Table: t.Name,
-					Phase: 10,
+					SQL:           fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET STATISTICS %d;", qualified, sql.QuoteIdent(col.Name), *col.Statistics),
+					Kind:          "statistics",
+					Name:          t.Name + "." + col.Name,
+					Table:         t.Name,
+					Phase:         10,
+					Transactional: true,
 				})
 			}
 		}
@@ -334,10 +418,12 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		t := &tables[i]
 		if t.Owner != "" {
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.AlterTableOwner(t.Schema, t.Name, t.Owner),
-				Kind:  "owner",
-				Table: t.Name,
-				Phase: 11,
+				SQL:           sql.AlterTableOwner(t.Schema, t.Name, t.Owner),
+				Kind:          "owner",
+				Name:          t.Name,
+				Table:         t.Name,
+				Phase:         11,
+				Transactional: true,
 			})
 		}
 	}
@@ -347,10 +433,12 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		t := &tables[i]
 		if t.EnableRLS {
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.AlterTableEnableRLS(t.Schema, t.Name),
-				Kind:  "rls_enable",
-				Table: t.Name,
-				Phase: 12,
+				SQL:           sql.AlterTableEnableRLS(t.Schema, t.Name),
+				Kind:          "rls_enable",
+				Name:          t.Name,
+				Table:         t.Name,
+				Phase:         12,
+				Transactional: true,
 			})
 		}
 	}
@@ -360,10 +448,12 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		t := &tables[i]
 		if t.ForceRLS {
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.AlterTableForceRLS(t.Schema, t.Name),
-				Kind:  "rls_force",
-				Table: t.Name,
-				Phase: 12,
+				SQL:           sql.AlterTableForceRLS(t.Schema, t.Name),
+				Kind:          "rls_force",
+				Name:          t.Name,
+				Table:         t.Name,
+				Phase:         12,
+				Transactional: true,
 			})
 		}
 	}
@@ -374,10 +464,12 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		policies := sortedPolicies(t.Policies)
 		for _, p := range policies {
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CreatePolicy(t.Schema, t.Name, p),
-				Kind:  "policy",
-				Table: t.Name,
-				Phase: 13,
+				SQL:           sql.CreatePolicy(t.Schema, t.Name, p),
+				Kind:          "policy",
+				Name:          p.Name,
+				Table:         t.Name,
+				Phase:         13,
+				Transactional: true,
 			})
 		}
 	}
@@ -403,15 +495,20 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 				schemaName = v.Schema
 			}
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CreateView(schemaName, v, false),
-				Kind:  "view",
-				Phase: 14,
+				SQL:           sql.CreateView(schemaName, v, false),
+				IdempotentSQL: sql.CreateView(schemaName, v, true),
+				Kind:          "view",
+				Name:          v.Name,
+				Phase:         14,
+				Transactional: true,
 			})
 			if v.Comment != "" {
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CommentOn("VIEW", sql.QualifiedName(schemaName, v.Name), v.Comment),
-					Kind:  "comment",
-					Phase: 14,
+					SQL:           sql.CommentOn("VIEW", sql.QualifiedName(schemaName, v.Name), v.Comment),
+					Kind:          "comment",
+					Name:          "view." + v.Name,
+					Phase:         14,
+					Transactional: true,
 				})
 			}
 		}
@@ -438,23 +535,34 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 				schemaName = mv.Schema
 			}
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CreateMaterializedView(schemaName, mv),
-				Kind:  "materialized_view",
-				Phase: 15,
+				SQL:           sql.CreateMaterializedView(schemaName, mv),
+				Kind:          "materialized_view",
+				Name:          mv.Name,
+				Phase:         15,
+				Transactional: true,
 			})
 			if mv.Comment != "" {
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CommentOn("MATERIALIZED VIEW", sql.QualifiedName(schemaName, mv.Name), mv.Comment),
-					Kind:  "comment",
-					Phase: 15,
+					SQL:           sql.CommentOn("MATERIALIZED VIEW", sql.QualifiedName(schemaName, mv.Name), mv.Comment),
+					Kind:          "comment",
+					Name:          "matview." + mv.Name,
+					Phase:         15,
+					Transactional: true,
 				})
 			}
 			for j := range mv.Indexes {
 				idx := &mv.Indexes[j]
+				idxName := idx.Name
+				if idxName == "" {
+					idxName = sql.ConstraintName(mv.Name, "idx", idx.Columns...)
+				}
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CreateIndex(schemaName, idx, mv.Name, false, false),
-					Kind:  "index",
-					Phase: 15,
+					SQL:           sql.CreateIndex(schemaName, idx, mv.Name, false, false),
+					IdempotentSQL: sql.CreateIndex(schemaName, idx, mv.Name, true, false),
+					Kind:          "index",
+					Name:          idxName,
+					Phase:         15,
+					Transactional: true,
 				})
 			}
 		}
@@ -480,20 +588,29 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 			if f.Schema != "" {
 				schemaName = f.Schema
 			}
+			// CREATE OR REPLACE FUNCTION is inherently idempotent.
+			funcSQL := sql.CreateFunction(schemaName, *f)
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CreateFunction(schemaName, *f),
-				Kind:  "function",
-				Phase: 16,
+				SQL:           funcSQL,
+				IdempotentSQL: funcSQL,
+				Kind:          "function",
+				Name:          f.Name,
+				Phase:         16,
+				Transactional: true,
 			})
 			if f.Comment != "" {
 				kind := "FUNCTION"
 				if f.IsProc {
 					kind = "PROCEDURE"
 				}
+				commentSQL := sql.CommentOn(kind, sql.QualifiedName(schemaName, f.Name), f.Comment)
 				tuples = append(tuples, ddlTuple{
-					SQL:   sql.CommentOn(kind, sql.QualifiedName(schemaName, f.Name), f.Comment),
-					Kind:  "comment",
-					Phase: 16,
+					SQL:           commentSQL,
+					IdempotentSQL: commentSQL,
+					Kind:          "comment",
+					Name:          "func." + f.Name,
+					Phase:         16,
+					Transactional: true,
 				})
 			}
 		}
@@ -505,15 +622,21 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		triggers := sortedTriggers(t.Triggers)
 		for _, trig := range triggers {
 			tuples = append(tuples, ddlTuple{
-				SQL:   sql.CreateTrigger(t.Schema, t.Name, trig),
-				Kind:  "trigger",
-				Table: t.Name,
-				Phase: 17,
+				SQL:           sql.CreateTrigger(t.Schema, t.Name, trig),
+				Kind:          "trigger",
+				Name:          trig.Name,
+				Table:         t.Name,
+				Phase:         17,
+				Transactional: true,
 			})
 		}
 	}
 
-	// Build output.
+	return tuples, tables, diags
+}
+
+// renderDDLFile renders the schema_ddl.py file content from the given tuples.
+func renderDDLFile(tuples []ddlTuple, tables []model.Table) []byte {
 	var buf bytes.Buffer
 	buf.WriteString("# Code generated by pgdesign -- do not edit.\n\n")
 	buf.WriteString("from typing import Final\n\n")
@@ -541,7 +664,258 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 	}
 	buf.WriteString(")\n")
 
-	return buf.Bytes(), diags
+	return buf.Bytes()
+}
+
+// ddlSection groups tuples by their DDL phase kind for the executor file.
+type ddlSection struct {
+	kind          string
+	phase         int
+	transactional bool
+	tuples        []ddlTuple
+}
+
+// buildSections groups tuples into ordered sections by phase. Consecutive
+// tuples with the same phase are merged into one section.
+func buildSections(tuples []ddlTuple) []ddlSection {
+	if len(tuples) == 0 {
+		return nil
+	}
+
+	// Map phase -> section kind name. We use the phase number to derive
+	// a human-readable kind for each section.
+	phaseKind := map[int]string{
+		1:  "schemas",
+		2:  "extensions",
+		3:  "types",
+		4:  "tables",
+		5:  "partitions",
+		6:  "foreign_keys",
+		7:  "unique_constraints",
+		8:  "check_constraints",
+		9:  "indexes",
+		10: "comments",
+		11: "ownership",
+		12: "row_level_security",
+		13: "policies",
+		14: "views",
+		15: "materialized_views",
+		16: "functions",
+		17: "triggers",
+	}
+
+	var sections []ddlSection
+	var current *ddlSection
+
+	for _, t := range tuples {
+		if current == nil || current.phase != t.Phase {
+			kind := phaseKind[t.Phase]
+			if kind == "" {
+				kind = fmt.Sprintf("phase_%d", t.Phase)
+			}
+			sections = append(sections, ddlSection{
+				kind:          kind,
+				phase:         t.Phase,
+				transactional: true,
+			})
+			current = &sections[len(sections)-1]
+		}
+		current.tuples = append(current.tuples, t)
+		if !t.Transactional {
+			current.transactional = false
+		}
+	}
+
+	return sections
+}
+
+// renderExecutorFile generates the schema_executor.py file content.
+func renderExecutorFile(sections []ddlSection) []byte {
+	var buf bytes.Buffer
+
+	buf.WriteString("# Code generated by pgdesign -- do not edit.\n\n")
+	buf.WriteString("from __future__ import annotations\n\n")
+	buf.WriteString("from collections import namedtuple\n")
+	buf.WriteString("from dataclasses import dataclass, field\n")
+	buf.WriteString("from typing import Protocol, Sequence, runtime_checkable\n\n\n")
+
+	// AsyncConnection protocol
+	buf.WriteString("@runtime_checkable\n")
+	buf.WriteString("class AsyncConnection(Protocol):\n")
+	buf.WriteString("    async def execute(self, query: str) -> None: ...\n")
+	buf.WriteString("    async def fetch(self, query: str) -> list[dict]: ...\n")
+	buf.WriteString("    async def transaction(self) -> AsyncTransaction: ...\n\n\n")
+
+	buf.WriteString("@runtime_checkable\n")
+	buf.WriteString("class AsyncTransaction(Protocol):\n")
+	buf.WriteString("    async def __aenter__(self) -> AsyncTransaction: ...\n")
+	buf.WriteString("    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None: ...\n")
+	buf.WriteString("    async def execute(self, query: str) -> None: ...\n\n\n")
+
+	// DDLOp namedtuple
+	buf.WriteString("DDLOp = namedtuple(\"DDLOp\", [\"sql\", \"idempotent_sql\", \"name\"])\n\n\n")
+
+	// Section dataclass
+	buf.WriteString("@dataclass(frozen=True)\n")
+	buf.WriteString("class Section:\n")
+	buf.WriteString("    kind: str\n")
+	buf.WriteString("    ops: list[DDLOp] = field(default_factory=list)\n")
+	buf.WriteString("    transactional: bool = True\n\n")
+
+	// Existence check queries by kind
+	buf.WriteString("    async def exists(self, conn: AsyncConnection, op: DDLOp) -> bool:\n")
+	buf.WriteString("        \"\"\"Check if the object described by op already exists.\"\"\"\n")
+	buf.WriteString("        checkers = {\n")
+	buf.WriteString("            \"schemas\": \"SELECT 1 FROM information_schema.schemata WHERE schema_name = '{}'\",\n")
+	buf.WriteString("            \"extensions\": \"SELECT 1 FROM pg_extension WHERE extname = '{}'\",\n")
+	buf.WriteString("            \"types\": \"SELECT 1 FROM pg_type WHERE typname = '{}'\",\n")
+	buf.WriteString("            \"tables\": \"SELECT 1 FROM information_schema.tables WHERE table_name = '{}'\",\n")
+	buf.WriteString("            \"indexes\": \"SELECT 1 FROM pg_indexes WHERE indexname = '{}'\",\n")
+	buf.WriteString("            \"views\": \"SELECT 1 FROM information_schema.views WHERE table_name = '{}'\",\n")
+	buf.WriteString("            \"materialized_views\": \"SELECT 1 FROM pg_matviews WHERE matviewname = '{}'\",\n")
+	buf.WriteString("            \"functions\": \"SELECT 1 FROM pg_proc WHERE proname = '{}'\",\n")
+	buf.WriteString("            \"triggers\": \"SELECT 1 FROM pg_trigger WHERE tgname = '{}'\",\n")
+	buf.WriteString("            \"policies\": \"SELECT 1 FROM pg_policies WHERE policyname = '{}'\",\n")
+	buf.WriteString("            \"foreign_keys\": \"SELECT 1 FROM pg_constraint WHERE conname = '{}' AND contype = 'f'\",\n")
+	buf.WriteString("            \"unique_constraints\": \"SELECT 1 FROM pg_constraint WHERE conname = '{}' AND contype = 'u'\",\n")
+	buf.WriteString("            \"check_constraints\": \"SELECT 1 FROM pg_constraint WHERE conname = '{}' AND contype = 'c'\",\n")
+	buf.WriteString("        }\n")
+	buf.WriteString("        query_template = checkers.get(self.kind)\n")
+	buf.WriteString("        if query_template is None:\n")
+	buf.WriteString("            return False\n")
+	buf.WriteString("        escaped = op.name.replace(\"'\", \"''\")\n")
+	buf.WriteString("        rows = await conn.fetch(query_template.format(escaped))\n")
+	buf.WriteString("        return len(rows) > 0\n\n\n")
+
+	// ExecutionResult
+	buf.WriteString("@dataclass\n")
+	buf.WriteString("class ExecutionResult:\n")
+	buf.WriteString("    executed: list[tuple[str, str]] = field(default_factory=list)  # (section_kind, op_name)\n")
+	buf.WriteString("    skipped: list[tuple[str, str]] = field(default_factory=list)\n")
+	buf.WriteString("    errors: list[tuple[str, str, str]] = field(default_factory=list)  # (section_kind, op_name, error)\n\n\n")
+
+	// VerifyResult
+	buf.WriteString("@dataclass\n")
+	buf.WriteString("class VerifyResult:\n")
+	buf.WriteString("    present: list[tuple[str, str]] = field(default_factory=list)  # (section_kind, op_name)\n")
+	buf.WriteString("    missing: list[tuple[str, str]] = field(default_factory=list)\n\n\n")
+
+	// Sections list
+	buf.WriteString("SECTIONS: list[Section] = [\n")
+	for _, sec := range sections {
+		buf.WriteString(fmt.Sprintf("    Section(\n        kind=%q,\n        transactional=%s,\n        ops=[\n",
+			sec.kind, pythonBool(sec.transactional)))
+		for _, t := range sec.tuples {
+			sqlPy := pythonEscapeStr(t.SQL)
+			idempotentPy := "None"
+			if t.IdempotentSQL != "" {
+				idempotentPy = pythonEscapeStr(t.IdempotentSQL)
+			}
+			namePy := "None"
+			if t.Name != "" {
+				namePy = fmt.Sprintf("%q", t.Name)
+			}
+			buf.WriteString(fmt.Sprintf("            DDLOp(%s, %s, %s),\n", sqlPy, idempotentPy, namePy))
+		}
+		buf.WriteString("        ],\n    ),\n")
+	}
+	buf.WriteString("]\n\n\n")
+
+	// execute function
+	buf.WriteString("async def execute(\n")
+	buf.WriteString("    conn: AsyncConnection,\n")
+	buf.WriteString("    sections: Sequence[str] | None = None,\n")
+	buf.WriteString("    idempotent: bool = True,\n")
+	buf.WriteString("    dry_run: bool = False,\n")
+	buf.WriteString(") -> ExecutionResult:\n")
+	buf.WriteString("    \"\"\"Execute DDL sections.\n\n")
+	buf.WriteString("    Two-phase execution: transactional sections run inside a single\n")
+	buf.WriteString("    transaction, non-transactional sections run outside afterward.\n")
+	buf.WriteString("    \"\"\"\n")
+	buf.WriteString("    result = ExecutionResult()\n")
+	buf.WriteString("    selected = [s for s in SECTIONS if sections is None or s.kind in sections]\n")
+	buf.WriteString("    transactional = [s for s in selected if s.transactional]\n")
+	buf.WriteString("    non_transactional = [s for s in selected if not s.transactional]\n\n")
+	buf.WriteString("    # Phase 1: transactional ops in a single transaction.\n")
+	buf.WriteString("    if transactional and not dry_run:\n")
+	buf.WriteString("        async with conn.transaction() as tx:\n")
+	buf.WriteString("            for sec in transactional:\n")
+	buf.WriteString("                for op in sec.ops:\n")
+	buf.WriteString("                    stmt = op.idempotent_sql if idempotent and op.idempotent_sql else op.sql\n")
+	buf.WriteString("                    try:\n")
+	buf.WriteString("                        await tx.execute(stmt)\n")
+	buf.WriteString("                        result.executed.append((sec.kind, op.name))\n")
+	buf.WriteString("                    except Exception as e:\n")
+	buf.WriteString("                        result.errors.append((sec.kind, op.name, str(e)))\n")
+	buf.WriteString("                        raise\n")
+	buf.WriteString("    elif transactional and dry_run:\n")
+	buf.WriteString("        for sec in transactional:\n")
+	buf.WriteString("            for op in sec.ops:\n")
+	buf.WriteString("                result.executed.append((sec.kind, op.name))\n\n")
+	buf.WriteString("    # Phase 2: non-transactional ops outside any transaction.\n")
+	buf.WriteString("    for sec in non_transactional:\n")
+	buf.WriteString("        for op in sec.ops:\n")
+	buf.WriteString("            stmt = op.idempotent_sql if idempotent and op.idempotent_sql else op.sql\n")
+	buf.WriteString("            if not dry_run:\n")
+	buf.WriteString("                try:\n")
+	buf.WriteString("                    await conn.execute(stmt)\n")
+	buf.WriteString("                    result.executed.append((sec.kind, op.name))\n")
+	buf.WriteString("                except Exception as e:\n")
+	buf.WriteString("                    result.errors.append((sec.kind, op.name, str(e)))\n")
+	buf.WriteString("            else:\n")
+	buf.WriteString("                result.executed.append((sec.kind, op.name))\n\n")
+	buf.WriteString("    return result\n\n\n")
+
+	// verify function
+	buf.WriteString("async def verify(conn: AsyncConnection) -> VerifyResult:\n")
+	buf.WriteString("    \"\"\"Check which ops across all sections exist in the database.\"\"\"\n")
+	buf.WriteString("    result = VerifyResult()\n")
+	buf.WriteString("    for sec in SECTIONS:\n")
+	buf.WriteString("        for op in sec.ops:\n")
+	buf.WriteString("            if await sec.exists(conn, op):\n")
+	buf.WriteString("                result.present.append((sec.kind, op.name))\n")
+	buf.WriteString("            else:\n")
+	buf.WriteString("                result.missing.append((sec.kind, op.name))\n")
+	buf.WriteString("    return result\n\n\n")
+
+	// Convenience functions
+	buf.WriteString("async def create_schema(conn: AsyncConnection) -> ExecutionResult:\n")
+	buf.WriteString("    \"\"\"Execute all DDL, failing on conflicts.\"\"\"\n")
+	buf.WriteString("    return await execute(conn, idempotent=False)\n\n\n")
+
+	buf.WriteString("async def ensure_schema(conn: AsyncConnection) -> ExecutionResult:\n")
+	buf.WriteString("    \"\"\"Execute all DDL idempotently, safe to run on existing databases.\"\"\"\n")
+	buf.WriteString("    return await execute(conn, idempotent=True)\n")
+
+	return buf.Bytes()
+}
+
+// pythonBool returns a Python bool literal.
+func pythonBool(b bool) string {
+	if b {
+		return "True"
+	}
+	return "False"
+}
+
+// Generate produces a Python file with all DDL statements as data tuples.
+// This is the single-file Generator interface method.
+func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
+	tuples, tables, diags := buildTuples(schema)
+	return renderDDLFile(tuples, tables), diags
+}
+
+// GenerateFiles implements MultiFileGenerator, producing two files:
+// schema_ddl.py (tuples) and schema_executor.py (section executor).
+func (g *PythonDDLGenerator) GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+	tuples, tables, diags := buildTuples(schema)
+	sections := buildSections(tuples)
+
+	files := map[string][]byte{
+		"schema_ddl.py":      renderDDLFile(tuples, tables),
+		"schema_executor.py": renderExecutorFile(sections),
+	}
+	return files, diags
 }
 
 // pythonEscapeStr returns a Python string literal for the given SQL.
@@ -565,10 +939,13 @@ func collectPartitionTuples(schemaName, parentTable string, children []model.Par
 	for i := range children {
 		child := &children[i]
 		*tuples = append(*tuples, ddlTuple{
-			SQL:   sql.CreatePartitionOf(schemaName, child, parentTable, false),
-			Kind:  "partition",
-			Table: child.Name,
-			Phase: 5,
+			SQL:           sql.CreatePartitionOf(schemaName, child, parentTable, false),
+			IdempotentSQL: sql.CreatePartitionOf(schemaName, child, parentTable, true),
+			Kind:          "partition",
+			Name:          child.Name,
+			Table:         child.Name,
+			Phase:         5,
+			Transactional: true,
 		})
 		if len(child.Children) > 0 {
 			collectPartitionTuples(schemaName, child.Name, child.Children, tuples)
