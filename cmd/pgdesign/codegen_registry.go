@@ -18,6 +18,7 @@ func SupportedModes() map[string][]string {
 		"drizzle":     {"ts"},
 		"sqlalchemy":  {"python"},
 		"jpa":         {"java"},
+		"ddl":         {"python"},
 	}
 }
 
@@ -129,6 +130,13 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 			return &codegen.JavaJPAGenerator{}, nil
 		default:
 			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: java)", mode, lang)
+		}
+	case "ddl":
+		switch lang {
+		case "python":
+			return &codegen.PythonDDLGenerator{}, nil
+		default:
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: python)", mode, lang)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported codegen mode: %s", mode)
