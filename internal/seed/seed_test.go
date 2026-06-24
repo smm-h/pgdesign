@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func testSchema() *model.Schema {
@@ -22,9 +23,9 @@ func testSchema() *model.Schema {
 				Comment: "Organizations",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "name", PGType: "text", NotNull: true, SemanticTypeName: "short_text"},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true, SemanticTypeName: "timestamp"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "short_text"},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true, SemanticTypeName: "timestamp"},
 				},
 			},
 			{
@@ -32,15 +33,15 @@ func testSchema() *model.Schema {
 				Comment: "Users",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "org_id", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
-					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email"},
-					{Name: "status", PGType: "public.status", NotNull: true},
-					{Name: "is_active", PGType: "boolean", NotNull: true, SemanticTypeName: "flag"},
-					{Name: "login_count", PGType: "bigint", NotNull: true, SemanticTypeName: "counter"},
-					{Name: "slug", PGType: "text", NotNull: true, SemanticTypeName: "slug"},
-					{Name: "bio", PGType: "text", NotNull: false},
-					{Name: "score", PGType: "bigint", NotNull: true, Generated: "login_count * 10", Stored: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "org_id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "ref"},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "email"},
+					{Name: "status", PGType: typeinfo.T("public.status"), NotNull: true},
+					{Name: "is_active", PGType: typeinfo.T("boolean"), NotNull: true, SemanticTypeName: "flag"},
+					{Name: "login_count", PGType: typeinfo.T("bigint"), NotNull: true, SemanticTypeName: "counter"},
+					{Name: "slug", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "slug"},
+					{Name: "bio", PGType: typeinfo.T("text"), NotNull: false},
+					{Name: "score", PGType: typeinfo.T("bigint"), NotNull: true, Generated: "login_count * 10", Stored: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_users_org", Columns: []string{"org_id"}, RefSchema: "public", RefTable: "organizations", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -247,7 +248,7 @@ func TestGenerate_AllPGTypes(t *testing.T) {
 	for _, pgType := range pgTypes {
 		cols = append(cols, model.Column{
 			Name:    "col_" + strings.ReplaceAll(pgType, " ", "_"),
-			PGType:  pgType,
+			PGType:  typeinfo.T(pgType),
 			NotNull: true,
 		})
 	}
@@ -463,8 +464,8 @@ func TestGenerate_NullInjection(t *testing.T) {
 				Comment: "Test nulls",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "col_text", PGType: "text", NotNull: false},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "col_text", PGType: typeinfo.T("text"), NotNull: false},
 				},
 			},
 		},
@@ -520,7 +521,7 @@ func TestGenerate_NullNeverForNotNull(t *testing.T) {
 				Comment: "Test not null",
 				PK:      []string{"col_text"},
 				Columns: []model.Column{
-					{Name: "col_text", PGType: "text", NotNull: true},
+					{Name: "col_text", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 		},
@@ -558,8 +559,8 @@ func TestGenerate_CheckRange(t *testing.T) {
 				Comment: "Test CHECK constraints",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "age", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "age", PGType: typeinfo.T("integer"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_age", Expr: "age >= 18 AND age <= 65"},
@@ -613,8 +614,8 @@ func TestGenerate_CheckLength(t *testing.T) {
 				Comment: "Test length CHECK",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "code", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "code", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_code_len", Expr: "length(code) <= 5"},
@@ -664,8 +665,8 @@ func TestGenerate_CheckRegex(t *testing.T) {
 				Comment: "Test regex CHECK",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "code", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "code", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_code_fmt", Expr: "code ~ '^[A-Z]{3}-[0-9]{4}$'"},
@@ -721,8 +722,8 @@ func TestGenerate_UniqueConstraint(t *testing.T) {
 				Comment: "Test unique",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "email"},
 				},
 				Uniques: []model.UniqueConstraint{
 					{Name: "uq_email", Columns: []string{"email"}},
@@ -770,8 +771,8 @@ func TestGenerate_ZipfFKDistribution(t *testing.T) {
 				Comment: "Categories",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 			{
@@ -779,8 +780,8 @@ func TestGenerate_ZipfFKDistribution(t *testing.T) {
 				Comment: "Items",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "cat_id", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "cat_id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "ref"},
 				},
 				FKs: []model.FK{
 					{Name: "fk_items_cat", Columns: []string{"cat_id"}, RefSchema: "public", RefTable: "categories", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -857,8 +858,8 @@ func TestGenerate_LogNormalMoney(t *testing.T) {
 				Comment: "Test money",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "amount", PGType: "bigint", NotNull: true, SemanticTypeName: "money"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "amount", PGType: typeinfo.T("bigint"), NotNull: true, SemanticTypeName: "money"},
 				},
 			},
 		},
@@ -924,8 +925,8 @@ func TestGenerate_ArrayPopulation(t *testing.T) {
 				Comment: "Test arrays",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "tags", PGType: "text", NotNull: true, Array: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "tags", PGType: typeinfo.T("text"), NotNull: true, Array: true},
 				},
 			},
 		},
@@ -1003,9 +1004,9 @@ func TestGenerate_FKCycleHandling(t *testing.T) {
 				Comment: "Departments",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "head_id", PGType: "uuid", NotNull: false, SemanticTypeName: "ref"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
+					{Name: "head_id", PGType: typeinfo.T("uuid"), NotNull: false, SemanticTypeName: "ref"},
 				},
 				FKs: []model.FK{
 					{Name: "fk_dept_head", Columns: []string{"head_id"}, RefSchema: "public", RefTable: "employees", RefColumns: []string{"id"}, OnDelete: "SET NULL"},
@@ -1016,9 +1017,9 @@ func TestGenerate_FKCycleHandling(t *testing.T) {
 				Comment: "Employees",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "dept_id", PGType: "uuid", NotNull: false, SemanticTypeName: "ref"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
+					{Name: "dept_id", PGType: typeinfo.T("uuid"), NotNull: false, SemanticTypeName: "ref"},
 				},
 				FKs: []model.FK{
 					{Name: "fk_emp_dept", Columns: []string{"dept_id"}, RefSchema: "public", RefTable: "departments", RefColumns: []string{"id"}, OnDelete: "SET NULL"},
@@ -1063,8 +1064,8 @@ func TestGenerate_FKCycleNotNull(t *testing.T) {
 				Comment: "Alpha",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "beta_id", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "beta_id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "ref"},
 				},
 				FKs: []model.FK{
 					{Name: "fk_alpha_beta", Columns: []string{"beta_id"}, RefSchema: "public", RefTable: "beta", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -1075,8 +1076,8 @@ func TestGenerate_FKCycleNotNull(t *testing.T) {
 				Comment: "Beta",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "alpha_id", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "alpha_id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "ref"},
 				},
 				FKs: []model.FK{
 					{Name: "fk_beta_alpha", Columns: []string{"alpha_id"}, RefSchema: "public", RefTable: "alpha", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -1110,8 +1111,8 @@ func TestGenerate_JSONBWithSchema(t *testing.T) {
 				Comment: "Test JSONB",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "schemas/data.json"},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "data", PGType: typeinfo.T("jsonb"), NotNull: true, JSONSchema: "schemas/data.json"},
 				},
 			},
 		},
@@ -1261,8 +1262,8 @@ func TestGenerate_CopyFormat_SkipsSerialColumns(t *testing.T) {
 				Comment: "Test serial",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "serial", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("serial"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 		},
@@ -1299,8 +1300,8 @@ func TestGenerate_BatchInsert(t *testing.T) {
 				Comment: "Test batch",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 		},
@@ -1487,8 +1488,8 @@ func TestGenerate_CopyFormat_NullValues(t *testing.T) {
 				Comment: "Test copy nulls",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "note", PGType: "text", NotNull: false},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "note", PGType: typeinfo.T("text"), NotNull: false},
 				},
 			},
 		},
