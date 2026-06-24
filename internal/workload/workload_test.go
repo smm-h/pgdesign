@@ -5,6 +5,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // findByCode filters diagnostics to those matching the given code.
@@ -27,8 +28,8 @@ func TestStructural_W022_JsonbWithoutGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "documents",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "data", PGType: "jsonb"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "data", PGType: typeinfo.T("jsonb")},
 			},
 			PK: []string{"id"},
 		}},
@@ -54,8 +55,8 @@ func TestStructural_W022_JsonbWithGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "documents",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "data", PGType: "jsonb"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "data", PGType: typeinfo.T("jsonb")},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -78,8 +79,8 @@ func TestStructural_W022_JsonbArrayNotTriggered(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "documents",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "data", PGType: "jsonb", Array: true},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "data", PGType: typeinfo.T("jsonb"), Array: true},
 			},
 			PK: []string{"id"},
 		}},
@@ -100,8 +101,8 @@ func TestStructural_W023_ArrayWithoutGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "posts",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "tags", PGType: "text", Array: true},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
 			},
 			PK: []string{"id"},
 		}},
@@ -121,8 +122,8 @@ func TestStructural_W023_ArrayWithGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "posts",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "tags", PGType: "text", Array: true},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -144,8 +145,8 @@ func TestStructural_W024_TsvectorWithoutGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "articles",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "search_vec", PGType: "tsvector"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "search_vec", PGType: typeinfo.T("tsvector")},
 			},
 			PK: []string{"id"},
 		}},
@@ -165,8 +166,8 @@ func TestStructural_W024_TsvectorWithGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "articles",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "search_vec", PGType: "tsvector"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "search_vec", PGType: typeinfo.T("tsvector")},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -189,8 +190,8 @@ func TestStructural_I005_TimestampAppendOnlyWithoutBRIN(t *testing.T) {
 			Name:       "events",
 			AppendOnly: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			PK: []string{"id"},
 		}},
@@ -214,8 +215,8 @@ func TestStructural_I005_TimestampWithBRIN(t *testing.T) {
 			Name:       "events",
 			AppendOnly: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -238,8 +239,8 @@ func TestStructural_I005_NonAppendOnlyNoTrigger(t *testing.T) {
 			Name:       "events",
 			AppendOnly: false,
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			PK: []string{"id"},
 		}},
@@ -258,8 +259,8 @@ func TestStructural_I005_PlainTimestamp(t *testing.T) {
 			Name:       "logs",
 			AppendOnly: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "logged_at", PGType: "timestamp"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "logged_at", PGType: typeinfo.T("timestamp")},
 			},
 			PK: []string{"id"},
 		}},
@@ -276,10 +277,10 @@ func TestStructural_MultipleColumnsMultipleDiags(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "mixed",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "payload", PGType: "jsonb"},
-				{Name: "tags", PGType: "text", Array: true},
-				{Name: "search", PGType: "tsvector"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "payload", PGType: typeinfo.T("jsonb")},
+				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
+				{Name: "search", PGType: typeinfo.T("tsvector")},
 			},
 			PK: []string{"id"},
 		}},
@@ -310,8 +311,8 @@ func TestStructural_GINMethodCaseInsensitive(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "documents",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "data", PGType: "jsonb"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "data", PGType: typeinfo.T("jsonb")},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -611,8 +612,8 @@ func TestLowSelectivity_I006_Detected(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "is_active", PGType: "boolean"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "is_active", PGType: typeinfo.T("boolean")},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -642,8 +643,8 @@ func TestLowSelectivity_I006_NoBooleanIndex(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "is_active", PGType: "boolean"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "is_active", PGType: typeinfo.T("boolean")},
 			},
 			PK: []string{"id"},
 		}},
@@ -661,9 +662,9 @@ func TestLowSelectivity_I006_MultiColumnIndex(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "is_active", PGType: "boolean"},
-				{Name: "name", PGType: "text"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "is_active", PGType: typeinfo.T("boolean")},
+				{Name: "name", PGType: typeinfo.T("text")},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -684,8 +685,8 @@ func TestLowSelectivity_I006_NonBooleanColumn(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "status", PGType: "text"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "status", PGType: typeinfo.T("text")},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -713,7 +714,7 @@ func TestExcessiveIndexes_I007_Detected(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "big_table",
-			Columns: []model.Column{{Name: "col", PGType: "text"}},
+			Columns: []model.Column{{Name: "col", PGType: typeinfo.T("text")}},
 			PK:      []string{"col"},
 			Indexes: indexes,
 		}},
@@ -739,7 +740,7 @@ func TestExcessiveIndexes_I007_BelowThreshold(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "normal_table",
-			Columns: []model.Column{{Name: "col", PGType: "text"}},
+			Columns: []model.Column{{Name: "col", PGType: typeinfo.T("text")}},
 			PK:      []string{"col"},
 			Indexes: indexes,
 		}},
@@ -759,7 +760,7 @@ func TestExcessiveIndexes_I007_ExactlyNine(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "borderline",
-			Columns: []model.Column{{Name: "col", PGType: "text"}},
+			Columns: []model.Column{{Name: "col", PGType: typeinfo.T("text")}},
 			PK:      []string{"col"},
 			Indexes: indexes,
 		}},
@@ -775,7 +776,7 @@ func TestExcessiveIndexes_I007_NoIndexes(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "empty",
-			Columns: []model.Column{{Name: "id", PGType: "bigint"}},
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("bigint")}},
 			PK:      []string{"id"},
 		}},
 	}
