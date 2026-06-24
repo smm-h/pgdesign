@@ -13,7 +13,7 @@ Database migration planning, generation, and execution
 
 ## migrate apply
 
-Apply all pending migrations to the target database
+Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.
 
 ### Flags
 
@@ -26,7 +26,7 @@ Apply all pending migrations to the target database
 
 ## migrate generate
 
-Generate versioned migration files from schema changes
+Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.
 
 ### Flags
 
@@ -44,7 +44,7 @@ Generate versioned migration files from schema changes
 
 ## migrate plan
 
-Plan migrations by diffing schema against live database
+Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.
 
 ### Flags
 
@@ -61,7 +61,7 @@ Plan migrations by diffing schema against live database
 
 ## migrate rollback
 
-Rollback applied database migrations to a target version
+Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.
 
 ### Flags
 
@@ -73,7 +73,7 @@ Rollback applied database migrations to a target version
 
 ## migrate squash
 
-Consolidate a range of migrations into a single file
+Consolidate a range of sequential migration files into a single optimized migration. Cancels inverse operation pairs, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.
 
 ### Flags
 
@@ -86,7 +86,7 @@ Consolidate a range of migrations into a single file
 
 ## migrate status
 
-Show which migrations have been applied to the database
+Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.
 
 ### Flags
 
@@ -97,7 +97,7 @@ Show which migrations have been applied to the database
 
 ## migrate test
 
-Test migrations by applying them against a staging database
+Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.
 
 ### Flags
 

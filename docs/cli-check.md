@@ -9,17 +9,17 @@ nav_order: 2
 
 # pgdesign check
 
-Run registered project checks and report diagnostic results
+Run project checks
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--all` |  | bool |  |  | Run every registered check regardless of tag filters |
-| `--tag` |  | str |  |  | Tag DSL expression to select which checks should run |
-| `--name` |  | str |  |  | Glob pattern to select checks by their registered name |
-| `--list` |  | bool |  |  | List all registered checks with their tags and severity |
-| `--json` |  | bool |  |  | Format output as machine-readable JSON instead of text |
-| `--ignore-warnings` |  | bool |  |  | Treat warnings as non-fatal so only errors cause failure |
-| `--verbose` |  | bool |  |  | Show detailed diagnostic output for each check result |
-| `--dry-run` |  | bool |  |  | Show which checks would run without actually executing |
+| `--all` |  | bool |  |  | Run all checks |
+| `--tag` |  | str |  |  | Tag DSL expression |
+| `--name` |  | str |  |  | Glob pattern for check names |
+| `--list` |  | bool |  |  | List checks and tags |
+| `--json` |  | bool |  |  | JSON output |
+| `--ignore-warnings` |  | bool |  |  | Warnings do not cause failure |
+| `--verbose` |  | bool |  |  | Show all details |
+| `--dry-run` |  | bool |  |  | Show plan without executing |
