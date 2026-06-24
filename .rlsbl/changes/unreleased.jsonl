@@ -1,0 +1,1 @@
+{"commits":["92a0599999b9c55ab287bc66b1791b0943d8637f","06b90dc4e03fa541ab1cf9c81a4a9a231f6b8f7f"],"user_facing":true,"description":"**Fix.** PyPI wrapper now uses correct version for binary download URL instead of hardcoded 0.1.0.","type":"fix"}
