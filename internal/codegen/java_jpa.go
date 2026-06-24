@@ -93,7 +93,15 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 			if !col.NotNull {
 				nullable = "true"
 			}
-			annotations = append(annotations, fmt.Sprintf("@Column(name = %q, nullable = %s)", col.Name, nullable))
+			if col.Default == nil && col.DefaultExpr != "" {
+				pgType := col.PGType
+				if col.Array {
+					pgType += "[]"
+				}
+				annotations = append(annotations, fmt.Sprintf("@Column(name = %q, nullable = %s, columnDefinition = %q)", col.Name, nullable, pgType+" DEFAULT "+col.DefaultExpr))
+			} else {
+				annotations = append(annotations, fmt.Sprintf("@Column(name = %q, nullable = %s)", col.Name, nullable))
+			}
 
 			ei.Fields = append(ei.Fields, fieldInfo{
 				Annotations: annotations,

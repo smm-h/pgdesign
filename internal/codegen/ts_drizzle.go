@@ -117,6 +117,9 @@ func (g *TSDrizzleGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 			if col.Default != nil {
 				def := *col.Default
 				mods.WriteString(drizzleDefault(def, &needSqlTemplate))
+			} else if col.DefaultExpr != "" {
+				needSqlTemplate = true
+				mods.WriteString(fmt.Sprintf(".default(sql`%s`)", col.DefaultExpr))
 			}
 
 			// .array()

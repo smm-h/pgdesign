@@ -118,6 +118,8 @@ func (g *GoGormGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 
 			if col.Default != nil {
 				tagParts = append(tagParts, "default:"+*col.Default)
+			} else if col.DefaultExpr != "" {
+				tagParts = append(tagParts, "default:"+col.DefaultExpr)
 			}
 
 			if idxName, ok := uniqueIndexCol[col.Name]; ok {

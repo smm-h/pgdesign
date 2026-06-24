@@ -185,6 +185,9 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 			if col.Default != nil {
 				needText = true
 				args = append(args, fmt.Sprintf("server_default=text(%q)", *col.Default))
+			} else if col.DefaultExpr != "" {
+				needText = true
+				args = append(args, fmt.Sprintf("server_default=text(%q)", col.DefaultExpr))
 			}
 
 			mappedCol := "mapped_column(" + strings.Join(args, ", ") + ")"
