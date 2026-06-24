@@ -1235,3 +1235,162 @@ func TestLoadStateMachineType_TransitionMissingName(t *testing.T) {
 		t.Error("expected diagnostic code E113 for transition missing name")
 	}
 }
+
+func TestShadowBuiltin_Success(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// The builtin "id" is KindScalar with BaseType "uuid" and DefaultExpr "gen_random_uuid()".
+	// Shadow it with same Kind and BaseType but a different Check constraint.
+	userTypes := []UserTypeDef{
+		{
+			Name:  "id",
+			Kind:  "scalar",
+			Base:  "uuid",
+			Check: "VALUE IS NOT NULL",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	// I101 should be emitted via ShadowDiags.
+	shadowDiags := r.ShadowDiags()
+	foundI101 := false
+	for _, d := range shadowDiags {
+		if d.Code == "I101" {
+			foundI101 = true
+			break
+		}
+	}
+	if !foundI101 {
+		t.Error("expected I101 diagnostic for builtin shadowing, got none")
+	}
+
+	// Resolve should return the user's version.
+	td, err := r.Resolve("id")
+	if err != nil {
+		t.Fatalf("Resolve(id) error: %v", err)
+	}
+	if td.Source != "user" {
+		t.Errorf("Source = %q, want %q", td.Source, "user")
+	}
+	if td.Check != "VALUE IS NOT NULL" {
+		t.Errorf("Check = %q, want %q", td.Check, "VALUE IS NOT NULL")
+	}
+	// DefaultExpr should be gone (user version doesn't set it).
+	if td.DefaultExpr != "" {
+		t.Errorf("DefaultExpr = %q, want empty (user version)", td.DefaultExpr)
+	}
+}
+
+func TestShadowBuiltin_SealedViolation_Kind(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// Builtin "id" is KindScalar. Try to shadow with KindEnum.
+	userTypes := []UserTypeDef{
+		{
+			Name:   "id",
+			Kind:   "enum",
+			Values: []string{"a", "b"},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	// The loadEnumType path won't produce E114 directly; it comes from Register
+	// via ShadowDiags. Check both.
+	shadowDiags := r.ShadowDiags()
+	allDiags := append(diags, shadowDiags...)
+
+	foundE114 := false
+	for _, d := range allDiags {
+		if d.Code == "E114" {
+			foundE114 = true
+			break
+		}
+	}
+	if !foundE114 {
+		t.Error("expected E114 for sealed field Kind violation, got none")
+	}
+}
+
+func TestShadowBuiltin_SealedViolation_BaseType(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// Builtin "id" has BaseType "uuid". Try to shadow with BaseType "text".
+	userTypes := []UserTypeDef{
+		{
+			Name: "id",
+			Kind: "scalar",
+			Base: "text",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	shadowDiags := r.ShadowDiags()
+	allDiags := append(diags, shadowDiags...)
+
+	foundE114 := false
+	for _, d := range allDiags {
+		if d.Code == "E114" {
+			foundE114 = true
+			break
+		}
+	}
+	if !foundE114 {
+		t.Error("expected E114 for sealed field BaseType violation, got none")
+	}
+}
+
+func TestIsBuiltin(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// Before shadowing: "id" is builtin.
+	if !r.IsBuiltin("id") {
+		t.Error("IsBuiltin(id) = false before shadowing, want true")
+	}
+
+	// Non-existent type is not builtin.
+	if r.IsBuiltin("nonexistent") {
+		t.Error("IsBuiltin(nonexistent) = true, want false")
+	}
+
+	// Shadow the builtin.
+	userTypes := []UserTypeDef{
+		{
+			Name:  "id",
+			Kind:  "scalar",
+			Base:  "uuid",
+			Check: "VALUE IS NOT NULL",
+		},
+	}
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	// After shadowing: "id" is no longer builtin.
+	if r.IsBuiltin("id") {
+		t.Error("IsBuiltin(id) = true after shadowing, want false")
+	}
+}
+
+func TestIdempotentRegistration(t *testing.T) {
+	r := NewRegistry()
+	td1 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("text"), Source: "user"}
+	if err := r.Register(td1); err != nil {
+		t.Fatalf("first Register failed: %v", err)
+	}
+
+	// Identical registration should succeed silently.
+	td2 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("text"), Source: "user"}
+	if err := r.Register(td2); err != nil {
+		t.Fatalf("identical duplicate should succeed, got: %v", err)
+	}
+
+	// No shadow diagnostics should be emitted.
+	if len(r.ShadowDiags()) != 0 {
+		t.Errorf("expected no shadow diagnostics for idempotent registration, got %d", len(r.ShadowDiags()))
+	}
+}

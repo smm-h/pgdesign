@@ -88,6 +88,7 @@ type Registry struct {
 	mu             sync.RWMutex
 	types          map[string]*TypeDef
 	extensionTypes map[string]bool
+	shadowDiags    diagnostic.Diagnostics // diagnostics from builtin shadowing in Register()
 }
 
 // NewRegistry creates an empty Registry.
@@ -113,21 +114,73 @@ func (r *Registry) AddExtensionTypes(typeNames []string) {
 }
 
 // Register adds a type definition to the registry.
-// If a type with the same name already exists with an identical definition,
-// the registration is silently accepted (idempotent for multi-file schemas).
-// Returns an error if a type with the same name exists with a different definition.
+// Decision tree:
+//  1. Name not in registry: register normally.
+//  2. Name exists + identical definition: accept silently (idempotent for multi-file schemas).
+//  3. Name exists + different definition + existing is builtin: allow shadowing if sealed
+//     fields (Kind, BaseType.Base) match. Emits I101 on success, E114 on sealed field mismatch.
+//  4. Name exists + different definition + existing is not builtin: E105 error.
 func (r *Registry) Register(td *TypeDef) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if existing, exists := r.types[td.Name]; exists {
-		if typeDefsEqual(existing, td) {
+	existing, exists := r.types[td.Name]
+	if !exists {
+		r.types[td.Name] = td
+		return nil
+	}
+
+	if typeDefsEqual(existing, td) {
+		return nil
+	}
+
+	// Different definition: check if shadowing a builtin.
+	if existing.Source == "builtin" {
+		// Sealed field checks: Kind and BaseType.Base must match.
+		if existing.Kind != td.Kind {
+			r.shadowDiags = append(r.shadowDiags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E114",
+				Message:  fmt.Sprintf("type %q shadows builtin %q but has different Kind (sealed field cannot change)", td.Name, td.Name),
+			})
 			return nil
 		}
-		return fmt.Errorf("type %q already registered with a different definition", td.Name)
+		if existing.BaseType.Base != td.BaseType.Base {
+			r.shadowDiags = append(r.shadowDiags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E114",
+				Message:  fmt.Sprintf("type %q shadows builtin %q but has different BaseType (sealed field cannot change)", td.Name, td.Name),
+			})
+			return nil
+		}
+
+		// Sealed fields match: allow shadowing.
+		r.shadowDiags = append(r.shadowDiags, diagnostic.Diagnostic{
+			Severity: diagnostic.Info,
+			Code:     "I101",
+			Message:  fmt.Sprintf("type %q shadows builtin type %q", td.Name, td.Name),
+		})
+		r.types[td.Name] = td
+		return nil
 	}
-	r.types[td.Name] = td
-	return nil
+
+	return fmt.Errorf("type %q already registered with a different definition", td.Name)
+}
+
+// ShadowDiags returns diagnostics accumulated during Register() calls for
+// builtin shadowing (I101 info, E114 errors). Call after LoadUserTypes().
+func (r *Registry) ShadowDiags() diagnostic.Diagnostics {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.shadowDiags
+}
+
+// IsBuiltin returns true if the named type exists in the registry with Source "builtin".
+func (r *Registry) IsBuiltin(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	td, ok := r.types[name]
+	return ok && td.Source == "builtin"
 }
 
 // typeDefsEqual returns true if two TypeDefs have equivalent definitions.
