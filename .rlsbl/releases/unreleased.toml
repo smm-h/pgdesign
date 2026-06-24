@@ -1,0 +1,17 @@
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Structured type system with typeinfo package, type extends mechanism, UUID v7 support, and safety improvements"
+# Optional context explaining why these changes were made
+context = """
+This release introduces two foundational features: the typeinfo package for structured PostgreSQL type \
+representation (alias normalization, precision/scale parsing, DDL reconstruction), and the type extends \
+mechanism that enables user-defined types to derive from builtins or other types with per-kind merge \
+semantics (scalar field overlay, enum additive values, composite additive fields, state machine additive \
+states/transitions). Also includes UUID v7/pg_uuidv7 support, DefaultExpr emission in all four ORM \
+codegen modules, a testdb teardown safety guard, and a PyPI wrapper version sync fix.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
