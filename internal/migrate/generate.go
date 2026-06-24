@@ -500,15 +500,15 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			m.DDLOps = append(m.DDLOps, op)
 			diags = append(diags, classifyOp(op, risk.OpAddColumn, colCtx)...)
 
-			// Volatile defaults trigger table rewrites even on PG 11+.
-			if isVolatileDefault(op.Default) {
+			// Non-immutable defaults trigger table rewrites even on PG 11+.
+			if isNonImmutableDefault(op.Default) {
 				defaultStr := fmt.Sprintf("%v", op.Default)
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Warning,
-					Code:       "VOLATILE_DEFAULT",
+					Code:       "NON_IMMUTABLE_DEFAULT",
 					Table:      td.Name,
 					Column:     col.Name,
-					Message:    fmt.Sprintf("Column %s.%s has volatile default %q; volatile defaults trigger table rewrites even on PG 11+", td.Name, col.Name, defaultStr),
+					Message:    fmt.Sprintf("Column %s.%s has non-immutable default %q; non-immutable defaults trigger table rewrites even on PG 11+", td.Name, col.Name, defaultStr),
 					Suggestion: "Consider adding the column without a default, then backfilling with a DML step",
 				})
 			}
@@ -1606,23 +1606,31 @@ func splitLargeFKOp(op DDLOp, ctx risk.OpContext, threshold int64) ([]DDLOp, []d
 	return []DDLOp{addNotValid, validate}, nil
 }
 
-// isVolatileDefault checks whether a DDLOp default value contains a volatile
-// PostgreSQL function call. Volatile defaults trigger table rewrites even on
-// PG 11+ when adding a NOT NULL column.
-func isVolatileDefault(val interface{}) bool {
+// nonImmutablePatterns lists PostgreSQL function calls whose defaults are not
+// IMMUTABLE. PG 11+ only avoids table rewrites for IMMUTABLE defaults, so
+// STABLE functions (now(), statement_timestamp()) and VOLATILE functions
+// (gen_random_uuid(), random(), etc.) all trigger rewrites.
+var nonImmutablePatterns = []string{
+	"now()",
+	"clock_timestamp()",
+	"random()",
+	"nextval(",
+	"gen_random_uuid()",
+	"txid_current()",
+	"statement_timestamp()",
+	"uuid_generate_v7()",
+	"uuid_generate_v4()",
+}
+
+// isNonImmutableDefault checks whether a DDLOp default value contains a
+// non-immutable PostgreSQL function call. Non-immutable defaults (STABLE or
+// VOLATILE) trigger table rewrites even on PG 11+ when adding a NOT NULL column.
+func isNonImmutableDefault(val interface{}) bool {
 	if val == nil {
 		return false
 	}
 	s := strings.ToLower(fmt.Sprintf("%v", val))
-	for _, pattern := range []string{
-		"now()",
-		"clock_timestamp()",
-		"random()",
-		"nextval(",
-		"gen_random_uuid()",
-		"txid_current()",
-		"statement_timestamp()",
-	} {
+	for _, pattern := range nonImmutablePatterns {
 		if strings.Contains(s, pattern) {
 			return true
 		}

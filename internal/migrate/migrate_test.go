@@ -4302,7 +4302,7 @@ func TestBatchSize_ZeroNotSerialized(t *testing.T) {
 	}
 }
 
-func TestGenerateMigration_VolatileDefault(t *testing.T) {
+func TestGenerateMigration_NonImmutableDefault(t *testing.T) {
 	tests := []struct {
 		name       string
 		defaultVal string
@@ -4315,6 +4315,8 @@ func TestGenerateMigration_VolatileDefault(t *testing.T) {
 		{"nextval", "nextval('my_seq')", true},
 		{"txid_current()", "txid_current()", true},
 		{"statement_timestamp()", "statement_timestamp()", true},
+		{"uuid_generate_v7()", "uuid_generate_v7()", true},
+		{"uuid_generate_v4()", "uuid_generate_v4()", true},
 		{"constant_int", "42", false},
 		{"constant_string", "'hello'", false},
 		{"NOW_uppercase", "NOW()", true}, // case-insensitive
@@ -4351,23 +4353,23 @@ func TestGenerateMigration_VolatileDefault(t *testing.T) {
 
 			found := false
 			for _, diag := range diags {
-				if diag.Code == "VOLATILE_DEFAULT" {
+				if diag.Code == "NON_IMMUTABLE_DEFAULT" {
 					found = true
 					break
 				}
 			}
 
 			if tt.wantWarn && !found {
-				t.Errorf("expected VOLATILE_DEFAULT diagnostic for default %q, got none", tt.defaultVal)
+				t.Errorf("expected NON_IMMUTABLE_DEFAULT diagnostic for default %q, got none", tt.defaultVal)
 			}
 			if !tt.wantWarn && found {
-				t.Errorf("did not expect VOLATILE_DEFAULT diagnostic for default %q, but got one", tt.defaultVal)
+				t.Errorf("did not expect NON_IMMUTABLE_DEFAULT diagnostic for default %q, but got one", tt.defaultVal)
 			}
 		})
 	}
 }
 
-func TestIsVolatileDefault(t *testing.T) {
+func TestIsNonImmutableDefault(t *testing.T) {
 	tests := []struct {
 		val    interface{}
 		expect bool
@@ -4381,17 +4383,19 @@ func TestIsVolatileDefault(t *testing.T) {
 		{"random()", true},
 		{"txid_current()", true},
 		{"statement_timestamp()", true},
+		{"uuid_generate_v7()", true},
+		{"uuid_generate_v4()", true},
 		{42, false},
 		{"42", false},
 		{"'hello'", false},
-		{"current_timestamp", false}, // not volatile, it's stable
+		{"current_timestamp", false}, // stable but not in the list; PG treats it specially
 		{true, false},
 	}
 
 	for _, tt := range tests {
-		got := isVolatileDefault(tt.val)
+		got := isNonImmutableDefault(tt.val)
 		if got != tt.expect {
-			t.Errorf("isVolatileDefault(%v) = %v, want %v", tt.val, got, tt.expect)
+			t.Errorf("isNonImmutableDefault(%v) = %v, want %v", tt.val, got, tt.expect)
 		}
 	}
 }
