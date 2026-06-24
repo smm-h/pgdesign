@@ -13,8 +13,7 @@ compares to other migration tools.
 
 ## Expand / Migrate / Contract Pattern
 
-Every DDL and DML operation in a generated migration is classified into one
-of three phases:
+Every DDL and DML operation in a generated migration is classified into one of three phases based on its impact on the database: expand operations are additive and non-destructive, migrate operations move or validate data, and contract operations are destructive or require exclusive locks. This classification enables the executor to run operations in a safe order: all expand operations first, then data migrations, then destructive changes, minimizing the window where exclusive locks are held.
 
 | Phase | Purpose | Examples |
 |---|---|---|
@@ -24,8 +23,7 @@ of three phases:
 
 ### Phase classification algorithm
 
-Phase assignment happens in `AnnotatePhases` (`phase.go`). For each DDL
-operation, the system:
+Phase assignment happens in `AnnotatePhases` defined in `phase.go`, which processes each DDL and DML operation to determine whether it belongs in the expand, migrate, or contract phase. The classification uses a combination of operation type, risk level from the risk classification system, and hardcoded rules for known destructive operations. DML operations are unconditionally assigned to the migrate phase regardless of their risk level. For each DDL operation, the system:
 
 1. Builds a `risk.OpContext` from the operation's own fields (nullable,
    has-default, PG version).
@@ -46,9 +44,7 @@ operation, the system:
 
 ### Single-file phase annotations
 
-Phase metadata is a `Phase` field on each `DDLOp` and `DMLOp` within a
-single migration file. This contrasts with tools that use separate files per
-phase:
+Phase metadata is stored as a `Phase` field on each `DDLOp` and `DMLOp` within a single migration TOML file, keeping all operations for a version change together in one document. This design contrasts with tools like pgroll and Reshape that use separate files or phases per migration step, and with tools like Flyway and Liquibase that use imperative migrations with no automatic phasing at all. The single-file approach simplifies version tracking while still enabling phased execution through per-operation annotations.
 
 - **pgroll** uses separate expand/contract phases backed by column proxying
   and view-based dual-write, enabling zero-downtime column renames and type
@@ -86,22 +82,11 @@ creation rather than an incremental change, so phasing is not meaningful.
 
 ### The problem: lock queue cascades
 
-Adding a foreign key constraint with `ALTER TABLE ... ADD CONSTRAINT ...
-REFERENCES ...` acquires an `ACCESS EXCLUSIVE` lock on the source table and
-a `SHARE ROW EXCLUSIVE` lock on the referenced table. The `ACCESS EXCLUSIVE`
-lock blocks all concurrent operations -- reads, writes, and other DDL. Worse,
-PostgreSQL's lock queue is FIFO: if the lock request waits behind a running
-transaction, every subsequent operation on that table queues behind the lock
-request. On a busy table, this cascades into a pile-up of blocked queries that
-can cause an outage.
+Adding a foreign key constraint with `ALTER TABLE ... ADD CONSTRAINT ... REFERENCES ...` on a large table creates a cascade of locking problems that can escalate into a production outage. The operation acquires an ACCESS EXCLUSIVE lock on the source table and a SHARE ROW EXCLUSIVE lock on the referenced table, blocking all concurrent reads and writes. PostgreSQL's lock queue is FIFO: if the lock request waits behind a long-running transaction, every subsequent query on that table queues behind the lock request, creating a pile-up of blocked connections that can exhaust the connection pool.
 
 ### The solution: two-phase constraint addition
 
-`splitLargeFKOp` in `generate.go` detects when a foreign key is being added
-to a table with an estimated row count exceeding the `largeFKThreshold`
-(default: 10,000 rows, sourced from `TableStats` -- a `map[string]int64`
-of table name to estimated row count from `pg_stat_user_tables`). When the
-threshold is exceeded, the single `add_fk` operation splits into two:
+`splitLargeFKOp` in `generate.go` automatically detects when a foreign key is being added to a table with an estimated row count exceeding the `largeFKThreshold` (default: 10,000 rows, sourced from `TableStats` built from `pg_stat_user_tables`). It splits the single `add_fk` operation into a safe two-phase sequence. The first phase adds the constraint with NOT VALID, registering it in the catalog without scanning existing rows. The second phase validates the constraint under a SHARE UPDATE EXCLUSIVE lock that allows concurrent reads and writes. When the threshold is exceeded, the two operations are:
 
 1. **`add_fk_not_valid`** -- `ALTER TABLE ... ADD CONSTRAINT ... NOT VALID`.
    Registers the constraint in the catalog without scanning existing rows.
@@ -149,7 +134,7 @@ until zero rows match.
 
 ### Backfill SQL generation
 
-`buildBackfillSQL` in `generate.go` produces the backfill statement:
+`buildBackfillSQL` in `generate.go` produces the SQL UPDATE statement used to fill NULL values in existing rows when adding a NOT NULL constraint to a column that already has data. The generated SQL uses COALESCE to preserve any existing non-NULL values while filling NULL rows with a type-appropriate default. The `typeZeroValue` function provides sensible defaults for each PostgreSQL type: `false` for boolean, empty string for text, zero UUID for UUID, empty JSON for JSONB, current timestamp for date/time types, and zero for numeric types.
 
 ```sql
 UPDATE "table" SET "col" = COALESCE("col", <default>) WHERE "col" IS NULL
@@ -173,9 +158,7 @@ regardless of table size.
 
 ### Non-immutable defaults still require a rewrite
 
-Non-immutable functions -- those that can return different values on each
-call -- cannot use this optimization. `isNonImmutableDefault` in
-`generate.go` detects the following non-immutable functions:
+Non-immutable functions, which can return different values on each call, cannot use the PG 11 metadata-only optimization because PostgreSQL needs to compute a distinct value for each existing row. The `isNonImmutableDefault` function in `generate.go` detects these volatile defaults by checking for known non-immutable function calls in the default expression. When a volatile default is detected on a NOT NULL column addition, the risk classification is escalated because the operation requires a full table rewrite on pre-PG 11 databases or batched DML on PG 11+ to avoid holding exclusive locks.
 
 - `now()`
 - `clock_timestamp()`
@@ -199,9 +182,7 @@ classification escalates. `classifyAddColumn` in `risk.go` handles this:
 
 ## Squash Consolidation
 
-`SquashMigrations` in `squash.go` combines a range of migrations into one.
-After concatenating all DDL and DML operations, `optimizeDDLOps` runs a
-three-pass optimization:
+`SquashMigrations` in `squash.go` combines a range of sequential migrations into a single optimized migration that produces the same final schema state. After concatenating all DDL and DML operations from the source migrations, the `optimizeDDLOps` function runs a three-pass optimization pipeline that eliminates redundant operations, merges sequential type changes, and folds additive operations into CREATE TABLE statements. The result is a minimal migration that is typically much shorter than the sum of its source migrations.
 
 ### Pass 1: Cancel inverse pairs
 
@@ -255,14 +236,13 @@ operations are preserved.
 
 ### Result reporting
 
-`SquashResult` reports: the squashed `Migration`, original file paths,
-counts of cancelled pairs, merged ops, and consolidated ops.
+`SquashResult` reports the complete outcome of the squash operation including the squashed `Migration` struct, the list of original file paths that were consumed, and counts of how many operations were optimized at each pass: cancelled inverse pairs, merged sequential type changes, and operations consolidated into CREATE TABLE statements. These counts are displayed to the user to explain how the squash reduced the migration's complexity and help verify that the optimization produced the expected result.
 
 ## Multi-Step Rollback
 
 ### Single rollback
 
-`Rollback` in `rollback.go` reverts the most recently applied migration:
+`Rollback` in `rollback.go` reverts the most recently applied migration by executing its down operations in reverse order within a transaction. The function acquires an advisory lock to prevent concurrent rollback or apply operations, loads the migration file from disk, verifies that all operations are reversible before executing any rollback steps, and removes the version from the tracking table on successful completion. Non-transactional operations are handled by committing and reopening the transaction as needed.
 
 1. Acquires advisory lock (prevents concurrent rollback/apply).
 2. Queries the `pgdesign_migrations` table for the latest applied version.
@@ -280,7 +260,7 @@ counts of cancelled pairs, merged ops, and consolidated ops.
 
 ### Range rollback
 
-`RollbackTo` rolls back all migrations after a target version:
+`RollbackTo` rolls back all migrations applied after a specified target version, reverting them in reverse application order. The critical design feature is the pre-check: before executing any rollback step, the function verifies that ALL migrations in the rollback range are fully reversible. Without this pre-check, a partial rollback could leave the database in an intermediate state when a later migration turns out to contain an irreversible operation. Each migration is rolled back in its own transaction for isolation.
 
 1. Acquires advisory lock.
 2. Validates that the target version is currently applied.
@@ -304,8 +284,7 @@ and returns a descriptive error identifying which operation is irreversible.
 
 ### Risk levels
 
-Every DDL operation receives a risk level from `risk.Classify` in
-`risk/risk.go`:
+Every DDL operation receives a risk level from `risk.Classify` in `risk/risk.go`, which evaluates the operation type, its parameters, and the PostgreSQL version context to determine whether the operation is Safe, Caution, or Dangerous. The classification drives multiple downstream decisions including phase assignment, NOT VALID splitting, safe-ops collapse, and diagnostic generation. Risk levels are also displayed in migration plan output for human review.
 
 | Level | Meaning | Examples |
 |---|---|---|
@@ -315,7 +294,7 @@ Every DDL operation receives a risk level from `risk.Classify` in
 
 ### Lock types
 
-The risk system also tracks the PostgreSQL lock mode each operation acquires:
+The risk system also tracks the PostgreSQL lock mode that each operation acquires, because the lock type determines whether concurrent reads and writes can proceed during the operation. PostgreSQL uses a hierarchy of lock modes from the least restrictive (no lock) to the most restrictive (ACCESS EXCLUSIVE which blocks everything). Understanding the lock mode is essential for assessing the real-world impact of a migration on a production database under load.
 
 | Lock | Concurrent reads | Concurrent writes | Concurrent DDL |
 |---|---|---|---|
@@ -327,8 +306,7 @@ The risk system also tracks the PostgreSQL lock mode each operation acquires:
 
 ### Table size escalation
 
-`applyTableSizeEscalation` modifies the base classification based on
-estimated row count:
+`applyTableSizeEscalation` modifies the base risk classification based on the estimated row count of the affected table, because the same operation has very different impacts on a 1000-row table versus a 10-million-row table. An ACCESS EXCLUSIVE lock on a small table completes in milliseconds, but on a large table it blocks all concurrent access for a duration proportional to the data volume. The function uses two escalation thresholds based on row count estimates from `pg_stat_user_tables`.
 
 - **>1M rows** with `ACCESS EXCLUSIVE` lock and `Caution` base risk:
   escalated to **Dangerous**. The reasoning is that an exclusive lock on a
@@ -338,8 +316,7 @@ estimated row count:
 
 ### ADD COLUMN classification
 
-`classifyAddColumn` has special-case logic because the risk depends heavily
-on context:
+`classifyAddColumn` has special-case logic because the risk of adding a column depends heavily on the combination of nullability, default value presence, default immutability, and PostgreSQL version. A nullable column addition is always metadata-only, but a NOT NULL column with a volatile default like `gen_random_uuid()` on pre-PG 11 requires a full table rewrite that holds an ACCESS EXCLUSIVE lock for the duration. The function evaluates all four factors to produce the correct risk classification.
 
 | Scenario | Risk | Lock | Reason |
 |---|---|---|---|
@@ -365,8 +342,7 @@ on context:
 
 ## Non-Transactional Operations
 
-Some PostgreSQL DDL statements cannot execute inside a transaction block.
-`IsNonTransactional` in `sql_gen.go` identifies three operation types:
+Some PostgreSQL DDL statements cannot execute inside a transaction block and will fail with an error if attempted. The `IsNonTransactional` function in `sql_gen.go` identifies these operations so the migration executor can handle them by committing the current transaction, executing the operation on the bare connection, and then opening a new transaction for subsequent operations. This transparent handling means migrations can mix transactional and non-transactional operations without manual intervention. Three operation types are identified:
 
 - **`create_index_concurrently`** -- `CREATE INDEX CONCURRENTLY` builds
   the index without holding a lock that blocks writes, but requires running
@@ -385,8 +361,7 @@ self-documenting.
 
 ## Advisory Locks
 
-Migrations use PostgreSQL session-level advisory locks to prevent concurrent
-execution:
+Migrations use PostgreSQL session-level advisory locks to prevent concurrent execution by multiple migration processes connecting to the same database. The lock is acquired at the beginning of every apply, rollback, and rollback-to operation, ensuring that no two migration processes can modify the schema simultaneously. The lock uses non-blocking acquisition via `pg_try_advisory_lock`, which returns false immediately if another process holds the lock rather than waiting indefinitely.
 
 ```sql
 SELECT pg_try_advisory_lock(hashtext('pgdesign_migrate'))
