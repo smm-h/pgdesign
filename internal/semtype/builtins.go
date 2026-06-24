@@ -99,6 +99,7 @@ func NewBuiltinRegistry() *Registry {
 	}
 
 	for _, td := range builtins {
+		td.Source = "builtin"
 		// Builtins are guaranteed to not collide, panic on programmer error.
 		if err := r.Register(td); err != nil {
 			panic("builtin registration failed: " + err.Error())

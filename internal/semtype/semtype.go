@@ -80,6 +80,7 @@ type TypeDef struct {
 	Stored      bool             // whether generated column is stored
 	Identity    string           // identity generation: "ALWAYS" or "BY DEFAULT"
 	Array       bool
+	Source      string           // "builtin" or "user" — metadata, not compared by typeDefsEqual
 }
 
 // Registry holds named TypeDefs with thread-safe read access.
@@ -395,6 +396,7 @@ func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
 		EnumValues: ut.Values,
 		Array:      ut.Array,
 		Comment:    ut.Comment,
+		Source:     "user",
 	}
 
 	if ut.NotNull != nil {
@@ -486,6 +488,7 @@ func (r *Registry) loadCompositeType(ut UserTypeDef) diagnostic.Diagnostics {
 		BaseType: typeinfo.Type{Base: ut.Name}, // composite types use their own name as PG type
 		Fields:   fields,
 		Comment:  ut.Comment,
+		Source:   "user",
 	}
 
 	if err := r.Register(td); err != nil {
@@ -568,6 +571,7 @@ func (r *Registry) loadScalarType(ut UserTypeDef) diagnostic.Diagnostics {
 		Unique:      ut.Unique,
 		Array:       ut.Array,
 		Comment:     ut.Comment,
+		Source:      "user",
 	}
 
 	if ut.NotNull != nil {
@@ -704,6 +708,7 @@ func (r *Registry) loadStateMachineType(ut UserTypeDef) diagnostic.Diagnostics {
 		InitialState:   ut.InitialState,
 		EnforceTrigger: ut.EnforceTrigger,
 		Comment:        ut.Comment,
+		Source:         "user",
 	}
 
 	if ut.NotNull != nil {
