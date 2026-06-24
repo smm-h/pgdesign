@@ -1,6 +1,6 @@
 ---
 title: "Validation Rules"
-description: "Complete reference for all pgdesign validation rules: error codes, warning codes, and NF audit diagnostics."
+description: "Complete reference for all pgdesign validation rules including error codes, warning codes, normal form audit diagnostics, codegen diagnostics, and coverage checks."
 ---
 
 # Validation Rules
@@ -9,11 +9,11 @@ pgdesign's validator checks schemas for errors and warnings. Errors block DDL ge
 
 ## Error rules
 
-Errors indicate problems that must be fixed.
+Errors indicate problems in the schema definition that must be fixed before DDL generation can proceed. Each error has a unique code starting with E and identifies a specific violation of pgdesign's schema rules. Common errors include missing type definitions, missing ON DELETE clauses on foreign keys, missing table comments, and usage of deprecated PostgreSQL types. Errors are always reported regardless of configuration and cannot be suppressed via the validate.disable setting.
 
 ### E200: Missing column type
 
-A column has no PG type after type resolution. This usually means the column references an undefined semantic type.
+A column has no PostgreSQL type after type resolution, which means the column references an undefined semantic type name that does not exist in either the built-in type registry or the user-defined types section of the schema. This is one of the most common errors when starting a new schema, typically caused by a typo in the type name or by referencing a type that has not yet been defined in the TOML file.
 
 ```toml
 [tables.users.columns.name]
@@ -22,7 +22,7 @@ type = "nonexistent_type"  # E200: column missing type
 
 ### E201: FK missing ON DELETE
 
-Every foreign key must declare an `on_delete` clause.
+Every foreign key must explicitly declare an `on_delete` clause specifying what happens when the referenced row is deleted. PostgreSQL defaults to NO ACTION when on_delete is omitted, but this implicit default is a common source of integrity issues because developers often forget to consider the deletion behavior when defining foreign keys. pgdesign requires the explicit declaration to force a conscious decision about cascading, restricting, or nullifying on each foreign key relationship.
 
 ```toml
 [tables.posts.fks.fk_posts_author]
@@ -36,7 +36,7 @@ ref_columns = ["id"]
 
 ### E202: Table missing comment
 
-Every table must have a `comment` field.
+Every table must have a `comment` field that describes the table's purpose in the schema. pgdesign generates COMMENT ON TABLE statements in the DDL from these descriptions, making them visible in PostgreSQL's pg_catalog and in database tools like pgAdmin. Requiring comments forces documentation at the schema level, ensuring that every table has at least a brief description of what data it holds and why it exists in the system.
 
 ```toml
 [tables.users]
@@ -50,7 +50,7 @@ type = "id"
 
 ### E203: Table missing primary key
 
-Every table must have a primary key. Tables with an `id` or `auto_id` typed column get a PK inferred automatically.
+Every table must have a primary key to uniquely identify rows and enable efficient lookups, joins, and foreign key references. Tables that include a column using the `id` or `auto_id` semantic type get a primary key inferred automatically on that column, so an explicit `pk` declaration is only needed when using a different column or a composite primary key. Tables without any PK declaration and without an id-typed column produce this error.
 
 ```toml
 [tables.logs]
@@ -65,7 +65,7 @@ type = "short_text"
 
 ### E204: FK references non-existent target
 
-A foreign key references a table or column that does not exist in the schema.
+A foreign key references a table or column that does not exist in the schema. This can happen when a table name is misspelled in the `ref_table` field, when the referenced column name does not match the target table's actual column names, or when the referenced table has been removed from the schema without updating the foreign keys that point to it. The validator checks both the table existence and the column existence within that table.
 
 ```toml
 [tables.posts.fks.fk_posts_category]
@@ -77,11 +77,11 @@ on_delete = "RESTRICT"
 
 ### E206: Duplicate index
 
-An index's columns are an exact prefix of another index on the same table.
+An index's columns are an exact duplicate of another index on the same table, meaning both indexes cover the same columns in the same order with the same method. Duplicate indexes waste disk space, slow down write operations because PostgreSQL must maintain both indexes on every INSERT, UPDATE, and DELETE, and provide no query performance benefit since the query planner only uses one index at a time. This differs from W007 (redundant index) which detects leading-prefix overlaps rather than exact duplicates.
 
 ### E207: varchar usage
 
-`varchar` or `character varying` is used instead of `text`. pgdesign enforces `text` with `CHECK` constraints for length limits.
+`varchar` or `character varying` is used as a base type instead of `text`. In PostgreSQL, `varchar(N)` and `text` with a CHECK constraint have identical performance characteristics, but `text` with an explicit CHECK is more flexible because the length limit can be changed by modifying the CHECK constraint without a table rewrite. pgdesign enforces this convention by requiring `text` with `CHECK(LENGTH(col) <= N)` for length-limited string columns, or the `short_text` built-in type which provides this pattern automatically.
 
 ```toml
 # Don't do this -- use short_text or text with check instead
@@ -93,13 +93,13 @@ type = "scalar"  # with base_type = "varchar(255)"
 
 ### E208: timestamp without time zone
 
-`timestamp` (without time zone) is used instead of `timestamptz`. Always use `timestamptz` to avoid timezone ambiguity.
+`timestamp` without time zone is used instead of `timestamptz` (timestamp with time zone). PostgreSQL's `timestamp` type stores a date and time without any timezone information, which creates ambiguity about what moment in time the value represents. Applications running in different timezones will interpret the same stored value differently, leading to subtle data corruption. pgdesign requires `timestamptz` for all timestamp columns, which stores an absolute moment and converts to the session timezone on display.
 
 **Fix:** Use the `timestamp` or `timestamp_optional` semantic types, or `timestamptz` as a raw base type.
 
 ### E209: serial usage
 
-`serial` or `bigserial` is used. These are legacy PostgreSQL types.
+`serial` or `bigserial` is used as a column type. These are legacy PostgreSQL pseudo-types that create an implicit sequence and set the column default, but they have several drawbacks compared to the modern GENERATED ALWAYS AS IDENTITY syntax introduced in PostgreSQL 10. Serial columns do not prevent manual value insertion (which can cause sequence conflicts), and the implicit sequence is not properly linked to the column in all edge cases. pgdesign requires the `auto_id` semantic type or the `id` type instead.
 
 **Fix:** Use the `auto_id` semantic type (which uses `GENERATED ALWAYS AS IDENTITY`) or the `id` type (UUID).
 
@@ -111,11 +111,11 @@ A `float`, `real`, or `double precision` type is used on a column with a money-r
 
 ### E211: Naming convention violation
 
-Table, column, or index names do not match the `snake_case` pattern (`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`).
+Table, column, or index names do not match the `snake_case` pattern defined as `^[a-z][a-z0-9]*(_[a-z0-9]+)*$`, which requires lowercase letters, digits, and underscores with no leading digits or consecutive underscores. Consistent snake_case naming is enforced because PostgreSQL automatically lowercases unquoted identifiers, so mixed-case names require quoting everywhere they are used. The naming convention is configurable via the `naming_pattern` setting in pgdesign.toml for projects with different naming standards.
 
 ### E212: FK columns missing index
 
-FK columns have no covering index. Without an index, joins and cascaded deletes perform full table scans.
+Foreign key columns have no covering index, which means that JOIN operations using these columns and cascaded DELETE operations triggered by ON DELETE CASCADE must perform full table scans to find matching rows. On large tables, this can cause significant performance degradation and long-running queries that hold locks. pgdesign requires an index on FK columns to ensure that lookups are always index-backed, following PostgreSQL best practices for referential integrity performance.
 
 ```toml
 [tables.posts.fks.fk_posts_author]
@@ -130,7 +130,7 @@ on_delete = "CASCADE"
 
 ### E213: Generated column references generated column
 
-A generated column's expression references another generated column. PostgreSQL does not allow this.
+A generated column's expression references another generated column in the same table. PostgreSQL does not allow this because it creates a dependency chain between generated columns that cannot be resolved during tuple storage. The expression for a generated column can only reference non-generated columns in the same table, ensuring that the computation is always based on concrete stored values rather than derived values that may themselves be in the process of being computed.
 
 ```toml
 [tables.orders.columns.subtotal]
@@ -148,13 +148,13 @@ stored = true
 
 ### E214: Opclass requires undeclared extension
 
-An index uses an operator class (e.g., `gin_trgm_ops`) that requires a PostgreSQL extension not listed in `[meta].extensions`.
+An index uses an operator class like `gin_trgm_ops` or `vector_cosine_ops` that requires a PostgreSQL extension not listed in the schema's extension declarations. Operator classes are provided by extensions and must be available in the database before the index can be created. Without the extension declaration, pgdesign cannot verify that the operator class exists and the generated DDL would fail during application. The validator maintains a registry of known extensions and their provided operator classes.
 
 **Fix:** Add the extension to `extensions = ["pg_trgm"]` in the `[meta]` section.
 
 ### E109: Enum default is not a declared value
 
-Enum defaults must match one of the values in the enum's values list. Use raw values (e.g., `"created"`) not SQL literals (`"'created'"`). See also E110.
+Enum defaults must match one of the values declared in the enum's values list. pgdesign validates the default value against the declared values at schema compile time, catching typos and invalid defaults before they reach the database. Use raw values like `"created"` rather than SQL-quoted literals like `"'created'"` because pgdesign handles SQL quoting automatically during DDL generation. Invalid defaults would cause INSERT failures at runtime, so catching them early prevents data insertion errors in production.
 
 ```toml
 # Wrong: "archived" is not in the values list
@@ -174,7 +174,7 @@ default = "created"
 
 ### E110: Default value contains embedded SQL quotes
 
-Default values should be raw values -- pgdesign handles SQL quoting. Write `default = "created"` not `default = "'created'"`. This applies to all types (enums, scalars, arrays).
+Default values must be raw values without embedded SQL quotes because pgdesign handles SQL quoting automatically during DDL generation. Writing `default = "'created'"` with embedded single quotes produces double-quoted output like `DEFAULT '''created'''` in the generated DDL, which is almost certainly not the intended result. This validation applies to all type kinds including enums, scalars, and arrays, catching a common mistake that would otherwise produce subtle bugs where the default value includes literal quote characters.
 
 ```toml
 # Wrong: embedded SQL quotes
@@ -204,14 +204,14 @@ default = "pending"
 
 ### E215: RLS policy expression mismatch
 
-A row-level security policy uses the wrong expression type for its operation:
+A row-level security policy uses an expression type that is incompatible with its declared operation. PostgreSQL enforces specific rules about which expression types are valid for each policy operation: INSERT policies should use `with_check` because there are no existing rows to evaluate USING against, while SELECT and DELETE policies cannot use `with_check` because they only read existing rows. This validation catches configuration errors that would cause policy creation to fail at the database level.
 - INSERT policies should use `with_check`, not `using`
 - SELECT and DELETE policies cannot use `with_check`
 - UPDATE and ALL can use both
 
 ### E216: Index WITH parameter not valid for method
 
-An index uses a `with` storage parameter that is not valid for the specified index method. Each index method supports a specific set of parameters:
+An index uses a `with` storage parameter that is not valid for the specified index method, which would cause the CREATE INDEX statement to fail at the database level. Each PostgreSQL index method supports a specific set of storage parameters that control its internal behavior. For example, btree indexes support fillfactor and deduplicate_items, while HNSW indexes from pgvector support m and ef_construction. Using a parameter from the wrong method is always an error.
 
 - **btree**: `fillfactor`, `deduplicate_items`
 - **hash**: `fillfactor`
@@ -232,8 +232,7 @@ with = { fillfactor = "90" }  # E216: fillfactor is not valid for hnsw
 
 ### E217: Unknown index method
 
-An index uses a method that is not built into PostgreSQL (`btree`, `hash`, `gin`, `gist`, `brin`,
-`spgist`) and is not provided by any known extension.
+An index uses a method name that is not one of PostgreSQL's built-in methods (`btree`, `hash`, `gin`, `gist`, `brin`, `spgist`) and is not provided by any extension declared in the schema. This typically indicates a typo in the method name or the use of an extension-provided method without declaring the extension. The validator maintains a registry of known extension methods, so methods like `hnsw` and `ivfflat` are recognized when the pgvector extension is declared.
 
 ```toml
 [tables.items.indexes.items_embedding_idx]
@@ -246,8 +245,7 @@ Fix: use a built-in method or declare the extension that provides the desired me
 
 ### E219: Index method requires undeclared extension
 
-An index uses an extension-provided index method (e.g., `hnsw`, `ivfflat`) without the providing
-extension being declared in the schema.
+An index uses an extension-provided index method like `hnsw` or `ivfflat` without the providing extension being declared in the schema via `[[extensions]]`. Unlike E217 which catches completely unknown methods, E219 specifically identifies methods that the validator recognizes as belonging to a known extension but that extension has not been declared. This distinction provides a more helpful error message that tells the developer exactly which extension to declare rather than just reporting an unknown method name.
 
 ```toml
 [tables.items.indexes.items_embedding_idx]
@@ -264,21 +262,21 @@ name = "pgvector"
 
 ## Warning rules
 
-Warnings highlight potential design issues but do not block DDL generation.
+Warnings highlight potential design issues in the schema that may indicate anti-patterns, performance problems, or modeling errors, but they do not block DDL generation. Each warning has a unique code starting with W and can be individually disabled via the `validate.disable` setting in pgdesign.toml when the flagged pattern is intentional. Warnings can also be suppressed on specific tables or columns using the `[suppress]` section with a mandatory reason string explaining why the suppression is justified.
 
 ### W001: God table
 
-A table has more columns than the configured maximum (default: 30). This suggests the table is doing too much and should be decomposed.
+A table has more columns than the configured maximum threshold, which defaults to 30 columns. Tables with many columns often indicate that the table is trying to represent multiple concepts in a single relation, which violates the single responsibility principle and can lead to wide rows that exceed the TOAST threshold, NULL-heavy columns that waste storage, and complex queries that touch many columns unnecessarily. The threshold is configurable via the `max_columns` setting in the validate section of pgdesign.toml.
 
 **Suggestion:** Split into smaller, focused tables with foreign key relationships.
 
 ### W002: Orphan table
 
-A table has no FK relationships at all -- it neither references nor is referenced by any other table. This may indicate a missing relationship or an unused table.
+A table has no foreign key relationships at all, meaning it neither references nor is referenced by any other table in the schema. Orphan tables may indicate a missing relationship that should connect it to the rest of the data model, an unused table left over from a previous schema revision, or a legitimate standalone table like configuration storage. The warning is suppressible for tables that are intentionally disconnected from the relational graph.
 
 ### W003: Boolean state machine
 
-A table has 3 or more boolean columns. Multiple boolean flags often indicate a state machine that would be better modeled as an enum column.
+A table has 3 or more boolean columns, which often indicates that the table is modeling a state machine using individual boolean flags instead of a single enum column. Boolean flag sets create invalid state combinations (such as `is_active = true` and `is_suspended = true` simultaneously) that are difficult to prevent with CHECK constraints. An enum column eliminates invalid states by construction because only declared values are allowed, and pgdesign's state machine type adds trigger-enforced transitions for additional safety.
 
 ```toml
 # W003: is_active, is_verified, is_suspended suggest a status enum
@@ -296,21 +294,21 @@ type = "flag"
 
 ### W004: JSON array could be a table
 
-A jsonb column with a plural name and an empty array default (`'[]'::jsonb`) may be storing data that belongs in a normalized table.
+A JSONB column with a plural name and an empty array default (`'[]'::jsonb`) may be storing a list of items that would be better modeled as a separate normalized table with a foreign key relationship. Embedding arrays in JSONB columns circumvents referential integrity, makes it impossible to enforce constraints on individual array elements, prevents efficient indexing of element values, and violates first normal form. The pattern is detected heuristically by combining the column name (plural form) with the array default.
 
 **Suggestion:** Create a separate table with a foreign key instead of embedding a JSON array.
 
 ### W005: Missing created_at
 
-A non-junction table (more than 2 columns) lacks a `created_at` column. Most tables benefit from tracking when rows were created.
+A non-junction table with more than 2 columns lacks a `created_at` column. Most tables benefit from tracking when rows were created because this timestamp enables debugging data issues, auditing changes, implementing retention policies, and ordering records by creation time. Junction tables (typically with only 2 FK columns forming a composite PK) are exempt because they represent relationships rather than entities and their creation timing is less commonly needed.
 
 ### W006: char(n) usage
 
-`char(n)` is used instead of `text`. In PostgreSQL, `char(n)` pads with spaces and offers no performance benefit over `text`.
+`char(n)` is used instead of `text`. In PostgreSQL, `char(n)` pads stored values with trailing spaces to the declared length, which wastes storage space, creates confusing comparison behavior where trailing spaces affect equality checks, and offers no performance benefit over `text`. The only reason to use `char(n)` in PostgreSQL is compatibility with SQL standard or legacy systems, and pgdesign recommends `text` with a CHECK constraint for fixed-length requirements instead.
 
 ### W007: Redundant index
 
-An index's columns are a leading prefix of another index using the same method. The shorter index is redundant because the longer one handles the same queries.
+An index's columns are a strict leading prefix of another index on the same table using the same index method. The shorter index is redundant because PostgreSQL can use a multi-column btree index to satisfy queries that filter on any prefix of the index's column list. For example, if index A covers `(user_id)` and index B covers `(user_id, created_at)`, index A is redundant because index B handles all queries that would use A. This detection applies only to strict prefixes; same-length column lists are not flagged.
 
 ### W008: Circular FK dependency
 
@@ -318,11 +316,11 @@ Tables have circular foreign key references (A references B, B references A). pg
 
 ### W009: Policy error_code not snake_case
 
-An RLS policy's `error_code` field does not follow snake_case naming.
+An RLS policy's `error_code` field does not follow the snake_case naming convention required by pgdesign. Error codes in RLS policies are used by application code to identify specific access denial reasons, so consistent naming prevents errors when matching codes in error handlers. The snake_case pattern requires lowercase letters, digits, and underscores, matching the same naming convention enforced on tables, columns, and indexes throughout the schema.
 
 ### W010: Append-only table has mutable default column
 
-Tables with `append_only = true` should not have columns with mutable defaults (e.g., `updated_at` timestamp). Append-only tables are immutable after INSERT, so columns designed to track mutations are contradictory.
+Tables with `append_only = true` should not have columns with mutable defaults like `updated_at` timestamps with `now()` as the default expression. Append-only tables are immutable after INSERT because a BEFORE UPDATE OR DELETE trigger prevents all mutations, so columns designed to track when rows were last modified are contradictory and will never contain meaningful update timestamps. This warning identifies columns whose semantic purpose conflicts with the table's append-only constraint.
 
 ```toml
 [tables.audit_log]
@@ -338,15 +336,15 @@ default_expr = "now()"  # W010: mutable default on append-only table
 
 ## Normal form audit warnings
 
-These are emitted by `pgdesign check --tag nf`, not `pgdesign check --tag validation`. They require functional dependencies to be declared on the table.
+Normal form audit warnings are emitted by `pgdesign check --tag nf`, not by `pgdesign check --tag validation`, and they require functional dependencies to be explicitly declared on the table using the `[[dependencies]]` syntax. Without declared dependencies, the audit cannot determine whether a table violates normal forms because it has no information about which columns functionally determine which others. The audit checks 1NF through 3NF violations and suggests decompositions using Bernstein's synthesis algorithm when violations are found.
 
 ### W100: 1NF violation (repeating group)
 
-A jsonb column with a plural name, list-like name, or `'[]'::jsonb` default may contain repeating groups, violating first normal form.
+A JSONB column with a plural name, list-like name, or empty array default `'[]'::jsonb` may contain repeating groups, which violates first normal form. First normal form requires that every column contains atomic values rather than sets, lists, or nested structures. While PostgreSQL's JSONB type technically allows storing arrays and nested objects, using them to represent repeating groups prevents the database from enforcing constraints on individual elements and makes queries more complex.
 
 ### W101: 2NF violation (partial dependency)
 
-A non-prime attribute depends on a proper subset of a composite candidate key. This means the column belongs in a separate table keyed by that subset.
+A non-prime attribute depends on a proper subset of a composite candidate key rather than the full key, violating second normal form. This means the column's value is determined by only part of the primary key, and it should be extracted into a separate table keyed by that subset of columns. For example, if a table has a composite key `(student_id, course_id)` and a column `student_name` that depends only on `student_id`, the student name should be in a separate students table.
 
 ```toml
 [tables.enrollments]
@@ -364,13 +362,13 @@ dependent = ["student_name"]
 
 ### W102: 3NF violation (transitive dependency)
 
-A non-prime attribute is determined by a non-superkey. This means there is a transitive dependency that should be extracted into a separate table.
+A non-prime attribute is functionally determined by a column set that is not a superkey, indicating a transitive dependency that should be extracted into a separate table. In a transitive dependency, column A determines column B, and column B determines column C, so A transitively determines C through B. This creates update anomalies because changing B's value in one row but not another leads to inconsistent values of C. The fix is to extract the B-to-C dependency into its own table.
 
 When a 3NF violation is detected, pgdesign suggests a decomposition using Bernstein's synthesis algorithm.
 
 ## Disabling rules
 
-Disable rules by code in `pgdesign.toml`:
+Individual validation rules can be disabled by their diagnostic code in `pgdesign.toml` when a rule does not apply to your project. Disabled rules are completely skipped during `pgdesign check --tag validation` and do not appear in the output. This is useful for projects with legitimate reasons to deviate from pgdesign's defaults, such as using varchar for compatibility with external systems or having intentionally orphaned tables for audit logging.
 
 ```toml
 [validate]
@@ -381,7 +379,7 @@ This skips the disabled rules during `pgdesign check --tag validation`. The code
 
 ## Codegen diagnostics
 
-Diagnostics emitted during code generation, not during validation.
+Codegen diagnostics are emitted during application code generation rather than during schema validation. These diagnostics identify situations where the codegen engine encounters schema patterns it cannot fully translate into the target language, such as RLS policy expressions that use SQL constructs not supported by the codegen pattern matcher. Codegen diagnostics use the C0xx code range and are separate from the validation diagnostics that use E and W codes.
 
 ### C001: Unparseable policy expression
 
@@ -391,7 +389,7 @@ The codegen validator generator could not parse an RLS policy expression into a 
 
 ## Coverage checks
 
-Coverage checks analyze constraint completeness and schema coverage. They are run by `pgdesign check` (registered as the `coverage` check) and report diagnostic codes C100-C104.
+Coverage checks analyze constraint completeness and overall schema quality by looking for patterns that suggest missing constraints, missing indexes, or unused type definitions. They are registered as the `coverage` check in strictcli's check framework and report diagnostic codes in the C100-C104 range. Coverage checks run independently of the main validation rules and provide a complementary view of schema health focused on completeness rather than correctness.
 
 ### C100: Table without check constraints
 
@@ -403,7 +401,7 @@ Foreign key columns have no covering index. Without an index, cascaded deletes a
 
 ### C102: Unused enum type
 
-An enum type is defined in the schema but not referenced by any column. This may indicate dead code or a type that was defined but never wired up.
+An enum type is defined in the schema's `[types]` section but not referenced by any column in any table. This may indicate dead code left over from a schema refactoring, a type that was defined for future use but never wired up to a column, or a naming mismatch where a column references a slightly different type name. The coverage check surfaces these unused definitions so they can be either connected to their intended columns or removed from the schema to reduce clutter.
 
 ### C103: Orphan table
 
