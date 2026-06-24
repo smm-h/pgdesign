@@ -336,3 +336,28 @@ func TestGoGormGenerator_NonUniqueIndex(t *testing.T) {
 		}
 	}
 }
+
+func TestGoGormGenerator_DefaultExpr(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "items",
+			Comment: "Items",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+			},
+		}},
+	}
+
+	gen := &GoGormGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	if !containsGormField(result, "Id", "uuid.UUID", "default:gen_random_uuid()") {
+		t.Error("missing default:gen_random_uuid() in gorm tag for DefaultExpr column")
+	}
+}

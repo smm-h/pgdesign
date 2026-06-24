@@ -404,3 +404,34 @@ func TestPythonSQLAlchemyGenerator_MultipleTables(t *testing.T) {
 		t.Error("missing or incorrect quantity field (expected int)")
 	}
 }
+
+func TestPythonSQLAlchemyGenerator_DefaultExpr(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:    "items",
+				Comment: "Items",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+				},
+			},
+		},
+	}
+
+	gen := &PythonSQLAlchemyGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	if !strings.Contains(result, `server_default=text("gen_random_uuid()")`) {
+		t.Error("missing server_default=text(\"gen_random_uuid()\") for DefaultExpr column")
+	}
+
+	// text must be in sqlalchemy imports.
+	if !strings.Contains(result, "text") {
+		t.Error("missing text in sqlalchemy imports")
+	}
+}

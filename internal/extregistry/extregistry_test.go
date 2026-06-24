@@ -35,6 +35,17 @@ func TestRequiredExtensionForFunction_GenRandomUUID(t *testing.T) {
 	}
 }
 
+func TestRequiredExtensionForFunction_UuidGenerateV7(t *testing.T) {
+	r := NewBuiltinRegistry()
+	ext, ok := r.RequiredExtensionForFunction("uuid_generate_v7")
+	if !ok {
+		t.Fatal("expected uuid_generate_v7 to be found")
+	}
+	if ext != "pg_uuidv7" {
+		t.Fatalf("expected pg_uuidv7, got %s", ext)
+	}
+}
+
 func TestRequiredExtension_Unknown(t *testing.T) {
 	r := NewBuiltinRegistry()
 	_, ok := r.RequiredExtension("nonexistent_ops")

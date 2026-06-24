@@ -375,3 +375,30 @@ func TestJavaJPAGenerator_MultipleTables(t *testing.T) {
 		t.Error("missing or incorrect quantity field (expected short for smallint)")
 	}
 }
+
+func TestJavaJPAGenerator_DefaultExpr(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name:    "items",
+				Comment: "Items",
+				Columns: []model.Column{
+					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	gen := &JavaJPAGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	if !containsAnnotation(result, `columnDefinition = "uuid DEFAULT gen_random_uuid()"`) {
+		t.Errorf("missing columnDefinition with DEFAULT clause for DefaultExpr column, got:\n%s", result)
+	}
+}

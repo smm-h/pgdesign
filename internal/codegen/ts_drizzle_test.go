@@ -450,3 +450,40 @@ func TestTSDrizzleGenerator_TypeMapping(t *testing.T) {
 		t.Error("missing enumCol text fallback with // my_enum comment")
 	}
 }
+
+func TestTSDrizzleGenerator_DefaultExpr(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "items",
+			Comment: "Items",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+			},
+		}},
+	}
+
+	gen := &TSDrizzleGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	found := false
+	for _, line := range strings.Split(result, "\n") {
+		if strings.Contains(line, "id") && strings.Contains(line, ".default(sql`gen_random_uuid()`)") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("missing .default(sql`gen_random_uuid()`) for DefaultExpr column")
+	}
+
+	// sql import should be present.
+	if !strings.Contains(result, `import { sql } from "drizzle-orm"`) {
+		t.Error("missing sql import from drizzle-orm")
+	}
+}
