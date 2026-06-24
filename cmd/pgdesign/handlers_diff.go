@@ -210,7 +210,7 @@ func diffBase(paths []string, ref string) (*model.Schema, int) {
 
 	reg := semtype.NewBuiltinRegistry()
 	for _, raw := range raws {
-		userTypes := collectUserTypes(raw)
+		userTypes := parse.CollectUserTypes(raw)
 		if len(userTypes) > 0 {
 			loadDiags := reg.LoadUserTypes(userTypes)
 			if loadDiags.HasErrors() {

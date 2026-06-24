@@ -476,72 +476,7 @@ func parseAndBuild(data []byte) (*model.Schema, []diagnostic.Diagnostic) {
 
 	reg := semtype.NewBuiltinRegistry()
 
-	var userTypes []semtype.UserTypeDef
-	for _, rt := range raw.Types {
-		ut := semtype.UserTypeDef{
-			Name:   rt.Name,
-			Kind:   rt.Kind,
-			Base:   rt.BaseType,
-			Values: rt.Values,
-			Fields: rt.Fields,
-		}
-		if rt.NotNull != nil {
-			ut.NotNull = rt.NotNull
-		}
-		if rt.Default != nil {
-			v := *rt.Default
-			ut.Default = &v
-		}
-		if rt.DefaultExpr != nil {
-			ut.DefaultExpr = *rt.DefaultExpr
-		}
-		if rt.Check != nil {
-			ut.Check = *rt.Check
-		}
-		if rt.Unique != nil {
-			ut.Unique = *rt.Unique
-		}
-		if rt.Array != nil {
-			ut.Array = *rt.Array
-		}
-		if rt.Comment != nil {
-			ut.Comment = *rt.Comment
-		}
-		// State machine fields
-		if rt.InitialState != nil {
-			ut.InitialState = *rt.InitialState
-		}
-		if rt.EnforceTrigger != nil {
-			ut.EnforceTrigger = *rt.EnforceTrigger
-		}
-		if len(rt.States) > 0 {
-			for name, s := range rt.States {
-				us := semtype.UserSMState{Name: name}
-				if s.Terminal != nil {
-					us.Terminal = *s.Terminal
-				}
-				if s.Comment != nil {
-					us.Comment = *s.Comment
-				}
-				ut.States = append(ut.States, us)
-			}
-		}
-		for _, tr := range rt.Transitions {
-			utTr := semtype.UserSMTransition{
-				Name: tr.Name,
-				From: tr.From,
-				To:   tr.To,
-			}
-			if tr.Requires != nil {
-				utTr.Requires = tr.Requires
-			}
-			if tr.Comment != nil {
-				utTr.Comment = *tr.Comment
-			}
-			ut.Transitions = append(ut.Transitions, utTr)
-		}
-		userTypes = append(userTypes, ut)
-	}
+	userTypes := parse.CollectUserTypes(raw)
 	if len(userTypes) > 0 {
 		loadDiags := reg.LoadUserTypes(userTypes)
 		parseDiags = append(parseDiags, loadDiags...)

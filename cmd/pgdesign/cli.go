@@ -338,43 +338,6 @@ func resolveFromConfig(configPath string) ([]string, error) {
 	return cfg.SchemaFiles(filepath.Dir(configPath)), nil
 }
 
-// collectUserTypes extracts UserTypeDefs from a RawSchema's Types.
-func collectUserTypes(raw *parse.RawSchema) []semtype.UserTypeDef {
-	var userTypes []semtype.UserTypeDef
-	for _, rt := range raw.Types {
-		ut := semtype.UserTypeDef{
-			Name:   rt.Name,
-			Kind:   rt.Kind,
-			Base:   rt.BaseType,
-			Values: rt.Values,
-			Fields: rt.Fields,
-		}
-		if rt.NotNull != nil {
-			ut.NotNull = rt.NotNull
-		}
-		if rt.Default != nil {
-			v := *rt.Default
-			ut.Default = &v
-		}
-		if rt.DefaultExpr != nil {
-			ut.DefaultExpr = *rt.DefaultExpr
-		}
-		if rt.Check != nil {
-			ut.Check = *rt.Check
-		}
-		if rt.Unique != nil {
-			ut.Unique = *rt.Unique
-		}
-		if rt.Array != nil {
-			ut.Array = *rt.Array
-		}
-		if rt.Comment != nil {
-			ut.Comment = *rt.Comment
-		}
-		userTypes = append(userTypes, ut)
-	}
-	return userTypes
-}
 
 // parseAndBuild is a shared helper for commands that need a resolved schema.
 // It accepts one or more paths (files or a directory) and returns the built schema.
@@ -421,7 +384,7 @@ func parseAndBuild(paths []string) (*model.Schema, *semtype.Registry, int) {
 
 	// Load user-defined types from all schemas into the registry.
 	for _, raw := range raws {
-		userTypes := collectUserTypes(raw)
+		userTypes := parse.CollectUserTypes(raw)
 		if len(userTypes) > 0 {
 			loadDiags := reg.LoadUserTypes(userTypes)
 			if loadDiags.HasErrors() {
