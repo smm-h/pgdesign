@@ -82,11 +82,11 @@ creation rather than an incremental change, so phasing is not meaningful.
 
 ### The problem: lock queue cascades
 
-Adding a foreign key constraint with `ALTER TABLE ... ADD CONSTRAINT ... REFERENCES ...` on a large table creates a cascade of locking problems that can escalate into a production outage. The operation acquires an ACCESS EXCLUSIVE lock on the source table and a SHARE ROW EXCLUSIVE lock on the referenced table, blocking all concurrent reads and writes. PostgreSQL's lock queue is FIFO: if the lock request waits behind a long-running transaction, every subsequent query on that table queues behind the lock request, creating a pile-up of blocked connections that can exhaust the connection pool.
+Adding a foreign key constraint on a large table acquires an ACCESS EXCLUSIVE lock on the source table and a SHARE ROW EXCLUSIVE lock on the referenced table, blocking all concurrent reads and writes. PostgreSQL's lock queue is FIFO, so if the lock waits behind a running transaction, every subsequent query on that table queues behind the lock request, creating a pile-up that can exhaust the connection pool and cause an outage.
 
 ### The solution: two-phase constraint addition
 
-`splitLargeFKOp` in `generate.go` automatically detects when a foreign key is being added to a table with an estimated row count exceeding the `largeFKThreshold` (default: 10,000 rows, sourced from `TableStats` built from `pg_stat_user_tables`). It splits the single `add_fk` operation into a safe two-phase sequence. The first phase adds the constraint with NOT VALID, registering it in the catalog without scanning existing rows. The second phase validates the constraint under a SHARE UPDATE EXCLUSIVE lock that allows concurrent reads and writes. When the threshold is exceeded, the two operations are:
+`splitLargeFKOp` in `generate.go` detects when a foreign key is being added to a table exceeding the `largeFKThreshold` (default 10,000 rows from `pg_stat_user_tables`). It splits the single `add_fk` into two phases: first adding with NOT VALID for a brief metadata lock, then validating under a SHARE UPDATE EXCLUSIVE lock that allows concurrent reads and writes. The two operations are:
 
 1. **`add_fk_not_valid`** -- `ALTER TABLE ... ADD CONSTRAINT ... NOT VALID`.
    Registers the constraint in the catalog without scanning existing rows.
@@ -115,8 +115,7 @@ trigger quickly enough or may be unable to keep up with the sudden burst.
 
 ### The solution: batched execution
 
-`DMLOp` has a `BatchSize` field. When `BatchSize > 0`, the executor
-(`executeDMLOp` in `apply.go`) runs the SQL in a loop:
+The `DMLOp` struct has a `BatchSize` field that controls how many rows are processed in each iteration. When `BatchSize > 0`, the executor (`executeDMLOp` in `apply.go`) runs the SQL in a loop, processing one batch at a time with a commit between batches. This gives autovacuum an opportunity to clean up dead tuples between batches and keeps the transaction size bounded. The SQL itself must include a LIMIT clause matching the batch size:
 
 ```
 for {
@@ -134,7 +133,7 @@ until zero rows match.
 
 ### Backfill SQL generation
 
-`buildBackfillSQL` in `generate.go` produces the SQL UPDATE statement used to fill NULL values in existing rows when adding a NOT NULL constraint to a column that already has data. The generated SQL uses COALESCE to preserve any existing non-NULL values while filling NULL rows with a type-appropriate default. The `typeZeroValue` function provides sensible defaults for each PostgreSQL type: `false` for boolean, empty string for text, zero UUID for UUID, empty JSON for JSONB, current timestamp for date/time types, and zero for numeric types.
+`buildBackfillSQL` in `generate.go` produces the UPDATE statement used to fill NULL values when adding a NOT NULL constraint to a column with existing data. The generated SQL uses COALESCE to preserve non-NULL values while filling NULL rows with type-appropriate defaults from `typeZeroValue`: `false` for boolean, empty string for text, zero UUID for UUID, empty JSON for JSONB, and zero for numerics.
 
 ```sql
 UPDATE "table" SET "col" = COALESCE("col", <default>) WHERE "col" IS NULL
@@ -158,7 +157,7 @@ regardless of table size.
 
 ### Non-immutable defaults still require a rewrite
 
-Non-immutable functions, which can return different values on each call, cannot use the PG 11 metadata-only optimization because PostgreSQL needs to compute a distinct value for each existing row. The `isNonImmutableDefault` function in `generate.go` detects these volatile defaults by checking for known non-immutable function calls in the default expression. When a volatile default is detected on a NOT NULL column addition, the risk classification is escalated because the operation requires a full table rewrite on pre-PG 11 databases or batched DML on PG 11+ to avoid holding exclusive locks.
+Non-immutable functions that return different values on each call cannot use the PG 11 metadata-only optimization because PostgreSQL must compute a distinct value for each existing row. The `isNonImmutableDefault` function in `generate.go` detects these volatile defaults by checking for known function calls like `gen_random_uuid()` and `now()`. When detected, the risk classification is escalated because the operation requires a full table rewrite or batched DML.
 
 - `now()`
 - `clock_timestamp()`

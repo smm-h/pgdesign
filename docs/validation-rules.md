@@ -1,6 +1,6 @@
 ---
 title: "Validation Rules"
-description: "Complete reference for all pgdesign validation rules including error codes, warning codes, normal form audit diagnostics, codegen diagnostics, and coverage checks."
+description: "Complete reference for all pgdesign validation rules including error codes, warning codes, normal form audit diagnostics, and coverage checks."
 ---
 
 # Validation Rules
@@ -77,7 +77,7 @@ on_delete = "RESTRICT"
 
 ### E206: Duplicate index
 
-An index's columns are an exact duplicate of another index on the same table, meaning both indexes cover the same columns in the same order with the same method. Duplicate indexes waste disk space, slow down write operations because PostgreSQL must maintain both indexes on every INSERT, UPDATE, and DELETE, and provide no query performance benefit since the query planner only uses one index at a time. This differs from W007 (redundant index) which detects leading-prefix overlaps rather than exact duplicates.
+An index's columns are an exact duplicate of another index on the same table, meaning both indexes cover the same columns in the same order with the same method. Duplicate indexes waste disk space and slow down every write operation because PostgreSQL must maintain both. This differs from W007 (redundant index) which detects leading-prefix overlaps rather than exact duplicates.
 
 ### E207: varchar usage
 
@@ -99,7 +99,7 @@ type = "scalar"  # with base_type = "varchar(255)"
 
 ### E209: serial usage
 
-`serial` or `bigserial` is used as a column type. These are legacy PostgreSQL pseudo-types that create an implicit sequence and set the column default, but they have several drawbacks compared to the modern GENERATED ALWAYS AS IDENTITY syntax introduced in PostgreSQL 10. Serial columns do not prevent manual value insertion (which can cause sequence conflicts), and the implicit sequence is not properly linked to the column in all edge cases. pgdesign requires the `auto_id` semantic type or the `id` type instead.
+`serial` or `bigserial` is used as a column type. These are legacy PostgreSQL pseudo-types that create an implicit sequence and set the column default, but they have drawbacks compared to the modern GENERATED ALWAYS AS IDENTITY syntax. Serial columns do not prevent manual value insertion, which can cause sequence conflicts. pgdesign requires the `auto_id` semantic type or the `id` type instead.
 
 **Fix:** Use the `auto_id` semantic type (which uses `GENERATED ALWAYS AS IDENTITY`) or the `id` type (UUID).
 
@@ -308,7 +308,7 @@ A non-junction table with more than 2 columns lacks a `created_at` column. Most 
 
 ### W007: Redundant index
 
-An index's columns are a strict leading prefix of another index on the same table using the same index method. The shorter index is redundant because PostgreSQL can use a multi-column btree index to satisfy queries that filter on any prefix of the index's column list. For example, if index A covers `(user_id)` and index B covers `(user_id, created_at)`, index A is redundant because index B handles all queries that would use A. This detection applies only to strict prefixes; same-length column lists are not flagged.
+An index's columns are a strict leading prefix of another index on the same table using the same index method, making the shorter index redundant. PostgreSQL can use a multi-column btree index to satisfy queries on any prefix of the column list. For example, index A on `(user_id)` is redundant when index B on `(user_id, created_at)` exists. Same-length column lists are not flagged.
 
 ### W008: Circular FK dependency
 
@@ -344,7 +344,7 @@ A JSONB column with a plural name, list-like name, or empty array default `'[]':
 
 ### W101: 2NF violation (partial dependency)
 
-A non-prime attribute depends on a proper subset of a composite candidate key rather than the full key, violating second normal form. This means the column's value is determined by only part of the primary key, and it should be extracted into a separate table keyed by that subset of columns. For example, if a table has a composite key `(student_id, course_id)` and a column `student_name` that depends only on `student_id`, the student name should be in a separate students table.
+A non-prime attribute depends on a proper subset of a composite candidate key rather than the full key, violating second normal form. The column's value is determined by only part of the primary key and should be extracted into a separate table keyed by that subset. For example, `student_name` depending only on `student_id` in a `(student_id, course_id)` composite key belongs in a separate students table.
 
 ```toml
 [tables.enrollments]
@@ -362,7 +362,7 @@ dependent = ["student_name"]
 
 ### W102: 3NF violation (transitive dependency)
 
-A non-prime attribute is functionally determined by a column set that is not a superkey, indicating a transitive dependency that should be extracted into a separate table. In a transitive dependency, column A determines column B, and column B determines column C, so A transitively determines C through B. This creates update anomalies because changing B's value in one row but not another leads to inconsistent values of C. The fix is to extract the B-to-C dependency into its own table.
+A non-prime attribute is functionally determined by a column set that is not a superkey, indicating a transitive dependency that should be extracted into a separate table. In a transitive dependency, column A determines B, and B determines C, creating update anomalies because changing B's value inconsistently leads to contradictory C values. When detected, pgdesign suggests a decomposition using Bernstein's synthesis algorithm.
 
 When a 3NF violation is detected, pgdesign suggests a decomposition using Bernstein's synthesis algorithm.
 
@@ -401,7 +401,7 @@ Foreign key columns have no covering index. Without an index, cascaded deletes a
 
 ### C102: Unused enum type
 
-An enum type is defined in the schema's `[types]` section but not referenced by any column in any table. This may indicate dead code left over from a schema refactoring, a type that was defined for future use but never wired up to a column, or a naming mismatch where a column references a slightly different type name. The coverage check surfaces these unused definitions so they can be either connected to their intended columns or removed from the schema to reduce clutter.
+An enum type is defined in the schema's `[types]` section but not referenced by any column in any table. This may indicate dead code from a schema refactoring, a type defined for future use but never wired up, or a naming mismatch where a column references a different type name. The coverage check surfaces these unused definitions so they can be connected to columns or removed.
 
 ### C103: Orphan table
 

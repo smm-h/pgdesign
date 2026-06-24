@@ -55,7 +55,7 @@ All codegen consumers guard with `if schema.FKGraph == nil { schema.BuildFKGraph
 
 ## Cascade Analysis
 
-BFS and DFS walkers over the FK graph that follow only CASCADE edges to assess the potential impact of DELETE operations. Located in `internal/model/fkgraph.go`, these walkers measure two dimensions of cascade risk: depth measures the longest chain of cascading deletes from a single table, while breadth measures the total number of distinct tables affected by a cascade. Both metrics are needed because a shallow but wide cascade affects many tables simultaneously, while a narrow but deep cascade creates long dependency chains.
+BFS and DFS walkers over the FK graph that follow only CASCADE edges to assess the potential impact of DELETE operations. Located in `internal/model/fkgraph.go`, these walkers measure two dimensions of cascade risk: depth measures the longest chain of cascading deletes, while breadth counts distinct affected tables. Both metrics are needed because shallow-wide and narrow-deep cascades pose different risks.
 
 ### CascadeDepth (used by W013)
 
@@ -67,7 +67,7 @@ Delegates to `CascadeChain()` and returns the length of the resulting list, whic
 
 ### CascadeChain (used by W015)
 
-BFS-ordered list of all tables reachable via CASCADE edges from a starting table, where tables appear in order of their distance from the start. The first elements are tables directly referenced by the starting table with ON DELETE CASCADE, followed by tables one hop further, and so on. Returns `nil` if no CASCADE edges exist from the starting table. This ordered list is used by W015 to detect mixed ON DELETE actions in cascade chains, where some edges use CASCADE and others use RESTRICT or SET NULL.
+BFS-ordered list of all tables reachable via CASCADE edges from a starting table, where tables appear in order of distance from the start. Returns `nil` if no CASCADE edges exist. This ordered list is used by W015 to detect mixed ON DELETE actions in cascade chains where some edges use CASCADE and others use RESTRICT or SET NULL, which can produce surprising behavior when deleting rows.
 
 ### Why Both BFS and DFS
 
