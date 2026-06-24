@@ -26,7 +26,7 @@ The generation pipeline per table:
 
 ## Regex String Generation
 
-Located in `internal/seed/regen.go`. Uses Go's `regexp/syntax` package to walk the regex AST and generate matching strings.
+Located in `internal/seed/regen.go`, the regex string generator uses Go's `regexp/syntax` package to parse CHECK constraint patterns into an AST and walk it to produce strings that match the pattern. This approach generates valid data directly from the regex structure rather than using rejection sampling, which would be slow for complex patterns with narrow valid ranges. The generator handles character classes, alternation, repetition quantifiers, captures, and anchors.
 
 ### Algorithm
 
@@ -84,7 +84,7 @@ In real databases, FK distributions are highly skewed -- some parent rows are re
 
 ### CHECK Constraint Parsing
 
-The `analyzeChecks` function parses each table's CHECK constraints using `sqlexpr.Parse()` and extracts hints for three recognized patterns:
+The `analyzeChecks` function parses each table's CHECK constraints using the sqlexpr SQL expression parser and extracts generation hints for three recognized constraint patterns. These hints guide the value generator to produce data that satisfies constraints on the first attempt rather than relying on retry loops. The three patterns cover the most common CHECK constraint forms found in production schemas: numeric range bounds, string length limits, and regex format validation.
 
 **Range constraints** (`col >= 18 AND col <= 65`): The `extractRange` function recognizes an AND node with comparison operators (`>=`, `<=`, `>`, `<`) on both sides referencing the same column. It handles both `col >= X` and `X <= col` orientations. Strict inequalities (`>`, `<`) are adjusted by 1 to produce inclusive bounds. Generated values are uniformly distributed within `[min, max]`.
 
@@ -106,7 +106,7 @@ CHECK hints take priority over default type-based generation. When a column matc
 
 ## Column Filtering
 
-These column types are excluded from generated output:
+Certain column types are excluded from generated INSERT or COPY output because PostgreSQL computes their values automatically. Generated columns use server-side expressions, identity columns are assigned by sequences, and serial types use implicit sequences. Excluding these columns prevents conflicts with PostgreSQL's automatic value assignment and ensures the generated SQL is valid for both INSERT and COPY formats.
 
 - **Generated columns** (`col.Generated != ""`): PostgreSQL computes these automatically
 - **ALWAYS identity columns** (`col.Identity == "ALWAYS"`): PostgreSQL assigns values automatically
@@ -117,11 +117,11 @@ These column types are excluded from generated output:
 
 ### The Problem
 
-Circular FK references (e.g., `departments.head_id -> employees.id`, `employees.dept_id -> departments.id`) create a chicken-and-egg problem: you cannot insert into either table without the other existing first.
+Circular FK references create a chicken-and-egg problem where you cannot insert into either table without the other existing first. For example, if departments references employees via head_id and employees references departments via dept_id, neither table can be populated first because the FK constraint would fail. The seed generator solves this using a two-pass approach that temporarily inserts NULL values for cycle-breaking FK columns, then backfills them with UPDATE statements after all tables have initial data.
 
 ### Two-Pass Solution
 
-The generator uses `Schema.CycleGroups` (pre-computed by the model builder) to identify which tables participate in cycles and which specific FK columns create the cycle.
+The generator uses `Schema.CycleGroups`, which is pre-computed by the model builder during schema resolution, to identify which tables participate in FK cycles and which specific FK columns create the circular dependency. The cycle groups are computed once and reused by both the DDL generator (for deferred constraint creation) and the seed generator (for two-pass NULL-then-UPDATE insertion). This ensures consistent cycle handling across all code paths that need to deal with circular references.
 
 1. **Pass 1 -- INSERT with NULLs**: For tables in a cycle, FK columns pointing to cycle peers are set to NULL in the initial INSERT. All other columns are generated normally. PK values are tracked for later use.
 2. **Pass 2 -- UPDATE with values**: After all tables have been seeded, deferred UPDATE statements backfill the NULL FK columns with Zipf-distributed references to the now-existing parent rows. Each row gets its own UPDATE statement keyed on the PK.
@@ -144,7 +144,7 @@ If a cycle-breaking FK column is declared NOT NULL, the generator emits a `S001`
 
 ### COPY Format
 
-PostgreSQL `COPY ... FROM stdin` for bulk loading. Faster than INSERT for large datasets.
+PostgreSQL `COPY ... FROM stdin` format for high-performance bulk loading, typically 5 to 10 times faster than INSERT for large datasets. COPY bypasses the SQL parser and writes directly to the table's heap, making it the preferred format when seeding databases with thousands of rows or more. The format uses tab-separated values with backslash escaping, represents NULL as `\N`, and terminates with a `\.` line. Serial columns are excluded from COPY output because COPY cannot use DEFAULT values.
 
 - Header: `COPY schema.table (col1, col2, ...) FROM stdin;`
 - Rows: tab-separated values, one per line
@@ -166,7 +166,7 @@ The `toCopyValue` function handles the conversion from INSERT-format SQL values 
 
 ## Edge-Case Mode (`--mode edge-cases`)
 
-When `cfg.Mode == "edge-cases"`, the generator forces exactly 1 row per table (ignoring the `rowsPerTable` parameter) and produces boundary values designed to stress-test application code.
+When `cfg.Mode == "edge-cases"`, the generator forces exactly one row per table regardless of the `rowsPerTable` parameter and produces boundary values designed to stress-test application code and database constraints. Edge-case values include empty strings, zero values, minimum and maximum integer bounds, epoch timestamps, empty collections, and NULL for all nullable columns. Integer edge-case values rotate between zero and the type's maximum value using a per-type counter, so multiple integer columns in the same table receive different boundary values.
 
 Values by type:
 
@@ -201,7 +201,7 @@ Integer edge-case values rotate between 0 and MAX via a per-PGType counter (`int
 
 ## Semantic Type Handling
 
-Semantic types (`col.SemanticTypeName`) take priority over PGType-based generation:
+Semantic types identified by `col.SemanticTypeName` take priority over raw PostgreSQL type-based generation, producing values that match the semantic intent of each column rather than just its storage type. For example, email columns generate realistic email addresses, money columns use log-normal distributions matching real financial data patterns, and slug columns produce URL-safe identifiers. When no semantic type is recognized, the generator falls back to the column's raw PostgreSQL type for value generation.
 
 | Semantic type | Generation strategy |
 |--------------|---------------------|
@@ -223,7 +223,7 @@ If the semantic type name matches an enum name, a random enum value is selected.
 
 ## Type Coverage
 
-The generator handles these PostgreSQL types:
+The generator handles all 42 built-in PostgreSQL types, including numeric types, string types, binary data, date and time types, UUID, network address types, JSON, XML, full-text search types, OID, range and multirange types, user-defined enums, and array columns. Unknown or extension-provided types that are not in the recognized list produce a NULL cast with a comment indicating the unsupported type, ensuring the generated SQL is always syntactically valid.
 
 - **Numeric**: boolean, integer, bigint, smallint, serial, bigserial, smallserial, numeric, real, float4, float8
 - **String**: text, citext, varchar, char
@@ -255,7 +255,7 @@ The `*rand.Rand` parameter controls all random decisions. Passing the same seed 
 
 ## JSONB Schema-Aware Generation
 
-When a JSONB column has a `json_schema` attribute (referencing an external JSON Schema file), the generator produces a JSON object containing:
+When a JSONB column has a `json_schema` attribute referencing an external JSON Schema file, the generator produces a JSON object that conforms to the schema's basic structure rather than generating an empty object or random JSON. The generated object includes a `_schema` key identifying the schema file and an `id` field with a random integer, providing a recognizable structure that satisfies the CHECK constraints derived from the JSON Schema's required properties.
 - `_schema`: the schema file reference
 - `id`: a random integer
 
