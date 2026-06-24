@@ -187,7 +187,7 @@ func writeGoCheckPattern(buf *bytes.Buffer, col, goField string, pat checkPatter
 func columnPGType(table model.Table, colName string) string {
 	for _, c := range table.Columns {
 		if c.Name == colName {
-			return strings.ToLower(c.PGType)
+			return c.PGType.Base
 		}
 	}
 	return ""

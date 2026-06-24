@@ -98,7 +98,7 @@ func (g *TSDrizzleGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		isSinglePK := len(tbl.PK) == 1
 
 		for _, col := range tbl.Columns {
-			builder, comment := pgTypeToDrizzleBuilder(col.PGType)
+			builder, comment := pgTypeToDrizzleBuilder(col.PGType.Base)
 			pgCoreImports[builder] = true
 
 			var mods strings.Builder
@@ -312,28 +312,28 @@ func (g *TSDrizzleGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 // function name and an optional trailing comment. Unrecognized types fall back
 // to "text" with a comment noting the original type.
 func pgTypeToDrizzleBuilder(pgType string) (builder string, comment string) {
-	switch strings.ToLower(pgType) {
-	case "text", "varchar", "character varying", "char", "character", "bpchar":
+	switch pgType {
+	case "text", "varchar", "char", "bpchar":
 		return "text", ""
-	case "integer", "int4":
+	case "int4":
 		return "integer", ""
-	case "bigint", "int8":
+	case "int8":
 		return "bigint", ""
-	case "smallint", "int2":
+	case "int2":
 		return "smallint", ""
-	case "real", "float4":
+	case "float4":
 		return "real", ""
-	case "double precision", "float8":
+	case "float8":
 		return "doublePrecision", ""
-	case "boolean", "bool":
+	case "bool":
 		return "boolean", ""
 	case "uuid":
 		return "uuid", ""
-	case "timestamptz", "timestamp", "timestamp with time zone", "timestamp without time zone":
+	case "timestamptz", "timestamp":
 		return "timestamp", ""
 	case "date":
 		return "date", ""
-	case "numeric", "decimal":
+	case "numeric":
 		return "numeric", ""
 	case "jsonb":
 		return "jsonb", ""

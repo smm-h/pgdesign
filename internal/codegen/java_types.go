@@ -147,24 +147,24 @@ func pgBaseTypeToJava(col model.Column) (string, []string) {
 		return "long", nil
 	}
 
-	pgType := strings.ToLower(col.PGType)
+	pgType := col.PGType.Base
 
 	switch pgType {
-	case "text", "varchar", "character varying", "char", "character", "bpchar":
+	case "text", "varchar", "char", "bpchar":
 		return "String", nil
-	case "integer", "int4":
+	case "int4":
 		return "int", nil
-	case "bigint", "int8":
+	case "int8":
 		return "long", nil
-	case "smallint", "int2":
+	case "int2":
 		return "short", nil
-	case "real", "float4":
+	case "float4":
 		return "float", nil
-	case "double precision", "float8":
+	case "float8":
 		return "double", nil
-	case "boolean", "bool":
+	case "bool":
 		return "boolean", nil
-	case "timestamptz", "timestamp", "timestamp with time zone", "timestamp without time zone":
+	case "timestamptz", "timestamp":
 		return "Instant", []string{"java.time.Instant"}
 	case "date":
 		return "Instant", []string{"java.time.Instant"}
@@ -172,7 +172,7 @@ func pgBaseTypeToJava(col model.Column) (string, []string) {
 		return "UUID", []string{"java.util.UUID"}
 	case "jsonb", "json":
 		return "JsonNode", []string{"com.fasterxml.jackson.databind.JsonNode"}
-	case "numeric", "decimal":
+	case "numeric":
 		return "BigDecimal", []string{"java.math.BigDecimal"}
 	case "bytea":
 		return "byte[]", nil

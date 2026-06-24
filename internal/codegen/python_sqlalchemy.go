@@ -31,20 +31,20 @@ func pgTypeToSA(col model.Column) saTypeInfo {
 		return saTypeInfo{SAColumnType: "Integer", PythonType: "int", SAImport: "Integer"}
 	}
 
-	pgType := strings.ToLower(col.PGType)
+	pgType := col.PGType.Base
 
 	switch pgType {
-	case "text", "varchar", "character varying", "char", "character", "bpchar":
+	case "text", "varchar", "char", "bpchar":
 		return saTypeInfo{SAColumnType: "String", PythonType: "str", SAImport: "String"}
-	case "integer", "int4":
+	case "int4":
 		return saTypeInfo{SAColumnType: "Integer", PythonType: "int", SAImport: "Integer"}
-	case "bigint", "int8":
+	case "int8":
 		return saTypeInfo{SAColumnType: "BigInteger", PythonType: "int", SAImport: "BigInteger"}
-	case "smallint", "int2":
+	case "int2":
 		return saTypeInfo{SAColumnType: "SmallInteger", PythonType: "int", SAImport: "SmallInteger"}
-	case "boolean", "bool":
+	case "bool":
 		return saTypeInfo{SAColumnType: "Boolean", PythonType: "bool", SAImport: "Boolean"}
-	case "timestamptz", "timestamp", "timestamp with time zone", "timestamp without time zone":
+	case "timestamptz", "timestamp":
 		return saTypeInfo{SAColumnType: "DateTime(timezone=True)", PythonType: "datetime", SAImport: "DateTime", PyImport: "datetime"}
 	case "date":
 		return saTypeInfo{SAColumnType: "DateTime", PythonType: "datetime", SAImport: "DateTime", PyImport: "datetime"}
@@ -52,9 +52,9 @@ func pgTypeToSA(col model.Column) saTypeInfo {
 		return saTypeInfo{SAColumnType: "UUID", PythonType: "uuid.UUID", IsDialect: true, PyImport: "uuid"}
 	case "jsonb", "json":
 		return saTypeInfo{SAColumnType: "JSONB", PythonType: "dict[str, Any]", IsDialect: true, PyImport: "Any"}
-	case "numeric", "decimal":
+	case "numeric":
 		return saTypeInfo{SAColumnType: "Numeric", PythonType: "Decimal", SAImport: "Numeric", PyImport: "Decimal"}
-	case "real", "float4", "double precision", "float8":
+	case "float4", "float8":
 		return saTypeInfo{SAColumnType: "Float", PythonType: "float", SAImport: "Float"}
 	case "bytea":
 		return saTypeInfo{SAColumnType: "LargeBinary", PythonType: "bytes", SAImport: "LargeBinary"}

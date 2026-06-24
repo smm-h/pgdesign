@@ -56,17 +56,19 @@ func ExtractConstraints(table model.Table, schema model.Schema) ConstraintSet {
 			cs.NotNullFields = append(cs.NotNullFields, col.Name)
 		}
 
-		// Enum: match column type against declared enums (case-insensitive).
-		if vals, ok := enumMap[strings.ToLower(col.PGType)]; ok {
+		// Enum: match column type against declared enums.
+		if vals, ok := enumMap[col.PGType.Base]; ok {
 			cs.EnumFields[col.Name] = vals
 		}
 
-		// Domain: match column type against declared domains (case-insensitive).
-		if domain, ok := domainMap[strings.ToLower(col.PGType)]; ok {
-			if domain.Check != "" {
-				cs.CheckExprs[col.Name] = domain.Check
+		// Domain: match column type against declared domains.
+		if col.PGType.DomainName != "" {
+			if domain, ok := domainMap[strings.ToLower(col.PGType.DomainName)]; ok {
+				if domain.Check != "" {
+					cs.CheckExprs[col.Name] = domain.Check
+				}
+				cs.DomainBaseTypes[col.Name] = domain.BaseType.Base
 			}
-			cs.DomainBaseTypes[col.Name] = domain.BaseType
 		}
 
 		// JSON schema annotation.

@@ -20,7 +20,7 @@ func generatePerTablePgFile(tbl *model.Table, schema *model.Schema, smMap map[st
 	// Collect imports.
 	imports := newImportCollector()
 	for _, col := range tbl.Columns {
-		m := LookupType(col.PGType, LangPython)
+		m := LookupType(col.PGType.Base, LangPython)
 		imports.addFromMapping(m, col)
 	}
 	for _, col := range tbl.Columns {
@@ -469,7 +469,7 @@ func generatePgBackendFile(tables []model.Table, schema *model.Schema, smMap map
 	imports := newImportCollector()
 	for _, tbl := range tables {
 		for _, col := range tbl.Columns {
-			m := LookupType(col.PGType, LangPython)
+			m := LookupType(col.PGType.Base, LangPython)
 			imports.addFromMapping(m, col)
 		}
 		for _, col := range tbl.Columns {

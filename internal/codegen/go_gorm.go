@@ -8,6 +8,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // GoGormGenerator generates Go structs with GORM struct tags corresponding to
@@ -84,12 +85,12 @@ func (g *GoGormGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 		for _, col := range tbl.Columns {
 			var goType string
 			var importPath string
-			isBytea := strings.ToLower(col.PGType) == "bytea"
+			isBytea := col.PGType.Base == "bytea"
 
 			if col.SemanticTypeName == "money" {
 				goType = LookupMoneyType(LangGo)
 			} else {
-				m := LookupType(col.PGType, LangGo)
+				m := LookupType(col.PGType.Base, LangGo)
 				goType = m.Type
 				importPath = m.Import
 			}
@@ -110,7 +111,7 @@ func (g *GoGormGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 				tagParts = append(tagParts, "not null")
 			}
 
-			pgTypeStr := col.PGType
+			pgTypeStr := typeinfo.Reconstruct(col.PGType)
 			if col.Array {
 				pgTypeStr += "[]"
 			}

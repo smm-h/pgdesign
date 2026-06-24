@@ -3,7 +3,6 @@ package codegen
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
@@ -124,18 +123,18 @@ func pgTypeToPython(col model.Column) (pyType string, needed []string) {
 		return applyPythonModifiers(baseType, col, needed)
 	}
 
-	pgType := strings.ToLower(col.PGType)
+	pgType := col.PGType.Base
 
 	switch pgType {
-	case "text", "varchar", "character varying", "char", "character", "bpchar":
+	case "text", "varchar", "char", "bpchar":
 		baseType = "str"
-	case "integer", "int4", "bigint", "int8", "smallint", "int2":
+	case "int4", "int8", "int2":
 		baseType = "int"
-	case "real", "float4", "double precision", "float8":
+	case "float4", "float8":
 		baseType = "float"
-	case "boolean", "bool":
+	case "bool":
 		baseType = "bool"
-	case "timestamptz", "timestamp", "timestamp with time zone", "timestamp without time zone":
+	case "timestamptz", "timestamp":
 		baseType = "datetime"
 		needed = append(needed, "datetime")
 	case "date":
@@ -147,7 +146,7 @@ func pgTypeToPython(col model.Column) (pyType string, needed []string) {
 	case "jsonb", "json":
 		baseType = "dict[str, Any]"
 		needed = append(needed, "Any")
-	case "numeric", "decimal":
+	case "numeric":
 		baseType = "Decimal"
 		needed = append(needed, "Decimal")
 	case "bytea":

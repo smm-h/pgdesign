@@ -48,12 +48,12 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		for _, col := range tbl.Columns {
 			var goType string
 			var importPath string
-			isBytea := strings.ToLower(col.PGType) == "bytea"
+			isBytea := col.PGType.Base == "bytea"
 
 			if col.SemanticTypeName == "money" {
 				goType = LookupMoneyType(LangGo)
 			} else {
-				m := LookupType(col.PGType, LangGo)
+				m := LookupType(col.PGType.Base, LangGo)
 				goType = m.Type
 				importPath = m.Import
 			}

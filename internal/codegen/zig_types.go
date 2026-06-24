@@ -3,7 +3,6 @@ package codegen
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
@@ -80,24 +79,24 @@ func zigBaseType(col model.Column) string {
 		return "i64"
 	}
 
-	pgType := strings.ToLower(col.PGType)
+	pgType := col.PGType.Base
 
 	switch pgType {
-	case "text", "varchar", "character varying", "char", "character", "bpchar":
+	case "text", "varchar", "char", "bpchar":
 		return "[]const u8"
-	case "integer", "int4":
+	case "int4":
 		return "i32"
-	case "bigint", "int8":
+	case "int8":
 		return "i64"
-	case "smallint", "int2":
+	case "int2":
 		return "i16"
-	case "real", "float4":
+	case "float4":
 		return "f32"
-	case "double precision", "float8":
+	case "float8":
 		return "f64"
-	case "boolean", "bool":
+	case "bool":
 		return "bool"
-	case "timestamptz", "timestamp", "timestamp with time zone", "timestamp without time zone":
+	case "timestamptz", "timestamp":
 		return "i64"
 	case "date":
 		return "i64"
@@ -105,7 +104,7 @@ func zigBaseType(col model.Column) string {
 		return "[16]u8"
 	case "jsonb", "json":
 		return "[]const u8"
-	case "numeric", "decimal":
+	case "numeric":
 		return "[]const u8"
 	case "bytea":
 		return "[]const u8"

@@ -8,6 +8,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // JavaJPAGenerator generates JPA entity classes corresponding to database tables,
@@ -94,11 +95,11 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 				nullable = "true"
 			}
 			if col.Default == nil && col.DefaultExpr != "" {
-				pgType := col.PGType
+				pgTypeStr := typeinfo.Reconstruct(col.PGType)
 				if col.Array {
-					pgType += "[]"
+					pgTypeStr += "[]"
 				}
-				annotations = append(annotations, fmt.Sprintf("@Column(name = %q, nullable = %s, columnDefinition = %q)", col.Name, nullable, pgType+" DEFAULT "+col.DefaultExpr))
+				annotations = append(annotations, fmt.Sprintf("@Column(name = %q, nullable = %s, columnDefinition = %q)", col.Name, nullable, pgTypeStr+" DEFAULT "+col.DefaultExpr))
 			} else {
 				annotations = append(annotations, fmt.Sprintf("@Column(name = %q, nullable = %s)", col.Name, nullable))
 			}

@@ -103,16 +103,16 @@ func pgTypeToTS(col model.Column) string {
 		return applyTSModifiers(baseType, col)
 	}
 
-	pgType := strings.ToLower(col.PGType)
+	pgType := col.PGType.Base
 
 	switch pgType {
-	case "text", "varchar", "character varying", "char", "character", "bpchar":
+	case "text", "varchar", "char", "bpchar":
 		baseType = "string"
-	case "integer", "int4", "bigint", "int8", "smallint", "int2", "real", "float4", "double precision", "float8":
+	case "int4", "int8", "int2", "float4", "float8":
 		baseType = "number"
-	case "boolean", "bool":
+	case "bool":
 		baseType = "boolean"
-	case "timestamptz", "timestamp", "timestamp with time zone", "timestamp without time zone":
+	case "timestamptz", "timestamp":
 		baseType = "Date"
 	case "date":
 		baseType = "Date"
@@ -120,7 +120,7 @@ func pgTypeToTS(col model.Column) string {
 		baseType = "string"
 	case "jsonb", "json":
 		baseType = "Record<string, unknown>"
-	case "numeric", "decimal":
+	case "numeric":
 		baseType = "string"
 	case "bytea":
 		baseType = "Uint8Array"

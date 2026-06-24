@@ -21,7 +21,7 @@ func generatePerTableMemFile(tbl *model.Table, schema *model.Schema, smMap map[s
 	// Collect imports.
 	imports := newImportCollector()
 	for _, col := range tbl.Columns {
-		m := LookupType(col.PGType, LangPython)
+		m := LookupType(col.PGType.Base, LangPython)
 		imports.addFromMapping(m, col)
 	}
 	for _, col := range tbl.Columns {
@@ -57,7 +57,7 @@ func generatePerTableMemFile(tbl *model.Table, schema *model.Schema, smMap map[s
 	pkCols := pkColumns(tbl)
 	needsUUID4 := false
 	for _, col := range pkCols {
-		if isAutoColumn(col, tbl.PK) && col.PGType == "uuid" {
+		if isAutoColumn(col, tbl.PK) && col.PGType.Base == "uuid" {
 			needsUUID4 = true
 			break
 		}
@@ -167,9 +167,9 @@ func writeMemCreateMethod(buf *bytes.Buffer, tbl *model.Table, smMap map[string]
 	// Generate PK if auto.
 	for _, col := range pkCols {
 		if isAutoColumn(col, tbl.PK) {
-			if col.PGType == "uuid" {
+			if col.PGType.Base == "uuid" {
 				fmt.Fprintf(buf, "        %s = uuid4()\n", col.Name)
-			} else if col.Identity != "" || col.PGType == "integer" || col.PGType == "bigint" || col.PGType == "serial" || col.PGType == "bigserial" {
+			} else if col.Identity != "" || col.PGType.Base == "int4" || col.PGType.Base == "int8" || col.PGType.Base == "serial" || col.PGType.Base == "bigserial" {
 				// Auto-increment: use max existing key + 1.
 				fmt.Fprintf(buf, "        store = self._ctx.stores[%q]\n", tbl.Name)
 				fmt.Fprintf(buf, "        %s = max(store.keys(), default=0) + 1\n", col.Name)
@@ -527,7 +527,7 @@ func generateMemoryBackendFile(tables []model.Table, schema *model.Schema, smMap
 	imports := newImportCollector()
 	for _, tbl := range tables {
 		for _, col := range tbl.Columns {
-			m := LookupType(col.PGType, LangPython)
+			m := LookupType(col.PGType.Base, LangPython)
 			imports.addFromMapping(m, col)
 		}
 		for _, col := range tbl.Columns {
