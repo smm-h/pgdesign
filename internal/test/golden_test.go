@@ -98,7 +98,7 @@ func TestGolden(t *testing.T) {
 
 			// Build once per schema.
 			reg := semtype.NewBuiltinRegistry()
-			userTypes := collectUserTypes(raw)
+			userTypes := parse.CollectUserTypes(raw)
 			if len(userTypes) > 0 {
 				loadDiags := reg.LoadUserTypes(userTypes)
 				if loadDiags.HasErrors() {
@@ -182,73 +182,6 @@ func TestGolden(t *testing.T) {
 			}
 		})
 	}
-}
-
-// collectUserTypes extracts UserTypeDefs from a RawSchema's Types.
-func collectUserTypes(raw *parse.RawSchema) []semtype.UserTypeDef {
-	var userTypes []semtype.UserTypeDef
-	for _, rt := range raw.Types {
-		ut := semtype.UserTypeDef{
-			Name:   rt.Name,
-			Kind:   rt.Kind,
-			Base:   rt.BaseType,
-			Values: rt.Values,
-		}
-		if rt.NotNull != nil {
-			ut.NotNull = rt.NotNull
-		}
-		if rt.Default != nil {
-			v := *rt.Default
-			ut.Default = &v
-		}
-		if rt.DefaultExpr != nil {
-			ut.DefaultExpr = *rt.DefaultExpr
-		}
-		if rt.Check != nil {
-			ut.Check = *rt.Check
-		}
-		if rt.Unique != nil {
-			ut.Unique = *rt.Unique
-		}
-		if rt.Comment != nil {
-			ut.Comment = *rt.Comment
-		}
-		// State machine fields
-		if rt.InitialState != nil {
-			ut.InitialState = *rt.InitialState
-		}
-		if rt.EnforceTrigger != nil {
-			ut.EnforceTrigger = *rt.EnforceTrigger
-		}
-		if len(rt.States) > 0 {
-			for name, s := range rt.States {
-				us := semtype.UserSMState{Name: name}
-				if s.Terminal != nil {
-					us.Terminal = *s.Terminal
-				}
-				if s.Comment != nil {
-					us.Comment = *s.Comment
-				}
-				ut.States = append(ut.States, us)
-			}
-		}
-		for _, tr := range rt.Transitions {
-			utTr := semtype.UserSMTransition{
-				Name: tr.Name,
-				From: tr.From,
-				To:   tr.To,
-			}
-			if tr.Requires != nil {
-				utTr.Requires = tr.Requires
-			}
-			if tr.Comment != nil {
-				utTr.Comment = *tr.Comment
-			}
-			ut.Transitions = append(ut.Transitions, utTr)
-		}
-		userTypes = append(userTypes, ut)
-	}
-	return userTypes
 }
 
 // itoa converts an int to a string without importing strconv.
