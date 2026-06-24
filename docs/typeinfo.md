@@ -1,3 +1,8 @@
+---
+title: "typeinfo Package"
+description: "Reference for the typeinfo package that provides structured PostgreSQL type parsing, normalization, alias resolution, and SQL type string reconstruction for DDL generation."
+---
+
 # typeinfo Package
 
 The `typeinfo` package provides structured PostgreSQL type representation. It parses raw type strings (from TOML schemas, `format_type()` output, etc.) into a normalized struct and reconstructs SQL type strings for DDL generation.
@@ -25,7 +30,7 @@ type Params struct {
 
 ## Alias Map
 
-Parse normalizes all type names through this alias map (keys are lowercase):
+Parse normalizes all type names through this alias map, which maps verbose PostgreSQL type names to their canonical short-form equivalents. All input is lowercased before lookup. This normalization ensures that type comparisons between TOML schema definitions and introspected live database types produce consistent results regardless of how the type was originally specified. Types not found in the map pass through unchanged.
 
 | Input | Canonical Output |
 |-------|-----------------|
@@ -70,7 +75,7 @@ DomainName is never set by Parse.
 
 ### Parameter Semantics
 
-The parameter string is interpreted based on the resolved base type:
+The parameter string inside parentheses is interpreted differently based on the resolved base type. For numeric types, the first parameter is precision and the optional second is scale. For timestamp and time types, the single parameter controls fractional second precision. For string and bit types, the parameter specifies the maximum length. Extension types and any unrecognized types store the raw parenthesized value in RawModifier for passthrough in DDL generation.
 
 | Base Type | Single Param Meaning | Two Params |
 |-----------|---------------------|------------|
@@ -137,4 +142,4 @@ Note: These defaults are not part of the `typeinfo` package itself but are used 
 
 ## Consumers
 
-The typeinfo package is imported by: semtype, model, validate, generate, codegen, diff, migrate, seed, sql, introspect. It sits at the bottom of the dependency graph with no internal dependencies.
+The typeinfo package is imported by semtype, model, validate, generate, codegen, diff, migrate, seed, sql, and introspect, making it one of the most widely used internal packages. It sits at the bottom of the dependency graph with no internal dependencies, providing the foundation for type handling throughout the entire compilation pipeline from parsing through code generation and migration planning.

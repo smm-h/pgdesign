@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Get started with pgdesign in five minutes: install, define a schema, generate SQL, and validate."
+description: "Get started with pgdesign in five minutes: install the tool, define a TOML schema, generate PostgreSQL DDL, validate rules, and audit normal forms."
 ---
 
 # Quickstart
@@ -29,7 +29,7 @@ pip install pgdesign
 
 ## Creating your first schema
 
-Create a file called `schema.toml`:
+Create a file called `schema.toml` in your project directory. This TOML file defines your database schema using pgdesign's declarative format, including table definitions with typed columns, foreign key relationships, indexes, and constraints. pgdesign compiles this into PostgreSQL DDL with strict enforcement of naming conventions, NOT NULL defaults, and required ON DELETE clauses on foreign keys.
 
 ```toml
 [meta]
