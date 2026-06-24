@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.16.1
+
+Fix diff --base extension type loading, normalize test aliases, update strictcli
+
+### Fixes
+
+- **Fix.** `diff --base` now loads extension types from project config, fixing failures when schemas use extension-provided types like pgvector.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.16.0
 
 Structured type system with typeinfo package, type extends mechanism, UUID v7 support, and safety improvements
@@ -29,12 +43,6 @@ This release introduces two foundational features: the typeinfo package for stru
 - **Fix.** PyPI wrapper now uses correct version for binary download URL instead of hardcoded 0.1.0.
 - **Fix.** Renamed volatile default detection to non-immutable default detection. `now()` and `statement_timestamp()` correctly remain in the list (STABLE, not IMMUTABLE). Added `uuid_generate_v7()` and `uuid_generate_v4()` detection.
 - **Fix.** SQLAlchemy, Drizzle, GORM, and JPA codegen now emit server defaults for expression-based defaults (`DefaultExpr`), not just literal defaults.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.15.0
 
