@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "pgdesign",
   "slug": "pgdesign",
-  "version": "0.14.2",
+  "version": "0.15.0",
   "description": null,
   "language": "go",
   "base_url": "https://pgdesign.smmh.dev",
@@ -263,6 +263,16 @@
       "type": "doc"
     },
     {
+      "path": "type-extends.md",
+      "title": "Type Extends",
+      "type": "doc"
+    },
+    {
+      "path": "typeinfo.md",
+      "title": "typeinfo Package",
+      "type": "doc"
+    },
+    {
       "path": "validation-rules.md",
       "title": "Validation Rules",
       "type": "doc"
@@ -274,5 +284,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-06-23T10:48:57.277402+00:00"
+  "last_gen": "2026-06-24T10:47:03.950751+00:00"
 }
