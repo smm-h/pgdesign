@@ -1,6 +1,6 @@
 ---
 title: "State Machines"
-description: "How pgdesign defines state machine types with enforced transitions via database triggers, D2 state diagrams, diff and migration support, and codegen transition maps."
+description: "How pgdesign defines state machine types with enforced transitions via triggers, D2 state diagrams, diff support, and codegen transition methods."
 ---
 
 # State Machines
@@ -9,7 +9,7 @@ pgdesign supports state machine types that enforce valid state transitions at th
 
 ## TOML Syntax
 
-State machines are defined in the `[types.*]` section with `kind = "state_machine"`:
+State machines are defined in the `[types.*]` section with `kind = "state_machine"`, declaring the valid states, allowed transitions between them, and the initial state. Each state machine produces a CHECK constraint for value validation, a BEFORE UPDATE trigger function for transition enforcement, and can optionally generate D2 state diagrams and type-safe transition methods in codegen output across all supported languages.
 
 ```toml
 [types.order_status]
@@ -34,7 +34,7 @@ not_null = true
 
 ### Named Transitions
 
-Named transitions provide human-readable names for state changes and support additional parameters:
+Named transitions provide human-readable names for state changes and support additional required parameters that must be supplied when performing the transition. Each named transition specifies the set of valid source states, a single target state, and an optional `requires` map of parameter names to their PostgreSQL types. These named transitions drive the codegen output, producing type-safe methods with the required parameters as function arguments.
 
 ```toml
 [[types.order_status.named_transitions]]
@@ -55,7 +55,7 @@ The `requires` field declares additional parameters needed when performing the t
 
 ### CHECK Constraint
 
-A CHECK constraint ensures the column value is always a valid state:
+A CHECK constraint ensures the column value is always one of the declared valid states. This constraint is enforced at the database level on both INSERT and UPDATE operations, preventing any row from containing an undeclared state value. The constraint uses an IN list of all declared state values and is named following the `chk_<table>_<column>_valid` convention for consistent identification across the schema.
 
 ```sql
 ALTER TABLE orders
@@ -65,7 +65,7 @@ ALTER TABLE orders
 
 ### Trigger Enforcement
 
-A BEFORE UPDATE trigger validates state transitions:
+A BEFORE UPDATE trigger validates that every state change follows the declared transition rules. The trigger function compares the OLD and NEW values of the state column and raises an exception with a descriptive error message if the transition is not allowed. This enforcement happens at the database level, guaranteeing that no application code can bypass the transition rules regardless of how the UPDATE statement is constructed.
 
 ```sql
 CREATE OR REPLACE FUNCTION check_orders_status_transition()
@@ -103,13 +103,13 @@ Every `from` state in named transitions must be a valid state. Every `to` state 
 
 ## D2 State Diagrams
 
-State machines generate D2 diagrams showing states as nodes and transitions as directed edges. The initial state is visually distinguished. Unreachable states (if any) are marked.
+State machines generate D2 diagrams showing states as nodes and transitions as directed edges between them. The initial state is visually distinguished with a special style, and unreachable states are marked with a warning indicator if present. These diagrams are included in the D2 output format alongside the entity-relationship diagram and provide a clear visualization of the allowed state flow for each state machine type defined in the schema.
 
 ## Codegen
 
 ### Transition Methods
 
-For each named transition, codegen produces methods on the per-table Writer protocol and both backends:
+For each named transition, codegen produces type-safe methods on the per-table Writer protocol and both PgBackend and InMemoryBackend implementations. Each method is named after the transition, takes the row identifier and any required parameters as arguments, validates the current state, and performs the state change atomically. This means application code calls descriptive methods like `confirm_orders` or `suspend_orders` instead of raw UPDATE statements.
 
 - `cancel_orders(id: UUID) -> None`
 - `confirm_orders(id: UUID) -> None`
@@ -121,11 +121,11 @@ InMemoryBackend: reads the row from the in-memory store, validates the transitio
 
 ### Constraint Registry
 
-The `_constraints.py` file includes STATE_MACHINE_TRANSITION constraints with the full transition map in the params dict. The ConstraintEngine uses this for InMemory validation of state changes.
+The `_constraints.py` file includes STATE_MACHINE_TRANSITION constraints with the full transition map encoded in the params dictionary, listing every valid from-to pair. The ConstraintEngine uses this transition map for InMemory validation of state changes, ensuring the InMemoryBackend enforces exactly the same transition rules as the database trigger without requiring a live PostgreSQL connection. This enables comprehensive testing of state machine logic in unit tests.
 
 ## Diff and Migration
 
-State machine type changes are detected during diff:
+State machine type changes are detected during diff and classified by risk level based on whether they expand or contract the set of valid states and transitions. Adding new states or transitions is a safe expand operation, while removing states or transitions is dangerous because existing rows may contain the removed values or depend on the removed transitions. Migration generates the appropriate DDL for CHECK constraint updates and CREATE OR REPLACE FUNCTION for trigger changes.
 
 - New states added: safe (expand)
 - States removed: dangerous (may break existing rows)
