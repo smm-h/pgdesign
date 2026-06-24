@@ -1,6 +1,4 @@
-// Package sqlutil provides a shared adapter between the sqlexpr parser and the
-// diagnostic package, preventing each consumer from reimplementing
-// parse-error-to-diagnostic conversion.
+// Package sqlutil provides a shared adapter between the sqlexpr parser and the diagnostic package for consistent parse-error-to-diagnostic conversion.
 //
 // ParseExpr parses a SQL expression via sqlexpr.Parse and converts any
 // ParseError into a diagnostic.Warning with position information. The returned

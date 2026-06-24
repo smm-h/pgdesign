@@ -1,5 +1,4 @@
-// Package serve provides an HTTP API server for pgdesign schema inspection,
-// validation, and database statistics.
+// Package serve provides an HTTP API server and web UI for pgdesign schema inspection, validation, database statistics, and interactive exploration.
 package serve
 
 import (

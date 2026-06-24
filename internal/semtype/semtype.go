@@ -1,5 +1,4 @@
-// Package semtype implements the semantic type system for pgdesign.
-// It maps type names to PostgreSQL types with enforced attributes.
+// Package semtype implements the semantic type system for pgdesign, mapping user-defined enums, scalar domains, composite types, and state machines.
 package semtype
 
 import (

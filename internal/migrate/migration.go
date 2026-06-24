@@ -1,4 +1,4 @@
-// Package migrate provides migration generation, application, and rollback.
+// Package migrate provides migration generation, application, rollback, squash consolidation, and safety linting with risk classification for schema changes.
 package migrate
 
 import (

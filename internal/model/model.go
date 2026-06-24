@@ -1,5 +1,4 @@
-// Package model provides the resolved intermediate representation (IR) for pgdesign.
-// It is the canonical in-memory schema that all downstream packages consume.
+// Package model provides the resolved intermediate representation for pgdesign, the canonical in-memory schema that all downstream packages consume.
 //
 // Adding a new schema object type (e.g., domain, sequence, composite type):
 //

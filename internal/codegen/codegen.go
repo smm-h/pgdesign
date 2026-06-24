@@ -1,4 +1,5 @@
-// Package codegen generates application-layer code from resolved pgdesign schemas.
+// Package codegen generates type-safe application-layer code from resolved pgdesign schemas across six target languages including Go, TypeScript, and Python.
+//
 // It extracts RLS policies and produces language-specific validators that can
 // pre-check policy conditions before hitting the database.
 package codegen

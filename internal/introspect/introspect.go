@@ -1,5 +1,4 @@
-// Package introspect provides live PostgreSQL database introspection.
-// It extracts schema information from pg_catalog into the resolved IR.
+// Package introspect provides live PostgreSQL database introspection, extracting schema information from pg_catalog into the resolved IR model.
 package introspect
 
 import (

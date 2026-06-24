@@ -1,6 +1,4 @@
-// Package sql provides shared SQL builder functions for PostgreSQL DDL generation.
-// It is the single place where SQL text is constructed -- no other package builds
-// SQL strings directly.
+// Package sql provides shared SQL builder functions for PostgreSQL DDL generation, the single place where SQL text is constructed across all packages.
 package sql
 
 import (

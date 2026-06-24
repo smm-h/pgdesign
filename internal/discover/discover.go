@@ -1,5 +1,4 @@
-// Package discover provides automatic functional dependency discovery from live
-// PostgreSQL data using the TANE algorithm (Huhtala et al., 1999).
+// Package discover provides automatic functional dependency discovery from live PostgreSQL data using the TANE algorithm (Huhtala et al., 1999).
 package discover
 
 import (

@@ -1,4 +1,4 @@
-// Package fd provides functional dependency algorithms used by validate/ and audit/.
+// Package fd provides functional dependency primitives including closure computation, minimal cover, candidate keys, and BCNF decomposition for audit.
 package fd
 
 import "sort"

@@ -1,6 +1,6 @@
-// Package parse provides a lenient TOML parser for pgdesign schema files.
-// It extracts structure without enforcing semantic rules, producing a RawSchema
-// and diagnostics. Column order is preserved via AST walking (not map iteration).
+// Package parse provides a lenient TOML parser for pgdesign schema files, extracting structure without enforcing semantic rules into a RawSchema.
+//
+// Column order is preserved via AST walking (not map iteration).
 package parse
 
 // RawSchema is the top-level result of parsing one or more TOML schema files.

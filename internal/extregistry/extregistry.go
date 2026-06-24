@@ -1,6 +1,4 @@
-// Package extregistry implements the PostgreSQL extension capability registry.
-// It maps extension names to what they provide (types, opclasses, functions,
-// index methods) and supports reverse lookups.
+// Package extregistry implements the PostgreSQL extension capability registry, mapping extension names to the types, opclasses, and functions they provide.
 package extregistry
 
 // Extension describes what a PostgreSQL extension provides.

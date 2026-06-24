@@ -1,5 +1,4 @@
-// Package risk provides shared risk classification for schema change operations.
-// Used by diff/ and migrate/ to assess operation safety.
+// Package risk provides shared risk classification for schema change operations, categorizing DDL statements by safety level for diff and migrate.
 package risk
 
 // RiskLevel represents the safety level of a schema operation.

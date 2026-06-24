@@ -1,4 +1,4 @@
-// Package config loads pgdesign.toml project configuration files.
+// Package config loads and validates pgdesign.toml project configuration files including output targets, suppression rules, and extension declarations.
 package config
 
 import (

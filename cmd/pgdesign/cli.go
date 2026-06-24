@@ -44,174 +44,174 @@ func main() {
 
 	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output"))
 
-	app.Command("generate", "Generate SQL from schema file(s) or directory", handleGenerate,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
+	app.Command("generate", "Generate SQL DDL from TOML schema file(s) or directory", handleGenerate,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all statements"),
-			strictcli.BoolFlag("no-comments", "Exclude COMMENT ON statements from output"),
-			strictcli.StringFlag("format", "Output format", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg", "doc", "graphql")),
-			strictcli.BoolFlag("strict-nf", "Enable strict normal form checking"),
+			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all generated DDL statements"),
+			strictcli.BoolFlag("no-comments", "Exclude COMMENT ON statements from the generated output"),
+			strictcli.StringFlag("format", "Output format for the generated schema representation", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg", "doc", "graphql")),
+			strictcli.BoolFlag("strict-nf", "Promote normal form violations to errors instead of warnings"),
 		),
 	)
 
-	app.Command("fmt", "Format a pgdesign schema file or directory", handleFmt,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path to file or directory")),
+	app.Command("fmt", "Format a pgdesign TOML schema file or directory in place", handleFmt,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path to the TOML schema file or directory to format")),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("check", "Check if file is already formatted (exit 1 if not)"),
-			strictcli.StringFlag("table-order", "Table ordering: dependency or alphabetical",
+			strictcli.StringFlag("table-order", "Table ordering strategy: dependency-based or alphabetical",
 				strictcli.Default("dependency"), strictcli.Choices("dependency", "alphabetical")),
 			strictcli.StringFlag("column-order", "Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve",
 				strictcli.Default("pk_fk_alpha"), strictcli.Choices("pk_fk_alpha", "alphabetical", "fk_last", "preserve")),
 		),
 	)
 
-	app.Command("introspect", "Introspect a live PostgreSQL database", handleIntrospect,
+	app.Command("introspect", "Introspect a live PostgreSQL database into TOML schema", handleIntrospect,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.StringFlag("schema", "Schema name to introspect", strictcli.Repeatable(), strictcli.Unique(true)),
-			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("schema", "PostgreSQL schema name(s) to introspect (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
 			strictcli.BoolFlag("extensions", "Discover extension types, functions, and opclasses"),
 		),
 	)
 
-	app.Command("diff", "Diff schema file(s) or directory against a target", handleDiff,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
+	app.Command("diff", "Compare schema file(s) or directory against another target", handleDiff,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.BoolFlag("json", "Output diff as JSON"),
-			strictcli.StringFlag("live", "PostgreSQL connection URL for live comparison", strictcli.Default(nil)),
-			strictcli.StringFlag("against", "TOML schema file or directory to compare against", strictcli.Default(nil)),
-			strictcli.StringFlag("base", "Git ref to compare against (e.g., main, HEAD~1)", strictcli.Default(nil)),
+			strictcli.BoolFlag("json", "Output the schema diff in machine-readable JSON format"),
+			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil)),
+			strictcli.StringFlag("against", "Path to TOML schema file or directory to compare against", strictcli.Default(nil)),
+			strictcli.StringFlag("base", "Git ref to compare the current schema against (e.g., main)", strictcli.Default(nil)),
 		),
 	)
 
-	mig := app.Group("migrate", "Database migration commands")
-	mig.Command("plan", "Plan migrations from schema changes", handleMigratePlan,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
+	mig := app.Group("migrate", "Database migration planning, generation, and execution")
+	mig.Command("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.", handleMigratePlan,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
 		),
 	)
-	mig.Command("generate", "Generate migration files", handleMigrateGenerate,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
+	mig.Command("generate", "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.", handleMigrateGenerate,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.StringFlag("version", "Migration version (semver)", strictcli.Default(nil)),
-			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("version", "Semantic version string for the generated migration", strictcli.Default(nil)),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
 		),
 	)
-	mig.Command("apply", "Apply pending migrations", handleMigrateApply,
+	mig.Command("apply", "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.", handleMigrateApply,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
-			strictcli.BoolFlag("dry-run", "Show SQL without executing"),
-			strictcli.IntFlag("timeout", "Lock timeout in seconds", strictcli.Default(30)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing"),
+			strictcli.IntFlag("timeout", "Advisory lock acquisition timeout in seconds before aborting", strictcli.Default(30)),
 		),
 	)
-	mig.Command("rollback", "Rollback the last migration", handleMigrateRollback,
+	mig.Command("rollback", "Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.", handleMigrateRollback,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
 			strictcli.StringFlag("to", "Target version to rollback to (exclusive — this version stays applied)"),
 		),
 	)
-	mig.Command("status", "Show migration status", handleMigrateStatus,
+	mig.Command("status", "Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.", handleMigrateStatus,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
 		),
 	)
-	mig.Command("squash", "Squash a range of migrations into one", handleMigrateSquash,
+	mig.Command("squash", "Consolidate a range of sequential migration files into a single optimized migration. Cancels inverse operation pairs, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.", handleMigrateSquash,
 		strictcli.WithFlags(
-			strictcli.StringFlag("from", "Start version (inclusive)"),
-			strictcli.StringFlag("to", "End version (inclusive)"),
-			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
-			strictcli.StringFlag("db", "PostgreSQL connection URL for safety check"),
+			strictcli.StringFlag("from", "First migration version to include in the squash range"),
+			strictcli.StringFlag("to", "Last migration version to include in the squash range"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for pre-squash safety check"),
 		),
 	)
-	mig.Command("test", "Test migrations against a staging database", handleMigrateTest,
+	mig.Command("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.", handleMigrateTest,
 		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) or directory (required with --shadow)", strictcli.Variadic(), strictcli.ArgRequired(false))),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "Staging database connection URL"),
-			strictcli.StringFlag("dir", "Migrations directory", strictcli.Default("migrations")),
-			strictcli.IntFlag("timeout", "Timeout in seconds", strictcli.Default(60)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.IntFlag("timeout", "Maximum time in seconds before the test run is aborted", strictcli.Default(60)),
 			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema"),
 		),
 	)
 
-	app.Command("seed", "Generate type-aware test data", handleSeed,
-		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) or directory", strictcli.Variadic())),
+	app.Command("seed", "Generate type-aware test data for all schema tables", handleSeed,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory for seed generation", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.IntFlag("rows", "Rows per table", strictcli.Default(10)),
-			strictcli.IntFlag("seed", "RNG seed for reproducibility", strictcli.Default(nil)),
-			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
-			strictcli.BoolFlag("apply", "Insert directly into database"),
-			strictcli.StringFlag("db", "PostgreSQL connection URL (required with --apply)", strictcli.Default(nil)),
-			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable(), strictcli.Unique(true), strictcli.Default(nil)),
-			strictcli.StringFlag("format", "Output format for seed data", strictcli.Default("insert"), strictcli.Choices("insert", "copy")),
-			strictcli.BoolFlag("clean", "Emit TRUNCATE before seed data"),
-			strictcli.StringFlag("mode", "Generation mode", strictcli.Default("normal"), strictcli.Choices("normal", "edge-cases")),
+			strictcli.IntFlag("rows", "Number of rows to generate per table in the schema", strictcli.Default(10)),
+			strictcli.IntFlag("seed", "Random number generator seed for deterministic output", strictcli.Default(nil)),
+			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
+			strictcli.BoolFlag("apply", "Insert generated seed data directly into the database"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL, required when using --apply", strictcli.Default(nil)),
+			strictcli.StringFlag("schema", "PostgreSQL schema name to filter seed generation to", strictcli.Repeatable(), strictcli.Unique(true), strictcli.Default(nil)),
+			strictcli.StringFlag("format", "SQL output format for generated seed data statements", strictcli.Default("insert"), strictcli.Choices("insert", "copy")),
+			strictcli.BoolFlag("clean", "Emit TRUNCATE CASCADE statements before inserting seeds"),
+			strictcli.StringFlag("mode", "Data generation strategy: normal values or edge-cases", strictcli.Default("normal"), strictcli.Choices("normal", "edge-cases")),
 		),
 	)
 
-	app.Command("serve", "Start the pgdesign HTTP API server", handleServe,
+	app.Command("serve", "Start the pgdesign HTTP API server and web interface", handleServe,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.IntFlag("port", "HTTP port to listen on", strictcli.Default(8080)),
-			strictcli.StringFlag("schema", "Schema name to serve", strictcli.Repeatable(), strictcli.Unique(true)),
-			strictcli.IntFlag("timeout", "Request timeout in seconds", strictcli.Default(30)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.IntFlag("port", "TCP port number for the HTTP API server to listen on", strictcli.Default(8080)),
+			strictcli.StringFlag("schema", "PostgreSQL schema name to serve via the API (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.IntFlag("timeout", "Maximum time in seconds for each HTTP request to complete", strictcli.Default(30)),
 		),
 	)
 
-	app.Command("codegen", "Generate application code from schema policies", handleCodegen,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path(s) to schema file(s) or directory", strictcli.Variadic())),
+	app.Command("codegen", "Generate type-safe application code from schema definitions", handleCodegen,
+		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL", strictcli.Default(nil)),
-			strictcli.StringFlag("lang", "Target language", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
-			strictcli.StringFlag("mode", "Codegen mode", strictcli.Default("validators"), strictcli.Choices(toInterfaceSlice(SupportedModeNames())...)),
-			strictcli.StringFlag("output", "Output file path (default: stdout)", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil)),
+			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
+			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toInterfaceSlice(SupportedModeNames())...)),
+			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
 		),
 	)
 
-	app.Command("build", "Generate all configured outputs", handleBuild,
+	app.Command("build", "Generate all configured outputs from pgdesign.toml", handleBuild,
 		strictcli.WithFlags(
-			strictcli.BoolFlag("dry-run", "Show what would be generated without writing"),
-			strictcli.BoolFlag("no-commit", "Skip auto-commit of generated files"),
+			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files"),
+			strictcli.BoolFlag("no-commit", "Skip the automatic git commit of generated output files"),
 		),
 	)
 
-	app.Command("stats", "Database statistics and health analysis", handleStats,
+	app.Command("stats", "Analyze database statistics, index usage, and health", handleStats,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.BoolFlag("json", "Output as JSON"),
-			strictcli.StringFlag("schema", "Schema name", strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.BoolFlag("json", "Output all statistics in machine-readable JSON format"),
+			strictcli.StringFlag("schema", "PostgreSQL schema name to analyze (repeatable for multiple)", strictcli.Repeatable(), strictcli.Unique(true)),
 		),
-		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) for cross-reference", strictcli.Variadic(), strictcli.ArgRequired(false))),
+		strictcli.WithArgs(strictcli.NewArg("path", "TOML schema file(s) for cross-referencing with live data", strictcli.Variadic(), strictcli.ArgRequired(false))),
 	)
 
-	tdb := app.Group("testdb", "Ephemeral test database management")
-	tdb.Command("setup", "Create an ephemeral test database and apply DDL", handleTestdbSetup,
+	tdb := app.Group("testdb", "Manage ephemeral test databases for schema testing")
+	tdb.Command("setup", "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.", handleTestdbSetup,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
-			strictcli.StringFlag("ddl", "Path to SQL DDL file"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("ddl", "Path to the SQL DDL file to apply to the test database"),
 		),
 	)
-	tdb.Command("teardown", "Drop an ephemeral test database", handleTestdbTeardown,
+	tdb.Command("teardown", "Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.", handleTestdbTeardown,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
 		),
 	)
-	tdb.Command("gc", "Drop orphaned test databases", handleTestdbGC,
+	tdb.Command("gc", "Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.", handleTestdbGC,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
 			strictcli.StringFlag("older-than", "Drop databases older than this duration (e.g., 2h, 30m)"),
 		),
 	)
-	tdb.Command("init", "Generate test database wrappers for consumer projects", handleTestdbInit,
+	tdb.Command("init", "Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.", handleTestdbInit,
 		strictcli.WithFlags(
-			strictcli.StringFlag("language", "Target language(s)", strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.StringFlag("language", "Target programming language(s) for wrapper generation", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Default(nil)),
-			strictcli.BoolFlag("force", "Overwrite existing files"),
+			strictcli.BoolFlag("force", "Overwrite existing wrapper files without prompting"),
 			strictcli.StringFlag("ci", "CI provider for workflow generation (e.g., github-actions)", strictcli.Default(nil)),
 		),
 	)

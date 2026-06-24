@@ -1,4 +1,5 @@
-// Package audit provides normal form analysis for pgdesign schemas.
+// Package audit provides normal form analysis (1NF through BCNF) for pgdesign schemas using declared functional dependencies and Bernstein synthesis.
+//
 // It detects 1NF, 2NF, 3NF, and BCNF violations using declared functional dependencies
 // and suggests decompositions via Bernstein's synthesis algorithm.
 package audit

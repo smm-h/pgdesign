@@ -1,4 +1,4 @@
-// Package generate transforms a resolved model.Schema into PostgreSQL DDL output.
+// Package generate transforms a resolved model.Schema into PostgreSQL DDL output including tables, views, materialized views, functions, and triggers.
 package generate
 
 import (

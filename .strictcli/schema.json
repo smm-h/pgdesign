@@ -74,93 +74,93 @@
       "flags": [
         {
           "default": false,
-          "help": "Show what would be generated without writing",
+          "help": "Show what would be generated without writing any files",
           "name": "dry-run",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Skip auto-commit of generated files",
+          "help": "Skip the automatic git commit of generated output files",
           "name": "no-commit",
           "negatable": true,
           "type": "bool"
         }
       ],
-      "help": "Generate all configured outputs",
+      "help": "Generate all configured outputs from pgdesign.toml",
       "name": "build"
     },
     "check": {
       "flags": [
         {
           "default": false,
-          "help": "Run all checks",
+          "help": "Run every registered check regardless of tag filters",
           "name": "all",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": "",
-          "help": "Tag DSL expression",
+          "help": "Tag DSL expression to select which checks should run",
           "name": "tag",
           "type": "str"
         },
         {
           "default": "",
-          "help": "Glob pattern for check names",
+          "help": "Glob pattern to select checks by their registered name",
           "name": "name",
           "type": "str"
         },
         {
           "default": false,
-          "help": "List checks and tags",
+          "help": "List all registered checks with their tags and severity",
           "name": "list",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "JSON output",
+          "help": "Format output as machine-readable JSON instead of text",
           "name": "json",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Warnings do not cause failure",
+          "help": "Treat warnings as non-fatal so only errors cause failure",
           "name": "ignore-warnings",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Show all details",
+          "help": "Show detailed diagnostic output for each check result",
           "name": "verbose",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Show plan without executing",
+          "help": "Show which checks would run without actually executing",
           "name": "dry-run",
           "negatable": true,
           "type": "bool"
         }
       ],
-      "help": "Run project checks",
+      "help": "Run registered project checks and report diagnostic results",
       "name": "check"
     },
     "codegen": {
       "args": [
         {
-          "help": "Path(s) to schema file(s) or directory",
+          "help": "Path to TOML schema file(s) or directory containing them",
           "name": "path",
           "variadic": true
         }
       ],
       "flags": [
         {
-          "help": "PostgreSQL connection URL",
+          "help": "PostgreSQL connection URL for the target database server",
           "name": "db",
           "type": "str"
         },
@@ -173,35 +173,41 @@
             "java",
             "kotlin"
           ],
-          "help": "Target language",
+          "help": "Target programming language for the generated code",
           "name": "lang",
           "type": "str"
         },
         {
           "choices": [
-            "validators",
             "constants",
+            "constraints",
+            "ddl",
+            "drizzle",
+            "gorm",
+            "jpa",
+            "query-layer",
+            "sqlalchemy",
             "types",
-            "constraints"
+            "validators"
           ],
           "default": "validators",
-          "help": "Codegen mode",
+          "help": "Code generation mode determining what code to produce",
           "name": "mode",
           "type": "str"
         },
         {
-          "help": "Output file path (default: stdout)",
+          "help": "Write output to a file at this path instead of stdout",
           "name": "output",
           "type": "str"
         }
       ],
-      "help": "Generate application code from schema policies",
+      "help": "Generate type-safe application code from schema definitions",
       "name": "codegen"
     },
     "diff": {
       "args": [
         {
-          "help": "Path(s) to schema file(s) or directory",
+          "help": "Path to TOML schema file(s) or directory containing them",
           "name": "path",
           "variadic": true
         }
@@ -209,34 +215,34 @@
       "flags": [
         {
           "default": false,
-          "help": "Output diff as JSON",
+          "help": "Output the schema diff in machine-readable JSON format",
           "name": "json",
           "negatable": true,
           "type": "bool"
         },
         {
-          "help": "PostgreSQL connection URL for live comparison",
+          "help": "PostgreSQL connection URL for live database comparison",
           "name": "live",
           "type": "str"
         },
         {
-          "help": "TOML schema file or directory to compare against",
+          "help": "Path to TOML schema file or directory to compare against",
           "name": "against",
           "type": "str"
         },
         {
-          "help": "Git ref to compare against (e.g., main, HEAD~1)",
+          "help": "Git ref to compare the current schema against (e.g., main)",
           "name": "base",
           "type": "str"
         }
       ],
-      "help": "Diff schema file(s) or directory against a target",
+      "help": "Compare schema file(s) or directory against another target",
       "name": "diff"
     },
     "fmt": {
       "args": [
         {
-          "help": "Path to file or directory",
+          "help": "Path to the TOML schema file or directory to format",
           "name": "path"
         }
       ],
@@ -254,7 +260,7 @@
             "alphabetical"
           ],
           "default": "dependency",
-          "help": "Table ordering: dependency or alphabetical",
+          "help": "Table ordering strategy: dependency-based or alphabetical",
           "name": "table-order",
           "type": "str"
         },
@@ -271,13 +277,13 @@
           "type": "str"
         }
       ],
-      "help": "Format a pgdesign schema file or directory",
+      "help": "Format a pgdesign TOML schema file or directory in place",
       "name": "fmt"
     },
     "generate": {
       "args": [
         {
-          "help": "Path(s) to schema file(s) or directory",
+          "help": "Path to TOML schema file(s) or directory containing them",
           "name": "path",
           "variadic": true
         }
@@ -285,14 +291,14 @@
       "flags": [
         {
           "default": false,
-          "help": "Add IF NOT EXISTS guards to all statements",
+          "help": "Add IF NOT EXISTS guards to all generated DDL statements",
           "name": "idempotent",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Exclude COMMENT ON statements from output",
+          "help": "Exclude COMMENT ON statements from the generated output",
           "name": "no-comments",
           "negatable": true,
           "type": "bool"
@@ -307,38 +313,38 @@
             "graphql"
           ],
           "default": "sql",
-          "help": "Output format",
+          "help": "Output format for the generated schema representation",
           "name": "format",
           "type": "str"
         },
         {
           "default": false,
-          "help": "Enable strict normal form checking",
+          "help": "Promote normal form violations to errors instead of warnings",
           "name": "strict-nf",
           "negatable": true,
           "type": "bool"
         }
       ],
-      "help": "Generate SQL from schema file(s) or directory",
+      "help": "Generate SQL DDL from TOML schema file(s) or directory",
       "name": "generate"
     },
     "introspect": {
       "flags": [
         {
-          "help": "PostgreSQL connection URL",
+          "help": "PostgreSQL connection URL for the target database server",
           "name": "db",
           "type": "str"
         },
         {
           "default": [],
-          "help": "Schema name to introspect",
+          "help": "PostgreSQL schema name(s) to introspect (repeatable)",
           "name": "schema",
           "repeatable": true,
           "type": "str",
           "unique": true
         },
         {
-          "help": "Output file path (default: stdout)",
+          "help": "Write output to a file at this path instead of stdout",
           "name": "output",
           "type": "str"
         },
@@ -350,13 +356,13 @@
           "type": "bool"
         }
       ],
-      "help": "Introspect a live PostgreSQL database",
+      "help": "Introspect a live PostgreSQL database into TOML schema",
       "name": "introspect"
     },
     "seed": {
       "args": [
         {
-          "help": "Schema file(s) or directory",
+          "help": "Path to TOML schema file(s) or directory for seed generation",
           "name": "path",
           "variadic": true
         }
@@ -364,34 +370,34 @@
       "flags": [
         {
           "default": 10,
-          "help": "Rows per table",
+          "help": "Number of rows to generate per table in the schema",
           "name": "rows",
           "type": "int"
         },
         {
-          "help": "RNG seed for reproducibility",
+          "help": "Random number generator seed for deterministic output",
           "name": "seed",
           "type": "int"
         },
         {
-          "help": "Output file path (default: stdout)",
+          "help": "Write output to a file at this path instead of stdout",
           "name": "output",
           "type": "str"
         },
         {
           "default": false,
-          "help": "Insert directly into database",
+          "help": "Insert generated seed data directly into the database",
           "name": "apply",
           "negatable": true,
           "type": "bool"
         },
         {
-          "help": "PostgreSQL connection URL (required with --apply)",
+          "help": "PostgreSQL connection URL, required when using --apply",
           "name": "db",
           "type": "str"
         },
         {
-          "help": "Schema name",
+          "help": "PostgreSQL schema name to filter seed generation to",
           "name": "schema",
           "repeatable": true,
           "type": "str",
@@ -403,13 +409,13 @@
             "copy"
           ],
           "default": "insert",
-          "help": "Output format for seed data",
+          "help": "SQL output format for generated seed data statements",
           "name": "format",
           "type": "str"
         },
         {
           "default": false,
-          "help": "Emit TRUNCATE before seed data",
+          "help": "Emit TRUNCATE CASCADE statements before inserting seeds",
           "name": "clean",
           "negatable": true,
           "type": "bool"
@@ -420,30 +426,30 @@
             "edge-cases"
           ],
           "default": "normal",
-          "help": "Generation mode",
+          "help": "Data generation strategy: normal values or edge-cases",
           "name": "mode",
           "type": "str"
         }
       ],
-      "help": "Generate type-aware test data",
+      "help": "Generate type-aware test data for all schema tables",
       "name": "seed"
     },
     "serve": {
       "flags": [
         {
-          "help": "PostgreSQL connection URL",
+          "help": "PostgreSQL connection URL for the target database server",
           "name": "db",
           "type": "str"
         },
         {
           "default": 8080,
-          "help": "HTTP port to listen on",
+          "help": "TCP port number for the HTTP API server to listen on",
           "name": "port",
           "type": "int"
         },
         {
           "default": [],
-          "help": "Schema name to serve",
+          "help": "PostgreSQL schema name to serve via the API (repeatable)",
           "name": "schema",
           "repeatable": true,
           "type": "str",
@@ -451,18 +457,18 @@
         },
         {
           "default": 30,
-          "help": "Request timeout in seconds",
+          "help": "Maximum time in seconds for each HTTP request to complete",
           "name": "timeout",
           "type": "int"
         }
       ],
-      "help": "Start the pgdesign HTTP API server",
+      "help": "Start the pgdesign HTTP API server and web interface",
       "name": "serve"
     },
     "stats": {
       "args": [
         {
-          "help": "Schema file(s) for cross-reference",
+          "help": "TOML schema file(s) for cross-referencing with live data",
           "name": "path",
           "required": false,
           "variadic": true
@@ -470,27 +476,27 @@
       ],
       "flags": [
         {
-          "help": "PostgreSQL connection URL",
+          "help": "PostgreSQL connection URL for the target database server",
           "name": "db",
           "type": "str"
         },
         {
           "default": false,
-          "help": "Output as JSON",
+          "help": "Output all statistics in machine-readable JSON format",
           "name": "json",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": [],
-          "help": "Schema name",
+          "help": "PostgreSQL schema name to analyze (repeatable for multiple)",
           "name": "schema",
           "repeatable": true,
           "type": "str",
           "unique": true
         }
       ],
-      "help": "Database statistics and health analysis",
+      "help": "Analyze database statistics, index usage, and health",
       "name": "stats"
     }
   },
@@ -501,15 +507,22 @@
       "deprecated": {},
       "env_prefix": null,
       "global_flags": [],
-      "groups": {}
+      "groups": {},
+      "tag_contracts": {}
     },
     "arg": {
+      "choices": null,
+      "default": null,
       "required": true,
+      "type": "str",
       "variadic": false
     },
     "command": {
       "args": [],
+      "constraints": [],
       "flags": [],
+      "hidden": false,
+      "interactive": false,
       "passthrough": false,
       "tags": []
     },
@@ -528,8 +541,10 @@
       "commands": {},
       "deprecated": {},
       "groups": {},
+      "hidden": false,
       "tags": []
-    }
+    },
+    "schema_version": 1
   },
   "global_flags": [
     {
@@ -546,96 +561,96 @@
         "apply": {
           "flags": [
             {
-              "help": "PostgreSQL connection URL",
+              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
               "type": "str"
             },
             {
               "default": "migrations",
-              "help": "Migrations directory",
+              "help": "Directory containing migration files to read or write",
               "name": "dir",
               "type": "str"
             },
             {
               "default": false,
-              "help": "Show SQL without executing",
+              "help": "Preview the migration SQL statements without executing",
               "name": "dry-run",
               "negatable": true,
               "type": "bool"
             },
             {
               "default": 30,
-              "help": "Lock timeout in seconds",
+              "help": "Advisory lock acquisition timeout in seconds before aborting",
               "name": "timeout",
               "type": "int"
             }
           ],
-          "help": "Apply pending migrations",
+          "help": "Apply all pending migrations to the target database",
           "name": "apply"
         },
         "generate": {
           "args": [
             {
-              "help": "Path(s) to schema file(s) or directory",
+              "help": "Path to TOML schema file(s) or directory containing them",
               "name": "path",
               "variadic": true
             }
           ],
           "flags": [
             {
-              "help": "PostgreSQL connection URL",
+              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
               "type": "str"
             },
             {
-              "help": "Migration version (semver)",
+              "help": "Semantic version string for the generated migration",
               "name": "version",
               "type": "str"
             },
             {
               "default": "migrations",
-              "help": "Migrations directory",
+              "help": "Directory containing migration files to read or write",
               "name": "dir",
               "type": "str"
             }
           ],
-          "help": "Generate migration files",
+          "help": "Generate versioned migration files from schema changes",
           "name": "generate"
         },
         "plan": {
           "args": [
             {
-              "help": "Path(s) to schema file(s) or directory",
+              "help": "Path to TOML schema file(s) or directory containing them",
               "name": "path",
               "variadic": true
             }
           ],
           "flags": [
             {
-              "help": "PostgreSQL connection URL",
+              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
               "type": "str"
             },
             {
               "default": "migrations",
-              "help": "Migrations directory",
+              "help": "Directory containing migration files to read or write",
               "name": "dir",
               "type": "str"
             }
           ],
-          "help": "Plan migrations from schema changes",
+          "help": "Plan migrations by diffing schema against live database",
           "name": "plan"
         },
         "rollback": {
           "flags": [
             {
-              "help": "PostgreSQL connection URL",
+              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
               "type": "str"
             },
             {
               "default": "migrations",
-              "help": "Migrations directory",
+              "help": "Directory containing migration files to read or write",
               "name": "dir",
               "type": "str"
             },
@@ -645,51 +660,51 @@
               "type": "str"
             }
           ],
-          "help": "Rollback the last migration",
+          "help": "Rollback applied database migrations to a target version",
           "name": "rollback"
         },
         "squash": {
           "flags": [
             {
-              "help": "Start version (inclusive)",
+              "help": "First migration version to include in the squash range",
               "name": "from",
               "type": "str"
             },
             {
-              "help": "End version (inclusive)",
+              "help": "Last migration version to include in the squash range",
               "name": "to",
               "type": "str"
             },
             {
               "default": "migrations",
-              "help": "Migrations directory",
+              "help": "Directory containing migration files to read or write",
               "name": "dir",
               "type": "str"
             },
             {
-              "help": "PostgreSQL connection URL for safety check",
+              "help": "PostgreSQL connection URL for pre-squash safety check",
               "name": "db",
               "type": "str"
             }
           ],
-          "help": "Squash a range of migrations into one",
+          "help": "Consolidate a range of migrations into a single file",
           "name": "squash"
         },
         "status": {
           "flags": [
             {
-              "help": "PostgreSQL connection URL",
+              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
               "type": "str"
             },
             {
               "default": "migrations",
-              "help": "Migrations directory",
+              "help": "Directory containing migration files to read or write",
               "name": "dir",
               "type": "str"
             }
           ],
-          "help": "Show migration status",
+          "help": "Show which migrations have been applied to the database",
           "name": "status"
         },
         "test": {
@@ -703,19 +718,19 @@
           ],
           "flags": [
             {
-              "help": "Staging database connection URL",
+              "help": "PostgreSQL connection URL for the staging test database",
               "name": "db",
               "type": "str"
             },
             {
               "default": "migrations",
-              "help": "Migrations directory",
+              "help": "Directory containing migration files to read or write",
               "name": "dir",
               "type": "str"
             },
             {
               "default": 60,
-              "help": "Timeout in seconds",
+              "help": "Maximum time in seconds before the test run is aborted",
               "name": "timeout",
               "type": "int"
             },
@@ -727,11 +742,11 @@
               "type": "bool"
             }
           ],
-          "help": "Test migrations against a staging database",
+          "help": "Test migrations by applying them against a staging database",
           "name": "test"
         }
       },
-      "help": "Database migration commands",
+      "help": "Database migration planning, generation, and execution",
       "name": "migrate"
     },
     "testdb": {
@@ -739,7 +754,7 @@
         "gc": {
           "flags": [
             {
-              "help": "PostgreSQL connection URL",
+              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
               "type": "str"
             },
@@ -749,14 +764,14 @@
               "type": "str"
             }
           ],
-          "help": "Drop orphaned test databases",
+          "help": "Drop orphaned test databases that were not torn down",
           "name": "gc"
         },
         "init": {
           "flags": [
             {
               "default": [],
-              "help": "Target language(s)",
+              "help": "Target programming language(s) for wrapper generation",
               "name": "language",
               "repeatable": true,
               "type": "str",
@@ -769,7 +784,7 @@
             },
             {
               "default": false,
-              "help": "Overwrite existing files",
+              "help": "Overwrite existing wrapper files without prompting",
               "name": "force",
               "negatable": true,
               "type": "bool"
@@ -786,37 +801,38 @@
         "setup": {
           "flags": [
             {
-              "help": "PostgreSQL connection URL",
+              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
               "type": "str"
             },
             {
-              "help": "Path to SQL DDL file",
+              "help": "Path to the SQL DDL file to apply to the test database",
               "name": "ddl",
               "type": "str"
             }
           ],
-          "help": "Create an ephemeral test database and apply DDL",
+          "help": "Create an ephemeral test database and apply DDL schema",
           "name": "setup"
         },
         "teardown": {
           "flags": [
             {
-              "help": "PostgreSQL connection URL",
+              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
               "type": "str"
             }
           ],
-          "help": "Drop an ephemeral test database",
+          "help": "Drop an ephemeral test database created by testdb setup",
           "name": "teardown"
         }
       },
-      "help": "Ephemeral test database management",
+      "help": "Manage ephemeral test databases for schema testing",
       "name": "testdb"
     }
   },
   "help": "PostgreSQL schema compiler",
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
-  "version": ""
+  "schema_version": 1,
+  "version": "0.15.1-0.20260624113503-2a57fb058c76+dirty"
 }

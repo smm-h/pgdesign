@@ -1,4 +1,4 @@
-// Package graph provides generic graph algorithms.
+// Package graph provides generic topological sorting and cycle detection algorithms used by model, generate, and format for dependency ordering.
 package graph
 
 // TopoSort performs a topological sort using Kahn's algorithm.

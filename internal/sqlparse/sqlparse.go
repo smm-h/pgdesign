@@ -1,7 +1,6 @@
-// Package sqlparse wraps wasilibs/go-pgquery, a WASM-based port of
-// PostgreSQL's actual parser (libpg_query), to provide SQL statement splitting
-// and expression deparsing. The WASM implementation requires no CGo, no C
-// compiler, and no native libpg_query build.
+// Package sqlparse wraps wasilibs/go-pgquery, a WASM-based PostgreSQL parser requiring no CGo, for SQL statement splitting and expression deparsing.
+//
+// The WASM implementation requires no C compiler and no native libpg_query build.
 //
 // SplitStatements splits SQL text into individual statements using the real
 // PostgreSQL parser, correctly handling dollar-quoting ($$ blocks), string

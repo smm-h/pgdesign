@@ -1,5 +1,4 @@
-// Package validate provides the strict validation engine for pgdesign schemas.
-// It operates on the resolved IR and returns diagnostics for rule violations.
+// Package validate provides the strict validation engine for pgdesign schemas, operating on the resolved IR to detect rule violations and anti-patterns.
 package validate
 
 import (

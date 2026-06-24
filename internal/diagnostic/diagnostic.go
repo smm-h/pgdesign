@@ -1,4 +1,4 @@
-// Package diagnostic provides shared error/warning types used by all compiler passes.
+// Package diagnostic provides shared error, warning, and hint reporting types used by all pgdesign compiler passes from parsing through code generation.
 package diagnostic
 
 import (

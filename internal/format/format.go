@@ -1,4 +1,5 @@
-// Package format implements canonical TOML formatting for pgdesign schema files.
+// Package format implements canonical TOML formatting for pgdesign schema files, reordering sections via a comment-preserving go-toml-edit AST in place.
+//
 // It parses the input via go-toml-edit to get a comment-preserving AST, then
 // reorders sections in-place according to canonical ordering. Comments attached
 // to sections and keys travel with them during reordering.
