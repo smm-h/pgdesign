@@ -10,6 +10,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // reservedWords is a set of common PostgreSQL reserved words that require quoting.
@@ -182,7 +183,7 @@ func CreateDomain(schemaName string, d model.Domain) string {
 	qualified := QualifiedName(schemaName, d.Name)
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CREATE DOMAIN %s AS %s", qualified, d.BaseType))
+	sb.WriteString(fmt.Sprintf("CREATE DOMAIN %s AS %s", qualified, typeinfo.Reconstruct(d.BaseType)))
 
 	if d.NotNull {
 		sb.WriteString(" NOT NULL")
@@ -191,7 +192,7 @@ func CreateDomain(schemaName string, d model.Domain) string {
 	if d.DefaultExpr != "" {
 		sb.WriteString(" DEFAULT " + ExprValue(d.DefaultExpr))
 	} else if d.Default != "" {
-		sb.WriteString(" DEFAULT " + LiteralValue(d.Default, d.BaseType))
+		sb.WriteString(" DEFAULT " + LiteralValue(d.Default, d.BaseType.Base))
 	}
 
 	if d.Check != "" {
@@ -209,7 +210,7 @@ func CreateCompositeType(schemaName string, ct model.CompositeType) string {
 
 	fieldDefs := make([]string, len(ct.Fields))
 	for i, f := range ct.Fields {
-		fieldDefs[i] = fmt.Sprintf("%s %s", QuoteIdent(f.Name), f.PGType)
+		fieldDefs[i] = fmt.Sprintf("%s %s", QuoteIdent(f.Name), typeinfo.Reconstruct(f.PGType))
 	}
 
 	return fmt.Sprintf("CREATE TYPE %s AS (\n    %s\n);",
@@ -323,7 +324,7 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	}
 
 	var parts []string
-	pgType := resolveColumnType(col.PGType, enums)
+	pgType := resolveColumnType(typeinfo.Reconstruct(col.PGType), enums)
 	if col.Array {
 		pgType += "[]"
 	}
@@ -1087,7 +1088,7 @@ func CreateFunction(schemaName string, f model.Function) string {
 	// Build argument list
 	argParts := make([]string, len(f.Args))
 	for i, arg := range f.Args {
-		argDef := QuoteIdent(arg.Name) + " " + arg.Type
+		argDef := QuoteIdent(arg.Name) + " " + typeinfo.Reconstruct(arg.Type)
 		if arg.Default != "" {
 			argDef += " DEFAULT " + arg.Default
 		}
@@ -1140,7 +1141,7 @@ func DropFunction(schemaName string, f model.Function, cascade bool) string {
 	// Build argument type list for overload resolution
 	argTypes := make([]string, len(f.Args))
 	for i, arg := range f.Args {
-		argTypes[i] = arg.Type
+		argTypes[i] = typeinfo.Reconstruct(arg.Type)
 	}
 
 	kind := "FUNCTION"
