@@ -1702,7 +1702,7 @@ func funcArgsEqual(a, b []model.FunctionArg) bool {
 		return false
 	}
 	for i := range a {
-		if a[i].Name != b[i].Name || a[i].Type != b[i].Type || a[i].Default != b[i].Default {
+		if a[i].Name != b[i].Name || !a[i].Type.Equal(b[i].Type) || a[i].Default != b[i].Default {
 			return false
 		}
 	}
