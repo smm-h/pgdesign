@@ -204,9 +204,50 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 	var enums []Enum
 	var compositeTypes []CompositeType
 
-	// Build enums from raw types with kind=enum.
+	// Build enums and composite types from raw types.
+	// Extended types (with Extends set) are resolved from the registry to get
+	// merged data; non-extended types are read directly from the raw TOML.
 	for _, rt := range raw.Types {
-		if strings.EqualFold(rt.Kind, "enum") {
+		// Determine the effective kind: for extended types, resolve from registry.
+		if rt.Extends != nil {
+			td, err := reg.Resolve(rt.Name)
+			if err != nil {
+				continue
+			}
+			switch td.Kind {
+			case semtype.KindEnum:
+				enums = append(enums, Enum{
+					Schema:  raw.Meta.Schema,
+					Name:    td.Name,
+					Values:  td.EnumValues,
+					Comment: td.Comment,
+				})
+			case semtype.KindComposite:
+				ct := CompositeType{
+					Schema:  raw.Meta.Schema,
+					Name:    td.Name,
+					Comment: td.Comment,
+				}
+				for _, f := range td.Fields {
+					ct.Fields = append(ct.Fields, CompositeField{
+						Name:   f.Name,
+						PGType: typeinfo.Parse(f.PGType),
+					})
+				}
+				compositeTypes = append(compositeTypes, ct)
+			case semtype.KindStateMachine:
+				enums = append(enums, Enum{
+					Schema:  raw.Meta.Schema,
+					Name:    td.Name,
+					Values:  td.EnumValues,
+					Comment: td.Comment,
+				})
+			}
+			continue
+		}
+
+		switch {
+		case strings.EqualFold(rt.Kind, "enum"):
 			e := Enum{
 				Schema: raw.Meta.Schema,
 				Name:   rt.Name,
@@ -216,12 +257,8 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 				e.Comment = *rt.Comment
 			}
 			enums = append(enums, e)
-		}
-	}
 
-	// Build composite types from raw types with kind=composite.
-	for _, rt := range raw.Types {
-		if strings.EqualFold(rt.Kind, "composite") {
+		case strings.EqualFold(rt.Kind, "composite"):
 			ct := CompositeType{
 				Schema: raw.Meta.Schema,
 				Name:   rt.Name,
@@ -243,23 +280,18 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 				})
 			}
 			compositeTypes = append(compositeTypes, ct)
-		}
-	}
 
-	// Build enums from state machine types (states become PG enum values).
-	for _, rt := range raw.Types {
-		if strings.EqualFold(rt.Kind, "state_machine") {
+		case strings.EqualFold(rt.Kind, "state_machine"):
 			td, err := reg.Resolve(rt.Name)
 			if err != nil {
 				continue
 			}
-			e := Enum{
+			enums = append(enums, Enum{
 				Schema:  raw.Meta.Schema,
 				Name:    td.Name,
 				Values:  td.EnumValues,
 				Comment: td.Comment,
-			}
-			enums = append(enums, e)
+			})
 		}
 	}
 
