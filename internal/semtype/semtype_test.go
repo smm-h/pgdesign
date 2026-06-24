@@ -2,6 +2,8 @@ package semtype
 
 import (
 	"testing"
+
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestBuiltinResolve(t *testing.T) {
@@ -9,7 +11,7 @@ func TestBuiltinResolve(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		pgType      string
+		pgType      typeinfo.Type
 		notNull     bool
 		defaultVal  *string
 		defaultExpr string
@@ -17,19 +19,19 @@ func TestBuiltinResolve(t *testing.T) {
 		generated   string
 		identity    string
 	}{
-		{"id", "uuid", true, nil, "gen_random_uuid()", "", "", ""},
-		{"ref", "uuid", true, nil, "", "", "", ""},
-		{"timestamp", "timestamptz", true, nil, "now()", "", "", ""},
-		{"timestamp_optional", "timestamptz", false, nil, "", "", "", ""},
-		{"money", "bigint", true, strPtr("0"), "", "", "", ""},
-		{"slug", "text", true, nil, "", "VALUE ~ '^[a-z0-9-]+$'", "", ""},
-		{"email", "text", true, nil, "", "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'", "", ""},
-		{"short_text", "text", true, nil, "", "LENGTH(VALUE) <= 255", "", ""},
-		{"json", "jsonb", true, nil, "'{}'::jsonb", "", "", ""},
-		{"json_array", "jsonb", true, nil, "'[]'::jsonb", "", "", ""},
-		{"counter", "bigint", true, strPtr("0"), "", "", "", ""},
-		{"flag", "boolean", true, strPtr("false"), "", "", "", ""},
-		{"auto_id", "bigint", true, nil, "", "", "", "ALWAYS"},
+		{"id", typeinfo.T("uuid"), true, nil, "gen_random_uuid()", "", "", ""},
+		{"ref", typeinfo.T("uuid"), true, nil, "", "", "", ""},
+		{"timestamp", typeinfo.T("timestamptz"), true, nil, "now()", "", "", ""},
+		{"timestamp_optional", typeinfo.T("timestamptz"), false, nil, "", "", "", ""},
+		{"money", typeinfo.T("bigint"), true, strPtr("0"), "", "", "", ""},
+		{"slug", typeinfo.T("text"), true, nil, "", "VALUE ~ '^[a-z0-9-]+$'", "", ""},
+		{"email", typeinfo.T("text"), true, nil, "", "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'", "", ""},
+		{"short_text", typeinfo.T("text"), true, nil, "", "LENGTH(VALUE) <= 255", "", ""},
+		{"json", typeinfo.T("jsonb"), true, nil, "'{}'::jsonb", "", "", ""},
+		{"json_array", typeinfo.T("jsonb"), true, nil, "'[]'::jsonb", "", "", ""},
+		{"counter", typeinfo.T("bigint"), true, strPtr("0"), "", "", "", ""},
+		{"flag", typeinfo.T("boolean"), true, strPtr("false"), "", "", "", ""},
+		{"auto_id", typeinfo.T("bigint"), true, nil, "", "", "", "ALWAYS"},
 	}
 
 	for _, tt := range tests {
@@ -39,7 +41,7 @@ func TestBuiltinResolve(t *testing.T) {
 				t.Fatalf("Resolve(%q) returned error: %v", tt.name, err)
 			}
 			if td.BaseType != tt.pgType {
-				t.Errorf("BaseType = %q, want %q", td.BaseType, tt.pgType)
+				t.Errorf("BaseType = %v, want %v", td.BaseType, tt.pgType)
 			}
 			if td.NotNull != tt.notNull {
 				t.Errorf("NotNull = %v, want %v", td.NotNull, tt.notNull)
@@ -73,19 +75,19 @@ func TestResolveUnknownType(t *testing.T) {
 
 func TestRegisterDuplicate(t *testing.T) {
 	r := NewRegistry()
-	td := &TypeDef{Name: "test", Kind: KindScalar, BaseType: "text"}
+	td := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("text")}
 	if err := r.Register(td); err != nil {
 		t.Fatalf("first Register failed: %v", err)
 	}
 
 	// Identical duplicate registration should succeed (idempotent).
-	td2 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: "text"}
+	td2 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("text")}
 	if err := r.Register(td2); err != nil {
 		t.Fatalf("identical duplicate should succeed, got: %v", err)
 	}
 
 	// Conflicting duplicate should fail.
-	td3 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: "integer"}
+	td3 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("integer")}
 	if err := r.Register(td3); err == nil {
 		t.Fatal("expected error for conflicting duplicate registration, got nil")
 	}
@@ -143,8 +145,8 @@ func TestLoadUserScalarTypeWithCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve(positive_int) error: %v", err)
 	}
-	if td.BaseType != "integer" {
-		t.Errorf("BaseType = %q, want %q", td.BaseType, "integer")
+	if td.BaseType != typeinfo.T("integer") {
+		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T("integer"))
 	}
 	if td.Check != "VALUE > 0" {
 		t.Errorf("Check = %q, want %q", td.Check, "VALUE > 0")
@@ -277,8 +279,8 @@ func TestResolveColumnOverrideNullable(t *testing.T) {
 	if rc.NotNull {
 		t.Error("NotNull = true, want false (nullable override)")
 	}
-	if rc.PGType != "uuid" {
-		t.Errorf("PGType = %q, want %q", rc.PGType, "uuid")
+	if rc.PGType != typeinfo.T("uuid") {
+		t.Errorf("PGType = %v, want %v", rc.PGType, typeinfo.T("uuid"))
 	}
 	if rc.DefaultExpr != "gen_random_uuid()" {
 		t.Errorf("DefaultExpr = %q, want %q", rc.DefaultExpr, "gen_random_uuid()")
@@ -330,8 +332,8 @@ func TestResolveColumnNoOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveColumn error: %v", err)
 	}
-	if rc.PGType != "text" {
-		t.Errorf("PGType = %q, want %q", rc.PGType, "text")
+	if rc.PGType != typeinfo.T("text") {
+		t.Errorf("PGType = %v, want %v", rc.PGType, typeinfo.T("text"))
 	}
 	if !rc.NotNull {
 		t.Error("NotNull = false, want true")
@@ -539,8 +541,8 @@ func TestExtensionType_Accepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve(embedding) error: %v", err)
 	}
-	if td.BaseType != "vector(384)" {
-		t.Errorf("BaseType = %q, want %q", td.BaseType, "vector(384)")
+	if td.BaseType != typeinfo.MustParse("vector(384)") {
+		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.MustParse("vector(384)"))
 	}
 }
 
@@ -626,8 +628,8 @@ func TestLoadUserScalarType_RangeTypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Resolve(my_%s) error: %v", rt, err)
 			}
-			if td.BaseType != rt {
-				t.Errorf("BaseType = %q, want %q", td.BaseType, rt)
+			if td.BaseType != typeinfo.T(rt) {
+				t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T(rt))
 			}
 		})
 	}
@@ -661,8 +663,8 @@ func TestLoadUserCompositeType(t *testing.T) {
 	if td.Kind != KindComposite {
 		t.Errorf("Kind = %v, want KindComposite", td.Kind)
 	}
-	if td.BaseType != "address" {
-		t.Errorf("BaseType = %q, want %q", td.BaseType, "address")
+	if td.BaseType != typeinfo.T("address") {
+		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T("address"))
 	}
 	if td.Comment != "Mailing address" {
 		t.Errorf("Comment = %q, want %q", td.Comment, "Mailing address")
@@ -773,7 +775,7 @@ func TestCompositeTypeDefsEqual(t *testing.T) {
 	a := &TypeDef{
 		Name:     "address",
 		Kind:     KindComposite,
-		BaseType: "address",
+		BaseType: typeinfo.T("address"),
 		Fields: []CompositeField{
 			{Name: "city", PGType: "text"},
 			{Name: "street", PGType: "text"},
@@ -782,7 +784,7 @@ func TestCompositeTypeDefsEqual(t *testing.T) {
 	b := &TypeDef{
 		Name:     "address",
 		Kind:     KindComposite,
-		BaseType: "address",
+		BaseType: typeinfo.T("address"),
 		Fields: []CompositeField{
 			{Name: "city", PGType: "text"},
 			{Name: "street", PGType: "text"},
@@ -796,7 +798,7 @@ func TestCompositeTypeDefsEqual(t *testing.T) {
 	c := &TypeDef{
 		Name:     "address",
 		Kind:     KindComposite,
-		BaseType: "address",
+		BaseType: typeinfo.T("address"),
 		Fields: []CompositeField{
 			{Name: "city", PGType: "text"},
 		},
@@ -809,7 +811,7 @@ func TestCompositeTypeDefsEqual(t *testing.T) {
 	d := &TypeDef{
 		Name:     "address",
 		Kind:     KindComposite,
-		BaseType: "address",
+		BaseType: typeinfo.T("address"),
 		Fields: []CompositeField{
 			{Name: "city", PGType: "varchar"},
 			{Name: "street", PGType: "text"},
@@ -823,7 +825,7 @@ func TestCompositeTypeDefsEqual(t *testing.T) {
 	e := &TypeDef{
 		Name:     "address",
 		Kind:     KindComposite,
-		BaseType: "address",
+		BaseType: typeinfo.T("address"),
 		Fields: []CompositeField{
 			{Name: "town", PGType: "text"},
 			{Name: "street", PGType: "text"},
@@ -873,8 +875,8 @@ func TestLoadStateMachineType(t *testing.T) {
 	if td.Kind != KindStateMachine {
 		t.Errorf("Kind = %v, want KindStateMachine", td.Kind)
 	}
-	if td.BaseType != "order_status" {
-		t.Errorf("BaseType = %q, want %q", td.BaseType, "order_status")
+	if td.BaseType != typeinfo.T("order_status") {
+		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T("order_status"))
 	}
 	if td.InitialState != "pending" {
 		t.Errorf("InitialState = %q, want %q", td.InitialState, "pending")
@@ -1128,7 +1130,7 @@ func TestStateMachineTypeDefsEqual(t *testing.T) {
 	a := &TypeDef{
 		Name:         "order_status",
 		Kind:         KindStateMachine,
-		BaseType:     "order_status",
+		BaseType:     typeinfo.T("order_status"),
 		InitialState: "pending",
 		States: []SMStateDef{
 			{Name: "pending"},
@@ -1142,7 +1144,7 @@ func TestStateMachineTypeDefsEqual(t *testing.T) {
 	b := &TypeDef{
 		Name:         "order_status",
 		Kind:         KindStateMachine,
-		BaseType:     "order_status",
+		BaseType:     typeinfo.T("order_status"),
 		InitialState: "pending",
 		States: []SMStateDef{
 			{Name: "pending"},
@@ -1161,7 +1163,7 @@ func TestStateMachineTypeDefsEqual(t *testing.T) {
 	c := &TypeDef{
 		Name:         "order_status",
 		Kind:         KindStateMachine,
-		BaseType:     "order_status",
+		BaseType:     typeinfo.T("order_status"),
 		InitialState: "done",
 		States:       a.States,
 		Transitions:  a.Transitions,
@@ -1174,7 +1176,7 @@ func TestStateMachineTypeDefsEqual(t *testing.T) {
 	d := &TypeDef{
 		Name:           "order_status",
 		Kind:           KindStateMachine,
-		BaseType:       "order_status",
+		BaseType:       typeinfo.T("order_status"),
 		InitialState:   "pending",
 		EnforceTrigger: true,
 		States:         a.States,
@@ -1188,7 +1190,7 @@ func TestStateMachineTypeDefsEqual(t *testing.T) {
 	e := &TypeDef{
 		Name:         "order_status",
 		Kind:         KindStateMachine,
-		BaseType:     "order_status",
+		BaseType:     typeinfo.T("order_status"),
 		InitialState: "pending",
 		States: []SMStateDef{
 			{Name: "pending"},
