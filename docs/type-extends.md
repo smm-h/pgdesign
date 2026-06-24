@@ -1,10 +1,15 @@
+---
+title: "Type Extends"
+description: "How pgdesign type derivation works for scalars, enums, composites, and state machines using extends with sealed, overridable, and additive field semantics."
+---
+
 # Type Extends
 
 Type derivation allows defining new types that inherit from and extend existing types. This works for all four type kinds: scalar, enum, composite, and state machine.
 
 ## Syntax
 
-Add `extends = "parent_type_name"` to any `[types.*]` section in your schema TOML:
+Add `extends = "parent_type_name"` to any `[types.*]` section in your schema TOML to derive a new type from an existing one. The parent type must be either a builtin type or another user-defined type declared in the same schema. Types with extends references are topologically sorted before processing, so parent types are always resolved before their children regardless of declaration order in the TOML file.
 
 ```toml
 [types.strict_email]
@@ -18,7 +23,7 @@ The parent type must be either a builtin type or another user-defined type. Type
 
 ### Scalar Extends
 
-Scalar extends performs field overlay: the child inherits all fields from the parent and can override non-sealed fields.
+Scalar extends performs field overlay where the child inherits all fields from the parent and can selectively override non-sealed fields like not_null, default, check, and comment. The base PostgreSQL type and kind are sealed and cannot be changed by the child, ensuring type safety across the derivation chain. This pattern is useful for creating specialized variants of domain types with different constraints or defaults.
 
 ```toml
 [types.email]
@@ -36,7 +41,7 @@ Overridable fields: `not_null`, `default`, `default_expr`, `check`, `unique`, `a
 
 ### Enum Extends
 
-Enum extends is additive: the child inherits all parent values and can add new ones.
+Enum extends is additive, meaning the child inherits all parent values and can declare additional ones that are appended to the parent's value list. Duplicate values that already exist in the parent are silently deduplicated. If the child provides no new values and no field overrides, E117 is emitted as a warning since the derivation has no effect. The child can also override default, not_null, comment, and array fields.
 
 ```toml
 [types.color]
@@ -55,7 +60,7 @@ Overridable fields: `default`, `not_null`, `comment`, `array`.
 
 ### Composite Extends
 
-Composite extends is additive: the child inherits all parent fields and adds new ones. Field name collisions are a hard error (E118).
+Composite extends is additive, meaning the child inherits all parent fields and declares additional ones that are merged into the parent's field set. Field name collisions between parent and child are a hard error (E118) because implicit field overriding in composite types would create ambiguity about which definition takes precedence. The child can only override the comment field from the parent; all structural fields like kind and existing field definitions are sealed.
 
 ```toml
 [types.address]
@@ -80,7 +85,7 @@ Overridable fields: `comment`.
 
 ### State Machine Extends
 
-State machine extends is additive for states and transitions. State name collisions are a hard error (E119). The child can override `initial`, `enforce_trigger`, and `comment`.
+State machine extends is additive for both states and transitions, allowing the child to define new states and new transition rules that are merged with the parent's definitions. State name collisions between parent and child are a hard error (E119) to prevent ambiguous state definitions. The child can override `initial`, `enforce_trigger`, and `comment` fields. After the merge, reachability validation runs from the final initial state to ensure all states in the combined machine are reachable.
 
 ```toml
 [types.order_status]
@@ -140,7 +145,7 @@ Sealed fields cannot be changed. Attempting to change a sealed field produces E1
 
 ## Self-Shadowing (Overriding Builtins)
 
-User-defined types can shadow builtin types by using the same name. This is not `extends` -- it is a direct re-registration with sealed field enforcement.
+User-defined types can shadow builtin types by declaring a type with the same name, such as redefining `id` to use a different UUID generation function. This is not `extends` but rather a direct re-registration with sealed field enforcement. The sealed fields (kind and base type) must match the builtin being shadowed, or E114 is emitted. Successful shadowing produces an I101 informational diagnostic so the override is visible during validation.
 
 ```toml
 [types.id]
@@ -185,7 +190,7 @@ Additional codes related to builtin shadowing:
 
 ## Source Tracking
 
-The `Source` field on `TypeDef` tracks the origin of each type definition:
+The `Source` field on `TypeDef` tracks the origin of each type definition, distinguishing between types that were registered as builtins during initialization, defined directly by the user in TOML, or created through extends derivation. This tracking enables diagnostic messages to accurately report where a type came from and helps the validation engine distinguish between intentional shadowing of builtins and accidental name collisions.
 
 - `"builtin"` -- registered by `NewBuiltinRegistry()` (e.g., id, ref, timestamp, money)
 - `"user"` -- registered by `LoadUserTypes()` without extends
