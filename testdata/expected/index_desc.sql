@@ -6,7 +6,7 @@ CREATE TABLE chat.messages (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     channel short_text NOT NULL,
     sent_at timestamptz NOT NULL DEFAULT now(),
-    score bigint NOT NULL DEFAULT 0,
+    score int8 NOT NULL DEFAULT 0,
     CONSTRAINT pk_messages PRIMARY KEY (id)
 );
 

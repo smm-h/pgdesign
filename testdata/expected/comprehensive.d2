@@ -12,9 +12,9 @@ tasks: {
   project_id: uuid {constraint: foreign_key}
   title: short_text
   priority: priority
-  estimated_hours: bigint
-  hourly_rate: bigint
-  estimated_cost: bigint
+  estimated_hours: int8
+  hourly_rate: int8
+  estimated_cost: int8
   created_at: timestamptz
 }
 audit_log: {

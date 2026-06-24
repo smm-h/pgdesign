@@ -7,7 +7,7 @@ CREATE TABLE auth.users (
     username text,
     display_name text NOT NULL DEFAULT '',
     email text,
-    email_verified boolean NOT NULL DEFAULT false,
+    email_verified bool NOT NULL DEFAULT false,
     created_at float8 NOT NULL,
     updated_at float8 NOT NULL,
     CONSTRAINT pk_users PRIMARY KEY (id)
@@ -17,7 +17,7 @@ CREATE TABLE auth.magic_links (
     token text NOT NULL,
     email text NOT NULL,
     expires_at float8 NOT NULL,
-    used boolean NOT NULL DEFAULT false,
+    used bool NOT NULL DEFAULT false,
     CONSTRAINT pk_magic_links PRIMARY KEY (token)
 );
 
@@ -54,7 +54,7 @@ CREATE TABLE auth.email_verifications (
     user_id text NOT NULL,
     email text NOT NULL,
     expires_at float8 NOT NULL,
-    used boolean NOT NULL DEFAULT false,
+    used bool NOT NULL DEFAULT false,
     CONSTRAINT pk_email_verifications PRIMARY KEY (token)
 );
 
@@ -62,23 +62,23 @@ CREATE TABLE auth.password_resets (
     token text NOT NULL,
     user_id text NOT NULL,
     expires_at float8 NOT NULL,
-    used boolean NOT NULL DEFAULT false,
+    used bool NOT NULL DEFAULT false,
     CONSTRAINT pk_password_resets PRIMARY KEY (token)
 );
 
 CREATE TABLE auth.totp_secrets (
     user_id text NOT NULL,
     secret text NOT NULL,
-    verified boolean NOT NULL DEFAULT false,
+    verified bool NOT NULL DEFAULT false,
     created_at float8 NOT NULL,
     CONSTRAINT pk_totp_secrets PRIMARY KEY (user_id)
 );
 
 CREATE TABLE auth.recovery_codes (
-    id bigint NOT NULL,
+    id int8 NOT NULL,
     user_id text NOT NULL,
     code_hash text NOT NULL,
-    used boolean NOT NULL DEFAULT false,
+    used bool NOT NULL DEFAULT false,
     CONSTRAINT pk_recovery_codes PRIMARY KEY (id)
 );
 
@@ -88,7 +88,7 @@ CREATE TABLE auth.webauthn_credentials (
     public_key bytea NOT NULL,
     attestation_type text NOT NULL,
     transport text,
-    sign_count integer NOT NULL DEFAULT 0,
+    sign_count int4 NOT NULL DEFAULT 0,
     created_at float8 NOT NULL,
     last_used float8,
     CONSTRAINT pk_webauthn_credentials PRIMARY KEY (id)

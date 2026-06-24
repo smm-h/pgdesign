@@ -4,21 +4,21 @@ players: {
   auth_id: text {constraint: foreign_key}
   name: text
   display_name: text
-  is_anonymous: boolean
+  is_anonymous: bool
   created_at: timestamptz
-  is_ai: boolean
+  is_ai: bool
   ai_model: text
 }
 server_registry: {
   shape: sql_table
   id: text {constraint: primary_key}
   host: text
-  port: integer
+  port: int4
   version: text
   server_type: server_type
   status: server_status
-  max_sessions: integer
-  active_sessions: integer
+  max_sessions: int4
+  active_sessions: int4
   last_heartbeat: timestamptz
   registered_at: timestamptz
 }
@@ -29,7 +29,7 @@ experiment: {
   description: text
   variants: jsonb
   status: experiment_status
-  allocation_pct: integer
+  allocation_pct: int4
   created_at: timestamptz
 }
 achievement_def: {
@@ -58,7 +58,7 @@ game_catalog: {
   description: text
   tags: jsonb
   creator: uuid {constraint: foreign_key}
-  ai_generated: boolean
+  ai_generated: bool
   created_at: timestamptz
   generation_model: text
   generation_prompt: text
@@ -75,19 +75,19 @@ chat_messages: {
 player_privacy_settings: {
   shape: sql_table
   player_id: uuid {constraint: primary_key}
-  public_profile: boolean
-  chat_enabled: boolean
-  friends_enabled: boolean
-  leaderboard_visible: boolean
+  public_profile: bool
+  chat_enabled: bool
+  friends_enabled: bool
+  leaderboard_visible: bool
   updated_at: timestamptz
 }
 player_age_verification: {
   shape: sql_table
   player_id: uuid {constraint: primary_key}
   birth_date: date
-  is_minor: boolean
-  parental_consent_required: boolean
-  parental_consent_given: boolean
+  is_minor: bool
+  parental_consent_required: bool
+  parental_consent_given: bool
   parent_email: text
   consent_token: text
   consent_token_expires_at: timestamptz
@@ -100,8 +100,8 @@ player_profile: {
   bio: text
   avatar_url: text
   status_text: text
-  level: integer
-  xp: bigint
+  level: int4
+  xp: int8
 }
 player_setting: {
   shape: sql_table
@@ -128,14 +128,14 @@ report: {
 currency_balance: {
   shape: sql_table
   player_id: uuid {constraint: primary_key}
-  balance: bigint
+  balance: int8
   updated_at: timestamptz
 }
 currency_transaction: {
   shape: sql_table
   id: uuid {constraint: primary_key}
   player_id: uuid {constraint: foreign_key}
-  amount: bigint
+  amount: int8
   type: currency_transaction_type
   reason: text
   reference_type: text
@@ -150,7 +150,7 @@ notification: {
   title: text
   body: text
   data: jsonb
-  read: boolean
+  read: bool
   created_at: timestamptz
 }
 api_keys: {
@@ -176,7 +176,7 @@ platform_leaderboards: {
   id: uuid {constraint: primary_key}
   game_id: uuid {constraint: foreign_key}
   player_id: uuid {constraint: foreign_key}
-  score: bigint
+  score: int8
   metadata: jsonb
   achieved_at: timestamptz
 }
@@ -186,7 +186,7 @@ game_version: {
   game_id: uuid {constraint: foreign_key}
   version_number: text
   bundle_path: text
-  bundle_size: bigint
+  bundle_size: int8
   changelog: text
   created_at: timestamptz
 }
@@ -220,8 +220,8 @@ generation_job: {
   prompt: text
   status: generation_status
   model: text
-  cost_cents: integer
-  progress: integer
+  cost_cents: int4
+  progress: int4
   error_message: text
   created_at: timestamptz
   completed_at: timestamptz
@@ -232,7 +232,7 @@ session: {
   game_id: uuid {constraint: foreign_key}
   status: session_status
   room_code: text
-  max_players: integer
+  max_players: int4
   config: jsonb
   result: jsonb
   created_at: timestamptz
@@ -261,9 +261,9 @@ game_play: {
   game_id: uuid {constraint: foreign_key}
   player_id: uuid {constraint: foreign_key}
   version_id: uuid {constraint: foreign_key}
-  duration_seconds: integer
-  completed: boolean
-  score: bigint
+  duration_seconds: int4
+  completed: bool
+  score: int8
   created_at: timestamptz
 }
 session_participant: {
@@ -279,7 +279,7 @@ action_log: {
   session_id: uuid {constraint: foreign_key}
   player_id: uuid {constraint: foreign_key}
   action: jsonb
-  sequence_num: bigint
+  sequence_num: int8
   created_at: timestamptz
 }
 state_snapshot: {
@@ -287,7 +287,7 @@ state_snapshot: {
   id: uuid {constraint: primary_key}
   session_id: uuid {constraint: foreign_key}
   state: jsonb
-  action_sequence_num: bigint
+  action_sequence_num: int8
   created_at: timestamptz
 }
 players.auth_id -> users.id: SET NULL

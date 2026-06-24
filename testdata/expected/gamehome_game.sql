@@ -20,9 +20,9 @@ CREATE TABLE game.players (
     auth_id text,
     name text NOT NULL,
     display_name text NOT NULL,
-    is_anonymous boolean NOT NULL DEFAULT false,
+    is_anonymous bool NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
-    is_ai boolean NOT NULL DEFAULT false,
+    is_ai bool NOT NULL DEFAULT false,
     ai_model text,
     CONSTRAINT pk_players PRIMARY KEY (id)
 );
@@ -30,12 +30,12 @@ CREATE TABLE game.players (
 CREATE TABLE game.server_registry (
     id text NOT NULL,
     host text NOT NULL,
-    port integer NOT NULL,
+    port int4 NOT NULL,
     version text NOT NULL,
     server_type game.server_type NOT NULL,
     status game.server_status NOT NULL,
-    max_sessions integer NOT NULL,
-    active_sessions integer NOT NULL DEFAULT 0,
+    max_sessions int4 NOT NULL,
+    active_sessions int4 NOT NULL DEFAULT 0,
     last_heartbeat timestamptz NOT NULL,
     registered_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_server_registry PRIMARY KEY (id)
@@ -47,7 +47,7 @@ CREATE TABLE game.experiment (
     description text,
     variants jsonb NOT NULL DEFAULT '{}'::jsonb,
     status game.experiment_status NOT NULL,
-    allocation_pct integer NOT NULL DEFAULT 100,
+    allocation_pct int4 NOT NULL DEFAULT 100,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_experiment PRIMARY KEY (id)
 );
@@ -79,7 +79,7 @@ CREATE TABLE game.game_catalog (
     description text,
     tags jsonb NOT NULL DEFAULT '[]'::jsonb,
     creator uuid,
-    ai_generated boolean NOT NULL DEFAULT false,
+    ai_generated bool NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     generation_model text,
     generation_prompt text,
@@ -98,10 +98,10 @@ CREATE TABLE game.chat_messages (
 
 CREATE TABLE game.player_privacy_settings (
     player_id uuid NOT NULL,
-    public_profile boolean NOT NULL DEFAULT false,
-    chat_enabled boolean NOT NULL DEFAULT false,
-    friends_enabled boolean NOT NULL DEFAULT false,
-    leaderboard_visible boolean NOT NULL DEFAULT true,
+    public_profile bool NOT NULL DEFAULT false,
+    chat_enabled bool NOT NULL DEFAULT false,
+    friends_enabled bool NOT NULL DEFAULT false,
+    leaderboard_visible bool NOT NULL DEFAULT true,
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_player_privacy_settings PRIMARY KEY (player_id)
 );
@@ -109,9 +109,9 @@ CREATE TABLE game.player_privacy_settings (
 CREATE TABLE game.player_age_verification (
     player_id uuid NOT NULL,
     birth_date date NOT NULL,
-    is_minor boolean NOT NULL DEFAULT false,
-    parental_consent_required boolean NOT NULL DEFAULT false,
-    parental_consent_given boolean NOT NULL DEFAULT false,
+    is_minor bool NOT NULL DEFAULT false,
+    parental_consent_required bool NOT NULL DEFAULT false,
+    parental_consent_given bool NOT NULL DEFAULT false,
     parent_email text,
     consent_token text,
     consent_token_expires_at timestamptz,
@@ -125,8 +125,8 @@ CREATE TABLE game.player_profile (
     bio text,
     avatar_url text,
     status_text text,
-    level integer NOT NULL DEFAULT 1,
-    xp bigint NOT NULL DEFAULT 0,
+    level int4 NOT NULL DEFAULT 1,
+    xp int8 NOT NULL DEFAULT 0,
     CONSTRAINT pk_player_profile PRIMARY KEY (player_id)
 );
 
@@ -157,7 +157,7 @@ CREATE TABLE game.report (
 
 CREATE TABLE game.currency_balance (
     player_id uuid NOT NULL,
-    balance bigint NOT NULL DEFAULT 0,
+    balance int8 NOT NULL DEFAULT 0,
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_currency_balance PRIMARY KEY (player_id)
 );
@@ -165,7 +165,7 @@ CREATE TABLE game.currency_balance (
 CREATE TABLE game.currency_transaction (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     player_id uuid NOT NULL,
-    amount bigint NOT NULL DEFAULT 0,
+    amount int8 NOT NULL DEFAULT 0,
     "type" game.currency_transaction_type NOT NULL,
     reason text NOT NULL,
     reference_type text,
@@ -181,7 +181,7 @@ CREATE TABLE game.notification (
     title text NOT NULL,
     body text NOT NULL,
     data jsonb,
-    read boolean NOT NULL DEFAULT false,
+    read bool NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_notification PRIMARY KEY (id)
 );
@@ -210,7 +210,7 @@ CREATE TABLE game.platform_leaderboards (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     game_id uuid NOT NULL,
     player_id uuid NOT NULL,
-    score bigint NOT NULL DEFAULT 0,
+    score int8 NOT NULL DEFAULT 0,
     metadata jsonb,
     achieved_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_platform_leaderboards PRIMARY KEY (id)
@@ -221,7 +221,7 @@ CREATE TABLE game.game_version (
     game_id uuid NOT NULL,
     version_number text NOT NULL,
     bundle_path text NOT NULL,
-    bundle_size bigint NOT NULL DEFAULT 0,
+    bundle_size int8 NOT NULL DEFAULT 0,
     changelog text,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_game_version PRIMARY KEY (id)
@@ -259,8 +259,8 @@ CREATE TABLE game.generation_job (
     prompt text NOT NULL,
     status game.generation_status NOT NULL,
     model text NOT NULL,
-    cost_cents integer NOT NULL DEFAULT 0,
-    progress integer NOT NULL DEFAULT 0,
+    cost_cents int4 NOT NULL DEFAULT 0,
+    progress int4 NOT NULL DEFAULT 0,
     error_message text,
     created_at timestamptz NOT NULL DEFAULT now(),
     completed_at timestamptz,
@@ -272,7 +272,7 @@ CREATE TABLE game.session (
     game_id uuid NOT NULL,
     status game.session_status NOT NULL,
     room_code text NOT NULL,
-    max_players integer NOT NULL,
+    max_players int4 NOT NULL,
     config jsonb NOT NULL DEFAULT '{}'::jsonb,
     result jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -304,9 +304,9 @@ CREATE TABLE game.game_play (
     game_id uuid NOT NULL,
     player_id uuid NOT NULL,
     version_id uuid,
-    duration_seconds integer,
-    completed boolean NOT NULL DEFAULT false,
-    score bigint DEFAULT 0,
+    duration_seconds int4,
+    completed bool NOT NULL DEFAULT false,
+    score int8 DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_game_play PRIMARY KEY (id)
 );
@@ -324,7 +324,7 @@ CREATE TABLE game.action_log (
     session_id uuid NOT NULL,
     player_id uuid NOT NULL,
     action jsonb NOT NULL DEFAULT '{}'::jsonb,
-    sequence_num bigint NOT NULL DEFAULT 0,
+    sequence_num int8 NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_action_log PRIMARY KEY (id)
 );
@@ -333,7 +333,7 @@ CREATE TABLE game.state_snapshot (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     session_id uuid NOT NULL,
     state jsonb NOT NULL DEFAULT '{}'::jsonb,
-    action_sequence_num bigint NOT NULL DEFAULT 0,
+    action_sequence_num int8 NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_state_snapshot PRIMARY KEY (id)
 );

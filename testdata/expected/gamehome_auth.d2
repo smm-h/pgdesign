@@ -4,7 +4,7 @@ users: {
   username: text
   display_name: text
   email: text
-  email_verified: boolean
+  email_verified: bool
   created_at: float8
   updated_at: float8
 }
@@ -13,7 +13,7 @@ magic_links: {
   token: text {constraint: primary_key}
   email: text
   expires_at: float8
-  used: boolean
+  used: bool
 }
 credentials: {
   shape: sql_table
@@ -46,28 +46,28 @@ email_verifications: {
   user_id: text {constraint: foreign_key}
   email: text
   expires_at: float8
-  used: boolean
+  used: bool
 }
 password_resets: {
   shape: sql_table
   token: text {constraint: primary_key}
   user_id: text {constraint: foreign_key}
   expires_at: float8
-  used: boolean
+  used: bool
 }
 totp_secrets: {
   shape: sql_table
   user_id: text {constraint: primary_key}
   secret: text
-  verified: boolean
+  verified: bool
   created_at: float8
 }
 recovery_codes: {
   shape: sql_table
-  id: bigint {constraint: primary_key}
+  id: int8 {constraint: primary_key}
   user_id: text {constraint: foreign_key}
   code_hash: text
-  used: boolean
+  used: bool
 }
 webauthn_credentials: {
   shape: sql_table
@@ -76,7 +76,7 @@ webauthn_credentials: {
   public_key: bytea
   attestation_type: text
   transport: text
-  sign_count: integer
+  sign_count: int4
   created_at: float8
   last_used: float8
 }

@@ -6,7 +6,10 @@
     {
       "name": "email",
       "schema": "public",
-      "base_type": "text",
+      "base_type": {
+        "base": "text",
+        "params": {}
+      },
       "check": "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'"
     }
   ],
@@ -18,20 +21,30 @@
       "columns": [
         {
           "name": "id",
-          "pg_type": "uuid",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
         {
           "name": "email",
-          "pg_type": "email",
+          "pg_type": {
+            "base": "text",
+            "domain_name": "email",
+            "params": {}
+          },
           "not_null": true,
           "semantic_type_name": "email"
         },
         {
           "name": "created_at",
-          "pg_type": "timestamptz",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
           "not_null": true,
           "default_expr": "now()",
           "semantic_type_name": "timestamp"

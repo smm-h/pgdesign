@@ -6,7 +6,10 @@
     {
       "name": "short_text",
       "schema": "chat",
-      "base_type": "text",
+      "base_type": {
+        "base": "text",
+        "params": {}
+      },
       "check": "LENGTH(VALUE) \u003c= 255"
     }
   ],
@@ -18,27 +21,40 @@
       "columns": [
         {
           "name": "id",
-          "pg_type": "uuid",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
           "semantic_type_name": "id"
         },
         {
           "name": "channel",
-          "pg_type": "short_text",
+          "pg_type": {
+            "base": "text",
+            "domain_name": "short_text",
+            "params": {}
+          },
           "not_null": true,
           "semantic_type_name": "short_text"
         },
         {
           "name": "sent_at",
-          "pg_type": "timestamptz",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
           "not_null": true,
           "default_expr": "now()",
           "semantic_type_name": "timestamp"
         },
         {
           "name": "score",
-          "pg_type": "bigint",
+          "pg_type": {
+            "base": "int8",
+            "params": {}
+          },
           "not_null": true,
           "default": "0",
           "semantic_type_name": "counter"

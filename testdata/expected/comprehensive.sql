@@ -21,9 +21,9 @@ CREATE TABLE app.tasks (
     project_id uuid NOT NULL,
     title short_text NOT NULL,
     priority app.priority NOT NULL DEFAULT 'medium',
-    estimated_hours bigint NOT NULL DEFAULT 0,
-    hourly_rate bigint NOT NULL DEFAULT 0,
-    estimated_cost bigint NOT NULL GENERATED ALWAYS AS (estimated_hours * hourly_rate) STORED,
+    estimated_hours int8 NOT NULL DEFAULT 0,
+    hourly_rate int8 NOT NULL DEFAULT 0,
+    estimated_cost int8 NOT NULL GENERATED ALWAYS AS (estimated_hours * hourly_rate) STORED,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_tasks PRIMARY KEY (id)
 );
