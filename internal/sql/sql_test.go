@@ -6,6 +6,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestQuoteIdent(t *testing.T) {
@@ -109,9 +110,9 @@ func TestCreateTable(t *testing.T) {
 		Name:   "posts",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-			{Name: "title", PGType: "text", NotNull: true},
-			{Name: "body", PGType: "text", NotNull: false},
+			{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+			{Name: "title", PGType: typeinfo.T("text"), NotNull: true},
+			{Name: "body", PGType: typeinfo.T("text"), NotNull: false},
 		},
 		PK: []string{"id"},
 	}
@@ -144,8 +145,8 @@ func TestCreateTable_WithPartitioning(t *testing.T) {
 		Name:   "events",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true},
-			{Name: "created_at", PGType: "timestamptz", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+			{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 		},
 		PK: []string{"id"},
 		Partitioning: &model.PartitionSpec{
@@ -166,9 +167,9 @@ func TestCreateTable_WithMultiColumnPartitioning(t *testing.T) {
 		Name:   "events",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true},
-			{Name: "year", PGType: "integer", NotNull: true},
-			{Name: "region", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+			{Name: "year", PGType: typeinfo.T("integer"), NotNull: true},
+			{Name: "region", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 		Partitioning: &model.PartitionSpec{
@@ -187,9 +188,9 @@ func TestCreateTable_GeneratedColumn(t *testing.T) {
 		Name:   "products",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "integer", NotNull: true},
-			{Name: "price", PGType: "numeric", NotNull: true},
-			{Name: "tax", PGType: "numeric", NotNull: true, Generated: "price * 0.2", Stored: true},
+			{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+			{Name: "price", PGType: typeinfo.T("numeric"), NotNull: true},
+			{Name: "tax", PGType: typeinfo.T("numeric"), NotNull: true, Generated: "price * 0.2", Stored: true},
 		},
 		PK: []string{"id"},
 	}
@@ -206,9 +207,9 @@ func TestColumnDef_VirtualVersionGate(t *testing.T) {
 		Name:   "t",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "integer", NotNull: true},
-			{Name: "val", PGType: "integer", NotNull: true},
-			{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+			{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+			{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
+			{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
 		},
 		PK: []string{"id"},
 	}
@@ -259,8 +260,8 @@ func TestCreateTable_IdentityColumn(t *testing.T) {
 		Name:   "events",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true, Identity: "ALWAYS"},
-			{Name: "name", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true, Identity: "ALWAYS"},
+			{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -281,8 +282,8 @@ func TestCreateTable_IdentityByDefault(t *testing.T) {
 		Name:   "logs",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true, Identity: "BY DEFAULT"},
-			{Name: "message", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true, Identity: "BY DEFAULT"},
+			{Name: "message", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -299,8 +300,8 @@ func TestCreateTable_IdentityFallbackPrePG10(t *testing.T) {
 		Name:   "events",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true, Identity: "ALWAYS"},
-			{Name: "name", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true, Identity: "ALWAYS"},
+			{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -321,8 +322,8 @@ func TestCreateTable_IdentityNoFallbackPG10(t *testing.T) {
 		Name:   "events",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true, Identity: "ALWAYS"},
-			{Name: "name", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true, Identity: "ALWAYS"},
+			{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -340,8 +341,8 @@ func TestCreateTable_IdentityNoFallbackUnspecified(t *testing.T) {
 		Name:   "events",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true, Identity: "ALWAYS"},
-			{Name: "name", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true, Identity: "ALWAYS"},
+			{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -431,10 +432,10 @@ func TestCreateTable_EnumColumnSchemaQualified(t *testing.T) {
 		Name:   "servers",
 		Schema: "game",
 		Columns: []model.Column{
-			{Name: "id", PGType: "uuid", NotNull: true},
-			{Name: "kind", PGType: "server_type", NotNull: true},
-			{Name: "status", PGType: "status", NotNull: true},
-			{Name: "name", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+			{Name: "kind", PGType: typeinfo.T("server_type"), NotNull: true},
+			{Name: "status", PGType: typeinfo.T("status"), NotNull: true},
+			{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -462,10 +463,10 @@ func TestCreateTable_ArrayColumn(t *testing.T) {
 		Name:   "posts",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "uuid", NotNull: true},
-			{Name: "tags", PGType: "text", NotNull: true, Array: true},
-			{Name: "scores", PGType: "integer", NotNull: false, Array: true},
-			{Name: "title", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+			{Name: "tags", PGType: typeinfo.T("text"), NotNull: true, Array: true},
+			{Name: "scores", PGType: typeinfo.T("integer"), NotNull: false, Array: true},
+			{Name: "title", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -492,8 +493,8 @@ func TestCreateTable_ArrayColumnWithEnum(t *testing.T) {
 		Name:   "items",
 		Schema: "app",
 		Columns: []model.Column{
-			{Name: "id", PGType: "uuid", NotNull: true},
-			{Name: "tags", PGType: "tag_type", NotNull: true, Array: true},
+			{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+			{Name: "tags", PGType: typeinfo.T("tag_type"), NotNull: true, Array: true},
 		},
 		PK: []string{"id"},
 	}
@@ -516,8 +517,8 @@ func TestCreateTable_CrossSchemaEnum(t *testing.T) {
 		Name:   "tasks",
 		Schema: "app",
 		Columns: []model.Column{
-			{Name: "id", PGType: "uuid", NotNull: true},
-			{Name: "priority", PGType: "priority", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+			{Name: "priority", PGType: typeinfo.T("priority"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -603,7 +604,7 @@ func TestIdempotentMode(t *testing.T) {
 	table := &model.Table{
 		Name:    "items",
 		Schema:  "public",
-		Columns: []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+		Columns: []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 		PK:      []string{"id"},
 	}
 	got = CreateTable(table, "public", true, 0, nil)
@@ -1215,8 +1216,8 @@ func TestColumnDef_ArrayIntegerDefault_QuotedEmptyArray(t *testing.T) {
 		Name:   "results",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "uuid", NotNull: true},
-			{Name: "scores", PGType: "integer", NotNull: true, Array: true, Default: model.StrPtr("{}")},
+			{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+			{Name: "scores", PGType: typeinfo.T("integer"), NotNull: true, Array: true, Default: model.StrPtr("{}")},
 		},
 		PK: []string{"id"},
 	}
@@ -1410,9 +1411,9 @@ func TestCreateTable_ColumnCollation(t *testing.T) {
 		Name:   "messages",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true},
-			{Name: "content", PGType: "text", NotNull: true, Collation: "de_DE"},
-			{Name: "title", PGType: "text", NotNull: true, Collation: "C"},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+			{Name: "content", PGType: typeinfo.T("text"), NotNull: true, Collation: "de_DE"},
+			{Name: "title", PGType: typeinfo.T("text"), NotNull: true, Collation: "C"},
 		},
 		PK: []string{"id"},
 	}
@@ -1430,8 +1431,8 @@ func TestCreateTable_ColumnCollation_NoCollation(t *testing.T) {
 		Name:   "items",
 		Schema: "public",
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true},
-			{Name: "name", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+			{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 		},
 		PK: []string{"id"},
 	}
@@ -1505,37 +1506,37 @@ func TestCreateDomain(t *testing.T) {
 		{
 			name:   "basic",
 			schema: "app",
-			domain: model.Domain{Name: "slug", BaseType: "text"},
+			domain: model.Domain{Name: "slug", BaseType: typeinfo.T("text")},
 			want:   "CREATE DOMAIN app.slug AS text;",
 		},
 		{
 			name:   "with_not_null",
 			schema: "app",
-			domain: model.Domain{Name: "email", BaseType: "text", NotNull: true},
+			domain: model.Domain{Name: "email", BaseType: typeinfo.T("text"), NotNull: true},
 			want:   "CREATE DOMAIN app.email AS text NOT NULL;",
 		},
 		{
 			name:   "with_check",
 			schema: "public",
-			domain: model.Domain{Name: "positive_int", BaseType: "integer", Check: "VALUE > 0"},
+			domain: model.Domain{Name: "positive_int", BaseType: typeinfo.T("integer"), Check: "VALUE > 0"},
 			want:   "CREATE DOMAIN public.positive_int AS integer CHECK (VALUE > 0);",
 		},
 		{
 			name:   "with_default_literal",
 			schema: "app",
-			domain: model.Domain{Name: "counter", BaseType: "bigint", NotNull: true, Default: "0"},
+			domain: model.Domain{Name: "counter", BaseType: typeinfo.T("bigint"), NotNull: true, Default: "0"},
 			want:   "CREATE DOMAIN app.counter AS bigint NOT NULL DEFAULT 0;",
 		},
 		{
 			name:   "with_default_expr",
 			schema: "app",
-			domain: model.Domain{Name: "ts", BaseType: "timestamptz", NotNull: true, DefaultExpr: "now()"},
+			domain: model.Domain{Name: "ts", BaseType: typeinfo.T("timestamptz"), NotNull: true, DefaultExpr: "now()"},
 			want:   "CREATE DOMAIN app.ts AS timestamptz NOT NULL DEFAULT now();",
 		},
 		{
 			name:   "full",
 			schema: "myapp",
-			domain: model.Domain{Name: "slug", BaseType: "text", NotNull: true, Check: "VALUE ~ '^[a-z0-9-]+$'"},
+			domain: model.Domain{Name: "slug", BaseType: typeinfo.T("text"), NotNull: true, Check: "VALUE ~ '^[a-z0-9-]+$'"},
 			want:   "CREATE DOMAIN myapp.slug AS text NOT NULL CHECK (VALUE ~ '^[a-z0-9-]+$');",
 		},
 	}
@@ -1555,10 +1556,10 @@ func TestCreateCompositeType(t *testing.T) {
 		Name:   "address",
 		Schema: "public",
 		Fields: []model.CompositeField{
-			{Name: "city", PGType: "text"},
-			{Name: "state", PGType: "text"},
-			{Name: "street", PGType: "text"},
-			{Name: "zip", PGType: "text"},
+			{Name: "city", PGType: typeinfo.T("text")},
+			{Name: "state", PGType: typeinfo.T("text")},
+			{Name: "street", PGType: typeinfo.T("text")},
+			{Name: "zip", PGType: typeinfo.T("text")},
 		},
 	}
 	got := CreateCompositeType("public", ct)
@@ -1573,7 +1574,7 @@ func TestCreateCompositeType(t *testing.T) {
 	}
 	// Verify all fields are present.
 	for _, f := range ct.Fields {
-		if !strings.Contains(got, f.Name+" "+f.PGType) {
+		if !strings.Contains(got, f.Name+" "+typeinfo.Reconstruct(f.PGType)) {
 			t.Errorf("missing field %q: %s", f.Name, got)
 		}
 	}
@@ -1588,8 +1589,8 @@ func TestCreateCompositeType_ReservedFieldName(t *testing.T) {
 		Name:   "meta",
 		Schema: "app",
 		Fields: []model.CompositeField{
-			{Name: "user", PGType: "text"},
-			{Name: "value", PGType: "integer"},
+			{Name: "user", PGType: typeinfo.T("text")},
+			{Name: "value", PGType: typeinfo.T("integer")},
 		},
 	}
 	got := CreateCompositeType("app", ct)
@@ -1729,8 +1730,8 @@ func TestCreateFunction_Full(t *testing.T) {
 		Language:   "plpgsql",
 		ReturnType: "numeric",
 		Args: []model.FunctionArg{
-			{Name: "order_id", Type: "uuid"},
-			{Name: "tax_rate", Type: "numeric", Default: "0.0"},
+			{Name: "order_id", Type: typeinfo.T("uuid")},
+			{Name: "tax_rate", Type: typeinfo.T("numeric"), Default: "0.0"},
 		},
 		Body:            "BEGIN\n  RETURN 42;\nEND;",
 		Volatility:      "STABLE",
@@ -1821,8 +1822,8 @@ func TestDropFunction(t *testing.T) {
 	f := model.Function{
 		Name: "calc_total",
 		Args: []model.FunctionArg{
-			{Name: "order_id", Type: "uuid"},
-			{Name: "tax_rate", Type: "numeric"},
+			{Name: "order_id", Type: typeinfo.T("uuid")},
+			{Name: "tax_rate", Type: typeinfo.T("numeric")},
 		},
 	}
 	got := DropFunction("app", f, false)
