@@ -514,30 +514,56 @@ func (r *Registry) loadExtendedType(ut UserTypeDef) diagnostic.Diagnostics {
 		return diags
 	}
 
-	// For now, only scalar merge is supported.
-	if parent.Kind != KindScalar {
+	var merged *TypeDef
+
+	switch parent.Kind {
+	case KindScalar:
+		// Sealed field enforcement: BaseType cannot be changed via extends.
+		if ut.Base != "" {
+			childBase := typeinfo.Parse(ut.Base)
+			if childBase.Base != parent.BaseType.Base {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E114",
+					Message:  fmt.Sprintf("type %q extends %q but has different BaseType (sealed field cannot change)", ut.Name, ut.Extends),
+				})
+				return diags
+			}
+		}
+		merged = mergeScalarType(parent, ut)
+
+	case KindEnum:
+		var mergeDiags diagnostic.Diagnostics
+		merged, mergeDiags = mergeEnumType(parent, ut)
+		diags = append(diags, mergeDiags...)
+		if diags.HasErrors() {
+			return diags
+		}
+
+	case KindComposite:
+		var mergeDiags diagnostic.Diagnostics
+		merged, mergeDiags = mergeCompositeType(parent, ut)
+		diags = append(diags, mergeDiags...)
+		if diags.HasErrors() {
+			return diags
+		}
+
+	case KindStateMachine:
+		var mergeDiags diagnostic.Diagnostics
+		merged, mergeDiags = mergeStateMachineType(parent, ut)
+		diags = append(diags, mergeDiags...)
+		if diags.HasErrors() {
+			return diags
+		}
+
+	default:
 		diags = append(diags, diagnostic.Diagnostic{
 			Severity: diagnostic.Error,
 			Code:     "E116",
-			Message:  fmt.Sprintf("extends not yet supported for %s types", parent.Kind),
+			Message:  fmt.Sprintf("extends not supported for %s types", parent.Kind),
 		})
 		return diags
 	}
-
-	// Sealed field enforcement: BaseType cannot be changed via extends.
-	if ut.Base != "" {
-		childBase := typeinfo.Parse(ut.Base)
-		if childBase.Base != parent.BaseType.Base {
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Error,
-				Code:     "E114",
-				Message:  fmt.Sprintf("type %q extends %q but has different BaseType (sealed field cannot change)", ut.Name, ut.Extends),
-			})
-			return diags
-		}
-	}
-
-	merged := mergeScalarType(parent, ut)
 
 	if err := r.Register(merged); err != nil {
 		diags = append(diags, diagnostic.Diagnostic{
@@ -591,6 +617,282 @@ func mergeScalarType(parent *TypeDef, child UserTypeDef) *TypeDef {
 	}
 
 	return td
+}
+
+// mergeEnumType creates a new TypeDef by copying the parent enum and appending
+// the child's values (with deduplication).
+func mergeEnumType(parent *TypeDef, child UserTypeDef) (*TypeDef, diagnostic.Diagnostics) {
+	var diags diagnostic.Diagnostics
+
+	td := &TypeDef{
+		Name:       child.Name,
+		Kind:       KindEnum,
+		BaseType:   typeinfo.Type{Base: child.Name},
+		NotNull:    parent.NotNull,
+		Default:    parent.Default,
+		EnumValues: make([]string, len(parent.EnumValues)),
+		Array:      parent.Array,
+		Comment:    parent.Comment,
+		Source:     "extended",
+	}
+	copy(td.EnumValues, parent.EnumValues)
+
+	// Append child values, deduplicating against parent.
+	parentSet := make(map[string]bool, len(parent.EnumValues))
+	for _, v := range parent.EnumValues {
+		parentSet[v] = true
+	}
+	for _, v := range child.Values {
+		if !parentSet[v] {
+			td.EnumValues = append(td.EnumValues, v)
+		}
+	}
+
+	// Override non-zero fields from child.
+	if child.Default != nil {
+		td.Default = child.Default
+	}
+	if child.NotNull != nil {
+		td.NotNull = *child.NotNull
+	}
+	if child.Comment != "" {
+		td.Comment = child.Comment
+	}
+	if child.Array {
+		td.Array = true
+	}
+
+	// E117: enum extends with no new values and no other overrides.
+	hasNewValues := len(child.Values) > 0
+	hasOverrides := child.Default != nil || child.NotNull != nil || child.Comment != "" || child.Array
+	if !hasNewValues && !hasOverrides {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Warning,
+			Code:     "E117",
+			Message:  fmt.Sprintf("enum type %q extends %q with no new values or overrides", child.Name, child.Extends),
+		})
+	}
+
+	return td, diags
+}
+
+// mergeCompositeType creates a new TypeDef by merging the parent composite's
+// fields with the child's fields. Duplicate field names are a hard error.
+func mergeCompositeType(parent *TypeDef, child UserTypeDef) (*TypeDef, diagnostic.Diagnostics) {
+	var diags diagnostic.Diagnostics
+
+	td := &TypeDef{
+		Name:     child.Name,
+		Kind:     KindComposite,
+		BaseType: typeinfo.Type{Base: child.Name},
+		Comment:  parent.Comment,
+		Source:   "extended",
+	}
+
+	// Check for field name collisions.
+	parentFieldSet := make(map[string]bool, len(parent.Fields))
+	for _, f := range parent.Fields {
+		parentFieldSet[f.Name] = true
+	}
+	for name := range child.Fields {
+		if parentFieldSet[name] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E118",
+				Message:  fmt.Sprintf("composite type %q extends %q: field %q exists in both parent and child", child.Name, child.Extends, name),
+			})
+		}
+	}
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	// Copy parent fields.
+	td.Fields = make([]CompositeField, len(parent.Fields))
+	copy(td.Fields, parent.Fields)
+
+	// Append child fields, sorted for determinism.
+	childNames := make([]string, 0, len(child.Fields))
+	for name := range child.Fields {
+		childNames = append(childNames, name)
+	}
+	sort.Strings(childNames)
+	for _, name := range childNames {
+		td.Fields = append(td.Fields, CompositeField{Name: name, PGType: child.Fields[name]})
+	}
+
+	// Override non-zero fields from child.
+	if child.Comment != "" {
+		td.Comment = child.Comment
+	}
+
+	return td, diags
+}
+
+// mergeStateMachineType creates a new TypeDef by merging the parent state
+// machine with the child's states and transitions. Duplicate state names are a
+// hard error. After merge, reachability is validated from the (possibly
+// overridden) initial state.
+func mergeStateMachineType(parent *TypeDef, child UserTypeDef) (*TypeDef, diagnostic.Diagnostics) {
+	var diags diagnostic.Diagnostics
+
+	td := &TypeDef{
+		Name:           child.Name,
+		Kind:           KindStateMachine,
+		BaseType:       typeinfo.Type{Base: child.Name},
+		NotNull:        parent.NotNull,
+		InitialState:   parent.InitialState,
+		EnforceTrigger: parent.EnforceTrigger,
+		Comment:        parent.Comment,
+		Source:         "extended",
+	}
+
+	// Check for state name collisions.
+	parentStateSet := make(map[string]bool, len(parent.States))
+	for _, s := range parent.States {
+		parentStateSet[s.Name] = true
+	}
+	for _, s := range child.States {
+		if parentStateSet[s.Name] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E119",
+				Message:  fmt.Sprintf("state machine type %q extends %q: state %q exists in both parent and child", child.Name, child.Extends, s.Name),
+			})
+		}
+	}
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	// Copy parent states and append child states.
+	td.States = make([]SMStateDef, len(parent.States))
+	copy(td.States, parent.States)
+	for _, s := range child.States {
+		td.States = append(td.States, SMStateDef{
+			Name:     s.Name,
+			Terminal: s.Terminal,
+			Comment:  s.Comment,
+		})
+	}
+
+	// Copy parent transitions and append child transitions.
+	td.Transitions = make([]SMTransitionDef, len(parent.Transitions))
+	for i, tr := range parent.Transitions {
+		fromCopy := make([]string, len(tr.From))
+		copy(fromCopy, tr.From)
+		requires := make(map[string]string, len(tr.Requires))
+		for k, v := range tr.Requires {
+			requires[k] = v
+		}
+		td.Transitions[i] = SMTransitionDef{
+			Name:     tr.Name,
+			From:     fromCopy,
+			To:       tr.To,
+			Requires: requires,
+			Comment:  tr.Comment,
+		}
+	}
+	for _, tr := range child.Transitions {
+		requires := make(map[string]string, len(tr.Requires))
+		for k, v := range tr.Requires {
+			requires[k] = v
+		}
+		td.Transitions = append(td.Transitions, SMTransitionDef{
+			Name:     tr.Name,
+			From:     tr.From,
+			To:       tr.To,
+			Requires: requires,
+			Comment:  tr.Comment,
+		})
+	}
+
+	// Override initial state if child sets it.
+	if child.InitialState != "" {
+		td.InitialState = child.InitialState
+	}
+
+	// Override enforce trigger if child sets it.
+	if child.EnforceTrigger {
+		td.EnforceTrigger = true
+	}
+
+	// Override comment if child sets it.
+	if child.Comment != "" {
+		td.Comment = child.Comment
+	}
+
+	// Build EnumValues from merged states.
+	td.EnumValues = make([]string, len(td.States))
+	for i, s := range td.States {
+		td.EnumValues[i] = s.Name
+	}
+
+	// Validate all transition from/to references against merged state set.
+	stateSet := make(map[string]bool, len(td.States))
+	for _, s := range td.States {
+		stateSet[s.Name] = true
+	}
+	for _, tr := range td.Transitions {
+		for _, from := range tr.From {
+			if !stateSet[from] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "E113",
+					Message:  fmt.Sprintf("state machine type %q: transition %q references unknown from-state %q", child.Name, tr.Name, from),
+				})
+			}
+		}
+		if !stateSet[tr.To] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E113",
+				Message:  fmt.Sprintf("state machine type %q: transition %q references unknown to-state %q", child.Name, tr.Name, tr.To),
+			})
+		}
+	}
+	if diags.HasErrors() {
+		return nil, diags
+	}
+
+	// Validate initial state is in the merged state set.
+	if !stateSet[td.InitialState] {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E112",
+			Message:  fmt.Sprintf("state machine type %q: initial state %q is not a declared state", child.Name, td.InitialState),
+		})
+		return nil, diags
+	}
+
+	// Reachability: BFS from initial state.
+	reachable := make(map[string]bool)
+	queue := []string{td.InitialState}
+	reachable[td.InitialState] = true
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, tr := range td.Transitions {
+			for _, from := range tr.From {
+				if from == current && !reachable[tr.To] {
+					reachable[tr.To] = true
+					queue = append(queue, tr.To)
+				}
+			}
+		}
+	}
+	for _, s := range td.States {
+		if !reachable[s.Name] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Warning,
+				Code:       "W027",
+				Message:    fmt.Sprintf("state machine %q: state %q is unreachable from initial state %q", td.Name, s.Name, td.InitialState),
+				Suggestion: "Add a transition leading to this state, or remove it",
+			})
+		}
+	}
+
+	return td, diags
 }
 
 func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {

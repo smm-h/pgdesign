@@ -37,6 +37,9 @@ package diagnostic
 // E108  Check expression missing VALUE placeholder
 // E109  Enum default not in declared values
 // E110  Default value contains embedded SQL quotes
+// E117  Enum extends with no new values or overrides
+// E118  Composite extends: field name collision
+// E119  State machine extends: state name collision
 //
 // === Model build errors (E120-E129) ===
 //

@@ -1714,3 +1714,500 @@ func TestExtendsSealedFieldViolation(t *testing.T) {
 		t.Error("expected diagnostic code E114 for sealed field BaseType violation")
 	}
 }
+
+// --- Enum extends tests ---
+
+func TestExtendsEnumBasic(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:   "base_status",
+			Kind:   "enum",
+			Values: []string{"a", "b"},
+		},
+		{
+			Name:    "ext_status",
+			Extends: "base_status",
+			Values:  []string{"c"},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("ext_status")
+	if err != nil {
+		t.Fatalf("Resolve(ext_status) error: %v", err)
+	}
+	if td.Kind != KindEnum {
+		t.Errorf("Kind = %v, want KindEnum", td.Kind)
+	}
+	if td.Source != "extended" {
+		t.Errorf("Source = %q, want %q", td.Source, "extended")
+	}
+	expected := []string{"a", "b", "c"}
+	if len(td.EnumValues) != len(expected) {
+		t.Fatalf("EnumValues length = %d, want %d", len(td.EnumValues), len(expected))
+	}
+	for i, v := range expected {
+		if td.EnumValues[i] != v {
+			t.Errorf("EnumValues[%d] = %q, want %q", i, td.EnumValues[i], v)
+		}
+	}
+	// BaseType should use child's name.
+	if td.BaseType.Base != "ext_status" {
+		t.Errorf("BaseType.Base = %q, want %q", td.BaseType.Base, "ext_status")
+	}
+}
+
+func TestExtendsEnumDedup(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:   "base_status",
+			Kind:   "enum",
+			Values: []string{"a", "b"},
+		},
+		{
+			Name:    "ext_status",
+			Extends: "base_status",
+			Values:  []string{"b", "c"},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("ext_status")
+	if err != nil {
+		t.Fatalf("Resolve(ext_status) error: %v", err)
+	}
+	// "b" is in parent, should be deduped. Result: [a, b, c].
+	expected := []string{"a", "b", "c"}
+	if len(td.EnumValues) != len(expected) {
+		t.Fatalf("EnumValues length = %d, want %d; got %v", len(td.EnumValues), len(expected), td.EnumValues)
+	}
+	for i, v := range expected {
+		if td.EnumValues[i] != v {
+			t.Errorf("EnumValues[%d] = %q, want %q", i, td.EnumValues[i], v)
+		}
+	}
+}
+
+func TestExtendsEnumNoNewValues_E117(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:   "base_status",
+			Kind:   "enum",
+			Values: []string{"a", "b"},
+		},
+		{
+			Name:    "ext_status",
+			Extends: "base_status",
+			// No values, no overrides.
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	// Should NOT have hard errors, but should have E117 warning.
+	foundE117 := false
+	for _, d := range diags {
+		if d.Code == "E117" {
+			foundE117 = true
+			break
+		}
+	}
+	if !foundE117 {
+		t.Error("expected E117 warning for enum extends with no new values or overrides")
+	}
+}
+
+func TestExtendsEnumOverrideComment(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:    "base_status",
+			Kind:    "enum",
+			Values:  []string{"a", "b"},
+			Comment: "base comment",
+		},
+		{
+			Name:    "ext_status",
+			Extends: "base_status",
+			Comment: "extended comment",
+			// Comment override alone should not trigger E117.
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	// E117 should NOT fire because there is a comment override.
+	for _, d := range diags {
+		if d.Code == "E117" {
+			t.Error("unexpected E117 when comment override is present")
+		}
+	}
+
+	td, err := r.Resolve("ext_status")
+	if err != nil {
+		t.Fatalf("Resolve(ext_status) error: %v", err)
+	}
+	if td.Comment != "extended comment" {
+		t.Errorf("Comment = %q, want %q", td.Comment, "extended comment")
+	}
+}
+
+// --- Composite extends tests ---
+
+func TestExtendsCompositeBasic(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "base_addr",
+			Kind: "composite",
+			Fields: map[string]string{
+				"x": "integer",
+				"y": "text",
+			},
+		},
+		{
+			Name:    "ext_addr",
+			Extends: "base_addr",
+			Fields: map[string]string{
+				"z": "boolean",
+			},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("ext_addr")
+	if err != nil {
+		t.Fatalf("Resolve(ext_addr) error: %v", err)
+	}
+	if td.Kind != KindComposite {
+		t.Errorf("Kind = %v, want KindComposite", td.Kind)
+	}
+	if td.Source != "extended" {
+		t.Errorf("Source = %q, want %q", td.Source, "extended")
+	}
+	// Parent fields sorted: x, y. Child field: z. Total: 3.
+	if len(td.Fields) != 3 {
+		t.Fatalf("Fields length = %d, want 3", len(td.Fields))
+	}
+	// Parent fields come first (sorted: x, y), then child fields (sorted: z).
+	expectedFields := []CompositeField{
+		{Name: "x", PGType: "integer"},
+		{Name: "y", PGType: "text"},
+		{Name: "z", PGType: "boolean"},
+	}
+	for i, f := range expectedFields {
+		if td.Fields[i] != f {
+			t.Errorf("Fields[%d] = %+v, want %+v", i, td.Fields[i], f)
+		}
+	}
+}
+
+func TestExtendsCompositeFieldCollision_E118(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "base_addr",
+			Kind: "composite",
+			Fields: map[string]string{
+				"x": "integer",
+			},
+		},
+		{
+			Name:    "ext_addr",
+			Extends: "base_addr",
+			Fields: map[string]string{
+				"x": "text",
+			},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for composite field collision, got none")
+	}
+	foundE118 := false
+	for _, d := range diags {
+		if d.Code == "E118" {
+			foundE118 = true
+			break
+		}
+	}
+	if !foundE118 {
+		t.Error("expected E118 for composite field collision")
+	}
+}
+
+func TestExtendsCompositeOverrideComment(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "base_addr",
+			Kind: "composite",
+			Fields: map[string]string{
+				"x": "integer",
+			},
+			Comment: "base comment",
+		},
+		{
+			Name:    "ext_addr",
+			Extends: "base_addr",
+			Fields: map[string]string{
+				"y": "text",
+			},
+			Comment: "extended comment",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("ext_addr")
+	if err != nil {
+		t.Fatalf("Resolve(ext_addr) error: %v", err)
+	}
+	if td.Comment != "extended comment" {
+		t.Errorf("Comment = %q, want %q", td.Comment, "extended comment")
+	}
+}
+
+// --- State machine extends tests ---
+
+func TestExtendsStateMachineBasic(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "base_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "created"},
+				{Name: "active"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "activate", From: []string{"created"}, To: "active"},
+			},
+			InitialState:   "created",
+			EnforceTrigger: true,
+		},
+		{
+			Name:    "ext_sm",
+			Extends: "base_sm",
+			States: []UserSMState{
+				{Name: "archived", Terminal: true},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "archive", From: []string{"active"}, To: "archived"},
+			},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("ext_sm")
+	if err != nil {
+		t.Fatalf("Resolve(ext_sm) error: %v", err)
+	}
+	if td.Kind != KindStateMachine {
+		t.Errorf("Kind = %v, want KindStateMachine", td.Kind)
+	}
+	if td.Source != "extended" {
+		t.Errorf("Source = %q, want %q", td.Source, "extended")
+	}
+	// States: created, active (from parent) + archived (from child).
+	if len(td.States) != 3 {
+		t.Fatalf("States length = %d, want 3", len(td.States))
+	}
+	if td.States[0].Name != "created" || td.States[1].Name != "active" || td.States[2].Name != "archived" {
+		t.Errorf("States = %v, want [created, active, archived]", td.States)
+	}
+	if !td.States[2].Terminal {
+		t.Error("States[2] (archived) Terminal = false, want true")
+	}
+	// Transitions: activate (from parent) + archive (from child).
+	if len(td.Transitions) != 2 {
+		t.Fatalf("Transitions length = %d, want 2", len(td.Transitions))
+	}
+	if td.Transitions[0].Name != "activate" || td.Transitions[1].Name != "archive" {
+		t.Errorf("Transitions = %v, want [activate, archive]", td.Transitions)
+	}
+	// EnumValues should match merged states.
+	expectedValues := []string{"created", "active", "archived"}
+	if len(td.EnumValues) != len(expectedValues) {
+		t.Fatalf("EnumValues length = %d, want %d", len(td.EnumValues), len(expectedValues))
+	}
+	for i, v := range expectedValues {
+		if td.EnumValues[i] != v {
+			t.Errorf("EnumValues[%d] = %q, want %q", i, td.EnumValues[i], v)
+		}
+	}
+	// InitialState inherited from parent.
+	if td.InitialState != "created" {
+		t.Errorf("InitialState = %q, want %q", td.InitialState, "created")
+	}
+	// EnforceTrigger inherited from parent.
+	if !td.EnforceTrigger {
+		t.Error("EnforceTrigger = false, want true (inherited)")
+	}
+}
+
+func TestExtendsStateMachineStateCollision_E119(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "base_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "active"},
+				{Name: "done"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "finish", From: []string{"active"}, To: "done"},
+			},
+			InitialState: "active",
+		},
+		{
+			Name:    "ext_sm",
+			Extends: "base_sm",
+			States: []UserSMState{
+				{Name: "active"}, // duplicate
+			},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for SM state collision, got none")
+	}
+	foundE119 := false
+	for _, d := range diags {
+		if d.Code == "E119" {
+			foundE119 = true
+			break
+		}
+	}
+	if !foundE119 {
+		t.Error("expected E119 for state machine state collision")
+	}
+}
+
+func TestExtendsStateMachineInitialOverride(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "base_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "created"},
+				{Name: "active"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "activate", From: []string{"created"}, To: "active"},
+			},
+			InitialState: "created",
+		},
+		{
+			Name:    "ext_sm",
+			Extends: "base_sm",
+			States: []UserSMState{
+				{Name: "draft"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "create", From: []string{"draft"}, To: "created"},
+			},
+			InitialState: "draft",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("ext_sm")
+	if err != nil {
+		t.Fatalf("Resolve(ext_sm) error: %v", err)
+	}
+	// InitialState should be overridden to "draft".
+	if td.InitialState != "draft" {
+		t.Errorf("InitialState = %q, want %q", td.InitialState, "draft")
+	}
+	// All states should be reachable: draft -> created -> active.
+	// No W027 warnings expected.
+	for _, d := range diags {
+		if d.Code == "W027" {
+			t.Errorf("unexpected W027 reachability warning: %s", d.Message)
+		}
+	}
+}
+
+func TestExtendsStateMachineUnreachable_W027(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name: "base_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "created"},
+				{Name: "active"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "activate", From: []string{"created"}, To: "active"},
+			},
+			InitialState: "created",
+		},
+		{
+			Name:    "ext_sm",
+			Extends: "base_sm",
+			States: []UserSMState{
+				{Name: "orphan"}, // no transition leads here
+			},
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	// Should succeed but with W027 warning for "orphan".
+	if diags.HasErrors() {
+		t.Fatalf("unexpected hard errors: %v", diags)
+	}
+	foundW027 := false
+	for _, d := range diags {
+		if d.Code == "W027" {
+			foundW027 = true
+			break
+		}
+	}
+	if !foundW027 {
+		t.Error("expected W027 for unreachable state 'orphan'")
+	}
+}
