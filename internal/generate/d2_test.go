@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
@@ -16,10 +17,10 @@ func TestGenerateD2TwoTables(t *testing.T) {
 				Name:   "users",
 				Schema: "blog",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -27,9 +28,9 @@ func TestGenerateD2TwoTables(t *testing.T) {
 				Name:   "posts",
 				Schema: "blog",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "title", PGType: "text", NotNull: true},
-					{Name: "author_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "title", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "author_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -70,7 +71,7 @@ func TestGenerateD2SQLTableShape(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -92,7 +93,7 @@ func TestGenerateD2FKEdgeLabelOnDelete(t *testing.T) {
 				Name:   "parents",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -100,8 +101,8 @@ func TestGenerateD2FKEdgeLabelOnDelete(t *testing.T) {
 				Name:   "children",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "parent_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "parent_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -134,7 +135,7 @@ func TestGenerateD2DefaultOnDelete(t *testing.T) {
 				Name:   "a",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -142,8 +143,8 @@ func TestGenerateD2DefaultOnDelete(t *testing.T) {
 				Name:   "b",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "a_id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "a_id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -176,8 +177,8 @@ func TestGenerateD2PrimaryKeyConstraint(t *testing.T) {
 				Name:   "things",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -203,7 +204,7 @@ func TestGenerateD2ForeignKeyConstraint(t *testing.T) {
 				Name:   "users",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -211,8 +212,8 @@ func TestGenerateD2ForeignKeyConstraint(t *testing.T) {
 				Name:   "posts",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "user_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -244,7 +245,7 @@ func TestGenerateD2ViaGenerate(t *testing.T) {
 				Name:   "items",
 				Schema: "test",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -298,9 +299,9 @@ func TestGenerateD2_Views(t *testing.T) {
 				Name:   "users",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "active", PGType: "boolean", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "active", PGType: typeinfo.MustParse("boolean"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -346,7 +347,7 @@ func TestGenerateSVGFormat(t *testing.T) {
 				Name:   "items",
 				Schema: "test",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -391,8 +392,8 @@ func TestGenerateD2_StateMachine(t *testing.T) {
 				Name:   "orders",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("order_status"), NotNull: true, SemanticTypeName: "order_status"},
 				},
 				PK: []string{"id"},
 			},
@@ -444,7 +445,7 @@ func TestGenerateD2_NilRegistry(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},

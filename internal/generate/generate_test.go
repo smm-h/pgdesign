@@ -9,6 +9,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
 )
@@ -34,9 +35,9 @@ func TestMinimalTable(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "value", PGType: "integer", NotNull: false},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "value", PGType: typeinfo.MustParse("integer"), NotNull: false},
 				},
 				PK: []string{"id"},
 			},
@@ -55,7 +56,7 @@ func TestMinimalTable(t *testing.T) {
 	if !strings.Contains(out, "name text NOT NULL") {
 		t.Errorf("expected name column, got:\n%s", out)
 	}
-	if !strings.Contains(out, "value integer") {
+	if !strings.Contains(out, "value int4") {
 		t.Errorf("expected value column, got:\n%s", out)
 	}
 	if !strings.Contains(out, "CONSTRAINT pk_items PRIMARY KEY (id)") {
@@ -71,7 +72,7 @@ func TestTwoTablesWithFK(t *testing.T) {
 				Name:   "authors",
 				Schema: "blog",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -79,8 +80,8 @@ func TestTwoTablesWithFK(t *testing.T) {
 				Name:   "posts",
 				Schema: "blog",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "author_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "author_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -127,8 +128,8 @@ func TestEnumGeneration(t *testing.T) {
 				Name:   "players",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "status", PGType: "status", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("status"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -166,9 +167,9 @@ func TestIndexGeneration(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "kind", PGType: "text", NotNull: true},
-					{Name: "active", PGType: "boolean", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "kind", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "active", PGType: typeinfo.MustParse("boolean"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Indexes: []model.Index{
@@ -199,8 +200,8 @@ func TestCommentsIncluded(t *testing.T) {
 				Schema:  "app",
 				Comment: "All registered users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, Comment: "Primary identifier"},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, Comment: "Primary identifier"},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -227,7 +228,7 @@ func TestCommentsExcluded(t *testing.T) {
 				Schema:  "app",
 				Comment: "All registered users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, Comment: "Primary identifier"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, Comment: "Primary identifier"},
 				},
 				PK: []string{"id"},
 			},
@@ -254,7 +255,7 @@ func TestIdempotentMode(t *testing.T) {
 				Name:   "accounts",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Indexes: []model.Index{
@@ -297,8 +298,8 @@ func TestDeterminism(t *testing.T) {
 				Name:   "things",
 				Schema: "det",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true, Comment: "Thing name"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true, Comment: "Thing name"},
 				},
 				PK:      []string{"id"},
 				Comment: "All things",
@@ -340,8 +341,8 @@ func TestJSONFormat(t *testing.T) {
 				Name:   "users",
 				Schema: "myapp",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "role", PGType: "role", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "role", PGType: typeinfo.MustParse("role"), NotNull: true},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -424,7 +425,7 @@ func TestOwnerGeneration(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK:    []string{"id"},
 				Owner: "db_admin",
@@ -468,7 +469,7 @@ func TestTrailingNewline(t *testing.T) {
 				Name:   "t",
 				Schema: "test",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -496,8 +497,8 @@ func TestMultiSchemaQualifiedNames(t *testing.T) {
 				Name:   "users",
 				Schema: "auth",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "role", PGType: "role", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "role", PGType: typeinfo.MustParse("role"), NotNull: true},
 				},
 				PK:      []string{"id"},
 				Comment: "All users",
@@ -516,9 +517,9 @@ func TestMultiSchemaQualifiedNames(t *testing.T) {
 				Name:   "scores",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "user_id", PGType: "uuid", NotNull: true},
-					{Name: "points", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "points", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -606,9 +607,9 @@ func TestUniqueIndex(t *testing.T) {
 				Name:   "pairs",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "a", PGType: "integer", NotNull: true},
-					{Name: "b", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "a", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "b", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Indexes: []model.Index{
@@ -639,8 +640,8 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true, Identity: "ALWAYS"},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -683,8 +684,8 @@ func TestPartitionChildrenGeneration(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
@@ -737,9 +738,9 @@ func TestPartitionChildrenRecursive(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
-					{Name: "region", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
+					{Name: "region", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
@@ -793,8 +794,8 @@ func TestPartmanGeneration(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
@@ -852,8 +853,8 @@ func TestPartmanNotEmittedWithoutExtension(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
@@ -886,9 +887,9 @@ func TestPartmanMultiColumnError(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "year", PGType: "integer", NotNull: true},
-					{Name: "region", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "year", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "region", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Partitioning: &model.PartitionSpec{
@@ -931,9 +932,9 @@ func TestRLSPolicyGeneration(t *testing.T) {
 				Name:   "documents",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "owner_id", PGType: "uuid", NotNull: true},
-					{Name: "content", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "owner_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "content", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK:        []string{"id"},
 				EnableRLS: true,
@@ -1001,7 +1002,7 @@ func TestRLSWithoutPolicies(t *testing.T) {
 				Name:   "secrets",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK:        []string{"id"},
 				EnableRLS: true,
@@ -1029,7 +1030,7 @@ func TestNoPoliciesNoRLS(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1055,8 +1056,8 @@ func TestRLSPolicyAllOperation(t *testing.T) {
 				Name:   "data",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "tenant_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "tenant_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK:        []string{"id"},
 				EnableRLS: true,
@@ -1099,8 +1100,8 @@ func TestForceRLSGeneration(t *testing.T) {
 				Name:   "secrets",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "data", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "data", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK:        []string{"id"},
 				EnableRLS: true,
@@ -1154,7 +1155,7 @@ func TestRestrictivePolicyGeneration(t *testing.T) {
 				Name:   "data",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK:        []string{"id"},
 				EnableRLS: true,
@@ -1199,7 +1200,7 @@ func TestForceRLSDocOutput(t *testing.T) {
 				Name:      "secrets",
 				Schema:    "app",
 				Comment:   "Secret data",
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				EnableRLS: true,
 				ForceRLS:  true,
@@ -1223,8 +1224,8 @@ func TestAppendOnlyTrigger(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "payload", PGType: "jsonb", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "payload", PGType: typeinfo.MustParse("jsonb"), NotNull: true},
 				},
 				PK:         []string{"id"},
 				AppendOnly: true,
@@ -1233,7 +1234,7 @@ func TestAppendOnlyTrigger(t *testing.T) {
 				Name:   "users",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1304,8 +1305,8 @@ func TestJSONSchemaCheckConstraints(t *testing.T) {
 				Schema:  "shop",
 				Comment: "Product catalog",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "metadata", PGType: "jsonb", NotNull: true, JSONSchema: "test_schema.json"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "metadata", PGType: typeinfo.MustParse("jsonb"), NotNull: true, JSONSchema: "test_schema.json"},
 				},
 				PK: []string{"id"},
 				Checks: []model.CheckConstraint{
@@ -1341,7 +1342,7 @@ func TestGenerate_UnsupportedFormat(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1410,10 +1411,10 @@ func TestDocFormat(t *testing.T) {
 				Schema:  "myapp",
 				Comment: "All registered users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "name", PGType: "text", NotNull: true, Comment: "Full name"},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "status", PGType: "status", NotNull: true, Default: model.StrPtr("active")},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true, Comment: "Full name"},
+					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("status"), NotNull: true, Default: model.StrPtr("active")},
 				},
 				PK: []string{"id"},
 				Indexes: []model.Index{
@@ -1441,11 +1442,11 @@ func TestDocFormat(t *testing.T) {
 				Schema:  "myapp",
 				Comment: "User blog posts",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "user_id", PGType: "uuid", NotNull: true},
-					{Name: "title", PGType: "text", NotNull: true},
-					{Name: "body", PGType: "text", NotNull: false},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true, DefaultExpr: "now()"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "title", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "body", PGType: typeinfo.MustParse("text"), NotNull: false},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true, DefaultExpr: "now()"},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -1608,8 +1609,8 @@ func TestGenerateDoc_Views(t *testing.T) {
 				Name:   "users",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1684,9 +1685,9 @@ func TestGenerate_Views(t *testing.T) {
 				Name:   "users",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "active", PGType: "boolean", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "active", PGType: typeinfo.MustParse("boolean"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1754,7 +1755,7 @@ func TestGenerate_ViewsNoComments(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1788,8 +1789,8 @@ func TestGenerateSQL_MaterializedView(t *testing.T) {
 				Name:   "orders",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1839,8 +1840,8 @@ func TestGenerateSQL_MaterializedViewWithIndex(t *testing.T) {
 				Name:   "orders",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1886,9 +1887,9 @@ func TestSetStatistics(t *testing.T) {
 				Name:   "events",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "kind", PGType: "text", NotNull: true, Statistics: intPtr(1000)},
-					{Name: "payload", PGType: "jsonb", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "kind", PGType: typeinfo.MustParse("text"), NotNull: true, Statistics: intPtr(1000)},
+					{Name: "payload", PGType: typeinfo.MustParse("jsonb"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1915,8 +1916,8 @@ func TestSetStatistics_NotEmittedWhenNil(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1938,14 +1939,14 @@ func TestDomainDDL(t *testing.T) {
 			{
 				Name:     "slug",
 				Schema:   "app",
-				BaseType: "text",
+				BaseType: typeinfo.MustParse("text"),
 				NotNull:  true,
 				Check:    "VALUE ~ '^[a-z0-9-]+$'",
 			},
 			{
 				Name:     "email_addr",
 				Schema:   "app",
-				BaseType: "text",
+				BaseType: typeinfo.MustParse("text"),
 				NotNull:  true,
 				Check:    "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'",
 			},
@@ -1958,7 +1959,7 @@ func TestDomainDDL(t *testing.T) {
 				Name:   "users",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -2009,13 +2010,13 @@ func TestDomainResolution_DDL(t *testing.T) {
 			{
 				Name:     "slug",
 				Schema:   "app",
-				BaseType: "text",
+				BaseType: typeinfo.MustParse("text"),
 				Check:    "VALUE ~ '^[a-z0-9-]+$'",
 			},
 			{
 				Name:     "email",
 				Schema:   "app",
-				BaseType: "text",
+				BaseType: typeinfo.MustParse("text"),
 				Check:    "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'",
 			},
 		},
@@ -2024,9 +2025,9 @@ func TestDomainResolution_DDL(t *testing.T) {
 				Name:   "profiles",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "handle", PGType: "slug", NotNull: true, SemanticTypeName: "slug"},
-					{Name: "contact", PGType: "email", NotNull: true, SemanticTypeName: "email"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "handle", PGType: typeinfo.Type{Base: "text", DomainName: "slug"}, NotNull: true, SemanticTypeName: "slug"},
+					{Name: "contact", PGType: typeinfo.Type{Base: "text", DomainName: "email"}, NotNull: true, SemanticTypeName: "email"},
 				},
 				PK: []string{"id"},
 			},
@@ -2081,9 +2082,9 @@ func TestExclusionConstraintDDL(t *testing.T) {
 			Comment: "Room bookings",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "room_id", PGType: "integer", NotNull: true},
-				{Name: "during", PGType: "tsrange", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "during", PGType: typeinfo.MustParse("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_overlap",
@@ -2111,9 +2112,9 @@ func TestExclusionConstraintDDLWithWhere(t *testing.T) {
 			Comment: "Room bookings",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "room_id", PGType: "integer", NotNull: true},
-				{Name: "during", PGType: "tsrange", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "during", PGType: typeinfo.MustParse("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_overlap",
@@ -2146,7 +2147,7 @@ func TestTriggerGeneration(t *testing.T) {
 				Schema:  "app",
 				Comment: "Orders",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Triggers: []model.Trigger{
@@ -2207,7 +2208,7 @@ func TestTriggerGeneration_NoTriggers(t *testing.T) {
 				Schema:  "app",
 				Comment: "Orders",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -2250,8 +2251,8 @@ func TestStateMachineTriggerGeneration(t *testing.T) {
 				Name:   "orders",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("order_status"), NotNull: true, SemanticTypeName: "order_status"},
 				},
 				PK: []string{"id"},
 			},
@@ -2305,8 +2306,8 @@ func TestStateMachineTriggerGeneration_EnforceFalse(t *testing.T) {
 				Name:   "tasks",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "state", PGType: "task_state", NotNull: true, SemanticTypeName: "task_state"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "state", PGType: typeinfo.MustParse("task_state"), NotNull: true, SemanticTypeName: "task_state"},
 				},
 				PK: []string{"id"},
 			},
@@ -2350,8 +2351,8 @@ func TestStateMachineTriggerGeneration_FilterFromSection17(t *testing.T) {
 				Name:   "orders",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("order_status"), NotNull: true, SemanticTypeName: "order_status"},
 				},
 				PK: []string{"id"},
 				Triggers: []model.Trigger{
