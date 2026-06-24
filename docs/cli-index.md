@@ -12,10 +12,12 @@ order: 91
 
 PostgreSQL schema compiler
 
+Version: 0.16.1-0.20260624174702-ad98caffa083+dirty
+
 ## Commands
 
 - [build](cli-build.html) -- Generate all configured outputs from pgdesign.toml
-- [check](cli-check.html) -- Run project checks
+- [check](cli-check.html) -- Run project checks registered via the check framework and report results
 - [codegen](cli-codegen.html) -- Generate type-safe application code from schema definitions
 - [diff](cli-diff.html) -- Compare schema file(s) or directory against another target
 - [fmt](cli-fmt.html) -- Format a pgdesign TOML schema file or directory in place
