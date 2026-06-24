@@ -2061,8 +2061,6 @@ func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
 	}
 }
 
-func intPtr(v int) *int { return &v }
-
 func TestColumnCollationChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
@@ -4155,5 +4153,131 @@ func TestPhantomDiffPrevention_SMTriggerOnlyInActual(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestDefaultPrecisionNoDiff(t *testing.T) {
+	// timestamp without explicit precision is equivalent to timestamp(6).
+	// This should produce NO diff.
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "created_at", PGType: typeinfo.Parse("timestamp")},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "created_at", PGType: typeinfo.Parse("timestamp(6)")},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("timestamp vs timestamp(6) should produce no diff, got: %s", d.Summary())
+	}
+}
+
+func TestNonDefaultPrecisionDiff(t *testing.T) {
+	// timestamp vs timestamp(3) is a real diff (3 is not the default).
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "created_at", PGType: typeinfo.Parse("timestamp")},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "created_at", PGType: typeinfo.Parse("timestamp(3)")},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("timestamp vs timestamp(3) should produce a diff")
+	}
+	cc := d.TablesChanged[0].ColumnsChanged[0]
+	if cc.TypeChanged == nil {
+		t.Fatal("expected TypeChanged to be set")
+	}
+}
+
+func TestNumericArbitraryVsSpecificDiff(t *testing.T) {
+	// numeric (no params) vs numeric(10,2) is a real diff.
+	// Arbitrary precision is NOT the same as specific precision.
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "products", Schema: "public", Columns: []model.Column{
+				{Name: "price", PGType: typeinfo.Parse("numeric")},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "products", Schema: "public", Columns: []model.Column{
+				{Name: "price", PGType: typeinfo.Parse("numeric(10,2)")},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("numeric vs numeric(10,2) should produce a diff")
+	}
+	cc := d.TablesChanged[0].ColumnsChanged[0]
+	if cc.TypeChanged == nil {
+		t.Fatal("expected TypeChanged to be set for numeric precision change")
+	}
+}
+
+func TestBitDefaultLengthNoDiff(t *testing.T) {
+	// bit without explicit length is equivalent to bit(1).
+	// This should produce NO diff.
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "flags", Schema: "public", Columns: []model.Column{
+				{Name: "active", PGType: typeinfo.Parse("bit")},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "flags", Schema: "public", Columns: []model.Column{
+				{Name: "active", PGType: typeinfo.Parse("bit(1)")},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("bit vs bit(1) should produce no diff, got: %s", d.Summary())
+	}
+}
+
+func TestVarcharUnlimitedVsLimitedDiff(t *testing.T) {
+	// varchar (no length) vs varchar(255) is a real diff.
+	// Unlimited length is NOT the same as 255.
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Columns: []model.Column{
+				{Name: "name", PGType: typeinfo.Parse("varchar")},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Columns: []model.Column{
+				{Name: "name", PGType: typeinfo.Parse("varchar(255)")},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("varchar vs varchar(255) should produce a diff")
+	}
+	cc := d.TablesChanged[0].ColumnsChanged[0]
+	if cc.TypeChanged == nil {
+		t.Fatal("expected TypeChanged to be set for varchar length change")
 	}
 }

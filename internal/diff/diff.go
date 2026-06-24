@@ -527,8 +527,10 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 	cc := ColumnChange{Name: desired.Name}
 	changed := false
 
-	// Type comparison using structured equality.
-	if !desired.PGType.Equal(actual.PGType) {
+	// Type comparison using default-precision-aware equality.
+	// This avoids false positives where omitted precision matches the PG default
+	// (e.g., timestamp vs timestamp(6) are semantically identical).
+	if !typesEqualWithDefaults(desired.PGType, actual.PGType) {
 		cc.TypeChanged = &[2]string{typeinfo.Reconstruct(actual.PGType), typeinfo.Reconstruct(desired.PGType)}
 		changed = true
 	}
@@ -705,9 +707,68 @@ func IsWidening(oldType, newType string) bool {
 	return false
 }
 
-// normalizeType lowercases and trims whitespace for comparison.
-func normalizeType(t string) string {
-	return strings.ToLower(strings.TrimSpace(t))
+// defaultPrecision maps base type names to their PostgreSQL default precision.
+// When a type is specified without explicit precision, PostgreSQL uses these
+// defaults. A nil value means "no default" -- omitting the parameter gives
+// arbitrary/unlimited semantics that differ from any specific value.
+//
+// Reference: https://www.postgresql.org/docs/current/datatype.html
+var defaultPrecision = map[string]*int{
+	"timestamp":   intPtr(6), // microsecond precision
+	"timestamptz": intPtr(6), // microsecond precision
+	"time":        intPtr(6), // microsecond precision
+	"timetz":      intPtr(6), // microsecond precision
+	"interval":    intPtr(6), // full range of fields
+	"bit":         intPtr(1), // default length is 1
+	// numeric (no params) = arbitrary precision (NOT same as 0) -- nil entry means no default
+	// varchar (no length) = unlimited (same as text) -- nil entry means no default
+}
+
+// typesEqualWithDefaults compares two typeinfo.Type values, treating omitted
+// precision/length as equivalent to the PostgreSQL default for that type.
+// For example, timestamp (no precision) equals timestamp(6) because 6 is the
+// PG default for timestamp precision.
+func typesEqualWithDefaults(a, b typeinfo.Type) bool {
+	if a.Base != b.Base || a.DomainName != b.DomainName || a.Params.RawModifier != b.Params.RawModifier {
+		return false
+	}
+	if !intPtrEqualWithDefault(a.Params.Precision, b.Params.Precision, a.Base) {
+		return false
+	}
+	if !intPtrEqual(a.Params.Scale, b.Params.Scale) {
+		return false
+	}
+	if !intPtrEqualWithDefault(a.Params.Length, b.Params.Length, a.Base) {
+		return false
+	}
+	return true
+}
+
+// intPtrEqualWithDefault compares two *int values, treating nil as the default
+// value for the given base type. The defaultPrecision map stores the implicit
+// default for each type (precision for timestamp/interval, length for bit).
+// Each PG type uses exactly one parameterization dimension, so both Precision
+// and Length can safely be checked against the same default value.
+func intPtrEqualWithDefault(a, b *int, base string) bool {
+	if intPtrEqual(a, b) {
+		return true
+	}
+	// One is nil and the other is not. Check if the non-nil value matches
+	// the default for this type.
+	defPtr := defaultPrecision[base]
+	if defPtr == nil {
+		// No default -- nil and non-nil are genuinely different.
+		return false
+	}
+	def := *defPtr
+
+	if a == nil && b != nil {
+		return *b == def
+	}
+	if b == nil && a != nil {
+		return *a == def
+	}
+	return false
 }
 
 // normalizeDefault returns a normalized default value for comparison.
@@ -1369,6 +1430,11 @@ func sliceEqual(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// intPtr returns a pointer to the given int value.
+func intPtr(n int) *int {
+	return &n
 }
 
 // intPtrEqual returns true if two *int pointers represent the same value.
