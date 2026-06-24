@@ -67,7 +67,7 @@ func DetectLowSelectivityIndexes(schema *model.Schema) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 	for _, table := range schema.Tables {
 		for _, col := range table.Columns {
-			if col.PGType != "boolean" {
+			if col.PGType.Base != "bool" {
 				continue
 			}
 			for _, idx := range table.Indexes {

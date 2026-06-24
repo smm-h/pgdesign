@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // generateDoc produces a Markdown data dictionary from the resolved schema.
@@ -58,7 +59,7 @@ func generateDoc(schema *model.Schema) string {
 				def = *col.Default
 			}
 			comment := col.Comment
-			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", col.Name, col.PGType, nullable, def, comment)
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", col.Name, typeinfo.Reconstruct(col.PGType), nullable, def, comment)
 		}
 
 		// Primary Key

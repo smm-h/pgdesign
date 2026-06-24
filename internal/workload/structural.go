@@ -19,7 +19,7 @@ func StructuralRecommendations(schema *model.Schema) []diagnostic.Diagnostic {
 			hasGIN := columnHasIndexMethod(table, col.Name, "gin")
 
 			// W022: JSONB columns without a GIN index
-			if col.PGType == "jsonb" && !col.Array && !hasGIN {
+			if col.PGType.Base == "jsonb" && !col.Array && !hasGIN {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Warning,
 					Code:       "W022",
@@ -43,7 +43,7 @@ func StructuralRecommendations(schema *model.Schema) []diagnostic.Diagnostic {
 			}
 
 			// W024: tsvector columns without a GIN index
-			if col.PGType == "tsvector" && !hasGIN {
+			if col.PGType.Base == "tsvector" && !hasGIN {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Warning,
 					Code:       "W024",
@@ -55,7 +55,7 @@ func StructuralRecommendations(schema *model.Schema) []diagnostic.Diagnostic {
 			}
 
 			// I005: Timestamp columns on append_only tables without a BRIN index
-			if table.AppendOnly && isTimestamp(col.PGType) && !columnHasIndexMethod(table, col.Name, "brin") {
+			if table.AppendOnly && isTimestamp(col.PGType.Base) && !columnHasIndexMethod(table, col.Name, "brin") {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Info,
 					Code:       "I005",

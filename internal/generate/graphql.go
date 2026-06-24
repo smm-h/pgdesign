@@ -30,28 +30,26 @@ func toCamelCase(s string) string {
 // pgTypeToGraphQL maps a PostgreSQL type to a GraphQL type.
 func pgTypeToGraphQL(pgType string, isPK bool, enumNames map[string]bool) string {
 	switch pgType {
-	case "integer", "int4", "smallint", "int2":
+	case "int4", "int2":
 		return "Int"
-	case "bigint", "int8":
+	case "int8":
 		return "Int"
-	case "text", "varchar", "character varying", "char", "character", "name":
+	case "text", "varchar", "char", "name":
 		return "String"
-	case "boolean", "bool":
+	case "bool":
 		return "Boolean"
 	case "uuid":
 		if isPK {
 			return "ID"
 		}
 		return "String"
-	case "float4", "real":
+	case "float4":
 		return "Float"
-	case "float8", "double precision":
+	case "float8":
 		return "Float"
-	case "numeric", "decimal":
+	case "numeric":
 		return "Float"
-	case "timestamptz", "timestamp with time zone",
-		"timestamp", "timestamp without time zone",
-		"date", "time", "time with time zone", "timetz", "interval":
+	case "timestamptz", "timestamp", "date", "time", "timetz", "interval":
 		return "DateTime"
 	case "jsonb", "json":
 		return "JSON"
@@ -127,7 +125,7 @@ func generateGraphQL(schema *model.Schema) string {
 			if isPK {
 				gqlType = "ID"
 			} else {
-				gqlType = pgTypeToGraphQL(col.PGType, false, enumNames)
+				gqlType = pgTypeToGraphQL(col.PGType.Base, false, enumNames)
 			}
 
 			b.WriteString("  ")

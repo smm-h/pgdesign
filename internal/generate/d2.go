@@ -9,6 +9,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
 	"oss.terrastruct.com/d2/d2lib"
@@ -118,7 +119,7 @@ func renderD2Table(t *model.Table) string {
 		b.WriteString("  ")
 		b.WriteString(col.Name)
 		b.WriteString(": ")
-		b.WriteString(col.PGType)
+		b.WriteString(typeinfo.Reconstruct(col.PGType))
 
 		constraint := columnConstraint(t, col.Name)
 		if constraint != "" {

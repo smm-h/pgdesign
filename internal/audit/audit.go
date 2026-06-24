@@ -65,7 +65,7 @@ func auditTable(tbl *model.Table) []diagnostic.Diagnostic {
 func check1NF(tbl *model.Table) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 	for _, col := range tbl.Columns {
-		if col.PGType != "jsonb" {
+		if col.PGType.Base != "jsonb" {
 			continue
 		}
 		name := strings.ToLower(col.Name)

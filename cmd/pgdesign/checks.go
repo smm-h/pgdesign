@@ -264,7 +264,7 @@ func analyzeCoverage(schema *model.Schema) []diagnostic.Diagnostic {
 		used := false
 		for _, table := range schema.Tables {
 			for _, col := range table.Columns {
-				if col.PGType == enum.Name {
+				if col.PGType.Base == enum.Name {
 					used = true
 					break
 				}
