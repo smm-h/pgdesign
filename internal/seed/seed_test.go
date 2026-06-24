@@ -37,11 +37,11 @@ func testSchema() *model.Schema {
 					{Name: "org_id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "ref"},
 					{Name: "email", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "email"},
 					{Name: "status", PGType: typeinfo.T("public.status"), NotNull: true},
-					{Name: "is_active", PGType: typeinfo.T("boolean"), NotNull: true, SemanticTypeName: "flag"},
-					{Name: "login_count", PGType: typeinfo.T("bigint"), NotNull: true, SemanticTypeName: "counter"},
+					{Name: "is_active", PGType: typeinfo.T("bool"), NotNull: true, SemanticTypeName: "flag"},
+					{Name: "login_count", PGType: typeinfo.T("int8"), NotNull: true, SemanticTypeName: "counter"},
 					{Name: "slug", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "slug"},
 					{Name: "bio", PGType: typeinfo.T("text"), NotNull: false},
-					{Name: "score", PGType: typeinfo.T("bigint"), NotNull: true, Generated: "login_count * 10", Stored: true},
+					{Name: "score", PGType: typeinfo.T("int8"), NotNull: true, Generated: "login_count * 10", Stored: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_users_org", Columns: []string{"org_id"}, RefSchema: "public", RefTable: "organizations", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -248,7 +248,7 @@ func TestGenerate_AllPGTypes(t *testing.T) {
 	for _, pgType := range pgTypes {
 		cols = append(cols, model.Column{
 			Name:    "col_" + strings.ReplaceAll(pgType, " ", "_"),
-			PGType:  typeinfo.T(pgType),
+			PGType:  typeinfo.MustParse(pgType),
 			NotNull: true,
 		})
 	}
@@ -464,7 +464,7 @@ func TestGenerate_NullInjection(t *testing.T) {
 				Comment: "Test nulls",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "col_text", PGType: typeinfo.T("text"), NotNull: false},
 				},
 			},
@@ -559,8 +559,8 @@ func TestGenerate_CheckRange(t *testing.T) {
 				Comment: "Test CHECK constraints",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "age", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "age", PGType: typeinfo.T("int4"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_age", Expr: "age >= 18 AND age <= 65"},
@@ -614,7 +614,7 @@ func TestGenerate_CheckLength(t *testing.T) {
 				Comment: "Test length CHECK",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "code", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
@@ -665,7 +665,7 @@ func TestGenerate_CheckRegex(t *testing.T) {
 				Comment: "Test regex CHECK",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "code", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
@@ -859,7 +859,7 @@ func TestGenerate_LogNormalMoney(t *testing.T) {
 				PK:      []string{"id"},
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
-					{Name: "amount", PGType: typeinfo.T("bigint"), NotNull: true, SemanticTypeName: "money"},
+					{Name: "amount", PGType: typeinfo.T("int8"), NotNull: true, SemanticTypeName: "money"},
 				},
 			},
 		},
@@ -925,7 +925,7 @@ func TestGenerate_ArrayPopulation(t *testing.T) {
 				Comment: "Test arrays",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "tags", PGType: typeinfo.T("text"), NotNull: true, Array: true},
 				},
 			},
@@ -1111,7 +1111,7 @@ func TestGenerate_JSONBWithSchema(t *testing.T) {
 				Comment: "Test JSONB",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "data", PGType: typeinfo.T("jsonb"), NotNull: true, JSONSchema: "schemas/data.json"},
 				},
 			},
@@ -1300,7 +1300,7 @@ func TestGenerate_BatchInsert(t *testing.T) {
 				Comment: "Test batch",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
@@ -1488,7 +1488,7 @@ func TestGenerate_CopyFormat_NullValues(t *testing.T) {
 				Comment: "Test copy nulls",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "note", PGType: typeinfo.T("text"), NotNull: false},
 				},
 			},

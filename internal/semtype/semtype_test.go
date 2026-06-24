@@ -23,15 +23,15 @@ func TestBuiltinResolve(t *testing.T) {
 		{"ref", typeinfo.T("uuid"), true, nil, "", "", "", ""},
 		{"timestamp", typeinfo.T("timestamptz"), true, nil, "now()", "", "", ""},
 		{"timestamp_optional", typeinfo.T("timestamptz"), false, nil, "", "", "", ""},
-		{"money", typeinfo.T("bigint"), true, strPtr("0"), "", "", "", ""},
+		{"money", typeinfo.T("int8"), true, strPtr("0"), "", "", "", ""},
 		{"slug", typeinfo.T("text"), true, nil, "", "VALUE ~ '^[a-z0-9-]+$'", "", ""},
 		{"email", typeinfo.T("text"), true, nil, "", "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'", "", ""},
 		{"short_text", typeinfo.T("text"), true, nil, "", "LENGTH(VALUE) <= 255", "", ""},
 		{"json", typeinfo.T("jsonb"), true, nil, "'{}'::jsonb", "", "", ""},
 		{"json_array", typeinfo.T("jsonb"), true, nil, "'[]'::jsonb", "", "", ""},
-		{"counter", typeinfo.T("bigint"), true, strPtr("0"), "", "", "", ""},
-		{"flag", typeinfo.T("boolean"), true, strPtr("false"), "", "", "", ""},
-		{"auto_id", typeinfo.T("bigint"), true, nil, "", "", "", "ALWAYS"},
+		{"counter", typeinfo.T("int8"), true, strPtr("0"), "", "", "", ""},
+		{"flag", typeinfo.T("bool"), true, strPtr("false"), "", "", "", ""},
+		{"auto_id", typeinfo.T("int8"), true, nil, "", "", "", "ALWAYS"},
 	}
 
 	for _, tt := range tests {
@@ -145,8 +145,8 @@ func TestLoadUserScalarTypeWithCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve(positive_int) error: %v", err)
 	}
-	if td.BaseType != typeinfo.T("integer") {
-		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T("integer"))
+	if td.BaseType != typeinfo.T("int4") {
+		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T("int4"))
 	}
 	if td.Check != "VALUE > 0" {
 		t.Errorf("Check = %q, want %q", td.Check, "VALUE > 0")

@@ -613,7 +613,7 @@ func TestLowSelectivity_I006_Detected(t *testing.T) {
 			Name: "users",
 			Columns: []model.Column{
 				{Name: "id", PGType: typeinfo.T("bigint")},
-				{Name: "is_active", PGType: typeinfo.T("boolean")},
+				{Name: "is_active", PGType: typeinfo.T("bool")},
 			},
 			PK: []string{"id"},
 			Indexes: []model.Index{{
@@ -644,7 +644,7 @@ func TestLowSelectivity_I006_NoBooleanIndex(t *testing.T) {
 			Name: "users",
 			Columns: []model.Column{
 				{Name: "id", PGType: typeinfo.T("bigint")},
-				{Name: "is_active", PGType: typeinfo.T("boolean")},
+				{Name: "is_active", PGType: typeinfo.T("bool")},
 			},
 			PK: []string{"id"},
 		}},
@@ -663,7 +663,7 @@ func TestLowSelectivity_I006_MultiColumnIndex(t *testing.T) {
 			Name: "users",
 			Columns: []model.Column{
 				{Name: "id", PGType: typeinfo.T("bigint")},
-				{Name: "is_active", PGType: typeinfo.T("boolean")},
+				{Name: "is_active", PGType: typeinfo.T("bool")},
 				{Name: "name", PGType: typeinfo.T("text")},
 			},
 			PK: []string{"id"},
