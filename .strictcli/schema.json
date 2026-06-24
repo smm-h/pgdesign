@@ -94,60 +94,60 @@
       "flags": [
         {
           "default": false,
-          "help": "Run all checks",
+          "help": "Run every registered check regardless of tag or name filters",
           "name": "all",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": "",
-          "help": "Tag DSL expression",
+          "help": "Tag DSL expression to select checks (e.g. 'changelog \u0026 !quality')",
           "name": "tag",
           "type": "str"
         },
         {
           "default": "",
-          "help": "Glob pattern for check names",
+          "help": "Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*')",
           "name": "name",
           "type": "str"
         },
         {
           "default": false,
-          "help": "List checks and tags",
+          "help": "List all registered checks with their tags and exit without running",
           "name": "list",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "JSON output",
+          "help": "Output check results as machine-readable JSON instead of human text",
           "name": "json",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Warnings do not cause failure",
+          "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
           "name": "ignore-warnings",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Show all details",
+          "help": "Show full details for passing checks in addition to failures and warnings",
           "name": "verbose",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Show plan without executing",
+          "help": "Show which checks would run based on current filters without executing them",
           "name": "dry-run",
           "negatable": true,
           "type": "bool"
         }
       ],
-      "help": "Run project checks",
+      "help": "Run project checks registered via the check framework and report results",
       "name": "check"
     },
     "codegen": {
@@ -507,15 +507,22 @@
       "deprecated": {},
       "env_prefix": null,
       "global_flags": [],
-      "groups": {}
+      "groups": {},
+      "tag_contracts": {}
     },
     "arg": {
+      "choices": null,
+      "default": null,
       "required": true,
+      "type": "str",
       "variadic": false
     },
     "command": {
       "args": [],
+      "constraints": [],
       "flags": [],
+      "hidden": false,
+      "interactive": false,
       "passthrough": false,
       "tags": []
     },
@@ -534,8 +541,10 @@
       "commands": {},
       "deprecated": {},
       "groups": {},
+      "hidden": false,
       "tags": []
-    }
+    },
+    "schema_version": 1
   },
   "global_flags": [
     {
@@ -824,5 +833,6 @@
   "help": "PostgreSQL schema compiler",
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
-  "version": ""
+  "schema_version": 1,
+  "version": "0.16.1-0.20260624174702-ad98caffa083+dirty"
 }
