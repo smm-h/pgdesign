@@ -209,6 +209,23 @@ func diffBase(paths []string, ref string) (*model.Schema, int) {
 	}
 
 	reg := semtype.NewBuiltinRegistry()
+
+	// Register extension-provided types so they pass the base type allowlist.
+	// Prefer the config from the git ref; fall back to the working tree config.
+	if configErr == nil {
+		refCfg, err := config.LoadBytes(configBytes)
+		if err == nil {
+			for _, ext := range refCfg.Extensions {
+				reg.AddExtensionTypes(ext.Types)
+			}
+		}
+	} else {
+		cfg := loadProjectConfig(resolvedPaths[0])
+		for _, ext := range cfg.Extensions {
+			reg.AddExtensionTypes(ext.Types)
+		}
+	}
+
 	for _, raw := range raws {
 		userTypes := parse.CollectUserTypes(raw)
 		if len(userTypes) > 0 {
