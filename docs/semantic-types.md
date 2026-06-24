@@ -1,6 +1,6 @@
 ---
 title: "Semantic Types"
-description: "Reference for pgdesign's semantic type system: built-in types, custom types, and type composition rules."
+description: "Reference for pgdesign's semantic type system covering built-in types, custom scalar and enum definitions, type composition rules, and default value handling."
 ---
 
 # Semantic Types
@@ -9,7 +9,7 @@ pgdesign uses a semantic type system instead of raw PostgreSQL types. Each seman
 
 ## Why semantic types?
 
-Raw PG types leave too many decisions to each column definition. Semantic types encode your project's conventions once:
+Raw PostgreSQL types leave too many decisions to each individual column definition, leading to inconsistencies across a schema where the same logical concept is implemented differently in different tables. Semantic types encode your project's conventions once in a single type definition, and every column that references that type automatically inherits the correct PostgreSQL type, nullability, default value, and check constraint without repeating them.
 
 - `id` always means UUID, NOT NULL, with `gen_random_uuid()` default
 - `money` always means bigint (cents), NOT NULL, default 0
@@ -39,7 +39,7 @@ When you write `type = "email"`, every email column in your schema gets the same
 
 ### Scalar types
 
-Scalar types wrap a PostgreSQL base type with constraints.
+Scalar types wrap a PostgreSQL base type with optional constraints, defaults, and nullability rules. When a scalar type includes a CHECK constraint, pgdesign generates a CREATE DOMAIN statement in the DDL, and columns of that type reference the domain name instead of the raw PostgreSQL type. This ensures the constraint is enforced at the database level for all columns using the type without duplicating the CHECK expression.
 
 ```toml
 [types.currency_amount]
@@ -76,7 +76,7 @@ The `kind` field defaults to `"scalar"` when omitted.
 
 ### Enum types
 
-Enum types create a PostgreSQL `CREATE TYPE ... AS ENUM`.
+Enum types create a PostgreSQL `CREATE TYPE ... AS ENUM` with a fixed set of allowed string values. Each enum type must declare at least one value (E101) and can optionally specify a default value that must be one of the declared values (E109). Enum types are NOT NULL by default like all pgdesign types; override with `not_null = false` when nullable enum columns are needed. Default values are validated at schema compile time against the declared values list.
 
 ```toml
 [types.status]
@@ -112,7 +112,7 @@ Array defaults use raw values: `default = "{}"` produces `DEFAULT '{}'` in the g
 
 ## Type composition rules
 
-When a column uses a semantic type, the type provides base values and the column can override them.
+When a column uses a semantic type, the type provides base values for nullability, defaults, and constraints, and the column definition can selectively override any of them. This composition model means types define sensible defaults while individual columns can customize behavior for specific use cases. The override rules follow a clear precedence chain where column-level settings always win over type-level settings.
 
 ### Override precedence
 
@@ -122,7 +122,7 @@ When a column uses a semantic type, the type provides base values and the column
 
 ### Examples
 
-Using a type as-is:
+The following examples demonstrate how semantic types compose with column-level overrides to produce the final DDL output. Each example shows the TOML column definition and the resulting PostgreSQL DDL, illustrating how type defaults, nullability overrides, and default value overrides interact in practice. These composition rules apply uniformly to all built-in and user-defined types across the schema.
 
 ```toml
 [tables.users.columns.id]
@@ -167,7 +167,7 @@ default = "pending"
 
 ## Default values
 
-The `default` field holds raw values. pgdesign handles SQL quoting automatically when generating DDL. Do not embed SQL quotes in default values.
+The `default` field holds raw values that pgdesign automatically quotes when generating DDL. Do not embed SQL quotes in default values because pgdesign adds them during code generation. The E110 validation rule detects embedded quotes and reports them as errors. For SQL expressions like function calls or casts, use the separate `default_expr` field which writes the value verbatim into the DDL without additional quoting. This separation prevents ambiguity between literal string defaults and expression defaults.
 
 ```toml
 # Correct: raw value, pgdesign adds SQL quotes in generated DDL
