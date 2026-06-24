@@ -13,6 +13,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/testdb"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // --- Unit tests (no DB required) ---
@@ -26,8 +27,8 @@ func TestGenerateMigration_AddTable(t *testing.T) {
 				Schema: "game",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Comment: "Player accounts",
 			},
@@ -83,8 +84,8 @@ func TestGenerateMigration_AddColumn(t *testing.T) {
 				Name:   "players",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "level", PGType: typeinfo.T("integer"), NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -95,7 +96,7 @@ func TestGenerateMigration_AddColumn(t *testing.T) {
 			{
 				Name: "game.players",
 				ColumnsAdded: []model.Column{
-					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
+					{Name: "level", PGType: typeinfo.T("integer"), NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -137,8 +138,8 @@ func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
 				Name:   "players",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "level", PGType: typeinfo.T("integer"), NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -149,7 +150,7 @@ func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
 			{
 				Name: "game.players",
 				ColumnsAdded: []model.Column{
-					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
+					{Name: "level", PGType: typeinfo.T("integer"), NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -176,8 +177,8 @@ func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
 				Name:   "players",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "level", PGType: typeinfo.T("integer"), NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -188,7 +189,7 @@ func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
 			{
 				Name: "game.players",
 				ColumnsAdded: []model.Column{
-					{Name: "level", PGType: "integer", NotNull: true, Default: model.StrPtr("1")},
+					{Name: "level", PGType: typeinfo.T("integer"), NotNull: true, Default: model.StrPtr("1")},
 				},
 			},
 		},
@@ -256,8 +257,8 @@ func TestGenerateMigration_PartitionChildAdded(t *testing.T) {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 				},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
@@ -328,8 +329,8 @@ func TestGenerateMigration_PartitionChildRemoved(t *testing.T) {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 				},
 				Partitioning: &model.PartitionSpec{
 					Strategy: "range",
@@ -697,8 +698,8 @@ func TestOpToSQL_CreateTable(t *testing.T) {
 		Schema: "game",
 		PK:     []string{"id"},
 		Columns: []model.Column{
-			{Name: "id", PGType: "bigint", NotNull: true},
-			{Name: "name", PGType: "text", NotNull: true},
+			{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+			{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 		},
 	}
 	op := DDLOp{
@@ -1404,7 +1405,7 @@ func TestAppendOnlyMigration(t *testing.T) {
 			{
 				Name:       "events",
 				Schema:     "app",
-				Columns:    []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:    []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:         []string{"id"},
 				AppendOnly: true,
 			},
@@ -1464,8 +1465,8 @@ func TestGenerateMigration_LargeTableEscalation(t *testing.T) {
 				Name:   "players",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 		},
@@ -1531,8 +1532,8 @@ func TestGenerateMigration_LargeTableFK_Split(t *testing.T) {
 				Name:   "scores",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "player_id", PGType: "bigint", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "player_id", PGType: typeinfo.T("bigint"), NotNull: true},
 				},
 			},
 		},
@@ -1609,8 +1610,8 @@ func TestGenerateMigration_SmallTableFK_NoSplit(t *testing.T) {
 				Name:   "scores",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "player_id", PGType: "bigint", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "player_id", PGType: typeinfo.T("bigint"), NotNull: true},
 				},
 			},
 		},
@@ -1661,8 +1662,8 @@ func TestGenerateMigration_NoStats_NoSplit_NoEscalation(t *testing.T) {
 				Name:   "scores",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "player_id", PGType: "bigint", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "player_id", PGType: typeinfo.T("bigint"), NotNull: true},
 				},
 			},
 		},
@@ -1713,8 +1714,8 @@ func TestGenerateMigration_ExpandContract_SetNotNull_LargeTable(t *testing.T) {
 				Name:   "players",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true, Default: model.StrPtr("'unknown'")},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true, Default: model.StrPtr("'unknown'")},
 				},
 			},
 		},
@@ -1774,8 +1775,8 @@ func TestGenerateMigration_ExpandContract_SetNotNull_SmallTable(t *testing.T) {
 				Name:   "players",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true, Default: model.StrPtr("'unknown'")},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true, Default: model.StrPtr("'unknown'")},
 				},
 			},
 		},
@@ -1824,8 +1825,8 @@ func TestGenerateMigration_ExpandContract_TypeNarrow_LargeTable(t *testing.T) {
 				Name:   "players",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 		},
@@ -1875,8 +1876,8 @@ func TestGenerateMigration_ArrayChanged_ScalarToArray(t *testing.T) {
 				Name:   "posts",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "tags", PGType: "text", NotNull: true, Array: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "tags", PGType: typeinfo.T("text"), NotNull: true, Array: true},
 				},
 			},
 		},
@@ -1922,8 +1923,8 @@ func TestGenerateMigration_ArrayChanged_ArrayToScalar(t *testing.T) {
 				Name:   "posts",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "tags", PGType: "text", NotNull: true, Array: false},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "tags", PGType: typeinfo.T("text"), NotNull: true, Array: false},
 				},
 			},
 		},
@@ -2494,8 +2495,8 @@ func TestGenerateMigration_CollationChange(t *testing.T) {
 				Name:   "messages",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "content", PGType: "text", Collation: "de_DE"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "content", PGType: typeinfo.T("text"), Collation: "de_DE"},
 				},
 			},
 		},
@@ -2541,8 +2542,8 @@ func TestGenerateMigration_StatisticsChange(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", Statistics: &v},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), Statistics: &v},
 				},
 			},
 		},
@@ -2585,8 +2586,8 @@ func TestGenerateMigration_StatisticsReset(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text")},
 				},
 			},
 		},
@@ -2953,7 +2954,7 @@ func TestGenerateMigration_AddFunction(t *testing.T) {
 				Schema:     "public",
 				Language:   "plpgsql",
 				ReturnType: "numeric",
-				Args:       []model.FunctionArg{{Name: "amount", Type: "numeric"}},
+				Args:       []model.FunctionArg{{Name: "amount", Type: typeinfo.T("numeric")}},
 				Body:       "BEGIN RETURN amount * 0.1; END;",
 			},
 		},
@@ -3040,7 +3041,7 @@ func TestGenerateMigration_FunctionBodyChange(t *testing.T) {
 				Schema:     "public",
 				Language:   "plpgsql",
 				ReturnType: "numeric",
-				Args:       []model.FunctionArg{{Name: "x", Type: "numeric"}},
+				Args:       []model.FunctionArg{{Name: "x", Type: typeinfo.T("numeric")}},
 				Body:       "BEGIN RETURN x * 2; END;",
 			},
 		},
@@ -3083,7 +3084,7 @@ func TestGenerateMigration_FunctionSignatureChange(t *testing.T) {
 				Schema:     "public",
 				Language:   "plpgsql",
 				ReturnType: "numeric",
-				Args:       []model.FunctionArg{{Name: "x", Type: "numeric"}, {Name: "y", Type: "numeric"}},
+				Args:       []model.FunctionArg{{Name: "x", Type: typeinfo.T("numeric")}, {Name: "y", Type: typeinfo.T("numeric")}},
 				Body:       "BEGIN RETURN x + y; END;",
 			},
 		},
@@ -3141,7 +3142,7 @@ func TestGenerateMigration_DomainAdded(t *testing.T) {
 	desired := &model.Schema{
 		Name: "app",
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9-]+$'"},
 		},
 	}
 	d := &diff.SchemaDiff{
@@ -3253,7 +3254,7 @@ func TestOpToSQL_CreateDomain(t *testing.T) {
 		Schema: "public",
 		DomainDef: &model.Domain{
 			Name:     "slug",
-			BaseType: "text",
+			BaseType: typeinfo.T("text"),
 			NotNull:  true,
 			Check:    "VALUE ~ '^[a-z0-9-]+$'",
 		},
@@ -3331,7 +3332,7 @@ func TestGenerateMigration_DomainBaseTypeChanged(t *testing.T) {
 	desired := &model.Schema{
 		Name: "app",
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: "bigint"},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("bigint")},
 		},
 	}
 	d := &diff.SchemaDiff{
@@ -3537,7 +3538,7 @@ func TestGenerateMigration_TriggerOnNewTable(t *testing.T) {
 				Comment: "Order table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
 				},
 				Triggers: []model.Trigger{
 					{Name: "audit_insert", Function: "audit_fn", Events: []string{"INSERT"}, Timing: "AFTER", ForEach: "ROW"},
@@ -3704,8 +3705,8 @@ func TestGenerateMigration_FKChanged(t *testing.T) {
 				Name:   "scores",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "player_id", PGType: "bigint", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "player_id", PGType: typeinfo.T("bigint"), NotNull: true},
 				},
 			},
 		},
@@ -3770,7 +3771,7 @@ func TestGenerateMigration_NewTableWithRLS(t *testing.T) {
 			Name:      "documents",
 			Schema:    "public",
 			Comment:   "docs table",
-			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			PK:        []string{"id"},
 			EnableRLS: true,
 			ForceRLS:  true,
@@ -3834,7 +3835,7 @@ func TestGenerateMigration_EnableRLSChanged(t *testing.T) {
 			Name:      "documents",
 			Schema:    "public",
 			Comment:   "docs table",
-			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			PK:        []string{"id"},
 			EnableRLS: true,
 		}},
@@ -3870,7 +3871,7 @@ func TestGenerateMigration_DisableRLS(t *testing.T) {
 			Name:      "documents",
 			Schema:    "public",
 			Comment:   "docs table",
-			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			PK:        []string{"id"},
 			EnableRLS: false,
 		}},
@@ -3906,7 +3907,7 @@ func TestGenerateMigration_ForceRLSChanged(t *testing.T) {
 			Name:      "documents",
 			Schema:    "public",
 			Comment:   "docs table",
-			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			PK:        []string{"id"},
 			ForceRLS:  true,
 		}},
@@ -3942,7 +3943,7 @@ func TestGenerateMigration_NoForceRLS(t *testing.T) {
 			Name:      "documents",
 			Schema:    "public",
 			Comment:   "docs table",
-			Columns:   []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			PK:        []string{"id"},
 			ForceRLS:  false,
 		}},
@@ -3985,7 +3986,7 @@ func TestGenerateMigration_PolicyAdded(t *testing.T) {
 			Name:     "documents",
 			Schema:   "public",
 			Comment:  "docs",
-			Columns:  []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns:  []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			PK:       []string{"id"},
 			Policies: []model.Policy{pol},
 		}},
@@ -4028,7 +4029,7 @@ func TestGenerateMigration_PolicyRemoved(t *testing.T) {
 			Name:    "documents",
 			Schema:  "public",
 			Comment: "docs",
-			Columns: []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			PK:      []string{"id"},
 		}},
 	}
@@ -4074,7 +4075,7 @@ func TestGenerateMigration_PolicyChanged(t *testing.T) {
 			Name:     "documents",
 			Schema:   "public",
 			Comment:  "docs",
-			Columns:  []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns:  []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			PK:       []string{"id"},
 			Policies: []model.Policy{newPol},
 		}},
@@ -4331,8 +4332,8 @@ func TestGenerateMigration_NonImmutableDefault(t *testing.T) {
 						Name:   "users",
 						Schema: "public",
 						Columns: []model.Column{
-							{Name: "id", PGType: "bigint", NotNull: true},
-							{Name: "created_at", PGType: "timestamptz", NotNull: true, DefaultExpr: tt.defaultVal},
+							{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+							{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true, DefaultExpr: tt.defaultVal},
 						},
 					},
 				},
@@ -4343,7 +4344,7 @@ func TestGenerateMigration_NonImmutableDefault(t *testing.T) {
 					{
 						Name: "users",
 						ColumnsAdded: []model.Column{
-							{Name: "created_at", PGType: "timestamptz", NotNull: true, DefaultExpr: tt.defaultVal},
+							{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true, DefaultExpr: tt.defaultVal},
 						},
 					},
 				},
@@ -4409,8 +4410,8 @@ func TestGenerateMigration_SMTransitionChangeRegeneratesTrigger(t *testing.T) {
 				Schema: "app",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, SemanticTypeName: "order_status"},
 				},
 				Comment: "Orders table",
 			},
@@ -4499,8 +4500,8 @@ func TestGenerateMigration_SMTransitionChangeNoEnforceTrigger(t *testing.T) {
 				Schema: "app",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, SemanticTypeName: "order_status"},
 				},
 				Comment: "Orders table",
 			},
