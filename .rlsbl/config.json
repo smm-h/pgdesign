@@ -45,6 +45,15 @@
             "line": 8
           }
         ]
+      },
+      {
+        "reason": "non-user-facing batch",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 20
+          }
+        ]
       }
     ]
   }
