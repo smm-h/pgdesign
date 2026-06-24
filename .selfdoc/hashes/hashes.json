@@ -97,7 +97,7 @@
   },
   "en/format-reference.md": {
     "content": "1c545e5c01cc7d3b15cf1367476024bbecae96ec31f49915c8b2652133b75920",
-    "description": "d751cc860eba07c3ab9e6014495ed36d420f3f7d56b31724dd6fcb8ca0c4e835"
+    "description": "ea61a54868567c7558c6fd1186d07e2d7a96417100bf6b1c6191d9876786894a"
   },
   "en/format.md": {
     "content": "88888fa1cd0f131bf8a0d9f837549a925c5e0a0e3029335d63279d9d83e629ca",
@@ -271,12 +271,12 @@
     "description": "d6ce38ae707c27b942cfbb8d06a0cb9da3c2e24394a177428f9ca0bac9aa4e0b"
   },
   "en/query-layer.md": {
-    "content": "7db55fd82dfe4896652fc4bd45520cc05c0f4571a1b5de405bcc6eb2148ff1d6",
-    "description": "210f7d7f6305504eccebe0e91acc1a4b3029b1d16e9660cb4e2c29d17b25b3ea"
+    "content": "14df60d7204c0e2f474f91fdb6a3053b75ed70c1b0f41848688c637c185d31f3",
+    "description": "aacf79125fb67337c7071872391a6a9bf079c6021b456737bc4bdde04f36bc91"
   },
   "en/quickstart.md": {
-    "content": "2568a60fa6f2c4ca4ab6fc7d5d2975e0e3f89ec6185d97ad18b2d72c77cd02b3",
-    "description": "4e8baab2f7f34464dd51949235b62295675b637526c093a64d4343c7d9ce453b"
+    "content": "6e1afb18bd7f8ddb63b20a289c8e95643d9dd6d1b76adcc25c476ff353a8e978",
+    "description": "accadcc3b205224cb0cee9f61920cefbabd47739608fa0c5a0cf4924312001d5"
   },
   "en/risk.md": {
     "content": "611154ddd9f75dc06bb330fa4b4fe3fa255c50692c8a771ce9f0a565d86047ec",
@@ -287,8 +287,8 @@
     "description": "22e12713f8ab93a2fee681aac2de1a0496f5016f395ae88e9948b3f4eed376af"
   },
   "en/semantic-types.md": {
-    "content": "7eb45d31bc1a0039e0242352e87413f42707b918dfaeb26a8588363622f1844f",
-    "description": "7cb620ad1e5d4ad53db5ba841c23ad346679b5033ba86f6df285bdeb3da31e52"
+    "content": "839a7cfa4d118cce6ce1d34e29a1d7c13af6c7646f8c713636af6571806625bd",
+    "description": "703ffdd0b84c2d338341b739d3722633d26f7669c8dbf37ab33d1ded090f8c3d"
   },
   "en/semtype.md": {
     "content": "87a31ce18905240e21be88bd88e09e65f5c1a2cef39d1056e50d07b44ba96594",
@@ -303,12 +303,20 @@
     "description": "360b66c1ee2cd8e98be1e9e04c585845851ab199828fa8337e3add2c1b0c1e81"
   },
   "en/state-machines.md": {
-    "content": "31ba6521bdc337d4e83d6606410a2459bba7ce32c36697631a15172ec4b77415",
-    "description": "29be78bfe869f9107d9e58fb25940a6405fe2195622cfc4f8b38f4ee63e48c31"
+    "content": "0556286e18c4268e47f17c9a3ffae240b018ac3a69233c20d17a0349177d12db",
+    "description": "fa7795bcb10776d2f0937bdf9d3efcd8c6ed013bf2213b0c97b9a7618205f936"
   },
   "en/testdb-guide.md": {
     "content": "cfd6bfce1b8ebebd74d88048c38b9fa4448c8f250de7219691820c0a398a3645",
     "description": "1b62de217edd791aa15bc65037bbad61ac704f376208cbb13e9f0adb81bd948b"
+  },
+  "en/type-extends.md": {
+    "content": "05e50927f9b8ecdb55ddf7d84d9726f7c71dfbc6c535ea20b341cee26d2dc64a",
+    "description": "28adc1aea538d63a9600f716a253729572c537a6d47a58264c9ebad37a7da153"
+  },
+  "en/typeinfo.md": {
+    "content": "e51627cd90ec8a5c0c57bfa692db415548705d931df6f6f267344c51abcb0e58",
+    "description": "67c7493fc0193fac0f1cfc900b1fc4b46731ee0fbd8148fb68b21c36cf65f147"
   },
   "en/validate.md": {
     "content": "10908621bcf715319c668553217c2bdf49635a5ae397d3f8265d16a0c3baa4ff",
