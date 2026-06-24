@@ -1,6 +1,6 @@
 ---
 title: "Format Reference"
-description: "Complete reference for the pgdesign TOML schema format: meta, types, tables, columns, constraints, and indexes."
+description: "Complete reference for the pgdesign TOML schema format covering meta, types, tables, columns, constraints, indexes, views, materialized views, and project configuration."
 ---
 
 # Format Reference
@@ -9,7 +9,7 @@ pgdesign schemas are written in TOML. A schema file defines metadata, custom typ
 
 ## [meta]
 
-The `[meta]` section declares schema-level settings.
+The `[meta]` section declares schema-level settings that apply to the entire schema file. This includes the target PostgreSQL major version for version-aware DDL generation, the PostgreSQL schema name for qualified identifiers, and the list of required PostgreSQL extensions that provide custom types, operator classes, and index methods used elsewhere in the schema.
 
 ```toml
 [meta]
@@ -26,7 +26,7 @@ extensions = ["pgcrypto", "pg_trgm"]
 
 ## [types.*]
 
-User-defined semantic types extend the built-in type system.
+User-defined semantic types extend the built-in type system with project-specific domain concepts. Types defined here can be referenced by any column in the schema and produce the corresponding PostgreSQL DDL: enum types become CREATE TYPE, scalar types with CHECK constraints become CREATE DOMAIN, composite types become CREATE TYPE AS, and state machines produce CHECK constraints with trigger-enforced transitions.
 
 ### Enum types
 
@@ -71,7 +71,7 @@ Extension-provided types are also valid as base types when declared via `[[exten
 
 ## [tables.*]
 
-Each table is defined under `[tables.<table_name>]`.
+Each table is defined under `[tables.<table_name>]` with a required comment describing its purpose, a primary key specification, and nested sections for columns, foreign keys, indexes, unique constraints, check constraints, RLS policies, and partitioning. Tables are emitted in dependency order in the generated DDL, with circular foreign key references handled via deferred ALTER TABLE ADD CONSTRAINT statements.
 
 ```toml
 [tables.users]
@@ -99,7 +99,7 @@ type = "timestamp"
 
 ## Column properties
 
-Columns are defined under `[tables.<table>.columns.<column>]`.
+Columns are defined under `[tables.<table>.columns.<column>]` and require a semantic type reference. All columns are NOT NULL by default; use `nullable = true` to opt in to nullability. Columns inherit defaults, NOT NULL behavior, and CHECK constraints from their semantic type, but can override any of these at the column level. Generated columns, array columns, and JSONB shape validation are also supported through column-level attributes.
 
 ```toml
 [tables.products.columns.price]
@@ -134,7 +134,7 @@ Generated columns cannot reference other generated columns (E213).
 
 ## Foreign keys
 
-Foreign keys are defined under `[tables.<table>.fks.<fk_name>]`.
+Foreign keys are defined under `[tables.<table>.fks.<fk_name>]` and require an explicit `on_delete` clause specifying CASCADE, RESTRICT, SET NULL, or NO ACTION. pgdesign enforces this requirement via E201 because implicit ON DELETE NO ACTION is a common source of integrity issues. Foreign key columns should have a covering index for join performance, enforced by E212.
 
 ```toml
 [tables.posts.fks.fk_posts_author]
@@ -155,7 +155,7 @@ Every FK must declare `on_delete` (E201). FK columns should have a covering inde
 
 ## Indexes
 
-Indexes are defined under `[tables.<table>.indexes.<index_name>]`.
+Indexes are defined under `[tables.<table>.indexes.<index_name>]` and support btree, hash, gin, gist, brin, and extension-provided methods like hnsw and ivfflat. Each index specifies its columns, optional operator class, partial predicate, covering columns, uniqueness, and storage parameters. Duplicate indexes are detected by E206, and redundant indexes that are prefixes of other indexes are flagged by W007.
 
 ```toml
 [tables.users.indexes.idx_users_email]
@@ -287,7 +287,7 @@ Each partition child:
 
 ## Functional dependencies
 
-Used by `pgdesign check --tag nf` for normal form analysis.
+Functional dependencies are declared per-table and used by `pgdesign check --tag nf` for normal form analysis. Each dependency specifies a determinant (left-hand side columns) and dependent (right-hand side columns), allowing the audit engine to check 1NF through BCNF compliance. Dependencies inferred from primary keys and unique constraints must be explicitly declared via A100, and any redundancy in declared dependencies is surfaced as an informational diagnostic.
 
 ```toml
 [[tables.enrollments.dependencies]]
@@ -302,7 +302,7 @@ dependent = ["student_name"]
 
 ## Maintenance
 
-Partition lifecycle configuration.
+Partition lifecycle configuration controls automatic partition management for time-series and append-only tables. The maintenance section specifies how many future partitions to pre-create ahead of the current period, the retention duration after which old partitions are eligible for cleanup, and whether expired partitions should be preserved as detached tables rather than dropped entirely. These settings integrate with pg_partman when available.
 
 ```toml
 [tables.events.maintenance]
@@ -319,7 +319,7 @@ retention_keep_table = true
 
 ## [views.*]
 
-Views are defined under `[views.<view_name>]`.
+Views are defined under `[views.<view_name>]` with a required SQL SELECT query and optional comment and dependency declarations. Views are emitted after all tables in the generated DDL output, and the `depends_on` field controls ordering when views reference other views. pgdesign validates that referenced tables exist and generates CREATE OR REPLACE VIEW statements in the correct dependency order.
 
 ```toml
 [views.active_users]
@@ -342,7 +342,7 @@ Views are emitted after tables in DDL output. The `depends_on` field controls or
 
 ## [materialized_views.*]
 
-Materialized views are defined under `[materialized_views.<view_name>]`.
+Materialized views are defined under `[materialized_views.<view_name>]` with a required SQL SELECT query, optional WITH DATA flag, and support for nested index definitions. Unlike regular views, materialized views store their query results on disk and must be explicitly refreshed. Indexes on materialized views are required for REFRESH MATERIALIZED VIEW CONCURRENTLY, which avoids locking the view during refresh operations.
 
 ```toml
 [materialized_views.user_stats]
@@ -372,7 +372,7 @@ Materialized views support nested index definitions using the same syntax as tab
 
 ## Project configuration (pgdesign.toml)
 
-Project-level settings live in `pgdesign.toml` (separate from schema files).
+Project-level settings live in `pgdesign.toml`, which is separate from the TOML schema files that define tables and types. This configuration file controls which schema files to load, the migrations directory path, formatting preferences, validation rule overrides, migration behavior thresholds, extension declarations with their provided types and operator classes, database connection pool settings, and build output targets for generating SQL, diagrams, documentation, and application code.
 
 ```toml
 [project]
@@ -421,7 +421,7 @@ index_methods = ["hnsw", "ivfflat"]
 
 ### [suppress]
 
-Suppress specific diagnostics on individual tables or columns. Each key is `"table.CODE"` or `"table.column.CODE"`, and the value is a mandatory reason string explaining why the suppression is justified.
+Suppress specific diagnostics on individual tables or columns when the default rule does not apply to a particular case. Each key is `"table.CODE"` or `"table.column.CODE"`, and the value is a mandatory reason string explaining why the suppression is justified. The reason requirement prevents blanket suppression without documentation, ensuring that each exception has a recorded rationale that future maintainers can evaluate.
 
 ```toml
 [suppress]
@@ -433,7 +433,7 @@ Suppressed diagnostics are excluded from check output. Suppression applies durin
 
 ## [output.*]
 
-Build output targets define what `pgdesign build` generates. Each output is a named section under `[output]`.
+Build output targets define what `pgdesign build` generates from the compiled schema. Each output is a named section under `[output]` specifying a format (sql, d2, json, svg, doc, or codegen), a file path, and format-specific options. For codegen outputs, the target language and generation mode must be specified. Multiple outputs can be configured to generate SQL DDL, D2 diagrams, JSON snapshots, documentation, and application-layer code from a single build command.
 
 ```toml
 [output.ddl]
