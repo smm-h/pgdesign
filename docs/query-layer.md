@@ -1,6 +1,6 @@
 ---
 title: "Python Query Layer"
-description: "How pgdesign generates a complete type-safe Python query layer with protocols, dual backends (PgBackend and InMemoryBackend), and a declarative constraint registry."
+description: "How pgdesign generates a type-safe Python query layer with protocols, dual backends, and a declarative constraint registry for testing."
 ---
 
 # Python Query Layer
@@ -21,7 +21,7 @@ The `--mode query-layer --lang python` codegen mode generates a complete type-sa
 
 ## Protocol Derivation Rules
 
-Methods are derived from the schema, not hand-written:
+Methods are derived algorithmically from the schema structure, not hand-written. The protocol definitions, method signatures, and parameter types are all generated from the resolved model, ensuring that every table's CRUD operations, FK-based lookups, unique constraint lookups, and state machine transitions are covered automatically. When the schema changes, regenerating the query layer updates all protocols and implementations to match.
 
 **Writer methods** (per-table):
 - `create_<table>`: INSERT. Parameters: required NOT NULL columns without defaults, optional columns with defaults or nullable. Returns PK type.
@@ -45,7 +45,7 @@ Methods are derived from the schema, not hand-written:
 
 ## Architecture: Context + Delegate + Forwarding
 
-The query layer avoids Python's MRO complexity by using a flat delegation pattern:
+The query layer avoids Python's method resolution order complexity by using a flat delegation pattern with three distinct layers. Each layer has a clear responsibility: contexts hold connection state, per-table delegates implement the actual database operations, and composite backends provide the unified API by forwarding calls to the appropriate delegate. This architecture eliminates diamond inheritance issues and makes each component independently testable.
 
 1. **Context**: Holds connection state. `PgContext` wraps an asyncpg pool. `InMemoryContext` wraps dict stores and unique indexes.
 
@@ -61,7 +61,7 @@ This pattern means:
 
 ## Constraint Registry
 
-The `_constraints.py` file provides a data-driven constraint system for the InMemoryBackend.
+The `_constraints.py` file provides a data-driven constraint system that enables the InMemoryBackend to enforce the same database rules as PostgreSQL without requiring a live database connection. Every NOT NULL, ENUM, UNIQUE, CHECK, FK, ON DELETE, and state machine transition constraint from the schema is represented as a declarative Constraint dataclass with a kind, table, column, and parameters. This allows the InMemoryBackend to validate writes against the full set of schema constraints.
 
 ### ConstraintKind
 
@@ -83,7 +83,7 @@ class ConstraintKind(Enum):
 
 ### Per-Table Constraint Lists
 
-Each table gets a `<TABLE>_CONSTRAINTS: list[Constraint]` with entries derived from:
+Each table gets a `<TABLE>_CONSTRAINTS: list[Constraint]` variable containing all constraints that apply to that table, derived from the schema's column definitions, foreign keys, unique constraints, CHECK expressions, and state machine transitions. The constraint list is generated at code generation time from the resolved model, so it always reflects the current schema without manual maintenance. Constraint kinds are categorized for efficient validation.
 - NOT NULL columns
 - Enum-typed columns (valid values list)
 - CHECK constraints (classified as range, comparison, length, or pattern)
@@ -94,7 +94,7 @@ Each table gets a `<TABLE>_CONSTRAINTS: list[Constraint]` with entries derived f
 
 ### ConstraintEngine
 
-Static methods that validate constraints against in-memory stores:
+Static methods on the ConstraintEngine class validate constraints against in-memory dictionary stores, implementing the same logical checks that PostgreSQL enforces via CHECK constraints, triggers, and foreign key references. The engine handles INSERT validation (NOT NULL, ENUM, UNIQUE, FK, CHECK), UPDATE validation (merging old and new values, plus state machine transition checks), and DELETE processing (recursive ON DELETE CASCADE, RESTRICT blocking, and SET NULL propagation).
 
 - `validate_insert(table, constraints, row, stores, unique_indexes)`: Checks NOT_NULL, ENUM, UNIQUE, FK, CHECK_*, skips STATE_MACHINE_TRANSITION (no old state).
 - `validate_update(table, constraints, old_row, new_row, pk_columns, stores, unique_indexes)`: Merges old+new, runs insert validation on merged row, then checks STATE_MACHINE_TRANSITION (validates old->new transition is allowed).
@@ -102,11 +102,11 @@ Static methods that validate constraints against in-memory stores:
 
 ### ALL_CONSTRAINTS
 
-A `dict[str, list[Constraint]]` mapping every table name to its constraint list. Used by `process_delete` for cascade processing -- deleting from one table may cascade to children in other tables.
+A `dict[str, list[Constraint]]` mapping every table name to its complete constraint list, aggregating constraints from all tables in the schema into a single lookup structure. This global mapping is used by the `process_delete` method for cascade processing, since deleting a row from one table may trigger ON DELETE CASCADE actions that affect child rows in other tables. The recursive cascade traversal uses ALL_CONSTRAINTS to discover which tables have foreign keys pointing to the deleted row's table.
 
 ## State Machine Single-Source-of-Truth
 
-State machine definitions in TOML flow to three enforcement points from the same model:
+State machine definitions in TOML flow to three enforcement points from the same model, ensuring that the database trigger, the PgBackend Python validation, and the InMemoryBackend constraint engine all enforce exactly the same transition rules. This single-source-of-truth approach means transition rules are never duplicated or manually synchronized across enforcement layers. All three derive from `model.SMTransitionMap`, and the transition map flows from the TOML through the model to each output.
 
 1. **Database trigger**: BEFORE UPDATE trigger validates transitions in PostgreSQL (generated by `generate` package).
 2. **PgBackend codegen**: SELECT FOR UPDATE, validate in Python, then UPDATE (defense-in-depth alongside the trigger).
@@ -116,7 +116,7 @@ All three derive from `model.SMTransitionMap`, ensuring consistency. The transit
 
 ## Table Groups
 
-Schema TOML can define groups:
+Schema TOML can define groups that organize tables into logical subsets for selective code generation. When groups are configured, the `--group` flag filters which tables are included in the generated query layer output. The `--backends` flag controls which backend implementations to generate, allowing projects to generate only the PgBackend for production deployments or only the InMemoryBackend for testing. Both flags can be combined for fine-grained control.
 
 ```toml
 [groups]
@@ -143,7 +143,7 @@ When a backend is filtered out, its files are not generated and the `__init__.py
 
 ## Dual-Backend Conformance
 
-Conformance is verified at the codegen level (Go tests, not Python runtime):
+Conformance between the two backends is verified at the codegen level through Go tests that inspect the generated Python code, not through Python runtime checks. This compile-time verification ensures that both backends maintain identical public method sets, matching parameter signatures, and consistent constraint enforcement logic. The verification covers eight specific conformance properties that together guarantee behavioral equivalence between the PgBackend and InMemoryBackend.
 
 1. PgBackend and InMemoryBackend have the exact same set of public methods
 2. Both implement every method declared in the Backend protocol
