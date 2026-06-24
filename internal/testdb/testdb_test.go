@@ -1,6 +1,7 @@
 package testdb
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -163,4 +164,56 @@ func TestCreateOptionsValidate(t *testing.T) {
 func TestSkipIfNoPostgres(t *testing.T) {
 	SkipIfNoPostgres(t)
 	// If we reach here, PostgreSQL is available.
+}
+
+func TestDrop_InvalidName(t *testing.T) {
+	// Manager with a dummy maintenance URL — we never actually connect.
+	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
+
+	cases := []struct {
+		name string
+		desc string
+	}{
+		{"production_db", "plain name"},
+		{"my_app", "underscore but wrong format"},
+		{"", "empty string"},
+		{"my_test_db", "contains 'test' but wrong format"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			db := &EphemeralDB{Name: tc.name}
+			err := m.Drop(context.Background(), db)
+			if err == nil {
+				t.Fatalf("expected error for name %q, got nil", tc.name)
+			}
+			if !strings.Contains(err.Error(), "refusing to drop") {
+				t.Fatalf("expected 'refusing to drop' in error, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestDrop_ValidName(t *testing.T) {
+	// A validly-formatted name should pass the guard and fail later at pgx.Connect.
+	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
+	db := &EphemeralDB{Name: "mydb_test_1234567890_abcd1234"}
+	err := m.Drop(context.Background(), db)
+	if err == nil {
+		// Unexpected: there's no live DB, so we expect a connection error.
+		t.Fatal("expected an error (no live DB), got nil")
+	}
+	if strings.Contains(err.Error(), "refusing to drop") {
+		t.Fatalf("valid name should not trigger the guard, got: %v", err)
+	}
+}
+
+func TestDropByName_InvalidName(t *testing.T) {
+	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
+	err := m.DropByName(context.Background(), "production_db")
+	if err == nil {
+		t.Fatal("expected error for invalid name, got nil")
+	}
+	if !strings.Contains(err.Error(), "refusing to drop") {
+		t.Fatalf("expected 'refusing to drop' in error, got: %v", err)
+	}
 }
