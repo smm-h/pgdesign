@@ -196,7 +196,7 @@ func columnPGType(table model.Table, colName string) string {
 // isStringPGType returns true if the PostgreSQL type maps to a Go string.
 func isStringPGType(pgType string) bool {
 	switch pgType {
-	case "text", "varchar", "character varying", "char", "character", "name", "citext":
+	case "text", "varchar", "char", "name", "citext":
 		return true
 	}
 	return false
