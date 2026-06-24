@@ -1,6 +1,6 @@
 ---
 title: "Workload Analysis"
-description: "How pgdesign analyzes schemas and query patterns to recommend indexes and detect performance anti-patterns."
+description: "How pgdesign analyzes schemas and live query patterns to recommend indexes, detect N+1 queries, and flag performance anti-patterns in PostgreSQL databases."
 ---
 
 # Workload Analysis
@@ -9,7 +9,7 @@ pgdesign provides a two-tier approach to index recommendations and performance d
 
 ## Architecture: Structural vs Workload Tiers
 
-The split exists because schema analysis and query analysis answer fundamentally different questions:
+The split into two tiers exists because schema analysis and query analysis answer fundamentally different questions and have different requirements. Structural analysis is deterministic and always available because it works from the TOML schema definition alone, while workload analysis requires a running PostgreSQL database with the pg_stat_statements extension enabled. By separating these concerns, teams can run structural checks in CI without database access and add workload checks when a live database is available.
 
 - **Structural analysis** answers: "Given these column types and index definitions, are there obvious gaps?" This is deterministic and always available.
 - **Workload analysis** answers: "Given actual query patterns, where are the real bottlenecks?" This requires a running database with `pg_stat_statements` enabled.
@@ -29,7 +29,7 @@ pgdesign does not use hypothetical indexes (`hypopg`) because that requires a ru
 
 ## Check Registration
 
-Workload checks are registered as two named checks in strictcli's check framework:
+Workload checks are registered as two named checks in strictcli's check framework, allowing them to be invoked individually or as part of a full check run. The structural check runs without any database connection and analyzes the resolved schema model for index coverage gaps, while the workload check connects to a live PostgreSQL database to analyze actual query patterns and table access statistics. Both checks produce diagnostics through the standard diagnostic system.
 
 - **`structural`** -- runs all schema-only recommendations. No database connection needed. Invoked via `pgdesign check --name structural`.
 - **`workload`** -- runs live analysis against a database. Requires a database URL (from `database.url` in `pgdesign.toml` or `PGDESIGN_DB` environment variable). If no URL is available, the check returns "skip". Invoked via `pgdesign check --name workload`.
@@ -38,11 +38,11 @@ Both checks also run as part of `pgdesign check --all`.
 
 ## Structural Recommendations (Schema-Only)
 
-All structural checks operate on the resolved schema model. They iterate tables and columns, checking column types against index coverage.
+All structural checks operate on the resolved schema model without requiring a database connection. They iterate over every table and column in the schema, checking column types against the declared index coverage to identify common patterns where a missing index would cause performance problems. The checks cover JSONB columns, array columns, tsvector columns, append-only tables, boolean columns, and excessive index counts, producing warnings or informational diagnostics as appropriate.
 
 ### W022: JSONB Column Without GIN Index
 
-JSONB columns used for querying benefit from GIN indexes for `@>`, `?`, `?|`, `?&` operators. Fires when a JSONB column has no GIN index covering it.
+JSONB columns used for querying benefit significantly from GIN indexes because the containment (`@>`), existence (`?`), and any/all existence (`?|`, `?&`) operators require full column scans without an index. This check fires when a JSONB column has no GIN index covering it, suggesting that queries using these operators will perform sequential scans. The check explicitly excludes JSONB array columns (`jsonb[]`) because those are handled by the W023 array check instead.
 
 The check explicitly excludes `jsonb[]` (array of JSONB) -- those trigger W023 instead.
 
@@ -50,13 +50,13 @@ The check explicitly excludes `jsonb[]` (array of JSONB) -- those trigger W023 i
 
 ### W023: Array Column Without GIN Index
 
-Array columns benefit from GIN indexes for `@>`, `<@`, `&&` operators. Fires when any array-typed column (not just JSONB arrays) has no GIN index.
+Array columns benefit from GIN indexes for the containment (`@>`, `<@`) and overlap (`&&`) operators, which are the primary array query operators in PostgreSQL. Without a GIN index, these operators require scanning every row and comparing array contents element by element. This check fires when any array-typed column, including JSONB arrays, text arrays, integer arrays, and all other array types, has no GIN index covering it.
 
 **Condition:** `col.Array && !columnHasIndexMethod(table, col.Name, "gin")`
 
 ### W024: tsvector Column Without GIN Index
 
-Full-text search columns (`tsvector` type) require a GIN index for the `@@` operator to be efficient. Without it, every query does a sequential scan of the tsvector column.
+Full-text search columns with the `tsvector` type require a GIN index for the `@@` text search match operator to be efficient. Without a GIN index, every full-text search query must scan every row in the table and compare the search query against each tsvector value, which becomes prohibitively slow as the table grows. This is one of the most impactful missing index patterns because full-text search is almost always used in user-facing query features where performance is critical.
 
 **Condition:** `col.PGType == "tsvector" && !columnHasIndexMethod(table, col.Name, "gin")`
 
@@ -78,7 +78,7 @@ Fires only for **single-column** indexes on boolean columns. Multi-column indexe
 
 ### I007: Excessive Indexes
 
-Tables with 10 or more indexes. Each index adds overhead to INSERT, UPDATE, and DELETE operations. This is informational -- some tables legitimately need many indexes.
+Tables with 10 or more indexes may have excessive write overhead because every INSERT, UPDATE, and DELETE operation must maintain all indexes on the table. Each additional index adds write amplification and increases the amount of WAL generated per write operation. This check is informational rather than a warning because some tables with complex query patterns legitimately need many indexes, but it serves as a prompt to review whether all indexes are actually used by production queries.
 
 **Threshold:** `len(table.Indexes) >= 10` (exactly 9 indexes does not trigger).
 
@@ -101,7 +101,7 @@ This is implemented in `FindDuplicateIndexes`, which operates on `[]IndexInfo` s
 
 ### Index Method Matching
 
-All structural checks use `columnHasIndexMethod`, which matches index methods case-insensitively via `strings.EqualFold`. This means "GIN", "gin", and "Gin" all satisfy the check.
+All structural checks use the `columnHasIndexMethod` helper function, which matches index methods case-insensitively via `strings.EqualFold`. This means "GIN", "gin", and "Gin" all satisfy the check for a GIN index on a column. The function searches through all indexes on a table for one that includes the specified column name and uses the specified index method, returning true if any matching index is found regardless of whether additional columns are also indexed.
 
 ## Live Analysis (Requires Database)
 
@@ -151,7 +151,7 @@ Algorithm:
 
 ### W026: Sequential Scan Heavy
 
-Queries `pg_stat_user_tables` for tables where sequential scans vastly outnumber index scans.
+Queries `pg_stat_user_tables` for tables where sequential scans vastly outnumber index scans, indicating that the PostgreSQL query planner is choosing full table scans over indexed lookups. This pattern typically means either the table is missing a needed index, the existing indexes do not cover the columns used in WHERE clauses, or the table is small enough that sequential scans are actually faster. The check uses a 10x threshold to filter out tables where sequential scans are normal.
 
 The `QueryTableScanStats` function reads `pg_stat_user_tables` for the configured schema names (defaulting to `["public"]`), returning `[]TableScanStats` with fields:
 
@@ -166,7 +166,7 @@ The `DetectSeqScanHeavy` function fires W026 when `stat.SeqScan > 0 && stat.SeqS
 
 ## Data Structures
 
-The workload package exports these types:
+The workload package exports several data structures used by the check handlers, the stats command, and the serve HTTP API. These types represent query execution statistics from pg_stat_statements, table-level scan statistics from pg_stat_user_tables, index metadata for duplicate detection, and the results of duplicate index analysis. All types use standard Go struct conventions with JSON tags for the serve API endpoints.
 
 ```go
 type StatementStats struct {
