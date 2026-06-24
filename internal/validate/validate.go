@@ -15,6 +15,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sqlexpr"
 	"github.com/smm-h/pgdesign/internal/sqlutil"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // Config controls which rules run and their parameters.
@@ -183,7 +184,7 @@ func checkMissingColumnType(schema *model.Schema, _ *Config) []diagnostic.Diagno
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
 		for _, col := range t.Columns {
-			if col.PGType == "" {
+			if col.PGType.Base == "" {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
 					Code:       "E200",
@@ -378,8 +379,7 @@ func checkVarcharUsage(schema *model.Schema, _ *Config) []diagnostic.Diagnostic 
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
 		for _, col := range t.Columns {
-			lower := strings.ToLower(col.PGType)
-			if strings.Contains(lower, "varchar") || strings.Contains(lower, "character varying") {
+			if col.PGType.Base == "varchar" || col.PGType.Base == "char" {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
 					Code:       "E207",
@@ -399,8 +399,7 @@ func checkTimestampNoTZ(schema *model.Schema, _ *Config) []diagnostic.Diagnostic
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
 		for _, col := range t.Columns {
-			lower := strings.ToLower(col.PGType)
-			if lower == "timestamp" || lower == "timestamp without time zone" {
+			if col.PGType.Base == "timestamp" {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
 					Code:       "E208",
@@ -420,8 +419,8 @@ func checkSerialUsage(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
 		for _, col := range t.Columns {
-			lower := strings.ToLower(col.PGType)
-			if strings.Contains(lower, "serial") {
+			base := col.PGType.Base
+			if base == "serial" || base == "bigserial" || base == "smallserial" {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
 					Code:       "E209",
@@ -440,14 +439,14 @@ func checkSerialUsage(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 func checkFloatMoney(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 	moneyKeywords := []string{"price", "cost", "amount", "balance", "total", "fee"}
-	floatTypes := []string{"real", "float", "double precision"}
+	floatTypes := []string{"float4", "float8"}
 
 	for _, t := range schema.Tables {
 		for _, col := range t.Columns {
-			lower := strings.ToLower(col.PGType)
+			base := col.PGType.Base
 			isFloat := false
 			for _, ft := range floatTypes {
-				if lower == ft || strings.HasPrefix(lower, "float") {
+				if base == ft {
 					isFloat = true
 					break
 				}
@@ -1055,7 +1054,7 @@ func checkBooleanStates(schema *model.Schema, _ *Config) []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
 		count := 0
 		for _, col := range t.Columns {
-			if strings.ToLower(col.PGType) == "boolean" {
+			if col.PGType.Base == "bool" {
 				count++
 			}
 		}
@@ -1077,7 +1076,7 @@ func checkJSONCouldBeTable(schema *model.Schema, _ *Config) []diagnostic.Diagnos
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
 		for _, col := range t.Columns {
-			if strings.ToLower(col.PGType) != "jsonb" {
+			if col.PGType.Base != "jsonb" {
 				continue
 			}
 			if !strings.HasSuffix(col.Name, "s") {
@@ -1135,8 +1134,7 @@ func checkPreferText(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
 		for _, col := range t.Columns {
-			lower := strings.ToLower(col.PGType)
-			if strings.Contains(lower, "char(") {
+			if col.PGType.Base == "char" && col.PGType.Params.Length != nil {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Warning,
 					Code:       "W006",
@@ -2373,38 +2371,21 @@ var pgTypeWidths = map[string]pgTypeInfo{
 }
 
 // estimateVarlenaSize returns the estimated average byte size for a varlena column type.
-func estimateVarlenaSize(pgType string) int {
-	lower := strings.ToLower(pgType)
+func estimateVarlenaSize(t typeinfo.Type) int {
 	// varchar(N) -> N/2 + 4 (4 bytes varlena header + average half-fill)
-	if strings.HasPrefix(lower, "varchar(") || strings.HasPrefix(lower, "character varying(") {
-		s := strings.TrimPrefix(lower, "varchar(")
-		if s == lower {
-			s = strings.TrimPrefix(lower, "character varying(")
-		}
-		s = strings.TrimSuffix(s, ")")
-		if n, err := strconv.Atoi(s); err == nil {
-			return n/2 + 4
-		}
+	if t.Base == "varchar" && t.Params.Length != nil {
+		return *t.Params.Length/2 + 4
 	}
 	// char(N) -> N + 4
-	if strings.HasPrefix(lower, "char(") || strings.HasPrefix(lower, "character(") {
-		s := strings.TrimPrefix(lower, "char(")
-		if s == lower {
-			s = strings.TrimPrefix(lower, "character(")
-		}
-		s = strings.TrimSuffix(s, ")")
-		if n, err := strconv.Atoi(s); err == nil {
-			return n + 4
-		}
+	if t.Base == "char" && t.Params.Length != nil {
+		return *t.Params.Length + 4
 	}
-	switch {
-	case lower == "jsonb":
+	switch t.Base {
+	case "jsonb", "json":
 		return 64
-	case lower == "json":
-		return 64
-	case lower == "bytea":
+	case "bytea":
 		return 32
-	case lower == "numeric" || lower == "decimal":
+	case "numeric":
 		return 16
 	default:
 		return 32 // generic varlena estimate for text, etc.
@@ -2437,16 +2418,8 @@ func lookupTypeInfo(col model.Column) pgTypeInfo {
 	if col.Array {
 		return pgTypeInfo{-1, 'i'} // arrays are varlena
 	}
-	pgType := strings.ToLower(col.PGType)
-	if info, ok := pgTypeWidths[pgType]; ok {
+	if info, ok := pgTypeWidths[col.PGType.Base]; ok {
 		return info
-	}
-	// Strip parenthesized suffix: varchar(255) -> varchar
-	if idx := strings.Index(pgType, "("); idx != -1 {
-		base := pgType[:idx]
-		if info, ok := pgTypeWidths[base]; ok {
-			return info
-		}
 	}
 	// Unknown type: assume varlena
 	return pgTypeInfo{-1, 'i'}
