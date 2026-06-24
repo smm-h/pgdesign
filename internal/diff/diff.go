@@ -4,13 +4,12 @@ package diff
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/risk"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // SchemaDiff describes the differences between a desired and actual schema.
@@ -528,11 +527,9 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 	cc := ColumnChange{Name: desired.Name}
 	changed := false
 
-	// Type comparison (case-insensitive, normalized).
-	dt := normalizeType(desired.PGType)
-	at := normalizeType(actual.PGType)
-	if dt != at {
-		cc.TypeChanged = &[2]string{actual.PGType, desired.PGType}
+	// Type comparison using structured equality.
+	if !desired.PGType.Equal(actual.PGType) {
+		cc.TypeChanged = &[2]string{typeinfo.Reconstruct(actual.PGType), typeinfo.Reconstruct(desired.PGType)}
 		changed = true
 	}
 
@@ -673,58 +670,39 @@ func classifyColumnChange(cc *ColumnChange, desired *model.Column) risk.Classifi
 }
 
 // IsWidening returns true if oldType -> newType is a safe widening conversion.
+// Arguments are SQL type strings (e.g., from typeinfo.Reconstruct output).
 func IsWidening(oldType, newType string) bool {
-	old := strings.ToLower(strings.TrimSpace(oldType))
-	new_ := strings.ToLower(strings.TrimSpace(newType))
+	oldT := typeinfo.Parse(oldType)
+	newT := typeinfo.Parse(newType)
 
-	// int -> bigint
-	if (old == "integer" || old == "int" || old == "int4") &&
-		(new_ == "bigint" || new_ == "int8") {
+	// int4 -> int8
+	if oldT.Base == "int4" && newT.Base == "int8" {
 		return true
 	}
 
-	// smallint -> integer or bigint
-	if (old == "smallint" || old == "int2") &&
-		(new_ == "integer" || new_ == "int" || new_ == "int4" || new_ == "bigint" || new_ == "int8") {
+	// int2 -> int4 or int8
+	if oldT.Base == "int2" && (newT.Base == "int4" || newT.Base == "int8") {
 		return true
 	}
 
 	// varchar -> text
-	if strings.HasPrefix(old, "character varying") || strings.HasPrefix(old, "varchar") {
-		if new_ == "text" {
-			return true
-		}
-	}
-
-	// varchar(N) -> varchar(M) where M > N
-	oldLen := extractVarcharLen(old)
-	newLen := extractVarcharLen(new_)
-	if oldLen > 0 && newLen > 0 && newLen > oldLen {
+	if oldT.Base == "varchar" && newT.Base == "text" {
 		return true
 	}
 
-	// real -> double precision
-	if (old == "real" || old == "float4") &&
-		(new_ == "double precision" || new_ == "float8") {
+	// varchar(N) -> varchar(M) where M > N
+	if oldT.Base == "varchar" && newT.Base == "varchar" &&
+		oldT.Params.Length != nil && newT.Params.Length != nil &&
+		*newT.Params.Length > *oldT.Params.Length {
+		return true
+	}
+
+	// float4 -> float8
+	if oldT.Base == "float4" && newT.Base == "float8" {
 		return true
 	}
 
 	return false
-}
-
-var varcharLenRe = regexp.MustCompile(`(?:varchar|character varying)\s*\(\s*(\d+)\s*\)`)
-
-// extractVarcharLen extracts the length from varchar(N) or character varying(N).
-func extractVarcharLen(t string) int {
-	m := varcharLenRe.FindStringSubmatch(t)
-	if m == nil {
-		return 0
-	}
-	n, err := strconv.Atoi(m[1])
-	if err != nil {
-		return 0
-	}
-	return n
 }
 
 // normalizeType lowercases and trims whitespace for comparison.
@@ -1530,12 +1508,10 @@ func diffCompositeType(desired, actual *model.CompositeType) *CompositeTypeDiff 
 		changed = true
 	}
 	for _, p := range matched {
-		dt := normalizeType(p.Desired.PGType)
-		at := normalizeType(p.Actual.PGType)
-		if dt != at {
+		if !p.Desired.PGType.Equal(p.Actual.PGType) {
 			ctd.FieldsChanged = append(ctd.FieldsChanged, CompositeFieldChange{
 				Name:        p.Desired.Name,
-				TypeChanged: &[2]string{p.Actual.PGType, p.Desired.PGType},
+				TypeChanged: &[2]string{typeinfo.Reconstruct(p.Actual.PGType), typeinfo.Reconstruct(p.Desired.PGType)},
 			})
 			changed = true
 		}
@@ -1675,7 +1651,7 @@ func funcArgSignatureEqual(a, b []model.FunctionArg) bool {
 		return false
 	}
 	for i := range a {
-		if normalizeType(a[i].Type) != normalizeType(b[i].Type) {
+		if !a[i].Type.Equal(b[i].Type) {
 			return false
 		}
 	}
@@ -1724,8 +1700,8 @@ func diffDomain(desired, actual *model.Domain) *DomainDiff {
 	dd := &DomainDiff{Name: domainKey(desired)}
 	changed := false
 
-	if normalizeType(desired.BaseType) != normalizeType(actual.BaseType) {
-		dd.BaseTypeChanged = &[2]string{actual.BaseType, desired.BaseType}
+	if !desired.BaseType.Equal(actual.BaseType) {
+		dd.BaseTypeChanged = &[2]string{typeinfo.Reconstruct(actual.BaseType), typeinfo.Reconstruct(desired.BaseType)}
 		changed = true
 	}
 

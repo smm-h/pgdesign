@@ -15,6 +15,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/risk"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	pgsql "github.com/smm-h/pgdesign/internal/sql"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // GenerateMigration converts a SchemaDiff into a Migration with DDL/DML ops
@@ -482,7 +483,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				Op:      "add_column",
 				Table:   td.Name,
 				Column:  col.Name,
-				Type:    col.PGType,
+				Type:    typeinfo.Reconstruct(col.PGType),
 				NotNull: col.NotNull,
 				Down: &DownOp{
 					Ops: []DDLOp{{Op: "drop_column", Table: td.Name, Column: col.Name}},
@@ -616,7 +617,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				if table := findTable(desired, td.Name); table != nil {
 					for _, col := range table.Columns {
 						if col.Name == cc.Name {
-							targetType = col.PGType
+							targetType = typeinfo.Reconstruct(col.PGType)
 							if col.Array {
 								targetType += "[]"
 							}
@@ -644,7 +645,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				if table := findTable(desired, td.Name); table != nil {
 					for _, col := range table.Columns {
 						if col.Name == cc.Name {
-							targetType = col.PGType
+							targetType = typeinfo.Reconstruct(col.PGType)
 							if col.Array {
 								targetType += "[]"
 							}
@@ -1947,9 +1948,9 @@ func buildBackfillSQL(tableName, colName string, desired *model.Schema) string {
 				if col.DefaultExpr != "" {
 					defaultVal = col.DefaultExpr
 				} else if col.Default != nil {
-					defaultVal = formatDefault(*col.Default, col.PGType)
+					defaultVal = formatDefault(*col.Default, col.PGType.Base)
 				} else {
-					defaultVal = typeZeroValue(col.PGType)
+					defaultVal = typeZeroValue(col.PGType.Base)
 				}
 				break
 			}

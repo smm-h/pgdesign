@@ -7,6 +7,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/sql"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // OpToSQL converts a DDLOp to a SQL statement.
@@ -190,7 +191,7 @@ func opCreateTableConsolidated(op DDLOp) string {
 		case "add_column":
 			col := model.Column{
 				Name:      cop.Column,
-				PGType:    cop.Type,
+				PGType:    typeinfo.Parse(cop.Type),
 				Collation: cop.Collation,
 				NotNull:   cop.NotNull,
 				Generated: cop.Generated,

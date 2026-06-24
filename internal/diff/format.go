@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/risk"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // ANSI color codes.
@@ -133,7 +134,7 @@ func FormatTerminal(d *SchemaDiff) string {
 	for _, ctd := range d.CompositeTypesChanged {
 		fmt.Fprintf(&b, "%s~ composite type %s%s\n", colorYellow, ctd.Name, colorReset)
 		for _, f := range ctd.FieldsAdded {
-			fmt.Fprintf(&b, "  %s+ field %s %s%s\n", colorGreen, f.Name, f.PGType, colorReset)
+			fmt.Fprintf(&b, "  %s+ field %s %s%s\n", colorGreen, f.Name, typeinfo.Reconstruct(f.PGType), colorReset)
 		}
 		for _, name := range ctd.FieldsRemoved {
 			fmt.Fprintf(&b, "  %s- field %s%s\n", colorRed, name, colorReset)
@@ -319,7 +320,7 @@ func formatTableDiff(b *strings.Builder, td *TableDiff) {
 
 	// Columns
 	for _, col := range td.ColumnsAdded {
-		fmt.Fprintf(b, "  %s+ column %s %s%s\n", colorGreen, col.Name, col.PGType, colorReset)
+		fmt.Fprintf(b, "  %s+ column %s %s%s\n", colorGreen, col.Name, typeinfo.Reconstruct(col.PGType), colorReset)
 	}
 	for _, name := range td.ColumnsRemoved {
 		fmt.Fprintf(b, "  %s- column %s%s\n", colorRed, name, colorReset)
