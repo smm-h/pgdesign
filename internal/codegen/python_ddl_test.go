@@ -9,6 +9,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
@@ -307,7 +308,7 @@ func TestPythonDDL_SingleTable(t *testing.T) {
 			Comment: "All users",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 			},
 		}},
 	}

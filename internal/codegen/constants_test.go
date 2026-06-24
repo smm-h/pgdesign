@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func testSchema() *model.Schema {
@@ -15,28 +16,28 @@ func testSchema() *model.Schema {
 				Name:   "session",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "game_id", PGType: "uuid"},
-					{Name: "status", PGType: "text"},
-					{Name: "room_code", PGType: "text"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
+					{Name: "game_id", PGType: typeinfo.MustParse("uuid")},
+					{Name: "status", PGType: typeinfo.MustParse("text")},
+					{Name: "room_code", PGType: typeinfo.MustParse("text")},
 				},
 			},
 			{
 				Name:   "player",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "display_name", PGType: "text"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
+					{Name: "display_name", PGType: typeinfo.MustParse("text")},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz")},
 				},
 			},
 			{
 				Name:   "chat_message",
 				Schema: "game",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "sender_id", PGType: "uuid"},
-					{Name: "body", PGType: "text"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
+					{Name: "sender_id", PGType: typeinfo.MustParse("uuid")},
+					{Name: "body", PGType: typeinfo.MustParse("text")},
 				},
 			},
 		},
@@ -295,7 +296,7 @@ func TestGoConstantsGenerator_NoSchema(t *testing.T) {
 			{
 				Name: "items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
 				},
 			},
 		},
@@ -326,7 +327,7 @@ func TestPythonConstantsGenerator_NoSchema(t *testing.T) {
 			{
 				Name: "items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
 				},
 			},
 		},
@@ -442,7 +443,7 @@ func TestTSConstantsGenerator_NoSchema(t *testing.T) {
 			{
 				Name: "items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
 				},
 			},
 		},
@@ -558,7 +559,7 @@ func TestJavaConstantsGenerator_NoSchema(t *testing.T) {
 			{
 				Name: "items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
 				},
 			},
 		},
@@ -679,7 +680,7 @@ func TestKotlinConstantsGenerator_NoSchema(t *testing.T) {
 			{
 				Name: "items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
 				},
 			},
 		},
@@ -713,7 +714,7 @@ func TestZigConstantsGenerator_NoSchema(t *testing.T) {
 			{
 				Name: "items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid")},
 				},
 			},
 		},

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // constraintTestSchema builds a schema that exercises all constraint types:
@@ -23,10 +24,10 @@ func constraintTestSchema() *model.Schema {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "age", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "age", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				Uniques: []model.UniqueConstraint{
 					{Name: "uq_email", Columns: []string{"email"}},
@@ -40,11 +41,11 @@ func constraintTestSchema() *model.Schema {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true, Identity: "ALWAYS"},
-					{Name: "user_id", PGType: "uuid", NotNull: true},
-					{Name: "status", PGType: "text", NotNull: true, SemanticTypeName: "order_status"},
-					{Name: "priority", PGType: "priority", NotNull: true},
-					{Name: "total", PGType: "numeric", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("text"), NotNull: true, SemanticTypeName: "order_status"},
+					{Name: "priority", PGType: typeinfo.MustParse("priority"), NotNull: true},
+					{Name: "total", PGType: typeinfo.MustParse("numeric"), NotNull: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_user", Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}, OnDelete: "RESTRICT"},
@@ -58,10 +59,10 @@ func constraintTestSchema() *model.Schema {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true, Identity: "ALWAYS"},
-					{Name: "order_id", PGType: "integer", NotNull: true},
-					{Name: "product", PGType: "text", NotNull: true},
-					{Name: "quantity", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "order_id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "product", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "quantity", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_order", Columns: []string{"order_id"}, RefTable: "orders", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -75,9 +76,9 @@ func constraintTestSchema() *model.Schema {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true, Identity: "ALWAYS"},
-					{Name: "user_id", PGType: "uuid", NotNull: false},
-					{Name: "action", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: false},
+					{Name: "action", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_user", Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}, OnDelete: "SET NULL"},
@@ -425,8 +426,8 @@ func TestConstraints_CheckLengthPattern(t *testing.T) {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true, Identity: "ALWAYS"},
-					{Name: "bio", PGType: "text", NotNull: false},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "bio", PGType: typeinfo.MustParse("text"), NotNull: false},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_bio_len", Expr: "LENGTH(bio) <= 500"},
@@ -460,8 +461,8 @@ func TestConstraints_CheckPatternLike(t *testing.T) {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true, Identity: "ALWAYS"},
-					{Name: "code", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "code", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_code_fmt", Expr: "code LIKE 'ABC-%'"},
@@ -487,7 +488,7 @@ func TestConstraints_DomainCheck(t *testing.T) {
 	schema := &model.Schema{
 		Name: "domain_test",
 		Domains: []model.Domain{
-			{Name: "positive_int", BaseType: "integer", Check: "VALUE > 0"},
+			{Name: "positive_int", BaseType: typeinfo.MustParse("integer"), Check: "VALUE > 0"},
 		},
 		Tables: []model.Table{
 			{
@@ -495,8 +496,8 @@ func TestConstraints_DomainCheck(t *testing.T) {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true, Identity: "ALWAYS"},
-					{Name: "quantity", PGType: "positive_int", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "quantity", PGType: typeinfo.Type{Base: "int4", DomainName: "positive_int"}, NotNull: true},
 				},
 			},
 		},

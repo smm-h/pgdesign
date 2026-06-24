@@ -17,7 +17,7 @@ STATEMENTS: Final[list[tuple[str, str, str | None, int]]] = [
     ("""CREATE TABLE shop.orders (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     customer_id uuid NOT NULL,
-    total bigint NOT NULL DEFAULT 0,
+    total int8 NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_orders PRIMARY KEY (id)
 );""", "table", "orders", 4),

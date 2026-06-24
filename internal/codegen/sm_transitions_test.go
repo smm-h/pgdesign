@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // smTestSchema returns a schema with a state machine type for testing.
@@ -33,8 +34,8 @@ func smTestSchema() *model.Schema {
 				Name:   "orders",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("order_status"), NotNull: true, SemanticTypeName: "order_status"},
 				},
 			},
 		},
@@ -329,7 +330,7 @@ func TestTransitionMaps_NoStateMachines(t *testing.T) {
 			{
 				Name: "items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 			},
 		},
@@ -364,7 +365,7 @@ func TestTransitionMaps_EmptyTransitions(t *testing.T) {
 			{
 				Name: "devices",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 				},
 			},
 		},

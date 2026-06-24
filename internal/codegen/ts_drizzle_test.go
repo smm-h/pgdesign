@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestTSDrizzleGenerator_Basic(t *testing.T) {
@@ -14,11 +15,11 @@ func TestTSDrizzleGenerator_Basic(t *testing.T) {
 			Comment: "Application users",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "email", PGType: "text", NotNull: true},
-				{Name: "score", PGType: "bigint", NotNull: true},
-				{Name: "is_active", PGType: "boolean", NotNull: true},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+				{Name: "score", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+				{Name: "is_active", PGType: typeinfo.MustParse("boolean"), NotNull: true},
+				{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -76,11 +77,11 @@ func TestTSDrizzleGenerator_Defaults(t *testing.T) {
 			Comment: "Configs",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "enabled", PGType: "boolean", NotNull: true, Default: model.StrPtr("true")},
-				{Name: "retries", PGType: "integer", NotNull: true, Default: model.StrPtr("3")},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true, Default: model.StrPtr("now()")},
-				{Name: "label", PGType: "text", NotNull: true, Default: model.StrPtr("unnamed")},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "enabled", PGType: typeinfo.MustParse("boolean"), NotNull: true, Default: model.StrPtr("true")},
+				{Name: "retries", PGType: typeinfo.MustParse("integer"), NotNull: true, Default: model.StrPtr("3")},
+				{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true, Default: model.StrPtr("now()")},
+				{Name: "label", PGType: typeinfo.MustParse("text"), NotNull: true, Default: model.StrPtr("unnamed")},
 			},
 		}},
 	}
@@ -153,8 +154,8 @@ func TestTSDrizzleGenerator_Relations(t *testing.T) {
 				Comment: "Users",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 			},
 			{
@@ -162,9 +163,9 @@ func TestTSDrizzleGenerator_Relations(t *testing.T) {
 				Comment: "Orders",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "user_id", PGType: "uuid", NotNull: true},
-					{Name: "total", PGType: "numeric", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "total", PGType: typeinfo.MustParse("numeric"), NotNull: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_orders_user", Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}},
@@ -222,9 +223,9 @@ func TestTSDrizzleGenerator_CompositePK(t *testing.T) {
 			Comment: "Order items",
 			PK:      []string{"order_id", "item_id"},
 			Columns: []model.Column{
-				{Name: "order_id", PGType: "uuid", NotNull: true},
-				{Name: "item_id", PGType: "uuid", NotNull: true},
-				{Name: "quantity", PGType: "integer", NotNull: true},
+				{Name: "order_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				{Name: "item_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				{Name: "quantity", PGType: typeinfo.MustParse("integer"), NotNull: true},
 			},
 		}},
 	}
@@ -267,9 +268,9 @@ func TestTSDrizzleGenerator_Indexes(t *testing.T) {
 			Comment: "Events",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "email", PGType: "text", NotNull: true},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+				{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 			},
 			Indexes: []model.Index{
 				{Name: "idx_events_email", Columns: []string{"email"}, Unique: true},
@@ -334,9 +335,9 @@ func TestTSDrizzleGenerator_NullableAndArray(t *testing.T) {
 			Comment: "Items",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "name", PGType: "text", NotNull: false},
-				{Name: "tags", PGType: "text", NotNull: true, Array: true},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: false},
+				{Name: "tags", PGType: typeinfo.MustParse("text"), NotNull: true, Array: true},
 			},
 		}},
 	}
@@ -378,19 +379,19 @@ func TestTSDrizzleGenerator_TypeMapping(t *testing.T) {
 			Comment: "All types",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "big_id", PGType: "bigint", NotNull: true},
-				{Name: "small_id", PGType: "smallint", NotNull: true},
-				{Name: "name", PGType: "text", NotNull: true},
-				{Name: "active", PGType: "boolean", NotNull: true},
-				{Name: "uid", PGType: "uuid", NotNull: true},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
-				{Name: "score", PGType: "real", NotNull: true},
-				{Name: "precise", PGType: "double precision", NotNull: true},
-				{Name: "amount", PGType: "numeric", NotNull: true},
-				{Name: "data", PGType: "jsonb", NotNull: true},
-				{Name: "raw_data", PGType: "bytea", NotNull: true},
-				{Name: "enum_col", PGType: "my_enum", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "big_id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+				{Name: "small_id", PGType: typeinfo.MustParse("smallint"), NotNull: true},
+				{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+				{Name: "active", PGType: typeinfo.MustParse("boolean"), NotNull: true},
+				{Name: "uid", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
+				{Name: "score", PGType: typeinfo.MustParse("real"), NotNull: true},
+				{Name: "precise", PGType: typeinfo.MustParse("double precision"), NotNull: true},
+				{Name: "amount", PGType: typeinfo.MustParse("numeric"), NotNull: true},
+				{Name: "data", PGType: typeinfo.MustParse("jsonb"), NotNull: true},
+				{Name: "raw_data", PGType: typeinfo.MustParse("bytea"), NotNull: true},
+				{Name: "enum_col", PGType: typeinfo.MustParse("my_enum"), NotNull: true},
 			},
 		}},
 	}
@@ -458,7 +459,7 @@ func TestTSDrizzleGenerator_DefaultExpr(t *testing.T) {
 			Comment: "Items",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
 			},
 		}},
 	}

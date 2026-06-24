@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestExtractConstraints_Basic(t *testing.T) {
@@ -15,15 +16,15 @@ func TestExtractConstraints_Basic(t *testing.T) {
 			{
 				Name: "users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "status", PGType: "status", NotNull: true},
-					{Name: "bio", PGType: "text", NotNull: false},
-					{Name: "age", PGType: "integer", NotNull: true},
-					{Name: "profile", PGType: "jsonb", NotNull: true, JSONSchema: "schemas/profile.json"},
-					{Name: "auto_id", PGType: "bigint", NotNull: true, Identity: "ALWAYS"},
-					{Name: "computed", PGType: "text", NotNull: true, Generated: "lower(name)"},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("status"), NotNull: true},
+					{Name: "bio", PGType: typeinfo.MustParse("text"), NotNull: false},
+					{Name: "age", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "profile", PGType: typeinfo.MustParse("jsonb"), NotNull: true, JSONSchema: "schemas/profile.json"},
+					{Name: "auto_id", PGType: typeinfo.MustParse("bigint"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "computed", PGType: typeinfo.MustParse("text"), NotNull: true, Generated: "lower(name)"},
 				},
 				PK: []string{"id"},
 				Checks: []model.CheckConstraint{
@@ -112,8 +113,8 @@ func TestExtractConstraints_EmptyTable(t *testing.T) {
 			{
 				Name: "empty",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "data", PGType: "text", NotNull: false},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "data", PGType: typeinfo.MustParse("text"), NotNull: false},
 				},
 				PK: []string{"id"},
 			},

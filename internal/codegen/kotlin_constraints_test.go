@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestKotlinConstraintsGenerator_Generate(t *testing.T) {
@@ -17,12 +18,12 @@ func TestKotlinConstraintsGenerator_Generate(t *testing.T) {
 			{
 				Name: "users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "role", PGType: "role", NotNull: true},
-					{Name: "age", PGType: "integer", NotNull: true},
-					{Name: "slug", PGType: "varchar", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "role", PGType: typeinfo.MustParse("role"), NotNull: true},
+					{Name: "age", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "slug", PGType: typeinfo.MustParse("varchar"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Checks: []model.CheckConstraint{
@@ -135,7 +136,7 @@ func TestKotlinConstraintsGenerator_NoConstraints(t *testing.T) {
 			{
 				Name: "simple",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},

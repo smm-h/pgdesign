@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // testSchema returns a schema with tables exercising all code paths:
@@ -18,11 +19,11 @@ func qlTestSchema() *model.Schema {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: false},
-					{Name: "score", PGType: "integer", NotNull: true, Default: model.StrPtr("0")},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true, DefaultExpr: "now()"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: false},
+					{Name: "score", PGType: typeinfo.MustParse("integer"), NotNull: true, Default: model.StrPtr("0")},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true, DefaultExpr: "now()"},
 				},
 				Uniques: []model.UniqueConstraint{
 					{Name: "uq_email", Columns: []string{"email"}},
@@ -34,11 +35,11 @@ func qlTestSchema() *model.Schema {
 				PK:         []string{"id"},
 				AppendOnly: true,
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
-					{Name: "user_id", PGType: "uuid", NotNull: true},
-					{Name: "total", PGType: "numeric", NotNull: true},
-					{Name: "status", PGType: "text", NotNull: true, SemanticTypeName: "order_status"},
-					{Name: "suspended_at", PGType: "timestamptz", NotNull: false},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "total", PGType: typeinfo.MustParse("numeric"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("text"), NotNull: true, SemanticTypeName: "order_status"},
+					{Name: "suspended_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: false},
 				},
 				FKs: []model.FK{
 					{Name: "fk_user", Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -49,11 +50,11 @@ func qlTestSchema() *model.Schema {
 				Schema: "public",
 				PK:     []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true, Identity: "ALWAYS"},
-					{Name: "order_id", PGType: "uuid", NotNull: true},
-					{Name: "product", PGType: "text", NotNull: true},
-					{Name: "quantity", PGType: "integer", NotNull: true},
-					{Name: "row_version", PGType: "integer", NotNull: true, Generated: "stored"},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true, Identity: "ALWAYS"},
+					{Name: "order_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "product", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "quantity", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "row_version", PGType: typeinfo.MustParse("integer"), NotNull: true, Generated: "stored"},
 				},
 				FKs: []model.FK{
 					{Name: "fk_order", Columns: []string{"order_id"}, RefTable: "orders", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -448,9 +449,9 @@ func TestPythonQueryLayer_CompositePK(t *testing.T) {
 				Schema: "public",
 				PK:     []string{"left_id", "right_id"},
 				Columns: []model.Column{
-					{Name: "left_id", PGType: "uuid", NotNull: true},
-					{Name: "right_id", PGType: "uuid", NotNull: true},
-					{Name: "data", PGType: "text", NotNull: false},
+					{Name: "left_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "right_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "data", PGType: typeinfo.MustParse("text"), NotNull: false},
 				},
 			},
 		},

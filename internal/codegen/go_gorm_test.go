@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // containsGormField checks that a line exists containing the field name, Go type,
@@ -29,11 +30,11 @@ func TestGoGormGenerator_Basic(t *testing.T) {
 			Comment: "Application users",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "email", PGType: "text", NotNull: true},
-				{Name: "score", PGType: "bigint", NotNull: true},
-				{Name: "is_active", PGType: "boolean", NotNull: true},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+				{Name: "score", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+				{Name: "is_active", PGType: typeinfo.MustParse("boolean"), NotNull: true},
+				{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 			},
 			Indexes: []model.Index{
 				{Name: "idx_users_email", Columns: []string{"email"}, Unique: true},
@@ -96,16 +97,16 @@ func TestGoGormGenerator_Basic(t *testing.T) {
 	if !containsGormField(result, "Score", "int64", "column:score") {
 		t.Error("missing Score column:score tag")
 	}
-	if !containsGormField(result, "Score", "int64", "type:bigint") {
-		t.Error("missing Score type:bigint tag")
+	if !containsGormField(result, "Score", "int64", "type:int8") {
+		t.Error("missing Score type:int8 tag")
 	}
 
 	// IsActive field.
 	if !containsGormField(result, "IsActive", "bool", "column:is_active") {
 		t.Error("missing IsActive column:is_active tag")
 	}
-	if !containsGormField(result, "IsActive", "bool", "type:boolean") {
-		t.Error("missing IsActive type:boolean tag")
+	if !containsGormField(result, "IsActive", "bool", "type:bool") {
+		t.Error("missing IsActive type:bool tag")
 	}
 
 	// CreatedAt field.
@@ -124,9 +125,9 @@ func TestGoGormGenerator_Defaults(t *testing.T) {
 			Comment: "Configs",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "enabled", PGType: "boolean", NotNull: true, Default: model.StrPtr("true")},
-				{Name: "retries", PGType: "integer", NotNull: true, Default: model.StrPtr("3")},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "enabled", PGType: typeinfo.MustParse("boolean"), NotNull: true, Default: model.StrPtr("true")},
+				{Name: "retries", PGType: typeinfo.MustParse("integer"), NotNull: true, Default: model.StrPtr("3")},
 			},
 		}},
 	}
@@ -155,8 +156,8 @@ func TestGoGormGenerator_Relationships(t *testing.T) {
 				Comment: "Users",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 				},
 			},
 			{
@@ -164,9 +165,9 @@ func TestGoGormGenerator_Relationships(t *testing.T) {
 				Comment: "Orders",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "user_id", PGType: "uuid", NotNull: true},
-					{Name: "total", PGType: "numeric", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "total", PGType: typeinfo.MustParse("numeric"), NotNull: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_orders_user", Columns: []string{"user_id"}, RefTable: "users", RefColumns: []string{"id"}},
@@ -201,10 +202,10 @@ func TestGoGormGenerator_NullableAndArray(t *testing.T) {
 			Comment: "Items",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "name", PGType: "text", NotNull: false},
-				{Name: "tags", PGType: "text", NotNull: true, Array: true},
-				{Name: "scores", PGType: "integer", NotNull: false, Array: true},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: false},
+				{Name: "tags", PGType: typeinfo.MustParse("text"), NotNull: true, Array: true},
+				{Name: "scores", PGType: typeinfo.MustParse("integer"), NotNull: false, Array: true},
 			},
 		}},
 	}
@@ -235,9 +236,9 @@ func TestGoGormGenerator_NullableAndArray(t *testing.T) {
 		t.Error("missing Tags []string with type:text[] tag")
 	}
 
-	// Nullable array integer -> *[]int32, tag should contain type:integer[].
-	if !containsGormField(result, "Scores", "*[]int32", "type:integer[]") {
-		t.Error("missing Scores *[]int32 with type:integer[] tag")
+	// Nullable array integer -> *[]int32, tag should contain type:int4[].
+	if !containsGormField(result, "Scores", "*[]int32", "type:int4[]") {
+		t.Error("missing Scores *[]int32 with type:int4[] tag")
 	}
 }
 
@@ -271,8 +272,8 @@ func TestGoGormGenerator_Enums(t *testing.T) {
 			Comment: "Users",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "status", PGType: "status", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "status", PGType: typeinfo.MustParse("status"), NotNull: true},
 			},
 		}},
 	}
@@ -306,8 +307,8 @@ func TestGoGormGenerator_NonUniqueIndex(t *testing.T) {
 			Comment: "Events",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 			},
 			Indexes: []model.Index{
 				{Name: "idx_events_created_at", Columns: []string{"created_at"}, Unique: false},
@@ -344,7 +345,7 @@ func TestGoGormGenerator_DefaultExpr(t *testing.T) {
 			Comment: "Items",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
 			},
 		}},
 	}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // --- Phase 17: Per-table InMemory delegate tests ---
@@ -711,9 +712,9 @@ func TestMem_CompositePK(t *testing.T) {
 				Schema: "public",
 				PK:     []string{"left_id", "right_id"},
 				Columns: []model.Column{
-					{Name: "left_id", PGType: "uuid", NotNull: true},
-					{Name: "right_id", PGType: "uuid", NotNull: true},
-					{Name: "data", PGType: "text", NotNull: false},
+					{Name: "left_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "right_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "data", PGType: typeinfo.MustParse("text"), NotNull: false},
 				},
 			},
 		},

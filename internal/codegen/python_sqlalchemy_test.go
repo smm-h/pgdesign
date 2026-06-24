@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // containsSAField checks that at least one line in s contains a SQLAlchemy
@@ -29,16 +30,16 @@ func TestPythonSQLAlchemyGenerator_Basic(t *testing.T) {
 				Schema:  "public",
 				Comment: "Application users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "score", PGType: "bigint", NotNull: true},
-					{Name: "is_active", PGType: "boolean", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
-					{Name: "metadata", PGType: "jsonb", NotNull: true},
-					{Name: "age", PGType: "integer", NotNull: true},
-					{Name: "rating", PGType: "double precision", NotNull: true},
-					{Name: "avatar", PGType: "bytea", NotNull: true},
-					{Name: "balance", PGType: "numeric", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+					{Name: "score", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "is_active", PGType: typeinfo.MustParse("boolean"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
+					{Name: "metadata", PGType: typeinfo.MustParse("jsonb"), NotNull: true},
+					{Name: "age", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "rating", PGType: typeinfo.MustParse("double precision"), NotNull: true},
+					{Name: "avatar", PGType: typeinfo.MustParse("bytea"), NotNull: true},
+					{Name: "balance", PGType: typeinfo.MustParse("numeric"), NotNull: true},
 				},
 			},
 		},
@@ -139,11 +140,11 @@ func TestPythonSQLAlchemyGenerator_NullableAndArray(t *testing.T) {
 				Name:    "items",
 				Comment: "Test items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: false},
-					{Name: "tags", PGType: "text", NotNull: true, Array: true},
-					{Name: "scores", PGType: "integer", NotNull: false, Array: true},
-					{Name: "status", PGType: "user_status", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: false},
+					{Name: "tags", PGType: typeinfo.MustParse("text"), NotNull: true, Array: true},
+					{Name: "scores", PGType: typeinfo.MustParse("integer"), NotNull: false, Array: true},
+					{Name: "status", PGType: typeinfo.MustParse("user_status"), NotNull: true},
 				},
 			},
 		},
@@ -230,8 +231,8 @@ func TestPythonSQLAlchemyGenerator_MoneySemanticType(t *testing.T) {
 				Name:    "products",
 				Comment: "Products",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "price", PGType: "bigint", NotNull: true, SemanticTypeName: "money"},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "price", PGType: typeinfo.MustParse("bigint"), NotNull: true, SemanticTypeName: "money"},
 				},
 			},
 		},
@@ -258,7 +259,7 @@ func TestPythonSQLAlchemyGenerator_ForeignKeys(t *testing.T) {
 				Name:    "users",
 				Comment: "Users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -266,8 +267,8 @@ func TestPythonSQLAlchemyGenerator_ForeignKeys(t *testing.T) {
 				Name:    "orders",
 				Comment: "Orders",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "user_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 				},
 				PK: []string{"id"},
 				FKs: []model.FK{
@@ -324,8 +325,8 @@ func TestPythonSQLAlchemyGenerator_ServerDefault(t *testing.T) {
 				Name:    "events",
 				Comment: "Events",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, Default: model.StrPtr("gen_random_uuid()")},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true, Default: model.StrPtr("now()")},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, Default: model.StrPtr("gen_random_uuid()")},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true, Default: model.StrPtr("now()")},
 				},
 			},
 		},
@@ -360,16 +361,16 @@ func TestPythonSQLAlchemyGenerator_MultipleTables(t *testing.T) {
 				Name:    "orders",
 				Comment: "Orders",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "total", PGType: "numeric", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "total", PGType: typeinfo.MustParse("numeric"), NotNull: true},
 				},
 			},
 			{
 				Name:    "order_items",
 				Comment: "Order items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "quantity", PGType: "smallint", NotNull: true},
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "quantity", PGType: typeinfo.MustParse("smallint"), NotNull: true},
 				},
 			},
 		},
@@ -412,7 +413,7 @@ func TestPythonSQLAlchemyGenerator_DefaultExpr(t *testing.T) {
 				Name:    "items",
 				Comment: "Items",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, DefaultExpr: "gen_random_uuid()"},
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true, DefaultExpr: "gen_random_uuid()"},
 				},
 			},
 		},
