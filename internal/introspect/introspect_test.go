@@ -1053,7 +1053,7 @@ func TestExportDomains(t *testing.T) {
 			{
 				Name:     "counter",
 				Schema:   "test",
-				BaseType: typeinfo.T("bigint"),
+				BaseType: typeinfo.T("int8"),
 				Default:  "0",
 			},
 		},

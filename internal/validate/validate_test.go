@@ -1261,7 +1261,7 @@ func TestE205_ColumnDefaultEmbeddedQuotes(t *testing.T) {
 					{Name: "id", PGType: typeinfo.T("uuid")},
 					{Name: "status", PGType: typeinfo.T("text"), Default: model.StrPtr("'pending'")},
 					{Name: "data", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'{}'")},
-					{Name: "count", PGType: typeinfo.T("integer"), Default: model.StrPtr("0")},
+					{Name: "count", PGType: typeinfo.T("int4"), Default: model.StrPtr("0")},
 					{Name: "name", PGType: typeinfo.T("text"), Default: model.StrPtr("unknown")},
 				},
 			},
@@ -1366,7 +1366,7 @@ func TestE216_InvalidWithParam(t *testing.T) {
 			Schema:  "public",
 			Comment: "test",
 			PK:      []string{"id"},
-			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int4"), NotNull: true}},
 			Indexes: []model.Index{{
 				Name:    "idx_t_id",
 				Columns: []string{"id"},
@@ -1394,7 +1394,7 @@ func TestE216_ValidHnswParams_NoDiag(t *testing.T) {
 			Comment: "test",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 				{Name: "embedding", PGType: typeinfo.MustParse("vector(384)"), NotNull: true},
 			},
 			Indexes: []model.Index{{
@@ -1425,9 +1425,9 @@ func TestE218_VirtualRequiresPG18_Error(t *testing.T) {
 				Comment: "Order records",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("int4"), NotNull: true, Generated: "val * 2", Stored: false},
 				},
 			},
 		},
@@ -1456,9 +1456,9 @@ func TestE218_VirtualRequiresPG18_Warning(t *testing.T) {
 				Comment: "Order records",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("int4"), NotNull: true, Generated: "val * 2", Stored: false},
 				},
 			},
 		},
@@ -1485,9 +1485,9 @@ func TestE218_VirtualRequiresPG18_NoDiag(t *testing.T) {
 				Comment: "Order records",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("int4"), NotNull: true, Generated: "val * 2", Stored: false},
 				},
 			},
 		},
@@ -1511,9 +1511,9 @@ func TestE218_StoredGenerated_NoDiag(t *testing.T) {
 				Comment: "Order records",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("int4"), NotNull: true, Generated: "val * 2", Stored: true},
 				},
 			},
 		},
@@ -1666,8 +1666,8 @@ func TestE221_ExclusionBtreeGistMissing(t *testing.T) {
 			Comment: "Room bookings",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer")},
-				{Name: "room_id", PGType: typeinfo.T("integer")},
+				{Name: "id", PGType: typeinfo.T("int4")},
+				{Name: "room_id", PGType: typeinfo.T("int4")},
 				{Name: "during", PGType: typeinfo.T("tsrange")},
 			},
 			Exclusions: []model.ExclusionConstraint{{
@@ -1702,8 +1702,8 @@ func TestE221_ExclusionBtreeGistPresent(t *testing.T) {
 			Comment: "Room bookings",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer")},
-				{Name: "room_id", PGType: typeinfo.T("integer")},
+				{Name: "id", PGType: typeinfo.T("int4")},
+				{Name: "room_id", PGType: typeinfo.T("int4")},
 				{Name: "during", PGType: typeinfo.T("tsrange")},
 			},
 			Exclusions: []model.ExclusionConstraint{{
@@ -1734,7 +1734,7 @@ func TestE221_ExclusionRangeOperatorOnly(t *testing.T) {
 			Comment: "Room bookings",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer")},
+				{Name: "id", PGType: typeinfo.T("int4")},
 				{Name: "during", PGType: typeinfo.T("tsrange")},
 			},
 			Exclusions: []model.ExclusionConstraint{{
@@ -2485,7 +2485,7 @@ func TestW019_RangeSubsumption(t *testing.T) {
 				Name: "people", Schema: "public", Comment: "People", PK: []string{"id"},
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "age", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "age", PGType: typeinfo.T("int4"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_age_wide", Expr: "age >= 0 AND age <= 200"},
@@ -2517,7 +2517,7 @@ func TestW019_OpenEndedRange(t *testing.T) {
 				Name: "people", Schema: "public", Comment: "People", PK: []string{"id"},
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "age", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "age", PGType: typeinfo.T("int4"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_age_positive", Expr: "age >= 0"},
@@ -2545,7 +2545,7 @@ func TestW019_NonInclusiveBounds(t *testing.T) {
 				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "score", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "score", PGType: typeinfo.T("int4"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_score_wide", Expr: "score >= 0 AND score <= 100"},
@@ -2599,7 +2599,7 @@ func TestW019_EqualRanges_NoRedundancy(t *testing.T) {
 				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "qty", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "qty", PGType: typeinfo.T("int4"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_qty_a", Expr: "qty >= 0 AND qty <= 100"},
@@ -2625,7 +2625,7 @@ func TestW019_NoOverlap_NoDiag(t *testing.T) {
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
 					{Name: "price", PGType: typeinfo.T("numeric"), NotNull: true},
-					{Name: "quantity", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "quantity", PGType: typeinfo.T("int4"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_price", Expr: "price >= 0"},
@@ -2680,7 +2680,7 @@ func TestI002_AllColumnsReferenced_NoDiag(t *testing.T) {
 					{Name: "org_id", PGType: typeinfo.T("uuid"), NotNull: true},
 					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
-					{Name: "age", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "age", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "full_name", PGType: typeinfo.T("text"), NotNull: true, Generated: "name || ' (user)'"},
 				},
 				FKs: []model.FK{
@@ -2886,11 +2886,11 @@ func TestI004_ColumnReordering(t *testing.T) {
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
 					{Name: "flag1", PGType: typeinfo.T("bool"), NotNull: true},
-					{Name: "big1", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "big1", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "flag2", PGType: typeinfo.T("bool"), NotNull: true},
-					{Name: "big2", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "big2", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "flag3", PGType: typeinfo.T("bool"), NotNull: true},
-					{Name: "big3", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "big3", PGType: typeinfo.T("int8"), NotNull: true},
 				},
 			},
 		},
@@ -2910,9 +2910,9 @@ func TestI004_OptimalOrder_NoDiag(t *testing.T) {
 				PK: []string{"id"},
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "big1", PGType: typeinfo.T("bigint"), NotNull: true},
-					{Name: "big2", PGType: typeinfo.T("bigint"), NotNull: true},
-					{Name: "big3", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "big1", PGType: typeinfo.T("int8"), NotNull: true},
+					{Name: "big2", PGType: typeinfo.T("int8"), NotNull: true},
+					{Name: "big3", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "flag1", PGType: typeinfo.T("bool"), NotNull: true},
 					{Name: "flag2", PGType: typeinfo.T("bool"), NotNull: true},
 					{Name: "flag3", PGType: typeinfo.T("bool"), NotNull: true},
@@ -2930,8 +2930,8 @@ func TestI004_OptimalOrder_NoDiag(t *testing.T) {
 func TestEstimateRowSize_KnownSchema(t *testing.T) {
 	cols := []model.Column{
 		{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
-		{Name: "count", PGType: typeinfo.T("integer"), NotNull: true},
-		{Name: "total", PGType: typeinfo.T("bigint"), NotNull: true},
+		{Name: "count", PGType: typeinfo.T("int4"), NotNull: true},
+		{Name: "total", PGType: typeinfo.T("int8"), NotNull: true},
 	}
 	size, padding := estimateRowSize(cols)
 	// Header(24) + uuid(16)=40, int(4)=44, align-to-8=48, bigint(8)=56, +4 ItemId=60

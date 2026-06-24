@@ -13,7 +13,7 @@ func TestEmptyDiff(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "name", PGType: typeinfo.T("text"), NotNull: false},
 			}},
 		},
@@ -77,7 +77,7 @@ func TestColumnAdded(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 			}},
 		},
@@ -85,7 +85,7 @@ func TestColumnAdded(t *testing.T) {
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 			}},
 		},
 	}
@@ -103,14 +103,14 @@ func TestColumnRemoved(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 			}},
 		},
@@ -129,14 +129,14 @@ func TestColumnTypeChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 			}},
 		},
 	}
@@ -155,8 +155,8 @@ func TestColumnTypeChanged(t *testing.T) {
 	if cc.TypeChanged == nil {
 		t.Fatal("expected TypeChanged to be set")
 	}
-	if cc.TypeChanged[0] != "integer" || cc.TypeChanged[1] != "bigint" {
-		t.Errorf("expected [integer, bigint], got [%s, %s]", cc.TypeChanged[0], cc.TypeChanged[1])
+	if cc.TypeChanged[0] != "int4" || cc.TypeChanged[1] != "int8" {
+		t.Errorf("expected [int4, int8], got [%s, %s]", cc.TypeChanged[0], cc.TypeChanged[1])
 	}
 	// int -> bigint is widening, so risk should be Caution (not Dangerous).
 	if cc.Risk.RiskLevel != risk.Caution {
@@ -168,14 +168,14 @@ func TestColumnTypeChangedNarrowing(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 			}},
 		},
 	}
@@ -340,7 +340,7 @@ func TestSummaryOutput(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "email", PGType: typeinfo.T("text")},
 			}},
 			{Name: "posts", Schema: "public"},
@@ -352,7 +352,7 @@ func TestSummaryOutput(t *testing.T) {
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer")},
+				{Name: "id", PGType: typeinfo.T("int4")},
 			}},
 			{Name: "old_table", Schema: "public"},
 		},
@@ -666,14 +666,14 @@ func TestColumnCommentChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), Comment: "Primary key"},
+				{Name: "id", PGType: typeinfo.T("int8"), Comment: "Primary key"},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), Comment: ""},
+				{Name: "id", PGType: typeinfo.T("int8"), Comment: ""},
 			}},
 		},
 	}
@@ -716,14 +716,14 @@ func TestMultipleChangesHighestRisk(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: false},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: false},
 			}},
 		},
 	}
@@ -787,14 +787,14 @@ func TestIdentityChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), Identity: "BY DEFAULT"},
+				{Name: "id", PGType: typeinfo.T("int8"), Identity: "BY DEFAULT"},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), Identity: "ALWAYS"},
+				{Name: "id", PGType: typeinfo.T("int8"), Identity: "ALWAYS"},
 			}},
 		},
 	}
@@ -815,14 +815,14 @@ func TestGeneratedAndIdentityUnchanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), Identity: "ALWAYS", Generated: "STORED"},
+				{Name: "id", PGType: typeinfo.T("int8"), Identity: "ALWAYS", Generated: "STORED"},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), Identity: "ALWAYS", Generated: "STORED"},
+				{Name: "id", PGType: typeinfo.T("int8"), Identity: "ALWAYS", Generated: "STORED"},
 			}},
 		},
 	}
@@ -1978,8 +1978,8 @@ func TestDiff_StoredToVirtualTransition(t *testing.T) {
 				Name:   "orders",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("int4"), NotNull: true, Generated: "val * 2", Stored: false},
 				},
 			},
 		},
@@ -1990,8 +1990,8 @@ func TestDiff_StoredToVirtualTransition(t *testing.T) {
 				Name:   "orders",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("int4"), NotNull: true, Generated: "val * 2", Stored: true},
 				},
 			},
 		},
@@ -2036,8 +2036,8 @@ func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
 				Name:   "t",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true, Stored: false},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("int4"), NotNull: true, Stored: false},
 				},
 			},
 		},
@@ -2048,8 +2048,8 @@ func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
 				Name:   "t",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true, Stored: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("int4"), NotNull: true, Stored: true},
 				},
 			},
 		},
@@ -2068,7 +2068,7 @@ func TestColumnCollationChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text"), Collation: "de_DE"},
 				},
 			},
@@ -2080,7 +2080,7 @@ func TestColumnCollationChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text"), Collation: ""},
 				},
 			},
@@ -2117,7 +2117,7 @@ func TestColumnCollationUnchanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text"), Collation: "C"},
 				},
 			},
@@ -2137,7 +2137,7 @@ func TestColumnStatisticsChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text"), Statistics: intPtr(1000)},
 				},
 			},
@@ -2149,7 +2149,7 @@ func TestColumnStatisticsChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text")},
 				},
 			},
@@ -2186,7 +2186,7 @@ func TestColumnStatisticsReset(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text")},
 				},
 			},
@@ -2198,7 +2198,7 @@ func TestColumnStatisticsReset(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text"), Statistics: intPtr(500)},
 				},
 			},
@@ -2235,7 +2235,7 @@ func TestColumnStatisticsUnchanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text"), Statistics: intPtr(1000)},
 				},
 			},
@@ -2255,7 +2255,7 @@ func TestIndexCollationChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text")},
 				},
 				Indexes: []model.Index{
@@ -2270,7 +2270,7 @@ func TestIndexCollationChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text")},
 				},
 				Indexes: []model.Index{
@@ -2304,7 +2304,7 @@ func TestIndexCollationUnchanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "name", PGType: typeinfo.T("text")},
 				},
 				Indexes: []model.Index{
@@ -2326,8 +2326,8 @@ func TestDiff_ExclusionAdded(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("int4"), NotNull: true},
 				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
@@ -2345,8 +2345,8 @@ func TestDiff_ExclusionAdded(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("int4"), NotNull: true},
 				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 		}},
@@ -2373,8 +2373,8 @@ func TestDiff_ExclusionRemoved(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("int4"), NotNull: true},
 				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 		}},
@@ -2384,8 +2384,8 @@ func TestDiff_ExclusionRemoved(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("int4"), NotNull: true},
 				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
@@ -2417,8 +2417,8 @@ func TestDiff_ExclusionChanged(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("int4"), NotNull: true},
 				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
@@ -2435,8 +2435,8 @@ func TestDiff_ExclusionChanged(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
-				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("int4"), NotNull: true},
 				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
@@ -2471,7 +2471,7 @@ func TestDiff_UniqueChangedDeferrable(t *testing.T) {
 				Name:    "users",
 				Comment: "users table",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				PK: []string{"id"},
@@ -2488,7 +2488,7 @@ func TestDiff_UniqueChangedDeferrable(t *testing.T) {
 				Name:    "users",
 				Comment: "users table",
 				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
 					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				PK: []string{"id"},
@@ -3070,12 +3070,12 @@ func TestDomainCheckChanged(t *testing.T) {
 func TestDomainDefaultChanged(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: typeinfo.T("bigint"), Default: "1"},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("int8"), Default: "1"},
 		},
 	}
 	actual := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: typeinfo.T("bigint"), Default: "0"},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("int8"), Default: "0"},
 		},
 	}
 	d := Diff(desired, actual)
@@ -3173,12 +3173,12 @@ func TestDomainCommentChanged(t *testing.T) {
 func TestDomainBaseTypeChanged(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: typeinfo.T("bigint")},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("int8")},
 		},
 	}
 	actual := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: typeinfo.T("integer")},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("int4")},
 		},
 	}
 	d := Diff(desired, actual)
@@ -3192,7 +3192,7 @@ func TestDomainBaseTypeChanged(t *testing.T) {
 	if dd.BaseTypeChanged == nil {
 		t.Fatal("expected BaseTypeChanged to be set")
 	}
-	if dd.BaseTypeChanged[0] != "integer" || dd.BaseTypeChanged[1] != "bigint" {
+	if dd.BaseTypeChanged[0] != "int4" || dd.BaseTypeChanged[1] != "int8" {
 		t.Errorf("unexpected base type change: %v", dd.BaseTypeChanged)
 	}
 }

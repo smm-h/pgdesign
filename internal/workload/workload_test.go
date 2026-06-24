@@ -28,7 +28,7 @@ func TestStructural_W022_JsonbWithoutGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "documents",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "data", PGType: typeinfo.T("jsonb")},
 			},
 			PK: []string{"id"},
@@ -55,7 +55,7 @@ func TestStructural_W022_JsonbWithGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "documents",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "data", PGType: typeinfo.T("jsonb")},
 			},
 			PK: []string{"id"},
@@ -79,7 +79,7 @@ func TestStructural_W022_JsonbArrayNotTriggered(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "documents",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "data", PGType: typeinfo.T("jsonb"), Array: true},
 			},
 			PK: []string{"id"},
@@ -101,7 +101,7 @@ func TestStructural_W023_ArrayWithoutGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "posts",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
 			},
 			PK: []string{"id"},
@@ -122,7 +122,7 @@ func TestStructural_W023_ArrayWithGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "posts",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
 			},
 			PK: []string{"id"},
@@ -145,7 +145,7 @@ func TestStructural_W024_TsvectorWithoutGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "articles",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "search_vec", PGType: typeinfo.T("tsvector")},
 			},
 			PK: []string{"id"},
@@ -166,7 +166,7 @@ func TestStructural_W024_TsvectorWithGIN(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "articles",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "search_vec", PGType: typeinfo.T("tsvector")},
 			},
 			PK: []string{"id"},
@@ -190,7 +190,7 @@ func TestStructural_I005_TimestampAppendOnlyWithoutBRIN(t *testing.T) {
 			Name:       "events",
 			AppendOnly: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			PK: []string{"id"},
@@ -215,7 +215,7 @@ func TestStructural_I005_TimestampWithBRIN(t *testing.T) {
 			Name:       "events",
 			AppendOnly: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			PK: []string{"id"},
@@ -239,7 +239,7 @@ func TestStructural_I005_NonAppendOnlyNoTrigger(t *testing.T) {
 			Name:       "events",
 			AppendOnly: false,
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			PK: []string{"id"},
@@ -259,7 +259,7 @@ func TestStructural_I005_PlainTimestamp(t *testing.T) {
 			Name:       "logs",
 			AppendOnly: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "logged_at", PGType: typeinfo.T("timestamp")},
 			},
 			PK: []string{"id"},
@@ -277,7 +277,7 @@ func TestStructural_MultipleColumnsMultipleDiags(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "mixed",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "payload", PGType: typeinfo.T("jsonb")},
 				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
 				{Name: "search", PGType: typeinfo.T("tsvector")},
@@ -311,7 +311,7 @@ func TestStructural_GINMethodCaseInsensitive(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "documents",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "data", PGType: typeinfo.T("jsonb")},
 			},
 			PK: []string{"id"},
@@ -612,7 +612,7 @@ func TestLowSelectivity_I006_Detected(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "is_active", PGType: typeinfo.T("bool")},
 			},
 			PK: []string{"id"},
@@ -643,7 +643,7 @@ func TestLowSelectivity_I006_NoBooleanIndex(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "is_active", PGType: typeinfo.T("bool")},
 			},
 			PK: []string{"id"},
@@ -662,7 +662,7 @@ func TestLowSelectivity_I006_MultiColumnIndex(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "is_active", PGType: typeinfo.T("bool")},
 				{Name: "name", PGType: typeinfo.T("text")},
 			},
@@ -685,7 +685,7 @@ func TestLowSelectivity_I006_NonBooleanColumn(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "status", PGType: typeinfo.T("text")},
 			},
 			PK: []string{"id"},
@@ -776,7 +776,7 @@ func TestExcessiveIndexes_I007_NoIndexes(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "empty",
-			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("bigint")}},
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8")}},
 			PK:      []string{"id"},
 		}},
 	}

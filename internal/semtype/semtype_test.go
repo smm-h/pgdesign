@@ -87,7 +87,7 @@ func TestRegisterDuplicate(t *testing.T) {
 	}
 
 	// Conflicting duplicate should fail.
-	td3 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("integer")}
+	td3 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("int4")}
 	if err := r.Register(td3); err == nil {
 		t.Fatal("expected error for conflicting duplicate registration, got nil")
 	}

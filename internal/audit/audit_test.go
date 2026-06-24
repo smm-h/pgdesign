@@ -15,7 +15,7 @@ func TestAudit_NoDepsSkipped(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "name", PGType: typeinfo.T("text")},
 			},
 			PK: []string{"id"},
@@ -44,7 +44,7 @@ func TestAudit_CleanTable_NoViolations(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "clean",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint")},
+				{Name: "A", PGType: typeinfo.T("int8")},
 				{Name: "B", PGType: typeinfo.T("text")},
 				{Name: "C", PGType: typeinfo.T("text")},
 			},
@@ -68,7 +68,7 @@ func TestAudit_1NF_JsonbRepeatingGroup(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "posts",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "id", PGType: typeinfo.T("int8")},
 				{Name: "tags", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'[]'::jsonb")},
 			},
 			PK: []string{"id"},
@@ -103,8 +103,8 @@ func TestAudit_2NF_PartialDependency(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "orders",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint")},
-				{Name: "B", PGType: typeinfo.T("bigint")},
+				{Name: "A", PGType: typeinfo.T("int8")},
+				{Name: "B", PGType: typeinfo.T("int8")},
 				{Name: "C", PGType: typeinfo.T("text")},
 				{Name: "D", PGType: typeinfo.T("text")},
 			},
@@ -144,7 +144,7 @@ func TestAudit_3NF_TransitiveDependency(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "employees",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint")},
+				{Name: "A", PGType: typeinfo.T("int8")},
 				{Name: "B", PGType: typeinfo.T("text")},
 				{Name: "C", PGType: typeinfo.T("text")},
 			},
@@ -180,7 +180,7 @@ func TestAudit_DecompositionSuggestion(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "employees",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint")},
+				{Name: "A", PGType: typeinfo.T("int8")},
 				{Name: "B", PGType: typeinfo.T("text")},
 				{Name: "C", PGType: typeinfo.T("text")},
 			},
@@ -219,7 +219,7 @@ func TestAudit_FDInference_PKNoDeps(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 			},
@@ -253,7 +253,7 @@ func TestAudit_FDInference_PKDeclared(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "clean",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "A", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "B", PGType: typeinfo.T("text"), NotNull: true},
 				{Name: "C", PGType: typeinfo.T("text"), NotNull: true},
 			},
@@ -277,7 +277,7 @@ func TestAudit_FDInference_UniqueNotNull(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "items",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "A", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "B", PGType: typeinfo.T("text"), NotNull: true},
 				{Name: "C", PGType: typeinfo.T("text"), NotNull: true},
 			},
@@ -311,7 +311,7 @@ func TestAudit_FDInference_UniqueNullable(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "items",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "A", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "B", PGType: typeinfo.T("text"), NotNull: false},
 				{Name: "C", PGType: typeinfo.T("text"), NotNull: true},
 			},
@@ -338,9 +338,9 @@ func TestAudit_BCNF_Violation_3NF_Pass(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "bcnf_test",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint"), NotNull: true},
-				{Name: "B", PGType: typeinfo.T("bigint"), NotNull: true},
-				{Name: "C", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "A", PGType: typeinfo.T("int8"), NotNull: true},
+				{Name: "B", PGType: typeinfo.T("int8"), NotNull: true},
+				{Name: "C", PGType: typeinfo.T("int8"), NotNull: true},
 			},
 			PK: []string{"A", "B"},
 			Dependencies: []fd.FuncDep{
@@ -382,7 +382,7 @@ func TestAudit_BCNF_Pass(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "bcnf_clean",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "A", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "B", PGType: typeinfo.T("text"), NotNull: true},
 				{Name: "C", PGType: typeinfo.T("text"), NotNull: true},
 			},
@@ -406,9 +406,9 @@ func TestAudit_BCNF_DecompositionSuggestion(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "bcnf_test",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint"), NotNull: true},
-				{Name: "B", PGType: typeinfo.T("bigint"), NotNull: true},
-				{Name: "C", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "A", PGType: typeinfo.T("int8"), NotNull: true},
+				{Name: "B", PGType: typeinfo.T("int8"), NotNull: true},
+				{Name: "C", PGType: typeinfo.T("int8"), NotNull: true},
 			},
 			PK: []string{"A", "B"},
 			Dependencies: []fd.FuncDep{
@@ -449,7 +449,7 @@ func TestAudit_BCNF_NoDecomposition_WhenClean(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "bcnf_clean",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "A", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "B", PGType: typeinfo.T("text"), NotNull: true},
 				{Name: "C", PGType: typeinfo.T("text"), NotNull: true},
 			},
@@ -475,7 +475,7 @@ func TestAudit_3NF_Counterexample(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "employees",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint")},
+				{Name: "A", PGType: typeinfo.T("int8")},
 				{Name: "B", PGType: typeinfo.T("text")},
 				{Name: "C", PGType: typeinfo.T("text")},
 			},
@@ -522,9 +522,9 @@ func TestAudit_BCNF_Counterexample(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "bcnf_test",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint"), NotNull: true},
-				{Name: "B", PGType: typeinfo.T("bigint"), NotNull: true},
-				{Name: "C", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "A", PGType: typeinfo.T("int8"), NotNull: true},
+				{Name: "B", PGType: typeinfo.T("int8"), NotNull: true},
+				{Name: "C", PGType: typeinfo.T("int8"), NotNull: true},
 			},
 			PK: []string{"A", "B"},
 			Dependencies: []fd.FuncDep{
@@ -563,7 +563,7 @@ func TestAudit_MinimalCover_WithRedundancy(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "redundant",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint")},
+				{Name: "A", PGType: typeinfo.T("int8")},
 				{Name: "B", PGType: typeinfo.T("text")},
 				{Name: "C", PGType: typeinfo.T("text")},
 			},
@@ -600,7 +600,7 @@ func TestAudit_MinimalCover_NoRedundancy(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "clean",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint")},
+				{Name: "A", PGType: typeinfo.T("int8")},
 				{Name: "B", PGType: typeinfo.T("text")},
 				{Name: "C", PGType: typeinfo.T("text")},
 			},
@@ -625,7 +625,7 @@ func TestAudit_FDSource_Declared(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "sourced",
 			Columns: []model.Column{
-				{Name: "A", PGType: typeinfo.T("bigint")},
+				{Name: "A", PGType: typeinfo.T("int8")},
 				{Name: "B", PGType: typeinfo.T("text")},
 				{Name: "C", PGType: typeinfo.T("text")},
 			},
@@ -650,7 +650,7 @@ func TestAudit_FDInference_UpdatedMessage(t *testing.T) {
 		Tables: []model.Table{{
 			Name: "users",
 			Columns: []model.Column{
-				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 				{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 			},
 			PK: []string{"id"},
