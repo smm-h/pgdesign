@@ -8,7 +8,23 @@ import sys
 import tarfile
 import zipfile
 
-VERSION = "0.1.0"
+try:
+    from importlib.metadata import version as _pkg_version
+except ImportError:
+    _pkg_version = None
+
+__version__ = "0.15.0"
+
+
+def _get_version():
+    """Return the installed package version, falling back to __version__."""
+    if _pkg_version is not None:
+        try:
+            return _pkg_version("pgdesign")
+        except Exception:
+            pass
+    return __version__
+
 
 _BIN_DIR = os.path.join(os.path.dirname(__file__), "_bin")
 
@@ -31,12 +47,13 @@ def _download_binary(dest):
     import urllib.request
     import tempfile
 
+    ver = _get_version()
     os_name = _detect_os()
     arch = _detect_arch()
     ext = "zip" if os_name == "windows" else "tar.gz"
     url = (
         f"https://github.com/smm-h/pgdesign/releases/download/"
-        f"v{VERSION}/pgdesign_{VERSION}_{os_name}_{arch}.{ext}"
+        f"v{ver}/pgdesign_{ver}_{os_name}_{arch}.{ext}"
     )
 
     os.makedirs(_BIN_DIR, exist_ok=True)
@@ -44,7 +61,7 @@ def _download_binary(dest):
     with tempfile.TemporaryDirectory() as tmp:
         archive_path = os.path.join(tmp, f"pgdesign.{ext}")
 
-        print(f"Downloading pgdesign v{VERSION} for {os_name}/{arch}...")
+        print(f"Downloading pgdesign v{ver} for {os_name}/{arch}...")
         urllib.request.urlretrieve(url, archive_path)
 
         if ext == "zip":
@@ -75,7 +92,7 @@ def _download_binary(dest):
         if os_name != "windows":
             os.chmod(dest, os.stat(dest).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    print(f"pgdesign v{VERSION} installed to {dest}")
+    print(f"pgdesign v{ver} installed to {dest}")
 
 
 def _detect_os():
