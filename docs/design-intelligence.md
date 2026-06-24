@@ -11,11 +11,11 @@ Running `pgdesign check --tag design` executes the full validation suite and fil
 
 ## FK Graph Infrastructure
 
-The FK graph is built once during `Schema.Build()` (and `BuildMulti()`) as the final step and stored on the `Schema` struct (`FKGraph *FKGraph`, excluded from JSON). Located in `internal/model/fkgraph.go`.
+The FK graph is built once during `Schema.Build()` and `BuildMulti()` as the final step of schema resolution and stored persistently on the `Schema` struct as `FKGraph *FKGraph`, which is excluded from JSON serialization. Located in `internal/model/fkgraph.go`, the graph provides forward and reverse adjacency maps plus fan-in and fan-out counts. Multiple consumers access the graph for cascade analysis, codegen relationship generation, GraphQL field derivation, and workload N+1 detection.
 
 ### FKEdge
 
-Represents a single FK relationship between two columns. Multi-column FKs produce one edge per column pair.
+Represents a single FK relationship between two columns in the schema. Multi-column foreign keys produce one FKEdge per column pair, so a two-column FK like `(order_id, product_id) REFERENCES orders(id, product_id)` generates two edges. Each edge records the source table and column, target table and column, the ON DELETE action, and the constraint name. This per-column granularity enables precise cascade chain analysis and column-level relationship tracking.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -55,7 +55,7 @@ All codegen consumers guard with `if schema.FKGraph == nil { schema.BuildFKGraph
 
 ## Cascade Analysis
 
-BFS and DFS walkers over the FK graph, following only CASCADE edges. Located in `internal/model/fkgraph.go`.
+BFS and DFS walkers over the FK graph that follow only CASCADE edges to assess the potential impact of DELETE operations. Located in `internal/model/fkgraph.go`, these walkers measure two dimensions of cascade risk: depth measures the longest chain of cascading deletes from a single table, while breadth measures the total number of distinct tables affected by a cascade. Both metrics are needed because a shallow but wide cascade affects many tables simultaneously, while a narrow but deep cascade creates long dependency chains.
 
 ### CascadeDepth (used by W013)
 
@@ -63,11 +63,11 @@ DFS with backtracking. Follows edges in the `Reverse` graph where `OnDelete` equ
 
 ### CascadeBreadth (used by W014)
 
-Delegates to `CascadeChain()` and returns its length. Counts distinct reachable tables (excluding the starting table).
+Delegates to `CascadeChain()` and returns the length of the resulting list, which counts the number of distinct tables reachable from the starting table via CASCADE edges, excluding the starting table itself. This metric represents the blast radius of a DELETE with CASCADE on the given table. A breadth of 5 means that deleting a row from this table could trigger cascading deletes in up to 5 other tables, potentially affecting many rows across the schema.
 
 ### CascadeChain (used by W015)
 
-BFS-ordered list of all reachable tables via CASCADE edges. Tables appear in order of distance from the starting table. Returns `nil` if no CASCADE edges exist.
+BFS-ordered list of all tables reachable via CASCADE edges from a starting table, where tables appear in order of their distance from the start. The first elements are tables directly referenced by the starting table with ON DELETE CASCADE, followed by tables one hop further, and so on. Returns `nil` if no CASCADE edges exist from the starting table. This ordered list is used by W015 to detect mixed ON DELETE actions in cascade chains, where some edges use CASCADE and others use RESTRICT or SET NULL.
 
 ### Why Both BFS and DFS
 
@@ -81,7 +81,7 @@ Depth (DFS) measures worst-case chain length -- how deep a cascade goes. Breadth
 
 ### Configurable Thresholds
 
-Defined in `validate.Config`:
+Cascade analysis thresholds are defined in `validate.Config` and control when diagnostics are emitted for cascade depth and breadth. The thresholds use intentionally asymmetric comparison operators: depth uses strict greater-than because 3 levels of cascade is considered acceptable, while breadth uses greater-than-or-equal because affecting 5 tables already warrants review. Both thresholds are configurable through the validation configuration for projects with different risk tolerance levels.
 
 | Field | Default | Diagnostic | Comparison |
 |-------|---------|-----------|------------|
@@ -94,7 +94,7 @@ W015 (mixed ON DELETE) reads `Reverse[table]`, deduplicates edges by `FKName`, c
 
 ## Constraint Subsumption
 
-Three tiers of subsumption detection, all in `internal/validate/validate.go`.
+Constraint subsumption detection operates across three tiers of increasing complexity, all implemented in `internal/validate/validate.go`. Each tier handles a specific class of redundant constraints: structural rules detect obvious cases like a PK that makes a UNIQUE constraint redundant, expression normalization catches domain CHECK constraints duplicated at the column level, and range containment identifies numeric range constraints where one is strictly contained within another. Each tier is decidable for its target patterns.
 
 ### Tier 1: Structural Rules (always decidable)
 
@@ -104,7 +104,7 @@ Three tiers of subsumption detection, all in `internal/validate/validate.go`.
 
 ### Tier 2: Expression Normalization (decidable for common patterns)
 
-**W018 -- Domain CHECK Duplicates Column CHECK** (`checkDomainCheckDuplicate`). When a column uses a domain type that has a CHECK constraint, and the column also has its own CHECK:
+**W018 -- Domain CHECK Duplicates Column CHECK** (`checkDomainCheckDuplicate`) detects cases where a column has its own CHECK constraint that is logically equivalent to the CHECK constraint inherited from its domain type. When a column uses a domain type that has a CHECK constraint, and the column also declares its own CHECK, the column-level CHECK may be redundant because the domain already enforces the same rule at the type level. The detection proceeds through five steps:
 
 1. Build a map of domains by name.
 2. Extract the single referenced column from the column CHECK via `extractCheckColumn` (walks AST, returns the column only if exactly one distinct column is referenced).
@@ -116,7 +116,7 @@ If the canonical forms match, the column CHECK is redundant.
 
 ### Tier 3: Range Containment (decidable for numeric ranges)
 
-**W019 -- Range Subsumption** (`checkRangeSubsumption`). For tables with 2+ CHECK constraints:
+**W019 -- Range Subsumption** (`checkRangeSubsumption`) detects when one numeric range CHECK constraint is strictly contained within another on the same column, making the wider constraint redundant. For example, if a column has both `CHECK (age >= 0 AND age <= 150)` and `CHECK (age >= 18 AND age <= 65)`, the first constraint is subsumed by normal business logic but the second is the effective constraint. For tables with two or more CHECK constraints, the algorithm proceeds as follows:
 
 1. Extract `rangeInfo` from each CHECK via `extractRangeFromAST`: handles single comparisons and `AND` combinations, flips operator when column is on the right side. `mergeRanges` combines two single-bound ranges.
 2. For each pair of ranges on the same column, check asymmetric subsumption: if `ri.subsumes(rj) && !rj.subsumes(ri)`, the narrower constraint is redundant.
@@ -135,11 +135,11 @@ If the canonical forms match, the column CHECK is redundant.
 
 ## Dead Column Detection (I002)
 
-`checkDeadColumn` performs schema-only analysis. PostgreSQL does not expose per-column access statistics in `pg_catalog` (`pg_stat_user_tables` has table-level stats only; `pg_stats` has value distribution but not access frequency).
+`checkDeadColumn` performs schema-only analysis to identify columns that are not referenced by any index, constraint, foreign key, view, function, or RLS policy in the schema. PostgreSQL does not expose per-column access statistics in `pg_catalog` -- `pg_stat_user_tables` provides only table-level stats and `pg_stats` has value distribution but not access frequency. This means the detection is a necessary-but-not-sufficient condition: columns accessed only by application queries appear dead to schema-only analysis.
 
 ### Reference Scanning
 
-For each table, builds a `referenced` set by scanning:
+For each table, the dead column detector builds a comprehensive `referenced` set by scanning every schema object that could reference a column. The scan covers primary keys, foreign key columns, unique constraints, all index columns and their INCLUDE lists, index WHERE clause expressions, exclusion constraints, partition keys, CHECK constraint expressions, generated column expressions, RLS policy expressions, trigger WHEN clauses, and incoming FK references from other tables. Views, materialized views, and functions use a conservative heuristic.
 
 - PK columns
 - FK source columns
@@ -161,13 +161,13 @@ Any column not in the `referenced` set emits I002.
 
 ### Limitations
 
-This is a necessary-but-not-sufficient condition. A column accessed exclusively by application queries appears "dead" to schema-only analysis. The diagnostic is informational (I-level), not a warning.
+The schema-only approach is a necessary-but-not-sufficient condition for identifying truly unused columns. A column accessed exclusively by application SQL queries, ORM-generated queries, or ad-hoc reporting appears dead to this analysis because those access patterns are not captured in the schema definition. For this reason, the diagnostic is informational (I-level) rather than a warning, serving as a starting point for manual investigation rather than an actionable recommendation to drop the column.
 
 View and function detection uses a conservative heuristic: if the object references the table at all, all columns are marked referenced. This avoids false positives at the cost of reduced sensitivity.
 
 ## Row Size Estimation (I003, W021, I004)
 
-Estimates on-disk tuple size to detect tables with potential performance issues. Located in `internal/validate/validate.go`.
+Row size estimation calculates the approximate on-disk tuple size for each table based on its column types, alignment requirements, and nullable columns. Located in `internal/validate/validate.go`, this analysis detects tables whose rows exceed the PostgreSQL TOAST threshold (2048 bytes, reducing cache efficiency) or the page size (8192 bytes, requiring TOAST storage for every row). It also identifies potential savings from column reordering to minimize alignment padding waste.
 
 ### PostgreSQL Tuple Layout
 
@@ -190,7 +190,7 @@ The `pgTypeWidths` table maps approximately 50 PostgreSQL type names to `{Len, A
 
 ### Varlena Size Estimates
 
-When actual data is unavailable, estimated averages are used:
+When actual data is unavailable because the analysis runs from the schema definition alone, estimated average sizes are used for variable-length types. These estimates are intentionally conservative, using half the declared maximum for varchar and the full declared length for char, plus the 4-byte varlena header that PostgreSQL prepends to all variable-length values. JSONB and bytea use fixed estimates based on typical production data sizes rather than worst-case maximums.
 
 | Type | Estimate |
 |------|----------|
@@ -205,7 +205,7 @@ The 4-byte addition accounts for the varlena header.
 
 ### Alignment Algorithm
 
-`estimateRowSize` processes columns in declaration order:
+`estimateRowSize` processes columns in their declaration order within the TOML schema, simulating how PostgreSQL lays out tuple data on disk. The algorithm follows PostgreSQL's tuple layout rules: starting after the fixed 24-byte header, adding the null bitmap if any column is nullable, then iterating columns with alignment padding between them, and finally applying MAXALIGN to the total. The function returns both the total estimated row size and the total padding bytes wasted on alignment.
 
 1. Start at offset 24 (HeapTupleHeaderData after MAXALIGN).
 2. If any column is nullable, add null bitmap: `ceil(ncols/8)` bytes, MAXALIGN to 8-byte boundary.
@@ -230,7 +230,7 @@ W021 indicates rows that require TOAST storage and suggests table splitting. I00
 
 ## Natural Key Surfacing (I001)
 
-`checkNaturalKey` detects candidate keys derived from declared functional dependencies that differ from the primary key.
+`checkNaturalKey` detects candidate keys derived from declared functional dependencies that differ from the table's primary key, surfacing potential natural key alternatives that the schema designer may want to consider. The detection is driven by mathematical analysis of functional dependencies rather than naming conventions, ensuring that only true candidate keys (column sets that functionally determine all other columns) are reported. Candidate keys containing surrogate columns like `id` and `auto_id` are filtered out.
 
 ### Algorithm
 
