@@ -161,35 +161,37 @@ UPDATE "table" SET "col" = COALESCE("col", <default>) WHERE "col" IS NULL
 types. Backfill DML ops are generated when adding `NOT NULL` to an existing
 column on tables exceeding the `expandContractThreshold` (default: 10M rows).
 
-## Volatile Default Detection
+## Non-immutable Default Detection
 
 ### PG 11+ metadata-only ADD COLUMN
 
-PostgreSQL 11 introduced an optimization: adding a column with a
-non-volatile default no longer rewrites the table. The default is stored in
+PostgreSQL 11 introduced an optimization: adding a column with an
+immutable default no longer rewrites the table. The default is stored in
 `pg_attribute.attmissingval` and applied lazily when rows are read. This
 makes `ADD COLUMN ... DEFAULT 'constant'` a metadata-only operation
 regardless of table size.
 
-### Volatile defaults still require a rewrite
+### Non-immutable defaults still require a rewrite
 
-Volatile functions -- those that can return different values on each call --
-cannot use this optimization. `isVolatileDefault` in `generate.go` detects
-the following volatile functions:
+Non-immutable functions -- those that can return different values on each
+call -- cannot use this optimization. `isNonImmutableDefault` in
+`generate.go` detects the following non-immutable functions:
 
 - `now()`
 - `clock_timestamp()`
 - `random()`
 - `nextval(...)`
 - `gen_random_uuid()`
+- `uuid_generate_v4()`
+- `uuid_generate_v7()`
 - `txid_current()`
 - `statement_timestamp()`
 
-When a volatile default is detected on a NOT NULL column addition, the risk
+When a non-immutable default is detected on a NOT NULL column addition, the risk
 classification escalates. `classifyAddColumn` in `risk.go` handles this:
 
 - Nullable column, no default: **Safe** (metadata-only `ACCESS EXCLUSIVE`).
-- NOT NULL with non-volatile default on PG 11+: **Safe** (metadata-only).
+- NOT NULL with immutable default on PG 11+: **Safe** (metadata-only).
 - NOT NULL with default on pre-PG 11: **Dangerous** (full table rewrite,
   `RequiresDML` set).
 - NOT NULL without any default: **Dangerous** (fails immediately on
