@@ -87,6 +87,11 @@ func NewBuiltinRegistry() *Registry {
 	})
 
 	r.Register(&Extension{
+		Name:      "pg_uuidv7",
+		Functions: []string{"uuid_generate_v7"},
+	})
+
+	r.Register(&Extension{
 		Name:  "citext",
 		Types: []string{"citext"},
 	})
