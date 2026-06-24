@@ -94,60 +94,60 @@
       "flags": [
         {
           "default": false,
-          "help": "Run every registered check regardless of tag filters",
+          "help": "Run all checks",
           "name": "all",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": "",
-          "help": "Tag DSL expression to select which checks should run",
+          "help": "Tag DSL expression",
           "name": "tag",
           "type": "str"
         },
         {
           "default": "",
-          "help": "Glob pattern to select checks by their registered name",
+          "help": "Glob pattern for check names",
           "name": "name",
           "type": "str"
         },
         {
           "default": false,
-          "help": "List all registered checks with their tags and severity",
+          "help": "List checks and tags",
           "name": "list",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Format output as machine-readable JSON instead of text",
+          "help": "JSON output",
           "name": "json",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Treat warnings as non-fatal so only errors cause failure",
+          "help": "Warnings do not cause failure",
           "name": "ignore-warnings",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Show detailed diagnostic output for each check result",
+          "help": "Show all details",
           "name": "verbose",
           "negatable": true,
           "type": "bool"
         },
         {
           "default": false,
-          "help": "Show which checks would run without actually executing",
+          "help": "Show plan without executing",
           "name": "dry-run",
           "negatable": true,
           "type": "bool"
         }
       ],
-      "help": "Run registered project checks and report diagnostic results",
+      "help": "Run project checks",
       "name": "check"
     },
     "codegen": {
@@ -507,22 +507,15 @@
       "deprecated": {},
       "env_prefix": null,
       "global_flags": [],
-      "groups": {},
-      "tag_contracts": {}
+      "groups": {}
     },
     "arg": {
-      "choices": null,
-      "default": null,
       "required": true,
-      "type": "str",
       "variadic": false
     },
     "command": {
       "args": [],
-      "constraints": [],
       "flags": [],
-      "hidden": false,
-      "interactive": false,
       "passthrough": false,
       "tags": []
     },
@@ -541,10 +534,8 @@
       "commands": {},
       "deprecated": {},
       "groups": {},
-      "hidden": false,
       "tags": []
-    },
-    "schema_version": 1
+    }
   },
   "global_flags": [
     {
@@ -585,7 +576,7 @@
               "type": "int"
             }
           ],
-          "help": "Apply all pending migrations to the target database",
+          "help": "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.",
           "name": "apply"
         },
         "generate": {
@@ -614,7 +605,7 @@
               "type": "str"
             }
           ],
-          "help": "Generate versioned migration files from schema changes",
+          "help": "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.",
           "name": "generate"
         },
         "plan": {
@@ -638,7 +629,7 @@
               "type": "str"
             }
           ],
-          "help": "Plan migrations by diffing schema against live database",
+          "help": "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.",
           "name": "plan"
         },
         "rollback": {
@@ -660,7 +651,7 @@
               "type": "str"
             }
           ],
-          "help": "Rollback applied database migrations to a target version",
+          "help": "Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.",
           "name": "rollback"
         },
         "squash": {
@@ -687,7 +678,7 @@
               "type": "str"
             }
           ],
-          "help": "Consolidate a range of migrations into a single file",
+          "help": "Consolidate a range of sequential migration files into a single optimized migration. Cancels inverse operation pairs, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.",
           "name": "squash"
         },
         "status": {
@@ -704,7 +695,7 @@
               "type": "str"
             }
           ],
-          "help": "Show which migrations have been applied to the database",
+          "help": "Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.",
           "name": "status"
         },
         "test": {
@@ -742,7 +733,7 @@
               "type": "bool"
             }
           ],
-          "help": "Test migrations by applying them against a staging database",
+          "help": "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.",
           "name": "test"
         }
       },
@@ -764,7 +755,7 @@
               "type": "str"
             }
           ],
-          "help": "Drop orphaned test databases that were not torn down",
+          "help": "Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.",
           "name": "gc"
         },
         "init": {
@@ -795,7 +786,7 @@
               "type": "str"
             }
           ],
-          "help": "Generate test database wrappers for consumer projects",
+          "help": "Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.",
           "name": "init"
         },
         "setup": {
@@ -811,7 +802,7 @@
               "type": "str"
             }
           ],
-          "help": "Create an ephemeral test database and apply DDL schema",
+          "help": "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.",
           "name": "setup"
         },
         "teardown": {
@@ -822,7 +813,7 @@
               "type": "str"
             }
           ],
-          "help": "Drop an ephemeral test database created by testdb setup",
+          "help": "Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.",
           "name": "teardown"
         }
       },
@@ -833,6 +824,5 @@
   "help": "PostgreSQL schema compiler",
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
-  "schema_version": 1,
-  "version": "0.15.1-0.20260624113503-2a57fb058c76+dirty"
+  "version": ""
 }
