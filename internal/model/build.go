@@ -11,6 +11,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // Build constructs a resolved Schema from raw parse output and a type registry.
@@ -238,7 +239,7 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 			for _, name := range fieldNames {
 				ct.Fields = append(ct.Fields, CompositeField{
 					Name:   name,
-					PGType: rt.Fields[name],
+					PGType: typeinfo.Parse(rt.Fields[name]),
 				})
 			}
 			compositeTypes = append(compositeTypes, ct)
@@ -400,7 +401,7 @@ func resolveFunction(rf parse.RawFunction, schemaName string) Function {
 	for _, ra := range rf.Args {
 		arg := FunctionArg{
 			Name: ra.Name,
-			Type: ra.Type,
+			Type: typeinfo.Parse(ra.Type),
 		}
 		if ra.Default != nil {
 			arg.Default = *ra.Default
@@ -692,9 +693,9 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 	}
 
 	// If the semantic type has a CHECK expression, the column uses a domain.
-	// Set PGType to the domain name (= semantic type name) instead of the base PG type.
+	// Set DomainName so DDL output uses the domain name instead of the base PG type.
 	if resolved.Check != "" {
-		col.PGType = rc.Type
+		col.PGType.DomainName = rc.Type
 	}
 
 	// Apply column-level generated override.

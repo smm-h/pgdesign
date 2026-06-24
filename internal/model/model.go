@@ -23,6 +23,7 @@ package model
 
 import (
 	"github.com/smm-h/pgdesign/internal/fd"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // NamedTransition holds a single named state machine transition with its
@@ -203,8 +204,8 @@ func (t *Table) CandidateKeys() [][]string {
 
 // Column represents a resolved column definition.
 type Column struct {
-	Name             string `json:"name"`
-	PGType           string `json:"pg_type"`
+	Name             string        `json:"name"`
+	PGType           typeinfo.Type `json:"pg_type"`
 	Collation        string `json:"collation,omitempty"`
 	NotNull          bool   `json:"not_null"`
 	Default          *string `json:"default,omitempty"`
@@ -326,9 +327,9 @@ type Sequence struct {
 
 // FunctionArg represents a single argument to a function or procedure.
 type FunctionArg struct {
-	Name    string `json:"name"`
-	Type    string `json:"type"`
-	Default string `json:"default,omitempty"`
+	Name    string        `json:"name"`
+	Type    typeinfo.Type `json:"type"`
+	Default string        `json:"default,omitempty"`
 }
 
 // Function represents a resolved function or procedure definition.
@@ -351,9 +352,9 @@ type Function struct {
 
 // Domain represents a resolved PostgreSQL domain type.
 type Domain struct {
-	Name        string `json:"name"`
-	Schema      string `json:"schema,omitempty"`
-	BaseType    string `json:"base_type"`
+	Name        string        `json:"name"`
+	Schema      string        `json:"schema,omitempty"`
+	BaseType    typeinfo.Type `json:"base_type"`
 	NotNull     bool   `json:"not_null,omitempty"`
 	Default     string `json:"default,omitempty"`
 	DefaultExpr string `json:"default_expr,omitempty"`
@@ -363,8 +364,8 @@ type Domain struct {
 
 // CompositeField represents a single field in a composite type.
 type CompositeField struct {
-	Name   string `json:"name"`
-	PGType string `json:"pg_type"`
+	Name   string        `json:"name"`
+	PGType typeinfo.Type `json:"pg_type"`
 }
 
 // CompositeType represents a resolved PostgreSQL composite type.

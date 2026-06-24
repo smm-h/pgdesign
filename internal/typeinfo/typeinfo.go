@@ -294,6 +294,35 @@ func reconstructParams(base string, p Params) string {
 	return ""
 }
 
+// Equal returns true if two Types have the same Base, DomainName, and Params
+// (deep comparison of pointer fields).
+func (t Type) Equal(other Type) bool {
+	if t.Base != other.Base || t.DomainName != other.DomainName || t.Params.RawModifier != other.Params.RawModifier {
+		return false
+	}
+	if !intPtrEqual(t.Params.Precision, other.Params.Precision) {
+		return false
+	}
+	if !intPtrEqual(t.Params.Scale, other.Params.Scale) {
+		return false
+	}
+	if !intPtrEqual(t.Params.Length, other.Params.Length) {
+		return false
+	}
+	return true
+}
+
+// intPtrEqual returns true if two *int values are deeply equal.
+func intPtrEqual(a, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
 // T is a concise constructor for test literals. It returns Type{Base: base}
 // with all params at zero values.
 func T(base string) Type {

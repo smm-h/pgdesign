@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // Kind represents the kind of a type definition.
@@ -62,7 +63,7 @@ type SMTransitionDef struct {
 type TypeDef struct {
 	Name        string
 	Kind        Kind
-	BaseType    string           // PG type (e.g., "uuid", "text", "bigint")
+	BaseType    typeinfo.Type    // PG type (e.g., "uuid", "text", "bigint")
 	NotNull     bool
 	Default     *string          // literal default value
 	DefaultExpr string           // SQL expression default (e.g., "gen_random_uuid()")
@@ -130,7 +131,7 @@ func (r *Registry) Register(td *TypeDef) error {
 
 // typeDefsEqual returns true if two TypeDefs have equivalent definitions.
 func typeDefsEqual(a, b *TypeDef) bool {
-	if a.Kind != b.Kind || a.BaseType != b.BaseType || a.NotNull != b.NotNull {
+	if a.Kind != b.Kind || !a.BaseType.Equal(b.BaseType) || a.NotNull != b.NotNull {
 		return false
 	}
 	if !strPtrEqual(a.Default, b.Default) || a.DefaultExpr != b.DefaultExpr {
@@ -389,7 +390,7 @@ func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
 	td := &TypeDef{
 		Name:       ut.Name,
 		Kind:       KindEnum,
-		BaseType:   ut.Name, // enums use their own name as PG type
+		BaseType:   typeinfo.Type{Base: ut.Name}, // enums use their own name as PG type
 		NotNull:    true,
 		EnumValues: ut.Values,
 		Array:      ut.Array,
@@ -482,7 +483,7 @@ func (r *Registry) loadCompositeType(ut UserTypeDef) diagnostic.Diagnostics {
 	td := &TypeDef{
 		Name:     ut.Name,
 		Kind:     KindComposite,
-		BaseType: ut.Name, // composite types use their own name as PG type
+		BaseType: typeinfo.Type{Base: ut.Name}, // composite types use their own name as PG type
 		Fields:   fields,
 		Comment:  ut.Comment,
 	}
@@ -559,7 +560,7 @@ func (r *Registry) loadScalarType(ut UserTypeDef) diagnostic.Diagnostics {
 	td := &TypeDef{
 		Name:        ut.Name,
 		Kind:        KindScalar,
-		BaseType:    ut.Base,
+		BaseType:    typeinfo.Parse(ut.Base),
 		NotNull:     true,
 		Default:     ut.Default,
 		DefaultExpr: ut.DefaultExpr,
@@ -695,7 +696,7 @@ func (r *Registry) loadStateMachineType(ut UserTypeDef) diagnostic.Diagnostics {
 	td := &TypeDef{
 		Name:           ut.Name,
 		Kind:           KindStateMachine,
-		BaseType:       ut.Name, // state machines use their own name as PG type (enum)
+		BaseType:       typeinfo.Type{Base: ut.Name}, // state machines use their own name as PG type (enum)
 		NotNull:        true,
 		EnumValues:     enumValues,
 		States:         states,
@@ -750,7 +751,7 @@ func parseKind(s string) (Kind, error) {
 // ResolvedColumn represents the final resolved attributes for a column after
 // applying type defaults and column-level overrides.
 type ResolvedColumn struct {
-	PGType      string
+	PGType      typeinfo.Type
 	NotNull     bool
 	Default     *string
 	DefaultExpr string
