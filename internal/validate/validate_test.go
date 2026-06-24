@@ -10,6 +10,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/fd"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestE201_FKMissingOnDelete(t *testing.T) {
@@ -20,9 +21,9 @@ func TestE201_FKMissingOnDelete(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "user_id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			FKs: []model.FK{{
 				Name:      "fk_user",
@@ -37,8 +38,8 @@ func TestE201_FKMissingOnDelete(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -60,8 +61,8 @@ func TestE202_TableMissingComment(t *testing.T) {
 			Schema: "public",
 			PK:     []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			// Comment is empty
 		}},
@@ -82,8 +83,8 @@ func TestE203_TableMissingPK(t *testing.T) {
 			Comment: "Events table",
 			PK:      nil, // missing PK
 			Columns: []model.Column{
-				{Name: "data", PGType: "jsonb"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "data", PGType: typeinfo.T("jsonb")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -103,9 +104,9 @@ func TestE207_VarcharUsage(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "email", PGType: "varchar(255)"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "email", PGType: typeinfo.MustParse("varchar(255)")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -128,8 +129,8 @@ func TestE211_NamingViolation(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -144,9 +145,9 @@ func TestE211_NamingViolation(t *testing.T) {
 func TestW001_GodTable(t *testing.T) {
 	cols := make([]model.Column, 35)
 	for i := range cols {
-		cols[i] = model.Column{Name: "col_" + string(rune('a'+i/26)) + string(rune('a'+i%26)), PGType: "text"}
+		cols[i] = model.Column{Name: "col_" + string(rune('a'+i/26)) + string(rune('a'+i%26)), PGType: typeinfo.T("text")}
 	}
-	cols = append(cols, model.Column{Name: "created_at", PGType: "timestamptz"})
+	cols = append(cols, model.Column{Name: "created_at", PGType: typeinfo.T("timestamptz")})
 
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -172,19 +173,19 @@ func TestW008_CircularFK(t *testing.T) {
 			{
 				Name: "a", Schema: "public", Comment: "A",
 				PK:      []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid"}, {Name: "b_id", PGType: "uuid"}, {Name: "created_at", PGType: "timestamptz"}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid")}, {Name: "b_id", PGType: typeinfo.T("uuid")}, {Name: "created_at", PGType: typeinfo.T("timestamptz")}},
 				FKs:     []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", OnDelete: "cascade"}},
 			},
 			{
 				Name: "b", Schema: "public", Comment: "B",
 				PK:      []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid"}, {Name: "c_id", PGType: "uuid"}, {Name: "created_at", PGType: "timestamptz"}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid")}, {Name: "c_id", PGType: typeinfo.T("uuid")}, {Name: "created_at", PGType: typeinfo.T("timestamptz")}},
 				FKs:     []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", OnDelete: "cascade"}},
 			},
 			{
 				Name: "c", Schema: "public", Comment: "C",
 				PK:      []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid"}, {Name: "a_id", PGType: "uuid"}, {Name: "created_at", PGType: "timestamptz"}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid")}, {Name: "a_id", PGType: typeinfo.T("uuid")}, {Name: "created_at", PGType: typeinfo.T("timestamptz")}},
 				FKs:     []model.FK{{Name: "fk_a", Columns: []string{"a_id"}, RefSchema: "public", RefTable: "a", OnDelete: "cascade"}},
 			},
 		},
@@ -207,8 +208,8 @@ func TestE204_CrossSchemaFK_Passes(t *testing.T) {
 				Comment: "User accounts",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 			},
 			{
@@ -217,9 +218,9 @@ func TestE204_CrossSchemaFK_Passes(t *testing.T) {
 				Comment: "Game players",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "auth_id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "auth_id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 				FKs: []model.FK{{
 					Name:       "fk_players_auth",
@@ -250,9 +251,9 @@ func TestE204_CrossSchemaFK_FailsWhenMissing(t *testing.T) {
 				Comment: "Game players",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "auth_id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "auth_id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 				FKs: []model.FK{{
 					Name:       "fk_players_auth",
@@ -282,9 +283,9 @@ func TestCleanSchema(t *testing.T) {
 				Comment: "User accounts",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "email", PGType: "text"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "email", PGType: typeinfo.T("text")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 			},
 			{
@@ -293,10 +294,10 @@ func TestCleanSchema(t *testing.T) {
 				Comment: "Blog posts",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "user_id", PGType: "uuid"},
-					{Name: "title", PGType: "text"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "user_id", PGType: typeinfo.T("uuid")},
+					{Name: "title", PGType: typeinfo.T("text")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 				FKs: []model.FK{{
 					Name:      "fk_user",
@@ -328,9 +329,9 @@ func TestE200_MissingColumnType(t *testing.T) {
 			Comment: "Events table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "data", PGType: ""}, // missing type
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "data", PGType: typeinfo.T("")}, // missing type
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -354,9 +355,9 @@ func TestE212_FKMissingIndex(t *testing.T) {
 				Comment: "Orders table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "user_id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "user_id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 				FKs: []model.FK{{
 					Name:      "fk_user",
@@ -373,8 +374,8 @@ func TestE212_FKMissingIndex(t *testing.T) {
 				Comment: "Users table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 			},
 		},
@@ -399,9 +400,9 @@ func TestE212_FKWithIndex_NoDiag(t *testing.T) {
 				Comment: "Orders table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "user_id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "user_id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 				FKs: []model.FK{{
 					Name:      "fk_user",
@@ -421,8 +422,8 @@ func TestE212_FKWithIndex_NoDiag(t *testing.T) {
 				Comment: "Users table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 			},
 		},
@@ -443,11 +444,11 @@ func TestW003_BooleanStates(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "is_active", PGType: "boolean"},
-				{Name: "is_verified", PGType: "boolean"},
-				{Name: "is_admin", PGType: "boolean"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "is_active", PGType: typeinfo.T("bool")},
+				{Name: "is_verified", PGType: typeinfo.T("bool")},
+				{Name: "is_admin", PGType: typeinfo.T("bool")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -470,10 +471,10 @@ func TestW003_TwoBooleans_NoDiag(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "is_active", PGType: "boolean"},
-				{Name: "is_verified", PGType: "boolean"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "is_active", PGType: typeinfo.T("bool")},
+				{Name: "is_verified", PGType: typeinfo.T("bool")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -493,9 +494,9 @@ func TestW004_JSONCouldBeTable(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "tags", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'[]'::jsonb")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -518,9 +519,9 @@ func TestW004_NonPlural_NoDiag(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "metadata", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "metadata", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'[]'::jsonb")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -540,10 +541,10 @@ func TestW007_RedundantIndex(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "user_id", PGType: "uuid"},
-				{Name: "status", PGType: "text"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "status", PGType: typeinfo.T("text")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Indexes: []model.Index{
 				{Name: "idx_user", Columns: []string{"user_id"}, Method: "btree"},
@@ -570,10 +571,10 @@ func TestW007_DifferentMethod_NoDiag(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "user_id", PGType: "uuid"},
-				{Name: "status", PGType: "text"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "status", PGType: typeinfo.T("text")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Indexes: []model.Index{
 				{Name: "idx_user_hash", Columns: []string{"user_id"}, Method: "hash"},
@@ -596,8 +597,8 @@ func TestDisabledRules(t *testing.T) {
 			Schema: "public",
 			PK:     []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			// Comment is empty -- would trigger E202
 		}},
@@ -625,9 +626,9 @@ func TestE204_RefColumnNotFound(t *testing.T) {
 				Comment: "Orders table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "user_id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "user_id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 				FKs: []model.FK{{
 					Name:       "fk_user",
@@ -648,8 +649,8 @@ func TestE204_RefColumnNotFound(t *testing.T) {
 				Comment: "Users table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 			},
 		},
@@ -674,9 +675,9 @@ func TestE204_RefColumnExists_NoDiag(t *testing.T) {
 				Comment: "Orders table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "user_id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "user_id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 				FKs: []model.FK{{
 					Name:       "fk_user",
@@ -697,8 +698,8 @@ func TestE204_RefColumnExists_NoDiag(t *testing.T) {
 				Comment: "Users table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "created_at", PGType: "timestamptz"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 				},
 			},
 		},
@@ -719,9 +720,9 @@ func TestE211_IndexNamingViolation(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "email", PGType: "text"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "email", PGType: typeinfo.T("text")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Indexes: []model.Index{{
 				Name:    "IdxUsersEmail",
@@ -756,12 +757,12 @@ func TestE213_GeneratedColRefsGenerated(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "first_name", PGType: "text"},
-				{Name: "last_name", PGType: "text"},
-				{Name: "full_name", PGType: "text", Generated: "first_name || ' ' || last_name", Stored: true},
-				{Name: "display_name", PGType: "text", Generated: "lower(full_name)", Stored: true},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "first_name", PGType: typeinfo.T("text")},
+				{Name: "last_name", PGType: typeinfo.T("text")},
+				{Name: "full_name", PGType: typeinfo.T("text"), Generated: "first_name || ' ' || last_name", Stored: true},
+				{Name: "display_name", PGType: typeinfo.T("text"), Generated: "lower(full_name)", Stored: true},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -784,11 +785,11 @@ func TestE213_GeneratedColRefsRegular_NoDiag(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "first_name", PGType: "text"},
-				{Name: "last_name", PGType: "text"},
-				{Name: "full_name", PGType: "text", Generated: "first_name || ' ' || last_name", Stored: true},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "first_name", PGType: typeinfo.T("text")},
+				{Name: "last_name", PGType: typeinfo.T("text")},
+				{Name: "full_name", PGType: typeinfo.T("text"), Generated: "first_name || ' ' || last_name", Stored: true},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -809,12 +810,12 @@ func TestE213_GeneratedColWithFunctionCalls_NoDiag(t *testing.T) {
 			Comment: "Products table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "name", PGType: "text"},
-				{Name: "price", PGType: "numeric"},
-				{Name: "search_name", PGType: "text", Generated: "lower(name)", Stored: true},
-				{Name: "display_price", PGType: "text", Generated: "cast(price as text) || ' USD'", Stored: true},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "name", PGType: typeinfo.T("text")},
+				{Name: "price", PGType: typeinfo.T("numeric")},
+				{Name: "search_name", PGType: typeinfo.T("text"), Generated: "lower(name)", Stored: true},
+				{Name: "display_price", PGType: typeinfo.T("text"), Generated: "cast(price as text) || ' USD'", Stored: true},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -885,9 +886,9 @@ func TestE215_InsertPolicyWithUsingOnly(t *testing.T) {
 			PK:        []string{"id"},
 			EnableRLS: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "channel_id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "channel_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Policies: []model.Policy{{
 				Name:      "insert_bad",
@@ -918,9 +919,9 @@ func TestE215_SelectPolicyWithWithCheck(t *testing.T) {
 			PK:        []string{"id"},
 			EnableRLS: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "channel_id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "channel_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Policies: []model.Policy{{
 				Name:      "select_bad",
@@ -947,9 +948,9 @@ func TestE215_UpdatePolicyBoth_NoDiag(t *testing.T) {
 			PK:        []string{"id"},
 			EnableRLS: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "channel_id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "channel_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Policies: []model.Policy{{
 				Name:      "update_own",
@@ -977,9 +978,9 @@ func TestW009_PolicyErrorCodeNotSnakeCase(t *testing.T) {
 			PK:        []string{"id"},
 			EnableRLS: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "channel_id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "channel_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Policies: []model.Policy{{
 				Name:      "insert_own",
@@ -1007,9 +1008,9 @@ func TestW009_PolicyErrorCodeSnakeCase_NoDiag(t *testing.T) {
 			PK:        []string{"id"},
 			EnableRLS: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "channel_id", PGType: "uuid"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "channel_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Policies: []model.Policy{{
 				Name:      "insert_own",
@@ -1036,9 +1037,9 @@ func TestSuppressW004_ColumnLevel(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "tags", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'[]'::jsonb")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -1078,9 +1079,9 @@ func TestSuppressW004_TableLevel(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "tags", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'[]'::jsonb")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -1119,9 +1120,9 @@ func TestSuppressW004_NoSuppression(t *testing.T) {
 			Comment: "Users table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "tags", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'[]'::jsonb")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -1165,8 +1166,8 @@ func TestW004_SuppressedWithJSONSchema(t *testing.T) {
 			{
 				Name: "users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "tags", PGType: "jsonb", NotNull: true, Default: model.StrPtr("'[]'::jsonb"), JSONSchema: "tags_schema.json"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "tags", PGType: typeinfo.T("jsonb"), NotNull: true, Default: model.StrPtr("'[]'::jsonb"), JSONSchema: "tags_schema.json"},
 				},
 				PK: []string{"id"},
 			},
@@ -1202,8 +1203,8 @@ func TestW004_NotSuppressedWithoutJSONSchema(t *testing.T) {
 			{
 				Name: "users",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "tags", PGType: "jsonb", NotNull: true, Default: model.StrPtr("'[]'::jsonb")},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "tags", PGType: typeinfo.T("jsonb"), NotNull: true, Default: model.StrPtr("'[]'::jsonb")},
 				},
 				PK: []string{"id"},
 			},
@@ -1226,8 +1227,8 @@ func TestAppendOnlyUpdatedAtWarning(t *testing.T) {
 				Schema:  "app",
 				Comment: "Event log",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "updated_at", PGType: "timestamptz", NotNull: true, SemanticTypeName: "timestamp"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "updated_at", PGType: typeinfo.T("timestamptz"), NotNull: true, SemanticTypeName: "timestamp"},
 				},
 				PK:         []string{"id"},
 				AppendOnly: true,
@@ -1257,11 +1258,11 @@ func TestE205_ColumnDefaultEmbeddedQuotes(t *testing.T) {
 				Comment: "test table",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "status", PGType: "text", Default: model.StrPtr("'pending'")},
-					{Name: "data", PGType: "jsonb", Default: model.StrPtr("'{}'")},
-					{Name: "count", PGType: "integer", Default: model.StrPtr("0")},
-					{Name: "name", PGType: "text", Default: model.StrPtr("unknown")},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "status", PGType: typeinfo.T("text"), Default: model.StrPtr("'pending'")},
+					{Name: "data", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'{}'")},
+					{Name: "count", PGType: typeinfo.T("integer"), Default: model.StrPtr("0")},
+					{Name: "name", PGType: typeinfo.T("text"), Default: model.StrPtr("unknown")},
 				},
 			},
 		},
@@ -1295,10 +1296,10 @@ func TestSuppressionPipeline_Integration(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "items", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb")},
-				{Name: "tags", PGType: "jsonb", Default: model.StrPtr("'[]'::jsonb"), JSONSchema: "tags_schema.json"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "items", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'[]'::jsonb")},
+				{Name: "tags", PGType: typeinfo.T("jsonb"), Default: model.StrPtr("'[]'::jsonb"), JSONSchema: "tags_schema.json"},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -1365,7 +1366,7 @@ func TestE216_InvalidWithParam(t *testing.T) {
 			Schema:  "public",
 			Comment: "test",
 			PK:      []string{"id"},
-			Columns: []model.Column{{Name: "id", PGType: "integer", NotNull: true}},
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("integer"), NotNull: true}},
 			Indexes: []model.Index{{
 				Name:    "idx_t_id",
 				Columns: []string{"id"},
@@ -1393,8 +1394,8 @@ func TestE216_ValidHnswParams_NoDiag(t *testing.T) {
 			Comment: "test",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "embedding", PGType: "vector(384)", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "embedding", PGType: typeinfo.MustParse("vector(384)"), NotNull: true},
 			},
 			Indexes: []model.Index{{
 				Name:    "idx_t_embedding",
@@ -1424,9 +1425,9 @@ func TestE218_VirtualRequiresPG18_Error(t *testing.T) {
 				Comment: "Order records",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "val", PGType: "integer", NotNull: true},
-					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
 				},
 			},
 		},
@@ -1455,9 +1456,9 @@ func TestE218_VirtualRequiresPG18_Warning(t *testing.T) {
 				Comment: "Order records",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "val", PGType: "integer", NotNull: true},
-					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
 				},
 			},
 		},
@@ -1484,9 +1485,9 @@ func TestE218_VirtualRequiresPG18_NoDiag(t *testing.T) {
 				Comment: "Order records",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "val", PGType: "integer", NotNull: true},
-					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
 				},
 			},
 		},
@@ -1510,9 +1511,9 @@ func TestE218_StoredGenerated_NoDiag(t *testing.T) {
 				Comment: "Order records",
 				PK:      []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "val", PGType: "integer", NotNull: true},
-					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: true},
 				},
 			},
 		},
@@ -1534,9 +1535,9 @@ func TestE217_HnswWithPgvectorDeclared_NoDiag(t *testing.T) {
 			Comment: "Items table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "embedding", PGType: "vector(384)"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "embedding", PGType: typeinfo.MustParse("vector(384)")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Indexes: []model.Index{{
 				Name:    "idx_items_embedding",
@@ -1566,9 +1567,9 @@ func TestE219_HnswWithoutPgvectorDeclared(t *testing.T) {
 			Comment: "Items table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "embedding", PGType: "vector(384)"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "embedding", PGType: typeinfo.MustParse("vector(384)")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Indexes: []model.Index{{
 				Name:    "idx_items_embedding",
@@ -1601,9 +1602,9 @@ func TestE217_BtreeIndex_NoDiag(t *testing.T) {
 			Comment: "Items table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "name", PGType: "text"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "name", PGType: typeinfo.T("text")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Indexes: []model.Index{{
 				Name:    "idx_items_name",
@@ -1632,9 +1633,9 @@ func TestE217_UnknownMethod(t *testing.T) {
 			Comment: "Items table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "name", PGType: "text"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "name", PGType: typeinfo.T("text")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 			Indexes: []model.Index{{
 				Name:    "idx_items_name",
@@ -1665,9 +1666,9 @@ func TestE221_ExclusionBtreeGistMissing(t *testing.T) {
 			Comment: "Room bookings",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer"},
-				{Name: "room_id", PGType: "integer"},
-				{Name: "during", PGType: "tsrange"},
+				{Name: "id", PGType: typeinfo.T("integer")},
+				{Name: "room_id", PGType: typeinfo.T("integer")},
+				{Name: "during", PGType: typeinfo.T("tsrange")},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_overlap",
@@ -1701,9 +1702,9 @@ func TestE221_ExclusionBtreeGistPresent(t *testing.T) {
 			Comment: "Room bookings",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer"},
-				{Name: "room_id", PGType: "integer"},
-				{Name: "during", PGType: "tsrange"},
+				{Name: "id", PGType: typeinfo.T("integer")},
+				{Name: "room_id", PGType: typeinfo.T("integer")},
+				{Name: "during", PGType: typeinfo.T("tsrange")},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_overlap",
@@ -1733,8 +1734,8 @@ func TestE221_ExclusionRangeOperatorOnly(t *testing.T) {
 			Comment: "Room bookings",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer"},
-				{Name: "during", PGType: "tsrange"},
+				{Name: "id", PGType: typeinfo.T("integer")},
+				{Name: "during", PGType: typeinfo.T("tsrange")},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_time_overlap",
@@ -1763,7 +1764,7 @@ func TestE222_RestrictivePolicyPG9_Error(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				Policies: []model.Policy{{
 					Name:      "restrict_read",
@@ -1795,7 +1796,7 @@ func TestE222_RestrictivePolicyPGUnknown_Warning(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				Policies: []model.Policy{{
 					Name:      "restrict_read",
@@ -1827,7 +1828,7 @@ func TestE222_RestrictivePolicyPG10_NoDiag(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				Policies: []model.Policy{{
 					Name:      "restrict_read",
@@ -1854,7 +1855,7 @@ func TestE222_PermissivePolicyPG9_NoDiag(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				Policies: []model.Policy{{
 					Name:      "allow_read",
@@ -1880,7 +1881,7 @@ func TestW011_RLSWithoutPolicies(t *testing.T) {
 				Name:      "secrets",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 			},
 		},
@@ -1905,7 +1906,7 @@ func TestW011_RLSWithPolicies_NoDiag(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				Policies: []model.Policy{{
 					Name:      "read_all",
@@ -1931,7 +1932,7 @@ func TestW012_RLSOperationGap(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				Policies: []model.Policy{
 					{Name: "read", Type: "PERMISSIVE", Operation: "SELECT", Using: "true"},
@@ -1963,7 +1964,7 @@ func TestW012_ALLCoversEverything_NoDiag(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				Policies: []model.Policy{{
 					Name:      "full_access",
@@ -1989,7 +1990,7 @@ func TestW012_AllFourOperations_NoDiag(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 				Policies: []model.Policy{
 					{Name: "read", Type: "PERMISSIVE", Operation: "SELECT", Using: "true"},
@@ -2015,7 +2016,7 @@ func TestW012_NoPolicies_NoDiag(t *testing.T) {
 				Name:      "docs",
 				Schema:    "public",
 				EnableRLS: true,
-				Columns:   []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:        []string{"id"},
 			},
 		},
@@ -2035,19 +2036,19 @@ func TestW013_CascadeDepthExceedsThreshold(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "a", Schema: "public", Comment: "A", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "b_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "b_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "b", Schema: "public", Comment: "B", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "c_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "c_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "c", Schema: "public", Comment: "C", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "d_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "d_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "d", Schema: "public", Comment: "D", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "e_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "e_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_e", Columns: []string{"e_id"}, RefSchema: "public", RefTable: "e", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "e", Schema: "public", Comment: "E", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 		},
 	}
 	schema.BuildFKGraph()
@@ -2075,16 +2076,16 @@ func TestW013_CascadeDepthAtThreshold_NoDiag(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "a", Schema: "public", Comment: "A", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "b_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "b_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "b", Schema: "public", Comment: "B", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "c_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "c_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "c", Schema: "public", Comment: "C", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "d_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "d_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "d", Schema: "public", Comment: "D", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 		},
 	}
 	schema.BuildFKGraph()
@@ -2104,12 +2105,12 @@ func TestW014_CascadeBreadthExceedsThreshold(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "hub", Schema: "public", Comment: "Hub", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "a_id", PGType: "uuid", NotNull: true},
-					{Name: "b_id", PGType: "uuid", NotNull: true},
-					{Name: "c_id", PGType: "uuid", NotNull: true},
-					{Name: "d_id", PGType: "uuid", NotNull: true},
-					{Name: "e_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "a_id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "b_id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "c_id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "d_id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "e_id", PGType: typeinfo.T("uuid"), NotNull: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_a", Columns: []string{"a_id"}, RefSchema: "public", RefTable: "leaf_a", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -2118,11 +2119,11 @@ func TestW014_CascadeBreadthExceedsThreshold(t *testing.T) {
 					{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "leaf_d", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
 					{Name: "fk_e", Columns: []string{"e_id"}, RefSchema: "public", RefTable: "leaf_e", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
 				}},
-			{Name: "leaf_a", Schema: "public", Comment: "A", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
-			{Name: "leaf_b", Schema: "public", Comment: "B", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
-			{Name: "leaf_c", Schema: "public", Comment: "C", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
-			{Name: "leaf_d", Schema: "public", Comment: "D", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
-			{Name: "leaf_e", Schema: "public", Comment: "E", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "leaf_a", Schema: "public", Comment: "A", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			{Name: "leaf_b", Schema: "public", Comment: "B", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			{Name: "leaf_c", Schema: "public", Comment: "C", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			{Name: "leaf_d", Schema: "public", Comment: "D", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			{Name: "leaf_e", Schema: "public", Comment: "E", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 		},
 	}
 	schema.BuildFKGraph()
@@ -2148,19 +2149,19 @@ func TestW014_CascadeBreadthBelowThreshold_NoDiag(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "hub", Schema: "public", Comment: "Hub", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "a_id", PGType: "uuid", NotNull: true},
-					{Name: "b_id", PGType: "uuid", NotNull: true},
-					{Name: "c_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "a_id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "b_id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "c_id", PGType: typeinfo.T("uuid"), NotNull: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_a", Columns: []string{"a_id"}, RefSchema: "public", RefTable: "leaf_a", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
 					{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "leaf_b", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
 					{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "leaf_c", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
 				}},
-			{Name: "leaf_a", Schema: "public", Comment: "A", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
-			{Name: "leaf_b", Schema: "public", Comment: "B", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
-			{Name: "leaf_c", Schema: "public", Comment: "C", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+			{Name: "leaf_a", Schema: "public", Comment: "A", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			{Name: "leaf_b", Schema: "public", Comment: "B", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			{Name: "leaf_c", Schema: "public", Comment: "C", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 		},
 	}
 	schema.BuildFKGraph()
@@ -2179,12 +2180,12 @@ func TestW015_MixedOnDeleteActions(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "target", Schema: "public", Comment: "Target", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 			{Name: "child_a", Schema: "public", Comment: "Child A", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "target_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "child_b", Schema: "public", Comment: "Child B", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "target_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "RESTRICT"}}},
 		},
 	}
@@ -2207,12 +2208,12 @@ func TestW015_ConsistentOnDelete_NoDiag(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "target", Schema: "public", Comment: "Target", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 			{Name: "child_a", Schema: "public", Comment: "Child A", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "target_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "child_b", Schema: "public", Comment: "Child B", PK: []string{"id"},
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}, {Name: "target_id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				FKs: []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 		},
 	}
@@ -2234,9 +2235,9 @@ func TestI001_NaturalKeyCandidate(t *testing.T) {
 			{
 				Name: "users", Schema: "public", Comment: "Users", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email"},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "email"},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Dependencies: []fd.FuncDep{
 					{Determinant: []string{"id"}, Dependent: []string{"email", "name"}, Source: "declared"},
@@ -2265,9 +2266,9 @@ func TestI001_OnlySurrogateKeys_NoDiag(t *testing.T) {
 			{
 				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true, SemanticTypeName: "id"},
-					{Name: "ref_code", PGType: "uuid", NotNull: true, SemanticTypeName: "ref"},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "id"},
+					{Name: "ref_code", PGType: typeinfo.T("uuid"), NotNull: true, SemanticTypeName: "ref"},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Dependencies: []fd.FuncDep{
 					{Determinant: []string{"id"}, Dependent: []string{"ref_code", "name"}, Source: "declared"},
@@ -2291,8 +2292,8 @@ func TestI001_NoDependencies_NoDiag(t *testing.T) {
 			{
 				Name: "simple", Schema: "public", Comment: "Simple", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 		},
@@ -2314,8 +2315,8 @@ func TestW016_PKSubsumesUnique(t *testing.T) {
 			{
 				Name: "docs", Schema: "public", Comment: "Docs", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "title", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "title", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Uniques: []model.UniqueConstraint{
 					{Name: "uq_id", Columns: []string{"id"}},
@@ -2343,8 +2344,8 @@ func TestW016_UniqueOnDifferentColumns_NoDiag(t *testing.T) {
 			{
 				Name: "users", Schema: "public", Comment: "Users", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Uniques: []model.UniqueConstraint{
 					{Name: "uq_email", Columns: []string{"email"}},
@@ -2369,8 +2370,8 @@ func TestW017_RedundantIsNotNullCheck(t *testing.T) {
 			{
 				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_name_not_null", Expr: "name IS NOT NULL"},
@@ -2395,8 +2396,8 @@ func TestW017_NullableColumn_NoDiag(t *testing.T) {
 			{
 				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: false},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: false},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_name_not_null", Expr: "name IS NOT NULL"},
@@ -2419,14 +2420,14 @@ func TestW018_DomainCheckDuplicate(t *testing.T) {
 	// Column of semantic type "email_type" has column-level CHECK with same expression.
 	schema := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "email_type", BaseType: "text", Check: "VALUE ~ '^.+@.+$'"},
+			{Name: "email_type", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^.+@.+$'"},
 		},
 		Tables: []model.Table{
 			{
 				Name: "users", Schema: "public", Comment: "Users", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email_type"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "email_type"},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_email", Expr: "email ~ '^.+@.+$'"},
@@ -2451,14 +2452,14 @@ func TestW018_DifferentCheck_NoDiag(t *testing.T) {
 	// Domain CHECK and column CHECK differ. No W018.
 	schema := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "email_type", BaseType: "text", Check: "VALUE ~ '^.+@.+$'"},
+			{Name: "email_type", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^.+@.+$'"},
 		},
 		Tables: []model.Table{
 			{
 				Name: "users", Schema: "public", Comment: "Users", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true, SemanticTypeName: "email_type"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true, SemanticTypeName: "email_type"},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_email_len", Expr: "length(email) > 5"},
@@ -2483,8 +2484,8 @@ func TestW019_RangeSubsumption(t *testing.T) {
 			{
 				Name: "people", Schema: "public", Comment: "People", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "age", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "age", PGType: typeinfo.T("integer"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_age_wide", Expr: "age >= 0 AND age <= 200"},
@@ -2515,8 +2516,8 @@ func TestW019_OpenEndedRange(t *testing.T) {
 			{
 				Name: "people", Schema: "public", Comment: "People", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "age", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "age", PGType: typeinfo.T("integer"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_age_positive", Expr: "age >= 0"},
@@ -2543,8 +2544,8 @@ func TestW019_NonInclusiveBounds(t *testing.T) {
 			{
 				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "score", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "score", PGType: typeinfo.T("integer"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_score_wide", Expr: "score >= 0 AND score <= 100"},
@@ -2570,8 +2571,8 @@ func TestW019_NegativeNumbers(t *testing.T) {
 			{
 				Name: "accounts", Schema: "public", Comment: "Accounts", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "balance", PGType: "numeric", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "balance", PGType: typeinfo.T("numeric"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_balance_wide", Expr: "balance >= -1000 AND balance <= 1000"},
@@ -2597,8 +2598,8 @@ func TestW019_EqualRanges_NoRedundancy(t *testing.T) {
 			{
 				Name: "items", Schema: "public", Comment: "Items", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "qty", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "qty", PGType: typeinfo.T("integer"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_qty_a", Expr: "qty >= 0 AND qty <= 100"},
@@ -2622,9 +2623,9 @@ func TestW019_NoOverlap_NoDiag(t *testing.T) {
 			{
 				Name: "products", Schema: "public", Comment: "Products", PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "price", PGType: "numeric", NotNull: true},
-					{Name: "quantity", PGType: "integer", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "price", PGType: typeinfo.T("numeric"), NotNull: true},
+					{Name: "quantity", PGType: typeinfo.T("integer"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_price", Expr: "price >= 0"},
@@ -2648,9 +2649,9 @@ func TestI002_DeadColumn(t *testing.T) {
 				Name: "orders", Schema: "public", Comment: "Orders",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "status", PGType: "text", NotNull: true},
-					{Name: "orphan_col", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "status", PGType: typeinfo.T("text"), NotNull: true},
+					{Name: "orphan_col", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				Checks: []model.CheckConstraint{
 					{Name: "chk_status", Expr: "status IN ('active', 'cancelled')"},
@@ -2675,12 +2676,12 @@ func TestI002_AllColumnsReferenced_NoDiag(t *testing.T) {
 				Name: "users", Schema: "public", Comment: "Users",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "org_id", PGType: "uuid", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "age", PGType: "integer", NotNull: true},
-					{Name: "full_name", PGType: "text", NotNull: true, Generated: "name || ' (user)'"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "org_id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
+					{Name: "age", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "full_name", PGType: typeinfo.T("text"), NotNull: true, Generated: "name || ' (user)'"},
 				},
 				FKs: []model.FK{
 					{Name: "fk_org", Columns: []string{"org_id"}, RefTable: "orgs", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -2700,7 +2701,7 @@ func TestI002_AllColumnsReferenced_NoDiag(t *testing.T) {
 				Name: "orgs", Schema: "public", Comment: "Organizations",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
 				},
 			},
 		},
@@ -2719,16 +2720,16 @@ func TestI002_FKRefColumnsReferenced(t *testing.T) {
 				Name: "orders", Schema: "public", Comment: "Orders",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "code", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "code", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 			{
 				Name: "items", Schema: "public", Comment: "Items",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "order_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "order_id", PGType: typeinfo.T("uuid"), NotNull: true},
 				},
 				FKs: []model.FK{
 					{Name: "fk_order", Columns: []string{"order_id"}, RefTable: "orders", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
@@ -2754,8 +2755,8 @@ func TestI002_ViewReferenceSuppresses(t *testing.T) {
 				Name: "products", Schema: "public", Comment: "Products",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "unreferenced", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "unreferenced", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 		},
@@ -2777,8 +2778,8 @@ func TestI002_PolicyUsingSuppresses(t *testing.T) {
 				Name: "secrets", Schema: "public", Comment: "Secrets",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "owner_id", PGType: "uuid", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "owner_id", PGType: typeinfo.T("uuid"), NotNull: true},
 				},
 				EnableRLS: true,
 				Policies: []model.Policy{
@@ -2796,12 +2797,12 @@ func TestI002_PolicyUsingSuppresses(t *testing.T) {
 
 func TestI003_RowSizeToastThreshold(t *testing.T) {
 	cols := []model.Column{
-		{Name: "id", PGType: "uuid", NotNull: true},
+		{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
 	}
 	for i := 0; i < 32; i++ {
 		cols = append(cols, model.Column{
 			Name:    fmt.Sprintf("data_%d", i),
-			PGType:  "jsonb",
+			PGType: typeinfo.T("jsonb"),
 			NotNull: true,
 		})
 	}
@@ -2823,12 +2824,12 @@ func TestI003_RowSizeToastThreshold(t *testing.T) {
 
 func TestW021_RowSizeExceedsPage(t *testing.T) {
 	cols := []model.Column{
-		{Name: "id", PGType: "uuid", NotNull: true},
+		{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
 	}
 	for i := 0; i < 130; i++ {
 		cols = append(cols, model.Column{
 			Name:    fmt.Sprintf("blob_%d", i),
-			PGType:  "jsonb",
+			PGType: typeinfo.T("jsonb"),
 			NotNull: true,
 		})
 	}
@@ -2860,10 +2861,10 @@ func TestI003_SmallTable_NoDiag(t *testing.T) {
 				Name: "users", Schema: "public", Comment: "Users",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "name", PGType: "text", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
-					{Name: "created_at", PGType: "timestamptz", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 				},
 			},
 		},
@@ -2883,13 +2884,13 @@ func TestI004_ColumnReordering(t *testing.T) {
 				Name: "padded", Schema: "public", Comment: "Padded table",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "flag1", PGType: "boolean", NotNull: true},
-					{Name: "big1", PGType: "bigint", NotNull: true},
-					{Name: "flag2", PGType: "boolean", NotNull: true},
-					{Name: "big2", PGType: "bigint", NotNull: true},
-					{Name: "flag3", PGType: "boolean", NotNull: true},
-					{Name: "big3", PGType: "bigint", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "flag1", PGType: typeinfo.T("bool"), NotNull: true},
+					{Name: "big1", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "flag2", PGType: typeinfo.T("bool"), NotNull: true},
+					{Name: "big2", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "flag3", PGType: typeinfo.T("bool"), NotNull: true},
+					{Name: "big3", PGType: typeinfo.T("bigint"), NotNull: true},
 				},
 			},
 		},
@@ -2908,13 +2909,13 @@ func TestI004_OptimalOrder_NoDiag(t *testing.T) {
 				Name: "optimal", Schema: "public", Comment: "Optimal table",
 				PK: []string{"id"},
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "big1", PGType: "bigint", NotNull: true},
-					{Name: "big2", PGType: "bigint", NotNull: true},
-					{Name: "big3", PGType: "bigint", NotNull: true},
-					{Name: "flag1", PGType: "boolean", NotNull: true},
-					{Name: "flag2", PGType: "boolean", NotNull: true},
-					{Name: "flag3", PGType: "boolean", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "big1", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "big2", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "big3", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "flag1", PGType: typeinfo.T("bool"), NotNull: true},
+					{Name: "flag2", PGType: typeinfo.T("bool"), NotNull: true},
+					{Name: "flag3", PGType: typeinfo.T("bool"), NotNull: true},
 				},
 			},
 		},
@@ -2928,9 +2929,9 @@ func TestI004_OptimalOrder_NoDiag(t *testing.T) {
 
 func TestEstimateRowSize_KnownSchema(t *testing.T) {
 	cols := []model.Column{
-		{Name: "id", PGType: "uuid", NotNull: true},
-		{Name: "count", PGType: "integer", NotNull: true},
-		{Name: "total", PGType: "bigint", NotNull: true},
+		{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+		{Name: "count", PGType: typeinfo.T("integer"), NotNull: true},
+		{Name: "total", PGType: typeinfo.T("bigint"), NotNull: true},
 	}
 	size, padding := estimateRowSize(cols)
 	// Header(24) + uuid(16)=40, int(4)=44, align-to-8=48, bigint(8)=56, +4 ItemId=60
@@ -3003,9 +3004,9 @@ func TestW027_SMUnreachableState(t *testing.T) {
 			Comment: "Items table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "flow_status", NotNull: true, SemanticTypeName: "flow_status"},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("flow_status"), NotNull: true, SemanticTypeName: "flow_status"},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -3031,9 +3032,9 @@ func TestW027_SMNoUnreachableState(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, SemanticTypeName: "order_status"},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -3076,9 +3077,9 @@ func TestW028_SMDeadEndState(t *testing.T) {
 			Comment: "Tasks table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "task_status", NotNull: true, SemanticTypeName: "task_status"},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("task_status"), NotNull: true, SemanticTypeName: "task_status"},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -3104,9 +3105,9 @@ func TestW028_SMNoDeadEnd(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, SemanticTypeName: "order_status"},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -3147,9 +3148,9 @@ func TestE223_SMRequiresColumnMissing(t *testing.T) {
 			Comment: "Payments table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "payment_status", NotNull: true, SemanticTypeName: "payment_status"},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("payment_status"), NotNull: true, SemanticTypeName: "payment_status"},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 				// payment_method column is MISSING.
 			},
 		}},
@@ -3194,10 +3195,10 @@ func TestE223_SMRequiresColumnPresent(t *testing.T) {
 			Comment: "Payments table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "payment_status", NotNull: true, SemanticTypeName: "payment_status"},
-				{Name: "payment_method", PGType: "text"},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("payment_status"), NotNull: true, SemanticTypeName: "payment_status"},
+				{Name: "payment_method", PGType: typeinfo.T("text")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -3221,9 +3222,9 @@ func TestE224_SMDefaultMismatch(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status", Default: &wrongDefault},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, SemanticTypeName: "order_status", Default: &wrongDefault},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -3253,9 +3254,9 @@ func TestE224_SMDefaultMatchesInitial(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status", Default: &correctDefault},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, SemanticTypeName: "order_status", Default: &correctDefault},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -3278,9 +3279,9 @@ func TestE224_SMNoDefault(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, SemanticTypeName: "order_status"},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
@@ -3301,8 +3302,8 @@ func TestE226_SMReservedTriggerPrefix(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 			Triggers: []model.Trigger{
 				{
@@ -3334,8 +3335,8 @@ func TestE226_SMNoReservedPrefix(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 			Triggers: []model.Trigger{
 				{
@@ -3364,9 +3365,9 @@ func TestSM_NilRegistrySkipsChecks(t *testing.T) {
 			Comment: "Orders table",
 			PK:      []string{"id"},
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid", NotNull: true},
-				{Name: "status", PGType: "order_status", NotNull: true, SemanticTypeName: "order_status"},
-				{Name: "created_at", PGType: "timestamptz", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+				{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, SemanticTypeName: "order_status"},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
 			},
 		}},
 	}
