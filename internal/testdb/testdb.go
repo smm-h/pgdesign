@@ -192,6 +192,12 @@ func (m *Manager) Create(ctx context.Context, opts CreateOptions) (*EphemeralDB,
 
 // Drop destroys an ephemeral test database and closes tracked connections.
 func (m *Manager) Drop(ctx context.Context, db *EphemeralDB) error {
+	// Guard: refuse to drop anything that doesn't match the ephemeral name pattern.
+	// This check MUST be before any connection cleanup or database operations.
+	if _, _, _, ok := ParseName(db.Name); !ok {
+		return fmt.Errorf("refusing to drop database %q: name does not match ephemeral test database pattern. Only databases created by pgdesign testdb setup can be dropped", db.Name)
+	}
+
 	// Close all tracked connections and pools.
 	db.mu.Lock()
 	for i := len(db.pools) - 1; i >= 0; i-- {
