@@ -5,6 +5,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {
@@ -23,9 +24,9 @@ func TestC100_TableWithoutCheckConstraints(t *testing.T) {
 			Name:   "orders",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "user_id", PGType: "uuid"},
-				{Name: "total", PGType: "numeric"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "total", PGType: typeinfo.T("numeric")},
 			},
 		}},
 	}
@@ -45,8 +46,8 @@ func TestC100_SkipsSmallTable(t *testing.T) {
 			Name:   "tags",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "name", PGType: "text"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "name", PGType: typeinfo.T("text")},
 			},
 		}},
 	}
@@ -64,9 +65,9 @@ func TestC100_SkipsAppendOnly(t *testing.T) {
 			Schema:     "public",
 			AppendOnly: true,
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "data", PGType: "jsonb"},
-				{Name: "created_at", PGType: "timestamptz"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "data", PGType: typeinfo.T("jsonb")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
 		}},
 	}
@@ -83,9 +84,9 @@ func TestC100_PassWithChecks(t *testing.T) {
 			Name:   "orders",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "total", PGType: "numeric"},
-				{Name: "status", PGType: "text"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "total", PGType: typeinfo.T("numeric")},
+				{Name: "status", PGType: typeinfo.T("text")},
 			},
 			Checks: []model.CheckConstraint{
 				{Name: "chk_total_positive", Expr: "total > 0"},
@@ -105,8 +106,8 @@ func TestC101_FKWithoutIndex(t *testing.T) {
 			Name:   "orders",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "user_id", PGType: "uuid"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
 			},
 			FKs: []model.FK{{
 				Name:      "fk_user",
@@ -133,8 +134,8 @@ func TestC101_FKWithIndex(t *testing.T) {
 			Name:   "orders",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "user_id", PGType: "uuid"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
 			},
 			FKs: []model.FK{{
 				Name:      "fk_user",
@@ -166,8 +167,8 @@ func TestC102_UnusedEnum(t *testing.T) {
 			Name:   "users",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "name", PGType: "text"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "name", PGType: typeinfo.T("text")},
 			},
 		}},
 	}
@@ -188,8 +189,8 @@ func TestC102_UsedEnum(t *testing.T) {
 			Name:   "users",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "status", PGType: "status"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "status", PGType: typeinfo.T("status")},
 			},
 		}},
 	}
@@ -206,9 +207,9 @@ func TestC103_OrphanTable(t *testing.T) {
 			Name:   "orphan",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "name", PGType: "text"},
-				{Name: "data", PGType: "jsonb"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "name", PGType: typeinfo.T("text")},
+				{Name: "data", PGType: typeinfo.T("jsonb")},
 			},
 		}},
 	}
@@ -228,8 +229,8 @@ func TestC103_SkipsSmallTable(t *testing.T) {
 			Name:   "small",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "name", PGType: "text"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "name", PGType: typeinfo.T("text")},
 			},
 		}},
 	}
@@ -246,9 +247,9 @@ func TestC103_TableWithOutgoingFK(t *testing.T) {
 			Name:   "orders",
 			Schema: "public",
 			Columns: []model.Column{
-				{Name: "id", PGType: "uuid"},
-				{Name: "user_id", PGType: "uuid"},
-				{Name: "total", PGType: "numeric"},
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "total", PGType: typeinfo.T("numeric")},
 			},
 			FKs: []model.FK{{
 				Name:      "fk_user",
@@ -273,18 +274,18 @@ func TestC103_TableReferencedByOther(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "name", PGType: "text"},
-					{Name: "email", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "name", PGType: typeinfo.T("text")},
+					{Name: "email", PGType: typeinfo.T("text")},
 				},
 			},
 			{
 				Name:   "orders",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "user_id", PGType: "uuid"},
-					{Name: "total", PGType: "numeric"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "user_id", PGType: typeinfo.T("uuid")},
+					{Name: "total", PGType: typeinfo.T("numeric")},
 				},
 				FKs: []model.FK{{
 					Name:      "fk_user",
@@ -312,18 +313,18 @@ func TestC104_SuggestsFilterIndex(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "status", PGType: "text"},
-					{Name: "name", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "status", PGType: typeinfo.T("text")},
+					{Name: "name", PGType: typeinfo.T("text")},
 				},
 			},
 			{
 				Name:   "orders",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "user_id", PGType: "uuid"},
-					{Name: "total", PGType: "numeric"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "user_id", PGType: typeinfo.T("uuid")},
+					{Name: "total", PGType: typeinfo.T("numeric")},
 				},
 				FKs: []model.FK{{
 					Name:       "fk_user",
@@ -353,18 +354,18 @@ func TestC104_NoSuggestionWithoutFilterColumns(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "name", PGType: "text"},
-					{Name: "email", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "name", PGType: typeinfo.T("text")},
+					{Name: "email", PGType: typeinfo.T("text")},
 				},
 			},
 			{
 				Name:   "orders",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid"},
-					{Name: "user_id", PGType: "uuid"},
-					{Name: "total", PGType: "numeric"},
+					{Name: "id", PGType: typeinfo.T("uuid")},
+					{Name: "user_id", PGType: typeinfo.T("uuid")},
+					{Name: "total", PGType: typeinfo.T("numeric")},
 				},
 				FKs: []model.FK{{
 					Name:       "fk_user",
