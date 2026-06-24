@@ -1,6 +1,6 @@
 ---
 title: internal/sqlparse
-description: "Package sqlparse wraps wasilibs/go-pgquery, a WASM-based port of"
+description: "Package sqlparse wraps wasilibs/go-pgquery, a WASM-based PostgreSQL parser requiring no CGo, for SQL statement splitting and expression deparsing."
 generated: true
 nav_group: "API Reference"
 nav_order: 23

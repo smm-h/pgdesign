@@ -1,6 +1,6 @@
 ---
 title: internal/parse
-description: "Package parse provides a lenient TOML parser for pgdesign schema files."
+description: "Package parse provides a lenient TOML parser for pgdesign schema files, extracting structure without enforcing semantic rules into a RawSchema."
 generated: true
 nav_group: "API Reference"
 nav_order: 16

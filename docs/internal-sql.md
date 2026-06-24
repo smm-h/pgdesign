@@ -1,6 +1,6 @@
 ---
 title: internal/sql
-description: "Package sql provides shared SQL builder functions for PostgreSQL DDL generation."
+description: "Package sql provides shared SQL builder functions for PostgreSQL DDL generation, the single place where SQL text is constructed across all packages."
 generated: true
 nav_group: "API Reference"
 nav_order: 21

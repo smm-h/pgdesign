@@ -1,6 +1,6 @@
 ---
 title: internal/risk
-description: "Package risk provides shared risk classification for schema change operations."
+description: "Package risk provides shared risk classification for schema change operations, categorizing DDL statements by safety level for diff and migrate."
 generated: true
 nav_group: "API Reference"
 nav_order: 17

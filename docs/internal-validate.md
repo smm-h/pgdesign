@@ -1,6 +1,6 @@
 ---
 title: internal/validate
-description: "Package validate provides the strict validation engine for pgdesign schemas."
+description: "Package validate provides the strict validation engine for pgdesign schemas, operating on the resolved IR to detect rule violations and anti-patterns."
 generated: true
 nav_group: "API Reference"
 nav_order: 26

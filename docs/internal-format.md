@@ -1,6 +1,6 @@
 ---
 title: internal/format
-description: "Package format implements canonical TOML formatting for pgdesign schema files."
+description: "Package format implements canonical TOML formatting for pgdesign schema files, reordering sections via a comment-preserving go-toml-edit AST in place."
 generated: true
 nav_group: "API Reference"
 nav_order: 10

@@ -1,6 +1,6 @@
 ---
 title: internal/audit
-description: "Package audit provides normal form analysis for pgdesign schemas."
+description: "Package audit provides normal form analysis (1NF through BCNF) for pgdesign schemas using declared functional dependencies and Bernstein synthesis."
 generated: true
 nav_group: "API Reference"
 nav_order: 1

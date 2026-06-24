@@ -1,6 +1,6 @@
 ---
 title: internal/semtype
-description: "Package semtype implements the semantic type system for pgdesign."
+description: "Package semtype implements the semantic type system for pgdesign, mapping user-defined enums, scalar domains, composite types, and state machines."
 generated: true
 nav_group: "API Reference"
 nav_order: 19

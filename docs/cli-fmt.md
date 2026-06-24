@@ -9,18 +9,18 @@ nav_order: 5
 
 # pgdesign fmt
 
-Format a pgdesign schema file or directory
+Format a pgdesign TOML schema file or directory in place
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--check` |  | bool |  |  | Check if file is already formatted (exit 1 if not) |
-| `--table-order` |  | str | dependency |  | Table ordering: dependency or alphabetical |
+| `--table-order` |  | str | dependency |  | Table ordering strategy: dependency-based or alphabetical |
 | `--column-order` |  | str | pk_fk_alpha |  | Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve |
 
 ## Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Path to file or directory |
+| `path` | yes | Path to the TOML schema file or directory to format |

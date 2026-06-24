@@ -1,6 +1,6 @@
 ---
 title: internal/config
-description: "Package config loads pgdesign.toml project configuration files."
+description: "Package config loads and validates pgdesign.toml project configuration files including output targets, suppression rules, and extension declarations."
 generated: true
 nav_group: "API Reference"
 nav_order: 3

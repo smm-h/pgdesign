@@ -1,6 +1,6 @@
 ---
 title: internal/graph
-description: "Package graph provides generic graph algorithms."
+description: "Package graph provides generic topological sorting and cycle detection algorithms used by model, generate, and format for dependency ordering."
 generated: true
 nav_group: "API Reference"
 nav_order: 12

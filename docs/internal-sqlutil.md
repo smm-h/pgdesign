@@ -1,6 +1,6 @@
 ---
 title: internal/sqlutil
-description: "Package sqlutil provides a shared adapter between the sqlexpr parser and the"
+description: "Package sqlutil provides a shared adapter between the sqlexpr parser and the diagnostic package for consistent parse-error-to-diagnostic conversion."
 generated: true
 nav_group: "API Reference"
 nav_order: 24

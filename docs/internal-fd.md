@@ -1,6 +1,6 @@
 ---
 title: internal/fd
-description: "Package fd provides functional dependency algorithms used by validate/ and audit/."
+description: "Package fd provides functional dependency primitives including closure computation, minimal cover, candidate keys, and BCNF decomposition for audit."
 generated: true
 nav_group: "API Reference"
 nav_order: 9

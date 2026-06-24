@@ -9,17 +9,17 @@ nav_order: 12
 
 # pgdesign testdb
 
-Ephemeral test database management
+Manage ephemeral test databases for schema testing
 
 ## testdb gc
 
-Drop orphaned test databases
+Drop orphaned test databases that were not torn down
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
 | `--older-than` |  | str |  |  | Drop databases older than this duration (e.g., 2h, 30m) |
 
 ## testdb init
@@ -30,28 +30,28 @@ Generate test database wrappers for consumer projects
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--language` |  | str |  |  | Target language(s) |
+| `--language` |  | str |  |  | Target programming language(s) for wrapper generation |
 | `--output` |  | str |  |  | Name of the SQL output section (for disambiguation) |
-| `--force` |  | bool |  |  | Overwrite existing files |
+| `--force` |  | bool |  |  | Overwrite existing wrapper files without prompting |
 | `--ci` |  | str |  |  | CI provider for workflow generation (e.g., github-actions) |
 
 ## testdb setup
 
-Create an ephemeral test database and apply DDL
+Create an ephemeral test database and apply DDL schema
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--ddl` |  | str |  |  | Path to SQL DDL file |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--ddl` |  | str |  |  | Path to the SQL DDL file to apply to the test database |
 
 ## testdb teardown
 
-Drop an ephemeral test database
+Drop an ephemeral test database created by testdb setup
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |

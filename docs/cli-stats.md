@@ -9,18 +9,18 @@ nav_order: 11
 
 # pgdesign stats
 
-Database statistics and health analysis
+Analyze database statistics, index usage, and health
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--json` |  | bool |  |  | Output as JSON |
-| `--schema` |  | str |  |  | Schema name |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--json` |  | bool |  |  | Output all statistics in machine-readable JSON format |
+| `--schema` |  | str |  |  | PostgreSQL schema name to analyze (repeatable for multiple) |
 
 ## Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | no | Schema file(s) for cross-reference |
+| `path` | no | TOML schema file(s) for cross-referencing with live data |

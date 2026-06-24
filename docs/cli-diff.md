@@ -9,19 +9,19 @@ nav_order: 4
 
 # pgdesign diff
 
-Diff schema file(s) or directory against a target
+Compare schema file(s) or directory against another target
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--json` |  | bool |  |  | Output diff as JSON |
-| `--live` |  | str |  |  | PostgreSQL connection URL for live comparison |
-| `--against` |  | str |  |  | TOML schema file or directory to compare against |
-| `--base` |  | str |  |  | Git ref to compare against (e.g., main, HEAD~1) |
+| `--json` |  | bool |  |  | Output the schema diff in machine-readable JSON format |
+| `--live` |  | str |  |  | PostgreSQL connection URL for live database comparison |
+| `--against` |  | str |  |  | Path to TOML schema file or directory to compare against |
+| `--base` |  | str |  |  | Git ref to compare the current schema against (e.g., main) |
 
 ## Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Path(s) to schema file(s) or directory |
+| `path` | yes | Path to TOML schema file(s) or directory containing them |

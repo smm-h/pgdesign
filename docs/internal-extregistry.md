@@ -1,6 +1,6 @@
 ---
 title: internal/extregistry
-description: "Package extregistry implements the PostgreSQL extension capability registry."
+description: "Package extregistry implements the PostgreSQL extension capability registry, mapping extension names to the types, opclasses, and functions they provide."
 generated: true
 nav_group: "API Reference"
 nav_order: 8

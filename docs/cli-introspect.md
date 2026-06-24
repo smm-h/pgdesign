@@ -9,13 +9,13 @@ nav_order: 7
 
 # pgdesign introspect
 
-Introspect a live PostgreSQL database
+Introspect a live PostgreSQL database into TOML schema
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--schema` |  | str |  |  | Schema name to introspect |
-| `--output` |  | str |  |  | Output file path (default: stdout) |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--schema` |  | str |  |  | PostgreSQL schema name(s) to introspect (repeatable) |
+| `--output` |  | str |  |  | Write output to a file at this path instead of stdout |
 | `--extensions` |  | bool |  |  | Discover extension types, functions, and opclasses |

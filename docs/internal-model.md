@@ -1,6 +1,6 @@
 ---
 title: internal/model
-description: "Package model provides the resolved intermediate representation (IR) for pgdesign."
+description: "Package model provides the resolved intermediate representation for pgdesign, the canonical in-memory schema that all downstream packages consume."
 generated: true
 nav_group: "API Reference"
 nav_order: 15

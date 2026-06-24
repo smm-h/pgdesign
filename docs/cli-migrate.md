@@ -9,103 +9,103 @@ nav_order: 8
 
 # pgdesign migrate
 
-Database migration commands
+Database migration planning, generation, and execution
 
 ## migrate apply
 
-Apply pending migrations
+Apply all pending migrations to the target database
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--dir` |  | str | migrations |  | Migrations directory |
-| `--dry-run` |  | bool |  |  | Show SQL without executing |
-| `--timeout` |  | int | 30 |  | Lock timeout in seconds |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | migrations |  | Directory containing migration files to read or write |
+| `--dry-run` |  | bool |  |  | Preview the migration SQL statements without executing |
+| `--timeout` |  | int | 30 |  | Advisory lock acquisition timeout in seconds before aborting |
 
 ## migrate generate
 
-Generate migration files
+Generate versioned migration files from schema changes
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--version` |  | str |  |  | Migration version (semver) |
-| `--dir` |  | str | migrations |  | Migrations directory |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--version` |  | str |  |  | Semantic version string for the generated migration |
+| `--dir` |  | str | migrations |  | Directory containing migration files to read or write |
 
 ### Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Path(s) to schema file(s) or directory |
+| `path` | yes | Path to TOML schema file(s) or directory containing them |
 
 ## migrate plan
 
-Plan migrations from schema changes
+Plan migrations by diffing schema against live database
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--dir` |  | str | migrations |  | Migrations directory |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | migrations |  | Directory containing migration files to read or write |
 
 ### Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Path(s) to schema file(s) or directory |
+| `path` | yes | Path to TOML schema file(s) or directory containing them |
 
 ## migrate rollback
 
-Rollback the last migration
+Rollback applied database migrations to a target version
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--dir` |  | str | migrations |  | Migrations directory |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | migrations |  | Directory containing migration files to read or write |
 | `--to` |  | str |  |  | Target version to rollback to (exclusive — this version stays applied) |
 
 ## migrate squash
 
-Squash a range of migrations into one
+Consolidate a range of migrations into a single file
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--from` |  | str |  |  | Start version (inclusive) |
-| `--to` |  | str |  |  | End version (inclusive) |
-| `--dir` |  | str | migrations |  | Migrations directory |
-| `--db` |  | str |  |  | PostgreSQL connection URL for safety check |
+| `--from` |  | str |  |  | First migration version to include in the squash range |
+| `--to` |  | str |  |  | Last migration version to include in the squash range |
+| `--dir` |  | str | migrations |  | Directory containing migration files to read or write |
+| `--db` |  | str |  |  | PostgreSQL connection URL for pre-squash safety check |
 
 ## migrate status
 
-Show migration status
+Show which migrations have been applied to the database
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--dir` |  | str | migrations |  | Migrations directory |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | migrations |  | Directory containing migration files to read or write |
 
 ## migrate test
 
-Test migrations against a staging database
+Test migrations by applying them against a staging database
 
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | Staging database connection URL |
-| `--dir` |  | str | migrations |  | Migrations directory |
-| `--timeout` |  | int | 60 |  | Timeout in seconds |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the staging test database |
+| `--dir` |  | str | migrations |  | Directory containing migration files to read or write |
+| `--timeout` |  | int | 60 |  | Maximum time in seconds before the test run is aborted |
 | `--shadow` |  | bool |  |  | Test by replaying migrations into a shadow database and diffing against TOML schema |
 
 ### Arguments

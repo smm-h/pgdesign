@@ -1,6 +1,6 @@
 ---
 title: internal/generate
-description: "Package generate transforms a resolved model.Schema into PostgreSQL DDL output."
+description: "Package generate transforms a resolved model.Schema into PostgreSQL DDL output including tables, views, materialized views, functions, and triggers."
 generated: true
 nav_group: "API Reference"
 nav_order: 11

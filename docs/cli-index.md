@@ -12,20 +12,22 @@ order: 91
 
 PostgreSQL schema compiler
 
+Version: 0.15.1-0.20260624113503-2a57fb058c76+dirty
+
 ## Commands
 
-- [build](cli-build.html) -- Generate all configured outputs
-- [check](cli-check.html) -- Run project checks
-- [codegen](cli-codegen.html) -- Generate application code from schema policies
-- [diff](cli-diff.html) -- Diff schema file(s) or directory against a target
-- [fmt](cli-fmt.html) -- Format a pgdesign schema file or directory
-- [generate](cli-generate.html) -- Generate SQL from schema file(s) or directory
-- [introspect](cli-introspect.html) -- Introspect a live PostgreSQL database
-- [seed](cli-seed.html) -- Generate type-aware test data
-- [serve](cli-serve.html) -- Start the pgdesign HTTP API server
-- [stats](cli-stats.html) -- Database statistics and health analysis
+- [build](cli-build.html) -- Generate all configured outputs from pgdesign.toml
+- [check](cli-check.html) -- Run registered project checks and report diagnostic results
+- [codegen](cli-codegen.html) -- Generate type-safe application code from schema definitions
+- [diff](cli-diff.html) -- Compare schema file(s) or directory against another target
+- [fmt](cli-fmt.html) -- Format a pgdesign TOML schema file or directory in place
+- [generate](cli-generate.html) -- Generate SQL DDL from TOML schema file(s) or directory
+- [introspect](cli-introspect.html) -- Introspect a live PostgreSQL database into TOML schema
+- [seed](cli-seed.html) -- Generate type-aware test data for all schema tables
+- [serve](cli-serve.html) -- Start the pgdesign HTTP API server and web interface
+- [stats](cli-stats.html) -- Analyze database statistics, index usage, and health
 
 ## Command Groups
 
-- [migrate](cli-migrate.html) -- Database migration commands
-- [testdb](cli-testdb.html) -- Ephemeral test database management
+- [migrate](cli-migrate.html) -- Database migration planning, generation, and execution
+- [testdb](cli-testdb.html) -- Manage ephemeral test databases for schema testing

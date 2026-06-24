@@ -9,19 +9,19 @@ nav_order: 3
 
 # pgdesign codegen
 
-Generate application code from schema policies
+Generate type-safe application code from schema definitions
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--lang` |  | str |  |  | Target language |
-| `--mode` |  | str | validators |  | Codegen mode |
-| `--output` |  | str |  |  | Output file path (default: stdout) |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--lang` |  | str |  |  | Target programming language for the generated code |
+| `--mode` |  | str | validators |  | Code generation mode determining what code to produce |
+| `--output` |  | str |  |  | Write output to a file at this path instead of stdout |
 
 ## Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Path(s) to schema file(s) or directory |
+| `path` | yes | Path to TOML schema file(s) or directory containing them |

@@ -9,13 +9,13 @@ nav_order: 10
 
 # pgdesign serve
 
-Start the pgdesign HTTP API server
+Start the pgdesign HTTP API server and web interface
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL |
-| `--port` |  | int | 8080 |  | HTTP port to listen on |
-| `--schema` |  | str |  |  | Schema name to serve |
-| `--timeout` |  | int | 30 |  | Request timeout in seconds |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--port` |  | int | 8080 |  | TCP port number for the HTTP API server to listen on |
+| `--schema` |  | str |  |  | PostgreSQL schema name to serve via the API (repeatable) |
+| `--timeout` |  | int | 30 |  | Maximum time in seconds for each HTTP request to complete |

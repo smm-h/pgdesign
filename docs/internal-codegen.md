@@ -1,6 +1,6 @@
 ---
 title: internal/codegen
-description: "Package codegen generates application-layer code from resolved pgdesign schemas."
+description: "Package codegen generates type-safe application-layer code from resolved pgdesign schemas across six target languages including Go, TypeScript, and Python."
 generated: true
 nav_group: "API Reference"
 nav_order: 2

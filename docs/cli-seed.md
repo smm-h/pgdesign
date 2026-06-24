@@ -9,24 +9,24 @@ nav_order: 9
 
 # pgdesign seed
 
-Generate type-aware test data
+Generate type-aware test data for all schema tables
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--rows` |  | int | 10 |  | Rows per table |
-| `--seed` |  | int |  |  | RNG seed for reproducibility |
-| `--output` |  | str |  |  | Output file path (default: stdout) |
-| `--apply` |  | bool |  |  | Insert directly into database |
-| `--db` |  | str |  |  | PostgreSQL connection URL (required with --apply) |
-| `--schema` |  | str |  |  | Schema name |
-| `--format` |  | str | insert |  | Output format for seed data |
-| `--clean` |  | bool |  |  | Emit TRUNCATE before seed data |
-| `--mode` |  | str | normal |  | Generation mode |
+| `--rows` |  | int | 10 |  | Number of rows to generate per table in the schema |
+| `--seed` |  | int |  |  | Random number generator seed for deterministic output |
+| `--output` |  | str |  |  | Write output to a file at this path instead of stdout |
+| `--apply` |  | bool |  |  | Insert generated seed data directly into the database |
+| `--db` |  | str |  |  | PostgreSQL connection URL, required when using --apply |
+| `--schema` |  | str |  |  | PostgreSQL schema name to filter seed generation to |
+| `--format` |  | str | insert |  | SQL output format for generated seed data statements |
+| `--clean` |  | bool |  |  | Emit TRUNCATE CASCADE statements before inserting seeds |
+| `--mode` |  | str | normal |  | Data generation strategy: normal values or edge-cases |
 
 ## Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Schema file(s) or directory |
+| `path` | yes | Path to TOML schema file(s) or directory for seed generation |

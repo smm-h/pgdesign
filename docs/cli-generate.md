@@ -9,19 +9,19 @@ nav_order: 6
 
 # pgdesign generate
 
-Generate SQL from schema file(s) or directory
+Generate SQL DDL from TOML schema file(s) or directory
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--idempotent` |  | bool |  |  | Add IF NOT EXISTS guards to all statements |
-| `--no-comments` |  | bool |  |  | Exclude COMMENT ON statements from output |
-| `--format` |  | str | sql |  | Output format |
-| `--strict-nf` |  | bool |  |  | Enable strict normal form checking |
+| `--idempotent` |  | bool |  |  | Add IF NOT EXISTS guards to all generated DDL statements |
+| `--no-comments` |  | bool |  |  | Exclude COMMENT ON statements from the generated output |
+| `--format` |  | str | sql |  | Output format for the generated schema representation |
+| `--strict-nf` |  | bool |  |  | Promote normal form violations to errors instead of warnings |
 
 ## Arguments
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `path` | yes | Path(s) to schema file(s) or directory |
+| `path` | yes | Path to TOML schema file(s) or directory containing them |

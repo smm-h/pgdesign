@@ -1,6 +1,6 @@
 ---
 title: internal/introspect
-description: "Package introspect provides live PostgreSQL database introspection."
+description: "Package introspect provides live PostgreSQL database introspection, extracting schema information from pg_catalog into the resolved IR model."
 generated: true
 nav_group: "API Reference"
 nav_order: 13

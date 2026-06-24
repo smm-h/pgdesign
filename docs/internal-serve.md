@@ -1,6 +1,6 @@
 ---
 title: internal/serve
-description: "Package serve provides an HTTP API server for pgdesign schema inspection,"
+description: "Package serve provides an HTTP API server and web UI for pgdesign schema inspection, validation, database statistics, and interactive exploration."
 generated: true
 nav_group: "API Reference"
 nav_order: 20

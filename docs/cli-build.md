@@ -9,11 +9,11 @@ nav_order: 1
 
 # pgdesign build
 
-Generate all configured outputs
+Generate all configured outputs from pgdesign.toml
 
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--dry-run` |  | bool |  |  | Show what would be generated without writing |
-| `--no-commit` |  | bool |  |  | Skip auto-commit of generated files |
+| `--dry-run` |  | bool |  |  | Show what would be generated without writing any files |
+| `--no-commit` |  | bool |  |  | Skip the automatic git commit of generated output files |

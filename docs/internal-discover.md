@@ -1,6 +1,6 @@
 ---
 title: internal/discover
-description: "Package discover provides automatic functional dependency discovery from live"
+description: "Package discover provides automatic functional dependency discovery from live PostgreSQL data using the TANE algorithm (Huhtala et al., 1999)."
 generated: true
 nav_group: "API Reference"
 nav_order: 7
