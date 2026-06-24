@@ -6,14 +6,15 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/risk"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestEmptyDiff(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", NotNull: true},
-				{Name: "name", PGType: "text", NotNull: false},
+				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "name", PGType: typeinfo.T("text"), NotNull: false},
 			}},
 		},
 	}
@@ -76,15 +77,15 @@ func TestColumnAdded(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", NotNull: true},
-				{Name: "email", PGType: "text", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
 			}},
 		},
 	}
@@ -102,15 +103,15 @@ func TestColumnRemoved(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", NotNull: true},
-				{Name: "email", PGType: "text", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+				{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 			}},
 		},
 	}
@@ -128,14 +129,14 @@ func TestColumnTypeChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
 			}},
 		},
 	}
@@ -167,14 +168,14 @@ func TestColumnTypeChangedNarrowing(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
 			}},
 		},
 	}
@@ -190,14 +191,14 @@ func TestNullableChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "name", PGType: "text", NotNull: true},
+				{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "name", PGType: "text", NotNull: false},
+				{Name: "name", PGType: typeinfo.T("text"), NotNull: false},
 			}},
 		},
 	}
@@ -219,14 +220,14 @@ func TestNullableChangedDropNotNull(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "name", PGType: "text", NotNull: false},
+				{Name: "name", PGType: typeinfo.T("text"), NotNull: false},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "name", PGType: "text", NotNull: true},
+				{Name: "name", PGType: typeinfo.T("text"), NotNull: true},
 			}},
 		},
 	}
@@ -339,8 +340,8 @@ func TestSummaryOutput(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint"},
-				{Name: "email", PGType: "text"},
+				{Name: "id", PGType: typeinfo.T("bigint")},
+				{Name: "email", PGType: typeinfo.T("text")},
 			}},
 			{Name: "posts", Schema: "public"},
 		},
@@ -351,7 +352,7 @@ func TestSummaryOutput(t *testing.T) {
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "integer"},
+				{Name: "id", PGType: typeinfo.T("integer")},
 			}},
 			{Name: "old_table", Schema: "public"},
 		},
@@ -410,14 +411,14 @@ func TestDefaultChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "status", PGType: "text", Default: model.StrPtr("active")},
+				{Name: "status", PGType: typeinfo.T("text"), Default: model.StrPtr("active")},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "status", PGType: "text", Default: model.StrPtr("inactive")},
+				{Name: "status", PGType: typeinfo.T("text"), Default: model.StrPtr("inactive")},
 			}},
 		},
 	}
@@ -665,14 +666,14 @@ func TestColumnCommentChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", Comment: "Primary key"},
+				{Name: "id", PGType: typeinfo.T("bigint"), Comment: "Primary key"},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", Comment: ""},
+				{Name: "id", PGType: typeinfo.T("bigint"), Comment: ""},
 			}},
 		},
 	}
@@ -690,14 +691,14 @@ func TestVarcharWidening(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "name", PGType: "varchar(200)"},
+				{Name: "name", PGType: typeinfo.MustParse("varchar(200)")},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "name", PGType: "varchar(100)"},
+				{Name: "name", PGType: typeinfo.MustParse("varchar(100)")},
 			}},
 		},
 	}
@@ -715,14 +716,14 @@ func TestMultipleChangesHighestRisk(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", NotNull: false},
+				{Name: "id", PGType: typeinfo.T("bigint"), NotNull: false},
 			}},
 		},
 	}
@@ -758,14 +759,14 @@ func TestGeneratedChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "orders", Schema: "public", Columns: []model.Column{
-				{Name: "total", PGType: "numeric", Generated: "STORED"},
+				{Name: "total", PGType: typeinfo.T("numeric"), Generated: "STORED"},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "orders", Schema: "public", Columns: []model.Column{
-				{Name: "total", PGType: "numeric", Generated: ""},
+				{Name: "total", PGType: typeinfo.T("numeric"), Generated: ""},
 			}},
 		},
 	}
@@ -786,14 +787,14 @@ func TestIdentityChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", Identity: "BY DEFAULT"},
+				{Name: "id", PGType: typeinfo.T("bigint"), Identity: "BY DEFAULT"},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", Identity: "ALWAYS"},
+				{Name: "id", PGType: typeinfo.T("bigint"), Identity: "ALWAYS"},
 			}},
 		},
 	}
@@ -814,14 +815,14 @@ func TestGeneratedAndIdentityUnchanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", Identity: "ALWAYS", Generated: "STORED"},
+				{Name: "id", PGType: typeinfo.T("bigint"), Identity: "ALWAYS", Generated: "STORED"},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
-				{Name: "id", PGType: "bigint", Identity: "ALWAYS", Generated: "STORED"},
+				{Name: "id", PGType: typeinfo.T("bigint"), Identity: "ALWAYS", Generated: "STORED"},
 			}},
 		},
 	}
@@ -1305,14 +1306,14 @@ func TestArrayChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "posts", Schema: "public", Columns: []model.Column{
-				{Name: "tags", PGType: "text", Array: true},
+				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "posts", Schema: "public", Columns: []model.Column{
-				{Name: "tags", PGType: "text", Array: false},
+				{Name: "tags", PGType: typeinfo.T("text"), Array: false},
 			}},
 		},
 	}
@@ -1333,14 +1334,14 @@ func TestArrayUnchanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "posts", Schema: "public", Columns: []model.Column{
-				{Name: "tags", PGType: "text", Array: true},
+				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{
 			{Name: "posts", Schema: "public", Columns: []model.Column{
-				{Name: "tags", PGType: "text", Array: true},
+				{Name: "tags", PGType: typeinfo.T("text"), Array: true},
 			}},
 		},
 	}
@@ -1398,7 +1399,7 @@ func TestAppendOnlyChanged(t *testing.T) {
 			{
 				Name:       "events",
 				Schema:     "app",
-				Columns:    []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns:    []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:         []string{"id"},
 				AppendOnly: true,
 			},
@@ -1409,7 +1410,7 @@ func TestAppendOnlyChanged(t *testing.T) {
 			{
 				Name:    "events",
 				Schema:  "app",
-				Columns: []model.Column{{Name: "id", PGType: "uuid", NotNull: true}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
 				PK:      []string{"id"},
 			},
 		},
@@ -1490,8 +1491,8 @@ func TestDiffColumnJSONSchema(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "new_schema.json"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "data", PGType: typeinfo.T("jsonb"), NotNull: true, JSONSchema: "new_schema.json"},
 				},
 				PK: []string{"id"},
 			},
@@ -1505,8 +1506,8 @@ func TestDiffColumnJSONSchema(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "old_schema.json"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "data", PGType: typeinfo.T("jsonb"), NotNull: true, JSONSchema: "old_schema.json"},
 				},
 				PK: []string{"id"},
 			},
@@ -1541,8 +1542,8 @@ func TestDiffColumnJSONSchemaAdded(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "schema.json"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "data", PGType: typeinfo.T("jsonb"), NotNull: true, JSONSchema: "schema.json"},
 				},
 				PK: []string{"id"},
 			},
@@ -1556,8 +1557,8 @@ func TestDiffColumnJSONSchemaAdded(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "data", PGType: "jsonb", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "data", PGType: typeinfo.T("jsonb"), NotNull: true},
 				},
 				PK: []string{"id"},
 			},
@@ -1587,8 +1588,8 @@ func TestDiffColumnJSONSchemaUnchanged(t *testing.T) {
 				Name:   "items",
 				Schema: "app",
 				Columns: []model.Column{
-					{Name: "id", PGType: "uuid", NotNull: true},
-					{Name: "data", PGType: "jsonb", NotNull: true, JSONSchema: "same.json"},
+					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+					{Name: "data", PGType: typeinfo.T("jsonb"), NotNull: true, JSONSchema: "same.json"},
 				},
 				PK: []string{"id"},
 			},
@@ -1977,8 +1978,8 @@ func TestDiff_StoredToVirtualTransition(t *testing.T) {
 				Name:   "orders",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: false},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: false},
 				},
 			},
 		},
@@ -1989,8 +1990,8 @@ func TestDiff_StoredToVirtualTransition(t *testing.T) {
 				Name:   "orders",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "computed", PGType: "integer", NotNull: true, Generated: "val * 2", Stored: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "computed", PGType: typeinfo.T("integer"), NotNull: true, Generated: "val * 2", Stored: true},
 				},
 			},
 		},
@@ -2035,8 +2036,8 @@ func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
 				Name:   "t",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "val", PGType: "integer", NotNull: true, Stored: false},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true, Stored: false},
 				},
 			},
 		},
@@ -2047,8 +2048,8 @@ func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
 				Name:   "t",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "val", PGType: "integer", NotNull: true, Stored: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "val", PGType: typeinfo.T("integer"), NotNull: true, Stored: true},
 				},
 			},
 		},
@@ -2069,8 +2070,8 @@ func TestColumnCollationChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", Collation: "de_DE"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), Collation: "de_DE"},
 				},
 			},
 		},
@@ -2081,8 +2082,8 @@ func TestColumnCollationChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", Collation: ""},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), Collation: ""},
 				},
 			},
 		},
@@ -2118,8 +2119,8 @@ func TestColumnCollationUnchanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", Collation: "C"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), Collation: "C"},
 				},
 			},
 		},
@@ -2138,8 +2139,8 @@ func TestColumnStatisticsChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", Statistics: intPtr(1000)},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), Statistics: intPtr(1000)},
 				},
 			},
 		},
@@ -2150,8 +2151,8 @@ func TestColumnStatisticsChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text")},
 				},
 			},
 		},
@@ -2187,8 +2188,8 @@ func TestColumnStatisticsReset(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text")},
 				},
 			},
 		},
@@ -2199,8 +2200,8 @@ func TestColumnStatisticsReset(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", Statistics: intPtr(500)},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), Statistics: intPtr(500)},
 				},
 			},
 		},
@@ -2236,8 +2237,8 @@ func TestColumnStatisticsUnchanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text", Statistics: intPtr(1000)},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text"), Statistics: intPtr(1000)},
 				},
 			},
 		},
@@ -2256,8 +2257,8 @@ func TestIndexCollationChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text")},
 				},
 				Indexes: []model.Index{
 					{Name: "idx_users_name", Columns: []string{"name"}, Collations: map[string]string{"name": "C"}},
@@ -2271,8 +2272,8 @@ func TestIndexCollationChanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text")},
 				},
 				Indexes: []model.Index{
 					{Name: "idx_users_name", Columns: []string{"name"}},
@@ -2305,8 +2306,8 @@ func TestIndexCollationUnchanged(t *testing.T) {
 				Name:   "users",
 				Schema: "public",
 				Columns: []model.Column{
-					{Name: "id", PGType: "bigint", NotNull: true},
-					{Name: "name", PGType: "text"},
+					{Name: "id", PGType: typeinfo.T("bigint"), NotNull: true},
+					{Name: "name", PGType: typeinfo.T("text")},
 				},
 				Indexes: []model.Index{
 					{Name: "idx_users_name", Columns: []string{"name"}, Collations: map[string]string{"name": "C"}},
@@ -2327,9 +2328,9 @@ func TestDiff_ExclusionAdded(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "room_id", PGType: "integer", NotNull: true},
-				{Name: "during", PGType: "tsrange", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_overlap",
@@ -2346,9 +2347,9 @@ func TestDiff_ExclusionAdded(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "room_id", PGType: "integer", NotNull: true},
-				{Name: "during", PGType: "tsrange", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 		}},
 	}
@@ -2374,9 +2375,9 @@ func TestDiff_ExclusionRemoved(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "room_id", PGType: "integer", NotNull: true},
-				{Name: "during", PGType: "tsrange", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 		}},
 	}
@@ -2385,9 +2386,9 @@ func TestDiff_ExclusionRemoved(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "room_id", PGType: "integer", NotNull: true},
-				{Name: "during", PGType: "tsrange", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_overlap",
@@ -2418,9 +2419,9 @@ func TestDiff_ExclusionChanged(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "room_id", PGType: "integer", NotNull: true},
-				{Name: "during", PGType: "tsrange", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_overlap",
@@ -2436,9 +2437,9 @@ func TestDiff_ExclusionChanged(t *testing.T) {
 			Name:    "bookings",
 			Comment: "Room bookings",
 			Columns: []model.Column{
-				{Name: "id", PGType: "integer", NotNull: true},
-				{Name: "room_id", PGType: "integer", NotNull: true},
-				{Name: "during", PGType: "tsrange", NotNull: true},
+				{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "room_id", PGType: typeinfo.T("integer"), NotNull: true},
+				{Name: "during", PGType: typeinfo.T("tsrange"), NotNull: true},
 			},
 			Exclusions: []model.ExclusionConstraint{{
 				Name:   "no_overlap",
@@ -2472,8 +2473,8 @@ func TestDiff_UniqueChangedDeferrable(t *testing.T) {
 				Name:    "users",
 				Comment: "users table",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Uniques: []model.UniqueConstraint{
@@ -2489,8 +2490,8 @@ func TestDiff_UniqueChangedDeferrable(t *testing.T) {
 				Name:    "users",
 				Comment: "users table",
 				Columns: []model.Column{
-					{Name: "id", PGType: "integer", NotNull: true},
-					{Name: "email", PGType: "text", NotNull: true},
+					{Name: "id", PGType: typeinfo.T("integer"), NotNull: true},
+					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 				},
 				PK: []string{"id"},
 				Uniques: []model.UniqueConstraint{
@@ -2643,8 +2644,8 @@ func TestCompositeTypeAdded(t *testing.T) {
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
-				{Name: "city", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
+				{Name: "city", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
@@ -2666,7 +2667,7 @@ func TestCompositeTypeRemoved(t *testing.T) {
 	actual := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
@@ -2683,17 +2684,17 @@ func TestCompositeTypeFieldAdded(t *testing.T) {
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
-				{Name: "city", PGType: "text"},
-				{Name: "zip", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
+				{Name: "city", PGType: typeinfo.T("text")},
+				{Name: "zip", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
-				{Name: "city", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
+				{Name: "city", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
@@ -2717,15 +2718,15 @@ func TestCompositeTypeFieldRemoved(t *testing.T) {
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
-				{Name: "city", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
+				{Name: "city", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
@@ -2743,14 +2744,14 @@ func TestCompositeTypeFieldTypeChanged(t *testing.T) {
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "varchar(200)"},
+				{Name: "street", PGType: typeinfo.MustParse("varchar(200)")},
 			}},
 		},
 	}
 	actual := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
@@ -2778,8 +2779,8 @@ func TestCompositeTypeUnchanged(t *testing.T) {
 	schema := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
-				{Name: "city", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
+				{Name: "city", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
@@ -2793,14 +2794,14 @@ func TestCompositeTypeCommentChanged(t *testing.T) {
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
 			}, Comment: "New comment"},
 		},
 	}
 	actual := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
 			}, Comment: "Old comment"},
 		},
 	}
@@ -2821,7 +2822,7 @@ func TestCompositeTypeSchemaQualified(t *testing.T) {
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Schema: "custom", Fields: []model.CompositeField{
-				{Name: "street", PGType: "text"},
+				{Name: "street", PGType: typeinfo.T("text")},
 			}},
 		},
 	}
@@ -2868,14 +2869,14 @@ func TestFunctionBodyChanged(t *testing.T) {
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
-				Args: []model.FunctionArg{{Name: "amount", Type: "numeric"}},
+				Args: []model.FunctionArg{{Name: "amount", Type: typeinfo.T("numeric")}},
 				Body: "BEGIN RETURN amount * 0.2; END;"},
 		},
 	}
 	actual := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
-				Args: []model.FunctionArg{{Name: "amount", Type: "numeric"}},
+				Args: []model.FunctionArg{{Name: "amount", Type: typeinfo.T("numeric")}},
 				Body: "BEGIN RETURN amount * 0.1; END;"},
 		},
 	}
@@ -2896,14 +2897,14 @@ func TestFunctionSignatureChanged(t *testing.T) {
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
-				Args: []model.FunctionArg{{Name: "amount", Type: "numeric"}, {Name: "rate", Type: "numeric"}},
+				Args: []model.FunctionArg{{Name: "amount", Type: typeinfo.T("numeric")}, {Name: "rate", Type: typeinfo.T("numeric")}},
 				Body: "BEGIN RETURN amount * rate; END;"},
 		},
 	}
 	actual := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
-				Args: []model.FunctionArg{{Name: "amount", Type: "numeric"}},
+				Args: []model.FunctionArg{{Name: "amount", Type: typeinfo.T("numeric")}},
 				Body: "BEGIN RETURN amount * 0.1; END;"},
 		},
 	}
@@ -2951,14 +2952,14 @@ func TestFunctionArgDefaultOnly(t *testing.T) {
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calc", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
-				Args: []model.FunctionArg{{Name: "amount", Type: "numeric", Default: "100"}},
+				Args: []model.FunctionArg{{Name: "amount", Type: typeinfo.T("numeric"), Default: "100"}},
 				Body: "BEGIN RETURN amount; END;"},
 		},
 	}
 	actual := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calc", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
-				Args: []model.FunctionArg{{Name: "amount", Type: "numeric", Default: "0"}},
+				Args: []model.FunctionArg{{Name: "amount", Type: typeinfo.T("numeric"), Default: "0"}},
 				Body: "BEGIN RETURN amount; END;"},
 		},
 	}
@@ -2978,7 +2979,7 @@ func TestFunctionArgDefaultOnly(t *testing.T) {
 func TestFunctionIdenticalNoDiff(t *testing.T) {
 	fn := model.Function{
 		Name: "calc", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
-		Args: []model.FunctionArg{{Name: "a", Type: "numeric"}},
+		Args: []model.FunctionArg{{Name: "a", Type: typeinfo.T("numeric")}},
 		Body: "BEGIN RETURN a; END;",
 	}
 	schema := &model.Schema{Functions: []model.Function{fn}}
@@ -3009,7 +3010,7 @@ func TestFunctionSummary(t *testing.T) {
 func TestDomainAdded(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9-]+$'"},
 		},
 	}
 	actual := &model.Schema{}
@@ -3026,7 +3027,7 @@ func TestDomainRemoved(t *testing.T) {
 	desired := &model.Schema{}
 	actual := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9-]+$'"},
 		},
 	}
 	d := Diff(desired, actual)
@@ -3041,12 +3042,12 @@ func TestDomainRemoved(t *testing.T) {
 func TestDomainCheckChanged(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9_-]+$'"},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9_-]+$'"},
 		},
 	}
 	actual := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9-]+$'"},
 		},
 	}
 	d := Diff(desired, actual)
@@ -3071,12 +3072,12 @@ func TestDomainCheckChanged(t *testing.T) {
 func TestDomainDefaultChanged(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: "bigint", Default: "1"},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("bigint"), Default: "1"},
 		},
 	}
 	actual := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: "bigint", Default: "0"},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("bigint"), Default: "0"},
 		},
 	}
 	d := Diff(desired, actual)
@@ -3098,12 +3099,12 @@ func TestDomainDefaultChanged(t *testing.T) {
 func TestDomainNotNullChanged(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", NotNull: true},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), NotNull: true},
 		},
 	}
 	actual := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", NotNull: false},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), NotNull: false},
 		},
 	}
 	d := Diff(desired, actual)
@@ -3125,7 +3126,7 @@ func TestDomainNotNullChanged(t *testing.T) {
 func TestDomainUnchanged(t *testing.T) {
 	schema := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", Check: "VALUE ~ '^[a-z0-9-]+$'"},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9-]+$'"},
 		},
 	}
 	d := Diff(schema, schema)
@@ -3137,7 +3138,7 @@ func TestDomainUnchanged(t *testing.T) {
 func TestDomainSchemaQualified(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "custom", BaseType: "text"},
+			{Name: "slug", Schema: "custom", BaseType: typeinfo.T("text")},
 		},
 	}
 	actual := &model.Schema{}
@@ -3150,12 +3151,12 @@ func TestDomainSchemaQualified(t *testing.T) {
 func TestDomainCommentChanged(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", Comment: "URL-safe identifier"},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Comment: "URL-safe identifier"},
 		},
 	}
 	actual := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "slug", Schema: "public", BaseType: "text", Comment: "old comment"},
+			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Comment: "old comment"},
 		},
 	}
 	d := Diff(desired, actual)
@@ -3174,12 +3175,12 @@ func TestDomainCommentChanged(t *testing.T) {
 func TestDomainBaseTypeChanged(t *testing.T) {
 	desired := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: "bigint"},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("bigint")},
 		},
 	}
 	actual := &model.Schema{
 		Domains: []model.Domain{
-			{Name: "counter", Schema: "public", BaseType: "integer"},
+			{Name: "counter", Schema: "public", BaseType: typeinfo.T("integer")},
 		},
 	}
 	d := Diff(desired, actual)
