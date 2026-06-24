@@ -1394,3 +1394,323 @@ func TestIdempotentRegistration(t *testing.T) {
 		t.Errorf("expected no shadow diagnostics for idempotent registration, got %d", len(r.ShadowDiags()))
 	}
 }
+
+func TestExtendsScalarBuiltin(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// Extend builtin "id" (uuid, NOT NULL, DefaultExpr gen_random_uuid())
+	// with a custom DefaultExpr.
+	userTypes := []UserTypeDef{
+		{
+			Name:        "custom_id",
+			Extends:     "id",
+			DefaultExpr: "uuid_generate_v7()",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("custom_id")
+	if err != nil {
+		t.Fatalf("Resolve(custom_id) error: %v", err)
+	}
+
+	// Kind and BaseType inherited from builtin "id".
+	if td.Kind != KindScalar {
+		t.Errorf("Kind = %v, want KindScalar", td.Kind)
+	}
+	if td.BaseType != typeinfo.T("uuid") {
+		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T("uuid"))
+	}
+
+	// DefaultExpr overridden by child.
+	if td.DefaultExpr != "uuid_generate_v7()" {
+		t.Errorf("DefaultExpr = %q, want %q", td.DefaultExpr, "uuid_generate_v7()")
+	}
+
+	// Source should be "extended".
+	if td.Source != "extended" {
+		t.Errorf("Source = %q, want %q", td.Source, "extended")
+	}
+
+	// NotNull inherited from parent.
+	if !td.NotNull {
+		t.Error("NotNull = false, want true (inherited from parent)")
+	}
+
+	// I101 should be emitted for shadowing builtin "id" (the child name is
+	// "custom_id" which is not "id", so no I101 expected here). Verify that
+	// the original "id" is untouched.
+	origID, err := r.Resolve("id")
+	if err != nil {
+		t.Fatalf("Resolve(id) error: %v", err)
+	}
+	if origID.DefaultExpr != "gen_random_uuid()" {
+		t.Errorf("original id DefaultExpr = %q, want %q", origID.DefaultExpr, "gen_random_uuid()")
+	}
+}
+
+func TestExtendsScalarUserType(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// Type A is a user scalar, then B extends A.
+	userTypes := []UserTypeDef{
+		{
+			Name:  "positive_int",
+			Kind:  "scalar",
+			Base:  "integer",
+			Check: "VALUE > 0",
+		},
+		{
+			Name:        "even_positive",
+			Extends:     "positive_int",
+			Check:       "VALUE > 0 AND VALUE % 2 = 0",
+			DefaultExpr: "2",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("even_positive")
+	if err != nil {
+		t.Fatalf("Resolve(even_positive) error: %v", err)
+	}
+
+	// BaseType inherited from positive_int.
+	if td.BaseType != typeinfo.T("int4") {
+		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T("int4"))
+	}
+
+	// Check overridden by child.
+	if td.Check != "VALUE > 0 AND VALUE % 2 = 0" {
+		t.Errorf("Check = %q, want %q", td.Check, "VALUE > 0 AND VALUE % 2 = 0")
+	}
+
+	// DefaultExpr set by child.
+	if td.DefaultExpr != "2" {
+		t.Errorf("DefaultExpr = %q, want %q", td.DefaultExpr, "2")
+	}
+
+	if td.Source != "extended" {
+		t.Errorf("Source = %q, want %q", td.Source, "extended")
+	}
+}
+
+func TestExtendsSelfShadowing(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// [types.id] extends = "id" — same name. Should resolve against the
+	// builtin "id", not itself.
+	userTypes := []UserTypeDef{
+		{
+			Name:        "id",
+			Extends:     "id",
+			DefaultExpr: "uuid_generate_v7()",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	td, err := r.Resolve("id")
+	if err != nil {
+		t.Fatalf("Resolve(id) error: %v", err)
+	}
+
+	// Should have builtin's Kind and BaseType + child's DefaultExpr.
+	if td.Kind != KindScalar {
+		t.Errorf("Kind = %v, want KindScalar", td.Kind)
+	}
+	if td.BaseType != typeinfo.T("uuid") {
+		t.Errorf("BaseType = %v, want %v", td.BaseType, typeinfo.T("uuid"))
+	}
+	if td.DefaultExpr != "uuid_generate_v7()" {
+		t.Errorf("DefaultExpr = %q, want %q", td.DefaultExpr, "uuid_generate_v7()")
+	}
+	if td.Source != "extended" {
+		t.Errorf("Source = %q, want %q", td.Source, "extended")
+	}
+
+	// I101 should be emitted via ShadowDiags for shadowing the builtin.
+	shadowDiags := r.ShadowDiags()
+	foundI101 := false
+	for _, d := range shadowDiags {
+		if d.Code == "I101" {
+			foundI101 = true
+			break
+		}
+	}
+	if !foundI101 {
+		t.Error("expected I101 diagnostic for self-shadowing builtin, got none")
+	}
+}
+
+func TestExtendsCircular(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// A extends B, B extends A — circular.
+	userTypes := []UserTypeDef{
+		{
+			Name:    "type_a",
+			Extends: "type_b",
+		},
+		{
+			Name:    "type_b",
+			Extends: "type_a",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for circular extends, got none")
+	}
+
+	foundE115 := false
+	for _, d := range diags {
+		if d.Code == "E115" {
+			foundE115 = true
+			break
+		}
+	}
+	if !foundE115 {
+		t.Error("expected diagnostic code E115 for circular extends")
+	}
+}
+
+func TestExtendsUnknownTarget(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	userTypes := []UserTypeDef{
+		{
+			Name:    "orphan",
+			Extends: "nonexistent",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for unknown extends target, got none")
+	}
+
+	foundE116 := false
+	for _, d := range diags {
+		if d.Code == "E116" {
+			foundE116 = true
+			break
+		}
+	}
+	if !foundE116 {
+		t.Error("expected diagnostic code E116 for unknown extends target")
+	}
+}
+
+func TestExtendsMultiLevel(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// C extends B extends A. Verify C has A's fields + B's overrides + C's overrides.
+	userTypes := []UserTypeDef{
+		{
+			Name:    "base_text",
+			Kind:    "scalar",
+			Base:    "text",
+			Check:   "VALUE IS NOT NULL",
+			Comment: "base comment",
+		},
+		{
+			Name:    "short_base",
+			Extends: "base_text",
+			Check:   "LENGTH(VALUE) <= 100",
+			Comment: "short comment",
+		},
+		{
+			Name:    "slug_short",
+			Extends: "short_base",
+			Check:   "VALUE ~ '^[a-z0-9-]+$' AND LENGTH(VALUE) <= 100",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+
+	// Verify base_text.
+	a, err := r.Resolve("base_text")
+	if err != nil {
+		t.Fatalf("Resolve(base_text) error: %v", err)
+	}
+	if a.Check != "VALUE IS NOT NULL" {
+		t.Errorf("base_text.Check = %q, want %q", a.Check, "VALUE IS NOT NULL")
+	}
+
+	// Verify short_base inherits from base_text.
+	b, err := r.Resolve("short_base")
+	if err != nil {
+		t.Fatalf("Resolve(short_base) error: %v", err)
+	}
+	if b.BaseType != typeinfo.T("text") {
+		t.Errorf("short_base.BaseType = %v, want %v", b.BaseType, typeinfo.T("text"))
+	}
+	if b.Check != "LENGTH(VALUE) <= 100" {
+		t.Errorf("short_base.Check = %q, want %q", b.Check, "LENGTH(VALUE) <= 100")
+	}
+	if b.Comment != "short comment" {
+		t.Errorf("short_base.Comment = %q, want %q", b.Comment, "short comment")
+	}
+
+	// Verify slug_short inherits from short_base.
+	c, err := r.Resolve("slug_short")
+	if err != nil {
+		t.Fatalf("Resolve(slug_short) error: %v", err)
+	}
+	if c.BaseType != typeinfo.T("text") {
+		t.Errorf("slug_short.BaseType = %v, want %v", c.BaseType, typeinfo.T("text"))
+	}
+	if c.Check != "VALUE ~ '^[a-z0-9-]+$' AND LENGTH(VALUE) <= 100" {
+		t.Errorf("slug_short.Check = %q, want %q", c.Check, "VALUE ~ '^[a-z0-9-]+$' AND LENGTH(VALUE) <= 100")
+	}
+	// Comment inherited from short_base (child doesn't set it).
+	if c.Comment != "short comment" {
+		t.Errorf("slug_short.Comment = %q, want %q (inherited from short_base)", c.Comment, "short comment")
+	}
+	if c.Source != "extended" {
+		t.Errorf("slug_short.Source = %q, want %q", c.Source, "extended")
+	}
+}
+
+func TestExtendsSealedFieldViolation(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// Extend builtin "id" (BaseType uuid) but try to set a different BaseType.
+	userTypes := []UserTypeDef{
+		{
+			Name:    "bad_id",
+			Extends: "id",
+			Base:    "text",
+		},
+	}
+
+	diags := r.LoadUserTypes(userTypes)
+	if !diags.HasErrors() {
+		t.Fatal("expected errors for sealed field violation, got none")
+	}
+
+	foundE114 := false
+	for _, d := range diags {
+		if d.Code == "E114" {
+			foundE114 = true
+			break
+		}
+	}
+	if !foundE114 {
+		t.Error("expected diagnostic code E114 for sealed field BaseType violation")
+	}
+}

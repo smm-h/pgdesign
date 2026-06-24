@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/graph"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
@@ -391,10 +392,14 @@ var pgTypeAllowlist = map[string]bool{
 }
 
 // LoadUserTypes validates and registers user-defined types into the registry.
+// Types with extends references are topologically sorted before processing
+// so that parent types are always loaded before their children.
 // Returns diagnostics for any validation failures.
 func (r *Registry) LoadUserTypes(types []UserTypeDef) diagnostic.Diagnostics {
 	var diags diagnostic.Diagnostics
 
+	// Pre-validate names before topo sort.
+	var valid []UserTypeDef
 	for _, ut := range types {
 		if ut.Name == "" {
 			diags = append(diags, diagnostic.Diagnostic{
@@ -402,6 +407,70 @@ func (r *Registry) LoadUserTypes(types []UserTypeDef) diagnostic.Diagnostics {
 				Code:     "E100",
 				Message:  "user-defined type has empty name",
 			})
+			continue
+		}
+		valid = append(valid, ut)
+	}
+
+	// Build set of user type names being loaded, for extends target validation.
+	userTypeNames := make(map[string]bool, len(valid))
+	for _, ut := range valid {
+		userTypeNames[ut.Name] = true
+	}
+
+	// Validate extends targets before topo sort: each target must exist in the
+	// registry or be another user type being loaded.
+	for _, ut := range valid {
+		if ut.Extends == "" || ut.Extends == ut.Name {
+			// No extends, or self-shadowing (self-dep is fine, topo sort skips it).
+			continue
+		}
+		r.mu.RLock()
+		_, inRegistry := r.types[ut.Extends]
+		r.mu.RUnlock()
+		if !inRegistry && !userTypeNames[ut.Extends] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E116",
+				Message:  fmt.Sprintf("type %q extends unknown type %q", ut.Name, ut.Extends),
+			})
+		}
+	}
+	if diags.HasErrors() {
+		return diags
+	}
+
+	// Topological sort by extends references.
+	sorted, cycles := graph.TopoSort(valid,
+		func(ut UserTypeDef) string { return ut.Name },
+		func(ut UserTypeDef) []string {
+			if ut.Extends == "" {
+				return nil
+			}
+			return []string{ut.Extends}
+		},
+	)
+
+	// Emit E115 for cycle members.
+	for _, cycle := range cycles {
+		names := make([]string, len(cycle))
+		for i, ut := range cycle {
+			names[i] = ut.Name
+		}
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E115",
+			Message:  fmt.Sprintf("circular extends reference: %s", strings.Join(names, ", ")),
+		})
+	}
+	if diags.HasErrors() {
+		return diags
+	}
+
+	// Process types in topological order.
+	for _, ut := range sorted {
+		if ut.Extends != "" {
+			diags = append(diags, r.loadExtendedType(ut)...)
 			continue
 		}
 
@@ -428,6 +497,100 @@ func (r *Registry) LoadUserTypes(types []UserTypeDef) diagnostic.Diagnostics {
 	}
 
 	return diags
+}
+
+// loadExtendedType handles a type with extends set.
+// It resolves the parent from the registry, merges fields, and registers.
+func (r *Registry) loadExtendedType(ut UserTypeDef) diagnostic.Diagnostics {
+	var diags diagnostic.Diagnostics
+
+	parent, err := r.Resolve(ut.Extends)
+	if err != nil {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E116",
+			Message:  fmt.Sprintf("type %q extends unknown type %q", ut.Name, ut.Extends),
+		})
+		return diags
+	}
+
+	// For now, only scalar merge is supported.
+	if parent.Kind != KindScalar {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E116",
+			Message:  fmt.Sprintf("extends not yet supported for %s types", parent.Kind),
+		})
+		return diags
+	}
+
+	// Sealed field enforcement: BaseType cannot be changed via extends.
+	if ut.Base != "" {
+		childBase := typeinfo.Parse(ut.Base)
+		if childBase.Base != parent.BaseType.Base {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E114",
+				Message:  fmt.Sprintf("type %q extends %q but has different BaseType (sealed field cannot change)", ut.Name, ut.Extends),
+			})
+			return diags
+		}
+	}
+
+	merged := mergeScalarType(parent, ut)
+
+	if err := r.Register(merged); err != nil {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error,
+			Code:     "E105",
+			Message:  fmt.Sprintf("type %q: %s", ut.Name, err.Error()),
+		})
+	}
+
+	return diags
+}
+
+// mergeScalarType creates a new TypeDef by copying the parent and overriding
+// with any non-zero fields from the child UserTypeDef.
+func mergeScalarType(parent *TypeDef, child UserTypeDef) *TypeDef {
+	td := &TypeDef{
+		Name:        child.Name,
+		Kind:        parent.Kind,
+		BaseType:    parent.BaseType,
+		NotNull:     parent.NotNull,
+		Default:     parent.Default,
+		DefaultExpr: parent.DefaultExpr,
+		Check:       parent.Check,
+		Unique:      parent.Unique,
+		Array:       parent.Array,
+		Comment:     parent.Comment,
+		Source:      "extended",
+	}
+
+	// Override with child's non-zero fields.
+	if child.NotNull != nil {
+		td.NotNull = *child.NotNull
+	}
+	if child.Default != nil {
+		td.Default = child.Default
+	}
+	if child.DefaultExpr != "" {
+		td.DefaultExpr = child.DefaultExpr
+	}
+	if child.Check != "" {
+		td.Check = child.Check
+	}
+	if child.Unique {
+		td.Unique = true
+	}
+	if child.Array {
+		td.Array = true
+	}
+	if child.Comment != "" {
+		td.Comment = child.Comment
+	}
+
+	return td
 }
 
 func (r *Registry) loadEnumType(ut UserTypeDef) diagnostic.Diagnostics {
