@@ -6,6 +6,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestJSONSchemaToChecks(t *testing.T) {
@@ -498,32 +499,32 @@ func TestBuild_DomainResolution(t *testing.T) {
 
 	if col := findCol("id"); col == nil {
 		t.Fatal("id column not found")
-	} else if col.PGType != "uuid" {
-		t.Errorf("id.PGType = %q, want %q", col.PGType, "uuid")
+	} else if got := typeinfo.Reconstruct(col.PGType); got != "uuid" {
+		t.Errorf("id.PGType = %q, want %q", got, "uuid")
 	}
 
 	if col := findCol("handle"); col == nil {
 		t.Fatal("handle column not found")
-	} else if col.PGType != "slug" {
-		t.Errorf("handle.PGType = %q, want %q", col.PGType, "slug")
+	} else if got := typeinfo.Reconstruct(col.PGType); got != "slug" {
+		t.Errorf("handle.PGType = %q, want %q", got, "slug")
 	}
 
 	if col := findCol("contact"); col == nil {
 		t.Fatal("contact column not found")
-	} else if col.PGType != "email" {
-		t.Errorf("contact.PGType = %q, want %q", col.PGType, "email")
+	} else if got := typeinfo.Reconstruct(col.PGType); got != "email" {
+		t.Errorf("contact.PGType = %q, want %q", got, "email")
 	}
 
 	if col := findCol("bio"); col == nil {
 		t.Fatal("bio column not found")
-	} else if col.PGType != "short_text" {
-		t.Errorf("bio.PGType = %q, want %q", col.PGType, "short_text")
+	} else if got := typeinfo.Reconstruct(col.PGType); got != "short_text" {
+		t.Errorf("bio.PGType = %q, want %q", got, "short_text")
 	}
 
 	if col := findCol("name"); col == nil {
 		t.Fatal("name column not found")
-	} else if col.PGType != "short_text" {
-		t.Errorf("name.PGType = %q, want %q", col.PGType, "short_text")
+	} else if got := typeinfo.Reconstruct(col.PGType); got != "short_text" {
+		t.Errorf("name.PGType = %q, want %q", got, "short_text")
 	}
 
 	// Domains should be built for slug, email, short_text (3 unique types).
@@ -540,8 +541,8 @@ func TestBuild_DomainResolution(t *testing.T) {
 	if d, ok := domainsByName["slug"]; !ok {
 		t.Error("missing domain for slug")
 	} else {
-		if d.BaseType != "text" {
-			t.Errorf("slug domain BaseType = %q, want %q", d.BaseType, "text")
+		if d.BaseType != typeinfo.T("text") {
+			t.Errorf("slug domain BaseType = %v, want %v", d.BaseType, typeinfo.T("text"))
 		}
 		if d.Check != "VALUE ~ '^[a-z0-9-]+$'" {
 			t.Errorf("slug domain Check = %q, want %q", d.Check, "VALUE ~ '^[a-z0-9-]+$'")
@@ -555,8 +556,8 @@ func TestBuild_DomainResolution(t *testing.T) {
 	if d, ok := domainsByName["email"]; !ok {
 		t.Error("missing domain for email")
 	} else {
-		if d.BaseType != "text" {
-			t.Errorf("email domain BaseType = %q, want %q", d.BaseType, "text")
+		if d.BaseType != typeinfo.T("text") {
+			t.Errorf("email domain BaseType = %v, want %v", d.BaseType, typeinfo.T("text"))
 		}
 		if d.Check != "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'" {
 			t.Errorf("email domain Check = %q, want %q", d.Check, "VALUE ~ '^[^@]+@[^@]+\\.[^@]+$'")
@@ -567,8 +568,8 @@ func TestBuild_DomainResolution(t *testing.T) {
 	if d, ok := domainsByName["short_text"]; !ok {
 		t.Error("missing domain for short_text")
 	} else {
-		if d.BaseType != "text" {
-			t.Errorf("short_text domain BaseType = %q, want %q", d.BaseType, "text")
+		if d.BaseType != typeinfo.T("text") {
+			t.Errorf("short_text domain BaseType = %v, want %v", d.BaseType, typeinfo.T("text"))
 		}
 		if d.Check != "LENGTH(VALUE) <= 255" {
 			t.Errorf("short_text domain Check = %q, want %q", d.Check, "LENGTH(VALUE) <= 255")
@@ -631,8 +632,8 @@ func TestBuild_DomainResolution_ExplicitChecksPreserved(t *testing.T) {
 	if nameCol == nil {
 		t.Fatal("name column not found")
 	}
-	if nameCol.PGType != "short_text" {
-		t.Errorf("name.PGType = %q, want %q", nameCol.PGType, "short_text")
+	if got := typeinfo.Reconstruct(nameCol.PGType); got != "short_text" {
+		t.Errorf("name.PGType = %q, want %q", got, "short_text")
 	}
 
 	// Domain should be created for short_text.
@@ -924,8 +925,8 @@ func TestBuildFunctions(t *testing.T) {
 	if len(f.Args) != 1 {
 		t.Fatalf("expected 1 arg, got %d", len(f.Args))
 	}
-	if f.Args[0].Name != "id" || f.Args[0].Type != "uuid" {
-		t.Errorf("expected arg id uuid, got %s %s", f.Args[0].Name, f.Args[0].Type)
+	if f.Args[0].Name != "id" || f.Args[0].Type != typeinfo.T("uuid") {
+		t.Errorf("expected arg id uuid, got %s %v", f.Args[0].Name, f.Args[0].Type)
 	}
 }
 
@@ -1191,8 +1192,8 @@ func TestBuild_StateMachineCreatesEnum(t *testing.T) {
 	if statusCol == nil {
 		t.Fatal("status column not found")
 	}
-	if statusCol.PGType != "order_status" {
-		t.Errorf("status.PGType = %q, want %q", statusCol.PGType, "order_status")
+	if got := typeinfo.Reconstruct(statusCol.PGType); got != "order_status" {
+		t.Errorf("status.PGType = %q, want %q", got, "order_status")
 	}
 }
 
@@ -1280,17 +1281,17 @@ func TestIsStateMachineColumn(t *testing.T) {
 		t.Fatalf("failed to load SM type: %v", diags)
 	}
 
-	smCol := Column{Name: "state", PGType: "task_state", SemanticTypeName: "task_state"}
+	smCol := Column{Name: "state", PGType: typeinfo.T("task_state"), SemanticTypeName: "task_state"}
 	if !IsStateMachineColumn(smCol, reg) {
 		t.Error("expected IsStateMachineColumn = true for SM column")
 	}
 
-	regularCol := Column{Name: "name", PGType: "text", SemanticTypeName: "short_text"}
+	regularCol := Column{Name: "name", PGType: typeinfo.T("text"), SemanticTypeName: "short_text"}
 	if IsStateMachineColumn(regularCol, reg) {
 		t.Error("expected IsStateMachineColumn = false for regular column")
 	}
 
-	noTypeCol := Column{Name: "bare", PGType: "text"}
+	noTypeCol := Column{Name: "bare", PGType: typeinfo.T("text")}
 	if IsStateMachineColumn(noTypeCol, reg) {
 		t.Error("expected IsStateMachineColumn = false for column with no semantic type")
 	}

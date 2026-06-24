@@ -6,6 +6,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/fd"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func testRegistry() *semtype.Registry {
@@ -496,7 +497,7 @@ func TestBuildMulti_MergesEnums(t *testing.T) {
 		err := reg.Register(&semtype.TypeDef{
 			Name:       name,
 			Kind:       semtype.KindEnum,
-			BaseType:   name,
+			BaseType:   typeinfo.T(name),
 			NotNull:    true,
 			EnumValues: []string{"a", "b"},
 		})
@@ -569,7 +570,7 @@ func TestEnumResolution(t *testing.T) {
 	err := reg.Register(&semtype.TypeDef{
 		Name:       "status",
 		Kind:       semtype.KindEnum,
-		BaseType:   "status",
+		BaseType:   typeinfo.T("status"),
 		NotNull:    true,
 		EnumValues: []string{"active", "inactive"},
 	})
