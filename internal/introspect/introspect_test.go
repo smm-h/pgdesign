@@ -9,6 +9,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/testdb"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 const testSchema = "public"
@@ -121,8 +122,8 @@ func TestIntrospectColumns(t *testing.T) {
 
 	// Check specific column properties.
 	nameCol := users.Columns[1]
-	if nameCol.PGType != "text" {
-		t.Errorf("name.PGType = %q, want %q", nameCol.PGType, "text")
+	if nameCol.PGType != typeinfo.T("text") {
+		t.Errorf("name.PGType = %v, want %v", nameCol.PGType, typeinfo.T("text"))
 	}
 	if !nameCol.NotNull {
 		t.Error("name.NotNull = false, want true")
@@ -139,8 +140,8 @@ func TestIntrospectColumns(t *testing.T) {
 
 	// tags is an array column.
 	tagsCol := users.Columns[5]
-	if tagsCol.PGType != "text" {
-		t.Errorf("tags.PGType = %q, want %q", tagsCol.PGType, "text")
+	if tagsCol.PGType != typeinfo.T("text") {
+		t.Errorf("tags.PGType = %v, want %v", tagsCol.PGType, typeinfo.T("text"))
 	}
 	if !tagsCol.Array {
 		t.Error("tags.Array = false, want true")
@@ -1044,7 +1045,7 @@ func TestExportDomains(t *testing.T) {
 			{
 				Name:     "slug",
 				Schema:   "test",
-				BaseType: "text",
+				BaseType: typeinfo.T("text"),
 				NotNull:  true,
 				Check:    "VALUE ~ '^[a-z0-9-]+$'",
 				Comment:  "URL-safe identifier",
@@ -1052,7 +1053,7 @@ func TestExportDomains(t *testing.T) {
 			{
 				Name:     "counter",
 				Schema:   "test",
-				BaseType: "bigint",
+				BaseType: typeinfo.T("bigint"),
 				Default:  "0",
 			},
 		},

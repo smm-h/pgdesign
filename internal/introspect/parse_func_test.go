@@ -2,6 +2,8 @@ package introspect
 
 import (
 	"testing"
+
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestParseFunctionArgs_Simple(t *testing.T) {
@@ -9,10 +11,10 @@ func TestParseFunctionArgs_Simple(t *testing.T) {
 	if len(args) != 2 {
 		t.Fatalf("expected 2 args, got %d", len(args))
 	}
-	if args[0].Name != "order_id" || args[0].Type != "uuid" {
+	if args[0].Name != "order_id" || args[0].Type != typeinfo.T("uuid") {
 		t.Errorf("arg[0] = %+v, want name=order_id type=uuid", args[0])
 	}
-	if args[1].Name != "amount" || args[1].Type != "numeric" {
+	if args[1].Name != "amount" || args[1].Type != typeinfo.T("numeric") {
 		t.Errorf("arg[1] = %+v, want name=amount type=numeric", args[1])
 	}
 }
@@ -22,7 +24,7 @@ func TestParseFunctionArgs_WithDefault(t *testing.T) {
 	if len(args) != 1 {
 		t.Fatalf("expected 1 arg, got %d", len(args))
 	}
-	if args[0].Name != "tax_rate" || args[0].Type != "numeric" || args[0].Default != "0.1" {
+	if args[0].Name != "tax_rate" || args[0].Type != typeinfo.T("numeric") || args[0].Default != "0.1" {
 		t.Errorf("arg = %+v, want name=tax_rate type=numeric default=0.1", args[0])
 	}
 }
@@ -39,10 +41,10 @@ func TestParseFunctionArgs_ParenthesizedType(t *testing.T) {
 	if len(args) != 2 {
 		t.Fatalf("expected 2 args, got %d", len(args))
 	}
-	if args[0].Name != "price" || args[0].Type != "numeric(10,2)" {
+	if args[0].Name != "price" || args[0].Type != typeinfo.MustParse("numeric(10,2)") {
 		t.Errorf("arg[0] = %+v, want name=price type=numeric(10,2)", args[0])
 	}
-	if args[1].Name != "name" || args[1].Type != "varchar(255)" {
+	if args[1].Name != "name" || args[1].Type != typeinfo.MustParse("varchar(255)") {
 		t.Errorf("arg[1] = %+v, want name=name type=varchar(255)", args[1])
 	}
 }
@@ -52,10 +54,10 @@ func TestParseFunctionArgs_ModePrefix(t *testing.T) {
 	if len(args) != 2 {
 		t.Fatalf("expected 2 args, got %d", len(args))
 	}
-	if args[0].Name != "x" || args[0].Type != "integer" {
-		t.Errorf("arg[0] = %+v, want name=x type=integer", args[0])
+	if args[0].Name != "x" || args[0].Type != typeinfo.T("int4") {
+		t.Errorf("arg[0] = %+v, want name=x type=int4", args[0])
 	}
-	if args[1].Name != "y" || args[1].Type != "text" {
+	if args[1].Name != "y" || args[1].Type != typeinfo.T("text") {
 		t.Errorf("arg[1] = %+v, want name=y type=text", args[1])
 	}
 }
