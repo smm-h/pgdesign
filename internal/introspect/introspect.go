@@ -16,6 +16,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // Introspect connects to a PostgreSQL database, extracts schema information
@@ -250,7 +251,7 @@ func queryCompositeTypes(ctx context.Context, conn *pgx.Conn, schemaName string)
 		for i := range fieldNames {
 			ct.Fields = append(ct.Fields, model.CompositeField{
 				Name:   fieldNames[i],
-				PGType: fieldTypes[i],
+				PGType: typeinfo.Parse(fieldTypes[i]),
 			})
 		}
 		cts = append(cts, ct)
@@ -295,7 +296,7 @@ func queryDomains(ctx context.Context, conn *pgx.Conn, schemaName string) ([]mod
 		dom := model.Domain{
 			Name:     name,
 			Schema:   schemaName,
-			BaseType: baseType,
+			BaseType: typeinfo.Parse(baseType),
 			NotNull:  notNull,
 		}
 		if defaultExpr != nil && *defaultExpr != "" {
@@ -498,9 +499,11 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		var attidentity string
 		var collation string
 		var attstattarget *int32
-		if err := rows.Scan(&c.Name, &c.PGType, &c.NotNull, &defaultExpr, &comment, &attgenerated, &attidentity, &collation, &attstattarget); err != nil {
+		var pgTypeStr string
+		if err := rows.Scan(&c.Name, &pgTypeStr, &c.NotNull, &defaultExpr, &comment, &attgenerated, &attidentity, &collation, &attstattarget); err != nil {
 			return nil, err
 		}
+		c.PGType = typeinfo.Parse(pgTypeStr)
 
 		// Map attgenerated: 's' = stored, 'v' = virtual, '' = not generated.
 		switch attgenerated {
@@ -546,10 +549,11 @@ func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersio
 		if comment != nil {
 			c.Comment = *comment
 		}
-		// Detect array types: format_type() returns "text[]", "integer[]", etc.
-		if strings.HasSuffix(c.PGType, "[]") {
+		// Detect array types: typeinfo.Parse normalizes "text[]" to Base="text[]".
+		// Strip the "[]" suffix from Base and set the column's Array flag instead.
+		if strings.HasSuffix(c.PGType.Base, "[]") {
 			c.Array = true
-			c.PGType = strings.TrimSuffix(c.PGType, "[]")
+			c.PGType.Base = strings.TrimSuffix(c.PGType.Base, "[]")
 		}
 		// Collation: non-empty means explicit collation was set.
 		// Filter out "default" collation -- it's the same as no collation.
@@ -1874,10 +1878,10 @@ func parseOneArg(s string) model.FunctionArg {
 	var arg model.FunctionArg
 	if len(parts) == 2 {
 		arg.Name = parts[0]
-		arg.Type = parts[1]
+		arg.Type = typeinfo.Parse(parts[1])
 	} else {
 		// Unnamed argument: just the type.
-		arg.Type = parts[0]
+		arg.Type = typeinfo.Parse(parts[0])
 	}
 	arg.Default = defaultVal
 	return arg

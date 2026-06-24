@@ -5,6 +5,7 @@ import (
 
 	tomledit "github.com/smm-h/go-toml-edit"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // Export serializes a model.Schema to pgdesign TOML format using go-toml-edit
@@ -72,7 +73,7 @@ func Export(schema *model.Schema) ([]byte, error) {
 			return nil, fmt.Errorf("create %s: %w", fieldsPath, err)
 		}
 		for _, f := range ct.Fields {
-			if err := doc.SetCreate(fieldsPath+"."+f.Name, f.PGType); err != nil {
+			if err := doc.SetCreate(fieldsPath+"."+f.Name, typeinfo.Reconstruct(f.PGType)); err != nil {
 				return nil, fmt.Errorf("set %s.%s: %w", fieldsPath, f.Name, err)
 			}
 		}
@@ -87,7 +88,7 @@ func Export(schema *model.Schema) ([]byte, error) {
 		if err := doc.SetCreate(path+".kind", "scalar"); err != nil {
 			return nil, fmt.Errorf("set %s.kind: %w", path, err)
 		}
-		if err := doc.SetCreate(path+".base_type", dom.BaseType); err != nil {
+		if err := doc.SetCreate(path+".base_type", typeinfo.Reconstruct(dom.BaseType)); err != nil {
 			return nil, fmt.Errorf("set %s.base_type: %w", path, err)
 		}
 		if dom.Check != "" {
@@ -150,7 +151,7 @@ func Export(schema *model.Schema) ([]byte, error) {
 			if err := doc.NewTable(colPath); err != nil {
 				return nil, fmt.Errorf("create column %s: %w", colPath, err)
 			}
-			if err := doc.SetCreate(colPath+".type", c.PGType); err != nil {
+			if err := doc.SetCreate(colPath+".type", typeinfo.Reconstruct(c.PGType)); err != nil {
 				return nil, fmt.Errorf("set %s.type: %w", colPath, err)
 			}
 			if !c.NotNull {
@@ -610,13 +611,13 @@ func Export(schema *model.Schema) ([]byte, error) {
 		for _, arg := range fn.Args {
 			argName := arg.Name
 			if argName == "" {
-				argName = "_unnamed_" + arg.Type
+				argName = "_unnamed_" + typeinfo.Reconstruct(arg.Type)
 			}
 			argPath := fnPath + ".args." + argName
 			if err := doc.NewTable(argPath); err != nil {
 				return nil, fmt.Errorf("create arg %s: %w", argPath, err)
 			}
-			if err := doc.SetCreate(argPath+".type", arg.Type); err != nil {
+			if err := doc.SetCreate(argPath+".type", typeinfo.Reconstruct(arg.Type)); err != nil {
 				return nil, fmt.Errorf("set %s.type: %w", argPath, err)
 			}
 			if arg.Default != "" {
