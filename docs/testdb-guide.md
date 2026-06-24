@@ -44,6 +44,8 @@ This generates standalone wrapper files for each requested language. The wrapper
 
 ### 3. Use in tests
 
+The following examples show how to use the generated test wrappers in Python and Go. Each wrapper provides a fixture or helper function that creates an ephemeral database, applies your schema DDL, provides a connection for your test to use, and automatically drops the database when the test completes. The database is isolated per test run, so parallel test execution works without conflicts, and crashed tests leave orphaned databases that the gc command cleans up.
+
 **Python (pytest):**
 
 ```python
@@ -82,7 +84,7 @@ func TestUserCreation(t *testing.T) {
 
 ## Generated Wrappers
 
-`pgdesign testdb init` generates one file per language. Each file is self-contained -- it implements the testdb protocol v1 contract:
+`pgdesign testdb init` generates one self-contained file per requested language that implements the full testdb protocol v1 contract without requiring the pgdesign binary at test runtime. Each generated wrapper handles the complete lifecycle of creating an ephemeral database, applying DDL from the pre-split JSON file, providing connection details to test code, and dropping the database on completion. The only runtime dependency is the language's PostgreSQL driver.
 
 1. **Create**: connect to the `postgres` maintenance database and `CREATE DATABASE` with a randomly-generated name.
 2. **Apply DDL**: read `schema.sql.split.json`, connect to the new database, execute each statement in order.
@@ -123,7 +125,7 @@ PGDESIGN_DB="postgres://postgres:postgres@localhost:5432/myapp?sslmode=disable"
 
 ### pgdesign.toml
 
-The `[database].url` field in `pgdesign.toml` is baked into the generated wrappers as the default base URL (used when `PGDESIGN_DB` is not set).
+The `[database].url` field in `pgdesign.toml` is baked into the generated wrappers as the default base URL, used when the `PGDESIGN_DB` environment variable is not set. This means wrappers work out of the box for local development where the database URL is stable, while CI environments can override the URL via the environment variable to point at service containers or dedicated test servers without modifying the generated wrapper code.
 
 The `[output]` section determines which SQL output provides the `.split.json` file. If you have multiple SQL outputs, use `--output <name>` during `testdb init` to specify which one.
 
@@ -138,11 +140,11 @@ path = "schema.sql"
 
 ## CLI Commands
 
-The CLI commands are for manual use, scripting, and CI pipelines. The generated wrappers handle these operations automatically during tests.
+The CLI commands provide manual access to the testdb lifecycle operations for scripting, debugging, and CI pipeline integration. While the generated wrappers handle these operations automatically during normal test execution, the CLI commands are useful for creating databases for manual inspection, cleaning up orphaned databases after CI failures, and integrating with build systems that need explicit control over the database lifecycle.
 
 ### testdb setup
 
-Create an ephemeral database and print its connection URL to stdout.
+Create an ephemeral database on the specified PostgreSQL server and print its connection URL to stdout. The command connects to the maintenance database, creates a new database with a unique timestamped name, applies the DDL from the specified SQL file, and returns the connection URL for the new database. This is useful for scripting scenarios where you need to create a database outside of the generated test wrappers.
 
 ```
 pgdesign testdb setup --db "postgres://localhost:5432/myapp" --ddl schema.sql
@@ -152,7 +154,7 @@ Output: `postgres://localhost:5432/myapp_test_1750000000_a3k9m2x1?sslmode=disabl
 
 ### testdb teardown
 
-Drop an ephemeral database by its connection URL.
+Drop an ephemeral database by its connection URL, terminating any remaining active connections before issuing the DROP DATABASE command. This ensures clean removal even when test code crashed without properly closing its database connections. The command validates that the target database name matches the pgdesign test naming pattern to prevent accidental deletion of non-test databases.
 
 ```
 pgdesign testdb teardown --db "postgres://localhost:5432/myapp_test_1750000000_a3k9m2x1"
@@ -160,7 +162,7 @@ pgdesign testdb teardown --db "postgres://localhost:5432/myapp_test_1750000000_a
 
 ### testdb gc
 
-Clean up orphaned ephemeral databases older than a given duration. Orphans can accumulate when tests crash without running teardown.
+Clean up orphaned ephemeral databases older than a specified duration by scanning the PostgreSQL server for databases matching the pgdesign test naming pattern and dropping those that exceed the age threshold. Orphaned databases accumulate when test processes crash, are killed, or fail to run their teardown logic. The gc command extracts the creation timestamp from each database name and compares it against the `--older-than` duration to determine which databases to drop.
 
 ```
 pgdesign testdb gc --db "postgres://localhost:5432/myapp" --older-than 2h
@@ -168,7 +170,7 @@ pgdesign testdb gc --db "postgres://localhost:5432/myapp" --older-than 2h
 
 ### testdb init
 
-Generate test wrapper files for one or more languages.
+Generate test wrapper files for one or more target programming languages. Each wrapper is a self-contained file that implements the full testdb lifecycle using the language's standard PostgreSQL driver and test framework conventions. Use `--force` to regenerate existing wrappers after a pgdesign upgrade, and `--output` to specify which SQL output section provides the DDL when your pgdesign.toml defines multiple SQL outputs.
 
 ```
 pgdesign testdb init --language python --language go
@@ -178,7 +180,7 @@ pgdesign testdb init --language ts --output ddl       # specify SQL output secti
 
 ## CI Integration
 
-The generated wrappers need only a running PostgreSQL server and the `PGDESIGN_DB` environment variable. In CI, provide a Postgres service container and set the variable.
+The generated wrappers need only a running PostgreSQL server and the `PGDESIGN_DB` environment variable pointing to it. In CI environments, provide a PostgreSQL service container via your CI provider's service configuration and set the environment variable to the container's connection URL. The wrappers handle all database lifecycle operations automatically, including creation, DDL application, and cleanup, so your CI pipeline only needs to start Postgres and set the URL.
 
 ### GitHub Actions
 
@@ -210,7 +212,7 @@ The wrappers handle everything else: creating the ephemeral database, applying D
 
 ### Garbage collection in CI
 
-Add a post-test step to clean up any orphaned databases from crashed runs:
+Add a post-test step with `if: always()` to clean up any orphaned ephemeral databases from test runs that crashed or were cancelled. This step runs regardless of whether the test step passed or failed, ensuring that orphaned databases do not accumulate across CI runs. The `--older-than` flag should be set shorter than your CI cache duration to prevent stale databases from consuming server resources.
 
 ```yaml
       - name: Cleanup orphaned test databases

@@ -1,6 +1,6 @@
 ---
 title: "Semantic Types"
-description: "Reference for pgdesign's semantic type system covering built-in types, custom scalar and enum definitions, type composition rules, and default value handling."
+description: "Reference for pgdesign's semantic type system covering built-in types, custom scalar and enum definitions, type composition, and default handling."
 ---
 
 # Semantic Types

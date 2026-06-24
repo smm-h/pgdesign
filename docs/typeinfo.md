@@ -1,6 +1,6 @@
 ---
 title: "typeinfo Package"
-description: "Reference for the typeinfo package that provides structured PostgreSQL type parsing, normalization, alias resolution, and SQL type string reconstruction for DDL generation."
+description: "Reference for the typeinfo package providing structured PostgreSQL type parsing, normalization, alias resolution, and SQL type string reconstruction."
 ---
 
 # typeinfo Package
