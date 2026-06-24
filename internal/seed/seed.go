@@ -11,6 +11,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/sqlexpr"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 var wordList = []string{"alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"}
@@ -223,7 +224,7 @@ func Generate(schema *model.Schema, rowsPerTable int, rng *rand.Rand, cfg *SeedC
 		isDefaultCol := make([]bool, len(cols))
 		if cfg.Format == "copy" {
 			for i, col := range cols {
-				switch col.PGType {
+				switch col.PGType.Base {
 				case "serial", "bigserial", "smallserial":
 					isDefaultCol[i] = true
 				}
@@ -536,24 +537,24 @@ func generateValue(col model.Column, table model.Table, rowIdx int, rng *rand.Ra
 	}
 
 	// Check PGType against enums.
-	if vals, ok := enumValues[col.PGType]; ok && len(vals) > 0 {
+	if vals, ok := enumValues[col.PGType.Base]; ok && len(vals) > 0 {
 		return fmt.Sprintf("'%s'", vals[rng.Intn(len(vals))])
 	}
 
 	// Fall back to PGType.
-	switch col.PGType {
-	case "boolean":
+	switch col.PGType.Base {
+	case "bool":
 		if rng.Intn(2) == 0 {
 			return "true"
 		}
 		return "false"
-	case "integer", "bigint", "smallint":
+	case "int4", "int8", "int2":
 		return fmt.Sprintf("%d", rng.Intn(10000))
 	case "serial", "bigserial", "smallserial":
 		return "DEFAULT"
 	case "numeric":
 		return fmt.Sprintf("'%d.%02d'", rng.Intn(10000), rng.Intn(100))
-	case "real", "float4":
+	case "float4":
 		return fmt.Sprintf("%f", rng.Float32()*1000)
 	case "float8":
 		return fmt.Sprintf("%f", rng.Float64()*1000)
@@ -665,7 +666,7 @@ func generateValue(col model.Column, table model.Table, rowIdx int, rng *rand.Ra
 	}
 
 	// Unknown types get a NULL cast so SQL still executes and the gap is visible.
-	return fmt.Sprintf("NULL::%s /* unsupported seed type */", col.PGType)
+	return fmt.Sprintf("NULL::%s /* unsupported seed type */", typeinfo.Reconstruct(col.PGType))
 }
 
 // toCopyValue transforms an INSERT-format SQL value to COPY-format (tab-separated stdin).
@@ -811,7 +812,7 @@ func escapeCopy(s string) string {
 func generateEdgeCaseValue(col model.Column, table model.Table, rng *rand.Rand, enumValues map[string][]string, generatedValues map[string]map[string][]string, intTypeCounter map[string]int) string {
 	// Array columns: empty array with cast.
 	if col.Array {
-		return fmt.Sprintf("ARRAY[]::%s[]", col.PGType)
+		return fmt.Sprintf("ARRAY[]::%s[]", typeinfo.Reconstruct(col.PGType))
 	}
 
 	// Nullable columns: NULL.
@@ -855,31 +856,31 @@ func generateEdgeCaseValue(col model.Column, table model.Table, rng *rand.Rand, 
 	}
 
 	// Check PGType against enums.
-	if vals, ok := enumValues[col.PGType]; ok && len(vals) > 0 {
+	if vals, ok := enumValues[col.PGType.Base]; ok && len(vals) > 0 {
 		return fmt.Sprintf("'%s'", vals[0])
 	}
 
 	// Fall back to PGType.
-	switch col.PGType {
-	case "boolean":
+	switch col.PGType.Base {
+	case "bool":
 		return "true"
-	case "integer":
-		cnt := intTypeCounter["integer"]
-		intTypeCounter["integer"] = cnt + 1
+	case "int4":
+		cnt := intTypeCounter["int4"]
+		intTypeCounter["int4"] = cnt + 1
 		if cnt == 0 {
 			return "0"
 		}
 		return "2147483647"
-	case "bigint":
-		cnt := intTypeCounter["bigint"]
-		intTypeCounter["bigint"] = cnt + 1
+	case "int8":
+		cnt := intTypeCounter["int8"]
+		intTypeCounter["int8"] = cnt + 1
 		if cnt == 0 {
 			return "0"
 		}
 		return "9223372036854775807"
-	case "smallint":
-		cnt := intTypeCounter["smallint"]
-		intTypeCounter["smallint"] = cnt + 1
+	case "int2":
+		cnt := intTypeCounter["int2"]
+		intTypeCounter["int2"] = cnt + 1
 		if cnt == 0 {
 			return "0"
 		}
@@ -888,7 +889,7 @@ func generateEdgeCaseValue(col model.Column, table model.Table, rng *rand.Rand, 
 		return "DEFAULT"
 	case "numeric":
 		return "0"
-	case "real", "float4", "float8":
+	case "float4", "float8":
 		return "0.0"
 	case "uuid":
 		return "'00000000-0000-0000-0000-000000000000'"
@@ -940,7 +941,7 @@ func generateEdgeCaseValue(col model.Column, table model.Table, rng *rand.Rand, 
 		return "'{}'::tsmultirange"
 	}
 
-	return fmt.Sprintf("NULL::%s /* unsupported seed type */", col.PGType)
+	return fmt.Sprintf("NULL::%s /* unsupported seed type */", typeinfo.Reconstruct(col.PGType))
 }
 
 // generateEdgeCaseRef returns the first generated value from the parent table.
@@ -970,7 +971,7 @@ func generateBaseString(col model.Column, table model.Table, rowIdx int, rng *ra
 	if col.SemanticTypeName == "email" {
 		return fmt.Sprintf("user%d@example.com", rowIdx)
 	}
-	switch col.PGType {
+	switch col.PGType.Base {
 	case "text", "citext":
 		return fmt.Sprintf("sample_%s_%s_%d", table.Name, col.Name, rowIdx)
 	case "varchar", "char":
