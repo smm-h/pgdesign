@@ -1,1 +1,2 @@
 {"commits":["eef0356860f28754edccc1de9f84f114cf4093fe"],"user_facing":false}
+{"commits":["1d61ba2b8ac64d068c6feef968bbed40f7e027a5"],"user_facing":true,"description":"**Fix.** `diff --base` now loads extension types from project config, fixing failures when schemas use extension-provided types like pgvector.","type":"fix"}
