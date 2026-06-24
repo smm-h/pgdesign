@@ -41,6 +41,7 @@ type RawSMTransition struct {
 type RawType struct {
 	Name       string
 	Kind       string
+	Extends    *string
 	BaseType   string
 	Values     []string
 	Fields     map[string]string // composite fields: field name -> PG type

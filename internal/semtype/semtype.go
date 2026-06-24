@@ -326,6 +326,7 @@ type UserSMTransition struct {
 type UserTypeDef struct {
 	Name        string
 	Kind        string // "scalar", "enum", "composite", "state_machine"
+	Extends     string // parent type name for type derivation
 	Base        string // PG base type (for scalars)
 	Values      []string // enum values
 	Fields      map[string]string // composite fields: field name -> PG type

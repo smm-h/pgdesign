@@ -392,7 +392,7 @@ func (p *parser) parseType(name string, tbl *tomledit.TableNode) RawType {
 	rt := RawType{Name: name}
 
 	knownKeys := map[string]bool{
-		"kind": true, "base_type": true, "values": true,
+		"kind": true, "extends": true, "base_type": true, "values": true,
 		"not_null": true, "default": true, "default_expr": true,
 		"check": true, "unique": true, "array": true, "comment": true,
 		"initial": true, "enforce": true,
@@ -414,6 +414,12 @@ func (p *parser) parseType(name string, tbl *tomledit.TableNode) RawType {
 				rt.Kind = v
 			} else {
 				p.errorf("E010", "", "", "[types.%s].kind must be a string", name)
+			}
+		case "extends":
+			if v, ok := nodeString(kv.Val); ok {
+				rt.Extends = &v
+			} else {
+				p.errorf("E010", "", "", "[types.%s].extends must be a string", name)
 			}
 		case "base_type":
 			if v, ok := nodeString(kv.Val); ok {

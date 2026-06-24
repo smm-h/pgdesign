@@ -15,6 +15,9 @@ func CollectUserTypes(raw *RawSchema) []semtype.UserTypeDef {
 			Values: rt.Values,
 			Fields: rt.Fields,
 		}
+		if rt.Extends != nil {
+			ut.Extends = *rt.Extends
+		}
 		if rt.NotNull != nil {
 			ut.NotNull = rt.NotNull
 		}
