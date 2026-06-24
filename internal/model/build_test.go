@@ -1296,3 +1296,277 @@ func TestIsStateMachineColumn(t *testing.T) {
 		t.Error("expected IsStateMachineColumn = false for column with no semantic type")
 	}
 }
+
+// --- Integration tests: extends through Build() ---
+
+func TestBuild_ExtendsEnum(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	userTypes := []semtype.UserTypeDef{
+		{
+			Name:   "base_status",
+			Kind:   "enum",
+			Values: []string{"a", "b"},
+		},
+		{
+			Name:    "ext_status",
+			Extends: "base_status",
+			Values:  []string{"c"},
+		},
+	}
+	diags := reg.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("failed to load types: %v", diags)
+	}
+
+	extends := "base_status"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Types: []parse.RawType{
+			{Name: "base_status", Kind: "enum", Values: []string{"a", "b"}},
+			{Name: "ext_status", Extends: &extends, Values: []string{"c"}},
+		},
+	}
+
+	schema, buildDiags := Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+
+	// Should have 2 enums: base_status and ext_status.
+	if len(schema.Enums) != 2 {
+		t.Fatalf("expected 2 enums, got %d", len(schema.Enums))
+	}
+
+	// Find ext_status enum.
+	var ext *Enum
+	for i := range schema.Enums {
+		if schema.Enums[i].Name == "ext_status" {
+			ext = &schema.Enums[i]
+			break
+		}
+	}
+	if ext == nil {
+		t.Fatal("ext_status enum not found")
+	}
+	// ext_status should have merged values: a, b, c.
+	expected := []string{"a", "b", "c"}
+	if len(ext.Values) != len(expected) {
+		t.Fatalf("ext_status values = %v, want %v", ext.Values, expected)
+	}
+	for i, v := range expected {
+		if ext.Values[i] != v {
+			t.Errorf("ext_status values[%d] = %q, want %q", i, ext.Values[i], v)
+		}
+	}
+}
+
+func TestBuild_ExtendsComposite(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	userTypes := []semtype.UserTypeDef{
+		{
+			Name: "base_comp",
+			Kind: "composite",
+			Fields: map[string]string{
+				"x": "integer",
+				"y": "text",
+			},
+		},
+		{
+			Name:    "ext_comp",
+			Extends: "base_comp",
+			Fields: map[string]string{
+				"z": "boolean",
+			},
+		},
+	}
+	diags := reg.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("failed to load types: %v", diags)
+	}
+
+	extends := "base_comp"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Types: []parse.RawType{
+			{Name: "base_comp", Kind: "composite", Fields: map[string]string{"x": "integer", "y": "text"}},
+			{Name: "ext_comp", Extends: &extends, Fields: map[string]string{"z": "boolean"}},
+		},
+	}
+
+	schema, buildDiags := Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+
+	// Should have 2 composite types: base_comp and ext_comp.
+	if len(schema.CompositeTypes) != 2 {
+		t.Fatalf("expected 2 composite types, got %d", len(schema.CompositeTypes))
+	}
+
+	// Find ext_comp.
+	var ext *CompositeType
+	for i := range schema.CompositeTypes {
+		if schema.CompositeTypes[i].Name == "ext_comp" {
+			ext = &schema.CompositeTypes[i]
+			break
+		}
+	}
+	if ext == nil {
+		t.Fatal("ext_comp composite type not found")
+	}
+	// ext_comp should have merged fields: x (integer), y (text), z (boolean).
+	if len(ext.Fields) != 3 {
+		t.Fatalf("ext_comp fields count = %d, want 3; fields = %v", len(ext.Fields), ext.Fields)
+	}
+	expectedFields := []CompositeField{
+		{Name: "x", PGType: typeinfo.Parse("integer")},
+		{Name: "y", PGType: typeinfo.Parse("text")},
+		{Name: "z", PGType: typeinfo.Parse("boolean")},
+	}
+	for i, f := range expectedFields {
+		if ext.Fields[i].Name != f.Name {
+			t.Errorf("ext_comp fields[%d].Name = %q, want %q", i, ext.Fields[i].Name, f.Name)
+		}
+		if ext.Fields[i].PGType != f.PGType {
+			t.Errorf("ext_comp fields[%d].PGType = %v, want %v", i, ext.Fields[i].PGType, f.PGType)
+		}
+	}
+}
+
+func TestBuild_ExtendsStateMachine(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	userTypes := []semtype.UserTypeDef{
+		{
+			Name: "base_sm",
+			Kind: "state_machine",
+			States: []semtype.UserSMState{
+				{Name: "created"},
+				{Name: "active"},
+			},
+			Transitions: []semtype.UserSMTransition{
+				{Name: "activate", From: []string{"created"}, To: "active"},
+			},
+			InitialState:   "created",
+			EnforceTrigger: true,
+		},
+		{
+			Name:    "ext_sm",
+			Extends: "base_sm",
+			States: []semtype.UserSMState{
+				{Name: "archived", Terminal: true},
+			},
+			Transitions: []semtype.UserSMTransition{
+				{Name: "archive", From: []string{"active"}, To: "archived"},
+			},
+		},
+	}
+	diags := reg.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("failed to load types: %v", diags)
+	}
+
+	extends := "base_sm"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Types: []parse.RawType{
+			{Name: "base_sm", Kind: "state_machine"},
+			{Name: "ext_sm", Extends: &extends},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name: "items",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "status", Type: "ext_sm"},
+				},
+			},
+		},
+	}
+
+	schema, buildDiags := Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+
+	// Should have 2 enums: base_sm and ext_sm (both SMs produce enums).
+	if len(schema.Enums) != 2 {
+		t.Fatalf("expected 2 enums, got %d: %v", len(schema.Enums), schema.Enums)
+	}
+
+	// Find ext_sm enum.
+	var ext *Enum
+	for i := range schema.Enums {
+		if schema.Enums[i].Name == "ext_sm" {
+			ext = &schema.Enums[i]
+			break
+		}
+	}
+	if ext == nil {
+		t.Fatal("ext_sm enum not found")
+	}
+	// ext_sm should have merged states: created, active, archived.
+	expected := []string{"created", "active", "archived"}
+	if len(ext.Values) != len(expected) {
+		t.Fatalf("ext_sm values = %v, want %v", ext.Values, expected)
+	}
+	for i, v := range expected {
+		if ext.Values[i] != v {
+			t.Errorf("ext_sm values[%d] = %q, want %q", i, ext.Values[i], v)
+		}
+	}
+}
+
+func TestBuild_ExtendsEnumDedupValues(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	userTypes := []semtype.UserTypeDef{
+		{
+			Name:   "base_status",
+			Kind:   "enum",
+			Values: []string{"a", "b"},
+		},
+		{
+			Name:    "ext_status",
+			Extends: "base_status",
+			Values:  []string{"b", "c"},
+		},
+	}
+	diags := reg.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("failed to load types: %v", diags)
+	}
+
+	extends := "base_status"
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Types: []parse.RawType{
+			{Name: "base_status", Kind: "enum", Values: []string{"a", "b"}},
+			{Name: "ext_status", Extends: &extends, Values: []string{"b", "c"}},
+		},
+	}
+
+	schema, buildDiags := Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+
+	var ext *Enum
+	for i := range schema.Enums {
+		if schema.Enums[i].Name == "ext_status" {
+			ext = &schema.Enums[i]
+			break
+		}
+	}
+	if ext == nil {
+		t.Fatal("ext_status enum not found")
+	}
+	// Deduped: [a, b, c].
+	expected := []string{"a", "b", "c"}
+	if len(ext.Values) != len(expected) {
+		t.Fatalf("ext_status values = %v, want %v", ext.Values, expected)
+	}
+	for i, v := range expected {
+		if ext.Values[i] != v {
+			t.Errorf("ext_status values[%d] = %q, want %q", i, ext.Values[i], v)
+		}
+	}
+}
