@@ -121,7 +121,7 @@ func main() {
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
 		),
 	)
-	mig.Command("squash", "Consolidate a range of sequential migration files into a single optimized migration. Cancels inverse operation pairs, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.", handleMigrateSquash,
+	mig.Command("squash", "Consolidate a range of sequential migration files into a single optimized migration. Recognizes 12 types of inverse operation pairs for cancellation, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.", handleMigrateSquash,
 		strictcli.WithFlags(
 			strictcli.StringFlag("from", "First migration version to include in the squash range"),
 			strictcli.StringFlag("to", "Last migration version to include in the squash range"),

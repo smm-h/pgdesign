@@ -687,7 +687,7 @@
               "type": "str"
             }
           ],
-          "help": "Consolidate a range of sequential migration files into a single optimized migration. Cancels inverse operation pairs, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.",
+          "help": "Consolidate a range of sequential migration files into a single optimized migration. Recognizes 12 types of inverse operation pairs for cancellation, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.",
           "name": "squash"
         },
         "status": {
@@ -834,5 +834,5 @@
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
   "schema_version": 1,
-  "version": "0.16.1-0.20260624174702-ad98caffa083+dirty"
+  "version": "0.16.2-0.20260625093253-5337c899fb17+dirty"
 }

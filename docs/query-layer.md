@@ -143,7 +143,7 @@ When a backend is filtered out, its files are not generated and the `__init__.py
 
 ## Dual-Backend Conformance
 
-Conformance between the two backends is verified at the codegen level through Go tests that inspect the generated Python code, not through Python runtime checks. This compile-time verification ensures that both backends maintain identical public method sets, matching parameter signatures, and consistent constraint enforcement logic. The verification covers eight specific conformance properties that together guarantee behavioral equivalence between the PgBackend and InMemoryBackend.
+Conformance between the two backends is verified at the codegen level through Go tests that inspect the generated Python code, not through Python runtime checks. This compile-time verification ensures that both backends maintain identical public method sets, matching parameter signatures, and consistent constraint enforcement logic. The verification covers 8 specific conformance properties that together guarantee behavioral equivalence between the PgBackend and InMemoryBackend.
 
 1. PgBackend and InMemoryBackend have the exact same set of public methods
 2. Both implement every method declared in the Backend protocol

@@ -9,7 +9,7 @@ pgdesign generates migrations by diffing your TOML schema against a live databas
 
 ## Migration file format
 
-Migration files are TOML documents containing `[[ddl]]` and `[[dml]]` operation arrays, where each operation specifies a schema change and its corresponding rollback instruction. The file starts with a description field summarizing the migration's purpose, followed by DDL operations for structural changes like creating tables, adding columns, and creating indexes, and DML operations for data migrations like backfills and transformations. Each operation includes risk classification and safety metadata.
+Migration files are TOML documents containing `[[ddl]]` and `[[dml]]` operation arrays, where each operation specifies a schema change and its corresponding rollback instruction. The file starts with a description field summarizing the migration's purpose, followed by DDL operations (35 operation types covering tables, columns, indexes, constraints, enums, views, materialized views, functions, and triggers) and DML operations (2 types: backfill and transform) for data migrations. Each operation includes risk classification and safety metadata.
 
 ```toml
 description = "Add posts table, add status column to users"
@@ -230,7 +230,7 @@ Use a dedicated staging database for migration testing -- the test modifies and 
 
 ## Safety linting and risk classification
 
-Every DDL operation in a generated migration is classified by risk level based on the type of schema change, the PostgreSQL lock it requires, and the estimated size of the affected table. This classification helps teams assess the impact of migrations before applying them to production databases. Risk levels are displayed in `migrate plan` output and annotated in migration files for review.
+Every DDL operation in a generated migration is assigned 1 of 3 risk levels (Safe, Caution, Dangerous) based on the type of schema change, the PostgreSQL lock it requires, and the estimated size of the affected table. This classification helps teams assess the impact of migrations before applying them to production databases. Risk levels are displayed in `migrate plan` output and annotated in migration files for review.
 
 | Risk Level | Meaning |
 |------------|---------|
@@ -403,7 +403,7 @@ The default is `5s`. This is set via `SET lock_timeout` before each migration ex
 
 ## Non-transactional operations
 
-Some PostgreSQL operations cannot run inside a transaction block and must be executed as standalone statements. pgdesign automatically detects these non-transactional operations during migration execution, commits the current transaction before the operation, executes it outside any transaction context, then starts a new transaction for subsequent operations. This handling is transparent and requires no manual intervention, ensuring that migrations containing a mix of transactional and non-transactional operations execute correctly.
+3 PostgreSQL operations cannot run inside a transaction block and must be executed as standalone statements. pgdesign automatically detects these non-transactional operations during migration execution, commits the current transaction before the operation, executes it outside any transaction context, then starts a new transaction for subsequent operations. This handling is transparent and requires no manual intervention, ensuring that migrations containing a mix of transactional and non-transactional operations execute correctly.
 
 - `CREATE INDEX CONCURRENTLY`
 - `DROP INDEX CONCURRENTLY`
