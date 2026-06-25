@@ -44,9 +44,7 @@ func CollectUserTypes(raw *RawSchema) []semtype.UserTypeDef {
 		if rt.InitialState != nil {
 			ut.InitialState = *rt.InitialState
 		}
-		if rt.EnforceTrigger != nil {
-			ut.EnforceTrigger = *rt.EnforceTrigger
-		}
+		ut.EnforceTrigger = rt.EnforceTrigger
 		if len(rt.States) > 0 {
 			for name, s := range rt.States {
 				us := semtype.UserSMState{Name: name}

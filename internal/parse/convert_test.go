@@ -185,7 +185,7 @@ func TestCollectUserTypes_StateMachine(t *testing.T) {
 	if ut.InitialState != "draft" {
 		t.Errorf("InitialState = %q, want %q", ut.InitialState, "draft")
 	}
-	if !ut.EnforceTrigger {
+	if ut.EnforceTrigger == nil || !*ut.EnforceTrigger {
 		t.Error("EnforceTrigger should be true")
 	}
 

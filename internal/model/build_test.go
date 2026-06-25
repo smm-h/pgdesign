@@ -875,7 +875,8 @@ func TestBuild_SequenceOwnedByIdentityColumn(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string { return &s }
+func strPtr(s string) *string  { return &s }
+func boolPtr(b bool) *bool     { return &b }
 
 func TestBuildFunctions(t *testing.T) {
 	lang := "plpgsql"
@@ -1447,7 +1448,7 @@ func TestBuild_ExtendsStateMachine(t *testing.T) {
 				{Name: "activate", From: []string{"created"}, To: "active"},
 			},
 			InitialState:   "created",
-			EnforceTrigger: true,
+			EnforceTrigger: boolPtr(true),
 		},
 		{
 			Name:    "ext_sm",

@@ -16,6 +16,7 @@ import (
 
 // intPtr returns a pointer to the given int.
 func intPtr(n int) *int { return &n }
+func boolPtr(b bool) *bool { return &b }
 
 // mustGenerate calls Generate and fails the test on error.
 func mustGenerate(t *testing.T, schema *model.Schema, opts Options) string {
@@ -2237,7 +2238,7 @@ func TestStateMachineTriggerGeneration(t *testing.T) {
 				{Name: "close", From: []string{"active"}, To: "closed"},
 			},
 			InitialState:   "pending",
-			EnforceTrigger: true,
+			EnforceTrigger: boolPtr(true),
 		},
 	})
 	if diags.HasErrors() {
@@ -2292,7 +2293,7 @@ func TestStateMachineTriggerGeneration_EnforceFalse(t *testing.T) {
 				{Name: "finish", From: []string{"draft"}, To: "done"},
 			},
 			InitialState:   "draft",
-			EnforceTrigger: false,
+			EnforceTrigger: boolPtr(false),
 		},
 	})
 	if diags.HasErrors() {
@@ -2337,7 +2338,7 @@ func TestStateMachineTriggerGeneration_FilterFromSection17(t *testing.T) {
 				{Name: "activate", From: []string{"pending"}, To: "active"},
 			},
 			InitialState:   "pending",
-			EnforceTrigger: true,
+			EnforceTrigger: boolPtr(true),
 		},
 	})
 	if diags.HasErrors() {

@@ -378,7 +378,7 @@ func TestGenerateD2_StateMachine(t *testing.T) {
 				{Name: "close", From: []string{"active"}, To: "closed"},
 			},
 			InitialState:   "pending",
-			EnforceTrigger: true,
+			EnforceTrigger: boolPtr(true),
 		},
 	})
 	if diags.HasErrors() {

@@ -839,6 +839,7 @@ func TestCompositeTypeDefsEqual(t *testing.T) {
 func TestLoadStateMachineType(t *testing.T) {
 	r := NewBuiltinRegistry()
 
+	enforce := true
 	userTypes := []UserTypeDef{
 		{
 			Name: "order_status",
@@ -858,7 +859,7 @@ func TestLoadStateMachineType(t *testing.T) {
 					Requires: map[string]string{"reason": "text"}, Comment: "Cancel with reason"},
 			},
 			InitialState:   "pending",
-			EnforceTrigger: true,
+			EnforceTrigger: &enforce,
 			Comment:        "Order lifecycle",
 		},
 	}
@@ -2000,6 +2001,7 @@ func TestExtendsCompositeOverrideComment(t *testing.T) {
 func TestExtendsStateMachineBasic(t *testing.T) {
 	r := NewBuiltinRegistry()
 
+	enforceTrue := true
 	userTypes := []UserTypeDef{
 		{
 			Name: "base_sm",
@@ -2012,7 +2014,7 @@ func TestExtendsStateMachineBasic(t *testing.T) {
 				{Name: "activate", From: []string{"created"}, To: "active"},
 			},
 			InitialState:   "created",
-			EnforceTrigger: true,
+			EnforceTrigger: &enforceTrue,
 		},
 		{
 			Name:    "ext_sm",
@@ -2076,6 +2078,93 @@ func TestExtendsStateMachineBasic(t *testing.T) {
 	if !td.EnforceTrigger {
 		t.Error("EnforceTrigger = false, want true (inherited)")
 	}
+}
+
+func TestExtendsStateMachineEnforceTriggerOverride(t *testing.T) {
+	baseSM := func(enforce bool) UserTypeDef {
+		v := enforce
+		return UserTypeDef{
+			Name: "base_sm",
+			Kind: "state_machine",
+			States: []UserSMState{
+				{Name: "created"},
+				{Name: "active"},
+			},
+			Transitions: []UserSMTransition{
+				{Name: "activate", From: []string{"created"}, To: "active"},
+			},
+			InitialState:   "created",
+			EnforceTrigger: &v,
+		}
+	}
+
+	t.Run("parent true, child explicitly false", func(t *testing.T) {
+		r := NewBuiltinRegistry()
+		childEnforce := false
+		diags := r.LoadUserTypes([]UserTypeDef{
+			baseSM(true),
+			{
+				Name:           "child_sm",
+				Extends:        "base_sm",
+				EnforceTrigger: &childEnforce,
+			},
+		})
+		if diags.HasErrors() {
+			t.Fatalf("unexpected errors: %v", diags)
+		}
+		td, err := r.Resolve("child_sm")
+		if err != nil {
+			t.Fatalf("Resolve error: %v", err)
+		}
+		if td.EnforceTrigger {
+			t.Error("EnforceTrigger = true, want false (child explicitly set false)")
+		}
+	})
+
+	t.Run("parent false, child explicitly true", func(t *testing.T) {
+		r := NewBuiltinRegistry()
+		childEnforce := true
+		diags := r.LoadUserTypes([]UserTypeDef{
+			baseSM(false),
+			{
+				Name:           "child_sm",
+				Extends:        "base_sm",
+				EnforceTrigger: &childEnforce,
+			},
+		})
+		if diags.HasErrors() {
+			t.Fatalf("unexpected errors: %v", diags)
+		}
+		td, err := r.Resolve("child_sm")
+		if err != nil {
+			t.Fatalf("Resolve error: %v", err)
+		}
+		if !td.EnforceTrigger {
+			t.Error("EnforceTrigger = false, want true (child explicitly set true)")
+		}
+	})
+
+	t.Run("parent true, child nil inherits", func(t *testing.T) {
+		r := NewBuiltinRegistry()
+		diags := r.LoadUserTypes([]UserTypeDef{
+			baseSM(true),
+			{
+				Name:    "child_sm",
+				Extends: "base_sm",
+				// EnforceTrigger not set (nil)
+			},
+		})
+		if diags.HasErrors() {
+			t.Fatalf("unexpected errors: %v", diags)
+		}
+		td, err := r.Resolve("child_sm")
+		if err != nil {
+			t.Fatalf("Resolve error: %v", err)
+		}
+		if !td.EnforceTrigger {
+			t.Error("EnforceTrigger = false, want true (inherited from parent)")
+		}
+	})
 }
 
 func TestExtendsStateMachineStateCollision_E119(t *testing.T) {

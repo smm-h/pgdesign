@@ -333,7 +333,7 @@ type UserTypeDef struct {
 	States         []UserSMState    // state machine states
 	Transitions    []UserSMTransition // state machine transitions
 	InitialState   string           // state machine initial state
-	EnforceTrigger bool             // state machine: generate enforcement trigger
+	EnforceTrigger *bool            // state machine: generate enforcement trigger (nil = not set)
 	NotNull     *bool
 	Default     *string
 	DefaultExpr string
@@ -811,9 +811,9 @@ func mergeStateMachineType(parent *TypeDef, child UserTypeDef) (*TypeDef, diagno
 		td.InitialState = child.InitialState
 	}
 
-	// Override enforce trigger if child sets it.
-	if child.EnforceTrigger {
-		td.EnforceTrigger = true
+	// Override enforce trigger if child explicitly sets it.
+	if child.EnforceTrigger != nil {
+		td.EnforceTrigger = *child.EnforceTrigger
 	}
 
 	// Override comment if child sets it.
@@ -1224,7 +1224,7 @@ func (r *Registry) loadStateMachineType(ut UserTypeDef) diagnostic.Diagnostics {
 		States:         states,
 		Transitions:    transitions,
 		InitialState:   ut.InitialState,
-		EnforceTrigger: ut.EnforceTrigger,
+		EnforceTrigger: ut.EnforceTrigger != nil && *ut.EnforceTrigger,
 		Comment:        ut.Comment,
 		Source:         "user",
 	}
