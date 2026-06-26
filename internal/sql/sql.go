@@ -519,6 +519,20 @@ BEGIN
 END $$;`, escapedName, escapedTable, stmt)
 }
 
+// wrapIdempotentCatalogCheck wraps a DDL statement in a DO $$ block that checks
+// a catalog condition before executing, making it idempotent. catalogCheckSQL is
+// a SELECT query that returns rows when the object already exists; createStmt is
+// the DDL to execute when it does not.
+func wrapIdempotentCatalogCheck(catalogCheckSQL, createStmt string) string {
+	escapedStmt := strings.ReplaceAll(createStmt, "'", "''")
+	return fmt.Sprintf(`DO $$
+BEGIN
+  IF NOT EXISTS (%s) THEN
+    EXECUTE '%s';
+  END IF;
+END $$;`, catalogCheckSQL, escapedStmt)
+}
+
 // CreateIndex generates a CREATE INDEX statement.
 // Handles Method (default btree), per-column Opclasses, WHERE, INCLUDE, and
 // CONCURRENTLY. When concurrently is true, IF NOT EXISTS is omitted because
