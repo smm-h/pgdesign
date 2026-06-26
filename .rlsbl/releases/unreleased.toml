@@ -1,0 +1,10 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "patch"
+# Short description of this release (required)
+description = "ILIKE constraint codegen fix, splitfmt hardening, transactional enum additions on PG 12+, and Plan unit tests."
+# Optional context explaining why these changes were made
+context = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
