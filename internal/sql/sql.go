@@ -178,7 +178,8 @@ func CreateEnum(schema, name string, values []string, idempotent bool) string {
 
 // CreateDomain generates a CREATE DOMAIN statement.
 // Emits: CREATE DOMAIN [schema.]name AS basetype [NOT NULL] [DEFAULT ...] [CHECK (...)].
-func CreateDomain(schemaName string, d model.Domain) string {
+// When idempotent is true, wraps in a DO $$ block that checks pg_type before creating.
+func CreateDomain(schemaName string, d model.Domain, idempotent bool) string {
 	qualified := QualifiedName(schemaName, d.Name)
 
 	var sb strings.Builder
@@ -199,12 +200,23 @@ func CreateDomain(schemaName string, d model.Domain) string {
 	}
 
 	sb.WriteString(";")
-	return sb.String()
+	stmt := sb.String()
+
+	if idempotent {
+		escapedType := strings.ReplaceAll(d.Name, "'", "''")
+		escapedSchema := strings.ReplaceAll(schemaName, "'", "''")
+		catalogCheck := fmt.Sprintf(
+			"SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = '%s' AND n.nspname = '%s' AND t.typtype = 'd'",
+			escapedType, escapedSchema)
+		return wrapIdempotentCatalogCheck(catalogCheck, stmt)
+	}
+	return stmt
 }
 
 // CreateCompositeType generates a CREATE TYPE ... AS statement for a composite type.
 // Emits: CREATE TYPE [schema.]name AS (field1 type1, field2 type2, ...)
-func CreateCompositeType(schemaName string, ct model.CompositeType) string {
+// When idempotent is true, wraps in a DO $$ block that checks pg_type before creating.
+func CreateCompositeType(schemaName string, ct model.CompositeType, idempotent bool) string {
 	qualified := QualifiedName(schemaName, ct.Name)
 
 	fieldDefs := make([]string, len(ct.Fields))
@@ -212,8 +224,18 @@ func CreateCompositeType(schemaName string, ct model.CompositeType) string {
 		fieldDefs[i] = fmt.Sprintf("%s %s", QuoteIdent(f.Name), typeinfo.Reconstruct(f.PGType))
 	}
 
-	return fmt.Sprintf("CREATE TYPE %s AS (\n    %s\n);",
+	stmt := fmt.Sprintf("CREATE TYPE %s AS (\n    %s\n);",
 		qualified, strings.Join(fieldDefs, ",\n    "))
+
+	if idempotent {
+		escapedType := strings.ReplaceAll(ct.Name, "'", "''")
+		escapedSchema := strings.ReplaceAll(schemaName, "'", "''")
+		catalogCheck := fmt.Sprintf(
+			"SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = '%s' AND n.nspname = '%s' AND t.typtype = 'c'",
+			escapedType, escapedSchema)
+		return wrapIdempotentCatalogCheck(catalogCheck, stmt)
+	}
+	return stmt
 }
 
 // DropCompositeType generates a DROP TYPE statement for a composite type.
@@ -695,11 +717,20 @@ func AlterTableForceRLS(schemaName, tableName string) string {
 // The FOR clause is omitted when operation is "ALL" (the PostgreSQL default).
 // The TO clause is omitted when role is empty (defaults to PUBLIC).
 // USING and WITH CHECK are wrapped in parentheses when present.
-func CreatePolicy(schemaName, tableName string, p model.Policy) string {
+//
+// When idempotent is true and pgVersion >= 15, uses CREATE OR REPLACE POLICY.
+// When idempotent is true and pgVersion < 15, wraps in a DO $$ block that
+// checks pg_policy before executing.
+func CreatePolicy(schemaName, tableName string, p model.Policy, idempotent bool, pgVersion int) string {
 	qualified := QualifiedName(schemaName, tableName)
 
+	createVerb := "CREATE POLICY"
+	if idempotent && pgcap.Has(pgVersion, pgcap.CreateOrReplacePolicy) {
+		createVerb = "CREATE OR REPLACE POLICY"
+	}
+
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CREATE POLICY %s ON %s", QuoteIdent(p.Name), qualified))
+	sb.WriteString(fmt.Sprintf("%s %s ON %s", createVerb, QuoteIdent(p.Name), qualified))
 
 	// AS RESTRICTIVE is only emitted when explicitly set. PERMISSIVE is the
 	// PostgreSQL default and is omitted for brevity (same as FOR ALL).
@@ -724,7 +755,20 @@ func CreatePolicy(schemaName, tableName string, p model.Policy) string {
 	}
 
 	sb.WriteString(";")
-	return sb.String()
+	stmt := sb.String()
+
+	// For pre-PG15 idempotent mode, wrap in a DO $$ block with a pg_policy check.
+	if idempotent && !pgcap.Has(pgVersion, pgcap.CreateOrReplacePolicy) {
+		escapedName := strings.ReplaceAll(p.Name, "'", "''")
+		escapedQualified := strings.ReplaceAll(qualified, "'", "''")
+		catalogCheck := fmt.Sprintf(
+			"SELECT 1 FROM pg_policy WHERE polname = '%s' AND polrelid = '%s'::regclass",
+			escapedName, escapedQualified,
+		)
+		return wrapIdempotentCatalogCheck(catalogCheck, stmt)
+	}
+
+	return stmt
 }
 
 // DropPolicy generates a DROP POLICY statement.
@@ -806,10 +850,15 @@ func RefreshMaterializedView(schemaName, name string, concurrently bool) string 
 }
 
 // CreateSequence generates a CREATE SEQUENCE statement.
-func CreateSequence(schemaName string, seq *model.Sequence) string {
+// When idempotent is true, IF NOT EXISTS is included.
+func CreateSequence(schemaName string, seq *model.Sequence, idempotent bool) string {
 	qualified := QualifiedName(schemaName, seq.Name)
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("CREATE SEQUENCE %s", qualified))
+	ifne := ""
+	if idempotent {
+		ifne = " IF NOT EXISTS"
+	}
+	sb.WriteString(fmt.Sprintf("CREATE SEQUENCE%s %s", ifne, qualified))
 
 	if seq.Start != nil {
 		sb.WriteString(fmt.Sprintf(" START WITH %d", *seq.Start))
@@ -913,11 +962,24 @@ $$ LANGUAGE plpgsql;`, qualified)
 
 // CreateAppendOnlyTrigger generates a CREATE TRIGGER statement that fires
 // BEFORE UPDATE OR DELETE to enforce append-only behavior on a table.
-func CreateAppendOnlyTrigger(schemaName, tableName string) string {
+// When idempotent is true and pgVersion supports CREATE OR REPLACE TRIGGER (PG 14+),
+// it emits CREATE OR REPLACE TRIGGER; otherwise it emits DROP TRIGGER IF EXISTS
+// followed by CREATE TRIGGER.
+func CreateAppendOnlyTrigger(schemaName, tableName string, idempotent bool, pgVersion int) string {
 	qualifiedTable := QualifiedName(schemaName, tableName)
 	qualifiedFunc := QualifiedName(schemaName, "pgdesign_deny_mutation")
-	return fmt.Sprintf("CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
-		qualifiedTable, qualifiedFunc)
+	trigName := "deny_mutation"
+	if idempotent && pgcap.Has(pgVersion, pgcap.CreateOrReplaceTrigger) {
+		return fmt.Sprintf("CREATE OR REPLACE TRIGGER %s BEFORE UPDATE OR DELETE ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
+			trigName, qualifiedTable, qualifiedFunc)
+	}
+	stmt := fmt.Sprintf("CREATE TRIGGER %s BEFORE UPDATE OR DELETE ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
+		trigName, qualifiedTable, qualifiedFunc)
+	if idempotent {
+		return fmt.Sprintf("DROP TRIGGER IF EXISTS %s ON %s;\n%s",
+			QuoteIdent(trigName), qualifiedTable, stmt)
+	}
+	return stmt
 }
 
 // StateMachineTriggerFuncName returns the reserved function name for a state machine
@@ -1029,25 +1091,47 @@ func CreateStateMachineTriggerFunction(schemaName, tableName, colName string, tr
 
 // CreateStateMachineTrigger generates a CREATE TRIGGER statement that fires BEFORE
 // UPDATE OF <col> to enforce state machine transitions.
-func CreateStateMachineTrigger(schemaName, tableName, colName string) string {
+// When idempotent is true and pgVersion supports CREATE OR REPLACE TRIGGER (PG 14+),
+// it emits CREATE OR REPLACE TRIGGER; otherwise it emits DROP TRIGGER IF EXISTS
+// followed by CREATE TRIGGER.
+func CreateStateMachineTrigger(schemaName, tableName, colName string, idempotent bool, pgVersion int) string {
 	trigName := StateMachineTriggerFuncName(tableName, colName)
 	qualifiedTable := QualifiedName(schemaName, tableName)
 	qualifiedFunc := QualifiedName(schemaName, trigName)
-	return fmt.Sprintf("CREATE TRIGGER %s BEFORE UPDATE OF %s ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
-		QuoteIdent(trigName), QuoteIdent(colName), qualifiedTable, qualifiedFunc)
+	quotedTrigName := QuoteIdent(trigName)
+	if idempotent && pgcap.Has(pgVersion, pgcap.CreateOrReplaceTrigger) {
+		return fmt.Sprintf("CREATE OR REPLACE TRIGGER %s BEFORE UPDATE OF %s ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
+			quotedTrigName, QuoteIdent(colName), qualifiedTable, qualifiedFunc)
+	}
+	stmt := fmt.Sprintf("CREATE TRIGGER %s BEFORE UPDATE OF %s ON %s FOR EACH ROW EXECUTE FUNCTION %s();",
+		quotedTrigName, QuoteIdent(colName), qualifiedTable, qualifiedFunc)
+	if idempotent {
+		return fmt.Sprintf("DROP TRIGGER IF EXISTS %s ON %s;\n%s",
+			quotedTrigName, qualifiedTable, stmt)
+	}
+	return stmt
 }
 
 // CreateTrigger generates a CREATE [CONSTRAINT] TRIGGER statement for a user-defined trigger.
-// Emits: CREATE [CONSTRAINT] TRIGGER name timing events ON [schema.]table
+// Emits: CREATE [OR REPLACE] [CONSTRAINT] TRIGGER name timing events ON [schema.]table
 //
 //	[REFERENCING OLD TABLE AS x NEW TABLE AS y]
 //	FOR EACH ROW|STATEMENT [WHEN (condition)]
 //	EXECUTE FUNCTION [schema.]func_name()
-func CreateTrigger(schemaName, tableName string, t model.Trigger) string {
+//
+// When idempotent is true and pgVersion supports CREATE OR REPLACE TRIGGER (PG 14+),
+// it emits CREATE OR REPLACE [CONSTRAINT] TRIGGER; otherwise it emits DROP TRIGGER IF EXISTS
+// followed by CREATE [CONSTRAINT] TRIGGER.
+func CreateTrigger(schemaName, tableName string, t model.Trigger, idempotent bool, pgVersion int) string {
 	qualifiedTable := QualifiedName(schemaName, tableName)
+	useOrReplace := idempotent && pgcap.Has(pgVersion, pgcap.CreateOrReplaceTrigger)
 
 	var sb strings.Builder
-	sb.WriteString("CREATE ")
+	if useOrReplace {
+		sb.WriteString("CREATE OR REPLACE ")
+	} else {
+		sb.WriteString("CREATE ")
+	}
 	if t.Constraint {
 		sb.WriteString("CONSTRAINT ")
 	}
@@ -1086,7 +1170,15 @@ func CreateTrigger(schemaName, tableName string, t model.Trigger) string {
 	qualifiedFunc := QualifiedName(schemaName, t.Function)
 	sb.WriteString(fmt.Sprintf(" EXECUTE FUNCTION %s();", qualifiedFunc))
 
-	return sb.String()
+	createStmt := sb.String()
+
+	// For pre-PG14 idempotent mode, prepend DROP TRIGGER IF EXISTS.
+	if idempotent && !useOrReplace {
+		return fmt.Sprintf("DROP TRIGGER IF EXISTS %s ON %s;\n%s",
+			QuoteIdent(t.Name), qualifiedTable, createStmt)
+	}
+
+	return createStmt
 }
 
 // DropTrigger generates a DROP TRIGGER statement.

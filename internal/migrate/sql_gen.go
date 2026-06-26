@@ -595,11 +595,11 @@ func opDropFunction(op DDLOp) string {
 func opCreateTrigger(op DDLOp) string {
 	if op.TriggerDef != nil {
 		schema, tableName := splitQualifiedName(op.Table)
-		return sql.CreateTrigger(schema, tableName, *op.TriggerDef)
+		return sql.CreateTrigger(schema, tableName, *op.TriggerDef, false, 0)
 	}
 	// Legacy: append-only trigger.
 	schema, tableName := splitQualifiedName(op.Table)
-	return sql.CreateAppendOnlyTrigger(schema, tableName)
+	return sql.CreateAppendOnlyTrigger(schema, tableName, false, 0)
 }
 
 func opDropTrigger(op DDLOp) string {
@@ -653,7 +653,7 @@ func opCreateSequence(op DDLOp) string {
 		if schema == "" {
 			schema = "public"
 		}
-		return sql.CreateSequence(schema, op.SequenceDef)
+		return sql.CreateSequence(schema, op.SequenceDef, false)
 	}
 	schema := op.Schema
 	if schema == "" {
@@ -734,7 +734,7 @@ func opCreateCompositeType(op DDLOp) string {
 		if schema == "" {
 			schema = "public"
 		}
-		return sql.CreateCompositeType(schema, *op.CompositeTypeDef)
+		return sql.CreateCompositeType(schema, *op.CompositeTypeDef, false)
 	}
 	// Fallback.
 	if op.Schema != "" {
@@ -769,7 +769,7 @@ func opCreateDomain(op DDLOp) string {
 		if schema == "" {
 			schema = "public"
 		}
-		return sql.CreateDomain(schema, *op.DomainDef)
+		return sql.CreateDomain(schema, *op.DomainDef, false)
 	}
 	// Fallback.
 	if op.Schema != "" {
@@ -856,7 +856,7 @@ func opCreatePolicy(op DDLOp) string {
 		return fmt.Sprintf("-- create_policy %s: missing PolicyDef", op.Name)
 	}
 	schema, tableName := splitQualifiedName(op.Table)
-	return sql.CreatePolicy(schema, tableName, *op.PolicyDef)
+	return sql.CreatePolicy(schema, tableName, *op.PolicyDef, false, op.PGVersion)
 }
 
 func opDropPolicy(op DDLOp) string {

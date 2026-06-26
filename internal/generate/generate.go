@@ -145,7 +145,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	if len(schema.Sequences) > 0 {
 		var seqStmts []string
 		for i := range schema.Sequences {
-			seqStmts = append(seqStmts, sql.CreateSequence(schema.Sequences[i].Schema, &schema.Sequences[i]))
+			seqStmts = append(seqStmts, sql.CreateSequence(schema.Sequences[i].Schema, &schema.Sequences[i], opts.Idempotent))
 		}
 		sections = append(sections, strings.Join(seqStmts, "\n"))
 	}
@@ -163,7 +163,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	if len(schema.Domains) > 0 {
 		var domainStmts []string
 		for _, d := range schema.Domains {
-			domainStmts = append(domainStmts, sql.CreateDomain(d.Schema, d))
+			domainStmts = append(domainStmts, sql.CreateDomain(d.Schema, d, opts.Idempotent))
 		}
 		sections = append(sections, strings.Join(domainStmts, "\n"))
 	}
@@ -172,7 +172,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	if len(schema.CompositeTypes) > 0 {
 		var ctStmts []string
 		for _, ct := range schema.CompositeTypes {
-			ctStmts = append(ctStmts, sql.CreateCompositeType(ct.Schema, ct))
+			ctStmts = append(ctStmts, sql.CreateCompositeType(ct.Schema, ct, opts.Idempotent))
 		}
 		sections = append(sections, strings.Join(ctStmts, "\n"))
 	}
@@ -323,7 +323,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			for i := range tables {
 				t := &tables[i]
 				if t.AppendOnly {
-					triggerStmts = append(triggerStmts, sql.CreateAppendOnlyTrigger(t.Schema, t.Name))
+					triggerStmts = append(triggerStmts, sql.CreateAppendOnlyTrigger(t.Schema, t.Name, opts.Idempotent, opts.PGVersion))
 				}
 			}
 			sections = append(sections, strings.Join(triggerStmts, "\n"))
@@ -346,7 +346,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 				smTriggerStmts = append(smTriggerStmts,
 					sql.CreateStateMachineTriggerFunction(t.Schema, t.Name, col.Name, td.Transitions))
 				smTriggerStmts = append(smTriggerStmts,
-					sql.CreateStateMachineTrigger(t.Schema, t.Name, col.Name))
+					sql.CreateStateMachineTrigger(t.Schema, t.Name, col.Name, opts.Idempotent, opts.PGVersion))
 			}
 		}
 		if len(smTriggerStmts) > 0 {
@@ -440,7 +440,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		t := &tables[i]
 		policies := sortedPolicies(t.Policies)
 		for _, p := range policies {
-			policyStmts = append(policyStmts, sql.CreatePolicy(t.Schema, t.Name, p))
+			policyStmts = append(policyStmts, sql.CreatePolicy(t.Schema, t.Name, p, opts.Idempotent, opts.PGVersion))
 		}
 	}
 	if len(policyStmts) > 0 {
@@ -568,7 +568,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			if strings.HasPrefix(trig.Name, "_pgdesign_sm_") {
 				continue
 			}
-			triggerStmts = append(triggerStmts, sql.CreateTrigger(t.Schema, t.Name, trig))
+			triggerStmts = append(triggerStmts, sql.CreateTrigger(t.Schema, t.Name, trig, opts.Idempotent, opts.PGVersion))
 		}
 	}
 	if len(triggerStmts) > 0 {

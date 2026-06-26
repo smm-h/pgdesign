@@ -105,7 +105,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	for i := range schema.Sequences {
 		seq := &schema.Sequences[i]
 		tuples = append(tuples, ddlTuple{
-			SQL:           sql.CreateSequence(seq.Schema, seq),
+			SQL:           sql.CreateSequence(seq.Schema, seq, false),
 			Kind:          "sequence",
 			Name:          seq.Name,
 			Phase:         2,
@@ -128,7 +128,8 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 3b. CREATE DOMAIN (phase 3)
 	for _, d := range schema.Domains {
 		tuples = append(tuples, ddlTuple{
-			SQL:           sql.CreateDomain(d.Schema, d),
+			SQL:           sql.CreateDomain(d.Schema, d, false),
+			IdempotentSQL: sql.CreateDomain(d.Schema, d, true),
 			Kind:          "domain",
 			Name:          d.Name,
 			Phase:         3,
@@ -139,7 +140,8 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 3c. CREATE TYPE AS (composite) (phase 3)
 	for _, ct := range schema.CompositeTypes {
 		tuples = append(tuples, ddlTuple{
-			SQL:           sql.CreateCompositeType(ct.Schema, ct),
+			SQL:           sql.CreateCompositeType(ct.Schema, ct, false),
+			IdempotentSQL: sql.CreateCompositeType(ct.Schema, ct, true),
 			Kind:          "composite",
 			Name:          ct.Name,
 			Phase:         3,
@@ -341,7 +343,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				t := &tables[i]
 				if t.AppendOnly {
 					tuples = append(tuples, ddlTuple{
-						SQL:           sql.CreateAppendOnlyTrigger(t.Schema, t.Name),
+						SQL:           sql.CreateAppendOnlyTrigger(t.Schema, t.Name, false, 0),
 						Kind:          "append_only_trigger",
 						Name:          t.Name + ".deny_mutation",
 						Table:         t.Name,
@@ -464,7 +466,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 		policies := sortedPolicies(t.Policies)
 		for _, p := range policies {
 			tuples = append(tuples, ddlTuple{
-				SQL:           sql.CreatePolicy(t.Schema, t.Name, p),
+				SQL:           sql.CreatePolicy(t.Schema, t.Name, p, false, 0),
 				Kind:          "policy",
 				Name:          p.Name,
 				Table:         t.Name,
@@ -622,7 +624,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 		triggers := sortedTriggers(t.Triggers)
 		for _, trig := range triggers {
 			tuples = append(tuples, ddlTuple{
-				SQL:           sql.CreateTrigger(t.Schema, t.Name, trig),
+				SQL:           sql.CreateTrigger(t.Schema, t.Name, trig, false, 0),
 				Kind:          "trigger",
 				Name:          trig.Name,
 				Table:         t.Name,

@@ -959,7 +959,7 @@ func TestCreatePolicy_SelectUsingOnly(t *testing.T) {
 		Using:     "user_id = current_user_id()",
 	}
 
-	got := CreatePolicy("app", "documents", p)
+	got := CreatePolicy("app", "documents", p, false, 0)
 
 	if !strings.Contains(got, "CREATE POLICY users_see_own ON app.documents") {
 		t.Errorf("expected CREATE POLICY header, got:\n%s", got)
@@ -986,7 +986,7 @@ func TestCreatePolicy_InsertWithCheckOnly(t *testing.T) {
 		WithCheck: "user_id = current_user_id()",
 	}
 
-	got := CreatePolicy("app", "documents", p)
+	got := CreatePolicy("app", "documents", p, false, 0)
 
 	if !strings.Contains(got, "FOR INSERT") {
 		t.Errorf("expected FOR INSERT, got:\n%s", got)
@@ -1008,7 +1008,7 @@ func TestCreatePolicy_UpdateBothClauses(t *testing.T) {
 		WithCheck: "user_id = current_user_id()",
 	}
 
-	got := CreatePolicy("app", "documents", p)
+	got := CreatePolicy("app", "documents", p, false, 0)
 
 	if !strings.Contains(got, "FOR UPDATE") {
 		t.Errorf("expected FOR UPDATE, got:\n%s", got)
@@ -1029,7 +1029,7 @@ func TestCreatePolicy_AllOmitsFOR(t *testing.T) {
 		Using:     "user_id = current_user_id()",
 	}
 
-	got := CreatePolicy("app", "documents", p)
+	got := CreatePolicy("app", "documents", p, false, 0)
 
 	if strings.Contains(got, "FOR ALL") {
 		t.Errorf("should not contain FOR ALL (ALL is the default), got:\n%s", got)
@@ -1046,7 +1046,7 @@ func TestCreatePolicy_NoRole(t *testing.T) {
 		Using:     "published = true",
 	}
 
-	got := CreatePolicy("app", "articles", p)
+	got := CreatePolicy("app", "articles", p, false, 0)
 
 	if strings.Contains(got, " TO ") {
 		t.Errorf("should not contain TO clause when role is empty, got:\n%s", got)
@@ -1064,7 +1064,7 @@ func TestCreatePolicy_SchemaQualified(t *testing.T) {
 		Using:     "tenant_id = current_setting('app.tenant_id')::uuid",
 	}
 
-	got := CreatePolicy("multi_tenant", "orders", p)
+	got := CreatePolicy("multi_tenant", "orders", p, false, 0)
 	expected := `CREATE POLICY tenant_isolation ON multi_tenant.orders FOR SELECT TO app_user USING (tenant_id = current_setting('app.tenant_id')::uuid);`
 
 	if got != expected {
@@ -1081,7 +1081,7 @@ func TestCreatePolicy_RestrictiveType(t *testing.T) {
 		Using:     "false",
 	}
 
-	got := CreatePolicy("app", "documents", p)
+	got := CreatePolicy("app", "documents", p, false, 0)
 
 	if !strings.Contains(got, "AS RESTRICTIVE") {
 		t.Errorf("expected AS RESTRICTIVE, got:\n%s", got)
@@ -1102,13 +1102,85 @@ func TestCreatePolicy_PermissiveOmitted(t *testing.T) {
 		Using:     "true",
 	}
 
-	got := CreatePolicy("app", "documents", p)
+	got := CreatePolicy("app", "documents", p, false, 0)
 
 	if strings.Contains(got, "AS PERMISSIVE") {
 		t.Errorf("should not contain AS PERMISSIVE (it's the default), got:\n%s", got)
 	}
 	if strings.Contains(got, "RESTRICTIVE") {
 		t.Errorf("should not contain RESTRICTIVE, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_IdempotentFalse(t *testing.T) {
+	p := model.Policy{
+		Name:      "users_see_own",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+	}
+
+	got := CreatePolicy("app", "documents", p, false, 0)
+
+	if !strings.HasPrefix(got, "CREATE POLICY") {
+		t.Errorf("expected bare CREATE POLICY, got:\n%s", got)
+	}
+	if strings.Contains(got, "OR REPLACE") {
+		t.Errorf("should not contain OR REPLACE when idempotent=false, got:\n%s", got)
+	}
+	if strings.Contains(got, "DO $$") {
+		t.Errorf("should not contain DO $$ when idempotent=false, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_IdempotentPG15(t *testing.T) {
+	p := model.Policy{
+		Name:      "users_see_own",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+	}
+
+	got := CreatePolicy("app", "documents", p, true, 15)
+
+	if !strings.Contains(got, "CREATE OR REPLACE POLICY") {
+		t.Errorf("expected CREATE OR REPLACE POLICY for PG15+, got:\n%s", got)
+	}
+	if strings.Contains(got, "DO $$") {
+		t.Errorf("should not contain DO $$ block for PG15+, got:\n%s", got)
+	}
+	if !strings.Contains(got, "FOR SELECT") {
+		t.Errorf("expected FOR SELECT, got:\n%s", got)
+	}
+}
+
+func TestCreatePolicy_IdempotentPG13(t *testing.T) {
+	p := model.Policy{
+		Name:      "users_see_own",
+		Operation: "SELECT",
+		Role:      "app_user",
+		Using:     "user_id = current_user_id()",
+	}
+
+	got := CreatePolicy("app", "documents", p, true, 13)
+
+	if strings.Contains(got, "OR REPLACE") {
+		t.Errorf("should not contain OR REPLACE for PG13, got:\n%s", got)
+	}
+	if !strings.Contains(got, "DO $$") {
+		t.Errorf("expected DO $$ block for PG13 idempotent, got:\n%s", got)
+	}
+	if !strings.Contains(got, "pg_policy") {
+		t.Errorf("expected pg_policy catalog check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "polname = 'users_see_own'") {
+		t.Errorf("expected policy name in catalog check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "app.documents") {
+		t.Errorf("expected qualified table name in catalog check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "IF NOT EXISTS") {
+		t.Errorf("expected IF NOT EXISTS in DO $$ block, got:\n%s", got)
 	}
 }
 
@@ -1174,10 +1246,26 @@ func TestCreateDenyMutationFunction(t *testing.T) {
 }
 
 func TestCreateAppendOnlyTrigger(t *testing.T) {
-	got := CreateAppendOnlyTrigger("app", "events")
+	got := CreateAppendOnlyTrigger("app", "events", false, 0)
 	want := "CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON app.events FOR EACH ROW EXECUTE FUNCTION app.pgdesign_deny_mutation();"
 	if got != want {
 		t.Errorf("CreateAppendOnlyTrigger = %q, want %q", got, want)
+	}
+}
+
+func TestCreateAppendOnlyTrigger_IdempotentPG14(t *testing.T) {
+	got := CreateAppendOnlyTrigger("app", "events", true, 14)
+	want := "CREATE OR REPLACE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON app.events FOR EACH ROW EXECUTE FUNCTION app.pgdesign_deny_mutation();"
+	if got != want {
+		t.Errorf("CreateAppendOnlyTrigger idempotent PG14 =\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestCreateAppendOnlyTrigger_IdempotentPG13(t *testing.T) {
+	got := CreateAppendOnlyTrigger("app", "events", true, 13)
+	want := "DROP TRIGGER IF EXISTS deny_mutation ON app.events;\nCREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON app.events FOR EACH ROW EXECUTE FUNCTION app.pgdesign_deny_mutation();"
+	if got != want {
+		t.Errorf("CreateAppendOnlyTrigger idempotent PG13 =\n  %s\nwant:\n  %s", got, want)
 	}
 }
 
@@ -1548,7 +1636,7 @@ func TestCreateDomain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := CreateDomain(tt.schema, tt.domain)
+			got := CreateDomain(tt.schema, tt.domain, false)
 			if got != tt.want {
 				t.Errorf("CreateDomain() = %q, want %q", got, tt.want)
 			}
@@ -1567,7 +1655,7 @@ func TestCreateCompositeType(t *testing.T) {
 			{Name: "zip", PGType: typeinfo.T("text")},
 		},
 	}
-	got := CreateCompositeType("public", ct)
+	got := CreateCompositeType("public", ct, false)
 	if !strings.Contains(got, "CREATE TYPE") {
 		t.Errorf("missing CREATE TYPE: %s", got)
 	}
@@ -1598,7 +1686,7 @@ func TestCreateCompositeType_ReservedFieldName(t *testing.T) {
 			{Name: "value", PGType: typeinfo.T("int4")},
 		},
 	}
-	got := CreateCompositeType("app", ct)
+	got := CreateCompositeType("app", ct, false)
 	// "user" is a reserved word and should be quoted.
 	if !strings.Contains(got, `"user" text`) {
 		t.Errorf("reserved field name should be quoted: %s", got)
@@ -1684,7 +1772,7 @@ func TestCreateSequence_Full(t *testing.T) {
 		Cycle:     true,
 		OwnedBy:   "orders.id",
 	}
-	got := CreateSequence("myapp", seq)
+	got := CreateSequence("myapp", seq, false)
 	want := "CREATE SEQUENCE myapp.order_seq START WITH 100 INCREMENT BY 2 MINVALUE 1 MAXVALUE 999999 CACHE 10 CYCLE OWNED BY myapp.orders.id;"
 	if got != want {
 		t.Errorf("CreateSequence() =\n  %s\nwant:\n  %s", got, want)
@@ -1693,10 +1781,59 @@ func TestCreateSequence_Full(t *testing.T) {
 
 func TestCreateSequence_Minimal(t *testing.T) {
 	seq := &model.Sequence{Name: "simple_seq"}
-	got := CreateSequence("public", seq)
+	got := CreateSequence("public", seq, false)
 	want := "CREATE SEQUENCE public.simple_seq NO MINVALUE NO MAXVALUE NO CYCLE;"
 	if got != want {
 		t.Errorf("CreateSequence() =\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestCreateSequence_Idempotent(t *testing.T) {
+	seq := &model.Sequence{Name: "order_seq"}
+	got := CreateSequence("public", seq, true)
+	want := "CREATE SEQUENCE IF NOT EXISTS public.order_seq NO MINVALUE NO MAXVALUE NO CYCLE;"
+	if got != want {
+		t.Errorf("CreateSequence(idempotent=true) =\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestCreateSequence_NotIdempotent(t *testing.T) {
+	seq := &model.Sequence{Name: "order_seq"}
+	got := CreateSequence("public", seq, false)
+	if strings.Contains(got, "IF NOT EXISTS") {
+		t.Errorf("CreateSequence(idempotent=false) should not contain IF NOT EXISTS, got:\n  %s", got)
+	}
+	want := "CREATE SEQUENCE public.order_seq NO MINVALUE NO MAXVALUE NO CYCLE;"
+	if got != want {
+		t.Errorf("CreateSequence(idempotent=false) =\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestWrapIdempotentCatalogCheck(t *testing.T) {
+	catalogSQL := "SELECT 1 FROM pg_type WHERE typname = 'my_domain'"
+	createStmt := "CREATE DOMAIN public.my_domain AS text"
+	got := wrapIdempotentCatalogCheck(catalogSQL, createStmt)
+	want := `DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'my_domain') THEN
+    EXECUTE 'CREATE DOMAIN public.my_domain AS text';
+  END IF;
+END $$;`
+	if got != want {
+		t.Errorf("wrapIdempotentCatalogCheck() =\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestWrapIdempotentCatalogCheck_EscapesSingleQuotes(t *testing.T) {
+	catalogSQL := "SELECT 1 FROM pg_type WHERE typname = 'status'"
+	createStmt := "CREATE DOMAIN public.status AS text DEFAULT 'active' CHECK (VALUE IN ('active', 'inactive'))"
+	got := wrapIdempotentCatalogCheck(catalogSQL, createStmt)
+	// Single quotes in the createStmt must be escaped to '' inside the EXECUTE string.
+	if !strings.Contains(got, "DEFAULT ''active''") {
+		t.Errorf("expected escaped single quotes in EXECUTE body, got:\n%s", got)
+	}
+	if !strings.Contains(got, "''active'', ''inactive''") {
+		t.Errorf("expected escaped single quotes in CHECK, got:\n%s", got)
 	}
 }
 
@@ -1864,7 +2001,7 @@ func TestCreateTrigger_Full(t *testing.T) {
 		ForEach:  "ROW",
 		When:     "NEW.status = 'active'",
 	}
-	got := CreateTrigger("app", "orders", trig)
+	got := CreateTrigger("app", "orders", trig, false, 0)
 	for _, want := range []string{
 		"CREATE TRIGGER",
 		"audit_changes",
@@ -1994,7 +2131,7 @@ func TestCreateStateMachineTriggerFunction_NoRequires(t *testing.T) {
 }
 
 func TestCreateStateMachineTrigger(t *testing.T) {
-	got := CreateStateMachineTrigger("app", "orders", "status")
+	got := CreateStateMachineTrigger("app", "orders", "status", false, 0)
 	want := "CREATE TRIGGER _pgdesign_sm_orders_status BEFORE UPDATE OF status ON app.orders FOR EACH ROW EXECUTE FUNCTION app._pgdesign_sm_orders_status();"
 	if got != want {
 		t.Errorf("CreateStateMachineTrigger =\n  %s\nwant:\n  %s", got, want)
@@ -2002,7 +2139,7 @@ func TestCreateStateMachineTrigger(t *testing.T) {
 }
 
 func TestCreateStateMachineTrigger_ReservedColumnName(t *testing.T) {
-	got := CreateStateMachineTrigger("app", "items", "type")
+	got := CreateStateMachineTrigger("app", "items", "type", false, 0)
 	// "type" is a reserved word and should be quoted.
 	if !strings.Contains(got, `UPDATE OF "type"`) {
 		t.Errorf("expected quoted column name, got:\n%s", got)
@@ -2017,7 +2154,7 @@ func TestCreateTrigger_Minimal(t *testing.T) {
 		Timing:   "BEFORE",
 		ForEach:  "ROW",
 	}
-	got := CreateTrigger("app", "orders", trig)
+	got := CreateTrigger("app", "orders", trig, false, 0)
 	for _, want := range []string{
 		"CREATE TRIGGER simple BEFORE INSERT ON",
 		"FOR EACH ROW",
@@ -2050,7 +2187,7 @@ func TestCreateTrigger_Constraint(t *testing.T) {
 		Deferrable:        true,
 		InitiallyDeferred: true,
 	}
-	got := CreateTrigger("app", "orders", trig)
+	got := CreateTrigger("app", "orders", trig, false, 0)
 	for _, want := range []string{
 		"CREATE CONSTRAINT TRIGGER",
 		"DEFERRABLE",
@@ -2072,7 +2209,7 @@ func TestCreateTrigger_WithReferencing(t *testing.T) {
 		ReferencingOld: "old_rows",
 		ReferencingNew: "new_rows",
 	}
-	got := CreateTrigger("app", "orders", trig)
+	got := CreateTrigger("app", "orders", trig, false, 0)
 	if !strings.Contains(got, "REFERENCING OLD TABLE AS old_rows NEW TABLE AS new_rows") {
 		t.Errorf("expected REFERENCING clause, got:\n%s", got)
 	}
@@ -2086,7 +2223,7 @@ func TestCreateTrigger_Statement(t *testing.T) {
 		Timing:   "AFTER",
 		ForEach:  "STATEMENT",
 	}
-	got := CreateTrigger("app", "orders", trig)
+	got := CreateTrigger("app", "orders", trig, false, 0)
 	for _, want := range []string{
 		"FOR EACH STATEMENT",
 		"INSERT OR UPDATE OR DELETE",
