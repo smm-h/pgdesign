@@ -1,0 +1,16 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "minor"
+# Short description of this release (required)
+description = "PG capability registry, mandatory pg_version, and complete --idempotent coverage for all DDL types."
+# Optional context explaining why these changes were made
+context = """
+Introduces a formal PG capability registry (internal/pgcap) that replaces scattered inline version comparisons with a declarative table mapping capabilities to minimum PG versions. All version-gated behavior now uses pgcap.Has() for consistency.
+
+pg_version is now mandatory for DDL-generating commands (generate, build, check, migrate). Commands that don't produce DDL (fmt, codegen, diff, seed) are unaffected. This eliminates the entire class of "unknown PG version" bugs where the tool had to guess behavior.
+
+The --idempotent flag now covers every DDL statement type: sequences (IF NOT EXISTS), domains and composite types (DO $$ catalog check), policies (CREATE OR REPLACE on PG 15+, catalog check on older), materialized views (DO $$ catalog check), and all three trigger types (CREATE OR REPLACE on PG 14+, DROP IF EXISTS + CREATE on older). Previously, triggers, domains, composite types, policies, matviews, and sequences were silently non-idempotent.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
