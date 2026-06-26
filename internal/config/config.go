@@ -12,23 +12,43 @@ import (
 	tomledit "github.com/smm-h/go-toml-edit"
 )
 
-// Config represents the parsed pgdesign.toml project configuration.
-type Config struct {
-	Project    ProjectConfig           `toml:"project"`
-	Database   DatabaseConfig          `toml:"database"`
-	Format     FormatConfig            `toml:"format"`
-	Validate   ValidateConfig          `toml:"validate"`
-	Migrate    MigrateConfig           `toml:"migrate"`
-	Extensions []ExtensionConfig       `toml:"extensions"`
-	Suppress   map[string]string       `toml:"suppress"`
-	Output     map[string]OutputConfig `toml:"-"`
+// RelativePath represents a path as declared in the TOML config file (relative to project root).
+type RelativePath string
+
+// AbsolutePath represents a fully resolved absolute filesystem path.
+type AbsolutePath string
+
+// PathKind constrains the Config generic to either relative or absolute paths.
+type PathKind interface {
+	RelativePath | AbsolutePath
 }
 
+// Config represents the parsed pgdesign.toml project configuration.
+type Config[P PathKind] struct {
+	Project    ProjectConfig[P]           `toml:"project"`
+	Database   DatabaseConfig             `toml:"database"`
+	Format     FormatConfig               `toml:"format"`
+	Validate   ValidateConfig             `toml:"validate"`
+	Migrate    MigrateConfig              `toml:"migrate"`
+	Extensions []ExtensionConfig          `toml:"extensions"`
+	Suppress   map[string]string          `toml:"suppress"`
+	Output     map[string]OutputConfig[P] `toml:"-"`
+
+	// SourcePath is the absolute path to the pgdesign.toml file that was loaded.
+	// Not part of the TOML schema; set by LoadAndResolve.
+	SourcePath string `toml:"-"`
+}
+
+// RawConfig is a Config with relative paths, as parsed directly from TOML.
+type RawConfig = Config[RelativePath]
+
+// ResolvedConfig is a Config with all paths resolved to absolute paths.
+type ResolvedConfig = Config[AbsolutePath]
 
 // ProjectConfig holds [project] section values.
-type ProjectConfig struct {
-	Schemas       []string `toml:"schemas"`
-	MigrationsDir string   `toml:"migrations_dir"`
+type ProjectConfig[P PathKind] struct {
+	Schemas       []P `toml:"schemas"`
+	MigrationsDir P   `toml:"migrations_dir"`
 }
 
 // DatabaseConfig holds [database] section values.
@@ -60,9 +80,9 @@ type MigrateConfig struct {
 }
 
 // OutputConfig holds an [output.<name>] section describing a build output target.
-type OutputConfig struct {
+type OutputConfig[P PathKind] struct {
 	Format     string   `toml:"format"`     // sql, d2, json, svg, doc, graphql, codegen
-	Path       string   `toml:"path"`       // relative to project root
+	Path       P        `toml:"path"`       // relative to project root (RawConfig) or absolute (ResolvedConfig)
 	Lang       string   `toml:"lang"`       // for codegen: python, zig, go, ts, java, kotlin
 	Mode       string   `toml:"mode"`       // for codegen: validators, constants
 	Groups     []string `toml:"groups"`     // restrict output to tables in these groups
@@ -87,7 +107,7 @@ var CodegenModes map[string][]string
 
 // Check checks the Config for semantic errors that TOML parsing alone
 // cannot catch (e.g., cross-field constraints).
-func (c *Config) Check() error {
+func (c *Config[P]) Check() error {
 	var errs []error
 	if c.Database.PoolMaxConns < 0 {
 		errs = append(errs, fmt.Errorf("pool_max_conns must be non-negative"))
@@ -117,7 +137,7 @@ func (c *Config) Check() error {
 		}
 	}
 	for name, out := range c.Output {
-		if out.Path == "" {
+		if out.Path == P("") {
 			errs = append(errs, fmt.Errorf("output.%s: path is required", name))
 		}
 		if !validFormats[out.Format] {
@@ -162,24 +182,24 @@ func (c *Config) Check() error {
 }
 
 // decodeOutput converts a raw map[string]any (from TOML decoding) into a typed
-// map[string]OutputConfig. Each value is expected to be a map[string]any
+// map[string]OutputConfig[RelativePath]. Each value is expected to be a map[string]any
 // representing the fields of an OutputConfig.
-func decodeOutput(raw map[string]any) (map[string]OutputConfig, error) {
+func decodeOutput(raw map[string]any) (map[string]OutputConfig[RelativePath], error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
-	out := make(map[string]OutputConfig, len(raw))
+	out := make(map[string]OutputConfig[RelativePath], len(raw))
 	for name, v := range raw {
 		m, ok := v.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("output.%s: expected table, got %T", name, v)
 		}
-		var oc OutputConfig
+		var oc OutputConfig[RelativePath]
 		if s, ok := m["format"].(string); ok {
 			oc.Format = s
 		}
 		if s, ok := m["path"].(string); ok {
-			oc.Path = s
+			oc.Path = RelativePath(s)
 		}
 		if s, ok := m["lang"].(string); ok {
 			oc.Lang = s
@@ -213,7 +233,7 @@ func decodeOutput(raw map[string]any) (map[string]OutputConfig, error) {
 }
 
 // Load reads and parses a pgdesign.toml file at the given path.
-func Load(path string) (*Config, error) {
+func Load(path string) (*RawConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read config: %w", err)
@@ -222,8 +242,8 @@ func Load(path string) (*Config, error) {
 }
 
 // LoadBytes parses config from in-memory bytes.
-func LoadBytes(data []byte) (*Config, error) {
-	var cfg Config
+func LoadBytes(data []byte) (*RawConfig, error) {
+	var cfg RawConfig
 	if err := tomledit.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("cannot parse config: %w", err)
 	}
@@ -254,17 +274,92 @@ func LoadBytes(data []byte) (*Config, error) {
 
 // LoadOrDefault attempts to load pgdesign.toml from dir. If the file does not
 // exist, it returns a zero-valued Config (all defaults). Other errors are returned.
-func LoadOrDefault(dir string) (*Config, error) {
+func LoadOrDefault(dir string) (*RawConfig, error) {
 	path, found := FindConfig(dir)
 	if !found {
-		return &Config{}, nil
+		return &RawConfig{}, nil
 	}
 	return Load(path)
 }
 
+// LoadAndResolve loads pgdesign.toml at the given path and resolves all relative
+// paths to absolute paths using the directory containing the config file as the
+// project root.
+func LoadAndResolve(path string) (*ResolvedConfig, error) {
+	raw, err := Load(path)
+	if err != nil {
+		return nil, err
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("cannot resolve config path: %w", err)
+	}
+	resolved, err := Resolve(raw, filepath.Dir(absPath))
+	if err != nil {
+		return nil, err
+	}
+	resolved.SourcePath = absPath
+	return resolved, nil
+}
+
+// Resolve converts a RawConfig (relative paths) into a ResolvedConfig (absolute paths)
+// by resolving each path relative to projectRoot.
+func Resolve(raw *RawConfig, projectRoot string) (*ResolvedConfig, error) {
+	resolved := &ResolvedConfig{
+		Database:   raw.Database,
+		Format:     raw.Format,
+		Validate:   raw.Validate,
+		Migrate:    raw.Migrate,
+		Extensions: raw.Extensions,
+		Suppress:   raw.Suppress,
+	}
+
+	// Resolve Project.Schemas
+	resolved.Project.Schemas = make([]AbsolutePath, len(raw.Project.Schemas))
+	for i, s := range raw.Project.Schemas {
+		resolved.Project.Schemas[i] = resolvePath(projectRoot, s)
+	}
+
+	// Resolve Project.MigrationsDir
+	resolved.Project.MigrationsDir = resolvePath(projectRoot, raw.Project.MigrationsDir)
+
+	// Resolve Output map
+	if len(raw.Output) > 0 {
+		resolved.Output = make(map[string]OutputConfig[AbsolutePath], len(raw.Output))
+		for name, out := range raw.Output {
+			resolved.Output[name] = OutputConfig[AbsolutePath]{
+				Format:     out.Format,
+				Path:       resolvePath(projectRoot, out.Path),
+				Lang:       out.Lang,
+				Mode:       out.Mode,
+				Groups:     out.Groups,
+				Backends:   out.Backends,
+				Idempotent: out.Idempotent,
+				Comments:   out.Comments,
+			}
+		}
+	}
+
+	return resolved, nil
+}
+
+// resolvePath resolves a RelativePath to an AbsolutePath relative to projectRoot.
+// If the path is empty, returns an empty AbsolutePath.
+// If the path is already absolute, returns it as-is.
+func resolvePath(projectRoot string, p RelativePath) AbsolutePath {
+	s := string(p)
+	if s == "" {
+		return AbsolutePath("")
+	}
+	if filepath.IsAbs(s) {
+		return AbsolutePath(s)
+	}
+	return AbsolutePath(filepath.Join(projectRoot, s))
+}
+
 // MergeValidateFlags merges CLI flag values into the validate config.
 // Non-zero flag values override config file values.
-func (c *Config) MergeValidateFlags(namingPattern string, maxColumns int) {
+func (c *Config[P]) MergeValidateFlags(namingPattern string, maxColumns int) {
 	if namingPattern != "" {
 		c.Validate.NamingPattern = namingPattern
 	}
@@ -273,26 +368,35 @@ func (c *Config) MergeValidateFlags(namingPattern string, maxColumns int) {
 	}
 }
 
-// SchemaFiles returns the absolute paths of all schema files listed in the
-// config, resolved relative to the directory containing pgdesign.toml.
-func (c *Config) SchemaFiles(configDir string) []string {
+// SchemaFiles returns the resolved schema file paths as strings.
+// On a ResolvedConfig, the paths are already absolute.
+// On a RawConfig, the paths are returned as-is (relative).
+func (c *Config[P]) SchemaFiles() []string {
 	paths := make([]string, len(c.Project.Schemas))
 	for i, s := range c.Project.Schemas {
-		if filepath.IsAbs(s) {
-			paths[i] = s
-		} else {
-			paths[i] = filepath.Join(configDir, s)
-		}
+		paths[i] = string(s)
 	}
 	return paths
 }
 
-// FindConfig looks for pgdesign.toml in the given directory.
-// Returns the path and true if found, or empty string and false if not.
+// FindConfig looks for pgdesign.toml by walking from the given directory toward
+// the filesystem root. Returns the path and true if found, or empty string and
+// false if not found in any ancestor.
 func FindConfig(dir string) (string, bool) {
-	path := filepath.Join(dir, "pgdesign.toml")
-	if _, err := os.Stat(path); err == nil {
-		return path, true
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", false
 	}
-	return "", false
+	for {
+		path := filepath.Join(absDir, "pgdesign.toml")
+		if _, err := os.Stat(path); err == nil {
+			return path, true
+		}
+		parent := filepath.Dir(absDir)
+		if parent == absDir {
+			// Reached filesystem root.
+			return "", false
+		}
+		absDir = parent
+	}
 }

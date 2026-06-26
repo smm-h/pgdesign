@@ -37,7 +37,7 @@ func handleServe(kwargs map[string]interface{}) int {
 
 	migrationsDir := "migrations"
 	if cfg.Project.MigrationsDir != "" {
-		migrationsDir = cfg.Project.MigrationsDir
+		migrationsDir = string(cfg.Project.MigrationsDir)
 	}
 
 	poolCfg := serve.PoolConfig{

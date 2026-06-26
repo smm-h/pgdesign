@@ -117,7 +117,7 @@ func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
 
 // resolveDBURL looks for a database connection URL in the config file or
 // environment. Returns empty string if no URL is available.
-func resolveDBURL(cfg *config.Config) string {
+func resolveDBURL[P config.PathKind](cfg *config.Config[P]) string {
 	if cfg.Database.URL != "" {
 		return cfg.Database.URL
 	}

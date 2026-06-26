@@ -183,7 +183,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 
 	configPath, found := config.FindConfig(cwd)
 	if !found {
-		fmt.Fprintln(os.Stderr, "error: pgdesign.toml not found in current directory")
+		fmt.Fprintln(os.Stderr, "error: pgdesign.toml not found in current directory or any ancestor")
 		return 1
 	}
 
@@ -195,7 +195,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 
 	// Find the SQL output section.
 	var sqlOutputName string
-	var sqlOutput config.OutputConfig
+	var sqlOutput config.OutputConfig[config.RelativePath]
 	var sqlOutputNames []string
 	for name, out := range cfg.Output {
 		if out.Format == "sql" {
@@ -231,7 +231,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 	_ = sqlOutputName
 
 	// Resolve DDL path: the .split.json companion file.
-	sqlPath := sqlOutput.Path
+	sqlPath := string(sqlOutput.Path)
 	if !filepath.IsAbs(sqlPath) {
 		sqlPath = filepath.Join(cwd, sqlPath)
 	}

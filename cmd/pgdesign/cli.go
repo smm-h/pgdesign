@@ -43,6 +43,7 @@ func main() {
 	app.RegisterCheck("workload", checkWorkload)
 
 	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output"))
+	app.GlobalFlag(strictcli.StringFlag("config", "Path to pgdesign.toml (bypasses directory search)", strictcli.Default(nil)))
 
 	app.Command("generate", "Generate SQL DDL from TOML schema file(s) or directory", handleGenerate,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
@@ -222,7 +223,7 @@ func main() {
 // loadProjectConfig attempts to load pgdesign.toml from the directory containing
 // the given path (or the path itself if it's a directory). Returns a zero-valued
 // config silently if no config file is found.
-func loadProjectConfig(path string) *config.Config {
+func loadProjectConfig(path string) *config.RawConfig {
 	dir := path
 	info, err := os.Stat(path)
 	if err == nil && !info.IsDir() {
@@ -231,21 +232,35 @@ func loadProjectConfig(path string) *config.Config {
 	cfg, err := config.LoadOrDefault(dir)
 	if err != nil {
 		// Config exists but is malformed; fall back to defaults.
-		return &config.Config{}
+		return &config.RawConfig{}
 	}
 	return cfg
+}
+
+// loadProjectConfigFromKwargs checks for the --config global flag first, then
+// falls back to loadProjectConfig with the given path.
+func loadProjectConfigFromKwargs(kwargs map[string]interface{}, fallbackPath string) *config.RawConfig {
+	if configPath, ok := kwargs["config"].(string); ok && configPath != "" {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: cannot load config %q: %v\n", configPath, err)
+			return &config.RawConfig{}
+		}
+		return cfg
+	}
+	return loadProjectConfig(fallbackPath)
 }
 
 // configSchemaNames derives PostgreSQL schema names from config.Project.Schemas
 // by stripping the .toml extension from each file basename. Returns nil if no
 // schemas are configured.
-func configSchemaNames(cfg *config.Config) []string {
+func configSchemaNames[P config.PathKind](cfg *config.Config[P]) []string {
 	if len(cfg.Project.Schemas) == 0 {
 		return nil
 	}
 	names := make([]string, len(cfg.Project.Schemas))
 	for i, s := range cfg.Project.Schemas {
-		base := filepath.Base(s)
+		base := filepath.Base(string(s))
 		names[i] = strings.TrimSuffix(base, ".toml")
 	}
 	return names
@@ -328,14 +343,14 @@ func resolveSchemaPaths(paths []string) ([]string, error) {
 
 // resolveFromConfig loads pgdesign.toml and returns the resolved schema file paths.
 func resolveFromConfig(configPath string) ([]string, error) {
-	cfg, err := config.Load(configPath)
+	resolved, err := config.LoadAndResolve(configPath)
 	if err != nil {
 		return nil, err
 	}
-	if len(cfg.Project.Schemas) == 0 {
+	if len(resolved.Project.Schemas) == 0 {
 		return nil, fmt.Errorf("pgdesign.toml lists no schemas")
 	}
-	return cfg.SchemaFiles(filepath.Dir(configPath)), nil
+	return resolved.SchemaFiles(), nil
 }
 
 

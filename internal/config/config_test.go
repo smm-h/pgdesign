@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -34,13 +36,13 @@ column_order = "pk_fk_alpha"
 		t.Fatalf("expected 2 schemas, got %d", len(cfg.Project.Schemas))
 	}
 	if cfg.Project.Schemas[0] != "auth.toml" {
-		t.Errorf("schemas[0] = %q, want %q", cfg.Project.Schemas[0], "auth.toml")
+		t.Errorf("schemas[0] = %q, want %q", cfg.Project.Schemas[0], RelativePath("auth.toml"))
 	}
 	if cfg.Project.Schemas[1] != "game.toml" {
-		t.Errorf("schemas[1] = %q, want %q", cfg.Project.Schemas[1], "game.toml")
+		t.Errorf("schemas[1] = %q, want %q", cfg.Project.Schemas[1], RelativePath("game.toml"))
 	}
 	if cfg.Project.MigrationsDir != "migrations" {
-		t.Errorf("migrations_dir = %q, want %q", cfg.Project.MigrationsDir, "migrations")
+		t.Errorf("migrations_dir = %q, want %q", cfg.Project.MigrationsDir, RelativePath("migrations"))
 	}
 	if cfg.Database.PGVersion != 18 {
 		t.Errorf("pg_version = %d, want %d", cfg.Database.PGVersion, 18)
@@ -54,13 +56,18 @@ column_order = "pk_fk_alpha"
 }
 
 func TestSchemaFiles(t *testing.T) {
-	cfg := &Config{
-		Project: ProjectConfig{
-			Schemas: []string{"auth.toml", "game.toml"},
+	raw := &RawConfig{
+		Project: ProjectConfig[RelativePath]{
+			Schemas: []RelativePath{"auth.toml", "game.toml"},
 		},
 	}
 
-	paths := cfg.SchemaFiles("/home/user/project/schema")
+	resolved, err := Resolve(raw, "/home/user/project/schema")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paths := resolved.SchemaFiles()
 	if len(paths) != 2 {
 		t.Fatalf("expected 2 paths, got %d", len(paths))
 	}
@@ -275,7 +282,7 @@ max_columns = 42
 }
 
 func TestMergeValidateFlags(t *testing.T) {
-	cfg := &Config{
+	cfg := &RawConfig{
 		Validate: ValidateConfig{
 			NamingPattern: "snake_case",
 			MaxColumns:    30,
@@ -707,3 +714,283 @@ path = "full.sql"
 		t.Errorf("expected no groups on full_sql output, got %v", fullSql.Groups)
 	}
 }
+
+func TestResolveAllPathFields(t *testing.T) {
+	// Build a RawConfig with known relative paths in all path fields.
+	raw := &RawConfig{
+		Project: ProjectConfig[RelativePath]{
+			Schemas:       []RelativePath{"auth.toml", "game.toml"},
+			MigrationsDir: "migrations",
+		},
+		Output: map[string]OutputConfig[RelativePath]{
+			"ddl": {
+				Format: "sql",
+				Path:   "out/schema.sql",
+			},
+			"diagram": {
+				Format: "d2",
+				Path:   "out/schema.d2",
+			},
+		},
+	}
+
+	root := "/project/root"
+	resolved, err := Resolve(raw, root)
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+
+	// Use reflect to walk the ResolvedConfig and verify all AbsolutePath fields
+	// are non-zero and absolute.
+	var checkAbsolutePaths func(v reflect.Value, path string)
+	checkAbsolutePaths = func(v reflect.Value, path string) {
+		switch v.Kind() {
+		case reflect.Struct:
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Type().Field(i)
+				checkAbsolutePaths(v.Field(i), path+"."+field.Name)
+			}
+		case reflect.Map:
+			for _, key := range v.MapKeys() {
+				checkAbsolutePaths(v.MapIndex(key), path+"["+key.String()+"]")
+			}
+		case reflect.Slice:
+			for i := 0; i < v.Len(); i++ {
+				checkAbsolutePaths(v.Index(i), path+"["+fmt.Sprintf("%d", i)+"]")
+			}
+		case reflect.Pointer:
+			if !v.IsNil() {
+				checkAbsolutePaths(v.Elem(), path)
+			}
+		case reflect.String:
+			if v.Type() == reflect.TypeOf(AbsolutePath("")) {
+				s := v.String()
+				if s == "" {
+					// Empty paths are allowed (zero-value fields).
+					return
+				}
+				if !filepath.IsAbs(s) {
+					t.Errorf("%s = %q: expected absolute path", path, s)
+				}
+			}
+		}
+	}
+
+	checkAbsolutePaths(reflect.ValueOf(*resolved), "ResolvedConfig")
+
+	// Verify specific fields.
+	if len(resolved.Project.Schemas) != 2 {
+		t.Fatalf("expected 2 schemas, got %d", len(resolved.Project.Schemas))
+	}
+	if resolved.Project.Schemas[0] != "/project/root/auth.toml" {
+		t.Errorf("schemas[0] = %q, want %q", resolved.Project.Schemas[0], "/project/root/auth.toml")
+	}
+	if resolved.Project.MigrationsDir != "/project/root/migrations" {
+		t.Errorf("migrations_dir = %q, want %q", resolved.Project.MigrationsDir, "/project/root/migrations")
+	}
+	if resolved.Output["ddl"].Path != "/project/root/out/schema.sql" {
+		t.Errorf("output.ddl.path = %q, want %q", resolved.Output["ddl"].Path, "/project/root/out/schema.sql")
+	}
+	if resolved.Output["diagram"].Path != "/project/root/out/schema.d2" {
+		t.Errorf("output.diagram.path = %q, want %q", resolved.Output["diagram"].Path, "/project/root/out/schema.d2")
+	}
+}
+
+func TestResolveAlreadyAbsolutePaths(t *testing.T) {
+	raw := &RawConfig{
+		Project: ProjectConfig[RelativePath]{
+			Schemas:       []RelativePath{"/absolute/auth.toml"},
+			MigrationsDir: "/absolute/migrations",
+		},
+	}
+
+	resolved, err := Resolve(raw, "/project/root")
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+
+	if resolved.Project.Schemas[0] != "/absolute/auth.toml" {
+		t.Errorf("absolute path was modified: got %q", resolved.Project.Schemas[0])
+	}
+	if resolved.Project.MigrationsDir != "/absolute/migrations" {
+		t.Errorf("absolute path was modified: got %q", resolved.Project.MigrationsDir)
+	}
+}
+
+func TestFindConfigWalkUp(t *testing.T) {
+	// Create a temp directory tree: root/a/b/c
+	tmpDir := t.TempDir()
+	aDir := filepath.Join(tmpDir, "a")
+	bDir := filepath.Join(tmpDir, "a", "b")
+	cDir := filepath.Join(tmpDir, "a", "b", "c")
+	for _, d := range []string{aDir, bDir, cDir} {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// No config anywhere: should not find.
+	_, found := FindConfig(cDir)
+	if found {
+		t.Error("expected no config found in empty tree")
+	}
+
+	// Place pgdesign.toml in the "a" directory.
+	configPath := filepath.Join(aDir, "pgdesign.toml")
+	if err := os.WriteFile(configPath, []byte("[project]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Search from "c" should find it in "a".
+	foundPath, found := FindConfig(cDir)
+	if !found {
+		t.Fatal("expected config found via walk-up")
+	}
+	if foundPath != configPath {
+		t.Errorf("found path = %q, want %q", foundPath, configPath)
+	}
+
+	// Search from "b" should also find it in "a".
+	foundPath, found = FindConfig(bDir)
+	if !found {
+		t.Fatal("expected config found from b")
+	}
+	if foundPath != configPath {
+		t.Errorf("found path = %q, want %q", foundPath, configPath)
+	}
+
+	// Search from "a" should find it directly.
+	foundPath, found = FindConfig(aDir)
+	if !found {
+		t.Fatal("expected config found in a")
+	}
+	if foundPath != configPath {
+		t.Errorf("found path = %q, want %q", foundPath, configPath)
+	}
+}
+
+func TestFindConfigPreferClosest(t *testing.T) {
+	// If both parent and child have pgdesign.toml, the child's should be found.
+	tmpDir := t.TempDir()
+	childDir := filepath.Join(tmpDir, "child")
+	if err := os.MkdirAll(childDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	parentConfig := filepath.Join(tmpDir, "pgdesign.toml")
+	childConfig := filepath.Join(childDir, "pgdesign.toml")
+	if err := os.WriteFile(parentConfig, []byte("[project]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(childConfig, []byte("[project]\nschemas = [\"child.toml\"]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	foundPath, found := FindConfig(childDir)
+	if !found {
+		t.Fatal("expected config found")
+	}
+	if foundPath != childConfig {
+		t.Errorf("found path = %q, want %q (should prefer closest)", foundPath, childConfig)
+	}
+}
+
+func TestLoadAndResolve(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["auth.toml", "game.toml"]
+migrations_dir = "migrations"
+
+[output.ddl]
+format = "sql"
+path = "out/schema.sql"
+`
+	configPath := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	resolved, err := LoadAndResolve(configPath)
+	if err != nil {
+		t.Fatalf("LoadAndResolve failed: %v", err)
+	}
+
+	if resolved.SourcePath == "" {
+		t.Error("SourcePath should be set")
+	}
+	if !filepath.IsAbs(resolved.SourcePath) {
+		t.Errorf("SourcePath should be absolute, got %q", resolved.SourcePath)
+	}
+
+	// Verify resolved paths are absolute.
+	for i, s := range resolved.Project.Schemas {
+		if !filepath.IsAbs(string(s)) {
+			t.Errorf("schemas[%d] = %q: not absolute", i, s)
+		}
+	}
+	if !filepath.IsAbs(string(resolved.Project.MigrationsDir)) {
+		t.Errorf("migrations_dir = %q: not absolute", resolved.Project.MigrationsDir)
+	}
+	if ddl, ok := resolved.Output["ddl"]; ok {
+		if !filepath.IsAbs(string(ddl.Path)) {
+			t.Errorf("output.ddl.path = %q: not absolute", ddl.Path)
+		}
+	} else {
+		t.Error("expected output.ddl in resolved config")
+	}
+}
+
+func TestResolveNonPathFieldsPreserved(t *testing.T) {
+	raw := &RawConfig{
+		Database: DatabaseConfig{
+			URL:       "postgres://localhost/test",
+			PGVersion: 16,
+		},
+		Format: FormatConfig{
+			TableOrder:  "dependency",
+			ColumnOrder: "pk_fk_alpha",
+		},
+		Validate: ValidateConfig{
+			Disable:       []string{"W001"},
+			NamingPattern: "snake_case",
+			MaxColumns:    50,
+		},
+		Migrate: MigrateConfig{
+			LockTimeout: "5s",
+		},
+		Extensions: []ExtensionConfig{
+			{Name: "pgcrypto", Types: []string{"uuid"}},
+		},
+		Suppress: map[string]string{
+			"users.W001": "intentional",
+		},
+	}
+
+	resolved, err := Resolve(raw, "/root")
+	if err != nil {
+		t.Fatalf("Resolve failed: %v", err)
+	}
+
+	if resolved.Database.URL != "postgres://localhost/test" {
+		t.Errorf("Database.URL not preserved: %q", resolved.Database.URL)
+	}
+	if resolved.Database.PGVersion != 16 {
+		t.Errorf("Database.PGVersion not preserved: %d", resolved.Database.PGVersion)
+	}
+	if resolved.Format.TableOrder != "dependency" {
+		t.Errorf("Format.TableOrder not preserved: %q", resolved.Format.TableOrder)
+	}
+	if resolved.Validate.MaxColumns != 50 {
+		t.Errorf("Validate.MaxColumns not preserved: %d", resolved.Validate.MaxColumns)
+	}
+	if resolved.Migrate.LockTimeout != "5s" {
+		t.Errorf("Migrate.LockTimeout not preserved: %q", resolved.Migrate.LockTimeout)
+	}
+	if len(resolved.Extensions) != 1 || resolved.Extensions[0].Name != "pgcrypto" {
+		t.Errorf("Extensions not preserved: %v", resolved.Extensions)
+	}
+	if resolved.Suppress["users.W001"] != "intentional" {
+		t.Errorf("Suppress not preserved: %v", resolved.Suppress)
+	}
+}
+

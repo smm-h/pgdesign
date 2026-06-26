@@ -284,12 +284,16 @@ func gitShow(ref, path string) ([]byte, error) {
 // parseSchemasFromConfigBytes extracts the project.schemas list from pgdesign.toml
 // bytes and resolves the paths relative to schemaDir.
 func parseSchemasFromConfigBytes(data []byte, schemaDir string) ([]string, error) {
-	cfg, err := config.LoadBytes(data)
+	raw, err := config.LoadBytes(data)
 	if err != nil {
 		return nil, err
 	}
-	if len(cfg.Project.Schemas) == 0 {
+	if len(raw.Project.Schemas) == 0 {
 		return nil, fmt.Errorf("pgdesign.toml at this ref has no project.schemas entries")
 	}
-	return cfg.SchemaFiles(schemaDir), nil
+	resolved, err := config.Resolve(raw, schemaDir)
+	if err != nil {
+		return nil, err
+	}
+	return resolved.SchemaFiles(), nil
 }

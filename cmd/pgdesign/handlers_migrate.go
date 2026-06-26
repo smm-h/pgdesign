@@ -202,7 +202,7 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 
 	dir := kwargs["dir"].(string)
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = cfg.Project.MigrationsDir
+		dir = string(cfg.Project.MigrationsDir)
 	}
 
 	schemaNames := []string{"public"}
@@ -297,7 +297,7 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 
 	dir := kwargs["dir"].(string)
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = cfg.Project.MigrationsDir
+		dir = string(cfg.Project.MigrationsDir)
 	}
 
 	dryRun := kwargs["dry_run"].(bool)
@@ -436,7 +436,7 @@ func handleMigrateRollback(kwargs map[string]interface{}) int {
 
 	dir := kwargs["dir"].(string)
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = cfg.Project.MigrationsDir
+		dir = string(cfg.Project.MigrationsDir)
 	}
 
 	lockTimeout := cfg.Migrate.LockTimeout
@@ -494,7 +494,7 @@ func handleMigrateStatus(kwargs map[string]interface{}) int {
 
 	dir := kwargs["dir"].(string)
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = cfg.Project.MigrationsDir
+		dir = string(cfg.Project.MigrationsDir)
 	}
 
 	ctx := context.Background()
@@ -577,7 +577,7 @@ func handleMigrateSquash(kwargs map[string]interface{}) int {
 
 	dir := kwargs["dir"].(string)
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = cfg.Project.MigrationsDir
+		dir = string(cfg.Project.MigrationsDir)
 	}
 
 	from, _ := kwargs["from"].(string)
@@ -700,7 +700,7 @@ func handleMigrateTest(kwargs map[string]interface{}) int {
 
 	dir := kwargs["dir"].(string)
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = cfg.Project.MigrationsDir
+		dir = string(cfg.Project.MigrationsDir)
 	}
 
 	timeout := kwargs["timeout"].(int)
@@ -899,7 +899,7 @@ func handleMigrateTestShadow(kwargs map[string]interface{}) int {
 
 	dir := kwargs["dir"].(string)
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = cfg.Project.MigrationsDir
+		dir = string(cfg.Project.MigrationsDir)
 	}
 
 	schemaNames := []string{"public"}

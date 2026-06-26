@@ -29,11 +29,11 @@ func handleBuild(kwargs map[string]interface{}) int {
 
 	configPath, found := config.FindConfig(cwd)
 	if !found {
-		fmt.Fprintln(os.Stderr, "error: no pgdesign.toml in current directory")
+		fmt.Fprintln(os.Stderr, "error: pgdesign.toml not found in current directory or any ancestor")
 		return 1
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.LoadAndResolve(configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
@@ -47,7 +47,7 @@ func handleBuild(kwargs map[string]interface{}) int {
 	// Resolve schema paths.
 	var schemaPaths []string
 	if len(cfg.Project.Schemas) > 0 {
-		schemaPaths = cfg.SchemaFiles(cwd)
+		schemaPaths = cfg.SchemaFiles()
 	} else {
 		schemaPaths, err = resolveFromConfig(configPath)
 		if err != nil {
@@ -74,10 +74,7 @@ func handleBuild(kwargs map[string]interface{}) int {
 
 	for _, name := range names {
 		out := cfg.Output[name]
-		outPath := out.Path
-		if !filepath.IsAbs(outPath) {
-			outPath = filepath.Join(cwd, outPath)
-		}
+		outPath := string(out.Path)
 
 		// Filter schema tables by groups when configured.
 		outputSchema := schema
