@@ -3,6 +3,7 @@ package splitfmt
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -227,5 +228,51 @@ func TestEmptyStatementContent(t *testing.T) {
 	}
 	if len(got) != 1 || got[0] != "" {
 		t.Fatalf("got %v, want %v", got, stmts)
+	}
+}
+
+func TestDecodeAdversarialCount(t *testing.T) {
+	// Count claims 999999999 statements but data only has one statement's worth.
+	// Must return an error (loop fails on second iteration) rather than OOMing.
+	input := []byte("999999999\n9\nSELECT 1;\n")
+	done := make(chan struct{})
+	var err error
+	go func() {
+		_, err = Decode(input)
+		close(done)
+	}()
+	select {
+	case <-done:
+		if err == nil {
+			t.Fatal("expected error for adversarial count, got nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Decode did not return within 5s — possible OOM from adversarial count")
+	}
+}
+
+func TestDecodeTrailingData(t *testing.T) {
+	// Encode one valid statement, then append garbage bytes.
+	data := Encode([]string{"SELECT 1;"})
+	data = append(data, []byte("garbage")...)
+	_, err := Decode(data)
+	if err == nil {
+		t.Fatal("expected error for trailing data, got nil")
+	}
+	if !strings.Contains(err.Error(), "trailing bytes") {
+		t.Fatalf("error should mention 'trailing bytes', got: %v", err)
+	}
+}
+
+func TestDecodeTrailingNewline(t *testing.T) {
+	// A trailing newline after valid content IS trailing data.
+	data := Encode([]string{"SELECT 1;"})
+	data = append(data, '\n')
+	_, err := Decode(data)
+	if err == nil {
+		t.Fatal("expected error for trailing newline, got nil")
+	}
+	if !strings.Contains(err.Error(), "trailing bytes") {
+		t.Fatalf("error should mention 'trailing bytes', got: %v", err)
 	}
 }

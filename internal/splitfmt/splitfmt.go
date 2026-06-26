@@ -60,7 +60,14 @@ func Decode(data []byte) ([]string, error) {
 	}
 	rest = rest[idx+1:]
 
-	statements := make([]string, 0, count)
+	allocCap := count
+	if allocCap > len(rest)/2 {
+		allocCap = len(rest) / 2
+	}
+	if allocCap < 0 {
+		allocCap = 0
+	}
+	statements := make([]string, 0, allocCap)
 	for i := range count {
 		// Read the length line.
 		idx = bytes.IndexByte(rest, '\n')
@@ -88,6 +95,10 @@ func Decode(data []byte) ([]string, error) {
 			return nil, fmt.Errorf("splitfmt: statement %d: missing trailing newline after payload", i)
 		}
 		rest = rest[1:]
+	}
+
+	if len(rest) > 0 {
+		return nil, fmt.Errorf("splitfmt: unexpected %d trailing bytes after %d statements", len(rest), count)
 	}
 
 	return statements, nil
