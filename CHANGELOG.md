@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 0.18.1
+
+ILIKE constraint codegen fix, splitfmt hardening, transactional enum additions on PG 12+, and Plan unit tests.
+
+### Features
+
+- **New feature.** `ALTER TYPE ADD VALUE` runs inside transactions on PG 12+ instead of requiring a separate non-transactional step. Controlled by the `TransactionalEnumAdd` pgcap capability.
+
+### Fixes
+
+- **Fix.** `splitfmt.Decode` now caps pre-allocation to prevent OOM on malformed input and rejects trailing bytes after valid content.
+- **Fix.** Constraint codegen now emits case-insensitive matching for `ILIKE` CHECK constraints: Go/Java use `(?i)` regex prefix, TypeScript uses `/regex/i` flag, Python uses `re.IGNORECASE`, Kotlin uses `RegexOption.IGNORE_CASE`. Zig skips ILIKE patterns with a comment (locale-aware folding unavailable).
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.18.0
 
 PG capability registry, mandatory pg_version, and complete --idempotent coverage for all DDL types.
@@ -29,12 +48,6 @@ The --idempotent flag now covers every DDL statement type: sequences (IF NOT EXI
 ### Fixes
 
 - **Fix.** `generate`, `build`, and `check --tag build` now write the resolved PG version back to the schema, ensuring version-gated validation and DDL generation use the config-level `pg_version` consistently.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.17.0
 
