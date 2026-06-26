@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/splitfmt"
 	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
@@ -27,7 +27,7 @@ func conformanceBaseURL() string {
 func conformanceFixturePath(t *testing.T) string {
 	t.Helper()
 	// The test runs in the package directory (internal/test/).
-	path, err := filepath.Abs("testdata/testdb_conformance.sql.split.json")
+	path, err := filepath.Abs("testdata/testdb_conformance.sql.sqlsplit")
 	if err != nil {
 		t.Fatalf("resolve fixture path: %v", err)
 	}
@@ -46,13 +46,11 @@ func conformanceFixtureDDL(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
-	var parsed struct {
-		Statements []string `json:"statements"`
-	}
-	if err := json.Unmarshal(data, &parsed); err != nil {
+	stmts, err := splitfmt.Decode(data)
+	if err != nil {
 		t.Fatalf("parse fixture: %v", err)
 	}
-	return strings.Join(parsed.Statements, "\n")
+	return strings.Join(stmts, "\n")
 }
 
 // conformanceManager creates a testdb.Manager from the base URL.
@@ -281,7 +279,7 @@ func TestConformancePython(t *testing.T) {
 
 
 def test_table_exists(pgdesign_db):
-    cur = pgdesign_db.cursor()
+    cur = pgdesign_db.conn.cursor()
     cur.execute(
         "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
     )
@@ -289,7 +287,7 @@ def test_table_exists(pgdesign_db):
 
 
 def test_column_count(pgdesign_db):
-    cur = pgdesign_db.cursor()
+    cur = pgdesign_db.conn.cursor()
     cur.execute(
         "SELECT count(*) FROM information_schema.columns "
         "WHERE table_name = 'conformance_test' AND table_schema = 'public'"
@@ -379,22 +377,24 @@ func TestConformanceTypeScript(t *testing.T) {
 async function main() {
     const db = await setupTestDB();
     try {
-        // Verify table exists.
-        const res = await db.client.query(
-            "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
-        );
-        if (!res.rows[0].exists) {
-            throw new Error("conformance_test table not found");
-        }
+        await db.withRawClient(async (client) => {
+            // Verify table exists.
+            const res = await client.query(
+                "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
+            );
+            if (!res.rows[0].exists) {
+                throw new Error("conformance_test table not found");
+            }
 
-        // Verify column count.
-        const colRes = await db.client.query(
-            "SELECT count(*) FROM information_schema.columns WHERE table_name = 'conformance_test' AND table_schema = 'public'"
-        );
-        const colCount = parseInt(colRes.rows[0].count, 10);
-        if (colCount !== 2) {
-            throw new Error("expected 2 columns, got " + colCount);
-        }
+            // Verify column count.
+            const colRes = await client.query(
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'conformance_test' AND table_schema = 'public'"
+            );
+            const colCount = parseInt(colRes.rows[0].count, 10);
+            if (colCount !== 2) {
+                throw new Error("expected 2 columns, got " + colCount);
+            }
+        });
 
         console.log("PASS");
     } finally {
@@ -469,7 +469,6 @@ func TestConformanceJava(t *testing.T) {
 	// Write the conformance test.
 	testContent := `package pgdesign;
 
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import org.junit.jupiter.api.Test;
@@ -482,26 +481,32 @@ class ConformanceTest {
 
     @Test
     void tableExists() throws Exception {
-        Connection conn = db.getConnection();
-        try (Statement stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery(
-                "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
-            );
-            assertTrue(rs.next());
-            assertTrue(rs.getBoolean(1), "conformance_test table not found");
-        }
+        db.withRawConnection(conn -> {
+            try (Statement stmt = conn.createStatement()) {
+                ResultSet rs = stmt.executeQuery(
+                    "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
+                );
+                assertTrue(rs.next());
+                assertTrue(rs.getBoolean(1), "conformance_test table not found");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     @Test
     void columnCount() throws Exception {
-        Connection conn = db.getConnection();
-        try (Statement stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery(
-                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'conformance_test' AND table_schema = 'public'"
-            );
-            assertTrue(rs.next());
-            assertEquals(2, rs.getInt(1), "expected 2 columns (id, name)");
-        }
+        db.withRawConnection(conn -> {
+            try (Statement stmt = conn.createStatement()) {
+                ResultSet rs = stmt.executeQuery(
+                    "SELECT count(*) FROM information_schema.columns WHERE table_name = 'conformance_test' AND table_schema = 'public'"
+                );
+                assertTrue(rs.next());
+                assertEquals(2, rs.getInt(1), "expected 2 columns (id, name)");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 }
 `
@@ -592,25 +597,27 @@ class ConformanceTest {
 
     @Test
     fun tableExists() {
-        val conn = db.connection!!
-        conn.createStatement().use { stmt ->
-            val rs = stmt.executeQuery(
-                "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
-            )
-            assertTrue(rs.next())
-            assertTrue(rs.getBoolean(1), "conformance_test table not found")
+        db.withRawConnection { conn ->
+            conn.createStatement().use { stmt ->
+                val rs = stmt.executeQuery(
+                    "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'conformance_test' AND schemaname = 'public')"
+                )
+                assertTrue(rs.next())
+                assertTrue(rs.getBoolean(1), "conformance_test table not found")
+            }
         }
     }
 
     @Test
     fun columnCount() {
-        val conn = db.connection!!
-        conn.createStatement().use { stmt ->
-            val rs = stmt.executeQuery(
-                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'conformance_test' AND table_schema = 'public'"
-            )
-            assertTrue(rs.next())
-            assertEquals(2, rs.getInt(1), "expected 2 columns (id, name)")
+        db.withRawConnection { conn ->
+            conn.createStatement().use { stmt ->
+                val rs = stmt.executeQuery(
+                    "SELECT count(*) FROM information_schema.columns WHERE table_name = 'conformance_test' AND table_schema = 'public'"
+                )
+                assertTrue(rs.next())
+                assertEquals(2, rs.getInt(1), "expected 2 columns (id, name)")
+            }
         }
     }
 }

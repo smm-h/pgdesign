@@ -230,12 +230,19 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 	}
 	_ = sqlOutputName
 
-	// Resolve DDL path: the .split.json companion file.
+	// Resolve DDL path: the .sqlsplit companion file.
 	sqlPath := string(sqlOutput.Path)
 	if !filepath.IsAbs(sqlPath) {
 		sqlPath = filepath.Join(cwd, sqlPath)
 	}
-	splitJSONPath := sqlPath + ".split.json"
+	splitPath := sqlPath + ".sqlsplit"
+
+	// Warn if an old .split.json file exists alongside the .sqlsplit.
+	oldSplitJSON := sqlPath + ".split.json"
+	if _, err := os.Stat(oldSplitJSON); err == nil {
+		fmt.Fprintf(os.Stderr, "warning: old %s exists alongside %s -- consider deleting it\n",
+			filepath.Base(oldSplitJSON), filepath.Base(splitPath))
+	}
 
 	// Get the base URL from config.
 	baseURL := cfg.Database.URL
@@ -268,7 +275,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 		}
 
 		// Render template.
-		content, err := testdb.RenderTemplate(lang, splitJSONPath, baseURL, baseName)
+		content, err := testdb.RenderTemplate(lang, splitPath, baseURL, baseName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: render template for %s: %v\n", lang, err)
 			return 1

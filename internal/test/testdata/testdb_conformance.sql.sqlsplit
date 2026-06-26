@@ -1,0 +1,3 @@
+1
+75
+CREATE TABLE conformance_test (id integer PRIMARY KEY, name text NOT NULL);
