@@ -2352,11 +2352,11 @@ func TestOpToSQL_AddColumnGenerated(t *testing.T) {
 		t.Errorf("PG17 + stored=false: expected STORED in: %s", got)
 	}
 
-	// PG 0 + stored=false -> VIRTUAL
+	// PG 0 (unknown) + stored=false -> STORED (conservative: pgcap.Has returns false)
 	op.PGVersion = 0
 	got = OpToSQL(op)
-	if !strings.Contains(got, "VIRTUAL") {
-		t.Errorf("PG0 + stored=false: expected VIRTUAL in: %s", got)
+	if !strings.Contains(got, "STORED") {
+		t.Errorf("PG0 + stored=false: expected STORED (conservative) in: %s", got)
 	}
 }
 
@@ -2474,7 +2474,7 @@ func TestGeneratedStorageKeyword(t *testing.T) {
 		{false, 19, "VIRTUAL"},
 		{false, 17, "STORED"},  // pre-PG18 defensive
 		{false, 12, "STORED"},  // pre-PG18 defensive
-		{false, 0, "VIRTUAL"},  // unspecified, respect user choice
+		{false, 0, "STORED"},   // unknown version, conservative (pgcap.Has returns false)
 	}
 
 	for _, tt := range tests {

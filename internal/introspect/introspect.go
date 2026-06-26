@@ -14,6 +14,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/pgcap"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
@@ -455,7 +456,7 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersi
 func queryColumns(ctx context.Context, conn *pgx.Conn, tableOID uint32, pgVersion int) ([]model.Column, error) {
 	// PG 12+ has attgenerated; older versions don't.
 	var query string
-	if pgVersion >= 12 {
+	if pgcap.Has(pgVersion, pgcap.AttGeneratedColumn) {
 		query = `
 			SELECT a.attname, format_type(a.atttypid, a.atttypmod) as type,
 			       a.attnotnull, pg_get_expr(ad.adbin, ad.adrelid) as default_expr,

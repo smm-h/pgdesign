@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/smm-h/pgdesign/internal/dbutil"
+	"github.com/smm-h/pgdesign/internal/pgcap"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
@@ -225,7 +226,7 @@ func (m *Manager) Drop(ctx context.Context, db *EphemeralDB) error {
 
 	sanitized := pgx.Identifier{db.Name}.Sanitize()
 
-	if m.pgVersion >= 13 {
+	if pgcap.Has(m.pgVersion, pgcap.DropDBForce) {
 		_, err = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+sanitized+" WITH (FORCE)")
 		if err != nil {
 			return fmt.Errorf("drop database %s: %w", db.Name, err)

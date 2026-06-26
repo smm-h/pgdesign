@@ -11,6 +11,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/pgcap"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sqlexpr"
 	"github.com/smm-h/pgdesign/internal/sqlutil"
@@ -940,11 +941,9 @@ func checkPolicyExprMismatch(schema *model.Schema, _ *Config) []diagnostic.Diagn
 // checkVirtualRequiresPG18 flags generated columns with stored=false when the
 // target PG version does not support VIRTUAL generated columns (requires PG 18+).
 //
-// E218 is emitted as an error when pgVersion is between 1 and 17, since those
-// versions only support STORED generated columns. E218 is emitted as a warning
-// when pgVersion is 0 (not configured), because support cannot be verified.
-// In both cases the suggestion directs users to either set stored = true or
-// configure pg_version >= 18 in pgdesign.toml.
+// E218 is emitted as an error when the target version lacks VirtualGeneratedCols
+// support, since those versions only support STORED generated columns. The
+// suggestion directs users to either set stored = true or configure pg_version >= 18.
 func checkVirtualRequiresPG18(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
@@ -953,7 +952,7 @@ func checkVirtualRequiresPG18(schema *model.Schema, _ *Config) []diagnostic.Diag
 				continue
 			}
 			// stored=false with a generated expression means VIRTUAL.
-			if schema.PGVersion > 0 && schema.PGVersion < 18 {
+			if !pgcap.Has(schema.PGVersion, pgcap.VirtualGeneratedCols) {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
 					Code:       "E218",
@@ -961,15 +960,6 @@ func checkVirtualRequiresPG18(schema *model.Schema, _ *Config) []diagnostic.Diag
 					Column:     c.Name,
 					Message:    fmt.Sprintf("VIRTUAL generated column %q requires PostgreSQL 18+, but target version is %d", c.Name, schema.PGVersion),
 					Suggestion: "Set stored = true, or configure pg_version >= 18 in pgdesign.toml",
-				})
-			} else if schema.PGVersion == 0 {
-				diags = append(diags, diagnostic.Diagnostic{
-					Severity:   diagnostic.Warning,
-					Code:       "E218",
-					Table:      t.Name,
-					Column:     c.Name,
-					Message:    fmt.Sprintf("VIRTUAL generated column %q requires PostgreSQL 18+; target version is not configured", c.Name),
-					Suggestion: "Set pg_version in [meta] to confirm PG 18+ support, or set stored = true",
 				})
 			}
 		}
@@ -1337,21 +1327,13 @@ func checkRestrictivePolicyRequiresPG10(schema *model.Schema, _ *Config) []diagn
 			if pol.Type != "RESTRICTIVE" {
 				continue
 			}
-			if schema.PGVersion > 0 && schema.PGVersion < 10 {
+			if !pgcap.Has(schema.PGVersion, pgcap.RestrictiveRLS) {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Error,
 					Code:       "E222",
 					Table:      t.Name,
 					Message:    fmt.Sprintf("RESTRICTIVE policy %q requires PostgreSQL 10+, but target version is %d", pol.Name, schema.PGVersion),
 					Suggestion: "Use type = \"permissive\", or configure pg_version >= 10 in pgdesign.toml",
-				})
-			} else if schema.PGVersion == 0 {
-				diags = append(diags, diagnostic.Diagnostic{
-					Severity:   diagnostic.Warning,
-					Code:       "E222",
-					Table:      t.Name,
-					Message:    fmt.Sprintf("RESTRICTIVE policy %q requires PostgreSQL 10+; target version is not configured", pol.Name),
-					Suggestion: "Set pg_version in [meta] to confirm PG 10+ support, or use type = \"permissive\"",
 				})
 			}
 		}

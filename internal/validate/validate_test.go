@@ -1446,9 +1446,12 @@ func TestE218_VirtualRequiresPG18_Error(t *testing.T) {
 	}
 }
 
-func TestE218_VirtualRequiresPG18_Warning(t *testing.T) {
+func TestE218_VirtualRequiresPG18_UnknownVersion(t *testing.T) {
+	// PGVersion 0 (unknown): pgcap.Has returns false, so the check treats
+	// it as a version that lacks VirtualGeneratedCols support -> Error.
+	// PG version is mandatory in production, so this is a safety net.
 	schema := &model.Schema{
-		PGVersion: 0, // unset
+		PGVersion: 0,
 		Tables: []model.Table{
 			{
 				Name:    "orders",
@@ -1469,8 +1472,8 @@ func TestE218_VirtualRequiresPG18_Warning(t *testing.T) {
 	if len(found) != 1 {
 		t.Fatalf("expected 1 E218 diagnostic, got %d: %v", len(found), found)
 	}
-	if found[0].Severity != diagnostic.Warning {
-		t.Errorf("E218 severity = %v, want Warning", found[0].Severity)
+	if found[0].Severity != diagnostic.Error {
+		t.Errorf("E218 severity = %v, want Error", found[0].Severity)
 	}
 }
 
@@ -1788,7 +1791,10 @@ func TestE222_RestrictivePolicyPG9_Error(t *testing.T) {
 	}
 }
 
-func TestE222_RestrictivePolicyPGUnknown_Warning(t *testing.T) {
+func TestE222_RestrictivePolicyPGUnknown_Error(t *testing.T) {
+	// PGVersion 0 (unknown): pgcap.Has returns false, so the check treats
+	// it as a version that lacks RestrictiveRLS support -> Error.
+	// PG version is mandatory in production, so this is a safety net.
 	schema := &model.Schema{
 		PGVersion: 0,
 		Tables: []model.Table{
@@ -1810,13 +1816,13 @@ func TestE222_RestrictivePolicyPGUnknown_Warning(t *testing.T) {
 	diags, _ := Validate(schema, nil)
 	found := false
 	for _, d := range diags {
-		if d.Code == "E222" && d.Severity == diagnostic.Warning {
+		if d.Code == "E222" && d.Severity == diagnostic.Error {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatal("expected E222 warning for RESTRICTIVE policy with unknown PG version")
+		t.Fatal("expected E222 error for RESTRICTIVE policy with unknown PG version")
 	}
 }
 

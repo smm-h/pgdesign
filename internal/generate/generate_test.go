@@ -668,12 +668,14 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 		t.Errorf("PGVersion=10: expected GENERATED ALWAYS AS IDENTITY, got:\n%s", out)
 	}
 
-	// PGVersion 0 (unspecified): should use GENERATED AS IDENTITY.
+	// PGVersion 0 (unknown): pgcap.Has returns false, so identity falls back
+	// to bigserial (conservative behavior). PG version is mandatory in
+	// production, so this path is a safety net.
 	opts.PGVersion = 0
 	out = mustGenerate(t, schema, opts)
 
-	if !strings.Contains(out, "GENERATED ALWAYS AS IDENTITY") {
-		t.Errorf("PGVersion=0: expected GENERATED ALWAYS AS IDENTITY, got:\n%s", out)
+	if !strings.Contains(out, "id bigserial NOT NULL") {
+		t.Errorf("PGVersion=0: expected bigserial fallback (conservative), got:\n%s", out)
 	}
 }
 

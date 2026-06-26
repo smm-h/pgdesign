@@ -1,6 +1,8 @@
 // Package risk provides shared risk classification for schema change operations, categorizing DDL statements by safety level for diff and migrate.
 package risk
 
+import "github.com/smm-h/pgdesign/internal/pgcap"
+
 // RiskLevel represents the safety level of a schema operation.
 type RiskLevel int
 
@@ -537,7 +539,7 @@ func classifyAddColumn(ctx OpContext) Classification {
 	}
 
 	// NOT NULL with default on PG11+: metadata-only, safe.
-	if ctx.HasDefault && ctx.PGVersion >= 11 {
+	if ctx.HasDefault && pgcap.Has(ctx.PGVersion, pgcap.MetadataOnlyDefault) {
 		return Classification{
 			RiskLevel:  Safe,
 			LockType:   LockAccessExclusive,
@@ -545,7 +547,7 @@ func classifyAddColumn(ctx OpContext) Classification {
 		}
 	}
 
-	// NOT NULL with volatile default (HasDefault but pre-PG11): table rewrite.
+	// NOT NULL with volatile default (HasDefault but no MetadataOnlyDefault): table rewrite.
 	if ctx.HasDefault {
 		return Classification{
 			RiskLevel:   Dangerous,

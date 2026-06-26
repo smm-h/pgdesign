@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/pgcap"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
@@ -237,8 +238,8 @@ func DropDomain(schemaName, name string, cascade bool) string {
 
 // CreateTable generates a CREATE TABLE statement with columns, inline PK, and
 // PARTITION BY. Foreign keys are NOT included (they use ALTER TABLE for cycle safety).
-// pgVersion controls version-specific DDL: when > 0 and < 10, identity columns
-// fall back to bigserial. When 0 (unspecified) or >= 10, GENERATED AS IDENTITY is used.
+// pgVersion controls version-specific DDL: when the target version lacks identity
+// column support (pre-PG10), identity columns fall back to bigserial.
 // enums is the list of enum types defined in the schema; when a column's PG type
 // matches an enum name, the type is emitted with its schema prefix.
 func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersion int, enums []model.Enum) string {
@@ -288,7 +289,7 @@ func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersi
 }
 
 // columnDef builds a single column definition line.
-// pgVersion controls version-specific DDL (0 means unspecified, treated as latest).
+// pgVersion controls version-specific DDL via pgcap capability checks.
 // enums is used to schema-qualify enum type names in column definitions.
 //
 // Generated column DDL varies by PostgreSQL version:
@@ -296,12 +297,10 @@ func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersi
 //   - PG 18+: both STORED and VIRTUAL are supported; when stored is omitted
 //     from the TOML definition, the model layer defaults stored to true, so
 //     STORED is emitted unless the user explicitly sets stored = false.
-//   - pgVersion == 0 (unspecified): the user's explicit choice is respected
-//     as-is (VIRTUAL if stored = false, STORED if stored = true).
 //
-// When pgVersion is between 1 and 17 and the column is not stored, this
-// function defensively emits STORED rather than VIRTUAL, since validate
-// should have already flagged this as E218.
+// When the target version does not support VIRTUAL, this function defensively
+// emits STORED rather than VIRTUAL, since validate should have already flagged
+// this as E218.
 //
 // Note: transitioning a generated column from STORED to VIRTUAL (or vice
 // versa) is destructive -- PostgreSQL does not support ALTER COLUMN to change
@@ -313,21 +312,17 @@ func GeneratedStorageKeyword(stored bool, pgVersion int) string {
 	if stored {
 		return "STORED"
 	}
-	if pgVersion >= 18 {
+	if pgcap.Has(pgVersion, pgcap.VirtualGeneratedCols) {
 		return "VIRTUAL"
 	}
-	if pgVersion > 0 {
-		// Pre-PG18: VIRTUAL not supported. Defensively emit STORED
-		// (validate should have caught this via E218).
-		return "STORED"
-	}
-	// pgVersion == 0 (unspecified): respect explicit user choice.
-	return "VIRTUAL"
+	// Pre-PG18: VIRTUAL not supported. Defensively emit STORED
+	// (validate should have caught this via E218).
+	return "STORED"
 }
 
 func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	// Pre-PG10 identity fallback: replace identity column with bigserial.
-	if col.Identity != "" && pgVersion > 0 && pgVersion < 10 {
+	if col.Identity != "" && !pgcap.Has(pgVersion, pgcap.IdentityColumns) {
 		var parts []string
 		pgType := "bigserial"
 		if col.Array {
