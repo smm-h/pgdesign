@@ -79,6 +79,15 @@ func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
 
 	cfg := loadProjectConfig(root)
 
+	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	if pgErr != nil {
+		return strictcli.CheckResult{
+			Status:  "skip",
+			Message: pgErr.Error(),
+		}
+	}
+	schema.PGVersion = pgVersion
+
 	extReg := extregistry.NewBuiltinRegistry()
 	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
 
@@ -360,6 +369,15 @@ func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
 
 	cfg := loadProjectConfig(root)
 
+	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	if pgErr != nil {
+		return strictcli.CheckResult{
+			Status:  "skip",
+			Message: pgErr.Error(),
+		}
+	}
+	schema.PGVersion = pgVersion
+
 	extReg := extregistry.NewBuiltinRegistry()
 	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
 
@@ -585,7 +603,13 @@ func checkBuild(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	if pgErr != nil {
+		return strictcli.CheckResult{
+			Status:  "skip",
+			Message: pgErr.Error(),
+		}
+	}
 	schema.PGVersion = pgVersion
 
 	plan, planErr := Plan(schema, cfg, typeReg, pgVersion)

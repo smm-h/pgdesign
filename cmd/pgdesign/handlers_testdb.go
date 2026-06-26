@@ -299,10 +299,11 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 
 	// Generate CI workflow if --ci is set.
 	if ciProvider != "" {
-		pgVersion := "16"
-		if cfg.Database.PGVersion != 0 {
-			pgVersion = fmt.Sprintf("%d", cfg.Database.PGVersion)
+		if cfg.Database.PGVersion == 0 {
+			fmt.Fprintln(os.Stderr, "error: pg_version is required in pgdesign.toml for CI template generation")
+			return 1
 		}
+		pgVersion := fmt.Sprintf("%d", cfg.Database.PGVersion)
 
 		content, err := testdb.RenderCITemplate(ciProvider, pgVersion, languages)
 		if err != nil {

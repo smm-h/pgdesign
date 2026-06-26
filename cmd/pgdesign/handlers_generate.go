@@ -31,7 +31,11 @@ func handleGenerate(kwargs map[string]interface{}) int {
 		}
 	}
 
-	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	pgVersion, err := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
 	schema.PGVersion = pgVersion
 
 	opts := generate.Options{

@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestResolvePGVersion(t *testing.T) {
 	tests := []struct {
@@ -25,4 +28,52 @@ func TestResolvePGVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequirePGVersion(t *testing.T) {
+	t.Run("returns_resolved_version_live", func(t *testing.T) {
+		got, err := requirePGVersion(17, 15, 14)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != 17 {
+			t.Errorf("requirePGVersion(17, 15, 14) = %d, want 17", got)
+		}
+	})
+
+	t.Run("returns_resolved_version_config", func(t *testing.T) {
+		got, err := requirePGVersion(0, 15, 14)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != 15 {
+			t.Errorf("requirePGVersion(0, 15, 14) = %d, want 15", got)
+		}
+	})
+
+	t.Run("returns_resolved_version_toml", func(t *testing.T) {
+		got, err := requirePGVersion(0, 0, 14)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != 14 {
+			t.Errorf("requirePGVersion(0, 0, 14) = %d, want 14", got)
+		}
+	})
+
+	t.Run("error_when_all_zero", func(t *testing.T) {
+		got, err := requirePGVersion(0, 0, 0)
+		if err == nil {
+			t.Fatalf("expected error, got version %d", got)
+		}
+		if got != 0 {
+			t.Errorf("expected 0 on error, got %d", got)
+		}
+		if !strings.Contains(err.Error(), "pg_version") {
+			t.Errorf("error should mention pg_version, got: %s", err.Error())
+		}
+		if !strings.Contains(err.Error(), "pgdesign.toml") {
+			t.Errorf("error should mention pgdesign.toml, got: %s", err.Error())
+		}
+	})
 }

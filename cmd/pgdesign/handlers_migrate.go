@@ -87,7 +87,12 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 	}
 
 	// Resolve PGVersion: live (from introspect) > config > TOML schema.
-	schema.PGVersion = resolvePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+	pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+	if pgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+		return 1
+	}
+	schema.PGVersion = pgVersion
 
 	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
 
@@ -255,7 +260,12 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 	}
 
 	// Resolve PGVersion: live (from introspect) > config > TOML schema.
-	schema.PGVersion = resolvePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+	pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+	if pgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+		return 1
+	}
+	schema.PGVersion = pgVersion
 
 	m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
 
@@ -1016,7 +1026,12 @@ func handleMigrateTestShadow(kwargs map[string]interface{}) int {
 	}
 
 	// Resolve PGVersion.
-	schema.PGVersion = resolvePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+	pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+	if pgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+		return 1
+	}
+	schema.PGVersion = pgVersion
 
 	// Diff shadow against desired.
 	d := diff.Diff(schema, actual)
