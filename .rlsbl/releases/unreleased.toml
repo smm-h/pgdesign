@@ -1,0 +1,20 @@
+# Version bump type: patch, minor, major, or hotfix
+bump = "minor"
+# Short description of this release (required)
+description = "Config phase-separation, build freshness checking, sealed .sqlsplit format, opaque testdb handles, and Zig constraint codegen."
+# Optional context explaining why these changes were made
+context = """
+Major architectural changes across five areas:
+
+Config system redesigned with generic path types (RelativePath/AbsolutePath) and phase-separated RawConfig/ResolvedConfig. Config files are now discovered via walk-up directory search (like git finding .git/).
+
+Build command refactored into Plan/Apply architecture with a new freshness check (pgdesign check --tag build) that enforces the working tree as a fixed point of pgdesign build.
+
+Testdb fixtures redesigned as opaque handles -- database names are no longer publicly accessible. New ConnString()/WithRawConn() API replaces raw field access. The .split.json format is replaced by a sealed .sqlsplit format that is trivially parseable in all 6 target languages.
+
+Zig joins Go/TS/Python/Java/Kotlin as a supported language for constraint codegen, using std.mem for LIKE pattern matching.
+"""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
