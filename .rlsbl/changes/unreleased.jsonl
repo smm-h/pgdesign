@@ -1,1 +1,2 @@
 {"commits":["771d796e1c21c7af61316f9c4582ca4c90f3938f"],"user_facing":true,"description":"**Fix.** State machine `enforce_trigger` override via extends now uses explicit `*bool` instead of `bool`, preventing unintended trigger suppression when extending state machine types.","type":"fix"}
+{"commits":["8dc73b703c98fea09ec0278ad0d9ae6cd9bcfe7b"],"user_facing":true,"description":"**Fix.** `testdb init` now correctly resolves relative output paths from `pgdesign.toml` instead of using them raw, fixing broken `.split.json` references when config paths are relative.","type":"fix"}
