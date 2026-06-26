@@ -1,0 +1,1 @@
+{"commits":["cfa4765e7c322e129aa265c1c168f310c3ceeaa5"],"user_facing":true,"description":"**Fix.** `generate`, `build`, and `check --tag build` now write the resolved PG version back to the schema, ensuring version-gated validation and DDL generation use the config-level `pg_version` consistently.","type":"fix"}
