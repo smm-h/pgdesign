@@ -76,11 +76,12 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		for _, val := range enumDiff.ValuesAdded {
 			schema, name := splitQualifiedName(enumDiff.Name)
 			op := DDLOp{
-				Op:     "alter_enum_add_value",
-				Name:   name,
-				Schema: schema,
-				Values: []string{val},
-				Down:   &DownOp{Irreversible: true},
+				Op:        "alter_enum_add_value",
+				Name:      name,
+				Schema:    schema,
+				Values:    []string{val},
+				PGVersion: desired.PGVersion,
+				Down:      &DownOp{Irreversible: true},
 			}
 			m.DDLOps = append(m.DDLOps, op)
 			diags = append(diags, classifyOp(op, risk.OpAlterEnumAddValue, risk.OpContext{PGVersion: desired.PGVersion})...)

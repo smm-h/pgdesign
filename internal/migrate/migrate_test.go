@@ -841,21 +841,30 @@ func TestOpToSQL_CreateIndexConcurrently(t *testing.T) {
 
 func TestIsNonTransactional(t *testing.T) {
 	tests := []struct {
-		op   string
-		want bool
+		name      string
+		op        string
+		pgVersion int
+		want      bool
 	}{
-		{"create_index_concurrently", true},
-		{"drop_index_concurrently", true},
-		{"alter_enum_add_value", true},
-		{"create_table", false},
-		{"add_column", false},
-		{"create_index", false},
+		{"concurrently_create", "create_index_concurrently", 0, true},
+		{"concurrently_create_pg16", "create_index_concurrently", 16, true},
+		{"concurrently_drop", "drop_index_concurrently", 0, true},
+		{"concurrently_drop_pg16", "drop_index_concurrently", 16, true},
+		{"enum_add_unknown_version", "alter_enum_add_value", 0, true},
+		{"enum_add_pg11", "alter_enum_add_value", 11, true},
+		{"enum_add_pg12", "alter_enum_add_value", 12, false},
+		{"enum_add_pg16", "alter_enum_add_value", 16, false},
+		{"create_table", "create_table", 0, false},
+		{"add_column", "add_column", 0, false},
+		{"create_index", "create_index", 0, false},
 	}
 	for _, tt := range tests {
-		got := IsNonTransactional(DDLOp{Op: tt.op})
-		if got != tt.want {
-			t.Errorf("IsNonTransactional(%q) = %v, want %v", tt.op, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsNonTransactional(DDLOp{Op: tt.op, PGVersion: tt.pgVersion})
+			if got != tt.want {
+				t.Errorf("IsNonTransactional(%q, pgVersion=%d) = %v, want %v", tt.op, tt.pgVersion, got, tt.want)
+			}
+		})
 	}
 }
 

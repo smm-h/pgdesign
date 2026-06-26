@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/pgcap"
 	"github.com/smm-h/pgdesign/internal/sql"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
@@ -151,8 +152,10 @@ func OpToSQL(op DDLOp) string {
 // IsNonTransactional returns true if the op must run outside a transaction.
 func IsNonTransactional(op DDLOp) bool {
 	switch op.Op {
-	case "create_index_concurrently", "drop_index_concurrently", "alter_enum_add_value":
+	case "create_index_concurrently", "drop_index_concurrently":
 		return true
+	case "alter_enum_add_value":
+		return !pgcap.Has(op.PGVersion, pgcap.TransactionalEnumAdd)
 	default:
 		return false
 	}
