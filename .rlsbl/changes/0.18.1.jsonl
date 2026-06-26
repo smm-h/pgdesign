@@ -1,0 +1,5 @@
+{"commits":["8f83b91ddaae43ec12667acade2b987576431063"],"user_facing":true,"description":"**Fix.** `splitfmt.Decode` now caps pre-allocation to prevent OOM on malformed input and rejects trailing bytes after valid content.","type":"fix"}
+{"commits":["627445f639c7e682f56cd8cfef9fb14f52408c5c"],"user_facing":true,"description":"**Fix.** Constraint codegen now emits case-insensitive matching for `ILIKE` CHECK constraints: Go/Java use `(?i)` regex prefix, TypeScript uses `/regex/i` flag, Python uses `re.IGNORECASE`, Kotlin uses `RegexOption.IGNORE_CASE`. Zig skips ILIKE patterns with a comment (locale-aware folding unavailable).","type":"fix"}
+{"commits":["002c48eb12e89d7fdff5269b08151ac5cc6416f4"],"user_facing":true,"description":"**New feature.** `ALTER TYPE ADD VALUE` runs inside transactions on PG 12+ instead of requiring a separate non-transactional step. Controlled by the `TransactionalEnumAdd` pgcap capability.","type":"feature"}
+{"commits":["d4797f7836dc84247db54e7e8f69a77fc63b6f02","725c7e0a089e8fa57febc787e90125a8c9166ea2"],"user_facing":false}
+{"commits":["1622ee02644c50943d4817fc546108a599bca38e"],"user_facing":false}
