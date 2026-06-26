@@ -187,7 +187,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.LoadAndResolve(configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: load config: %v\n", err)
 		return 1
@@ -195,7 +195,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 
 	// Find the SQL output section.
 	var sqlOutputName string
-	var sqlOutput config.OutputConfig[config.RelativePath]
+	var sqlOutput config.OutputConfig[config.AbsolutePath]
 	var sqlOutputNames []string
 	for name, out := range cfg.Output {
 		if out.Format == "sql" {
@@ -232,9 +232,6 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 
 	// Resolve DDL path: the .sqlsplit companion file.
 	sqlPath := string(sqlOutput.Path)
-	if !filepath.IsAbs(sqlPath) {
-		sqlPath = filepath.Join(cwd, sqlPath)
-	}
 	splitPath := sqlPath + ".sqlsplit"
 
 	// Warn if an old .split.json file exists alongside the .sqlsplit.
