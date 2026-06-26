@@ -1433,7 +1433,7 @@ func TestCreateMaterializedView_WithData(t *testing.T) {
 		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
 		WithData: true,
 	}
-	got := CreateMaterializedView("public", mv)
+	got := CreateMaterializedView("public", mv, false)
 	if !strings.Contains(got, "CREATE MATERIALIZED VIEW public.monthly_stats AS") {
 		t.Errorf("expected CREATE MATERIALIZED VIEW, got:\n%s", got)
 	}
@@ -1451,7 +1451,7 @@ func TestCreateMaterializedView_WithNoData(t *testing.T) {
 		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
 		WithData: false,
 	}
-	got := CreateMaterializedView("public", mv)
+	got := CreateMaterializedView("public", mv, false)
 	if !strings.Contains(got, "CREATE MATERIALIZED VIEW public.monthly_stats AS") {
 		t.Errorf("expected CREATE MATERIALIZED VIEW, got:\n%s", got)
 	}

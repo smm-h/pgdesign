@@ -507,7 +507,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			if mv.Schema != "" {
 				schemaName = mv.Schema
 			}
-			mvStmts = append(mvStmts, sql.CreateMaterializedView(schemaName, mv))
+			mvStmts = append(mvStmts, sql.CreateMaterializedView(schemaName, mv, opts.Idempotent))
 			if mv.Comment != "" && opts.IncludeComments {
 				mvStmts = append(mvStmts, sql.CommentOn("MATERIALIZED VIEW", sql.QualifiedName(schemaName, mv.Name), mv.Comment))
 			}

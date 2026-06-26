@@ -537,7 +537,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				schemaName = mv.Schema
 			}
 			tuples = append(tuples, ddlTuple{
-				SQL:           sql.CreateMaterializedView(schemaName, mv),
+				SQL:           sql.CreateMaterializedView(schemaName, mv, false),
 				Kind:          "materialized_view",
 				Name:          mv.Name,
 				Phase:         15,

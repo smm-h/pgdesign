@@ -632,7 +632,7 @@ func opCreateOrReplaceView(op DDLOp) string {
 func opCreateMaterializedView(op DDLOp) string {
 	if op.MaterializedViewDef != nil {
 		schema, _ := splitQualifiedName(op.Name)
-		return sql.CreateMaterializedView(schema, op.MaterializedViewDef)
+		return sql.CreateMaterializedView(schema, op.MaterializedViewDef, false)
 	}
 	return fmt.Sprintf("-- create_materialized_view: missing materialized view definition for %s", op.Name)
 }

@@ -813,8 +813,9 @@ func DropView(schemaName, viewName string, idempotent bool) string {
 }
 
 // CreateMaterializedView generates a CREATE MATERIALIZED VIEW statement.
-// PostgreSQL does not support CREATE OR REPLACE for materialized views.
-func CreateMaterializedView(schemaName string, mv *model.MaterializedView) string {
+// PostgreSQL does not support CREATE OR REPLACE or IF NOT EXISTS for materialized views.
+// When idempotent is true, wraps in a DO $$ block that checks pg_matviews before creating.
+func CreateMaterializedView(schemaName string, mv *model.MaterializedView, idempotent bool) string {
 	qualified := QualifiedName(schemaName, mv.Name)
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("CREATE MATERIALIZED VIEW %s AS\n", qualified))
@@ -824,7 +825,19 @@ func CreateMaterializedView(schemaName string, mv *model.MaterializedView) strin
 	} else {
 		sb.WriteString("\nWITH NO DATA;\n")
 	}
-	return sb.String()
+	stmt := sb.String()
+
+	if idempotent {
+		escapedName := strings.ReplaceAll(mv.Name, "'", "''")
+		escapedSchema := strings.ReplaceAll(schemaName, "'", "''")
+		catalogCheck := fmt.Sprintf(
+			"SELECT 1 FROM pg_matviews WHERE matviewname = '%s' AND schemaname = '%s'",
+			escapedName, escapedSchema,
+		)
+		return wrapIdempotentCatalogCheck(catalogCheck, stmt)
+	}
+
+	return stmt
 }
 
 // DropMaterializedView generates a DROP MATERIALIZED VIEW statement.
