@@ -1465,6 +1465,54 @@ func TestCreateMaterializedView_WithNoData(t *testing.T) {
 	}
 }
 
+func TestCreateMaterializedView_IdempotentFalse(t *testing.T) {
+	mv := &model.MaterializedView{
+		Name:     "monthly_stats",
+		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+		WithData: true,
+	}
+	got := CreateMaterializedView("public", mv, false)
+
+	if !strings.HasPrefix(got, "CREATE MATERIALIZED VIEW") {
+		t.Errorf("expected bare CREATE MATERIALIZED VIEW, got:\n%s", got)
+	}
+	if strings.Contains(got, "DO $$") {
+		t.Errorf("should not contain DO $$ when idempotent=false, got:\n%s", got)
+	}
+}
+
+func TestCreateMaterializedView_Idempotent(t *testing.T) {
+	mv := &model.MaterializedView{
+		Name:     "monthly_stats",
+		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
+		WithData: true,
+	}
+	got := CreateMaterializedView("public", mv, true)
+
+	if !strings.Contains(got, "DO $$") {
+		t.Errorf("expected DO $$ block for idempotent matview, got:\n%s", got)
+	}
+	if !strings.Contains(got, "pg_matviews") {
+		t.Errorf("expected pg_matviews catalog check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "matviewname = 'monthly_stats'") {
+		t.Errorf("expected matview name in catalog check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "schemaname = 'public'") {
+		t.Errorf("expected schema name in catalog check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "IF NOT EXISTS") {
+		t.Errorf("expected IF NOT EXISTS in DO $$ block, got:\n%s", got)
+	}
+	if !strings.Contains(got, "CREATE MATERIALIZED VIEW") {
+		t.Errorf("expected CREATE MATERIALIZED VIEW in the executed statement, got:\n%s", got)
+	}
+	// Should NOT contain OR REPLACE (PG doesn't support it for matviews).
+	if strings.Contains(got, "OR REPLACE") {
+		t.Errorf("should not contain OR REPLACE for matviews, got:\n%s", got)
+	}
+}
+
 func TestDropMaterializedView(t *testing.T) {
 	got := DropMaterializedView("public", "monthly_stats", false)
 	if got != "DROP MATERIALIZED VIEW public.monthly_stats;\n" {
