@@ -10,11 +10,42 @@ const BASE_URL = "{{BASE_URL}}";
 const BASE_NAME = "{{BASE_NAME}}";
 const CHARSET = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-export interface TestDB {
-  client: Client;
-  url: string;
-  name: string;
-  teardown: () => Promise<void>;
+const NAME_PATTERN = /^(.+)_test_(\d{10,})_([a-z0-9]{8})$/;
+
+function validateName(name: string): void {
+  if (!NAME_PATTERN.test(name)) {
+    throw new Error(
+      `pgdesign: refusing to use database "${name}": does not match ephemeral name pattern`
+    );
+  }
+}
+
+export class TestDB {
+  #client: Client;
+  #name: string;
+  #url: string;
+  #teardownFn: () => Promise<void>;
+
+  constructor(client: Client, name: string, url: string, teardownFn: () => Promise<void>) {
+    validateName(name);
+    this.#client = client;
+    this.#name = name;
+    this.#url = url;
+    this.#teardownFn = teardownFn;
+  }
+
+  /** Return the connection URL for ORM integration. */
+  connString(): string { return this.#url; }
+
+  /** Execute a callback with the raw pg Client. */
+  async withRawClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+    return fn(this.#client);
+  }
+
+  /** Tear down the ephemeral database. */
+  async teardown(): Promise<void> {
+    return this.#teardownFn();
+  }
 }
 
 function generateName(): string {
@@ -65,10 +96,37 @@ function escapeIdentifier(name: string): string {
   return '"' + name.replace(/"/g, '""') + '"';
 }
 
+/** Parse the .sqlsplit format: count line, then (byte-length, payload, newline) per stmt. */
+function parseSQLSplit(data: Buffer): string[] {
+  let pos = 0;
+
+  // Read statement count.
+  let nl = data.indexOf(0x0a, pos);
+  if (nl < 0) throw new Error("pgdesign testdb: missing statement count line");
+  const count = parseInt(data.subarray(pos, nl).toString("utf-8"), 10);
+  pos = nl + 1;
+
+  const stmts: string[] = [];
+  for (let i = 0; i < count; i++) {
+    // Read byte-length line.
+    nl = data.indexOf(0x0a, pos);
+    if (nl < 0) throw new Error(`pgdesign testdb: statement ${i}: missing length line`);
+    const length = parseInt(data.subarray(pos, nl).toString("utf-8"), 10);
+    pos = nl + 1;
+
+    // Read exactly `length` bytes.
+    stmts.push(data.subarray(pos, pos + length).toString("utf-8"));
+    pos += length;
+
+    // Skip trailing newline.
+    if (pos < data.length && data[pos] === 0x0a) pos++;
+  }
+  return stmts;
+}
+
 async function applyDDL(client: Client): Promise<void> {
-  const data = readFileSync(DDL_PATH, "utf-8");
-  const parsed = JSON.parse(data);
-  const stmts: string[] = parsed.statements;
+  const data = readFileSync(DDL_PATH);
+  const stmts = parseSQLSplit(data);
   for (let i = 0; i < stmts.length; i++) {
     try {
       await client.query(stmts[i]);
@@ -86,6 +144,7 @@ async function applyDDL(client: Client): Promise<void> {
 }
 
 async function dropDB(baseUrl: string, name: string): Promise<void> {
+  validateName(name);
   const maintUrl = swapDB(baseUrl, "postgres");
   const client = new Client({ connectionString: maintUrl });
   try {
@@ -103,11 +162,12 @@ async function dropDB(baseUrl: string, name: string): Promise<void> {
 }
 
 /**
- * Create an ephemeral test database, apply DDL, and return a connected client.
+ * Create an ephemeral test database, apply DDL, and return an opaque handle.
  * Call teardown() when done to drop the database.
  */
 export async function setupTestDB(): Promise<TestDB> {
   const name = generateName();
+  validateName(name);
   const baseUrl = process.env.PGDESIGN_DB || BASE_URL;
   const maintUrl = swapDB(baseUrl, "postgres");
 
@@ -132,12 +192,12 @@ export async function setupTestDB(): Promise<TestDB> {
     throw err;
   }
 
-  const teardown = async (): Promise<void> => {
+  const teardownFn = async (): Promise<void> => {
     await client.end().catch(() => {});
     await dropDB(baseUrl, name);
   };
 
-  return { client, url: dbUrl, name, teardown };
+  return new TestDB(client, name, dbUrl, teardownFn);
 }
 
 /**

@@ -16,7 +16,6 @@ const SUFFIX_LEN = 25;
 
 pub const TestDB = struct {
     conn: pg.Conn,
-    name: []const u8,
     url: []const u8,
     allocator: std.mem.Allocator,
     io: Io,
@@ -24,10 +23,21 @@ pub const TestDB = struct {
     name_buf: []u8,
     url_buf: []u8,
 
+    /// Return the connection URL for ORM integration.
+    pub fn connString(self: *const TestDB) []const u8 {
+        return self.url;
+    }
+
+    /// Execute a callback with the raw pg connection.
+    pub fn withRawConn(self: *TestDB, comptime callback: fn (*pg.Conn) anyerror!void) !void {
+        try callback(&self.conn);
+    }
+
     /// Create an ephemeral test database, apply DDL, and return a connection.
     pub fn setup(io: Io, allocator: std.mem.Allocator) !TestDB {
         const name = try generateName(allocator);
         errdefer allocator.free(name);
+        validateName(name);
 
         const base_url = std.posix.getenv("PGDESIGN_DB") orelse BASE_URL;
 
@@ -66,7 +76,6 @@ pub const TestDB = struct {
 
         return TestDB{
             .conn = conn,
-            .name = name,
             .url = db_url,
             .allocator = allocator,
             .io = io,
@@ -80,13 +89,48 @@ pub const TestDB = struct {
         self.conn.deinit();
 
         const base_url = std.posix.getenv("PGDESIGN_DB") orelse BASE_URL;
-        dropDB(self.io, self.allocator, base_url, self.name);
+        validateName(self.name_buf);
+        dropDB(self.io, self.allocator, base_url, self.name_buf);
 
         self.allocator.free(self.url_buf);
         self.allocator.free(self.name_buf);
         self.* = undefined;
     }
 };
+
+/// Validate that name matches the ephemeral pattern: {base}_test_{digits}_[a-z0-9]{8}
+/// Zig has no stdlib regex, so this validates structurally.
+fn validateName(name: []const u8) void {
+    // Find "_test_" in the name.
+    const marker = "_test_";
+    const marker_pos = std.mem.indexOf(u8, name, marker) orelse
+        @panic("pgdesign: refusing to use database: does not contain '_test_'");
+
+    // After "_test_", expect 10+ digits, then "_", then 8 lowercase alphanumeric.
+    const after_marker = name[marker_pos + marker.len ..];
+    // Count digits.
+    var digit_count: usize = 0;
+    while (digit_count < after_marker.len and after_marker[digit_count] >= '0' and after_marker[digit_count] <= '9') {
+        digit_count += 1;
+    }
+    if (digit_count < 10)
+        @panic("pgdesign: refusing to use database: timestamp too short");
+
+    // Expect underscore after digits.
+    if (digit_count >= after_marker.len or after_marker[digit_count] != '_')
+        @panic("pgdesign: refusing to use database: missing underscore after timestamp");
+
+    // Expect exactly 8 lowercase alphanumeric characters after the underscore.
+    const suffix = after_marker[digit_count + 1 ..];
+    if (suffix.len != 8)
+        @panic("pgdesign: refusing to use database: random suffix is not 8 characters");
+
+    for (suffix) |c| {
+        const valid = (c >= 'a' and c <= 'z') or (c >= '0' and c <= '9');
+        if (!valid)
+            @panic("pgdesign: refusing to use database: random suffix contains invalid character");
+    }
+}
 
 /// Generate a unique ephemeral database name.
 fn generateName(allocator: std.mem.Allocator) ![]u8 {
@@ -165,20 +209,48 @@ fn swapDB(allocator: std.mem.Allocator, conn_url: []const u8, db_name: []const u
     return try std.fmt.allocPrint(allocator, "{s}/{s}{s}", .{ prefix, db_name, query });
 }
 
-/// Read the .split.json file and execute each SQL statement.
+/// Parse the .sqlsplit format: count line, then (byte-length, payload, newline) per stmt.
+fn parseSQLSplit(allocator: std.mem.Allocator, data: []const u8) ![]const []const u8 {
+    var pos: usize = 0;
+
+    // Read statement count line.
+    const count_nl = std.mem.indexOfScalarPos(u8, data, pos, '\n') orelse
+        return error.MissingCountLine;
+    const count = try std.fmt.parseInt(usize, data[pos..count_nl], 10);
+    pos = count_nl + 1;
+
+    const stmts = try allocator.alloc([]const u8, count);
+    for (stmts, 0..) |*stmt, i| {
+        _ = i;
+        // Read byte-length line.
+        const len_nl = std.mem.indexOfScalarPos(u8, data, pos, '\n') orelse
+            return error.MissingLengthLine;
+        const length = try std.fmt.parseInt(usize, data[pos..len_nl], 10);
+        pos = len_nl + 1;
+
+        // Read exactly `length` bytes.
+        if (pos + length > data.len) return error.TruncatedPayload;
+        stmt.* = data[pos .. pos + length];
+        pos += length;
+
+        // Skip trailing newline.
+        if (pos < data.len and data[pos] == '\n') {
+            pos += 1;
+        }
+    }
+
+    return stmts;
+}
+
+/// Read the .sqlsplit file and execute each SQL statement.
 fn applyDDL(conn: *pg.Conn, allocator: std.mem.Allocator) !void {
     const data = try std.fs.cwd().readFileAlloc(allocator, DDL_PATH, std.math.maxInt(usize));
     defer allocator.free(data);
 
-    // Parse versioned split.json object.
-    const SplitJSON = struct {
-        version: u32,
-        statements: []const []const u8,
-    };
-    const parsed = try std.json.parseFromSlice(SplitJSON, allocator, data, .{});
-    defer parsed.deinit();
+    const stmts = try parseSQLSplit(allocator, data);
+    defer allocator.free(stmts);
 
-    for (parsed.value.statements, 0..) |stmt, i| {
+    for (stmts, 0..) |stmt, i| {
         _ = conn.exec(stmt, .{}) catch |err| {
             // Extract first non-empty line for preview.
             var preview: []const u8 = "";
@@ -277,11 +349,7 @@ fn escapeIdentifierFmt(allocator: std.mem.Allocator, prefix: []const u8, name: [
 //       var db = try testdb.TestDB.setup(io, std.testing.allocator);
 //       defer db.teardown();
 //
-//       // Use db.conn for queries (conn is pg.Conn value type, pass pointer).
-//       var result = try db.conn.query("SELECT 1 AS val", .{});
-//       defer result.deinit();
-//       if (try result.next()) |row| {
-//           const val = try row.get(i32, 0);
-//           try std.testing.expectEqual(@as(i32, 1), val);
-//       }
+//       // Use db.connString() for the URL, or db.withRawConn() for direct access.
+//       const url = db.connString();
+//       _ = url;
 //   }

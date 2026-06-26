@@ -8,7 +8,7 @@ import (
 func TestRenderTemplate(t *testing.T) {
 	for _, lang := range []string{"go", "python", "ts", "java", "kotlin", "zig"} {
 		t.Run(lang, func(t *testing.T) {
-			out, err := RenderTemplate(lang, "schema.sql.split.json", "postgres://localhost/mydb", "mydb")
+			out, err := RenderTemplate(lang, "schema.sql.sqlsplit", "postgres://localhost/mydb", "mydb")
 			if err != nil {
 				t.Fatalf("RenderTemplate(%q): %v", lang, err)
 			}
@@ -24,7 +24,7 @@ func TestRenderTemplate(t *testing.T) {
 				t.Error("unreplaced {{BASE_NAME}}")
 			}
 			// Verify substituted values are present.
-			if !strings.Contains(s, "schema.sql.split.json") {
+			if !strings.Contains(s, "schema.sql.sqlsplit") {
 				t.Error("DDL path not in output")
 			}
 			if !strings.Contains(s, "postgres://localhost/mydb") {
@@ -42,7 +42,7 @@ func TestRenderTemplate(t *testing.T) {
 }
 
 func TestRenderTemplateGoNameAssertion(t *testing.T) {
-	out, err := RenderTemplate("go", "schema.sql.split.json", "postgres://localhost/mydb", "mydb")
+	out, err := RenderTemplate("go", "schema.sql.sqlsplit", "postgres://localhost/mydb", "mydb")
 	if err != nil {
 		t.Fatalf("RenderTemplate(go): %v", err)
 	}
@@ -154,7 +154,7 @@ func TestTemplateTruncationUTF8Safe(t *testing.T) {
 
 	for _, lang := range SupportedLanguages() {
 		t.Run(lang, func(t *testing.T) {
-			out, err := RenderTemplate(lang, "schema.sql.split.json", "postgres://localhost/db", baseName)
+			out, err := RenderTemplate(lang, "schema.sql.sqlsplit", "postgres://localhost/db", baseName)
 			if err != nil {
 				t.Fatalf("RenderTemplate(%q): %v", lang, err)
 			}

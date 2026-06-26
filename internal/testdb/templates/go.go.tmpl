@@ -3,13 +3,15 @@
 package testdb
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/url"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,12 +26,22 @@ const (
 	charset  = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
 
+// namePattern validates ephemeral database names.
+var namePattern = regexp.MustCompile(`^(.+)_test_(\d{10,})_([a-z0-9]{8})$`)
+
 // TestDB holds an ephemeral test database connection.
 type TestDB struct {
-	Conn *pgx.Conn
-	URL  string
-	Name string
+	conn *pgx.Conn
+	url  string
+	name string
 }
+
+// ConnString returns the connection URL for the ephemeral database.
+func (t *TestDB) ConnString() string { return t.url }
+
+// WithRawConn calls fn with the underlying connection. The connection must not
+// be retained beyond the callback's return.
+func (t *TestDB) WithRawConn(fn func(*pgx.Conn) error) error { return fn(t.conn) }
 
 // SetupTestDB creates an ephemeral database, applies DDL, and returns a connection.
 // The database is automatically dropped when the test completes.
@@ -38,6 +50,7 @@ func SetupTestDB(t *testing.T) *TestDB {
 	ctx := context.Background()
 
 	name := generateName()
+	validateName(name)
 
 	connURL := os.Getenv("PGDESIGN_DB")
 	if connURL == "" {
@@ -66,14 +79,14 @@ func SetupTestDB(t *testing.T) *TestDB {
 		t.Fatalf("pgdesign testdb: connect to ephemeral DB: %v", err)
 	}
 
-	// Apply DDL from .split.json.
+	// Apply DDL from .sqlsplit.
 	if err := applyDDL(ctx, conn); err != nil {
 		conn.Close(ctx)
 		dropDB(connURL, name)
 		t.Fatalf("pgdesign testdb: apply DDL: %v", err)
 	}
 
-	tdb := &TestDB{Conn: conn, URL: dbURL, Name: name}
+	tdb := &TestDB{conn: conn, url: dbURL, name: name}
 
 	t.Cleanup(func() {
 		conn.Close(context.Background())
@@ -81,6 +94,13 @@ func SetupTestDB(t *testing.T) *TestDB {
 	})
 
 	return tdb
+}
+
+// validateName panics if the name does not match the ephemeral name pattern.
+func validateName(name string) {
+	if !namePattern.MatchString(name) {
+		panic(fmt.Sprintf("pgdesign: refusing to use database %q: does not match ephemeral name pattern", name))
+	}
 }
 
 // generateName creates a unique ephemeral database name.
@@ -135,20 +155,17 @@ func swapDB(connURL, dbName string) string {
 	return u.String()
 }
 
-// applyDDL reads the .split.json file and executes each SQL statement.
+// applyDDL reads the .sqlsplit file and executes each SQL statement.
 func applyDDL(ctx context.Context, conn *pgx.Conn) error {
 	data, err := os.ReadFile(ddlPath)
 	if err != nil {
 		return fmt.Errorf("read %s: %w", ddlPath, err)
 	}
 
-	var parsed struct {
-		Statements []string `json:"statements"`
-	}
-	if err := json.Unmarshal(data, &parsed); err != nil {
+	stmts, err := parseSQLSplit(data)
+	if err != nil {
 		return fmt.Errorf("parse %s: %w", ddlPath, err)
 	}
-	stmts := parsed.Statements
 
 	for i, stmt := range stmts {
 		if _, err := conn.Exec(ctx, stmt); err != nil {
@@ -168,8 +185,64 @@ func applyDDL(ctx context.Context, conn *pgx.Conn) error {
 	return nil
 }
 
+// parseSQLSplit decodes the .sqlsplit format: count line, then (byte-length
+// line, payload bytes, trailing newline) per statement.
+func parseSQLSplit(data []byte) ([]string, error) {
+	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+
+	// Read statement count.
+	if !scanner.Scan() {
+		return nil, fmt.Errorf("missing statement count line")
+	}
+	count, err := strconv.Atoi(scanner.Text())
+	if err != nil {
+		return nil, fmt.Errorf("invalid statement count: %w", err)
+	}
+
+	// Track position in raw data after the count line.
+	pos := len(scanner.Text()) + 1 // +1 for the newline
+	raw := data
+
+	stmts := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		// Read the byte-length line.
+		nlIdx := indexOf(raw[pos:], '\n')
+		if nlIdx < 0 {
+			return nil, fmt.Errorf("statement %d: missing length line", i)
+		}
+		length, err := strconv.Atoi(string(raw[pos : pos+nlIdx]))
+		if err != nil {
+			return nil, fmt.Errorf("statement %d: invalid byte length: %w", i, err)
+		}
+		pos += nlIdx + 1
+
+		// Read exactly `length` bytes.
+		if pos+length > len(raw) {
+			return nil, fmt.Errorf("statement %d: expected %d bytes but only %d remain", i, length, len(raw)-pos)
+		}
+		stmts = append(stmts, string(raw[pos:pos+length]))
+		pos += length
+
+		// Skip trailing newline.
+		if pos < len(raw) && raw[pos] == '\n' {
+			pos++
+		}
+	}
+	return stmts, nil
+}
+
+func indexOf(data []byte, b byte) int {
+	for i, c := range data {
+		if c == b {
+			return i
+		}
+	}
+	return -1
+}
+
 // dropDB terminates connections and drops the named database.
 func dropDB(connURL, name string) {
+	validateName(name)
 	ctx := context.Background()
 	maintURL := swapDB(connURL, "postgres")
 	conn, err := pgx.Connect(ctx, maintURL)

@@ -27,24 +27,30 @@ import org.junit.jupiter.api.extension.ExtensionContext
  *
  *     @Test
  *     fun example() {
- *         val conn = db.connection
- *         // ...
+ *         db.withRawConnection { conn ->
+ *             // ...
+ *         }
  *     }
  * }
  * ```
  */
 class TestDB : BeforeAllCallback, AfterAllCallback {
-    var connection: Connection? = null
-        private set
-    var url: String? = null
-        private set
-    var name: String? = null
-        private set
-
+    private var connection: Connection? = null
+    private var url: String? = null
+    private var name: String? = null
     private var baseUrl: String? = null
+
+    /** Returns the JDBC connection URL for ORM integration. */
+    fun connectionString(): String = url ?: error("pgdesign testdb: not initialized")
+
+    /** Executes a block with the raw JDBC connection. */
+    fun withRawConnection(block: (Connection) -> Unit) {
+        block(connection ?: error("pgdesign testdb: not initialized"))
+    }
 
     override fun beforeAll(ctx: ExtensionContext) {
         val generatedName = generateName()
+        validateName(generatedName)
         name = generatedName
 
         val envUrl = System.getenv("PGDESIGN_DB")
@@ -93,6 +99,13 @@ class TestDB : BeforeAllCallback, AfterAllCallback {
         // Fixed suffix: _test_ (6) + timestamp (10) + _ (1) + random (8) = 25
         private const val SUFFIX_LEN = 25
         private val RANDOM = SecureRandom()
+        private val NAME_PATTERN = Regex("^(.+)_test_(\\d{10,})_([a-z0-9]{8})$")
+
+        private fun validateName(name: String) {
+            check(NAME_PATTERN.matches(name)) {
+                "pgdesign: refusing to use database \"$name\": does not match ephemeral name pattern"
+            }
+        }
 
         private fun generateName(): String {
             val suffix = randomString(RAND_LEN)
@@ -153,12 +166,51 @@ class TestDB : BeforeAllCallback, AfterAllCallback {
         private fun escapeIdentifier(name: String): String =
             "\"${name.replace("\"", "\"\"")}\""
 
+        /**
+         * Parse the .sqlsplit format: count line, then (byte-length, payload, newline) per stmt.
+         */
+        private fun parseSQLSplit(data: ByteArray): List<String> {
+            var pos = 0
+
+            // Read statement count line.
+            val nl = data.indexOf('\n'.code.toByte(), pos)
+            require(nl >= 0) { "pgdesign testdb: missing statement count line in $DDL_PATH" }
+            val count = String(data, pos, nl - pos, StandardCharsets.UTF_8).trim().toInt()
+            pos = nl + 1
+
+            val stmts = mutableListOf<String>()
+            for (i in 0 until count) {
+                // Read byte-length line.
+                val lenNl = data.indexOf('\n'.code.toByte(), pos)
+                require(lenNl >= 0) {
+                    "pgdesign testdb: statement $i: missing length line in $DDL_PATH"
+                }
+                val length = String(data, pos, lenNl - pos, StandardCharsets.UTF_8).trim().toInt()
+                pos = lenNl + 1
+
+                // Read exactly `length` bytes.
+                stmts.add(String(data, pos, length, StandardCharsets.UTF_8))
+                pos += length
+
+                // Skip trailing newline.
+                if (pos < data.size && data[pos] == '\n'.code.toByte()) {
+                    pos++
+                }
+            }
+            return stmts
+        }
+
+        /** Extension: find byte in array starting at offset. */
+        private fun ByteArray.indexOf(b: Byte, from: Int): Int {
+            for (i in from until size) {
+                if (this[i] == b) return i
+            }
+            return -1
+        }
+
         private fun applyDDL(conn: Connection) {
-            val data = String(
-                Files.readAllBytes(Paths.get(DDL_PATH)),
-                StandardCharsets.UTF_8
-            )
-            val stmts = parseJsonStringArray(extractStatementsArray(data))
+            val data = Files.readAllBytes(Paths.get(DDL_PATH))
+            val stmts = parseSQLSplit(data)
             conn.createStatement().use { st ->
                 stmts.forEachIndexed { i, sql ->
                     try {
@@ -178,6 +230,7 @@ class TestDB : BeforeAllCallback, AfterAllCallback {
         }
 
         private fun dropDB(connUrl: String, dbName: String) {
+            validateName(dbName)
             val maintUrl = swapDB(connUrl, "postgres")
             try {
                 DriverManager.getConnection(toJdbcUrl(maintUrl)).use { conn ->
@@ -196,116 +249,6 @@ class TestDB : BeforeAllCallback, AfterAllCallback {
             } catch (_: java.sql.SQLException) {
                 // Best-effort cleanup.
             }
-        }
-
-        /**
-         * Extract the "statements" JSON array from a versioned split.json object.
-         * Expects input of the form: {"version": 1, "statements": [...]}
-         * Returns the array substring including brackets.
-         */
-        private fun extractStatementsArray(json: String): String {
-            val key = "\"statements\""
-            val keyIdx = json.indexOf(key)
-            require(keyIdx >= 0) {
-                "pgdesign testdb: missing \"statements\" key in $DDL_PATH"
-            }
-            val colonIdx = json.indexOf(':', keyIdx + key.length)
-            require(colonIdx >= 0) {
-                "pgdesign testdb: malformed JSON in $DDL_PATH"
-            }
-            val bracketStart = json.indexOf('[', colonIdx + 1)
-            require(bracketStart >= 0) {
-                "pgdesign testdb: missing statements array in $DDL_PATH"
-            }
-            // Find the matching closing bracket (handling nested strings with brackets).
-            var depth = 0
-            var inString = false
-            var escape = false
-            for (i in bracketStart until json.length) {
-                val c = json[i]
-                if (escape) {
-                    escape = false
-                    continue
-                }
-                if (c == '\\' && inString) {
-                    escape = true
-                    continue
-                }
-                if (c == '"') {
-                    inString = !inString
-                    continue
-                }
-                if (!inString) {
-                    if (c == '[') depth++
-                    else if (c == ']') {
-                        depth--
-                        if (depth == 0) {
-                            return json.substring(bracketStart, i + 1)
-                        }
-                    }
-                }
-            }
-            throw IllegalArgumentException(
-                "pgdesign testdb: unterminated statements array in $DDL_PATH"
-            )
-        }
-
-        /**
-         * Minimal JSON string array parser. Avoids external dependencies.
-         * Expects input of the form: ["stmt1", "stmt2", ...]
-         */
-        private fun parseJsonStringArray(json: String): List<String> {
-            val trimmed = json.trim()
-            require(trimmed.startsWith("[") && trimmed.endsWith("]")) {
-                "pgdesign testdb: expected JSON array in $DDL_PATH"
-            }
-            val inner = trimmed.substring(1, trimmed.length - 1).trim()
-            if (inner.isEmpty()) return emptyList()
-
-            val result = mutableListOf<String>()
-            var i = 0
-            while (i < inner.length) {
-                // Skip whitespace and commas.
-                while (i < inner.length && (inner[i] == ',' || inner[i].isWhitespace())) i++
-                if (i >= inner.length) break
-                require(inner[i] == '"') {
-                    "pgdesign testdb: expected string in JSON array at position $i"
-                }
-                i++ // skip opening quote
-                val sb = StringBuilder()
-                while (i < inner.length) {
-                    val c = inner[i]
-                    if (c == '\\' && i + 1 < inner.length) {
-                        when (val next = inner[i + 1]) {
-                            '"' -> sb.append('"')
-                            '\\' -> sb.append('\\')
-                            '/' -> sb.append('/')
-                            'n' -> sb.append('\n')
-                            'r' -> sb.append('\r')
-                            't' -> sb.append('\t')
-                            'b' -> sb.append('\b')
-                            'f' -> sb.append('\u000C')
-                            'u' -> {
-                                if (i + 5 < inner.length) {
-                                    val hex = inner.substring(i + 2, i + 6)
-                                    sb.append(hex.toInt(16).toChar())
-                                    i += 4 // extra advance for \uXXXX
-                                }
-                            }
-                            else -> sb.append(next)
-                        }
-                        i += 2
-                    } else if (c == '"') {
-                        i++ // skip closing quote
-                        break
-                    } else {
-                        sb.append(c)
-                        i++
-                    }
-                }
-                result.add(sb.toString())
-            }
-            return result
         }
     }
 }

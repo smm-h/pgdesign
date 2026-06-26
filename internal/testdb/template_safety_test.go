@@ -161,6 +161,88 @@ func TestTemplateNoSQLInterpolation(t *testing.T) {
 	})
 }
 
+// TestTemplateNoPublicName verifies that no template exposes the database name
+// as a public/exported field. The name must be private to enforce the opaque
+// handle pattern.
+func TestTemplateNoPublicName(t *testing.T) {
+	type check struct {
+		lang    string
+		pattern *regexp.Regexp
+		desc    string
+	}
+
+	checks := []check{
+		{"go", regexp.MustCompile(`\bName\s+string\b`), "exported Name field"},
+		{"python", regexp.MustCompile(`self\.name\b`), "public self.name (should be self._name)"},
+		{"ts", regexp.MustCompile(`(?m)^\s+name\s*:|public\s+name\b`), "public name property"},
+		{"java", regexp.MustCompile(`\bgetName\s*\(`), "getName() getter"},
+		{"kotlin", regexp.MustCompile(`(?m)^\s+va[lr]\s+name\s*:`), "public name property"},
+		{"zig", regexp.MustCompile(`pub\s+(const\s+)?name\b`), "pub name field"},
+	}
+
+	for _, c := range checks {
+		t.Run(c.lang, func(t *testing.T) {
+			file := langTemplates[c.lang]
+			data, err := TemplateFS.ReadFile("templates/" + file)
+			if err != nil {
+				t.Fatalf("read template %s: %v", file, err)
+			}
+			content := string(data)
+			if c.pattern.MatchString(content) {
+				t.Errorf("template exposes %s -- database name must be private", c.desc)
+			}
+		})
+	}
+}
+
+// TestTemplateNoJSONParsing verifies that no template uses JSON parsing.
+// All templates should use the .sqlsplit format instead.
+func TestTemplateNoJSONParsing(t *testing.T) {
+	jsonPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)json\.parse\b`),
+		regexp.MustCompile(`(?i)json\.unmarshal\b`),
+		regexp.MustCompile(`(?i)json\.loads\b`),
+		regexp.MustCompile(`(?i)parseJsonStringArray\b`),
+		regexp.MustCompile(`(?i)extractStatementsArray\b`),
+		regexp.MustCompile(`(?i)json\.parseFromSlice\b`),
+		regexp.MustCompile(`(?i)"encoding/json"`),
+		regexp.MustCompile(`(?i)import\s+json\b`),
+		regexp.MustCompile(`\.split\.json\b`),
+	}
+
+	for lang, file := range langTemplates {
+		t.Run(lang, func(t *testing.T) {
+			data, err := TemplateFS.ReadFile("templates/" + file)
+			if err != nil {
+				t.Fatalf("read template %s: %v", file, err)
+			}
+			content := string(data)
+			for _, pat := range jsonPatterns {
+				if pat.MatchString(content) {
+					t.Errorf("template contains JSON parsing pattern %s -- should use .sqlsplit format", pat.String())
+				}
+			}
+		})
+	}
+}
+
+// TestTemplateHasNameGuard verifies that every template validates the ephemeral
+// database name against the expected pattern before use.
+func TestTemplateHasNameGuard(t *testing.T) {
+	for lang, file := range langTemplates {
+		t.Run(lang, func(t *testing.T) {
+			data, err := TemplateFS.ReadFile("templates/" + file)
+			if err != nil {
+				t.Fatalf("read template %s: %v", file, err)
+			}
+			content := string(data)
+			if !strings.Contains(content, "refusing to use database") {
+				t.Error("template missing name validation guard (expected 'refusing to use database' error message)")
+			}
+		})
+	}
+}
+
 // TestTemplateRejectionSampling verifies that templates using raw byte-based
 // random generation implement rejection sampling with the correct threshold.
 // The threshold 252 = floor(256/36) * 36 eliminates modulo bias when mapping

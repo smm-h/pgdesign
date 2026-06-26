@@ -13,6 +13,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -27,8 +29,9 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  *
  * {@literal @}Test
  * void example() throws SQLException {
- *     Connection conn = db.getConnection();
- *     // ...
+ *     db.withRawConnection(conn -> {
+ *         // ...
+ *     });
  * }
  * </pre>
  */
@@ -42,22 +45,30 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
     // Fixed suffix: _test_ (6) + timestamp (10) + _ (1) + random (8) = 25
     private static final int SUFFIX_LEN = 25;
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Pattern NAME_PATTERN = Pattern.compile("^(.+)_test_(\\d{10,})_([a-z0-9]{8})$");
 
     private String name;
     private String url;
     private String baseUrl;
     private Connection connection;
 
-    /** Returns the JDBC connection to the ephemeral database. */
-    public Connection getConnection() { return connection; }
-    /** Returns the JDBC URL of the ephemeral database. */
-    public String getUrl() { return url; }
-    /** Returns the name of the ephemeral database. */
-    public String getName() { return name; }
+    /** Returns the JDBC connection URL for ORM integration. */
+    public String getConnectionString() { return url; }
+
+    /** Executes a callback with the raw JDBC connection. */
+    public void withRawConnection(Consumer<Connection> callback) { callback.accept(connection); }
+
+    private static void validateName(String name) {
+        if (!NAME_PATTERN.matcher(name).matches()) {
+            throw new IllegalStateException(
+                "pgdesign: refusing to use database \"" + name + "\": does not match ephemeral name pattern");
+        }
+    }
 
     @Override
     public void beforeAll(ExtensionContext ctx) throws Exception {
         name = generateName();
+        validateName(name);
         baseUrl = System.getenv("PGDESIGN_DB");
         if (baseUrl == null || baseUrl.isEmpty()) {
             baseUrl = BASE_URL;
@@ -168,12 +179,54 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
         return "\"" + name.replace("\"", "\"\"") + "\"";
     }
 
+    /**
+     * Parse the .sqlsplit format: count line, then (byte-length, payload, newline) per stmt.
+     */
+    private static List<String> parseSQLSplit(byte[] data) {
+        int pos = 0;
+
+        // Read statement count line.
+        int nl = indexOfByte(data, (byte) '\n', pos);
+        if (nl < 0) {
+            throw new IllegalArgumentException("pgdesign testdb: missing statement count line in " + DDL_PATH);
+        }
+        int count = Integer.parseInt(new String(data, pos, nl - pos, java.nio.charset.StandardCharsets.UTF_8).trim());
+        pos = nl + 1;
+
+        List<String> stmts = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            // Read byte-length line.
+            nl = indexOfByte(data, (byte) '\n', pos);
+            if (nl < 0) {
+                throw new IllegalArgumentException(
+                    "pgdesign testdb: statement " + i + ": missing length line in " + DDL_PATH);
+            }
+            int length = Integer.parseInt(
+                new String(data, pos, nl - pos, java.nio.charset.StandardCharsets.UTF_8).trim());
+            pos = nl + 1;
+
+            // Read exactly `length` bytes.
+            stmts.add(new String(data, pos, length, java.nio.charset.StandardCharsets.UTF_8));
+            pos += length;
+
+            // Skip trailing newline.
+            if (pos < data.length && data[pos] == '\n') {
+                pos++;
+            }
+        }
+        return stmts;
+    }
+
+    private static int indexOfByte(byte[] data, byte b, int from) {
+        for (int i = from; i < data.length; i++) {
+            if (data[i] == b) return i;
+        }
+        return -1;
+    }
+
     private static void applyDDL(Connection conn) throws IOException, SQLException {
-        String data = new String(
-            Files.readAllBytes(Paths.get(DDL_PATH)),
-            java.nio.charset.StandardCharsets.UTF_8
-        );
-        List<String> stmts = parseJsonStringArray(extractStatementsArray(data));
+        byte[] data = Files.readAllBytes(Paths.get(DDL_PATH));
+        List<String> stmts = parseSQLSplit(data);
         try (Statement st = conn.createStatement()) {
             for (int i = 0; i < stmts.size(); i++) {
                 try {
@@ -197,6 +250,7 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
     }
 
     private static void dropDB(String connUrl, String dbName) {
+        validateName(dbName);
         String maintUrl = swapDB(connUrl, "postgres");
         try (Connection conn = DriverManager.getConnection(toJdbcUrl(maintUrl))) {
             conn.setAutoCommit(true);
@@ -212,125 +266,5 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
         } catch (SQLException e) {
             // Best-effort cleanup.
         }
-    }
-
-    /**
-     * Extract the "statements" JSON array from a versioned split.json object.
-     * Expects input of the form: {"version": 1, "statements": [...]}
-     * Returns the array substring including brackets.
-     */
-    private static String extractStatementsArray(String json) {
-        String key = "\"statements\"";
-        int keyIdx = json.indexOf(key);
-        if (keyIdx < 0) {
-            throw new IllegalArgumentException(
-                "pgdesign testdb: missing \"statements\" key in " + DDL_PATH);
-        }
-        // Find the colon after the key.
-        int colonIdx = json.indexOf(':', keyIdx + key.length());
-        if (colonIdx < 0) {
-            throw new IllegalArgumentException(
-                "pgdesign testdb: malformed JSON in " + DDL_PATH);
-        }
-        // Find the opening bracket.
-        int bracketStart = json.indexOf('[', colonIdx + 1);
-        if (bracketStart < 0) {
-            throw new IllegalArgumentException(
-                "pgdesign testdb: missing statements array in " + DDL_PATH);
-        }
-        // Find the matching closing bracket (handling nested strings with brackets).
-        int depth = 0;
-        boolean inString = false;
-        boolean escape = false;
-        for (int i = bracketStart; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (escape) {
-                escape = false;
-                continue;
-            }
-            if (c == '\\' && inString) {
-                escape = true;
-                continue;
-            }
-            if (c == '"') {
-                inString = !inString;
-                continue;
-            }
-            if (!inString) {
-                if (c == '[') depth++;
-                else if (c == ']') {
-                    depth--;
-                    if (depth == 0) {
-                        return json.substring(bracketStart, i + 1);
-                    }
-                }
-            }
-        }
-        throw new IllegalArgumentException(
-            "pgdesign testdb: unterminated statements array in " + DDL_PATH);
-    }
-
-    /**
-     * Minimal JSON string array parser. Avoids external dependencies.
-     * Expects input of the form: ["stmt1", "stmt2", ...]
-     */
-    private static List<String> parseJsonStringArray(String json) {
-        List<String> result = new ArrayList<>();
-        json = json.trim();
-        if (!json.startsWith("[") || !json.endsWith("]")) {
-            throw new IllegalArgumentException("pgdesign testdb: expected JSON array in " + DDL_PATH);
-        }
-        json = json.substring(1, json.length() - 1).trim();
-        if (json.isEmpty()) {
-            return result;
-        }
-
-        int i = 0;
-        while (i < json.length()) {
-            // Skip whitespace and commas.
-            while (i < json.length() && (json.charAt(i) == ',' || Character.isWhitespace(json.charAt(i)))) {
-                i++;
-            }
-            if (i >= json.length()) break;
-            if (json.charAt(i) != '"') {
-                throw new IllegalArgumentException(
-                    "pgdesign testdb: expected string in JSON array at position " + i);
-            }
-            i++; // skip opening quote
-            StringBuilder sb = new StringBuilder();
-            while (i < json.length()) {
-                char c = json.charAt(i);
-                if (c == '\\' && i + 1 < json.length()) {
-                    char next = json.charAt(i + 1);
-                    switch (next) {
-                        case '"': sb.append('"'); break;
-                        case '\\': sb.append('\\'); break;
-                        case '/': sb.append('/'); break;
-                        case 'n': sb.append('\n'); break;
-                        case 'r': sb.append('\r'); break;
-                        case 't': sb.append('\t'); break;
-                        case 'b': sb.append('\b'); break;
-                        case 'f': sb.append('\f'); break;
-                        case 'u':
-                            if (i + 5 < json.length()) {
-                                String hex = json.substring(i + 2, i + 6);
-                                sb.append((char) Integer.parseInt(hex, 16));
-                                i += 4; // extra advance for \uXXXX
-                            }
-                            break;
-                        default: sb.append(next); break;
-                    }
-                    i += 2;
-                } else if (c == '"') {
-                    i++; // skip closing quote
-                    break;
-                } else {
-                    sb.append(c);
-                    i++;
-                }
-            }
-            result.add(sb.toString());
-        }
-        return result;
     }
 }
