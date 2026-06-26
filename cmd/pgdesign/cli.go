@@ -41,6 +41,7 @@ func main() {
 	app.RegisterCheck("design", checkDesign)
 	app.RegisterCheck("structural", checkStructural)
 	app.RegisterCheck("workload", checkWorkload)
+	app.RegisterCheck("build", checkBuild)
 
 	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output"))
 	app.GlobalFlag(strictcli.StringFlag("config", "Path to pgdesign.toml (bypasses directory search)", strictcli.Default(nil)))

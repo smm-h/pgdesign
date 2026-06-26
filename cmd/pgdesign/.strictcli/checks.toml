@@ -47,3 +47,11 @@ fast = false
 pure = false
 needs_network = true
 depends_on = ["validation"]
+
+[checks.build]
+tags = ["build"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["validation"]

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -538,5 +540,96 @@ func checkWorkload(ctx strictcli.CheckContext) strictcli.CheckResult {
 		Status:  "warn",
 		Message: fmt.Sprintf("%d workload issue(s) found", len(allDiags)),
 		Details: diagDetails(allDiags),
+	}
+}
+
+func checkBuild(ctx strictcli.CheckContext) strictcli.CheckResult {
+	root := ctx.ProjectRoot()
+
+	configPath, found := config.FindConfig(root)
+	if !found {
+		return strictcli.CheckResult{
+			Status:  "skip",
+			Message: "no pgdesign.toml found",
+		}
+	}
+
+	cfg, err := config.LoadAndResolve(configPath)
+	if err != nil {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: fmt.Sprintf("cannot load config: %v", err),
+		}
+	}
+
+	if len(cfg.Output) == 0 {
+		return strictcli.CheckResult{
+			Status:  "skip",
+			Message: "no [output] section in pgdesign.toml",
+		}
+	}
+
+	paths, err := loadSchemaForCheck(root)
+	if err != nil {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
+		}
+	}
+
+	schema, typeReg, exitCode := parseAndBuild(paths)
+	if exitCode != 0 {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: "schema parse/build failed",
+		}
+	}
+
+	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+
+	plan, planErr := Plan(schema, cfg, typeReg, pgVersion)
+	if planErr != nil {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: fmt.Sprintf("plan failed: %v", planErr),
+		}
+	}
+
+	// Sort paths for deterministic detail ordering.
+	planned := make([]string, 0, len(plan.Files))
+	for p := range plan.Files {
+		planned = append(planned, p)
+	}
+	sort.Strings(planned)
+
+	var staleFiles, missingFiles []string
+	for _, p := range planned {
+		existing, err := os.ReadFile(p)
+		if err != nil {
+			missingFiles = append(missingFiles, p)
+		} else if !bytes.Equal(existing, plan.Files[p]) {
+			staleFiles = append(staleFiles, p)
+		}
+	}
+
+	if len(staleFiles) == 0 && len(missingFiles) == 0 {
+		return strictcli.CheckResult{
+			Status:  "pass",
+			Message: "all build outputs are fresh",
+		}
+	}
+
+	var details []string
+	for _, p := range missingFiles {
+		details = append(details, fmt.Sprintf("[missing] %s", p))
+	}
+	for _, p := range staleFiles {
+		details = append(details, fmt.Sprintf("[stale] %s", p))
+	}
+
+	return strictcli.CheckResult{
+		Status:  "fail",
+		Message: fmt.Sprintf("working tree is not a fixed point of pgdesign build: %d file(s) would change, %d file(s) missing", len(staleFiles), len(missingFiles)),
+		Details: details,
 	}
 }
