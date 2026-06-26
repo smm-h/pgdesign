@@ -2146,6 +2146,28 @@ func TestCreateStateMachineTrigger_ReservedColumnName(t *testing.T) {
 	}
 }
 
+func TestCreateStateMachineTrigger_IdempotentPG14(t *testing.T) {
+	got := CreateStateMachineTrigger("app", "orders", "status", true, 14)
+	want := "CREATE OR REPLACE TRIGGER _pgdesign_sm_orders_status BEFORE UPDATE OF status ON app.orders FOR EACH ROW EXECUTE FUNCTION app._pgdesign_sm_orders_status();"
+	if got != want {
+		t.Errorf("CreateStateMachineTrigger idempotent PG14 =\n  %s\nwant:\n  %s", got, want)
+	}
+}
+
+func TestCreateStateMachineTrigger_IdempotentPG13(t *testing.T) {
+	got := CreateStateMachineTrigger("app", "orders", "status", true, 13)
+	// Pre-PG14: should emit DROP IF EXISTS before CREATE.
+	if !strings.Contains(got, "DROP TRIGGER IF EXISTS _pgdesign_sm_orders_status ON app.orders;") {
+		t.Errorf("expected DROP TRIGGER IF EXISTS prefix, got:\n%s", got)
+	}
+	if !strings.Contains(got, "CREATE TRIGGER _pgdesign_sm_orders_status BEFORE UPDATE OF status ON app.orders") {
+		t.Errorf("expected CREATE TRIGGER, got:\n%s", got)
+	}
+	if strings.Contains(got, "OR REPLACE") {
+		t.Errorf("should not contain OR REPLACE for PG13, got:\n%s", got)
+	}
+}
+
 func TestCreateTrigger_Minimal(t *testing.T) {
 	trig := model.Trigger{
 		Name:     "simple",
@@ -2234,6 +2256,79 @@ func TestCreateTrigger_Statement(t *testing.T) {
 	}
 }
 
+func TestCreateTrigger_IdempotentPG14(t *testing.T) {
+	trig := model.Trigger{
+		Name:     "audit_changes",
+		Function: "audit_func",
+		Events:   []string{"INSERT", "UPDATE"},
+		Timing:   "AFTER",
+		ForEach:  "ROW",
+	}
+	got := CreateTrigger("app", "orders", trig, true, 14)
+	if !strings.Contains(got, "CREATE OR REPLACE TRIGGER audit_changes") {
+		t.Errorf("expected CREATE OR REPLACE TRIGGER, got:\n%s", got)
+	}
+	if strings.Contains(got, "DROP TRIGGER") {
+		t.Errorf("should not contain DROP TRIGGER for PG14, got:\n%s", got)
+	}
+}
+
+func TestCreateTrigger_IdempotentPG13(t *testing.T) {
+	trig := model.Trigger{
+		Name:     "audit_changes",
+		Function: "audit_func",
+		Events:   []string{"INSERT", "UPDATE"},
+		Timing:   "AFTER",
+		ForEach:  "ROW",
+	}
+	got := CreateTrigger("app", "orders", trig, true, 13)
+	if !strings.Contains(got, "DROP TRIGGER IF EXISTS audit_changes ON app.orders;") {
+		t.Errorf("expected DROP TRIGGER IF EXISTS prefix, got:\n%s", got)
+	}
+	if !strings.Contains(got, "CREATE TRIGGER audit_changes AFTER INSERT OR UPDATE ON app.orders") {
+		t.Errorf("expected CREATE TRIGGER, got:\n%s", got)
+	}
+	if strings.Contains(got, "OR REPLACE") {
+		t.Errorf("should not contain OR REPLACE for PG13, got:\n%s", got)
+	}
+}
+
+func TestCreateTrigger_IdempotentConstraintPG14(t *testing.T) {
+	trig := model.Trigger{
+		Name:       "fk_check",
+		Function:   "check_func",
+		Events:     []string{"INSERT"},
+		Timing:     "AFTER",
+		ForEach:    "ROW",
+		Constraint: true,
+	}
+	got := CreateTrigger("app", "orders", trig, true, 14)
+	if !strings.Contains(got, "CREATE OR REPLACE CONSTRAINT TRIGGER fk_check") {
+		t.Errorf("expected CREATE OR REPLACE CONSTRAINT TRIGGER, got:\n%s", got)
+	}
+}
+
+func TestCreateTrigger_IdempotentConstraintPG13(t *testing.T) {
+	trig := model.Trigger{
+		Name:       "fk_check",
+		Function:   "check_func",
+		Events:     []string{"INSERT"},
+		Timing:     "AFTER",
+		ForEach:    "ROW",
+		Constraint: true,
+	}
+	got := CreateTrigger("app", "orders", trig, true, 13)
+	if !strings.Contains(got, "DROP TRIGGER IF EXISTS fk_check ON app.orders;") {
+		t.Errorf("expected DROP TRIGGER IF EXISTS prefix, got:\n%s", got)
+	}
+	if !strings.Contains(got, "CREATE CONSTRAINT TRIGGER fk_check") {
+		t.Errorf("expected CREATE CONSTRAINT TRIGGER, got:\n%s", got)
+	}
+	if strings.Contains(got, "OR REPLACE") {
+		t.Errorf("should not contain OR REPLACE for PG13, got:\n%s", got)
+	}
+}
+
 func TestDropTrigger(t *testing.T) {
 	got := DropTrigger("app", "orders", "audit_changes")
 	for _, want := range []string{
@@ -2245,5 +2340,86 @@ func TestDropTrigger(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("expected output to contain %q, got:\n%s", want, got)
 		}
+	}
+}
+
+func TestCreateDomain_Idempotent(t *testing.T) {
+	d := model.Domain{Name: "slug", BaseType: typeinfo.T("text"), NotNull: true, Check: "VALUE ~ '^[a-z0-9-]+$'"}
+
+	// idempotent=false: bare CREATE DOMAIN
+	got := CreateDomain("app", d, false)
+	if !strings.HasPrefix(got, "CREATE DOMAIN") {
+		t.Errorf("expected bare CREATE DOMAIN, got:\n%s", got)
+	}
+	if strings.Contains(got, "DO $$") {
+		t.Errorf("should not contain DO $$ when idempotent=false, got:\n%s", got)
+	}
+
+	// idempotent=true: wrapped in DO $$ block
+	got = CreateDomain("app", d, true)
+	if !strings.Contains(got, "DO $$") {
+		t.Errorf("expected DO $$ wrapper, got:\n%s", got)
+	}
+	if !strings.Contains(got, "pg_type") {
+		t.Errorf("expected pg_type catalog check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "pg_namespace") {
+		t.Errorf("expected pg_namespace join, got:\n%s", got)
+	}
+	if !strings.Contains(got, "t.typname = 'slug'") {
+		t.Errorf("expected type name check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "n.nspname = 'app'") {
+		t.Errorf("expected schema name check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "t.typtype = 'd'") {
+		t.Errorf("expected domain typtype check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "CREATE DOMAIN app.slug") {
+		t.Errorf("expected inner CREATE DOMAIN statement, got:\n%s", got)
+	}
+}
+
+func TestCreateCompositeType_Idempotent(t *testing.T) {
+	ct := model.CompositeType{
+		Name:   "address",
+		Schema: "public",
+		Fields: []model.CompositeField{
+			{Name: "city", PGType: typeinfo.T("text")},
+			{Name: "zip", PGType: typeinfo.T("text")},
+		},
+	}
+
+	// idempotent=false: bare CREATE TYPE
+	got := CreateCompositeType("public", ct, false)
+	if !strings.HasPrefix(got, "CREATE TYPE") {
+		t.Errorf("expected bare CREATE TYPE, got:\n%s", got)
+	}
+	if strings.Contains(got, "DO $$") {
+		t.Errorf("should not contain DO $$ when idempotent=false, got:\n%s", got)
+	}
+
+	// idempotent=true: wrapped in DO $$ block
+	got = CreateCompositeType("public", ct, true)
+	if !strings.Contains(got, "DO $$") {
+		t.Errorf("expected DO $$ wrapper, got:\n%s", got)
+	}
+	if !strings.Contains(got, "pg_type") {
+		t.Errorf("expected pg_type catalog check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "pg_namespace") {
+		t.Errorf("expected pg_namespace join, got:\n%s", got)
+	}
+	if !strings.Contains(got, "t.typname = 'address'") {
+		t.Errorf("expected type name check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "n.nspname = 'public'") {
+		t.Errorf("expected schema name check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "t.typtype = 'c'") {
+		t.Errorf("expected composite typtype check, got:\n%s", got)
+	}
+	if !strings.Contains(got, "CREATE TYPE public.address") {
+		t.Errorf("expected inner CREATE TYPE statement, got:\n%s", got)
 	}
 }

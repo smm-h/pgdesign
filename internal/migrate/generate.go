@@ -2099,7 +2099,7 @@ func generateSMTriggerOps(m *Migration, d *diff.SchemaDiff, desired *model.Schem
 					Name:   trigFuncName,
 					Column: col.Name,
 					Schema: t.Schema,
-					RawSQL: pgsql.CreateStateMachineTrigger(t.Schema, t.Name, col.Name),
+					RawSQL: pgsql.CreateStateMachineTrigger(t.Schema, t.Name, col.Name, false, 0),
 					Down: &DownOp{
 						Ops: []DDLOp{{Op: "drop_trigger", Table: tableName, Name: trigFuncName}},
 					},
