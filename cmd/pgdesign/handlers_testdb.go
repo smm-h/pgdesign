@@ -231,7 +231,11 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 	_ = sqlOutputName
 
 	// Resolve DDL path: the .split.json companion file.
-	splitJSONPath := sqlOutput.Path + ".split.json"
+	sqlPath := sqlOutput.Path
+	if !filepath.IsAbs(sqlPath) {
+		sqlPath = filepath.Join(cwd, sqlPath)
+	}
+	splitJSONPath := sqlPath + ".split.json"
 
 	// Get the base URL from config.
 	baseURL := cfg.Database.URL
