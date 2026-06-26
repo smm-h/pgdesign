@@ -51,6 +51,17 @@ type likePattern struct {
 
 func (p *likePattern) patternType() string { return "like" }
 
+// IsCaseInsensitive returns true if the LIKE operator is case-insensitive (ILIKE or NOT ILIKE).
+func (p *likePattern) IsCaseInsensitive() bool {
+	upper := strings.ToUpper(p.Op)
+	return strings.Contains(upper, "ILIKE")
+}
+
+// IsNegated returns true if the LIKE operator is negated (NOT LIKE or NOT ILIKE).
+func (p *likePattern) IsNegated() bool {
+	return strings.HasPrefix(strings.ToUpper(p.Op), "NOT")
+}
+
 // classifyCheck parses a CHECK expression and returns a checkPattern if it
 // matches a recognized pattern. Returns nil for unrecognized expressions.
 func classifyCheck(expr string) checkPattern {

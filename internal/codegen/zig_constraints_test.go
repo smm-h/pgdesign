@@ -236,6 +236,41 @@ func TestZigConstraintsGenerator_Comparison(t *testing.T) {
 	}
 }
 
+func TestZigConstraintsGenerator_ILIKEPattern(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "items",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "code", PGType: typeinfo.MustParse("text"), NotNull: true},
+				},
+				PK: []string{"id"},
+				Checks: []model.CheckConstraint{
+					{Name: "ck_code_ilike", Expr: "code ILIKE 'abc%'"},
+				},
+			},
+		},
+	}
+
+	gen := &ZigConstraintsGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// ILIKE should be skipped with a comment.
+	if !strings.Contains(result, "// ILIKE pattern requires locale-aware case folding -- skipped") {
+		t.Error("ILIKE pattern should emit skip comment in Zig generator")
+	}
+	// Should NOT contain startsWith or any pattern matching code.
+	if strings.Contains(result, "std.mem.startsWith") {
+		t.Error("ILIKE pattern should not emit startsWith in Zig")
+	}
+}
+
 func TestZigConstraintsGenerator_EmptySchema(t *testing.T) {
 	schema := &model.Schema{
 		Name: "empty",

@@ -149,10 +149,14 @@ func writePythonCheckPattern(buf *bytes.Buffer, col string, pat checkPattern) {
 
 	case *likePattern:
 		regex := likeToRegex(p.Pattern)
-		if strings.HasPrefix(strings.ToUpper(p.Op), "NOT") {
-			fmt.Fprintf(buf, "    if row.%s is not None and re.fullmatch(r\"%s\", row.%s):\n", col, regex, col)
+		flagsArg := ""
+		if p.IsCaseInsensitive() {
+			flagsArg = ", re.IGNORECASE"
+		}
+		if p.IsNegated() {
+			fmt.Fprintf(buf, "    if row.%s is not None and re.fullmatch(r\"%s\", row.%s%s):\n", col, regex, col, flagsArg)
 		} else {
-			fmt.Fprintf(buf, "    if row.%s is not None and not re.fullmatch(r\"%s\", row.%s):\n", col, regex, col)
+			fmt.Fprintf(buf, "    if row.%s is not None and not re.fullmatch(r\"%s\", row.%s%s):\n", col, regex, col, flagsArg)
 		}
 		fmt.Fprintf(buf, "        errors.append(ValidationError(field=%q, message=\"does not match required pattern\"))\n", col)
 	}

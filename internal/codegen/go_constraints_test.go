@@ -132,6 +132,40 @@ func TestGoConstraintsGenerator_EmptySchema(t *testing.T) {
 	}
 }
 
+func TestGoConstraintsGenerator_ILIKEPattern(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "items",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "code", PGType: typeinfo.MustParse("text"), NotNull: true},
+				},
+				PK: []string{"id"},
+				Checks: []model.CheckConstraint{
+					{Name: "ck_code_ilike", Expr: "code ILIKE 'abc%'"},
+				},
+			},
+		},
+	}
+
+	gen := &GoConstraintsGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// ILIKE should produce (?i) prefix in the regex pattern.
+	if !strings.Contains(result, `(?i)`) {
+		t.Error("ILIKE pattern should produce (?i) prefix in Go regex")
+	}
+	if !strings.Contains(result, "regexp.MustCompile") {
+		t.Error("missing regexp.MustCompile for ILIKE check")
+	}
+}
+
 func TestGoConstraintsGenerator_NoConstraints(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{

@@ -111,6 +111,41 @@ func TestTSConstraintsGenerator_Generate(t *testing.T) {
 	}
 }
 
+func TestTSConstraintsGenerator_ILIKEPattern(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "items",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "code", PGType: typeinfo.MustParse("text"), NotNull: true},
+				},
+				PK: []string{"id"},
+				Checks: []model.CheckConstraint{
+					{Name: "ck_code_ilike", Expr: "code ILIKE 'abc%'"},
+				},
+			},
+		},
+	}
+
+	gen := &TSConstraintsGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// ILIKE should produce /regex/i.test() -- the i flag goes AFTER the closing /.
+	if !strings.Contains(result, "/i.test(row.code)") {
+		t.Error("ILIKE pattern should produce /regex/i.test() in TypeScript, not (?i)")
+	}
+	// Must NOT contain (?i) -- JavaScript does not support inline flags.
+	if strings.Contains(result, "(?i)") {
+		t.Error("TypeScript must not use (?i) inline flag -- JavaScript does not support it")
+	}
+}
+
 func TestTSConstraintsGenerator_EmptySchema(t *testing.T) {
 	schema := &model.Schema{
 		Name: "empty",

@@ -225,6 +225,46 @@ func TestClassifyCheck_LengthDetails(t *testing.T) {
 	}
 }
 
+func TestLikePattern_IsCaseInsensitive(t *testing.T) {
+	tests := []struct {
+		op   string
+		want bool
+	}{
+		{"LIKE", false},
+		{"ILIKE", true},
+		{"NOT LIKE", false},
+		{"NOT ILIKE", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.op, func(t *testing.T) {
+			p := &likePattern{Op: tt.op}
+			if got := p.IsCaseInsensitive(); got != tt.want {
+				t.Errorf("IsCaseInsensitive() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLikePattern_IsNegated(t *testing.T) {
+	tests := []struct {
+		op   string
+		want bool
+	}{
+		{"LIKE", false},
+		{"NOT LIKE", true},
+		{"ILIKE", false},
+		{"NOT ILIKE", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.op, func(t *testing.T) {
+			p := &likePattern{Op: tt.op}
+			if got := p.IsNegated(); got != tt.want {
+				t.Errorf("IsNegated() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLikeToRegex(t *testing.T) {
 	tests := []struct {
 		pattern string

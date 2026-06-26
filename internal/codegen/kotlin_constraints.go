@@ -3,7 +3,6 @@ package codegen
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
@@ -165,10 +164,16 @@ func writeKotlinCheckPattern(buf *bytes.Buffer, col, kotlinField string, pat che
 
 	case *likePattern:
 		regex := likeToRegex(p.Pattern)
-		if strings.HasPrefix(strings.ToUpper(p.Op), "NOT") {
-			fmt.Fprintf(buf, "    if (%s != null && Regex(%q).matches(%s)) {\n", kotlinField, regex, kotlinField)
+		var regexExpr string
+		if p.IsCaseInsensitive() {
+			regexExpr = fmt.Sprintf("Regex(%q, RegexOption.IGNORE_CASE)", regex)
 		} else {
-			fmt.Fprintf(buf, "    if (%s != null && !Regex(%q).matches(%s)) {\n", kotlinField, regex, kotlinField)
+			regexExpr = fmt.Sprintf("Regex(%q)", regex)
+		}
+		if p.IsNegated() {
+			fmt.Fprintf(buf, "    if (%s != null && %s.matches(%s)) {\n", kotlinField, regexExpr, kotlinField)
+		} else {
+			fmt.Fprintf(buf, "    if (%s != null && !%s.matches(%s)) {\n", kotlinField, regexExpr, kotlinField)
 		}
 		fmt.Fprintf(buf, "        errors.add(ValidationError(field = %q, message = \"does not match required pattern\"))\n", col)
 		buf.WriteString("    }\n")

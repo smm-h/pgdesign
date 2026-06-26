@@ -144,10 +144,14 @@ func writeTSCheckPattern(buf *bytes.Buffer, col, tsField string, pat checkPatter
 
 	case *likePattern:
 		regex := likeToRegex(p.Pattern)
-		if strings.HasPrefix(strings.ToUpper(p.Op), "NOT") {
-			fmt.Fprintf(buf, "  if (row.%s != null && /%s/.test(row.%s)) {\n", tsField, escapeJSRegex(regex), tsField)
+		flags := ""
+		if p.IsCaseInsensitive() {
+			flags = "i"
+		}
+		if p.IsNegated() {
+			fmt.Fprintf(buf, "  if (row.%s != null && /%s/%s.test(row.%s)) {\n", tsField, escapeJSRegex(regex), flags, tsField)
 		} else {
-			fmt.Fprintf(buf, "  if (row.%s != null && !/%s/.test(row.%s)) {\n", tsField, escapeJSRegex(regex), tsField)
+			fmt.Fprintf(buf, "  if (row.%s != null && !/%s/%s.test(row.%s)) {\n", tsField, escapeJSRegex(regex), flags, tsField)
 		}
 		fmt.Fprintf(buf, "    errors.push({ field: %q, message: \"does not match required pattern\" })\n", col)
 		buf.WriteString("  }\n")

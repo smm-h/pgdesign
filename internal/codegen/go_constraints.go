@@ -3,7 +3,6 @@ package codegen
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
@@ -171,9 +170,12 @@ func writeGoCheckPattern(buf *bytes.Buffer, col, goField string, pat checkPatter
 
 	case *likePattern:
 		regex := likeToRegex(p.Pattern)
+		if p.IsCaseInsensitive() {
+			regex = "(?i)" + regex
+		}
 		varName := col + "Re"
 		fmt.Fprintf(buf, "\t%s := regexp.MustCompile(%q)\n", varName, regex)
-		if strings.HasPrefix(strings.ToUpper(p.Op), "NOT") {
+		if p.IsNegated() {
 			fmt.Fprintf(buf, "\tif %s.MatchString(row.%s) {\n", varName, goField)
 		} else {
 			fmt.Fprintf(buf, "\tif !%s.MatchString(row.%s) {\n", varName, goField)

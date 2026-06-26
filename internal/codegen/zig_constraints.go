@@ -153,9 +153,15 @@ func writeZigCheckPattern(buf *bytes.Buffer, col string, pat checkPattern) {
 
 // writeZigLikePattern emits Zig std.mem calls for LIKE patterns where possible.
 // Patterns that cannot be expressed with std.mem are skipped with a comment.
+// ILIKE patterns are skipped entirely because Zig's std.ascii is ASCII-only,
+// which would silently differ from PG's locale-aware ILIKE behavior.
 func writeZigLikePattern(buf *bytes.Buffer, col string, p *likePattern) {
+	if p.IsCaseInsensitive() {
+		fmt.Fprintf(buf, "    // ILIKE pattern requires locale-aware case folding -- skipped\n")
+		return
+	}
 	pattern := p.Pattern
-	isNot := strings.HasPrefix(strings.ToUpper(p.Op), "NOT")
+	isNot := p.IsNegated()
 
 	// Classify the LIKE pattern into startsWith, endsWith, contains, or skip.
 	switch {

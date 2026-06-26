@@ -164,7 +164,10 @@ func writeJavaCheckPattern(buf *bytes.Buffer, col, javaField string, pat checkPa
 
 	case *likePattern:
 		regex := likeToRegex(p.Pattern)
-		if strings.HasPrefix(strings.ToUpper(p.Op), "NOT") {
+		if p.IsCaseInsensitive() {
+			regex = "(?i)" + regex
+		}
+		if p.IsNegated() {
 			fmt.Fprintf(buf, "        if (row.%s() != null && Pattern.matches(%q, row.%s())) {\n", javaField, regex, javaField)
 		} else {
 			fmt.Fprintf(buf, "        if (row.%s() != null && !Pattern.matches(%q, row.%s())) {\n", javaField, regex, javaField)
