@@ -298,28 +298,11 @@ func opAddColumn(op DDLOp) string {
 	}
 	if op.Generated != "" {
 		parts = append(parts, fmt.Sprintf("GENERATED ALWAYS AS (%s) %s",
-			op.Generated, generatedStorageKeyword(op.Stored, op.PGVersion)))
+			op.Generated, sql.GeneratedStorageKeyword(op.Stored, op.PGVersion)))
 	} else if op.Default != nil {
 		parts = append(parts, fmt.Sprintf("DEFAULT %s", formatDefault(op.Default, op.Type)))
 	}
 	return strings.Join(parts, " ") + ";"
-}
-
-// generatedStorageKeyword returns STORED or VIRTUAL based on the stored flag
-// and target PostgreSQL version, using the same logic as sql.columnDef.
-func generatedStorageKeyword(stored bool, pgVersion int) string {
-	if stored {
-		return "STORED"
-	}
-	if pgVersion >= 18 {
-		return "VIRTUAL"
-	}
-	if pgVersion > 0 {
-		// Pre-PG18: VIRTUAL not supported. Defensively emit STORED.
-		return "STORED"
-	}
-	// pgVersion == 0 (unspecified): respect explicit user choice.
-	return "VIRTUAL"
 }
 
 func opDropColumn(op DDLOp) string {

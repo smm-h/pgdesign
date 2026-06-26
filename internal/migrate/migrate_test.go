@@ -12,6 +12,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/sql"
 	"github.com/smm-h/pgdesign/internal/testdb"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
@@ -2477,9 +2478,9 @@ func TestGeneratedStorageKeyword(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := generatedStorageKeyword(tt.stored, tt.pgVersion)
+		got := sql.GeneratedStorageKeyword(tt.stored, tt.pgVersion)
 		if got != tt.want {
-			t.Errorf("generatedStorageKeyword(stored=%v, pg=%d) = %q, want %q",
+			t.Errorf("GeneratedStorageKeyword(stored=%v, pg=%d) = %q, want %q",
 				tt.stored, tt.pgVersion, got, tt.want)
 		}
 	}

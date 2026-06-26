@@ -306,6 +306,25 @@ func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersi
 // Note: transitioning a generated column from STORED to VIRTUAL (or vice
 // versa) is destructive -- PostgreSQL does not support ALTER COLUMN to change
 // the storage mode. The column must be DROPped and recreated.
+
+// GeneratedStorageKeyword returns "STORED" or "VIRTUAL" for a generated column
+// based on the stored flag and target PostgreSQL version.
+func GeneratedStorageKeyword(stored bool, pgVersion int) string {
+	if stored {
+		return "STORED"
+	}
+	if pgVersion >= 18 {
+		return "VIRTUAL"
+	}
+	if pgVersion > 0 {
+		// Pre-PG18: VIRTUAL not supported. Defensively emit STORED
+		// (validate should have caught this via E218).
+		return "STORED"
+	}
+	// pgVersion == 0 (unspecified): respect explicit user choice.
+	return "VIRTUAL"
+}
+
 func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	// Pre-PG10 identity fallback: replace identity column with bigserial.
 	if col.Identity != "" && pgVersion > 0 && pgVersion < 10 {
@@ -340,18 +359,7 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 		parts = append(parts, fmt.Sprintf("GENERATED %s AS IDENTITY", col.Identity))
 	} else if col.Generated != "" {
 		parts = append(parts, fmt.Sprintf("GENERATED ALWAYS AS (%s)", col.Generated))
-		if col.Stored {
-			parts = append(parts, "STORED")
-		} else if pgVersion >= 18 {
-			parts = append(parts, "VIRTUAL")
-		} else if pgVersion > 0 {
-			// Pre-PG18: VIRTUAL not supported. Defensively emit STORED
-			// (validate should have caught this via E218).
-			parts = append(parts, "STORED")
-		} else {
-			// pgVersion == 0 (unspecified): respect explicit user choice.
-			parts = append(parts, "VIRTUAL")
-		}
+		parts = append(parts, GeneratedStorageKeyword(col.Stored, pgVersion))
 	} else if col.DefaultExpr != "" {
 		parts = append(parts, "DEFAULT "+ExprValue(col.DefaultExpr))
 	} else if col.Default != nil {
