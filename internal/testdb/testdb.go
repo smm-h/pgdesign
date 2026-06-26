@@ -141,17 +141,24 @@ func (m *Manager) Create(ctx context.Context, opts CreateOptions) (*EphemeralDB,
 	// Detect PG version on first call.
 	m.pgVersionOnce.Do(func() {
 		var versionStr string
-		err := conn.QueryRow(ctx, "SHOW server_version_num").Scan(&versionStr)
+		err := conn.QueryRow(ctx, "SHOW server_version").Scan(&versionStr)
 		if err != nil {
 			m.pgVersionErr = fmt.Errorf("detect PG version: %w", err)
 			return
 		}
-		v, err := strconv.Atoi(versionStr)
-		if err != nil {
-			m.pgVersionErr = fmt.Errorf("parse PG version %q: %w", versionStr, err)
+		// Parse major version from strings like "17.5 (Fedora 17.5-1.fc42)"
+		// or "16.2" or "15.0beta1".
+		parts := strings.SplitN(versionStr, ".", 2)
+		if len(parts) == 0 {
+			m.pgVersionErr = fmt.Errorf("cannot parse version %q", versionStr)
 			return
 		}
-		m.pgVersion = v
+		major, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+		if err != nil {
+			m.pgVersionErr = fmt.Errorf("parse PG major version from %q: %w", versionStr, err)
+			return
+		}
+		m.pgVersion = major
 	})
 	if m.pgVersionErr != nil {
 		return nil, m.pgVersionErr
@@ -218,7 +225,7 @@ func (m *Manager) Drop(ctx context.Context, db *EphemeralDB) error {
 
 	sanitized := pgx.Identifier{db.Name}.Sanitize()
 
-	if m.pgVersion >= 130000 {
+	if m.pgVersion >= 13 {
 		_, err = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+sanitized+" WITH (FORCE)")
 		if err != nil {
 			return fmt.Errorf("drop database %s: %w", db.Name, err)
