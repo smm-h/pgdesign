@@ -586,6 +586,7 @@ func checkBuild(ctx strictcli.CheckContext) strictcli.CheckResult {
 	}
 
 	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	schema.PGVersion = pgVersion
 
 	plan, planErr := Plan(schema, cfg, typeReg, pgVersion)
 	if planErr != nil {

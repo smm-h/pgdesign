@@ -63,6 +63,7 @@ func handleBuild(kwargs map[string]interface{}) int {
 	}
 
 	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	schema.PGVersion = pgVersion
 
 	// Generate all outputs in memory.
 	plan, planErr := Plan(schema, cfg, typeReg, pgVersion)
