@@ -1,0 +1,1 @@
+{"commits":["8f83b91ddaae43ec12667acade2b987576431063"],"user_facing":true,"description":"**Fix.** `splitfmt.Decode` now caps pre-allocation to prevent OOM on malformed input and rejects trailing bytes after valid content.","type":"fix"}
