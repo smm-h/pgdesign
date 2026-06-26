@@ -2,6 +2,40 @@
 
 # Changelog
 
+## 0.18.0
+
+PG capability registry, mandatory pg_version, and complete --idempotent coverage for all DDL types.
+
+<details>
+<summary>Context</summary>
+
+Introduces a formal PG capability registry (internal/pgcap) that replaces scattered inline version comparisons with a declarative table mapping capabilities to minimum PG versions. All version-gated behavior now uses pgcap.Has() for consistency.
+
+pg_version is now mandatory for DDL-generating commands (generate, build, check, migrate). Commands that don't produce DDL (fmt, codegen, diff, seed) are unaffected. This eliminates the entire class of "unknown PG version" bugs where the tool had to guess behavior.
+
+The --idempotent flag now covers every DDL statement type: sequences (IF NOT EXISTS), domains and composite types (DO $$ catalog check), policies (CREATE OR REPLACE on PG 15+, catalog check on older), materialized views (DO $$ catalog check), and all three trigger types (CREATE OR REPLACE on PG 14+, DROP IF EXISTS + CREATE on older). Previously, triggers, domains, composite types, policies, matviews, and sequences were silently non-idempotent.
+
+</details>
+
+### Breaking
+
+- **Breaking change.** `pg_version` is now required in `pgdesign.toml` for DDL-generating commands (`generate`, `build`, `check`, `migrate`). Commands that don't generate DDL (`fmt`, `codegen`, `diff`, `seed`) are unaffected.
+
+### Features
+
+- **New feature.** PG capability registry (`internal/pgcap`) provides declarative version-to-feature mapping. All inline PG version comparisons replaced with `pgcap.Has()` calls for 10 capabilities (PG 10-18).
+- **New feature.** `--idempotent` DDL generation now covers all statement types: sequences (`IF NOT EXISTS`), domains and composite types (`DO 1996273` catalog check), policies (version-gated `OR REPLACE` on PG 15+), materialized views (`DO 1996273` catalog check), and triggers (version-gated `OR REPLACE` on PG 14+, `DROP IF EXISTS + CREATE` on older).
+
+### Fixes
+
+- **Fix.** `generate`, `build`, and `check --tag build` now write the resolved PG version back to the schema, ensuring version-gated validation and DDL generation use the config-level `pg_version` consistently.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.17.0
 
 Config phase-separation, build freshness checking, sealed .sqlsplit format, opaque testdb handles, and Zig constraint codegen.
@@ -37,12 +71,6 @@ Zig joins Go/TS/Python/Java/Kotlin as a supported language for constraint codege
 
 - **Fix.** State machine `enforce_trigger` override via extends now uses explicit `*bool` instead of `bool`, preventing unintended trigger suppression when extending state machine types.
 - **Fix.** `testdb init` now correctly resolves relative output paths from `pgdesign.toml` instead of using them raw, fixing broken `.split.json` references when config paths are relative.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.16.1
 
