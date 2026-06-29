@@ -1,4 +1,0 @@
-{"commits":["3dbc5ead9ff4a5c294c114ea7ac58c50289d8939"],"user_facing":true,"description":"**Fix.** `pgdesign codegen --lang python --mode ddl` no longer panics when `--split-by-file` is not passed. The nil type assertion on the flag value crashed all Python DDL codegen.","type":"fix"}
-{"commits":["63de16dbb1bab5a50919efc052b1828520bfb501","5d60fffdfcdc784cf37646ef528b28368c9d1d5c"],"user_facing":false}
-{"commits":["923594d239fbf4fde58803d3bab2019be32c2d4f"],"user_facing":false}
-{"commits":["953a0165bc2437447bd44aad92f0f2ca96b0a283"],"user_facing":false}
