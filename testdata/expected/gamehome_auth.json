@@ -8,7 +8,7 @@
     {
       "name": "users",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "Core user accounts. All authentication methods link back here.",
       "columns": [
         {
@@ -109,7 +109,7 @@
     {
       "name": "magic_links",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "Passwordless login tokens sent via email.",
       "columns": [
         {
@@ -171,7 +171,7 @@
     {
       "name": "credentials",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "Password credentials. One row per user with a password.",
       "columns": [
         {
@@ -246,7 +246,7 @@
     {
       "name": "sessions",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "Active login sessions with expiry and device metadata.",
       "columns": [
         {
@@ -356,7 +356,7 @@
     {
       "name": "provider_links",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "OAuth/OIDC provider links. Composite PK on (provider, provider_sub) to prevent duplicates.",
       "columns": [
         {
@@ -440,7 +440,7 @@
     {
       "name": "email_verifications",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "Pending email verification tokens with expiry.",
       "columns": [
         {
@@ -524,7 +524,7 @@
     {
       "name": "password_resets",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "Password reset tokens with expiry.",
       "columns": [
         {
@@ -599,7 +599,7 @@
     {
       "name": "totp_secrets",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "TOTP (authenticator app) secrets for two-factor authentication.",
       "columns": [
         {
@@ -675,7 +675,7 @@
     {
       "name": "recovery_codes",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "One-time-use backup codes for MFA recovery.",
       "columns": [
         {
@@ -750,7 +750,7 @@
     {
       "name": "webauthn_credentials",
       "schema": "auth",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_auth.toml",
+      "source_file": "gamehome_auth.toml",
       "comment": "FIDO2/WebAuthn passkey credentials.",
       "columns": [
         {

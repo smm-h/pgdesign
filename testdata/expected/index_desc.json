@@ -17,7 +17,7 @@
     {
       "name": "messages",
       "schema": "chat",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/index_desc.toml",
+      "source_file": "index_desc.toml",
       "comment": "Chat messages",
       "columns": [
         {

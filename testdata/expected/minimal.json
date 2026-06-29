@@ -17,7 +17,7 @@
     {
       "name": "users",
       "schema": "public",
-      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/minimal.toml",
+      "source_file": "minimal.toml",
       "comment": "User accounts",
       "columns": [
         {

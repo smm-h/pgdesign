@@ -40,7 +40,7 @@ func File(path string) (*RawSchema, []diagnostic.Diagnostic) {
 		file: path,
 	}
 	schema := p.walk()
-	schema.SourceFile = path
+	schema.SourceFile = filepath.Base(path)
 	return schema, p.diags
 }
 
