@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.19.1
+
+Fix SourceFile storing absolute paths, which broke CI golden tests.
+
+### Fixes
+
+- **Fix.** SourceFile now stores the filename only (not the absolute path), fixing golden test failures on CI where paths differ between machines.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.19.0
 
 Source file provenance tracking and faceted Python DDL output (--split-by-file).
@@ -17,12 +31,6 @@ Adds SourceFile tracking to all 8 model types, enabling per-source-file code gen
 
 - **New feature.** All schema objects (tables, views, enums, domains, composite types, sequences, functions, materialized views) now track which source TOML file defined them via a `SourceFile` field, preserved through multi-file builds and topo sort.
 - **New feature.** Python DDL codegen supports faceted output via `--split-by-file` flag or `split = true` in pgdesign.toml. Produces per-concern files: `extensions.py`, `types.py`, `tables_<source>.py` (one per input TOML), and `post_tables.py` — instead of a single monolithic file.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.18.1
 
