@@ -1,0 +1,1 @@
+{"commits":["5234ed977d0f159ef952e8e5a2c1d23c306b1c00"],"user_facing":true,"description":"**New feature.** All schema objects (tables, views, enums, domains, composite types, sequences, functions, materialized views) now track which source TOML file defined them via a `SourceFile` field, preserved through multi-file builds and topo sort.","type":"feature"}
