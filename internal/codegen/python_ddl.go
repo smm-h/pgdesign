@@ -3,6 +3,7 @@ package codegen
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -16,7 +17,9 @@ import (
 // typed data tuples. Each statement is a (sql, kind, table_name_or_none, phase)
 // tuple. The output mirrors the exact section order of generateSQL in the
 // generate package.
-type PythonDDLGenerator struct{}
+type PythonDDLGenerator struct {
+	SplitByFile bool
+}
 
 // ddlTuple holds one DDL statement with its metadata.
 type ddlTuple struct {
@@ -26,7 +29,8 @@ type ddlTuple struct {
 	Name          string // human-readable name for the DDL op (e.g. table name, constraint name)
 	Table         string // empty string means None
 	Phase         int
-	Transactional bool // false for CONCURRENTLY indexes, ALTER TYPE ADD VALUE
+	Transactional bool   // false for CONCURRENTLY indexes, ALTER TYPE ADD VALUE
+	SourceFile    string // original TOML source file; empty for source-independent tuples
 }
 
 // buildTuples collects all DDL statements from the schema into a flat list of
@@ -110,6 +114,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 			Name:          seq.Name,
 			Phase:         2,
 			Transactional: true,
+			SourceFile:    seq.SourceFile,
 		})
 	}
 
@@ -122,6 +127,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 			Name:          e.Name,
 			Phase:         3,
 			Transactional: true,
+			SourceFile:    e.SourceFile,
 		})
 	}
 
@@ -134,6 +140,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 			Name:          d.Name,
 			Phase:         3,
 			Transactional: true,
+			SourceFile:    d.SourceFile,
 		})
 	}
 
@@ -146,6 +153,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 			Name:          ct.Name,
 			Phase:         3,
 			Transactional: true,
+			SourceFile:    ct.SourceFile,
 		})
 	}
 
@@ -161,6 +169,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 			Table:         tables[i].Name,
 			Phase:         4,
 			Transactional: true,
+			SourceFile:    tables[i].SourceFile,
 		})
 	}
 
@@ -168,7 +177,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	for i := range tables {
 		t := &tables[i]
 		if t.Partitioning != nil && len(t.Partitioning.Children) > 0 {
-			collectPartitionTuples(t.Schema, t.Name, t.Partitioning.Children, &tuples)
+			collectPartitionTuples(t.Schema, t.Name, t.SourceFile, t.Partitioning.Children, &tuples)
 		}
 	}
 
@@ -192,6 +201,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         5,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 			if t.Maintenance.Retention != "" {
 				tuples = append(tuples, ddlTuple{
@@ -201,6 +211,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 					Table:         t.Name,
 					Phase:         5,
 					Transactional: true,
+					SourceFile:    t.SourceFile,
 				})
 			}
 		}
@@ -224,6 +235,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         6,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -246,6 +258,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         7,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -268,6 +281,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         8,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -290,6 +304,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         8,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -312,6 +327,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         9,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -349,6 +365,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 						Table:         t.Name,
 						Phase:         9,
 						Transactional: true,
+						SourceFile:    t.SourceFile,
 					})
 				}
 			}
@@ -367,6 +384,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         10,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 		for _, col := range t.Columns {
@@ -379,6 +397,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 					Table:         t.Name,
 					Phase:         10,
 					Transactional: true,
+					SourceFile:    t.SourceFile,
 				})
 			}
 		}
@@ -393,6 +412,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Name:          "sequence." + seq.Name,
 				Phase:         10,
 				Transactional: true,
+				SourceFile:    seq.SourceFile,
 			})
 		}
 	}
@@ -410,6 +430,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 					Table:         t.Name,
 					Phase:         10,
 					Transactional: true,
+					SourceFile:    t.SourceFile,
 				})
 			}
 		}
@@ -426,6 +447,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         11,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -441,6 +463,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         12,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -456,6 +479,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         12,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -472,6 +496,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         13,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -503,6 +528,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Name:          v.Name,
 				Phase:         14,
 				Transactional: true,
+				SourceFile:    v.SourceFile,
 			})
 			if v.Comment != "" {
 				tuples = append(tuples, ddlTuple{
@@ -511,6 +537,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 					Name:          "view." + v.Name,
 					Phase:         14,
 					Transactional: true,
+					SourceFile:    v.SourceFile,
 				})
 			}
 		}
@@ -542,6 +569,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Name:          mv.Name,
 				Phase:         15,
 				Transactional: true,
+				SourceFile:    mv.SourceFile,
 			})
 			if mv.Comment != "" {
 				tuples = append(tuples, ddlTuple{
@@ -550,6 +578,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 					Name:          "matview." + mv.Name,
 					Phase:         15,
 					Transactional: true,
+					SourceFile:    mv.SourceFile,
 				})
 			}
 			for j := range mv.Indexes {
@@ -565,6 +594,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 					Name:          idxName,
 					Phase:         15,
 					Transactional: true,
+					SourceFile:    mv.SourceFile,
 				})
 			}
 		}
@@ -599,6 +629,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Name:          f.Name,
 				Phase:         16,
 				Transactional: true,
+				SourceFile:    f.SourceFile,
 			})
 			if f.Comment != "" {
 				kind := "FUNCTION"
@@ -613,6 +644,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 					Name:          "func." + f.Name,
 					Phase:         16,
 					Transactional: true,
+					SourceFile:    f.SourceFile,
 				})
 			}
 		}
@@ -630,6 +662,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				Table:         t.Name,
 				Phase:         17,
 				Transactional: true,
+				SourceFile:    t.SourceFile,
 			})
 		}
 	}
@@ -909,7 +942,11 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 
 // GenerateFiles implements MultiFileGenerator, producing two files:
 // schema_ddl.py (tuples) and schema_executor.py (section executor).
+// When SplitByFile is true, produces faceted output instead.
 func (g *PythonDDLGenerator) GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+	if g.SplitByFile {
+		return g.generateFacetedFiles(schema)
+	}
 	tuples, tables, diags := buildTuples(schema)
 	sections := buildSections(tuples)
 
@@ -917,6 +954,177 @@ func (g *PythonDDLGenerator) GenerateFiles(schema *model.Schema) (map[string][]b
 		"schema_ddl.py":      renderDDLFile(tuples, tables),
 		"schema_executor.py": renderExecutorFile(sections),
 	}
+	return files, diags
+}
+
+// facetKind classifies a tuple into one of four facet categories.
+const (
+	facetExtensions  = "extensions"
+	facetTypes       = "types"
+	facetTables      = "tables"
+	facetPostTables  = "post_tables"
+)
+
+// tupleFacet returns the facet category for a tuple.
+func tupleFacet(t *ddlTuple) string {
+	switch t.Kind {
+	case "schema", "extension":
+		return facetExtensions
+	case "append_only_trigger":
+		if t.Table == "" {
+			return facetExtensions
+		}
+		return facetTables
+	case "enum", "domain", "composite", "sequence":
+		return facetTypes
+	case "view", "materialized_view", "function":
+		return facetPostTables
+	case "comment":
+		// Route comments by phase: phases 14-16 are post-table objects.
+		if t.Phase >= 14 {
+			return facetPostTables
+		}
+		// Sequence comments have no Table but belong with types.
+		if t.Table == "" {
+			return facetTypes
+		}
+		return facetTables
+	case "index":
+		// Materialized view indexes are at phase 15.
+		if t.Phase == 15 {
+			return facetPostTables
+		}
+		return facetTables
+	default:
+		// table, partition, partman, fk, unique, check, exclusion,
+		// statistics, owner, rls_enable, rls_force, policy, trigger
+		return facetTables
+	}
+}
+
+// sourceBaseName extracts the base name from a source file path, stripping
+// the .toml extension. Returns empty string for empty input.
+func sourceBaseName(sourceFile string) string {
+	if sourceFile == "" {
+		return ""
+	}
+	base := filepath.Base(sourceFile)
+	if strings.HasSuffix(base, ".toml") {
+		base = base[:len(base)-5]
+	}
+	return base
+}
+
+// renderFacetFile renders a Python file for a faceted subset of tuples.
+// If includeTables is true, a TABLE_NAMES constant is emitted.
+func renderFacetFile(tuples []ddlTuple, tables []model.Table) []byte {
+	var buf bytes.Buffer
+	buf.WriteString("# Code generated by pgdesign -- do not edit.\n\n")
+	buf.WriteString("from typing import Final\n\n")
+	buf.WriteString("STATEMENTS: Final[list[tuple[str, str, str | None, int]]] = [\n")
+	for _, t := range tuples {
+		escapedSQL := pythonEscapeStr(t.SQL)
+		tablePy := "None"
+		if t.Table != "" {
+			tablePy = fmt.Sprintf("%q", t.Table)
+		}
+		buf.WriteString(fmt.Sprintf("    (%s, %q, %s, %d),\n", escapedSQL, t.Kind, tablePy, t.Phase))
+	}
+	buf.WriteString("]\n")
+
+	if len(tables) > 0 {
+		buf.WriteString("\nTABLE_NAMES: Final[tuple[str, ...]] = (")
+		for i, t := range tables {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(fmt.Sprintf("%q", t.Name))
+		}
+		if len(tables) == 1 {
+			buf.WriteString(",")
+		}
+		buf.WriteString(")\n")
+	}
+
+	return buf.Bytes()
+}
+
+// generateFacetedFiles produces per-source-file output: extensions.py, types.py,
+// tables_<source>.py (one per TOML source file), and post_tables.py.
+func (g *PythonDDLGenerator) generateFacetedFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+	tuples, tables, diags := buildTuples(schema)
+
+	// Partition tuples into facets.
+	var extensionTuples, typeTuples, postTableTuples []ddlTuple
+	// Map from source file path to table tuples.
+	tablesBySource := make(map[string][]ddlTuple)
+	// Track ordering of source files.
+	var sourceOrder []string
+	sourceSeen := make(map[string]bool)
+
+	for i := range tuples {
+		t := &tuples[i]
+		facet := tupleFacet(t)
+		switch facet {
+		case facetExtensions:
+			extensionTuples = append(extensionTuples, *t)
+		case facetTypes:
+			typeTuples = append(typeTuples, *t)
+		case facetPostTables:
+			postTableTuples = append(postTableTuples, *t)
+		case facetTables:
+			src := t.SourceFile
+			if !sourceSeen[src] {
+				sourceSeen[src] = true
+				sourceOrder = append(sourceOrder, src)
+			}
+			tablesBySource[src] = append(tablesBySource[src], *t)
+		}
+	}
+
+	// Derive base names and check for collisions.
+	baseToSource := make(map[string]string)
+	for _, src := range sourceOrder {
+		base := sourceBaseName(src)
+		if base == "" {
+			base = "unknown"
+		}
+		if existing, ok := baseToSource[base]; ok && existing != src {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Message:  fmt.Sprintf("faceted output: source files %q and %q produce the same base name %q", existing, src, base),
+			})
+			return nil, diags
+		}
+		baseToSource[base] = src
+	}
+
+	// Build table lists per source file for TABLE_NAMES.
+	tablesBySourceFile := make(map[string][]model.Table)
+	for _, tbl := range tables {
+		tablesBySourceFile[tbl.SourceFile] = append(tablesBySourceFile[tbl.SourceFile], tbl)
+	}
+
+	files := make(map[string][]byte)
+
+	if len(extensionTuples) > 0 {
+		files["extensions.py"] = renderFacetFile(extensionTuples, nil)
+	}
+	if len(typeTuples) > 0 {
+		files["types.py"] = renderFacetFile(typeTuples, nil)
+	}
+	for _, src := range sourceOrder {
+		base := sourceBaseName(src)
+		if base == "" {
+			base = "unknown"
+		}
+		fileName := "tables_" + base + ".py"
+		files[fileName] = renderFacetFile(tablesBySource[src], tablesBySourceFile[src])
+	}
+	if len(postTableTuples) > 0 {
+		files["post_tables.py"] = renderFacetFile(postTableTuples, nil)
+	}
+
 	return files, diags
 }
 
@@ -937,7 +1145,7 @@ func pythonEscapeStr(s string) string {
 }
 
 // collectPartitionTuples recursively collects partition DDL tuples.
-func collectPartitionTuples(schemaName, parentTable string, children []model.PartitionSpec, tuples *[]ddlTuple) {
+func collectPartitionTuples(schemaName, parentTable, sourceFile string, children []model.PartitionSpec, tuples *[]ddlTuple) {
 	for i := range children {
 		child := &children[i]
 		*tuples = append(*tuples, ddlTuple{
@@ -948,9 +1156,10 @@ func collectPartitionTuples(schemaName, parentTable string, children []model.Par
 			Table:         child.Name,
 			Phase:         5,
 			Transactional: true,
+			SourceFile:    sourceFile,
 		})
 		if len(child.Children) > 0 {
-			collectPartitionTuples(schemaName, child.Name, child.Children, tuples)
+			collectPartitionTuples(schemaName, child.Name, sourceFile, child.Children, tuples)
 		}
 	}
 }
