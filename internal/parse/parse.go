@@ -40,6 +40,7 @@ func File(path string) (*RawSchema, []diagnostic.Diagnostic) {
 		file: path,
 	}
 	schema := p.walk()
+	schema.SourceFile = path
 	return schema, p.diags
 }
 
@@ -60,6 +61,7 @@ func Bytes(data []byte) (*RawSchema, []diagnostic.Diagnostic) {
 		file: "<bytes>",
 	}
 	schema := p.walk()
+	schema.SourceFile = "<bytes>"
 	return schema, p.diags
 }
 

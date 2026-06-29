@@ -217,16 +217,18 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 			switch td.Kind {
 			case semtype.KindEnum:
 				enums = append(enums, Enum{
-					Schema:  raw.Meta.Schema,
-					Name:    td.Name,
-					Values:  td.EnumValues,
-					Comment: td.Comment,
+					Schema:     raw.Meta.Schema,
+					Name:       td.Name,
+					Values:     td.EnumValues,
+					Comment:    td.Comment,
+					SourceFile: raw.SourceFile,
 				})
 			case semtype.KindComposite:
 				ct := CompositeType{
-					Schema:  raw.Meta.Schema,
-					Name:    td.Name,
-					Comment: td.Comment,
+					Schema:     raw.Meta.Schema,
+					Name:       td.Name,
+					Comment:    td.Comment,
+					SourceFile: raw.SourceFile,
 				}
 				for _, f := range td.Fields {
 					ct.Fields = append(ct.Fields, CompositeField{
@@ -237,10 +239,11 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 				compositeTypes = append(compositeTypes, ct)
 			case semtype.KindStateMachine:
 				enums = append(enums, Enum{
-					Schema:  raw.Meta.Schema,
-					Name:    td.Name,
-					Values:  td.EnumValues,
-					Comment: td.Comment,
+					Schema:     raw.Meta.Schema,
+					Name:       td.Name,
+					Values:     td.EnumValues,
+					Comment:    td.Comment,
+					SourceFile: raw.SourceFile,
 				})
 			}
 			continue
@@ -249,9 +252,10 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 		switch {
 		case strings.EqualFold(rt.Kind, "enum"):
 			e := Enum{
-				Schema: raw.Meta.Schema,
-				Name:   rt.Name,
-				Values: rt.Values,
+				Schema:     raw.Meta.Schema,
+				Name:       rt.Name,
+				Values:     rt.Values,
+				SourceFile: raw.SourceFile,
 			}
 			if rt.Comment != nil {
 				e.Comment = *rt.Comment
@@ -260,8 +264,9 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 
 		case strings.EqualFold(rt.Kind, "composite"):
 			ct := CompositeType{
-				Schema: raw.Meta.Schema,
-				Name:   rt.Name,
+				Schema:     raw.Meta.Schema,
+				Name:       rt.Name,
+				SourceFile: raw.SourceFile,
 			}
 			if rt.Comment != nil {
 				ct.Comment = *rt.Comment
@@ -287,17 +292,18 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 				continue
 			}
 			enums = append(enums, Enum{
-				Schema:  raw.Meta.Schema,
-				Name:    td.Name,
-				Values:  td.EnumValues,
-				Comment: td.Comment,
+				Schema:     raw.Meta.Schema,
+				Name:       td.Name,
+				Values:     td.EnumValues,
+				Comment:    td.Comment,
+				SourceFile: raw.SourceFile,
 			})
 		}
 	}
 
 	// Resolve tables.
 	for _, rt := range raw.Tables {
-		t, tableDiags := resolveTable(rt, raw.Meta.Schema, reg)
+		t, tableDiags := resolveTable(rt, raw.Meta.Schema, reg, raw.SourceFile)
 		diags = append(diags, tableDiags...)
 		if t != nil {
 			tables = append(tables, *t)
@@ -305,6 +311,13 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 	}
 
 	// Build domains from scalar types with CHECK expressions.
+	// Build a typeName -> sourceFile map for domain provenance tracking.
+	// Domains are derived from scalar types in the registry, not directly from
+	// RawType declarations, so we map type names to their source file here.
+	typeSourceFile := make(map[string]string, len(raw.Types))
+	for _, rt := range raw.Types {
+		typeSourceFile[rt.Name] = raw.SourceFile
+	}
 	var domains []Domain
 	seen := make(map[string]bool)
 	for _, t := range tables {
@@ -318,11 +331,12 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 			}
 			seen[col.SemanticTypeName] = true
 			domains = append(domains, Domain{
-				Name:     td.Name,
-				Schema:   raw.Meta.Schema,
-				BaseType: td.BaseType,
-				Check:    td.Check,
-				Comment:  td.Comment,
+				Name:       td.Name,
+				Schema:     raw.Meta.Schema,
+				BaseType:   td.BaseType,
+				Check:      td.Check,
+				Comment:    td.Comment,
+				SourceFile: typeSourceFile[td.Name],
 			})
 		}
 	}
@@ -334,19 +348,20 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 func resolveViews(raw *parse.RawSchema) []View {
 	var views []View
 	for _, rv := range raw.Views {
-		v := resolveView(rv, raw.Meta.Schema)
+		v := resolveView(rv, raw.Meta.Schema, raw.SourceFile)
 		views = append(views, v)
 	}
 	return views
 }
 
 // resolveView converts a single raw view into a model View.
-func resolveView(rv parse.RawView, schemaName string) View {
+func resolveView(rv parse.RawView, schemaName string, sourceFile string) View {
 	v := View{
-		Name:      rv.Name,
-		Schema:    schemaName,
-		Query:     rv.Query,
-		DependsOn: rv.DependsOn,
+		Name:       rv.Name,
+		Schema:     schemaName,
+		SourceFile: sourceFile,
+		Query:      rv.Query,
+		DependsOn:  rv.DependsOn,
 	}
 	if rv.Comment != nil {
 		v.Comment = *rv.Comment
@@ -359,11 +374,12 @@ func resolveMaterializedViews(raw *parse.RawSchema) []MaterializedView {
 	var mvs []MaterializedView
 	for _, rmv := range raw.MaterializedViews {
 		mv := MaterializedView{
-			Name:      rmv.Name,
-			Schema:    raw.Meta.Schema,
-			Query:     rmv.Query,
-			DependsOn: rmv.DependsOn,
-			WithData:  true,
+			Name:       rmv.Name,
+			Schema:     raw.Meta.Schema,
+			SourceFile: raw.SourceFile,
+			Query:      rmv.Query,
+			DependsOn:  rmv.DependsOn,
+			WithData:   true,
 		}
 		if rmv.Comment != nil {
 			mv.Comment = *rmv.Comment
@@ -384,7 +400,7 @@ func resolveMaterializedViews(raw *parse.RawSchema) []MaterializedView {
 func resolveFunctions(raw *parse.RawSchema) []Function {
 	var funcs []Function
 	for _, rf := range raw.Functions {
-		f := resolveFunction(rf, raw.Meta.Schema)
+		f := resolveFunction(rf, raw.Meta.Schema, raw.SourceFile)
 		// Auto-populate DependsOn for LANGUAGE sql functions.
 		if len(f.DependsOn) == 0 && strings.EqualFold(f.Language, "sql") && f.Body != "" {
 			if refs, err := sqlparse.ExtractTableRefs(f.Body); err == nil && len(refs) > 0 {
@@ -397,11 +413,12 @@ func resolveFunctions(raw *parse.RawSchema) []Function {
 }
 
 // resolveFunction converts a single raw function into a model Function.
-func resolveFunction(rf parse.RawFunction, schemaName string) Function {
+func resolveFunction(rf parse.RawFunction, schemaName string, sourceFile string) Function {
 	f := Function{
-		Name:      rf.Name,
-		Schema:    schemaName,
-		DependsOn: rf.DependsOn,
+		Name:       rf.Name,
+		Schema:     schemaName,
+		SourceFile: sourceFile,
+		DependsOn:  rf.DependsOn,
 	}
 	if rf.Language != nil {
 		f.Language = *rf.Language
@@ -451,13 +468,14 @@ func resolveSequences(raw *parse.RawSchema, schema *Schema) ([]Sequence, diagnos
 
 	for _, rs := range raw.Sequences {
 		seq := Sequence{
-			Name:      rs.Name,
-			Schema:    raw.Meta.Schema,
-			Start:     rs.Start,
-			Increment: rs.Increment,
-			MinValue:  rs.MinValue,
-			MaxValue:  rs.MaxValue,
-			Cache:     rs.Cache,
+			Name:       rs.Name,
+			Schema:     raw.Meta.Schema,
+			SourceFile: raw.SourceFile,
+			Start:      rs.Start,
+			Increment:  rs.Increment,
+			MinValue:   rs.MinValue,
+			MaxValue:   rs.MaxValue,
+			Cache:      rs.Cache,
 		}
 		if rs.Cycle != nil {
 			seq.Cycle = *rs.Cycle
@@ -520,12 +538,13 @@ func resolveSequences(raw *parse.RawSchema, schema *Schema) ([]Sequence, diagnos
 }
 
 // resolveTable resolves a single raw table into a model Table.
-func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry) (*Table, diagnostic.Diagnostics) {
+func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, sourceFile string) (*Table, diagnostic.Diagnostics) {
 	var diags diagnostic.Diagnostics
 
 	t := &Table{
-		Name:   rt.Name,
-		Schema: schemaName,
+		Name:       rt.Name,
+		Schema:     schemaName,
+		SourceFile: sourceFile,
 	}
 
 	if rt.Comment != nil {

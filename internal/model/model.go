@@ -68,8 +68,9 @@ type Schema struct {
 
 // View represents a resolved view definition.
 type View struct {
-	Name      string   `json:"name"`
-	Schema    string   `json:"schema,omitempty"`
+	Name       string   `json:"name"`
+	Schema     string   `json:"schema,omitempty"`
+	SourceFile string   `json:"source_file,omitempty"`
 	Query     string   `json:"query"`
 	Comment   string   `json:"comment,omitempty"`
 	DependsOn []string `json:"depends_on,omitempty"`
@@ -77,8 +78,9 @@ type View struct {
 
 // MaterializedView represents a resolved materialized view definition.
 type MaterializedView struct {
-	Name      string  `json:"name"`
-	Schema    string  `json:"schema,omitempty"`
+	Name       string  `json:"name"`
+	Schema     string  `json:"schema,omitempty"`
+	SourceFile string  `json:"source_file,omitempty"`
 	Query     string  `json:"query"`
 	Comment   string  `json:"comment,omitempty"`
 	DependsOn []string `json:"depends_on,omitempty"`
@@ -139,6 +141,7 @@ func (s *Schema) FilterByGroups(groupNames []string) *Schema {
 type Table struct {
 	Name         string             `json:"name"`
 	Schema       string             `json:"schema"`
+	SourceFile   string             `json:"source_file,omitempty"`
 	Comment      string             `json:"comment"`
 	Columns      []Column           `json:"columns"`
 	PK           []string           `json:"pk"`
@@ -304,16 +307,18 @@ type Trigger struct {
 
 // Enum represents a resolved enum type.
 type Enum struct {
-	Schema  string   `json:"schema,omitempty"`
-	Name    string   `json:"name"`
+	Schema     string   `json:"schema,omitempty"`
+	Name       string   `json:"name"`
+	SourceFile string   `json:"source_file,omitempty"`
 	Values  []string `json:"values"`
 	Comment string   `json:"comment,omitempty"`
 }
 
 // Sequence represents a standalone PostgreSQL sequence.
 type Sequence struct {
-	Name      string `json:"name"`
-	Schema    string `json:"schema,omitempty"`
+	Name       string `json:"name"`
+	Schema     string `json:"schema,omitempty"`
+	SourceFile string `json:"source_file,omitempty"`
 	Start     *int64 `json:"start,omitempty"`
 	Increment *int64 `json:"increment,omitempty"`
 	MinValue  *int64 `json:"min_value,omitempty"`
@@ -335,6 +340,7 @@ type FunctionArg struct {
 type Function struct {
 	Name            string        `json:"name"`
 	Schema          string        `json:"schema,omitempty"`
+	SourceFile      string        `json:"source_file,omitempty"`
 	Language        string        `json:"language"`
 	ReturnType      string        `json:"return_type,omitempty"`
 	Args            []FunctionArg `json:"args,omitempty"`
@@ -353,6 +359,7 @@ type Function struct {
 type Domain struct {
 	Name        string        `json:"name"`
 	Schema      string        `json:"schema,omitempty"`
+	SourceFile  string        `json:"source_file,omitempty"`
 	BaseType    typeinfo.Type `json:"base_type"`
 	NotNull     bool   `json:"not_null,omitempty"`
 	Default     string `json:"default,omitempty"`
@@ -369,8 +376,9 @@ type CompositeField struct {
 
 // CompositeType represents a resolved PostgreSQL composite type.
 type CompositeType struct {
-	Name    string           `json:"name"`
-	Schema  string           `json:"schema,omitempty"`
+	Name       string           `json:"name"`
+	Schema     string           `json:"schema,omitempty"`
+	SourceFile string           `json:"source_file,omitempty"`
 	Fields  []CompositeField `json:"fields"`
 	Comment string           `json:"comment,omitempty"`
 }

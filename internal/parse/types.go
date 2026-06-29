@@ -13,6 +13,7 @@ type RawSchema struct {
 	Sequences         []RawSequence
 	Functions         []RawFunction
 	Groups            map[string][]string
+	SourceFile        string
 }
 
 // RawMeta holds the [meta] section values.
