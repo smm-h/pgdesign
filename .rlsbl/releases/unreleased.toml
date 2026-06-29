@@ -1,0 +1,14 @@
+# Version bump type: patch, minor, major, hotfix, or prerelease
+bump = "minor"
+# Short description of this release (required)
+description = "Source file provenance tracking and faceted Python DDL output (--split-by-file)."
+# Optional context explaining why these changes were made
+context = """
+Adds SourceFile tracking to all 8 model types, enabling per-source-file code generation. The Python DDL codegen gains a faceted output mode that splits output by DDL concern: extensions.py, types.py, tables_<source>.py (one per input TOML), and post_tables.py. Activated via --split-by-file CLI flag or split=true in pgdesign.toml output config.
+"""
+# Pre-release identifier: alpha, beta, rc, or stable
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
