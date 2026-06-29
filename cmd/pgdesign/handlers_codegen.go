@@ -18,7 +18,7 @@ func handleCodegen(kwargs map[string]interface{}) int {
 	lang := kwargs["lang"].(string)
 	mode := kwargs["mode"].(string)
 	quiet := kwargs["quiet"].(bool)
-	splitByFile := kwargs["split-by-file"].(bool)
+	splitByFile, _ := kwargs["split-by-file"].(bool)
 
 	gen, err := SelectGenerator(lang, mode)
 	if err != nil {
