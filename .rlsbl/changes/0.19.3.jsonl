@@ -1,0 +1,4 @@
+{"commits":["b66205bdc166bcd381d92531b4749c220e1d8e9f"],"user_facing":true,"description":"**Fix.** `--split-by-file` flag now works correctly \u2014 the kwargs key was using hyphens instead of underscores (strictcli normalizes flag names to underscores). Previously the flag was silently ignored.","type":"fix"}
+{"commits":["345f69cff16921067313c7d3d17c986307ecad9a"],"user_facing":true,"description":"**Improvement.** Test suite runs ~3x faster in `-short` mode by skipping WASM-dependent tests that trigger 6s parser initialization. CI still runs all tests.","type":"feature"}
+{"commits":["0336f7380615f49311d85142d39f127c74bff7d5","4d0ecd2553f7f8f410914a6d80748c03932af808","470ad04f791f82f66959a2b7ea45564e4734561a","5eb8f1ae7a77ac3e44a058a86dd88106e47ca21a"],"user_facing":false}
+{"commits":["df6f0ee45de462c1f60b8df47b260ade8a7758c4"],"user_facing":false}
