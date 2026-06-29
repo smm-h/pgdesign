@@ -18,11 +18,21 @@ func handleCodegen(kwargs map[string]interface{}) int {
 	lang := kwargs["lang"].(string)
 	mode := kwargs["mode"].(string)
 	quiet := kwargs["quiet"].(bool)
+	splitByFile := kwargs["split-by-file"].(bool)
 
 	gen, err := SelectGenerator(lang, mode)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
+	}
+
+	if splitByFile {
+		ddlGen, ok := gen.(*codegen.PythonDDLGenerator)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "error: --split-by-file is only supported for Python DDL mode (--lang python --mode ddl)\n")
+			return 1
+		}
+		ddlGen.SplitByFile = true
 	}
 
 	// MultiFileGenerator: write files into output directory.

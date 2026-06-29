@@ -172,6 +172,7 @@ func main() {
 			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
 			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toInterfaceSlice(SupportedModeNames())...)),
 			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
+			strictcli.BoolFlag("split-by-file", "Split Python DDL output into per-concern files (extensions, types, tables per source, post-tables)"),
 		),
 	)
 

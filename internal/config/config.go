@@ -89,6 +89,7 @@ type OutputConfig[P PathKind] struct {
 	Backends   []string `toml:"backends"`   // for query-layer: ["pg"], ["memory"], or both (default: both)
 	Idempotent bool     `toml:"idempotent"` // for sql: add IF NOT EXISTS
 	Comments   *bool    `toml:"comments"`   // for sql: include COMMENT ON (default true)
+	Split      bool     `toml:"split"`      // for codegen ddl python: split into per-concern files
 }
 
 // ExtensionConfig holds [[extensions]] array-of-tables entries.
@@ -176,6 +177,9 @@ func (c *Config[P]) Check() error {
 				errs = append(errs, fmt.Errorf("output.%s: language %q is not supported for mode %q (supported: %s)", name, out.Lang, out.Mode, strings.Join(supportedLangs, ", ")))
 			}
 		}
+		if out.Split && (out.Format != "codegen" || out.Mode != "ddl" || out.Lang != "python") {
+			errs = append(errs, fmt.Errorf("output.%s: split is only supported for codegen mode=ddl lang=python", name))
+		}
 	}
 
 	return errors.Join(errs...)
@@ -226,6 +230,9 @@ func decodeOutput(raw map[string]any) (map[string]OutputConfig[RelativePath], er
 		}
 		if b, ok := m["comments"].(bool); ok {
 			oc.Comments = &b
+		}
+		if b, ok := m["split"].(bool); ok {
+			oc.Split = b
 		}
 		out[name] = oc
 	}
@@ -336,6 +343,7 @@ func Resolve(raw *RawConfig, projectRoot string) (*ResolvedConfig, error) {
 				Backends:   out.Backends,
 				Idempotent: out.Idempotent,
 				Comments:   out.Comments,
+				Split:      out.Split,
 			}
 		}
 	}

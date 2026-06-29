@@ -172,6 +172,11 @@ func planCodegen(name string, schema *model.Schema, out config.OutputConfig[conf
 		qlg.Backends = out.Backends
 	}
 
+	// Configure faceted split for Python DDL generators.
+	if ddlGen, ok := gen.(*codegen.PythonDDLGenerator); ok && out.Split {
+		ddlGen.SplitByFile = true
+	}
+
 	// MultiFileGenerator: collect all files into the plan.
 	if mfg, ok := gen.(codegen.MultiFileGenerator); ok {
 		files, diags := mfg.GenerateFiles(schema)
