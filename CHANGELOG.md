@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.19.2
+
+Fix panic in Python DDL codegen when --split-by-file is not passed.
+
+### Fixes
+
+- **Fix.** `pgdesign codegen --lang python --mode ddl` no longer panics when `--split-by-file` is not passed. The nil type assertion on the flag value crashed all Python DDL codegen.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.19.1
 
 Fix SourceFile storing absolute paths, which broke CI golden tests.
@@ -9,12 +23,6 @@ Fix SourceFile storing absolute paths, which broke CI golden tests.
 ### Fixes
 
 - **Fix.** SourceFile now stores the filename only (not the absolute path), fixing golden test failures on CI where paths differ between machines.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.19.0
 

@@ -13,7 +13,7 @@ try:
 except ImportError:
     _pkg_version = None
 
-__version__ = "0.19.1"
+__version__ = "0.19.2"
 
 
 def _get_version():
