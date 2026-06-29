@@ -19,6 +19,7 @@
     {
       "name": "documents",
       "schema": "secure",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/rls_policies.toml",
       "comment": "User documents with row-level security",
       "columns": [
         {

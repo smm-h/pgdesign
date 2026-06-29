@@ -8,6 +8,7 @@
     {
       "schema": "app",
       "name": "priority",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/comprehensive.toml",
       "values": [
         "low",
         "medium",
@@ -32,6 +33,7 @@
     {
       "name": "projects",
       "schema": "app",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/comprehensive.toml",
       "comment": "Top-level projects with row-level security.",
       "columns": [
         {
@@ -129,6 +131,7 @@
     {
       "name": "tasks",
       "schema": "app",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/comprehensive.toml",
       "comment": "Individual tasks within a project.",
       "columns": [
         {
@@ -271,6 +274,7 @@
     {
       "name": "audit_log",
       "schema": "app",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/comprehensive.toml",
       "comment": "Immutable audit trail of project actions.",
       "columns": [
         {
@@ -382,6 +386,7 @@
     {
       "name": "events",
       "schema": "app",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/comprehensive.toml",
       "comment": "Time-series project events, partitioned by quarter.",
       "columns": [
         {
@@ -501,6 +506,7 @@
     {
       "name": "comments",
       "schema": "app",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/comprehensive.toml",
       "comment": "Comments on tasks with tagging support.",
       "columns": [
         {

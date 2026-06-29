@@ -7,6 +7,7 @@
     {
       "schema": "game",
       "name": "currency_transaction_type",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "earn",
         "spend",
@@ -19,6 +20,7 @@
     {
       "schema": "game",
       "name": "experiment_status",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "draft",
         "active",
@@ -30,6 +32,7 @@
     {
       "schema": "game",
       "name": "friendship_status",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "pending",
         "accepted",
@@ -40,6 +43,7 @@
     {
       "schema": "game",
       "name": "generation_status",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "pending",
         "running",
@@ -51,6 +55,7 @@
     {
       "schema": "game",
       "name": "moderation_action_type",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "warn",
         "mute",
@@ -63,6 +68,7 @@
     {
       "schema": "game",
       "name": "notification_type",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "friend_request",
         "game_like",
@@ -75,6 +81,7 @@
     {
       "schema": "game",
       "name": "report_status",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "open",
         "reviewing",
@@ -86,6 +93,7 @@
     {
       "schema": "game",
       "name": "report_target_type",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "player",
         "game",
@@ -97,6 +105,7 @@
     {
       "schema": "game",
       "name": "server_status",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "starting",
         "ready",
@@ -108,6 +117,7 @@
     {
       "schema": "game",
       "name": "server_type",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "beta",
         "stable"
@@ -117,6 +127,7 @@
     {
       "schema": "game",
       "name": "session_role",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "host",
         "player",
@@ -127,6 +138,7 @@
     {
       "schema": "game",
       "name": "session_status",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "values": [
         "waiting",
         "active",
@@ -139,6 +151,7 @@
     {
       "name": "players",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Game-layer player identity. Links to auth.users via auth_id; anonymous players have auth_id NULL and is_anonymous true.",
       "columns": [
         {
@@ -284,6 +297,7 @@
     {
       "name": "server_registry",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Game server fleet registry. Servers register on startup and heartbeat periodically. Used for room routing and load balancing.",
       "columns": [
         {
@@ -411,6 +425,7 @@
     {
       "name": "experiment",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "A/B experiments with variant definitions and allocation percentage.",
       "columns": [
         {
@@ -502,6 +517,7 @@
     {
       "name": "achievement_def",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Achievement templates with criteria. Defines what achievements exist.",
       "columns": [
         {
@@ -582,6 +598,7 @@
     {
       "name": "friendships",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Bidirectional friend relationships. player_a \u003c player_b enforces canonical ordering to prevent duplicates.",
       "columns": [
         {
@@ -736,6 +753,7 @@
     {
       "name": "game_catalog",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Game metadata registry. Game bundles live on filesystem; this stores discovery metadata only.",
       "columns": [
         {
@@ -886,6 +904,7 @@
     {
       "name": "chat_messages",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Player chat messages, partitioned by month. Retention: 90 days (drop old partitions via cron).",
       "columns": [
         {
@@ -1010,6 +1029,7 @@
     {
       "name": "player_privacy_settings",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Per-player privacy controls. Created at registration with all social features disabled (privacy-by-default).",
       "columns": [
         {
@@ -1107,6 +1127,7 @@
     {
       "name": "player_age_verification",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Age verification and parental consent state. is_minor is true when age \u003c 16. Minors require parental consent before enabling social features.",
       "columns": [
         {
@@ -1249,6 +1270,7 @@
     {
       "name": "player_profile",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Extended player profile with bio, avatar, and progression data.",
       "columns": [
         {
@@ -1343,6 +1365,7 @@
     {
       "name": "player_setting",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Key-value player settings. Composite PK on (player_id, key).",
       "columns": [
         {
@@ -1409,6 +1432,7 @@
     {
       "name": "follow",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Player-to-player follows. Composite PK prevents duplicate follows.",
       "columns": [
         {
@@ -1501,6 +1525,7 @@
     {
       "name": "report",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Player-submitted reports against other players, games, comments, or chat messages.",
       "columns": [
         {
@@ -1621,6 +1646,7 @@
     {
       "name": "currency_balance",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Current virtual currency balance per player. Single row per player.",
       "columns": [
         {
@@ -1688,6 +1714,7 @@
     {
       "name": "currency_transaction",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Immutable ledger of virtual currency transactions.",
       "columns": [
         {
@@ -1812,6 +1839,7 @@
     {
       "name": "notification",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Player notifications for friend requests, likes, achievements, moderation, and system events.",
       "columns": [
         {
@@ -1936,6 +1964,7 @@
     {
       "name": "api_keys",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "API keys for AI agent and service authentication. Keys are hashed; the plaintext is shown only once at creation.",
       "columns": [
         {
@@ -2056,6 +2085,7 @@
     {
       "name": "experiment_assignment",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Tracks which variant a player is assigned to in an experiment.",
       "columns": [
         {
@@ -2153,6 +2183,7 @@
     {
       "name": "platform_leaderboards",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Cross-game leaderboard entries. Each row is a score submission for a specific game.",
       "columns": [
         {
@@ -2283,6 +2314,7 @@
     {
       "name": "game_version",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Versioned game bundles. Each game can have multiple published versions.",
       "columns": [
         {
@@ -2388,6 +2420,7 @@
     {
       "name": "game_fork",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Tracks when a game is forked (remixed) from another. Links parent and child games.",
       "columns": [
         {
@@ -2513,6 +2546,7 @@
     {
       "name": "game_like",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Player likes on games. Composite PK prevents duplicate likes.",
       "columns": [
         {
@@ -2600,6 +2634,7 @@
     {
       "name": "game_comment",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Player comments on games.",
       "columns": [
         {
@@ -2705,6 +2740,7 @@
     {
       "name": "generation_job",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "AI game generation jobs. Tracks prompt, model, cost, and progress.",
       "columns": [
         {
@@ -2877,6 +2913,7 @@
     {
       "name": "session",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Multiplayer game sessions (lobbies). Tracks room code, player cap, and lifecycle.",
       "columns": [
         {
@@ -3055,6 +3092,7 @@
     {
       "name": "achievement",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Earned achievements per player. Composite PK prevents duplicate awards.",
       "columns": [
         {
@@ -3174,6 +3212,7 @@
     {
       "name": "moderation_action",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Actions taken by moderators in response to reports.",
       "columns": [
         {
@@ -3258,6 +3297,7 @@
     {
       "name": "game_play",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Individual play sessions. Tracks when a player plays a game, duration, and score.",
       "columns": [
         {
@@ -3414,6 +3454,7 @@
     {
       "name": "session_participant",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Players in a game session with their role.",
       "columns": [
         {
@@ -3511,6 +3552,7 @@
     {
       "name": "action_log",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Append-only game action log for replay and reconnection. Each action has a monotonically increasing sequence number within its session.",
       "columns": [
         {
@@ -3627,6 +3669,7 @@
     {
       "name": "state_snapshot",
       "schema": "game",
+      "source_file": "/home/m/Projects/pgdesign/testdata/schemas/gamehome_game.toml",
       "comment": "Periodic game state snapshots for fast reconnection. Load latest snapshot, replay actions from its sequence_num forward.",
       "columns": [
         {
