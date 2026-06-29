@@ -1,0 +1,15 @@
+[meta]
+version = 16
+schema = "public"
+
+[tables.tasks]
+comment = "Dispatch tasks"
+
+[tables.tasks.columns.id]
+type = "id"
+
+[tables.tasks.columns.status]
+type = "trace_status"
+
+[tables.tasks.columns.description]
+type = "short_text"

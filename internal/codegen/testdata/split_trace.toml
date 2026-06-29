@@ -1,0 +1,37 @@
+[meta]
+version = 16
+schema = "public"
+
+[types.trace_status]
+kind = "enum"
+values = ["pending", "active", "done"]
+
+[tables.spans]
+comment = "Trace spans"
+
+[tables.spans.columns.id]
+type = "id"
+
+[tables.spans.columns.name]
+type = "short_text"
+
+[tables.spans.columns.status]
+type = "trace_status"
+
+[tables.events]
+comment = "Trace events"
+
+[tables.events.columns.id]
+type = "id"
+
+[tables.events.columns.span_id]
+type = "ref"
+
+[tables.events.columns.message]
+type = "short_text"
+
+[tables.events.fks.fk_span]
+columns = ["span_id"]
+ref_table = "spans"
+ref_columns = ["id"]
+on_delete = "CASCADE"

@@ -1,6 +1,8 @@
 package model
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -1569,5 +1571,116 @@ func TestBuild_ExtendsEnumDedupValues(t *testing.T) {
 		if ext.Values[i] != v {
 			t.Errorf("ext_status values[%d] = %q, want %q", i, ext.Values[i], v)
 		}
+	}
+}
+
+func TestBuildMulti_SourceFile(t *testing.T) {
+	tracePath := filepath.Join("..", "codegen", "testdata", "split_trace.toml")
+	dispatchPath := filepath.Join("..", "codegen", "testdata", "split_dispatch.toml")
+
+	rawTrace, diags := parse.File(tracePath)
+	if len(diags) > 0 {
+		for _, d := range diags {
+			if d.Severity == diagnostic.Error {
+				t.Fatalf("parse error on split_trace.toml: %v", diags)
+			}
+		}
+	}
+	if rawTrace == nil {
+		t.Fatal("rawTrace is nil")
+	}
+
+	rawDispatch, diags := parse.File(dispatchPath)
+	if len(diags) > 0 {
+		for _, d := range diags {
+			if d.Severity == diagnostic.Error {
+				t.Fatalf("parse error on split_dispatch.toml: %v", diags)
+			}
+		}
+	}
+	if rawDispatch == nil {
+		t.Fatal("rawDispatch is nil")
+	}
+
+	// Verify parse-level SourceFile is set.
+	if !strings.Contains(rawTrace.SourceFile, "split_trace.toml") {
+		t.Errorf("rawTrace.SourceFile = %q, want to contain %q", rawTrace.SourceFile, "split_trace.toml")
+	}
+	if !strings.Contains(rawDispatch.SourceFile, "split_dispatch.toml") {
+		t.Errorf("rawDispatch.SourceFile = %q, want to contain %q", rawDispatch.SourceFile, "split_dispatch.toml")
+	}
+
+	// Register the trace_status enum type in the registry so columns can resolve.
+	reg := semtype.NewBuiltinRegistry()
+	loadDiags := reg.LoadUserTypes([]semtype.UserTypeDef{
+		{
+			Name:   "trace_status",
+			Kind:   "enum",
+			Values: []string{"pending", "active", "done"},
+		},
+	})
+	if loadDiags.HasErrors() {
+		t.Fatalf("failed to load user types: %v", loadDiags)
+	}
+
+	schema, buildDiags := BuildMulti([]*parse.RawSchema{rawTrace, rawDispatch}, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+
+	// Verify tables from trace have SourceFile containing "split_trace.toml".
+	for _, tbl := range schema.Tables {
+		switch tbl.Name {
+		case "spans", "events":
+			if !strings.Contains(tbl.SourceFile, "split_trace.toml") {
+				t.Errorf("table %q SourceFile = %q, want to contain %q", tbl.Name, tbl.SourceFile, "split_trace.toml")
+			}
+		case "tasks":
+			if !strings.Contains(tbl.SourceFile, "split_dispatch.toml") {
+				t.Errorf("table %q SourceFile = %q, want to contain %q", tbl.Name, tbl.SourceFile, "split_dispatch.toml")
+			}
+		default:
+			t.Errorf("unexpected table %q", tbl.Name)
+		}
+	}
+
+	// Verify SourceFile survives topo sort (tables are reordered but retain SourceFile).
+	// spans must come before events (FK dependency), but both keep their SourceFile.
+	foundSpans := false
+	foundEvents := false
+	for i, tbl := range schema.Tables {
+		if tbl.Name == "spans" {
+			foundSpans = true
+			if tbl.SourceFile == "" {
+				t.Errorf("table spans at index %d lost SourceFile after topo sort", i)
+			}
+		}
+		if tbl.Name == "events" {
+			foundEvents = true
+			if tbl.SourceFile == "" {
+				t.Errorf("table events at index %d lost SourceFile after topo sort", i)
+			}
+		}
+	}
+	if !foundSpans {
+		t.Error("table spans not found in schema.Tables")
+	}
+	if !foundEvents {
+		t.Error("table events not found in schema.Tables")
+	}
+
+	// Verify the trace_status Enum has SourceFile containing "split_trace.toml".
+	foundEnum := false
+	for _, e := range schema.Enums {
+		if e.Name == "trace_status" {
+			foundEnum = true
+			if !strings.Contains(e.SourceFile, "split_trace.toml") {
+				t.Errorf("enum trace_status SourceFile = %q, want to contain %q", e.SourceFile, "split_trace.toml")
+			}
+			break
+		}
+	}
+	if !foundEnum {
+		t.Error("enum trace_status not found in schema.Enums")
 	}
 }
