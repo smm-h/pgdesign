@@ -934,6 +934,9 @@ func TestBuildFunctions(t *testing.T) {
 }
 
 func TestBuild_FunctionAutoDepends_SQL(t *testing.T) {
+	if testing.Short() {
+		t.Skip("SQL function dependency detection requires WASM parser")
+	}
 	lang := "sql"
 	returns := "bigint"
 	body := "SELECT count(*) FROM users WHERE active = true"

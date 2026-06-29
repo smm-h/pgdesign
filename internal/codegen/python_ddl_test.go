@@ -217,6 +217,9 @@ func TestPythonDDL_AllKindsPresent(t *testing.T) {
 }
 
 func TestPythonDDL_StatementCountMatchesSQL(t *testing.T) {
+	if testing.Short() {
+		t.Skip("requires WASM parser")
+	}
 	schema := loadTestSchema(t)
 
 	// Generate SQL with comments (to match DDL generator which always emits comments).

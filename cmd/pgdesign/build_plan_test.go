@@ -28,6 +28,9 @@ func minimalSchema() *model.Schema {
 }
 
 func TestPlan_SQLOutput(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Plan() generates .sqlsplit via WASM parser")
+	}
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -77,6 +80,9 @@ func TestPlan_SQLOutput(t *testing.T) {
 }
 
 func TestPlan_IdempotentSQL(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Plan() generates .sqlsplit via WASM parser")
+	}
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -157,6 +163,9 @@ func TestPlan_SVGExcluded(t *testing.T) {
 }
 
 func TestPlan_GroupFiltering(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Plan() generates .sqlsplit via WASM parser")
+	}
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
