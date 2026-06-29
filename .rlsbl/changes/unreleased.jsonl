@@ -1,0 +1,1 @@
+{"commits":["b66205bdc166bcd381d92531b4749c220e1d8e9f"],"user_facing":true,"description":"**Fix.** `--split-by-file` flag now works correctly \u2014 the kwargs key was using hyphens instead of underscores (strictcli normalizes flag names to underscores). Previously the flag was silently ignored.","type":"fix"}
