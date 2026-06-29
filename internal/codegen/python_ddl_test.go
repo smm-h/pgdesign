@@ -551,3 +551,144 @@ func TestPythonDDL_MultiFileGenerator_Interface(t *testing.T) {
 	// Verify PythonDDLGenerator satisfies MultiFileGenerator at compile time.
 	var _ MultiFileGenerator = &PythonDDLGenerator{}
 }
+
+// -- Faceted output tests --
+
+// loadSplitTestSchema parses both split_trace.toml and split_dispatch.toml,
+// registers user-defined types, and builds a multi-file schema.
+func loadSplitTestSchema(t *testing.T) *model.Schema {
+	t.Helper()
+	tracePath := filepath.Join("testdata", "split_trace.toml")
+	dispatchPath := filepath.Join("testdata", "split_dispatch.toml")
+	raws, diags := parse.Files([]string{tracePath, dispatchPath})
+	for _, d := range diags {
+		if d.Severity == 0 {
+			t.Fatalf("parse error: %s", d.Message)
+		}
+	}
+	if len(raws) != 2 {
+		t.Fatalf("expected 2 parsed schemas, got %d", len(raws))
+	}
+	reg := semtype.NewBuiltinRegistry()
+	for _, raw := range raws {
+		userTypes := parse.CollectUserTypes(raw)
+		if len(userTypes) > 0 {
+			loadDiags := reg.LoadUserTypes(userTypes)
+			if loadDiags.HasErrors() {
+				t.Fatalf("LoadUserTypes errors: %v", loadDiags)
+			}
+		}
+	}
+	schema, buildDiags := model.BuildMulti(raws, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("build errors: %v", buildDiags)
+	}
+	return schema
+}
+
+func TestPythonDDL_FacetedOutput(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitByFile: true}
+	files, diags := gen.GenerateFiles(schema)
+	for _, d := range diags {
+		if d.Severity == 0 {
+			t.Fatalf("generation error: %s", d.Message)
+		}
+	}
+
+	expectedFiles := []string{"extensions.py", "types.py", "tables_split_trace.py", "tables_split_dispatch.py"}
+	for _, name := range expectedFiles {
+		if _, ok := files[name]; !ok {
+			t.Errorf("missing expected file %q in faceted output", name)
+		}
+	}
+
+	if _, ok := files["schema_executor.py"]; ok {
+		t.Error("schema_executor.py should not be present in faceted output")
+	}
+}
+
+func TestPythonDDL_FacetedTypes(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitByFile: true}
+	files, _ := gen.GenerateFiles(schema)
+
+	typesContent := string(files["types.py"])
+	if !strings.Contains(typesContent, "trace_status") {
+		t.Error("types.py should contain the trace_status enum")
+	}
+	if strings.Contains(typesContent, "CREATE TABLE") {
+		t.Error("types.py should not contain CREATE TABLE statements")
+	}
+}
+
+func TestPythonDDL_FacetedTableSeparation(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitByFile: true}
+	files, _ := gen.GenerateFiles(schema)
+
+	traceContent := string(files["tables_split_trace.py"])
+	dispatchContent := string(files["tables_split_dispatch.py"])
+
+	// Trace file should contain spans and events tables.
+	if !strings.Contains(traceContent, "spans") {
+		t.Error("tables_split_trace.py should contain spans table")
+	}
+	if !strings.Contains(traceContent, "events") {
+		t.Error("tables_split_trace.py should contain events table")
+	}
+
+	// Dispatch file should contain tasks table.
+	if !strings.Contains(dispatchContent, "tasks") {
+		t.Error("tables_split_dispatch.py should contain tasks table")
+	}
+
+	// Cross-file isolation.
+	if strings.Contains(traceContent, "tasks") {
+		t.Error("tables_split_trace.py should not contain tasks table")
+	}
+	if strings.Contains(dispatchContent, "spans") {
+		t.Error("tables_split_dispatch.py should not contain spans table")
+	}
+}
+
+func TestPythonDDL_FacetedEmptyPostTables(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitByFile: true}
+	files, _ := gen.GenerateFiles(schema)
+
+	if _, ok := files["post_tables.py"]; ok {
+		t.Error("post_tables.py should not be present when there are no views/functions")
+	}
+}
+
+func TestPythonDDL_FacetedNoExecutor(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitByFile: true}
+	files, _ := gen.GenerateFiles(schema)
+
+	if _, ok := files["schema_executor.py"]; ok {
+		t.Error("schema_executor.py should not be present in faceted output")
+	}
+}
+
+func TestPythonDDL_FacetedTableNames(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitByFile: true}
+	files, _ := gen.GenerateFiles(schema)
+
+	// Each tables_*.py file should contain TABLE_NAMES.
+	for name, content := range files {
+		if strings.HasPrefix(name, "tables_") {
+			if !strings.Contains(string(content), "TABLE_NAMES") {
+				t.Errorf("%s should contain TABLE_NAMES", name)
+			}
+		}
+	}
+
+	// types.py should NOT contain TABLE_NAMES.
+	typesContent := string(files["types.py"])
+	if strings.Contains(typesContent, "TABLE_NAMES") {
+		t.Error("types.py should not contain TABLE_NAMES")
+	}
+}
