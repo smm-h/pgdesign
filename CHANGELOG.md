@@ -2,6 +2,28 @@
 
 # Changelog
 
+## 0.19.0
+
+Source file provenance tracking and faceted Python DDL output (--split-by-file).
+
+<details>
+<summary>Context</summary>
+
+Adds SourceFile tracking to all 8 model types, enabling per-source-file code generation. The Python DDL codegen gains a faceted output mode that splits output by DDL concern: extensions.py, types.py, tables_<source>.py (one per input TOML), and post_tables.py. Activated via --split-by-file CLI flag or split=true in pgdesign.toml output config.
+
+</details>
+
+### Features
+
+- **New feature.** All schema objects (tables, views, enums, domains, composite types, sequences, functions, materialized views) now track which source TOML file defined them via a `SourceFile` field, preserved through multi-file builds and topo sort.
+- **New feature.** Python DDL codegen supports faceted output via `--split-by-file` flag or `split = true` in pgdesign.toml. Produces per-concern files: `extensions.py`, `types.py`, `tables_<source>.py` (one per input TOML), and `post_tables.py` — instead of a single monolithic file.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.18.1
 
 ILIKE constraint codegen fix, splitfmt hardening, transactional enum additions on PG 12+, and Plan unit tests.
@@ -14,12 +36,6 @@ ILIKE constraint codegen fix, splitfmt hardening, transactional enum additions o
 
 - **Fix.** `splitfmt.Decode` now caps pre-allocation to prevent OOM on malformed input and rejects trailing bytes after valid content.
 - **Fix.** Constraint codegen now emits case-insensitive matching for `ILIKE` CHECK constraints: Go/Java use `(?i)` regex prefix, TypeScript uses `/regex/i` flag, Python uses `re.IGNORECASE`, Kotlin uses `RegexOption.IGNORE_CASE`. Zig skips ILIKE patterns with a comment (locale-aware folding unavailable).
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.18.0
 
