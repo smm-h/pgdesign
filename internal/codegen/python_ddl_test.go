@@ -62,7 +62,7 @@ func TestPythonDDL_TupleCount(t *testing.T) {
 	gen := &PythonDDLGenerator{}
 	out, _ := gen.Generate(schema)
 
-	// Count tuples: lines matching the tuple pattern inside STATEMENTS.
+	// Count DDLStmt entries: lines matching DDLStmt( inside STATEMENTS.
 	output := string(out)
 	lines := strings.Split(output, "\n")
 	tupleCount := 0
@@ -76,7 +76,7 @@ func TestPythonDDL_TupleCount(t *testing.T) {
 		if inStatements && trimmed == "]" {
 			break
 		}
-		if inStatements && strings.HasPrefix(trimmed, "(") {
+		if inStatements && strings.HasPrefix(trimmed, "DDLStmt(") {
 			tupleCount++
 		}
 	}
@@ -94,7 +94,9 @@ func TestPythonDDL_PhaseOrdering(t *testing.T) {
 	gen := &PythonDDLGenerator{}
 	out, _ := gen.Generate(schema)
 
-	// Extract phase numbers from tuples. Each tuple ends with ", <phase>),".
+	// Extract phase numbers from DDLStmt entries.
+	// Format: DDLStmt(..., <phase>, True/False),
+	// The phase is the second-to-last field before the closing paren.
 	output := string(out)
 	lines := strings.Split(output, "\n")
 	var phases []int
@@ -108,34 +110,37 @@ func TestPythonDDL_PhaseOrdering(t *testing.T) {
 		if inStatements && trimmed == "]" {
 			break
 		}
-		if !inStatements {
+		if !inStatements || !strings.HasPrefix(trimmed, "DDLStmt(") {
 			continue
 		}
-		// Find the last number before the closing "),"
-		// Tuples end with ", <phase>),"
-		idx := strings.LastIndex(trimmed, "),")
-		if idx < 0 {
-			// Handle last tuple without trailing comma
-			idx = strings.LastIndex(trimmed, ")")
+		// Find ", <phase>, True)," or ", <phase>, False),"
+		// Look for the pattern: , <digits>, True) or , <digits>, False)
+		for _, boolStr := range []string{", True),", ", True)", ", False),", ", False)"} {
+			idx := strings.LastIndex(trimmed, boolStr)
+			if idx < 0 {
+				continue
+			}
+			// Walk backward from idx to find ", <phase>"
+			before := trimmed[:idx]
+			lastComma := strings.LastIndex(before, ", ")
+			if lastComma < 0 {
+				continue
+			}
+			phaseStr := before[lastComma+2:]
+			phase := 0
+			valid := true
+			for _, ch := range phaseStr {
+				if ch < '0' || ch > '9' {
+					valid = false
+					break
+				}
+				phase = phase*10 + int(ch-'0')
+			}
+			if valid && len(phaseStr) > 0 {
+				phases = append(phases, phase)
+			}
+			break
 		}
-		if idx < 0 {
-			continue
-		}
-		// Walk backward to find the phase integer
-		end := idx
-		start := end - 1
-		for start >= 0 && trimmed[start] >= '0' && trimmed[start] <= '9' {
-			start--
-		}
-		if start >= end-1 {
-			continue
-		}
-		phaseStr := trimmed[start+1 : end]
-		phase := 0
-		for _, ch := range phaseStr {
-			phase = phase*10 + int(ch-'0')
-		}
-		phases = append(phases, phase)
 	}
 
 	if len(phases) == 0 {
@@ -255,7 +260,7 @@ func TestPythonDDL_StatementCountMatchesSQL(t *testing.T) {
 		if inStatements && trimmed == "]" {
 			break
 		}
-		if inStatements && strings.HasPrefix(trimmed, "(") {
+		if inStatements && strings.HasPrefix(trimmed, "DDLStmt(") {
 			tupleCount++
 		}
 	}
@@ -279,8 +284,11 @@ func TestPythonDDL_Header(t *testing.T) {
 	if !strings.Contains(output, "from typing import Final") {
 		t.Error("missing typing import")
 	}
-	if !strings.Contains(output, "STATEMENTS: Final[list[tuple[str, str, str | None, int]]]") {
+	if !strings.Contains(output, "STATEMENTS: Final[list[DDLStmt]]") {
 		t.Error("missing STATEMENTS type annotation")
+	}
+	if !strings.Contains(output, `DDLStmt = namedtuple("DDLStmt"`) {
+		t.Error("missing DDLStmt namedtuple definition")
 	}
 }
 
@@ -293,7 +301,7 @@ func TestPythonDDL_EmptySchema(t *testing.T) {
 	}
 	output := string(out)
 
-	if !strings.Contains(output, "STATEMENTS: Final[list[tuple[str, str, str | None, int]]] = [\n]") {
+	if !strings.Contains(output, "STATEMENTS: Final[list[DDLStmt]] = [\n]") {
 		t.Error("empty schema should produce empty STATEMENTS list")
 	}
 	if !strings.Contains(output, "TABLE_NAMES: Final[tuple[str, ...]] = ()") {
@@ -599,15 +607,11 @@ func TestPythonDDL_FacetedOutput(t *testing.T) {
 		}
 	}
 
-	expectedFiles := []string{"extensions.py", "types.py", "tables_split_trace.py", "tables_split_dispatch.py"}
+	expectedFiles := []string{"extensions.py", "types.py", "tables_split_trace.py", "tables_split_dispatch.py", "schema_executor.py"}
 	for _, name := range expectedFiles {
 		if _, ok := files[name]; !ok {
 			t.Errorf("missing expected file %q in faceted output", name)
 		}
-	}
-
-	if _, ok := files["schema_executor.py"]; ok {
-		t.Error("schema_executor.py should not be present in faceted output")
 	}
 }
 
@@ -665,13 +669,113 @@ func TestPythonDDL_FacetedEmptyPostTables(t *testing.T) {
 	}
 }
 
-func TestPythonDDL_FacetedNoExecutor(t *testing.T) {
+func TestPythonDDL_FacetedExecutor(t *testing.T) {
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
 
-	if _, ok := files["schema_executor.py"]; ok {
-		t.Error("schema_executor.py should not be present in faceted output")
+	executor, ok := files["schema_executor.py"]
+	if !ok {
+		t.Fatal("schema_executor.py should be present in faceted output")
+	}
+	content := string(executor)
+
+	// Should import STATEMENTS from faceted modules.
+	if !strings.Contains(content, "from .extensions import STATEMENTS as _ext_stmts") {
+		t.Error("executor should import from extensions module")
+	}
+	if !strings.Contains(content, "from .types import STATEMENTS as _types_stmts") {
+		t.Error("executor should import from types module")
+	}
+	if !strings.Contains(content, "from .tables_split_trace import STATEMENTS as _tables_split_trace_stmts") {
+		t.Error("executor should import from tables_split_trace module")
+	}
+	if !strings.Contains(content, "from .tables_split_dispatch import STATEMENTS as _tables_split_dispatch_stmts") {
+		t.Error("executor should import from tables_split_dispatch module")
+	}
+
+	// Should concatenate all STATEMENTS.
+	if !strings.Contains(content, "_ALL_STMTS = ") {
+		t.Error("executor should concatenate all STATEMENTS into _ALL_STMTS")
+	}
+
+	// Should have the executor API.
+	if !strings.Contains(content, "async def execute(") {
+		t.Error("executor should have execute function")
+	}
+	if !strings.Contains(content, "async def verify(") {
+		t.Error("executor should have verify function")
+	}
+	if !strings.Contains(content, "async def create_schema(") {
+		t.Error("executor should have create_schema function")
+	}
+	if !strings.Contains(content, "async def ensure_schema(") {
+		t.Error("executor should have ensure_schema function")
+	}
+
+	// Should have SECTIONS.
+	if !strings.Contains(content, "SECTIONS: list[Section] = [") {
+		t.Error("executor should have SECTIONS list")
+	}
+}
+
+func TestPythonDDL_FacetedDDLStmt(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
+	files, _ := gen.GenerateFiles(schema)
+
+	// All faceted data files should use DDLStmt namedtuple.
+	for name, content := range files {
+		if name == "schema_executor.py" {
+			continue
+		}
+		s := string(content)
+		if !strings.Contains(s, `DDLStmt = namedtuple("DDLStmt"`) {
+			t.Errorf("%s should contain DDLStmt namedtuple definition", name)
+		}
+		if !strings.Contains(s, "STATEMENTS: Final[list[DDLStmt]]") {
+			t.Errorf("%s should use DDLStmt type annotation", name)
+		}
+		if !strings.Contains(s, "DDLStmt(") {
+			t.Errorf("%s should contain DDLStmt( entries", name)
+		}
+	}
+}
+
+func TestPythonDDL_NonFacetedDDLStmt(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	out, _ := gen.Generate(schema)
+	output := string(out)
+
+	if !strings.Contains(output, `DDLStmt = namedtuple("DDLStmt"`) {
+		t.Error("non-faceted output should contain DDLStmt namedtuple definition")
+	}
+	if !strings.Contains(output, "STATEMENTS: Final[list[DDLStmt]]") {
+		t.Error("non-faceted output should use DDLStmt type annotation")
+	}
+	if !strings.Contains(output, "DDLStmt(") {
+		t.Error("non-faceted output should contain DDLStmt( entries")
+	}
+	// Should NOT contain old 4-tuple format.
+	lines := strings.Split(output, "\n")
+	inStatements := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "STATEMENTS:") {
+			inStatements = true
+			continue
+		}
+		if inStatements && trimmed == "]" {
+			break
+		}
+		if inStatements && strings.HasPrefix(trimmed, "(") && !strings.HasPrefix(trimmed, "(\"") {
+			// Allow multi-line continuation but not raw tuples.
+			continue
+		}
+		if inStatements && strings.HasPrefix(trimmed, "(\"") {
+			t.Errorf("found raw tuple instead of DDLStmt: %s", trimmed[:min(60, len(trimmed))])
+		}
 	}
 }
 

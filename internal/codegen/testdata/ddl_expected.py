@@ -2,32 +2,85 @@
 
 from typing import Final
 
-STATEMENTS: Final[list[tuple[str, str, str | None, int]]] = [
-    ("CREATE SCHEMA shop;", "schema", None, 1),
-    ("CREATE EXTENSION pgcrypto;", "extension", None, 2),
-    ("CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);", "domain", None, 3),
-    ("CREATE DOMAIN shop.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\\.[^@]+$');", "domain", None, 3),
-    ("""CREATE TABLE shop.customers (
+from collections import namedtuple
+
+DDLStmt = namedtuple("DDLStmt", ["sql", "idempotent_sql", "kind", "name", "table", "phase", "transactional"])
+
+STATEMENTS: Final[list[DDLStmt]] = [
+    DDLStmt("CREATE SCHEMA shop;", "CREATE SCHEMA IF NOT EXISTS shop;", "schema", "shop", None, 1, True),
+    DDLStmt("CREATE EXTENSION pgcrypto;", "CREATE EXTENSION IF NOT EXISTS pgcrypto;", "extension", "pgcrypto", None, 2, True),
+    DDLStmt("CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);", """DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = 'short_text' AND n.nspname = 'shop' AND t.typtype = 'd') THEN
+    EXECUTE 'CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);';
+  END IF;
+END $$;""", "domain", "short_text", None, 3, True),
+    DDLStmt("CREATE DOMAIN shop.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\\.[^@]+$');", """DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = 'email' AND n.nspname = 'shop' AND t.typtype = 'd') THEN
+    EXECUTE 'CREATE DOMAIN shop.email AS text CHECK (VALUE ~ ''^[^@]+@[^@]+\\.[^@]+$'');';
+  END IF;
+END $$;""", "domain", "email", None, 3, True),
+    DDLStmt("""CREATE TABLE shop.customers (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     name short_text NOT NULL,
     email email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_customers PRIMARY KEY (id)
-);""", "table", "customers", 4),
-    ("""CREATE TABLE shop.orders (
+);""", """CREATE TABLE IF NOT EXISTS shop.customers (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    name short_text NOT NULL,
+    email email NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT pk_customers PRIMARY KEY (id)
+);""", "table", "customers", "customers", 4, True),
+    DDLStmt("""CREATE TABLE shop.orders (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     customer_id uuid NOT NULL,
     total int8 NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_orders PRIMARY KEY (id)
-);""", "table", "orders", 4),
-    ("ALTER TABLE shop.orders ADD CONSTRAINT fk_orders_customers FOREIGN KEY (customer_id) REFERENCES shop.customers (id) ON DELETE CASCADE;", "fk", "orders", 6),
-    ("ALTER TABLE shop.customers ADD CONSTRAINT uq_customers_email UNIQUE (email);", "unique", "customers", 7),
-    ("ALTER TABLE shop.orders ADD CONSTRAINT ck_orders_positive_total CHECK (total >= 0);", "check", "orders", 8),
-    ("CREATE INDEX idx_orders_customer ON shop.orders (customer_id);", "index", "orders", 9),
-    ("COMMENT ON TABLE shop.customers IS 'Registered customers';", "comment", "customers", 10),
-    ("COMMENT ON COLUMN shop.customers.name IS 'Full name';", "comment", "customers", 10),
-    ("COMMENT ON TABLE shop.orders IS 'Customer orders';", "comment", "orders", 10),
+);""", """CREATE TABLE IF NOT EXISTS shop.orders (
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    customer_id uuid NOT NULL,
+    total int8 NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT pk_orders PRIMARY KEY (id)
+);""", "table", "orders", "orders", 4, True),
+    DDLStmt("ALTER TABLE shop.orders ADD CONSTRAINT fk_orders_customers FOREIGN KEY (customer_id) REFERENCES shop.customers (id) ON DELETE CASCADE;", """DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'fk_orders_customers'
+    AND conrelid = 'shop.orders'::regclass
+  ) THEN
+    ALTER TABLE shop.orders ADD CONSTRAINT fk_orders_customers FOREIGN KEY (customer_id) REFERENCES shop.customers (id) ON DELETE CASCADE;
+  END IF;
+END $$;""", "fk", "fk_orders_customers", "orders", 6, True),
+    DDLStmt("ALTER TABLE shop.customers ADD CONSTRAINT uq_customers_email UNIQUE (email);", """DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'uq_customers_email'
+    AND conrelid = 'shop.customers'::regclass
+  ) THEN
+    ALTER TABLE shop.customers ADD CONSTRAINT uq_customers_email UNIQUE (email);
+  END IF;
+END $$;""", "unique", "uq_customers_email", "customers", 7, True),
+    DDLStmt("ALTER TABLE shop.orders ADD CONSTRAINT ck_orders_positive_total CHECK (total >= 0);", """DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'ck_orders_positive_total'
+    AND conrelid = 'shop.orders'::regclass
+  ) THEN
+    ALTER TABLE shop.orders ADD CONSTRAINT ck_orders_positive_total CHECK (total >= 0);
+  END IF;
+END $$;""", "check", "ck_orders_positive_total", "orders", 8, True),
+    DDLStmt("CREATE INDEX idx_orders_customer ON shop.orders (customer_id);", "CREATE INDEX IF NOT EXISTS idx_orders_customer ON shop.orders (customer_id);", "index", "idx_orders_customer", "orders", 9, True),
+    DDLStmt("COMMENT ON TABLE shop.customers IS 'Registered customers';", None, "comment", "table.customers", "customers", 10, True),
+    DDLStmt("COMMENT ON COLUMN shop.customers.name IS 'Full name';", None, "comment", "column.customers.name", "customers", 10, True),
+    DDLStmt("COMMENT ON TABLE shop.orders IS 'Customer orders';", None, "comment", "table.orders", "orders", 10, True),
 ]
 
 TABLE_NAMES: Final[tuple[str, ...]] = ("customers", "orders")
