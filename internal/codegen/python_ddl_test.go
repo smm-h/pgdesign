@@ -591,7 +591,7 @@ func loadSplitTestSchema(t *testing.T) *model.Schema {
 
 func TestPythonDDL_FacetedOutput(t *testing.T) {
 	schema := loadSplitTestSchema(t)
-	gen := &PythonDDLGenerator{SplitByFile: true}
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, diags := gen.GenerateFiles(schema)
 	for _, d := range diags {
 		if d.Severity == 0 {
@@ -613,7 +613,7 @@ func TestPythonDDL_FacetedOutput(t *testing.T) {
 
 func TestPythonDDL_FacetedTypes(t *testing.T) {
 	schema := loadSplitTestSchema(t)
-	gen := &PythonDDLGenerator{SplitByFile: true}
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
 
 	typesContent := string(files["types.py"])
@@ -627,7 +627,7 @@ func TestPythonDDL_FacetedTypes(t *testing.T) {
 
 func TestPythonDDL_FacetedTableSeparation(t *testing.T) {
 	schema := loadSplitTestSchema(t)
-	gen := &PythonDDLGenerator{SplitByFile: true}
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
 
 	traceContent := string(files["tables_split_trace.py"])
@@ -657,7 +657,7 @@ func TestPythonDDL_FacetedTableSeparation(t *testing.T) {
 
 func TestPythonDDL_FacetedEmptyPostTables(t *testing.T) {
 	schema := loadSplitTestSchema(t)
-	gen := &PythonDDLGenerator{SplitByFile: true}
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
 
 	if _, ok := files["post_tables.py"]; ok {
@@ -667,7 +667,7 @@ func TestPythonDDL_FacetedEmptyPostTables(t *testing.T) {
 
 func TestPythonDDL_FacetedNoExecutor(t *testing.T) {
 	schema := loadSplitTestSchema(t)
-	gen := &PythonDDLGenerator{SplitByFile: true}
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
 
 	if _, ok := files["schema_executor.py"]; ok {
@@ -677,7 +677,7 @@ func TestPythonDDL_FacetedNoExecutor(t *testing.T) {
 
 func TestPythonDDL_FacetedTableNames(t *testing.T) {
 	schema := loadSplitTestSchema(t)
-	gen := &PythonDDLGenerator{SplitByFile: true}
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
 
 	// Each tables_*.py file should contain TABLE_NAMES.

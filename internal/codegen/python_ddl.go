@@ -13,12 +13,27 @@ import (
 	"github.com/smm-h/pgdesign/internal/sql"
 )
 
+// SplitMode controls how PythonDDLGenerator distributes output across files.
+type SplitMode string
+
+const (
+	// SplitModeNone produces the default two-file output (schema_ddl.py + schema_executor.py).
+	SplitModeNone SplitMode = ""
+	// SplitModeFaceted splits output by concern (extensions, types, tables per source, post-tables).
+	SplitModeFaceted SplitMode = "faceted"
+	// SplitModeSelfContained splits output so each file is independently executable.
+	SplitModeSelfContained SplitMode = "self-contained"
+)
+
+// AllSplitModes lists the valid non-empty split modes.
+var AllSplitModes = []SplitMode{SplitModeFaceted, SplitModeSelfContained}
+
 // PythonDDLGenerator generates a Python file containing DDL statements as
 // typed data tuples. Each statement is a (sql, kind, table_name_or_none, phase)
 // tuple. The output mirrors the exact section order of generateSQL in the
 // generate package.
 type PythonDDLGenerator struct {
-	SplitByFile bool
+	SplitMode SplitMode
 }
 
 // ddlTuple holds one DDL statement with its metadata.
@@ -942,19 +957,27 @@ func (g *PythonDDLGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 
 // GenerateFiles implements MultiFileGenerator, producing two files:
 // schema_ddl.py (tuples) and schema_executor.py (section executor).
-// When SplitByFile is true, produces faceted output instead.
+// When SplitMode is set, produces split output instead.
 func (g *PythonDDLGenerator) GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
-	if g.SplitByFile {
+	switch g.SplitMode {
+	case SplitModeFaceted:
 		return g.generateFacetedFiles(schema)
-	}
-	tuples, tables, diags := buildTuples(schema)
-	sections := buildSections(tuples)
+	case SplitModeSelfContained:
+		return nil, []diagnostic.Diagnostic{{
+			Severity: diagnostic.Error,
+			Message:  "self-contained split mode not yet implemented",
+		}}
+	default:
+		// SplitModeNone: default two-file output.
+		tuples, tables, diags := buildTuples(schema)
+		sections := buildSections(tuples)
 
-	files := map[string][]byte{
-		"schema_ddl.py":      renderDDLFile(tuples, tables),
-		"schema_executor.py": renderExecutorFile(sections),
+		files := map[string][]byte{
+			"schema_ddl.py":      renderDDLFile(tuples, tables),
+			"schema_executor.py": renderExecutorFile(sections),
+		}
+		return files, diags
 	}
-	return files, diags
 }
 
 // facetKind classifies a tuple into one of four facet categories.
