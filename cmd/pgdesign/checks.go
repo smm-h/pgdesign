@@ -13,9 +13,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/discover"
-	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
-	"github.com/smm-h/pgdesign/internal/validate"
 	"github.com/smm-h/pgdesign/internal/workload"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
@@ -88,20 +86,7 @@ func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
 	}
 	schema.PGVersion = pgVersion
 
-	extReg := extregistry.NewBuiltinRegistry()
-	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
-
-	valCfg := &validate.Config{
-		NamingPattern: cfg.Validate.NamingPattern,
-		MaxColumns:    cfg.Validate.MaxColumns,
-		Disabled:      cfg.Validate.Disable,
-		Suppress:      cfg.Suppress,
-		Extensions:    schema.Extensions,
-		ExtRegistry:   extReg,
-		TypeRegistry:  typeReg,
-	}
-
-	diags, _ := validate.Validate(schema, valCfg)
+	diags := validateSchema(schema, typeReg, cfg, pgVersion)
 
 	if diagnostic.Diagnostics(diags).HasErrors() {
 		return strictcli.CheckResult{
@@ -378,20 +363,7 @@ func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
 	}
 	schema.PGVersion = pgVersion
 
-	extReg := extregistry.NewBuiltinRegistry()
-	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
-
-	valCfg := &validate.Config{
-		NamingPattern: cfg.Validate.NamingPattern,
-		MaxColumns:    cfg.Validate.MaxColumns,
-		Disabled:      cfg.Validate.Disable,
-		Suppress:      cfg.Suppress,
-		Extensions:    schema.Extensions,
-		ExtRegistry:   extReg,
-		TypeRegistry:  typeReg,
-	}
-
-	diags, _ := validate.Validate(schema, valCfg)
+	diags := validateSchema(schema, typeReg, cfg, pgVersion)
 
 	// Filter to design-related codes only.
 	var designDiags []diagnostic.Diagnostic

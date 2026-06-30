@@ -6,13 +6,28 @@ import (
 	"path/filepath"
 
 	"github.com/smm-h/pgdesign/internal/codegen"
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 )
 
 func handleCodegen(kwargs map[string]interface{}) int {
 	paths := extractPaths(kwargs)
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
+	}
+
+	// Load config and validate schema before generating code.
+	cfg := loadProjectConfig(paths[0])
+	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	schema.PGVersion = pgVersion
+
+	valDiags := validateSchema(schema, typeReg, cfg, pgVersion)
+	if len(valDiags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(valDiags, true))
+	}
+	if diagnostic.Diagnostics(valDiags).HasErrors() {
+		fmt.Fprintln(os.Stderr, "error: schema validation failed, refusing to generate code")
+		return 1
 	}
 
 	lang := kwargs["lang"].(string)

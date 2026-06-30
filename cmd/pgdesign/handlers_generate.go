@@ -38,6 +38,16 @@ func handleGenerate(kwargs map[string]interface{}) int {
 	}
 	schema.PGVersion = pgVersion
 
+	// Validate schema before generating output.
+	valDiags := validateSchema(schema, typeReg, cfg, pgVersion)
+	if len(valDiags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(valDiags, true))
+	}
+	if diagnostic.Diagnostics(valDiags).HasErrors() {
+		fmt.Fprintln(os.Stderr, "error: schema validation failed, refusing to generate")
+		return 1
+	}
+
 	opts := generate.Options{
 		Idempotent:      kwargs["idempotent"].(bool),
 		IncludeComments: !kwargs["no_comments"].(bool),

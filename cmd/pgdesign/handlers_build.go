@@ -69,6 +69,16 @@ func handleBuild(kwargs map[string]interface{}) int {
 	}
 	schema.PGVersion = pgVersion
 
+	// Validate schema before generating outputs.
+	valDiags := validateSchema(schema, typeReg, cfg, pgVersion)
+	if len(valDiags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(valDiags, true))
+	}
+	if diagnostic.Diagnostics(valDiags).HasErrors() {
+		fmt.Fprintln(os.Stderr, "error: schema validation failed, refusing to build")
+		return 1
+	}
+
 	// Generate all outputs in memory.
 	plan, planErr := Plan(schema, cfg, typeReg, pgVersion)
 	if planErr != nil {
