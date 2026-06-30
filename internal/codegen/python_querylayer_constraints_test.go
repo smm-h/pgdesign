@@ -44,7 +44,7 @@ func constraintTestSchema() *model.Schema {
 					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true, Identity: "ALWAYS"},
 					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 					{Name: "status", PGType: typeinfo.MustParse("text"), NotNull: true, SemanticTypeName: "order_status"},
-					{Name: "priority", PGType: typeinfo.MustParse("priority"), NotNull: true},
+					{Name: "priority", PGType: typeinfo.MustParse("priority"), NotNull: true, TypeKind: "enum"},
 					{Name: "total", PGType: typeinfo.MustParse("numeric"), NotNull: true},
 				},
 				FKs: []model.FK{

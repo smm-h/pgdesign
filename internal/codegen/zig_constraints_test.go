@@ -21,7 +21,7 @@ func TestZigConstraintsGenerator_Generate(t *testing.T) {
 					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
 					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
-					{Name: "role", PGType: typeinfo.MustParse("role"), NotNull: true},
+					{Name: "role", PGType: typeinfo.MustParse("role"), NotNull: true, TypeKind: "enum"},
 					{Name: "age", PGType: typeinfo.MustParse("integer"), NotNull: true},
 					{Name: "slug", PGType: typeinfo.MustParse("varchar"), NotNull: true},
 				},

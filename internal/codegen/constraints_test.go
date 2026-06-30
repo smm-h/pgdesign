@@ -19,7 +19,7 @@ func TestExtractConstraints_Basic(t *testing.T) {
 					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
 					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
-					{Name: "status", PGType: typeinfo.MustParse("status"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("status"), NotNull: true, TypeKind: "enum"},
 					{Name: "bio", PGType: typeinfo.MustParse("text"), NotNull: false},
 					{Name: "age", PGType: typeinfo.MustParse("integer"), NotNull: true},
 					{Name: "profile", PGType: typeinfo.MustParse("jsonb"), NotNull: true, JSONSchema: "schemas/profile.json"},
