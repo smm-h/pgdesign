@@ -20,6 +20,7 @@ func SupportedModes() map[string][]string {
 		"jpa":          {"java"},
 		"ddl":          {"python"},
 		"query-layer":  {"python"},
+		"enums":         {"go", "java", "kotlin", "python", "ts", "zig"},
 	}
 }
 
@@ -147,6 +148,13 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 			return &codegen.PythonQueryLayerGenerator{}, nil
 		default:
 			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: python)", mode, lang)
+		}
+	case "enums":
+		switch lang {
+		case "go", "java", "kotlin", "python", "ts", "zig":
+			return &codegen.EnumsGenerator{Lang: codegen.Lang(lang)}, nil
+		default:
+			return nil, fmt.Errorf("unsupported language for %s mode: %s (supported: go, java, kotlin, python, ts, zig)", mode, lang)
 		}
 	default:
 		return nil, fmt.Errorf("unsupported codegen mode: %s", mode)
