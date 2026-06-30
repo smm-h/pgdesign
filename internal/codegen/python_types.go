@@ -115,49 +115,12 @@ func (g *PythonTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnos
 // a list of import tokens that are needed. Import tokens are: "datetime",
 // "Decimal", "Any", "Optional", "UUID".
 func pgTypeToPython(col model.Column) (pyType string, needed []string) {
-	var baseType string
-
-	// Semantic type overrides.
-	if col.SemanticTypeName == "money" {
-		baseType = "int"
-		return applyPythonModifiers(baseType, col, needed)
+	resolver := NewTypeResolver(LangPython)
+	m := resolver.Resolve(col)
+	baseType := m.Type
+	if m.Import != "" {
+		needed = append(needed, m.Import)
 	}
-
-	pgType := col.PGType.Base
-
-	switch pgType {
-	case "text", "varchar", "char", "bpchar":
-		baseType = "str"
-	case "int4", "int8", "int2":
-		baseType = "int"
-	case "float4", "float8":
-		baseType = "float"
-	case "bool":
-		baseType = "bool"
-	case "timestamptz", "timestamp":
-		baseType = "datetime"
-		needed = append(needed, "datetime")
-	case "date":
-		baseType = "datetime"
-		needed = append(needed, "datetime")
-	case "uuid":
-		baseType = "UUID"
-		needed = append(needed, "UUID")
-	case "jsonb", "json":
-		baseType = "dict[str, Any]"
-		needed = append(needed, "Any")
-	case "numeric":
-		baseType = "Decimal"
-		needed = append(needed, "Decimal")
-	case "bytea":
-		baseType = "bytes"
-	case "interval":
-		baseType = "str"
-	default:
-		// Enum types and anything unrecognized fall back to str.
-		baseType = "str"
-	}
-
 	return applyPythonModifiers(baseType, col, needed)
 }
 

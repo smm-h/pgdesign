@@ -74,44 +74,6 @@ func pgTypeToZig(col model.Column) string {
 // zigBaseType returns the Zig type for a column's PostgreSQL type,
 // without array or nullable modifiers.
 func zigBaseType(col model.Column) string {
-	// Semantic type overrides.
-	if col.SemanticTypeName == "money" {
-		return "i64"
-	}
-
-	pgType := col.PGType.Base
-
-	switch pgType {
-	case "text", "varchar", "char", "bpchar":
-		return "[]const u8"
-	case "int4":
-		return "i32"
-	case "int8":
-		return "i64"
-	case "int2":
-		return "i16"
-	case "float4":
-		return "f32"
-	case "float8":
-		return "f64"
-	case "bool":
-		return "bool"
-	case "timestamptz", "timestamp":
-		return "i64"
-	case "date":
-		return "i64"
-	case "uuid":
-		return "[16]u8"
-	case "jsonb", "json":
-		return "[]const u8"
-	case "numeric":
-		return "[]const u8"
-	case "bytea":
-		return "[]const u8"
-	case "interval":
-		return "[]const u8"
-	default:
-		// Enum types and anything unrecognized fall back to []const u8.
-		return "[]const u8"
-	}
+	resolver := NewTypeResolver(LangZig)
+	return resolver.Resolve(col).Type
 }

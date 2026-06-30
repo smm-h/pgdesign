@@ -112,46 +112,12 @@ func pgTypeToKotlin(col model.Column) (string, []string) {
 // pgBaseTypeToKotlin returns the Kotlin type and imports for a column,
 // ignoring array and nullable modifiers.
 func pgBaseTypeToKotlin(col model.Column) (string, []string) {
-	// Semantic type overrides.
-	if col.SemanticTypeName == "money" {
-		return "Long", nil
+	resolver := NewTypeResolver(LangKotlin)
+	m := resolver.Resolve(col)
+	if m.Import != "" {
+		return m.Type, []string{m.Import}
 	}
-
-	pgType := col.PGType.Base
-
-	switch pgType {
-	case "text", "varchar", "char", "bpchar":
-		return "String", nil
-	case "int4":
-		return "Int", nil
-	case "int8":
-		return "Long", nil
-	case "int2":
-		return "Short", nil
-	case "float4":
-		return "Float", nil
-	case "float8":
-		return "Double", nil
-	case "bool":
-		return "Boolean", nil
-	case "timestamptz", "timestamp":
-		return "Instant", []string{"java.time.Instant"}
-	case "date":
-		return "Instant", []string{"java.time.Instant"}
-	case "uuid":
-		return "UUID", []string{"java.util.UUID"}
-	case "jsonb", "json":
-		return "JsonNode", []string{"com.fasterxml.jackson.databind.JsonNode"}
-	case "numeric":
-		return "BigDecimal", []string{"java.math.BigDecimal"}
-	case "bytea":
-		return "ByteArray", nil
-	case "interval":
-		return "String", nil
-	default:
-		// Enum types and anything unrecognized fall back to String.
-		return "String", nil
-	}
+	return m.Type, nil
 }
 
 // applyKotlinModifiers applies array and nullable modifiers to a Kotlin type.

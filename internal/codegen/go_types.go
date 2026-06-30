@@ -45,18 +45,13 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 			Name:      toPascalCase(tbl.Name),
 			TableName: tbl.Name,
 		}
+		resolver := NewTypeResolver(LangGo)
 		for _, col := range tbl.Columns {
-			var goType string
-			var importPath string
 			isBytea := col.PGType.Base == "bytea"
 
-			if col.SemanticTypeName == "money" {
-				goType = LookupMoneyType(LangGo)
-			} else {
-				m := LookupType(col.PGType.Base, LangGo)
-				goType = m.Type
-				importPath = m.Import
-			}
+			m := resolver.Resolve(col)
+			goType := m.Type
+			importPath := m.Import
 			goType = applyModifiers(goType, col, isBytea)
 
 			if importPath != "" {

@@ -95,43 +95,9 @@ func toCamelCase(s string) string {
 // pgTypeToTS maps a column's PostgreSQL type to a TypeScript type string.
 // It handles semantic types, arrays, and nullability.
 func pgTypeToTS(col model.Column) string {
-	var baseType string
-
-	// Semantic type overrides.
-	if col.SemanticTypeName == "money" {
-		baseType = "number"
-		return applyTSModifiers(baseType, col)
-	}
-
-	pgType := col.PGType.Base
-
-	switch pgType {
-	case "text", "varchar", "char", "bpchar":
-		baseType = "string"
-	case "int4", "int8", "int2", "float4", "float8":
-		baseType = "number"
-	case "bool":
-		baseType = "boolean"
-	case "timestamptz", "timestamp":
-		baseType = "Date"
-	case "date":
-		baseType = "Date"
-	case "uuid":
-		baseType = "string"
-	case "jsonb", "json":
-		baseType = "Record<string, unknown>"
-	case "numeric":
-		baseType = "string"
-	case "bytea":
-		baseType = "Uint8Array"
-	case "interval":
-		baseType = "string"
-	default:
-		// Enum types and anything unrecognized fall back to string.
-		baseType = "string"
-	}
-
-	return applyTSModifiers(baseType, col)
+	resolver := NewTypeResolver(LangTS)
+	m := resolver.Resolve(col)
+	return applyTSModifiers(m.Type, col)
 }
 
 // applyTSModifiers appends TypeScript array and nullability suffixes to a base type.

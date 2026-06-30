@@ -142,46 +142,12 @@ func pgTypeToJava(col model.Column) (string, []string) {
 // pgBaseTypeToJava returns the primitive/reference Java type and imports for a
 // column, ignoring array and nullable modifiers.
 func pgBaseTypeToJava(col model.Column) (string, []string) {
-	// Semantic type overrides.
-	if col.SemanticTypeName == "money" {
-		return "long", nil
+	resolver := NewTypeResolver(LangJava)
+	m := resolver.Resolve(col)
+	if m.Import != "" {
+		return m.Type, []string{m.Import}
 	}
-
-	pgType := col.PGType.Base
-
-	switch pgType {
-	case "text", "varchar", "char", "bpchar":
-		return "String", nil
-	case "int4":
-		return "int", nil
-	case "int8":
-		return "long", nil
-	case "int2":
-		return "short", nil
-	case "float4":
-		return "float", nil
-	case "float8":
-		return "double", nil
-	case "bool":
-		return "boolean", nil
-	case "timestamptz", "timestamp":
-		return "Instant", []string{"java.time.Instant"}
-	case "date":
-		return "Instant", []string{"java.time.Instant"}
-	case "uuid":
-		return "UUID", []string{"java.util.UUID"}
-	case "jsonb", "json":
-		return "JsonNode", []string{"com.fasterxml.jackson.databind.JsonNode"}
-	case "numeric":
-		return "BigDecimal", []string{"java.math.BigDecimal"}
-	case "bytea":
-		return "byte[]", nil
-	case "interval":
-		return "String", nil
-	default:
-		// Enum types and anything unrecognized fall back to String.
-		return "String", nil
-	}
+	return m.Type, nil
 }
 
 // toJavaWrapper converts a primitive Java type to its wrapper type for use in
