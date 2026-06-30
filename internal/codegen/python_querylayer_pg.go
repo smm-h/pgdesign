@@ -18,9 +18,10 @@ func generatePerTablePgFile(tbl *model.Table, schema *model.Schema, smMap map[st
 	rowType := className + "Row"
 
 	// Collect imports.
+	resolver := NewTypeResolver(LangPython)
 	imports := newImportCollector()
 	for _, col := range tbl.Columns {
-		m := LookupType(col.PGType.Base, LangPython)
+		m := resolver.Resolve(col)
 		imports.addFromMapping(m, col)
 	}
 	for _, col := range tbl.Columns {
@@ -466,10 +467,11 @@ func generatePgBackendFile(tables []model.Table, schema *model.Schema, smMap map
 	buf.WriteString("\nfrom typing import Any, Optional\n")
 
 	// Collect imports needed for type annotations.
+	resolver := NewTypeResolver(LangPython)
 	imports := newImportCollector()
 	for _, tbl := range tables {
 		for _, col := range tbl.Columns {
-			m := LookupType(col.PGType.Base, LangPython)
+			m := resolver.Resolve(col)
 			imports.addFromMapping(m, col)
 		}
 		for _, col := range tbl.Columns {

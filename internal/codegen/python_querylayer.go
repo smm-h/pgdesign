@@ -163,9 +163,10 @@ func generateProtocolsFile(schema *model.Schema) ([]byte, []diagnostic.Diagnosti
 	imports := newImportCollector()
 
 	// Pre-scan all columns to determine imports.
+	resolver := NewTypeResolver(LangPython)
 	for _, tbl := range tables {
 		for _, col := range tbl.Columns {
-			m := LookupType(col.PGType.Base, LangPython)
+			m := resolver.Resolve(col)
 			imports.addFromMapping(m, col)
 		}
 	}
@@ -729,11 +730,8 @@ func buildSMTypeMap(schema *model.Schema) map[string]*model.SMTransitionMap {
 // baseColumnPythonType returns the Python type for a column without nullable
 // wrapping. Used for method parameters where Optional is applied separately.
 func baseColumnPythonType(col model.Column) string {
-	m := LookupType(col.PGType.Base, LangPython)
-	baseType := m.Type
-	if col.SemanticTypeName == "money" {
-		baseType = LookupMoneyType(LangPython)
-	}
+	resolver := NewTypeResolver(LangPython)
+	baseType := resolver.Resolve(col).Type
 	if col.Array {
 		baseType = ApplyArray(baseType, LangPython)
 	}
@@ -743,13 +741,8 @@ func baseColumnPythonType(col model.Column) string {
 // columnPythonType returns the Python type string for a column, applying
 // nullable and array modifiers.
 func columnPythonType(col model.Column) string {
-	m := LookupType(col.PGType.Base, LangPython)
-	baseType := m.Type
-
-	// Money semantic type override.
-	if col.SemanticTypeName == "money" {
-		baseType = LookupMoneyType(LangPython)
-	}
+	resolver := NewTypeResolver(LangPython)
+	baseType := resolver.Resolve(col).Type
 
 	if col.Array {
 		baseType = ApplyArray(baseType, LangPython)
