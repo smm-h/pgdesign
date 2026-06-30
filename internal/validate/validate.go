@@ -126,6 +126,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"W028", checkSMDeadEndState},
 		{"E223", checkSMRequiresColumn},
 		{"E224", checkSMDefaultMismatch},
+		{"E225", checkFKInvalidOnDelete},
 		{"E226", checkSMReservedTriggerPrefix},
 	}
 
@@ -230,7 +231,7 @@ func checkFKMissingOnDelete(schema *model.Schema, _ *Config) []diagnostic.Diagno
 					Code:       "E201",
 					Table:      t.Name,
 					Message:    "FK " + fk.Name + " missing ON DELETE clause",
-					Suggestion: "Add on_delete = \"cascade\", \"restrict\", \"set null\", or \"no action\"",
+					Suggestion: "Add on_delete = \"cascade\", \"restrict\", \"set null\", \"set default\", or \"no action\"",
 				})
 			}
 		}
@@ -2722,6 +2723,35 @@ func checkSMDefaultMismatch(schema *model.Schema, config *Config) []diagnostic.D
 					Column:     col.Name,
 					Message:    fmt.Sprintf("column default %q does not match state machine %q initial state %q", *col.Default, td.Name, td.InitialState),
 					Suggestion: fmt.Sprintf("Set the default to %q, or change the initial state", td.InitialState),
+				})
+			}
+		}
+	}
+	return diags
+}
+
+// checkFKInvalidOnDelete (E225): FK on_delete value is not a valid PostgreSQL action.
+func checkFKInvalidOnDelete(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	valid := map[string]bool{
+		"CASCADE":     true,
+		"RESTRICT":    true,
+		"SET NULL":    true,
+		"SET DEFAULT": true,
+		"NO ACTION":   true,
+	}
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		for _, fk := range t.FKs {
+			if fk.OnDelete == "" {
+				continue // E201 handles missing on_delete
+			}
+			if !valid[strings.ToUpper(fk.OnDelete)] {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E225",
+					Table:      t.Name,
+					Message:    fmt.Sprintf("FK %s has invalid on_delete value %q", fk.Name, fk.OnDelete),
+					Suggestion: "Valid values: CASCADE, RESTRICT, SET NULL, SET DEFAULT, NO ACTION",
 				})
 			}
 		}

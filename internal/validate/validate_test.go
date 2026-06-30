@@ -3388,6 +3388,164 @@ func TestSM_NilRegistrySkipsChecks(t *testing.T) {
 	}
 }
 
+func TestE225_FKInvalidOnDelete(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
+			},
+			FKs: []model.FK{{
+				Name:      "fk_user",
+				Columns:   []string{"user_id"},
+				RefSchema: "public",
+				RefTable:  "users",
+				OnDelete:  "BANANA",
+			}},
+		}, {
+			Name:    "users",
+			Schema:  "public",
+			Comment: "Users table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
+			},
+		}},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E225")
+	if len(found) == 0 {
+		t.Fatal("expected E225 for invalid on_delete value \"BANANA\"")
+	}
+	if found[0].Table != "orders" {
+		t.Errorf("expected table 'orders', got %q", found[0].Table)
+	}
+	if !strings.Contains(found[0].Message, "BANANA") {
+		t.Errorf("expected message to contain \"BANANA\", got %q", found[0].Message)
+	}
+}
+
+func TestE225_LowercaseRestrict_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
+			},
+			FKs: []model.FK{{
+				Name:      "fk_user",
+				Columns:   []string{"user_id"},
+				RefSchema: "public",
+				RefTable:  "users",
+				OnDelete:  "restrict",
+			}},
+		}, {
+			Name:    "users",
+			Schema:  "public",
+			Comment: "Users table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
+			},
+		}},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E225")
+	if len(found) != 0 {
+		t.Fatalf("expected no E225 for lowercase \"restrict\", got %v", found)
+	}
+}
+
+func TestE225_SetNull_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
+			},
+			FKs: []model.FK{{
+				Name:      "fk_user",
+				Columns:   []string{"user_id"},
+				RefSchema: "public",
+				RefTable:  "users",
+				OnDelete:  "SET NULL",
+			}},
+		}, {
+			Name:    "users",
+			Schema:  "public",
+			Comment: "Users table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
+			},
+		}},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E225")
+	if len(found) != 0 {
+		t.Fatalf("expected no E225 for \"SET NULL\", got %v", found)
+	}
+}
+
+func TestE225_SetDefault_NoDiag(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
+			},
+			FKs: []model.FK{{
+				Name:      "fk_user",
+				Columns:   []string{"user_id"},
+				RefSchema: "public",
+				RefTable:  "users",
+				OnDelete:  "SET DEFAULT",
+			}},
+		}, {
+			Name:    "users",
+			Schema:  "public",
+			Comment: "Users table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
+			},
+		}},
+	}
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E225")
+	if len(found) != 0 {
+		t.Fatalf("expected no E225 for \"SET DEFAULT\", got %v", found)
+	}
+}
+
 // --- Helpers ---
 
 func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnostic {
