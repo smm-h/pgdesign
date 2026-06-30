@@ -1,0 +1,20 @@
+# Version bump type: patch, minor, major, hotfix, or prerelease
+bump = "minor"
+# Short description of this release (required)
+description = "Type resolution overhaul, StrEnum, faceted output v2, self-contained split mode, source routing, executor features, and validation gates."
+# Optional context explaining why these changes were made
+context = """
+Major codegen overhaul driven by the orxtra migration wishlist. Key changes:
+
+TypeKind on Column + TypeResolver: enum-typed columns now emit the actual enum class name instead of string in all 6 languages. The type resolution system is unified through a single TypeResolver that dispatches on col.TypeKind.
+
+Python enums use StrEnum (3.11+) instead of (str, Enum). Standalone --mode enums for enum-only output. E225 validates FK on_delete values. Build/generate/codegen validate the schema before generating.
+
+Faceted output redesigned: DDLStmt namedtuple (7 fields) replaces 4-tuples. Shared executor in faceted mode. Self-contained split mode with idempotent type preamble. exclude_sections + SECTION_KINDS + name validation on executor. extension_stubs for test environments. Source-aware output routing with AND composition with groups.
+"""
+# Pre-release identifier: alpha, beta, rc, or stable
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
