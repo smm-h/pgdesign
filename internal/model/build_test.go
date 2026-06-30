@@ -1687,3 +1687,66 @@ func TestBuildMulti_SourceFile(t *testing.T) {
 		t.Error("enum trace_status not found in schema.Enums")
 	}
 }
+
+func TestTypeKind_Enum(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	userTypes := []semtype.UserTypeDef{
+		{
+			Name:   "priority",
+			Kind:   "enum",
+			Values: []string{"low", "medium", "high"},
+		},
+	}
+	diags := reg.LoadUserTypes(userTypes)
+	if diags.HasErrors() {
+		t.Fatalf("failed to load user types: %v", diags)
+	}
+
+	raw := &parse.RawSchema{
+		Meta: parse.RawMeta{Schema: "public"},
+		Types: []parse.RawType{
+			{Name: "priority", Kind: "enum", Values: []string{"low", "medium", "high"}},
+		},
+		Tables: []parse.RawTable{
+			{
+				Name: "tasks",
+				Columns: []parse.RawColumn{
+					{Name: "id", Type: "id"},
+					{Name: "priority", Type: "priority"},
+					{Name: "title", Type: "short_text"},
+				},
+			},
+		},
+	}
+
+	schema, buildDiags := Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+
+	var priorityCol *Column
+	var titleCol *Column
+	for i := range schema.Tables[0].Columns {
+		switch schema.Tables[0].Columns[i].Name {
+		case "priority":
+			priorityCol = &schema.Tables[0].Columns[i]
+		case "title":
+			titleCol = &schema.Tables[0].Columns[i]
+		}
+	}
+
+	if priorityCol == nil {
+		t.Fatal("priority column not found")
+	}
+	if priorityCol.TypeKind != "enum" {
+		t.Errorf("priority.TypeKind = %q, want %q", priorityCol.TypeKind, "enum")
+	}
+
+	if titleCol == nil {
+		t.Fatal("title column not found")
+	}
+	// Builtin types should have TypeKind = "scalar" (the default Kind).
+	if titleCol.TypeKind != "scalar" {
+		t.Errorf("title.TypeKind = %q, want %q", titleCol.TypeKind, "scalar")
+	}
+}

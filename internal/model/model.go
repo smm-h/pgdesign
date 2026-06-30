@@ -220,6 +220,7 @@ type Column struct {
 	Array            bool   `json:"array,omitempty"`
 	JSONSchema       string `json:"json_schema,omitempty"`
 	Statistics       *int   `json:"statistics,omitempty"`
+	TypeKind         string `json:"type_kind,omitempty"`
 }
 
 // FK represents a resolved foreign key constraint.

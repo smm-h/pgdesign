@@ -1283,6 +1283,7 @@ type ResolvedColumn struct {
 	Stored      bool
 	Identity    string
 	Array       bool
+	Kind        string // "scalar", "enum", "composite", "state_machine"
 }
 
 // ResolveColumn resolves a column's final attributes by looking up the type
@@ -1303,6 +1304,7 @@ func (r *Registry) ResolveColumn(typeName string, nullable *bool, defaultOverrid
 		Stored:      td.Stored,
 		Identity:    td.Identity,
 		Array:       td.Array,
+		Kind:        td.Kind.String(),
 	}
 
 	// Column nullable overrides type NotNull

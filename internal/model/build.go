@@ -741,6 +741,7 @@ func resolveColumn(rc parse.RawColumn, tableName string, reg *semtype.Registry) 
 		Identity:         resolved.Identity,
 		SemanticTypeName: rc.Type,
 		Array:            resolved.Array,
+		TypeKind:         resolved.Kind,
 	}
 
 	// If the semantic type has a CHECK expression, the column uses a domain.
