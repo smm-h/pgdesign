@@ -1,0 +1,1 @@
+{"commits":["38eb413b443bd647d72e54f97e43648f00a970dc"],"user_facing":true,"description":"**Breaking change.** Python enum codegen now emits `class Foo(StrEnum):` instead of `class Foo(str, Enum):`. Requires Python 3.11+.","type":"breaking"}
