@@ -162,7 +162,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "auth_id",
@@ -172,7 +173,8 @@
           },
           "not_null": false,
           "comment": "FK to auth.users; NULL for anonymous players",
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "name",
@@ -181,7 +183,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "display_name",
@@ -190,7 +193,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "is_anonymous",
@@ -200,7 +204,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -210,7 +215,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         },
         {
           "name": "is_ai",
@@ -221,7 +227,8 @@
           "not_null": true,
           "default": "false",
           "comment": "Whether this player is an AI agent. Disclosed per EU AI Act Art. 52.",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "ai_model",
@@ -231,7 +238,8 @@
           },
           "not_null": false,
           "comment": "AI model identifier (e.g. claude-opus-4-6). NULL for human players.",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -308,7 +316,8 @@
           },
           "not_null": true,
           "comment": "Human-readable server identifier (e.g. python-1, zig-1)",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "host",
@@ -318,7 +327,8 @@
           },
           "not_null": true,
           "comment": "Hostname or IP address",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "port",
@@ -327,7 +337,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "version",
@@ -337,7 +348,8 @@
           },
           "not_null": true,
           "comment": "Server version string",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "server_type",
@@ -346,7 +358,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "server_type"
+          "semantic_type_name": "server_type",
+          "type_kind": "enum"
         },
         {
           "name": "status",
@@ -355,7 +368,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "server_status"
+          "semantic_type_name": "server_status",
+          "type_kind": "enum"
         },
         {
           "name": "max_sessions",
@@ -364,7 +378,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "active_sessions",
@@ -374,7 +389,8 @@
           },
           "not_null": true,
           "default": "0",
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "last_heartbeat",
@@ -383,7 +399,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "timestamp_no_default"
+          "semantic_type_name": "timestamp_no_default",
+          "type_kind": "scalar"
         },
         {
           "name": "registered_at",
@@ -393,7 +410,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -436,7 +454,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "name",
@@ -445,7 +464,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "description",
@@ -454,7 +474,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "variants",
@@ -465,7 +486,8 @@
           "not_null": true,
           "default_expr": "'{}'::jsonb",
           "comment": "JSON array of variant definitions",
-          "semantic_type_name": "json"
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
         },
         {
           "name": "status",
@@ -474,7 +496,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "experiment_status"
+          "semantic_type_name": "experiment_status",
+          "type_kind": "enum"
         },
         {
           "name": "allocation_pct",
@@ -485,7 +508,8 @@
           "not_null": true,
           "default": "100",
           "comment": "Percentage of eligible players to enroll (0-100)",
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -495,7 +519,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -528,7 +553,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "name",
@@ -537,7 +563,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "description",
@@ -546,7 +573,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "icon",
@@ -555,7 +583,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "criteria",
@@ -566,7 +595,8 @@
           "not_null": true,
           "default_expr": "'{}'::jsonb",
           "comment": "JSON object describing the unlock criteria",
-          "semantic_type_name": "json"
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -576,7 +606,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -609,7 +640,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "player_a",
@@ -618,7 +650,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "player_b",
@@ -627,7 +660,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "status",
@@ -636,7 +670,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "friendship_status"
+          "semantic_type_name": "friendship_status",
+          "type_kind": "enum"
         },
         {
           "name": "initiated_by",
@@ -645,7 +680,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -655,7 +691,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         },
         {
           "name": "updated_at",
@@ -665,7 +702,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -764,7 +802,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "title",
@@ -773,7 +812,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "description",
@@ -782,7 +822,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "tags",
@@ -792,7 +833,8 @@
           },
           "not_null": true,
           "default_expr": "'[]'::jsonb",
-          "semantic_type_name": "json_array"
+          "semantic_type_name": "json_array",
+          "type_kind": "scalar"
         },
         {
           "name": "creator",
@@ -801,7 +843,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "ai_generated",
@@ -811,7 +854,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -821,7 +865,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         },
         {
           "name": "generation_model",
@@ -831,7 +876,8 @@
           },
           "not_null": false,
           "comment": "AI model that generated this game. NULL for human-created. Disclosed per EU AI Act Art. 50.",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "generation_prompt",
@@ -841,7 +887,8 @@
           },
           "not_null": false,
           "comment": "Original prompt used to generate this game. Stored for transparency.",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -915,7 +962,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "sender_id",
@@ -924,7 +972,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "channel",
@@ -933,7 +982,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "body",
@@ -942,7 +992,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "metadata",
@@ -951,7 +1002,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "jsonb_nullable"
+          "semantic_type_name": "jsonb_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "sent_at",
@@ -961,7 +1013,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1039,7 +1092,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "public_profile",
@@ -1049,7 +1103,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "chat_enabled",
@@ -1059,7 +1114,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "friends_enabled",
@@ -1069,7 +1125,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "leaderboard_visible",
@@ -1079,7 +1136,8 @@
           },
           "not_null": true,
           "default": "true",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "updated_at",
@@ -1089,7 +1147,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1137,7 +1196,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "birth_date",
@@ -1146,7 +1206,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "date_field"
+          "semantic_type_name": "date_field",
+          "type_kind": "scalar"
         },
         {
           "name": "is_minor",
@@ -1157,7 +1218,8 @@
           "not_null": true,
           "default": "false",
           "comment": "True when age \u003c 16",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "parental_consent_required",
@@ -1167,7 +1229,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "parental_consent_given",
@@ -1177,7 +1240,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "parent_email",
@@ -1186,7 +1250,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "consent_token",
@@ -1195,7 +1260,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "consent_token_expires_at",
@@ -1204,7 +1270,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "timestamp_optional"
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
         },
         {
           "name": "consent_given_at",
@@ -1213,7 +1280,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "timestamp_optional"
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -1223,7 +1291,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1280,7 +1349,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "bio",
@@ -1289,7 +1359,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "avatar_url",
@@ -1298,7 +1369,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "status_text",
@@ -1307,7 +1379,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "level",
@@ -1317,7 +1390,8 @@
           },
           "not_null": true,
           "default": "1",
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "xp",
@@ -1327,7 +1401,8 @@
           },
           "not_null": true,
           "default": "0",
-          "semantic_type_name": "counter"
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1375,7 +1450,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "key",
@@ -1384,7 +1460,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "value",
@@ -1393,7 +1470,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1442,7 +1520,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "followed_id",
@@ -1451,7 +1530,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -1461,7 +1541,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1536,7 +1617,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "reporter_id",
@@ -1545,7 +1627,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "target_type",
@@ -1554,7 +1637,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "report_target_type"
+          "semantic_type_name": "report_target_type",
+          "type_kind": "enum"
         },
         {
           "name": "target_id",
@@ -1564,7 +1648,8 @@
           },
           "not_null": true,
           "comment": "UUID of the reported entity",
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "reason",
@@ -1573,7 +1658,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "status",
@@ -1582,7 +1668,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "report_status"
+          "semantic_type_name": "report_status",
+          "type_kind": "enum"
         },
         {
           "name": "created_at",
@@ -1592,7 +1679,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1656,7 +1744,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "balance",
@@ -1666,7 +1755,8 @@
           },
           "not_null": true,
           "default": "0",
-          "semantic_type_name": "counter"
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
         },
         {
           "name": "updated_at",
@@ -1676,7 +1766,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1725,7 +1816,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -1734,7 +1826,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "amount",
@@ -1745,7 +1838,8 @@
           "not_null": true,
           "default": "0",
           "comment": "Signed amount (positive = credit, negative = debit)",
-          "semantic_type_name": "counter"
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
         },
         {
           "name": "type",
@@ -1754,7 +1848,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "currency_transaction_type"
+          "semantic_type_name": "currency_transaction_type",
+          "type_kind": "enum"
         },
         {
           "name": "reason",
@@ -1763,7 +1858,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "reference_type",
@@ -1773,7 +1869,8 @@
           },
           "not_null": false,
           "comment": "Entity type that triggered the transaction (e.g. game_play, achievement)",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "reference_id",
@@ -1783,7 +1880,8 @@
           },
           "not_null": false,
           "comment": "UUID of the triggering entity",
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -1793,7 +1891,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1850,7 +1949,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -1859,7 +1959,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "type",
@@ -1868,7 +1969,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "notification_type"
+          "semantic_type_name": "notification_type",
+          "type_kind": "enum"
         },
         {
           "name": "title",
@@ -1877,7 +1979,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "body",
@@ -1886,7 +1989,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "data",
@@ -1896,7 +2000,8 @@
           },
           "not_null": false,
           "comment": "Arbitrary payload (e.g. friend request ID, game ID)",
-          "semantic_type_name": "jsonb_nullable"
+          "semantic_type_name": "jsonb_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "read",
@@ -1906,7 +2011,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -1916,7 +2022,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -1975,7 +2082,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -1984,7 +2092,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "key_hash",
@@ -1993,7 +2102,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "name",
@@ -2002,7 +2112,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "scopes",
@@ -2012,7 +2123,8 @@
           },
           "not_null": true,
           "default_expr": "'{}'::jsonb",
-          "semantic_type_name": "json"
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -2022,7 +2134,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         },
         {
           "name": "last_used_at",
@@ -2031,7 +2144,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "timestamp_optional"
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
         },
         {
           "name": "revoked_at",
@@ -2040,7 +2154,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "timestamp_optional"
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -2095,7 +2210,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -2104,7 +2220,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "variant",
@@ -2113,7 +2230,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "assigned_at",
@@ -2123,7 +2241,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -2194,7 +2313,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "game_id",
@@ -2203,7 +2323,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -2212,7 +2333,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "score",
@@ -2222,7 +2344,8 @@
           },
           "not_null": true,
           "default": "0",
-          "semantic_type_name": "counter"
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
         },
         {
           "name": "metadata",
@@ -2231,7 +2354,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "jsonb_nullable"
+          "semantic_type_name": "jsonb_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "achieved_at",
@@ -2241,7 +2365,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -2325,7 +2450,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "game_id",
@@ -2334,7 +2460,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "version_number",
@@ -2343,7 +2470,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "bundle_path",
@@ -2352,7 +2480,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "bundle_size",
@@ -2363,7 +2492,8 @@
           "not_null": true,
           "default": "0",
           "comment": "Bundle size in bytes",
-          "semantic_type_name": "counter"
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
         },
         {
           "name": "changelog",
@@ -2372,7 +2502,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -2382,7 +2513,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -2431,7 +2563,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "parent_game_id",
@@ -2440,7 +2573,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "child_game_id",
@@ -2449,7 +2583,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "forked_by",
@@ -2458,7 +2593,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -2468,7 +2604,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -2556,7 +2693,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "game_id",
@@ -2565,7 +2703,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -2575,7 +2714,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -2645,7 +2785,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "game_id",
@@ -2654,7 +2795,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -2663,7 +2805,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "body",
@@ -2672,7 +2815,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -2682,7 +2826,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -2751,7 +2896,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "requested_by",
@@ -2760,7 +2906,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "game_id",
@@ -2770,7 +2917,8 @@
           },
           "not_null": false,
           "comment": "Set after game is created",
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "prompt",
@@ -2779,7 +2927,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "status",
@@ -2788,7 +2937,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "generation_status"
+          "semantic_type_name": "generation_status",
+          "type_kind": "enum"
         },
         {
           "name": "model",
@@ -2797,7 +2947,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "cost_cents",
@@ -2807,7 +2958,8 @@
           },
           "not_null": true,
           "default": "0",
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "progress",
@@ -2818,7 +2970,8 @@
           "not_null": true,
           "default": "0",
           "comment": "0-100 percentage",
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "error_message",
@@ -2827,7 +2980,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -2837,7 +2991,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         },
         {
           "name": "completed_at",
@@ -2846,7 +3001,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "timestamp_optional"
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -2924,7 +3080,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "game_id",
@@ -2933,7 +3090,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "status",
@@ -2942,7 +3100,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "session_status"
+          "semantic_type_name": "session_status",
+          "type_kind": "enum"
         },
         {
           "name": "room_code",
@@ -2951,7 +3110,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "max_players",
@@ -2960,7 +3120,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "config",
@@ -2971,7 +3132,8 @@
           "not_null": true,
           "default_expr": "'{}'::jsonb",
           "comment": "Game-specific configuration for this session",
-          "semantic_type_name": "json"
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
         },
         {
           "name": "result",
@@ -2981,7 +3143,8 @@
           },
           "not_null": false,
           "comment": "Game result data set when session ends",
-          "semantic_type_name": "jsonb_nullable"
+          "semantic_type_name": "jsonb_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -2991,7 +3154,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         },
         {
           "name": "started_at",
@@ -3000,7 +3164,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "timestamp_optional"
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
         },
         {
           "name": "ended_at",
@@ -3009,7 +3174,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "timestamp_optional"
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
         },
         {
           "name": "server_id",
@@ -3019,7 +3185,8 @@
           },
           "not_null": false,
           "comment": "ID of the server hosting this session. NULL for sessions created before fleet routing.",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -3102,7 +3269,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "achievement_def_id",
@@ -3111,7 +3279,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "game_id",
@@ -3121,7 +3290,8 @@
           },
           "not_null": false,
           "comment": "Game that triggered the unlock, if applicable",
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "earned_at",
@@ -3131,7 +3301,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -3223,7 +3394,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "report_id",
@@ -3232,7 +3404,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "action_type",
@@ -3241,7 +3414,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "moderation_action_type"
+          "semantic_type_name": "moderation_action_type",
+          "type_kind": "enum"
         },
         {
           "name": "moderator_note",
@@ -3250,7 +3424,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "acted_at",
@@ -3260,7 +3435,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -3308,7 +3484,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "game_id",
@@ -3317,7 +3494,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -3326,7 +3504,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "version_id",
@@ -3335,7 +3514,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "duration_seconds",
@@ -3344,7 +3524,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "completed",
@@ -3354,7 +3535,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "score",
@@ -3364,7 +3546,8 @@
           },
           "not_null": false,
           "default": "0",
-          "semantic_type_name": "counter"
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -3374,7 +3557,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -3464,7 +3648,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -3473,7 +3658,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "role",
@@ -3482,7 +3668,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "session_role"
+          "semantic_type_name": "session_role",
+          "type_kind": "enum"
         },
         {
           "name": "joined_at",
@@ -3492,7 +3679,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -3563,7 +3751,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "session_id",
@@ -3572,7 +3761,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "player_id",
@@ -3581,7 +3771,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "action",
@@ -3591,7 +3782,8 @@
           },
           "not_null": true,
           "default_expr": "'{}'::jsonb",
-          "semantic_type_name": "json"
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
         },
         {
           "name": "sequence_num",
@@ -3601,7 +3793,8 @@
           },
           "not_null": true,
           "default": "0",
-          "semantic_type_name": "counter"
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -3611,7 +3804,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -3680,7 +3874,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "session_id",
@@ -3689,7 +3884,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "state",
@@ -3699,7 +3895,8 @@
           },
           "not_null": true,
           "default_expr": "'{}'::jsonb",
-          "semantic_type_name": "json"
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
         },
         {
           "name": "action_sequence_num",
@@ -3709,7 +3906,8 @@
           },
           "not_null": true,
           "default": "0",
-          "semantic_type_name": "counter"
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -3719,7 +3917,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [

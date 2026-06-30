@@ -19,7 +19,8 @@
           },
           "not_null": true,
           "comment": "Opaque user identifier",
-          "semantic_type_name": "text_id"
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
         },
         {
           "name": "username",
@@ -28,7 +29,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_nullable"
+          "semantic_type_name": "text_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "display_name",
@@ -38,7 +40,8 @@
           },
           "not_null": true,
           "default": "",
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "email",
@@ -47,7 +50,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_nullable"
+          "semantic_type_name": "text_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "email_verified",
@@ -57,7 +61,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -66,7 +71,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "updated_at",
@@ -75,7 +81,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -119,7 +126,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_id"
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
         },
         {
           "name": "email",
@@ -128,7 +136,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "expires_at",
@@ -137,7 +146,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "used",
@@ -147,7 +157,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -181,7 +192,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "password_hash",
@@ -190,7 +202,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -199,7 +212,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "updated_at",
@@ -208,7 +222,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -257,7 +272,8 @@
           },
           "not_null": true,
           "comment": "Session token",
-          "semantic_type_name": "text_id"
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
         },
         {
           "name": "user_id",
@@ -266,7 +282,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -275,7 +292,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "last_active",
@@ -284,7 +302,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "expires_at",
@@ -293,7 +312,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "ip",
@@ -302,7 +322,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_nullable"
+          "semantic_type_name": "text_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "user_agent",
@@ -311,7 +332,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_nullable"
+          "semantic_type_name": "text_nullable",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -366,7 +388,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "provider",
@@ -375,7 +398,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "provider_sub",
@@ -384,7 +408,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "provider_email",
@@ -393,7 +418,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_nullable"
+          "semantic_type_name": "text_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "linked_at",
@@ -402,7 +428,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -450,7 +477,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_id"
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
         },
         {
           "name": "user_id",
@@ -459,7 +487,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "email",
@@ -468,7 +497,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "expires_at",
@@ -477,7 +507,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "used",
@@ -487,7 +518,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -534,7 +566,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_id"
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
         },
         {
           "name": "user_id",
@@ -543,7 +576,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "expires_at",
@@ -552,7 +586,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "used",
@@ -562,7 +597,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -609,7 +645,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "secret",
@@ -618,7 +655,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "verified",
@@ -628,7 +666,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -637,7 +676,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -685,7 +725,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "bigint_id"
+          "semantic_type_name": "bigint_id",
+          "type_kind": "scalar"
         },
         {
           "name": "user_id",
@@ -694,7 +735,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "code_hash",
@@ -703,7 +745,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "used",
@@ -713,7 +756,8 @@
           },
           "not_null": true,
           "default": "false",
-          "semantic_type_name": "flag"
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
@@ -761,7 +805,8 @@
           },
           "not_null": true,
           "comment": "Credential ID from the authenticator",
-          "semantic_type_name": "text_id"
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
         },
         {
           "name": "user_id",
@@ -770,7 +815,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_ref"
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
         },
         {
           "name": "public_key",
@@ -779,7 +825,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "binary"
+          "semantic_type_name": "binary",
+          "type_kind": "scalar"
         },
         {
           "name": "attestation_type",
@@ -788,7 +835,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "text_field"
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
         },
         {
           "name": "transport",
@@ -797,7 +845,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "text_nullable"
+          "semantic_type_name": "text_nullable",
+          "type_kind": "scalar"
         },
         {
           "name": "sign_count",
@@ -807,7 +856,8 @@
           },
           "not_null": true,
           "default": "0",
-          "semantic_type_name": "int"
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -816,7 +866,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "epoch"
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
         },
         {
           "name": "last_used",
@@ -825,7 +876,8 @@
             "params": {}
           },
           "not_null": false,
-          "semantic_type_name": "epoch_nullable"
+          "semantic_type_name": "epoch_nullable",
+          "type_kind": "scalar"
         }
       ],
       "pk": [

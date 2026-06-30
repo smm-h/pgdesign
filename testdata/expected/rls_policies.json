@@ -30,7 +30,8 @@
           },
           "not_null": true,
           "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id"
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
         },
         {
           "name": "owner_id",
@@ -39,7 +40,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "ref"
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
         },
         {
           "name": "title",
@@ -49,7 +51,8 @@
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "short_text"
+          "semantic_type_name": "short_text",
+          "type_kind": "scalar"
         },
         {
           "name": "created_at",
@@ -59,7 +62,8 @@
           },
           "not_null": true,
           "default_expr": "now()",
-          "semantic_type_name": "timestamp"
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
         }
       ],
       "pk": [
