@@ -52,10 +52,14 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 			continue
 		}
 
-		// Filter schema tables by groups when configured.
+		// Filter schema tables by groups and/or source files when configured.
+		// Both filters compose via AND: groups narrows first, source narrows further.
 		outputSchema := schema
 		if len(out.Groups) > 0 {
-			outputSchema = schema.FilterByGroups(out.Groups)
+			outputSchema = outputSchema.FilterByGroups(out.Groups)
+		}
+		if len(out.Source) > 0 {
+			outputSchema = outputSchema.FilterBySource(out.Source)
 		}
 
 		switch out.Format {
