@@ -1181,3 +1181,135 @@ func TestFilterByGroupsEmpty(t *testing.T) {
 		t.Error("expected same schema pointer when groupNames is empty")
 	}
 }
+
+func TestFilterBySource_Basic(t *testing.T) {
+	schema := &Schema{
+		Tables: []Table{
+			{Name: "users", Schema: "public", SourceFile: "/project/schema/auth.toml"},
+			{Name: "sessions", Schema: "public", SourceFile: "/project/schema/auth.toml"},
+			{Name: "orders", Schema: "public", SourceFile: "/project/schema/commerce.toml"},
+			{Name: "products", Schema: "public", SourceFile: "/project/schema/commerce.toml"},
+		},
+	}
+	schema.buildTablesByName()
+
+	filtered := schema.FilterBySource([]string{"auth.toml"})
+	if len(filtered.Tables) != 2 {
+		t.Fatalf("expected 2 tables, got %d", len(filtered.Tables))
+	}
+	names := make(map[string]bool)
+	for _, tbl := range filtered.Tables {
+		names[tbl.Name] = true
+	}
+	if !names["users"] || !names["sessions"] {
+		t.Errorf("expected users and sessions, got %v", names)
+	}
+	if names["orders"] || names["products"] {
+		t.Errorf("orders/products should not be in filtered result")
+	}
+}
+
+func TestFilterBySource_TypesPassThrough(t *testing.T) {
+	schema := &Schema{
+		Tables: []Table{
+			{Name: "users", Schema: "public", SourceFile: "/project/schema/auth.toml"},
+			{Name: "orders", Schema: "public", SourceFile: "/project/schema/commerce.toml"},
+		},
+		Enums: []Enum{
+			{Name: "status", SourceFile: "/project/schema/commerce.toml", Values: []string{"active", "inactive"}},
+		},
+		Domains: []Domain{
+			{Name: "email_addr", SourceFile: "/project/schema/commerce.toml"},
+		},
+		CompositeTypes: []CompositeType{
+			{Name: "address", SourceFile: "/project/schema/commerce.toml"},
+		},
+		Views: []View{
+			{Name: "active_users", SourceFile: "/project/schema/commerce.toml"},
+		},
+		MaterializedViews: []MaterializedView{
+			{Name: "order_stats", SourceFile: "/project/schema/commerce.toml"},
+		},
+		Functions: []Function{
+			{Name: "get_user", SourceFile: "/project/schema/commerce.toml"},
+		},
+		Sequences: []Sequence{
+			{Name: "order_seq", SourceFile: "/project/schema/commerce.toml"},
+		},
+	}
+	schema.buildTablesByName()
+
+	// Filter to auth.toml only — all types from commerce.toml should still pass through.
+	filtered := schema.FilterBySource([]string{"auth.toml"})
+
+	if len(filtered.Tables) != 1 || filtered.Tables[0].Name != "users" {
+		t.Errorf("expected only users table, got %v", filtered.Tables)
+	}
+	if len(filtered.Enums) != 1 {
+		t.Errorf("expected 1 enum (pass-through), got %d", len(filtered.Enums))
+	}
+	if len(filtered.Domains) != 1 {
+		t.Errorf("expected 1 domain (pass-through), got %d", len(filtered.Domains))
+	}
+	if len(filtered.CompositeTypes) != 1 {
+		t.Errorf("expected 1 composite type (pass-through), got %d", len(filtered.CompositeTypes))
+	}
+	if len(filtered.Views) != 1 {
+		t.Errorf("expected 1 view (pass-through), got %d", len(filtered.Views))
+	}
+	if len(filtered.MaterializedViews) != 1 {
+		t.Errorf("expected 1 materialized view (pass-through), got %d", len(filtered.MaterializedViews))
+	}
+	if len(filtered.Functions) != 1 {
+		t.Errorf("expected 1 function (pass-through), got %d", len(filtered.Functions))
+	}
+	if len(filtered.Sequences) != 1 {
+		t.Errorf("expected 1 sequence (pass-through), got %d", len(filtered.Sequences))
+	}
+}
+
+func TestFilterBySource_EmptySource(t *testing.T) {
+	schema := &Schema{
+		Tables: []Table{
+			{Name: "users", Schema: "public", SourceFile: "/project/schema/auth.toml"},
+			{Name: "orders", Schema: "public", SourceFile: "/project/schema/commerce.toml"},
+		},
+	}
+	// Empty source list returns original schema.
+	result := schema.FilterBySource(nil)
+	if result != schema {
+		t.Error("expected same schema pointer when sources is empty")
+	}
+	result = schema.FilterBySource([]string{})
+	if result != schema {
+		t.Error("expected same schema pointer when sources is empty slice")
+	}
+}
+
+func TestFilterBySource_ANDWithGroups(t *testing.T) {
+	schema := &Schema{
+		Tables: []Table{
+			{Name: "users", Schema: "public", SourceFile: "/project/schema/auth.toml"},
+			{Name: "sessions", Schema: "public", SourceFile: "/project/schema/auth.toml"},
+			{Name: "orders", Schema: "public", SourceFile: "/project/schema/commerce.toml"},
+			{Name: "products", Schema: "public", SourceFile: "/project/schema/commerce.toml"},
+		},
+		Groups: map[string][]string{
+			"core": {"users", "orders"},
+		},
+	}
+	schema.buildTablesByName()
+
+	// Groups filter: core = {users, orders}
+	// Source filter: auth.toml = {users, sessions}
+	// AND intersection: {users}
+	filtered := schema.FilterByGroups([]string{"core"})
+	filtered = filtered.FilterBySource([]string{"auth.toml"})
+
+	if len(filtered.Tables) != 1 {
+		t.Fatalf("expected 1 table after AND composition, got %d", len(filtered.Tables))
+	}
+	if filtered.Tables[0].Name != "users" {
+		t.Errorf("expected table 'users', got %q", filtered.Tables[0].Name)
+	}
+}

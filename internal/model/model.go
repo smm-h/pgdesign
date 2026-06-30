@@ -21,6 +21,8 @@
 package model
 
 import (
+	"path/filepath"
+
 	"github.com/smm-h/pgdesign/internal/fd"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
@@ -133,6 +135,34 @@ func (s *Schema) FilterByGroups(groupNames []string) *Schema {
 	}
 
 	// Rebuild lookup map for the filtered set.
+	filtered.buildTablesByName()
+	return &filtered
+}
+
+// FilterBySource returns a shallow copy of the schema containing only tables
+// whose SourceFile basename matches one of the given source filenames. Other
+// schema fields (enums, domains, views, etc.) are preserved as-is — types
+// pass through because codegen needs them regardless of which source file
+// defined them. If sources is empty, the original schema is returned unchanged.
+func (s *Schema) FilterBySource(sources []string) *Schema {
+	if len(sources) == 0 {
+		return s
+	}
+
+	// Build a set of basenames to match against.
+	include := make(map[string]bool, len(sources))
+	for _, src := range sources {
+		include[filepath.Base(src)] = true
+	}
+
+	filtered := *s
+	filtered.Tables = nil
+	for _, t := range s.Tables {
+		if include[filepath.Base(t.SourceFile)] {
+			filtered.Tables = append(filtered.Tables, t)
+		}
+	}
+
 	filtered.buildTablesByName()
 	return &filtered
 }
