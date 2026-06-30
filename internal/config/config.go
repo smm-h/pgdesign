@@ -86,6 +86,7 @@ type OutputConfig[P PathKind] struct {
 	Lang       string   `toml:"lang"`       // for codegen: python, zig, go, ts, java, kotlin
 	Mode       string   `toml:"mode"`       // for codegen: validators, constants
 	Groups     []string `toml:"groups"`     // restrict output to tables in these groups
+	Source     []string `toml:"source"`     // restrict output to tables from these source files (basenames)
 	Backends   []string `toml:"backends"`   // for query-layer: ["pg"], ["memory"], or both (default: both)
 	Idempotent bool     `toml:"idempotent"` // for sql: add IF NOT EXISTS
 	Comments   *bool    `toml:"comments"`   // for sql: include COMMENT ON (default true)
@@ -185,6 +186,16 @@ func (c *Config[P]) Check() error {
 				errs = append(errs, fmt.Errorf("output.%s: split_mode is only supported for codegen mode=ddl lang=python", name))
 			}
 		}
+		if len(out.Source) > 0 {
+			if out.Format != "codegen" {
+				errs = append(errs, fmt.Errorf("output.%s: source is only supported for format = \"codegen\"", name))
+			}
+			for i, s := range out.Source {
+				if s == "" {
+					errs = append(errs, fmt.Errorf("output.%s: source[%d] must be a non-empty string", name, i))
+				}
+			}
+		}
 	}
 
 	return errors.Join(errs...)
@@ -220,6 +231,13 @@ func decodeOutput(raw map[string]any) (map[string]OutputConfig[RelativePath], er
 			for _, item := range arr {
 				if s, ok := item.(string); ok {
 					oc.Groups = append(oc.Groups, s)
+				}
+			}
+		}
+		if arr, ok := m["source"].([]any); ok {
+			for _, item := range arr {
+				if s, ok := item.(string); ok {
+					oc.Source = append(oc.Source, s)
 				}
 			}
 		}
@@ -345,6 +363,7 @@ func Resolve(raw *RawConfig, projectRoot string) (*ResolvedConfig, error) {
 				Lang:       out.Lang,
 				Mode:       out.Mode,
 				Groups:     out.Groups,
+				Source:     out.Source,
 				Backends:   out.Backends,
 				Idempotent: out.Idempotent,
 				Comments:   out.Comments,
