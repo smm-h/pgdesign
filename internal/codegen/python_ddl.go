@@ -1041,10 +1041,7 @@ func (g *PythonDDLGenerator) GenerateFiles(schema *model.Schema) (map[string][]b
 	case SplitModeFaceted:
 		return g.generateFacetedFiles(schema)
 	case SplitModeSelfContained:
-		return nil, []diagnostic.Diagnostic{{
-			Severity: diagnostic.Error,
-			Message:  "self-contained split mode not yet implemented",
-		}}
+		return g.generateSelfContainedFiles(schema)
 	default:
 		// SplitModeNone: default two-file output.
 		tuples, tables, diags := buildTuples(schema)
@@ -1234,6 +1231,106 @@ func (g *PythonDDLGenerator) generateFacetedFiles(schema *model.Schema) (map[str
 	// Generate schema_executor.py that imports and aggregates all faceted modules.
 	sections := buildSections(tuples)
 	files["schema_executor.py"] = renderFacetedExecutorFile(modules, sections)
+
+	return files, diags
+}
+
+// generateSelfContainedFiles produces per-source-file output where each file is
+// independently executable. Each file gets a preamble of ALL extension + schema +
+// type tuples (using IdempotentSQL) followed by its own table tuples (using SQL).
+// No shared executor is generated.
+func (g *PythonDDLGenerator) generateSelfContainedFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+	tuples, tables, diags := buildTuples(schema)
+
+	// Separate preamble tuples (extensions/schemas/types) from table-associated tuples.
+	var preambleTuples []ddlTuple
+	tablesBySource := make(map[string][]ddlTuple)
+	var sourceOrder []string
+	sourceSeen := make(map[string]bool)
+
+	for i := range tuples {
+		t := &tuples[i]
+		facet := tupleFacet(t)
+		switch facet {
+		case facetExtensions, facetTypes:
+			preambleTuples = append(preambleTuples, *t)
+		case facetTables:
+			src := t.SourceFile
+			if !sourceSeen[src] {
+				sourceSeen[src] = true
+				sourceOrder = append(sourceOrder, src)
+			}
+			tablesBySource[src] = append(tablesBySource[src], *t)
+		case facetPostTables:
+			// Post-table objects (views, functions, matviews) go with the source
+			// file they came from, or into a separate post_tables file if they
+			// have no source file association.
+			src := t.SourceFile
+			if src == "" {
+				src = "__post_tables__"
+			}
+			if !sourceSeen[src] {
+				sourceSeen[src] = true
+				sourceOrder = append(sourceOrder, src)
+			}
+			tablesBySource[src] = append(tablesBySource[src], *t)
+		}
+	}
+
+	// Derive base names and check for collisions.
+	baseToSource := make(map[string]string)
+	for _, src := range sourceOrder {
+		base := sourceBaseName(src)
+		if base == "" {
+			base = "unknown"
+		}
+		if src == "__post_tables__" {
+			base = "post_tables"
+		}
+		if existing, ok := baseToSource[base]; ok && existing != src {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Message:  fmt.Sprintf("self-contained output: source files %q and %q produce the same base name %q", existing, src, base),
+			})
+			return nil, diags
+		}
+		baseToSource[base] = src
+	}
+
+	// Build table lists per source file for TABLE_NAMES.
+	tablesBySourceFile := make(map[string][]model.Table)
+	for _, tbl := range tables {
+		tablesBySourceFile[tbl.SourceFile] = append(tablesBySourceFile[tbl.SourceFile], tbl)
+	}
+
+	// Convert preamble tuples to use IdempotentSQL where available.
+	idempotentPreamble := make([]ddlTuple, len(preambleTuples))
+	for i, t := range preambleTuples {
+		idempotentPreamble[i] = t
+		if t.IdempotentSQL != "" {
+			idempotentPreamble[i].SQL = t.IdempotentSQL
+		}
+	}
+
+	files := make(map[string][]byte)
+
+	for _, src := range sourceOrder {
+		base := sourceBaseName(src)
+		if base == "" {
+			base = "unknown"
+		}
+		if src == "__post_tables__" {
+			base = "post_tables"
+		}
+		fileName := base + ".py"
+
+		// Combine idempotent preamble + source-specific tuples.
+		combined := make([]ddlTuple, 0, len(idempotentPreamble)+len(tablesBySource[src]))
+		combined = append(combined, idempotentPreamble...)
+		combined = append(combined, tablesBySource[src]...)
+
+		files[fileName] = renderFacetFile(combined, tablesBySourceFile[src])
+	}
 
 	return files, diags
 }

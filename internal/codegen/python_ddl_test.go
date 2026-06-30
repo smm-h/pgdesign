@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -933,4 +934,189 @@ func TestPythonDDL_FacetedExecutor_FinalImport(t *testing.T) {
 	if !strings.Contains(executor, "from typing import Final, Protocol, Sequence, runtime_checkable") {
 		t.Error("faceted executor missing Final in typing import")
 	}
+}
+
+// -- 5.3: Self-contained split mode tests --
+
+func TestPythonDDL_SelfContainedOutput(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
+	files, diags := gen.GenerateFiles(schema)
+	for _, d := range diags {
+		if d.Severity == 0 {
+			t.Fatalf("generation error: %s", d.Message)
+		}
+	}
+
+	// Should have per-source files, no schema_executor.py.
+	expectedFiles := []string{"split_trace.py", "split_dispatch.py"}
+	for _, name := range expectedFiles {
+		if _, ok := files[name]; !ok {
+			t.Errorf("missing expected file %q in self-contained output", name)
+		}
+	}
+	if _, ok := files["schema_executor.py"]; ok {
+		t.Error("self-contained mode should not produce schema_executor.py")
+	}
+}
+
+func TestPythonDDL_SelfContainedPreamble(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
+	files, _ := gen.GenerateFiles(schema)
+
+	// Both files should contain the extension/schema preamble (schemas + extensions).
+	for _, name := range []string{"split_trace.py", "split_dispatch.py"} {
+		content := string(files[name])
+		if !strings.Contains(content, "CREATE SCHEMA") {
+			t.Errorf("%s should contain CREATE SCHEMA preamble", name)
+		}
+	}
+
+	// Both files should contain enum type definition (preamble).
+	for _, name := range []string{"split_trace.py", "split_dispatch.py"} {
+		content := string(files[name])
+		if !strings.Contains(content, "trace_status") {
+			t.Errorf("%s should contain trace_status enum preamble", name)
+		}
+	}
+}
+
+func TestPythonDDL_SelfContainedPreambleIdempotent(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
+	files, _ := gen.GenerateFiles(schema)
+
+	// Preamble tuples should use idempotent SQL (IF NOT EXISTS).
+	for _, name := range []string{"split_trace.py", "split_dispatch.py"} {
+		content := string(files[name])
+		// Schema creation should be idempotent.
+		if !strings.Contains(content, "IF NOT EXISTS") {
+			t.Errorf("%s preamble should use IF NOT EXISTS for idempotent SQL", name)
+		}
+	}
+}
+
+func TestPythonDDL_SelfContainedTableSeparation(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
+	files, _ := gen.GenerateFiles(schema)
+
+	traceContent := string(files["split_trace.py"])
+	dispatchContent := string(files["split_dispatch.py"])
+
+	// Trace file should contain spans and events tables.
+	if !strings.Contains(traceContent, "CREATE TABLE") {
+		t.Error("split_trace.py should contain CREATE TABLE")
+	}
+	if !strings.Contains(traceContent, "spans") {
+		t.Error("split_trace.py should contain spans table")
+	}
+	if !strings.Contains(traceContent, "events") {
+		t.Error("split_trace.py should contain events table")
+	}
+
+	// Dispatch file should contain tasks table.
+	if !strings.Contains(dispatchContent, "tasks") {
+		t.Error("split_dispatch.py should contain tasks table")
+	}
+
+	// Tables should not cross files (excluding preamble type references).
+	// The table DDL for "tasks" should only be in dispatch, not trace.
+	// We check for CREATE TABLE ... tasks specifically.
+	if strings.Contains(traceContent, `"table", "tasks"`) {
+		t.Error("split_trace.py should not contain tasks table tuple")
+	}
+	if strings.Contains(dispatchContent, `"table", "spans"`) {
+		t.Error("split_dispatch.py should not contain spans table tuple")
+	}
+}
+
+func TestPythonDDL_SelfContainedTableNames(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
+	files, _ := gen.GenerateFiles(schema)
+
+	// Each file should have TABLE_NAMES for its own tables only.
+	traceContent := string(files["split_trace.py"])
+	dispatchContent := string(files["split_dispatch.py"])
+
+	if !strings.Contains(traceContent, "TABLE_NAMES") {
+		t.Error("split_trace.py should contain TABLE_NAMES")
+	}
+	if !strings.Contains(dispatchContent, "TABLE_NAMES") {
+		t.Error("split_dispatch.py should contain TABLE_NAMES")
+	}
+}
+
+func TestPythonDDL_SelfContainedNoExecutor(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
+	files, _ := gen.GenerateFiles(schema)
+
+	// No file should contain executor constructs.
+	for name, content := range files {
+		s := string(content)
+		if strings.Contains(s, "async def execute(") {
+			t.Errorf("%s should not contain execute function in self-contained mode", name)
+		}
+		if strings.Contains(s, "class AsyncConnection") {
+			t.Errorf("%s should not contain AsyncConnection in self-contained mode", name)
+		}
+	}
+}
+
+func TestPythonDDL_SelfContainedDDLStmt(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
+	files, _ := gen.GenerateFiles(schema)
+
+	// All files should use DDLStmt namedtuple.
+	for name, content := range files {
+		s := string(content)
+		if !strings.Contains(s, `DDLStmt = namedtuple("DDLStmt"`) {
+			t.Errorf("%s should contain DDLStmt namedtuple definition", name)
+		}
+		if !strings.Contains(s, "STATEMENTS: Final[list[DDLStmt]]") {
+			t.Errorf("%s should use DDLStmt type annotation", name)
+		}
+	}
+}
+
+func TestPythonDDL_SelfContainedSingleSource(t *testing.T) {
+	// Test with a schema from a single source file (ddl_input.toml).
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
+	files, diags := gen.GenerateFiles(schema)
+	for _, d := range diags {
+		if d.Severity == 0 {
+			t.Fatalf("generation error: %s", d.Message)
+		}
+	}
+
+	// Single-source schema should produce one file.
+	if len(files) != 1 {
+		t.Errorf("expected 1 file for single-source schema, got %d: %v", len(files), fileNames(files))
+	}
+
+	// The file should contain both preamble and table DDL.
+	for _, content := range files {
+		s := string(content)
+		if !strings.Contains(s, "CREATE TABLE") {
+			t.Error("single-source self-contained file should contain CREATE TABLE")
+		}
+		if !strings.Contains(s, "DDLStmt(") {
+			t.Error("single-source self-contained file should contain DDLStmt entries")
+		}
+	}
+}
+
+// fileNames returns the sorted keys of a file map.
+func fileNames(files map[string][]byte) []string {
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
