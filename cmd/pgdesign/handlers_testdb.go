@@ -91,7 +91,7 @@ func handleTestdbGC(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	olderThanStr, _ := kwargs["older-than"].(string)
+	olderThanStr, _ := kwargs["older_than"].(string)
 	if olderThanStr == "" {
 		fmt.Fprintln(os.Stderr, "error: --older-than is required for testdb gc")
 		return 1
