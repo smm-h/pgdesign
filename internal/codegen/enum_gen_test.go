@@ -126,7 +126,7 @@ func TestGenerateTSEnum(t *testing.T) {
 func TestGeneratePythonEnum(t *testing.T) {
 	out := GenerateEnums([]model.Enum{testEnum()}, LangPython)
 	for _, want := range []string{
-		"class Status(str, Enum):",
+		"class Status(StrEnum):",
 		`"""user status"""`,
 		`ACTIVE = "active"`,
 		`IN_PROGRESS = "in-progress"`,

@@ -133,13 +133,13 @@ func generateTSEnum(e model.Enum) string {
 	return fmt.Sprintf("export type %s = %s;\n", typeName, strings.Join(quoted, " | "))
 }
 
-// generatePythonEnum produces a Python str Enum class for an enum.
-// The caller is responsible for adding "from enum import Enum" to the file.
+// generatePythonEnum produces a Python StrEnum class for an enum.
+// The caller is responsible for adding "from enum import StrEnum" to the file.
 func generatePythonEnum(e model.Enum) string {
 	var buf bytes.Buffer
 	className := toPascalCase(e.Name)
 
-	fmt.Fprintf(&buf, "class %s(str, Enum):\n", className)
+	fmt.Fprintf(&buf, "class %s(StrEnum):\n", className)
 	if e.Comment != "" {
 		fmt.Fprintf(&buf, "    \"\"\"%s\"\"\"\n", e.Comment)
 	}

@@ -67,7 +67,7 @@ func (g *PythonTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnos
 		buf.WriteString("from decimal import Decimal\n")
 	}
 	if len(schema.Enums) > 0 {
-		buf.WriteString("from enum import Enum\n")
+		buf.WriteString("from enum import StrEnum\n")
 	}
 
 	needAny := imports["Any"]

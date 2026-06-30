@@ -113,12 +113,12 @@ func TestPythonTypesGenerator_TransitionMap(t *testing.T) {
 	result := string(out)
 
 	// Enum class should be present.
-	if !strings.Contains(result, "class OrderStatus(str, Enum):") {
+	if !strings.Contains(result, "class OrderStatus(StrEnum):") {
 		t.Error("missing OrderStatus enum class")
 	}
 
 	// Enum import should be present.
-	if !strings.Contains(result, "from enum import Enum") {
+	if !strings.Contains(result, "from enum import StrEnum") {
 		t.Error("missing enum import")
 	}
 
