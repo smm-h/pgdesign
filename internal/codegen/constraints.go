@@ -38,10 +38,13 @@ func ExtractConstraints(table model.Table, schema model.Schema) ConstraintSet {
 		pkSet[col] = true
 	}
 
-	// Build map of enum names (lowercased) to their values.
-	enumMap := make(map[string][]string, len(schema.Enums))
+	// Build map of enum/state_machine type names (lowercased) to their valid values.
+	enumValues := make(map[string][]string, len(schema.Enums)+len(schema.StateMachineTransitions))
 	for _, e := range schema.Enums {
-		enumMap[strings.ToLower(e.Name)] = e.Values
+		enumValues[strings.ToLower(e.Name)] = e.Values
+	}
+	for _, smt := range schema.StateMachineTransitions {
+		enumValues[strings.ToLower(smt.TypeName)] = smt.States
 	}
 
 	// Build map of domain names (lowercased) to their definitions.
@@ -56,9 +59,11 @@ func ExtractConstraints(table model.Table, schema model.Schema) ConstraintSet {
 			cs.NotNullFields = append(cs.NotNullFields, col.Name)
 		}
 
-		// Enum: match column type against declared enums.
-		if vals, ok := enumMap[col.PGType.Base]; ok {
-			cs.EnumFields[col.Name] = vals
+		// Enum/state_machine: use TypeKind for detection, look up values by type name.
+		if col.TypeKind == "enum" || col.TypeKind == "state_machine" {
+			if vals, ok := enumValues[strings.ToLower(col.PGType.Base)]; ok {
+				cs.EnumFields[col.Name] = vals
+			}
 		}
 
 		// Domain: match column type against declared domains.
