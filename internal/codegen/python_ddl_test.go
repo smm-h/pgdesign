@@ -799,3 +799,138 @@ func TestPythonDDL_FacetedTableNames(t *testing.T) {
 		t.Error("types.py should not contain TABLE_NAMES")
 	}
 }
+
+// -- 5.1: exclude_sections, SECTION_KINDS, name validation tests --
+
+func TestPythonDDL_Executor_SectionKindsConstant(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "SECTION_KINDS: Final[frozenset[str]] = frozenset(s.kind for s in SECTIONS)") {
+		t.Error("executor missing SECTION_KINDS constant")
+	}
+}
+
+func TestPythonDDL_FacetedExecutor_SectionKindsConstant(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "SECTION_KINDS: Final[frozenset[str]] = frozenset(s.kind for s in SECTIONS)") {
+		t.Error("faceted executor missing SECTION_KINDS constant")
+	}
+}
+
+func TestPythonDDL_Executor_ExcludeSectionsParam(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "exclude_sections: Sequence[str] | None = None") {
+		t.Error("executor execute() missing exclude_sections parameter")
+	}
+}
+
+func TestPythonDDL_Executor_ExcludeSectionsValidation(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	// Mutual exclusion check.
+	if !strings.Contains(executor, "Cannot specify both sections and exclude_sections") {
+		t.Error("executor missing mutual exclusion validation for sections/exclude_sections")
+	}
+
+	// Unknown section name validation for sections param.
+	if !strings.Contains(executor, "Unknown section(s):") {
+		t.Error("executor missing unknown section name validation")
+	}
+
+	// The filter line should reference both sections and exclude_sections.
+	if !strings.Contains(executor, "s.kind not in exclude_sections") {
+		t.Error("executor filter should check exclude_sections")
+	}
+}
+
+func TestPythonDDL_Executor_VerifyExcludeSections(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	// verify() should accept both sections and exclude_sections.
+	verifyIdx := strings.Index(executor, "async def verify(")
+	if verifyIdx < 0 {
+		t.Fatal("executor missing verify function")
+	}
+	verifyBlock := executor[verifyIdx:]
+	nextFunc := strings.Index(verifyBlock[1:], "\nasync def ")
+	if nextFunc > 0 {
+		verifyBlock = verifyBlock[:nextFunc+1]
+	}
+
+	if !strings.Contains(verifyBlock, "exclude_sections: Sequence[str] | None = None") {
+		t.Error("verify() missing exclude_sections parameter")
+	}
+	if !strings.Contains(verifyBlock, "sections: Sequence[str] | None = None") {
+		t.Error("verify() missing sections parameter")
+	}
+	if !strings.Contains(verifyBlock, "Cannot specify both sections and exclude_sections") {
+		t.Error("verify() missing mutual exclusion validation")
+	}
+}
+
+// -- 5.2: extension_stubs tests --
+
+func TestPythonDDL_Executor_ExtensionStubsParam(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "extension_stubs: dict[str, str] | None = None") {
+		t.Error("executor execute() missing extension_stubs parameter")
+	}
+}
+
+func TestPythonDDL_Executor_ExtensionStubsLogic(t *testing.T) {
+	schema := loadTestSchema(t)
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	// The extension_stubs substitution should check section kind and op name.
+	if !strings.Contains(executor, `sec.kind == "extensions" and op.name in extension_stubs`) {
+		t.Error("executor missing extension_stubs substitution logic")
+	}
+	if !strings.Contains(executor, "stmt = extension_stubs[op.name]") {
+		t.Error("executor missing extension_stubs assignment")
+	}
+}
+
+func TestPythonDDL_FacetedExecutor_ExtensionStubsParam(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "extension_stubs: dict[str, str] | None = None") {
+		t.Error("faceted executor execute() missing extension_stubs parameter")
+	}
+}
+
+func TestPythonDDL_FacetedExecutor_FinalImport(t *testing.T) {
+	schema := loadSplitTestSchema(t)
+	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
+	files, _ := gen.GenerateFiles(schema)
+	executor := string(files["schema_executor.py"])
+
+	if !strings.Contains(executor, "from typing import Final, Protocol, Sequence, runtime_checkable") {
+		t.Error("faceted executor missing Final in typing import")
+	}
+}

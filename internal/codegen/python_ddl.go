@@ -815,7 +815,7 @@ func renderExecutorFile(sections []ddlSection) []byte {
 	buf.WriteString("from __future__ import annotations\n\n")
 	buf.WriteString("from collections import namedtuple\n")
 	buf.WriteString("from dataclasses import dataclass, field\n")
-	buf.WriteString("from typing import Protocol, Sequence, runtime_checkable\n\n\n")
+	buf.WriteString("from typing import Final, Protocol, Sequence, runtime_checkable\n\n\n")
 
 	// AsyncConnection protocol
 	buf.WriteString("@runtime_checkable\n")
@@ -897,21 +897,50 @@ func renderExecutorFile(sections []ddlSection) []byte {
 		}
 		buf.WriteString("        ],\n    ),\n")
 	}
-	buf.WriteString("]\n\n\n")
+	buf.WriteString("]\n\n")
+
+	// SECTION_KINDS constant
+	buf.WriteString("SECTION_KINDS: Final[frozenset[str]] = frozenset(s.kind for s in SECTIONS)\n\n\n")
 
 	// execute function
+	writeExecuteFunction(&buf)
+
+	// verify function
+	writeVerifyFunction(&buf)
+
+	// Convenience functions
+	writeConvenienceFunctions(&buf)
+
+	return buf.Bytes()
+}
+
+// writeExecuteFunction emits the async execute() function with exclude_sections,
+// extension_stubs, and section name validation.
+func writeExecuteFunction(buf *bytes.Buffer) {
 	buf.WriteString("async def execute(\n")
 	buf.WriteString("    conn: AsyncConnection,\n")
 	buf.WriteString("    sections: Sequence[str] | None = None,\n")
+	buf.WriteString("    exclude_sections: Sequence[str] | None = None,\n")
 	buf.WriteString("    idempotent: bool = True,\n")
 	buf.WriteString("    dry_run: bool = False,\n")
+	buf.WriteString("    extension_stubs: dict[str, str] | None = None,\n")
 	buf.WriteString(") -> ExecutionResult:\n")
 	buf.WriteString("    \"\"\"Execute DDL sections.\n\n")
 	buf.WriteString("    Two-phase execution: transactional sections run inside a single\n")
 	buf.WriteString("    transaction, non-transactional sections run outside afterward.\n")
 	buf.WriteString("    \"\"\"\n")
+	buf.WriteString("    if sections is not None and exclude_sections is not None:\n")
+	buf.WriteString("        raise ValueError(\"Cannot specify both sections and exclude_sections\")\n")
+	buf.WriteString("    if sections is not None:\n")
+	buf.WriteString("        unknown = set(sections) - SECTION_KINDS\n")
+	buf.WriteString("        if unknown:\n")
+	buf.WriteString("            raise ValueError(f\"Unknown section(s): {sorted(unknown)}. Valid: {sorted(SECTION_KINDS)}\")\n")
+	buf.WriteString("    if exclude_sections is not None:\n")
+	buf.WriteString("        unknown = set(exclude_sections) - SECTION_KINDS\n")
+	buf.WriteString("        if unknown:\n")
+	buf.WriteString("            raise ValueError(f\"Unknown section(s): {sorted(unknown)}. Valid: {sorted(SECTION_KINDS)}\")\n")
 	buf.WriteString("    result = ExecutionResult()\n")
-	buf.WriteString("    selected = [s for s in SECTIONS if sections is None or s.kind in sections]\n")
+	buf.WriteString("    selected = [s for s in SECTIONS if (sections is None or s.kind in sections) and (exclude_sections is None or s.kind not in exclude_sections)]\n")
 	buf.WriteString("    transactional = [s for s in selected if s.transactional]\n")
 	buf.WriteString("    non_transactional = [s for s in selected if not s.transactional]\n\n")
 	buf.WriteString("    # Phase 1: transactional ops in a single transaction.\n")
@@ -920,6 +949,8 @@ func renderExecutorFile(sections []ddlSection) []byte {
 	buf.WriteString("            for sec in transactional:\n")
 	buf.WriteString("                for op in sec.ops:\n")
 	buf.WriteString("                    stmt = op.idempotent_sql if idempotent and op.idempotent_sql else op.sql\n")
+	buf.WriteString("                    if extension_stubs is not None and sec.kind == \"extensions\" and op.name in extension_stubs:\n")
+	buf.WriteString("                        stmt = extension_stubs[op.name]\n")
 	buf.WriteString("                    try:\n")
 	buf.WriteString("                        await tx.execute(stmt)\n")
 	buf.WriteString("                        result.executed.append((sec.kind, op.name))\n")
@@ -934,6 +965,8 @@ func renderExecutorFile(sections []ddlSection) []byte {
 	buf.WriteString("    for sec in non_transactional:\n")
 	buf.WriteString("        for op in sec.ops:\n")
 	buf.WriteString("            stmt = op.idempotent_sql if idempotent and op.idempotent_sql else op.sql\n")
+	buf.WriteString("            if extension_stubs is not None and sec.kind == \"extensions\" and op.name in extension_stubs:\n")
+	buf.WriteString("                stmt = extension_stubs[op.name]\n")
 	buf.WriteString("            if not dry_run:\n")
 	buf.WriteString("                try:\n")
 	buf.WriteString("                    await conn.execute(stmt)\n")
@@ -943,20 +976,39 @@ func renderExecutorFile(sections []ddlSection) []byte {
 	buf.WriteString("            else:\n")
 	buf.WriteString("                result.executed.append((sec.kind, op.name))\n\n")
 	buf.WriteString("    return result\n\n\n")
+}
 
-	// verify function
-	buf.WriteString("async def verify(conn: AsyncConnection) -> VerifyResult:\n")
-	buf.WriteString("    \"\"\"Check which ops across all sections exist in the database.\"\"\"\n")
+// writeVerifyFunction emits the async verify() function with exclude_sections support.
+func writeVerifyFunction(buf *bytes.Buffer) {
+	buf.WriteString("async def verify(\n")
+	buf.WriteString("    conn: AsyncConnection,\n")
+	buf.WriteString("    sections: Sequence[str] | None = None,\n")
+	buf.WriteString("    exclude_sections: Sequence[str] | None = None,\n")
+	buf.WriteString(") -> VerifyResult:\n")
+	buf.WriteString("    \"\"\"Check which ops across selected sections exist in the database.\"\"\"\n")
+	buf.WriteString("    if sections is not None and exclude_sections is not None:\n")
+	buf.WriteString("        raise ValueError(\"Cannot specify both sections and exclude_sections\")\n")
+	buf.WriteString("    if sections is not None:\n")
+	buf.WriteString("        unknown = set(sections) - SECTION_KINDS\n")
+	buf.WriteString("        if unknown:\n")
+	buf.WriteString("            raise ValueError(f\"Unknown section(s): {sorted(unknown)}. Valid: {sorted(SECTION_KINDS)}\")\n")
+	buf.WriteString("    if exclude_sections is not None:\n")
+	buf.WriteString("        unknown = set(exclude_sections) - SECTION_KINDS\n")
+	buf.WriteString("        if unknown:\n")
+	buf.WriteString("            raise ValueError(f\"Unknown section(s): {sorted(unknown)}. Valid: {sorted(SECTION_KINDS)}\")\n")
 	buf.WriteString("    result = VerifyResult()\n")
-	buf.WriteString("    for sec in SECTIONS:\n")
+	buf.WriteString("    selected = [s for s in SECTIONS if (sections is None or s.kind in sections) and (exclude_sections is None or s.kind not in exclude_sections)]\n")
+	buf.WriteString("    for sec in selected:\n")
 	buf.WriteString("        for op in sec.ops:\n")
 	buf.WriteString("            if await sec.exists(conn, op):\n")
 	buf.WriteString("                result.present.append((sec.kind, op.name))\n")
 	buf.WriteString("            else:\n")
 	buf.WriteString("                result.missing.append((sec.kind, op.name))\n")
 	buf.WriteString("    return result\n\n\n")
+}
 
-	// Convenience functions
+// writeConvenienceFunctions emits the create_schema and ensure_schema helpers.
+func writeConvenienceFunctions(buf *bytes.Buffer) {
 	buf.WriteString("async def create_schema(conn: AsyncConnection) -> ExecutionResult:\n")
 	buf.WriteString("    \"\"\"Execute all DDL, failing on conflicts.\"\"\"\n")
 	buf.WriteString("    return await execute(conn, idempotent=False)\n\n\n")
@@ -964,8 +1016,6 @@ func renderExecutorFile(sections []ddlSection) []byte {
 	buf.WriteString("async def ensure_schema(conn: AsyncConnection) -> ExecutionResult:\n")
 	buf.WriteString("    \"\"\"Execute all DDL idempotently, safe to run on existing databases.\"\"\"\n")
 	buf.WriteString("    return await execute(conn, idempotent=True)\n")
-
-	return buf.Bytes()
 }
 
 // pythonBool returns a Python bool literal.
@@ -1198,7 +1248,7 @@ func renderFacetedExecutorFile(modules []facetModule, sections []ddlSection) []b
 	buf.WriteString("from __future__ import annotations\n\n")
 	buf.WriteString("from collections import namedtuple\n")
 	buf.WriteString("from dataclasses import dataclass, field\n")
-	buf.WriteString("from typing import Protocol, Sequence, runtime_checkable\n\n")
+	buf.WriteString("from typing import Final, Protocol, Sequence, runtime_checkable\n\n")
 
 	// Import STATEMENTS from each faceted module.
 	for _, m := range modules {
@@ -1303,73 +1353,19 @@ func renderFacetedExecutorFile(modules []facetModule, sections []ddlSection) []b
 		}
 		buf.WriteString("        ],\n    ),\n")
 	}
-	buf.WriteString("]\n\n\n")
+	buf.WriteString("]\n\n")
+
+	// SECTION_KINDS constant
+	buf.WriteString("SECTION_KINDS: Final[frozenset[str]] = frozenset(s.kind for s in SECTIONS)\n\n\n")
 
 	// execute function
-	buf.WriteString("async def execute(\n")
-	buf.WriteString("    conn: AsyncConnection,\n")
-	buf.WriteString("    sections: Sequence[str] | None = None,\n")
-	buf.WriteString("    idempotent: bool = True,\n")
-	buf.WriteString("    dry_run: bool = False,\n")
-	buf.WriteString(") -> ExecutionResult:\n")
-	buf.WriteString("    \"\"\"Execute DDL sections.\n\n")
-	buf.WriteString("    Two-phase execution: transactional sections run inside a single\n")
-	buf.WriteString("    transaction, non-transactional sections run outside afterward.\n")
-	buf.WriteString("    \"\"\"\n")
-	buf.WriteString("    result = ExecutionResult()\n")
-	buf.WriteString("    selected = [s for s in SECTIONS if sections is None or s.kind in sections]\n")
-	buf.WriteString("    transactional = [s for s in selected if s.transactional]\n")
-	buf.WriteString("    non_transactional = [s for s in selected if not s.transactional]\n\n")
-	buf.WriteString("    # Phase 1: transactional ops in a single transaction.\n")
-	buf.WriteString("    if transactional and not dry_run:\n")
-	buf.WriteString("        async with conn.transaction() as tx:\n")
-	buf.WriteString("            for sec in transactional:\n")
-	buf.WriteString("                for op in sec.ops:\n")
-	buf.WriteString("                    stmt = op.idempotent_sql if idempotent and op.idempotent_sql else op.sql\n")
-	buf.WriteString("                    try:\n")
-	buf.WriteString("                        await tx.execute(stmt)\n")
-	buf.WriteString("                        result.executed.append((sec.kind, op.name))\n")
-	buf.WriteString("                    except Exception as e:\n")
-	buf.WriteString("                        result.errors.append((sec.kind, op.name, str(e)))\n")
-	buf.WriteString("                        raise\n")
-	buf.WriteString("    elif transactional and dry_run:\n")
-	buf.WriteString("        for sec in transactional:\n")
-	buf.WriteString("            for op in sec.ops:\n")
-	buf.WriteString("                result.executed.append((sec.kind, op.name))\n\n")
-	buf.WriteString("    # Phase 2: non-transactional ops outside any transaction.\n")
-	buf.WriteString("    for sec in non_transactional:\n")
-	buf.WriteString("        for op in sec.ops:\n")
-	buf.WriteString("            stmt = op.idempotent_sql if idempotent and op.idempotent_sql else op.sql\n")
-	buf.WriteString("            if not dry_run:\n")
-	buf.WriteString("                try:\n")
-	buf.WriteString("                    await conn.execute(stmt)\n")
-	buf.WriteString("                    result.executed.append((sec.kind, op.name))\n")
-	buf.WriteString("                except Exception as e:\n")
-	buf.WriteString("                    result.errors.append((sec.kind, op.name, str(e)))\n")
-	buf.WriteString("            else:\n")
-	buf.WriteString("                result.executed.append((sec.kind, op.name))\n\n")
-	buf.WriteString("    return result\n\n\n")
+	writeExecuteFunction(&buf)
 
 	// verify function
-	buf.WriteString("async def verify(conn: AsyncConnection) -> VerifyResult:\n")
-	buf.WriteString("    \"\"\"Check which ops across all sections exist in the database.\"\"\"\n")
-	buf.WriteString("    result = VerifyResult()\n")
-	buf.WriteString("    for sec in SECTIONS:\n")
-	buf.WriteString("        for op in sec.ops:\n")
-	buf.WriteString("            if await sec.exists(conn, op):\n")
-	buf.WriteString("                result.present.append((sec.kind, op.name))\n")
-	buf.WriteString("            else:\n")
-	buf.WriteString("                result.missing.append((sec.kind, op.name))\n")
-	buf.WriteString("    return result\n\n\n")
+	writeVerifyFunction(&buf)
 
 	// Convenience functions
-	buf.WriteString("async def create_schema(conn: AsyncConnection) -> ExecutionResult:\n")
-	buf.WriteString("    \"\"\"Execute all DDL, failing on conflicts.\"\"\"\n")
-	buf.WriteString("    return await execute(conn, idempotent=False)\n\n\n")
-
-	buf.WriteString("async def ensure_schema(conn: AsyncConnection) -> ExecutionResult:\n")
-	buf.WriteString("    \"\"\"Execute all DDL idempotently, safe to run on existing databases.\"\"\"\n")
-	buf.WriteString("    return await execute(conn, idempotent=True)\n")
+	writeConvenienceFunctions(&buf)
 
 	return buf.Bytes()
 }
