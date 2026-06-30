@@ -27,6 +27,16 @@
   "private": false,
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": []
+    "exclusions": [
+      {
+        "reason": "**Breaking change.** Enum-typed columns in generated code now emit the enum class name (e.g., `RunStatus`) instead of the language's string type. Affects all 6 languages across types, constraints, GORM, and query-layer codegen. Powered by a new `TypeKind` field on columns and a unified `TypeResolver` that replaces per-language inline type switches.",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 5
+          }
+        ]
+      }
+    ]
   }
 }
