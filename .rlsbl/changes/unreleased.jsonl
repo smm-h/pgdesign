@@ -1,1 +1,2 @@
 {"commits":["38eb413b443bd647d72e54f97e43648f00a970dc"],"user_facing":true,"description":"**Breaking change.** Python enum codegen now emits `class Foo(StrEnum):` instead of `class Foo(str, Enum):`. Requires Python 3.11+.","type":"breaking"}
+{"commits":["e69cedffcc156e07f8141503cebba105eec5e573"],"user_facing":true,"description":"**New feature.** `build`, `generate`, and `codegen` commands now validate the schema before generating output. Invalid schemas produce error diagnostics and abort \u2014 no more generating code from broken schemas.","type":"feature"}
