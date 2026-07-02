@@ -2,6 +2,31 @@
 
 # Changelog
 
+## 0.21.0
+
+Flag renames for strictcli v0.18.0 compliance, fix testdb gc --older-than bug.
+
+<details>
+<summary>Context</summary>
+
+strictcli v0.18.0 bans bare --force and --no-* prefixed flags. Three flags renamed: --no-comments becomes --comments (Default(true)), --no-commit becomes --auto-commit (Default(true)), --force becomes --force-overwrite. Also fixed --older-than flag on testdb gc which was silently broken due to hyphen-to-underscore normalization mismatch.
+
+</details>
+
+### Breaking
+
+- **Breaking change.** Three flags renamed for strictcli v0.18.0 compliance: `--no-comments` becomes `--comments` (default true, negate with `--no-comments`), `--no-commit` becomes `--auto-commit` (default true, negate with `--no-auto-commit`), `--force` becomes `--force-overwrite`.
+
+### Fixes
+
+- **Fix.** `testdb gc --older-than` was silently broken — the kwargs key used hyphens instead of underscores, causing the flag to always be ignored.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.20.0
 
 Type resolution overhaul, StrEnum, faceted output v2, self-contained split mode, source routing, executor features, and validation gates.
@@ -34,12 +59,6 @@ Faceted output redesigned: DDLStmt namedtuple (7 fields) replaces 4-tuples. Shar
 - **New feature.** Generated executor gains `exclude_sections`, `SECTION_KINDS` constant with name validation, and `extension_stubs` parameter for substituting extension DDL in test environments.
 - **New feature.** Self-contained split mode (`--split-mode self-contained`): each per-source file includes an idempotent type preamble, making it independently executable without ordering dependencies.
 - **New feature.** Source-aware output routing: `source` field in `[output]` config filters tables by TOML source file. Composes with `groups` as AND. Types pass through unfiltered.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.19.3
 
