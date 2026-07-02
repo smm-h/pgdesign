@@ -12,7 +12,7 @@ order: 91
 
 PostgreSQL schema compiler
 
-Version: 0.16.2-0.20260625093253-5337c899fb17+dirty
+Version: 0.21.1-0.20260702233352-18f99950d61a+dirty
 
 ## Commands
 

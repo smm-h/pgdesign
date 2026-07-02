@@ -16,4 +16,4 @@ Generate all configured outputs from pgdesign.toml
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--dry-run` |  | bool |  |  | Show what would be generated without writing any files |
-| `--no-commit` |  | bool |  |  | Skip the automatic git commit of generated output files |
+| `--auto-commit` |  | bool | True |  | Automatically git commit generated output files |

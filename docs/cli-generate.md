@@ -16,7 +16,7 @@ Generate SQL DDL from TOML schema file(s) or directory
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--idempotent` |  | bool |  |  | Add IF NOT EXISTS guards to all generated DDL statements |
-| `--no-comments` |  | bool |  |  | Exclude COMMENT ON statements from the generated output |
+| `--comments` |  | bool | True |  | Include COMMENT ON statements in the generated output |
 | `--format` |  | str | sql |  | Output format for the generated schema representation |
 | `--strict-nf` |  | bool |  |  | Promote normal form violations to errors instead of warnings |
 

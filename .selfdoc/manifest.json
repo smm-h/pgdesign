@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "pgdesign",
   "slug": "pgdesign",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "",
   "language": "go",
   "base_url": "https://pgdesign.smmh.dev",
@@ -284,5 +284,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-07-02T21:10:18.495325+00:00"
+  "last_gen": "2026-07-02T23:36:18.224867+00:00"
 }
