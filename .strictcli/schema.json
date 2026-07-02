@@ -221,6 +221,13 @@
           "help": "Split Python DDL output mode",
           "name": "split-mode",
           "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file",
+          "name": "check",
+          "negatable": true,
+          "type": "bool"
         }
       ],
       "help": "Generate type-safe application code from schema definitions",
@@ -861,5 +868,5 @@
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
   "schema_version": 1,
-  "version": ""
+  "version": "0.21.1-0.20260702233352-18f99950d61a+dirty"
 }
