@@ -148,8 +148,10 @@ func TestFKGraph_MultiColumnFK(t *testing.T) {
 }
 
 // cascadeSchema builds a chain: a references b, b references c, c references d
-// (all CASCADE), plus e references a (SET NULL, non-cascade). Forward edges
-// follow the reference direction: a -> b -> c -> d.
+// (all CASCADE), plus e references a (SET NULL, non-cascade). ON DELETE
+// actions flow from the referenced table into the referencing tables, so
+// deleting from d cascades into c, then b, then a. Deleting from a cascades
+// nowhere (e references a with SET NULL, not CASCADE).
 func cascadeSchema() *Schema {
 	s := &Schema{
 		Tables: []Table{
@@ -172,10 +174,12 @@ func TestFKGraph_CascadeDepth(t *testing.T) {
 		table string
 		want  int
 	}{
-		{"a", 3},
-		{"b", 2},
-		{"c", 1},
-		{"d", 0},
+		// Deleting from d cascades d -> c -> b -> a (depth 3). Deleting from
+		// a affects nothing: e references a with SET NULL, not CASCADE.
+		{"a", 0},
+		{"b", 1},
+		{"c", 2},
+		{"d", 3},
 		{"e", 0},
 	}
 	for _, tt := range tests {
@@ -194,10 +198,10 @@ func TestFKGraph_CascadeBreadth(t *testing.T) {
 		table string
 		want  int
 	}{
-		{"a", 3},
-		{"b", 2},
-		{"c", 1},
-		{"d", 0},
+		{"a", 0},
+		{"b", 1},
+		{"c", 2},
+		{"d", 3},
 		{"e", 0},
 	}
 	for _, tt := range tests {
@@ -212,22 +216,55 @@ func TestFKGraph_CascadeChain(t *testing.T) {
 	s := cascadeSchema()
 	g := s.FKGraph
 
-	// From "a", BFS follows Forward CASCADE edges: a -> b -> c -> d.
-	chain := g.CascadeChain("a")
+	// Deleting from "d" cascades into the tables that (transitively)
+	// reference it with CASCADE: c, then b, then a.
+	chain := g.CascadeChain("d")
 	if len(chain) != 3 {
-		t.Fatalf("CascadeChain(a): expected 3 elements, got %d: %v", len(chain), chain)
+		t.Fatalf("CascadeChain(d): expected 3 elements, got %d: %v", len(chain), chain)
 	}
-	expected := []string{"b", "c", "d"}
+	expected := []string{"c", "b", "a"}
 	for i, want := range expected {
 		if chain[i] != want {
-			t.Errorf("CascadeChain(a)[%d] = %q, want %q", i, chain[i], want)
+			t.Errorf("CascadeChain(d)[%d] = %q, want %q", i, chain[i], want)
 		}
 	}
 
-	// From "d", no Forward CASCADE edges.
-	chain = g.CascadeChain("d")
+	// Deleting from "a" cascades nowhere: the only FK referencing a (from e)
+	// is SET NULL, and a's own FK to b is irrelevant (deleting a child never
+	// touches its parent).
+	chain = g.CascadeChain("a")
 	if chain != nil {
-		t.Errorf("CascadeChain(d): expected nil, got %v", chain)
+		t.Errorf("CascadeChain(a): expected nil, got %v", chain)
+	}
+}
+
+// TestFKGraph_CascadeDirection pins the traversal direction explicitly:
+// ON DELETE CASCADE deletes rows in REFERENCING tables when a REFERENCED row
+// is deleted, so the walk must follow Reverse edges (referenced -> referencing),
+// never Forward edges (referencing -> referenced).
+func TestFKGraph_CascadeDirection(t *testing.T) {
+	s := &Schema{
+		Tables: []Table{
+			{Name: "parent", Schema: "public"},
+			{Name: "child", Schema: "public", FKs: []FK{
+				{Name: "fk_child_parent", Columns: []string{"parent_id"}, RefTable: "parent", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+			}},
+		},
+	}
+	s.BuildFKGraph()
+	g := s.FKGraph
+
+	if got := g.CascadeDepth("parent"); got != 1 {
+		t.Errorf("CascadeDepth(parent) = %d, want 1 (deleting parent deletes child rows)", got)
+	}
+	if got := g.CascadeDepth("child"); got != 0 {
+		t.Errorf("CascadeDepth(child) = %d, want 0 (deleting child never touches parent)", got)
+	}
+	if chain := g.CascadeChain("parent"); len(chain) != 1 || chain[0] != "child" {
+		t.Errorf("CascadeChain(parent) = %v, want [child]", chain)
+	}
+	if chain := g.CascadeChain("child"); chain != nil {
+		t.Errorf("CascadeChain(child) = %v, want nil", chain)
 	}
 }
 

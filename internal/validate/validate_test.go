@@ -2038,7 +2038,10 @@ func TestW012_NoPolicies_NoDiag(t *testing.T) {
 // --- W013: CASCADE depth exceeds threshold ---
 
 func TestW013_CascadeDepthExceedsThreshold(t *testing.T) {
-	// Chain: a -> b -> c -> d -> e, all CASCADE. CascadeDepth(a) = 4 > 3.
+	// Chain: a references b references c references d references e, all
+	// CASCADE. Deleting from "e" cascades e -> d -> c -> b -> a, so
+	// CascadeDepth(e) = 4 > 3 and W013 must be attributed to "e" (the
+	// delete origin), not "a".
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "a", Schema: "public", Comment: "A", PK: []string{"id"},
@@ -2063,22 +2066,26 @@ func TestW013_CascadeDepthExceedsThreshold(t *testing.T) {
 	if len(found) == 0 {
 		t.Fatal("expected W013 for cascade depth > 3")
 	}
-	foundA := false
+	foundE := false
 	for _, d := range found {
-		if d.Table == "a" {
-			foundA = true
+		if d.Table == "e" {
+			foundE = true
 			if !strings.Contains(d.Message, "4") {
 				t.Errorf("expected depth 4 in message, got: %s", d.Message)
 			}
 		}
+		if d.Table == "a" {
+			t.Errorf("W013 wrongly attributed to 'a' (deleting from a cascades nowhere): %s", d.Message)
+		}
 	}
-	if !foundA {
-		t.Error("expected W013 on table 'a'")
+	if !foundE {
+		t.Error("expected W013 on table 'e' (the delete origin)")
 	}
 }
 
 func TestW013_CascadeDepthAtThreshold_NoDiag(t *testing.T) {
-	// Chain: a -> b -> c -> d, all CASCADE. CascadeDepth(a) = 3 = threshold. No trigger.
+	// Chain: a references b references c references d, all CASCADE.
+	// Deleting from "d" cascades depth 3 = threshold. No trigger anywhere.
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "a", Schema: "public", Comment: "A", PK: []string{"id"},
@@ -2097,39 +2104,39 @@ func TestW013_CascadeDepthAtThreshold_NoDiag(t *testing.T) {
 	schema.BuildFKGraph()
 	diags, _ := Validate(schema, nil)
 	for _, d := range diags {
-		if d.Code == "W013" && d.Table == "a" {
-			t.Fatalf("unexpected W013 for table 'a' when cascade depth equals threshold: %v", d)
+		if d.Code == "W013" {
+			t.Fatalf("unexpected W013 when max cascade depth equals threshold: %v", d)
 		}
 	}
 }
 
 // --- W014: CASCADE breadth exceeds threshold ---
 
+// w014SpokeTable builds a table with a single CASCADE FK referencing "hub".
+func w014SpokeTable(name string) model.Table {
+	return model.Table{Name: name, Schema: "public", Comment: name, PK: []string{"id"},
+		Columns: []model.Column{
+			{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+			{Name: "hub_id", PGType: typeinfo.T("uuid"), NotNull: true},
+		},
+		FKs: []model.FK{
+			{Name: "fk_" + name + "_hub", Columns: []string{"hub_id"}, RefSchema: "public", RefTable: "hub", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+		}}
+}
+
 func TestW014_CascadeBreadthExceedsThreshold(t *testing.T) {
-	// Table "hub" has CASCADE FKs to 5 leaf tables. CascadeBreadth(hub) = 5 >= 5.
+	// Five spoke tables each reference "hub" with CASCADE. Deleting from hub
+	// cascades into all 5 spokes: CascadeBreadth(hub) = 5 >= 5. W014 must be
+	// attributed to "hub" (the delete origin), not to the spokes.
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "hub", Schema: "public", Comment: "Hub", PK: []string{"id"},
-				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "a_id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "b_id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "c_id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "d_id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "e_id", PGType: typeinfo.T("uuid"), NotNull: true},
-				},
-				FKs: []model.FK{
-					{Name: "fk_a", Columns: []string{"a_id"}, RefSchema: "public", RefTable: "leaf_a", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
-					{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "leaf_b", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
-					{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "leaf_c", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
-					{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "leaf_d", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
-					{Name: "fk_e", Columns: []string{"e_id"}, RefSchema: "public", RefTable: "leaf_e", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
-				}},
-			{Name: "leaf_a", Schema: "public", Comment: "A", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
-			{Name: "leaf_b", Schema: "public", Comment: "B", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
-			{Name: "leaf_c", Schema: "public", Comment: "C", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
-			{Name: "leaf_d", Schema: "public", Comment: "D", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
-			{Name: "leaf_e", Schema: "public", Comment: "E", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			w014SpokeTable("spoke_a"),
+			w014SpokeTable("spoke_b"),
+			w014SpokeTable("spoke_c"),
+			w014SpokeTable("spoke_d"),
+			w014SpokeTable("spoke_e"),
 		},
 	}
 	schema.BuildFKGraph()
@@ -2142,39 +2149,31 @@ func TestW014_CascadeBreadthExceedsThreshold(t *testing.T) {
 	for _, d := range found {
 		if d.Table == "hub" {
 			foundHub = true
+		} else {
+			t.Errorf("W014 wrongly attributed to %q (deleting from a spoke cascades nowhere): %s", d.Table, d.Message)
 		}
 	}
 	if !foundHub {
-		t.Error("expected W014 on table 'hub'")
+		t.Error("expected W014 on table 'hub' (the delete origin)")
 	}
 }
 
 func TestW014_CascadeBreadthBelowThreshold_NoDiag(t *testing.T) {
-	// Table "hub" cascades to 3 leaf tables. CascadeBreadth(hub) = 3 < 5. No trigger.
+	// Three spoke tables reference "hub" with CASCADE. CascadeBreadth(hub) = 3 < 5. No trigger.
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "hub", Schema: "public", Comment: "Hub", PK: []string{"id"},
-				Columns: []model.Column{
-					{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "a_id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "b_id", PGType: typeinfo.T("uuid"), NotNull: true},
-					{Name: "c_id", PGType: typeinfo.T("uuid"), NotNull: true},
-				},
-				FKs: []model.FK{
-					{Name: "fk_a", Columns: []string{"a_id"}, RefSchema: "public", RefTable: "leaf_a", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
-					{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "leaf_b", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
-					{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "leaf_c", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
-				}},
-			{Name: "leaf_a", Schema: "public", Comment: "A", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
-			{Name: "leaf_b", Schema: "public", Comment: "B", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
-			{Name: "leaf_c", Schema: "public", Comment: "C", PK: []string{"id"}, Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			w014SpokeTable("spoke_a"),
+			w014SpokeTable("spoke_b"),
+			w014SpokeTable("spoke_c"),
 		},
 	}
 	schema.BuildFKGraph()
 	diags, _ := Validate(schema, nil)
 	for _, d := range diags {
-		if d.Code == "W014" && d.Table == "hub" {
-			t.Fatalf("unexpected W014 for table 'hub' with breadth 3 < 5: %v", d)
+		if d.Code == "W014" {
+			t.Fatalf("unexpected W014 with breadth 3 < 5: %v", d)
 		}
 	}
 }

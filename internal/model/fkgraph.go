@@ -20,8 +20,10 @@ type FKGraph struct {
 	FanOut  map[string]int      // table -> count of outgoing FK constraints
 }
 
-// CascadeDepth returns the max depth following ON DELETE CASCADE edges from the
-// given table. Uses DFS with a visited set to handle cycles defensively.
+// CascadeDepth returns the max depth of the ON DELETE CASCADE chain triggered
+// by deleting rows from the given table. ON DELETE actions flow from a
+// referenced table into the tables that reference it, so the walk follows
+// Reverse edges. Uses DFS with a visited set to handle cycles defensively.
 func (g *FKGraph) CascadeDepth(table string) int {
 	visited := make(map[string]bool)
 	return g.cascadeDepthDFS(table, visited)
@@ -30,14 +32,14 @@ func (g *FKGraph) CascadeDepth(table string) int {
 func (g *FKGraph) cascadeDepthDFS(table string, visited map[string]bool) int {
 	visited[table] = true
 	maxDepth := 0
-	for _, edge := range g.Forward[table] {
+	for _, edge := range g.Reverse[table] {
 		if !strings.EqualFold(edge.OnDelete, "CASCADE") {
 			continue
 		}
-		if visited[edge.ToTable] {
+		if visited[edge.FromTable] {
 			continue
 		}
-		depth := 1 + g.cascadeDepthDFS(edge.ToTable, visited)
+		depth := 1 + g.cascadeDepthDFS(edge.FromTable, visited)
 		if depth > maxDepth {
 			maxDepth = depth
 		}
@@ -46,15 +48,16 @@ func (g *FKGraph) cascadeDepthDFS(table string, visited map[string]bool) int {
 	return maxDepth
 }
 
-// CascadeBreadth returns the total count of distinct tables reachable via
-// CASCADE edges starting from the given table. Uses BFS. Does NOT count the
-// starting table.
+// CascadeBreadth returns the total count of distinct tables whose rows are
+// deleted when rows are deleted from the given table (transitively, via
+// CASCADE edges). Does NOT count the starting table.
 func (g *FKGraph) CascadeBreadth(table string) int {
 	return len(g.CascadeChain(table))
 }
 
-// CascadeChain returns an ordered list of tables in the cascade path (BFS order).
-// Does NOT include the starting table. Returns nil if no cascade edges exist.
+// CascadeChain returns an ordered list of tables affected by deleting rows
+// from the given table (BFS order over Reverse CASCADE edges). Does NOT
+// include the starting table. Returns nil if no cascade edges exist.
 func (g *FKGraph) CascadeChain(table string) []string {
 	visited := map[string]bool{table: true}
 	queue := []string{table}
@@ -63,16 +66,16 @@ func (g *FKGraph) CascadeChain(table string) []string {
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
-		for _, edge := range g.Forward[current] {
+		for _, edge := range g.Reverse[current] {
 			if !strings.EqualFold(edge.OnDelete, "CASCADE") {
 				continue
 			}
-			if visited[edge.ToTable] {
+			if visited[edge.FromTable] {
 				continue
 			}
-			visited[edge.ToTable] = true
-			result = append(result, edge.ToTable)
-			queue = append(queue, edge.ToTable)
+			visited[edge.FromTable] = true
+			result = append(result, edge.FromTable)
+			queue = append(queue, edge.FromTable)
 		}
 	}
 
