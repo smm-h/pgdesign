@@ -70,7 +70,7 @@ func generateDoc(schema *model.Schema) string {
 		// Foreign Keys
 		if len(t.FKs) > 0 {
 			b.WriteString("\n**Foreign Keys:**\n")
-			for _, fk := range sortedFKs(t.FKs) {
+			for _, fk := range model.SortedFKs(t.FKs) {
 				for i, col := range fk.Columns {
 					refCol := fk.RefColumns[i]
 					var ref string
@@ -87,7 +87,7 @@ func generateDoc(schema *model.Schema) string {
 		// Indexes
 		if len(t.Indexes) > 0 {
 			b.WriteString("\n**Indexes:**\n")
-			for _, idx := range sortedIndexes(t.Indexes) {
+			for _, idx := range model.SortedIndexes(t.Indexes) {
 				var parts []string
 				if idx.Method != "" {
 					parts = append(parts, idx.Method)
@@ -110,7 +110,7 @@ func generateDoc(schema *model.Schema) string {
 		// Unique Constraints
 		if len(t.Uniques) > 0 {
 			b.WriteString("\n**Unique Constraints:**\n")
-			for _, uq := range sortedUniques(t.Uniques) {
+			for _, uq := range model.SortedUniques(t.Uniques) {
 				fmt.Fprintf(&b, "- %s on (%s)\n", uq.Name, strings.Join(uq.Columns, ", "))
 			}
 		}
@@ -118,7 +118,7 @@ func generateDoc(schema *model.Schema) string {
 		// Check Constraints
 		if len(t.Checks) > 0 {
 			b.WriteString("\n**Check Constraints:**\n")
-			for _, ck := range sortedChecks(t.Checks) {
+			for _, ck := range model.SortedChecks(t.Checks) {
 				fmt.Fprintf(&b, "- %s: %s\n", ck.Name, ck.Expr)
 			}
 		}
@@ -126,7 +126,7 @@ func generateDoc(schema *model.Schema) string {
 		// Policies
 		if len(t.Policies) > 0 {
 			b.WriteString("\n**Policies:**\n")
-			for _, p := range sortedPolicies(t.Policies) {
+			for _, p := range model.SortedPolicies(t.Policies) {
 				var pParts []string
 				pParts = append(pParts, p.Operation)
 				if p.Role != "" {

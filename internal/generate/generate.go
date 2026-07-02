@@ -77,13 +77,13 @@ func generateJSON(schema *model.Schema) (string, error) {
 	s.Tables = make([]model.Table, len(schema.Tables))
 	copy(s.Tables, schema.Tables)
 	for i := range s.Tables {
-		s.Tables[i].FKs = sortedFKs(s.Tables[i].FKs)
-		s.Tables[i].Indexes = sortedIndexes(s.Tables[i].Indexes)
-		s.Tables[i].Uniques = sortedUniques(s.Tables[i].Uniques)
-		s.Tables[i].Checks = sortedChecks(s.Tables[i].Checks)
-		s.Tables[i].Exclusions = sortedExclusions(s.Tables[i].Exclusions)
-		s.Tables[i].Policies = sortedPolicies(s.Tables[i].Policies)
-		s.Tables[i].Triggers = sortedTriggers(s.Tables[i].Triggers)
+		s.Tables[i].FKs = model.SortedFKs(s.Tables[i].FKs)
+		s.Tables[i].Indexes = model.SortedIndexes(s.Tables[i].Indexes)
+		s.Tables[i].Uniques = model.SortedUniques(s.Tables[i].Uniques)
+		s.Tables[i].Checks = model.SortedChecks(s.Tables[i].Checks)
+		s.Tables[i].Exclusions = model.SortedExclusions(s.Tables[i].Exclusions)
+		s.Tables[i].Policies = model.SortedPolicies(s.Tables[i].Policies)
+		s.Tables[i].Triggers = model.SortedTriggers(s.Tables[i].Triggers)
 	}
 	s.Functions = make([]model.Function, len(schema.Functions))
 	copy(s.Functions, schema.Functions)
@@ -232,7 +232,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var fkStmts []string
 	for i := range tables {
 		t := &tables[i]
-		fks := sortedFKs(t.FKs)
+		fks := model.SortedFKs(t.FKs)
 		for _, fk := range fks {
 			fkCopy := fk
 			fkStmts = append(fkStmts, sql.AlterTableAddFK(t.Schema, t, &fkCopy, opts.Idempotent))
@@ -246,7 +246,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var uqStmts []string
 	for i := range tables {
 		t := &tables[i]
-		uqs := sortedUniques(t.Uniques)
+		uqs := model.SortedUniques(t.Uniques)
 		for _, uq := range uqs {
 			uqCopy := uq
 			uqStmts = append(uqStmts, sql.AlterTableAddUnique(t.Schema, t.Name, &uqCopy, opts.Idempotent))
@@ -260,7 +260,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var ckStmts []string
 	for i := range tables {
 		t := &tables[i]
-		cks := sortedChecks(t.Checks)
+		cks := model.SortedChecks(t.Checks)
 		for _, ck := range cks {
 			ckCopy := ck
 			ckStmts = append(ckStmts, sql.AlterTableAddCheck(t.Schema, t.Name, &ckCopy, opts.Idempotent))
@@ -274,7 +274,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var exclStmts []string
 	for i := range tables {
 		t := &tables[i]
-		excls := sortedExclusions(t.Exclusions)
+		excls := model.SortedExclusions(t.Exclusions)
 		for _, exc := range excls {
 			excCopy := exc
 			exclStmts = append(exclStmts, sql.AlterTableAddExclusion(t.Schema, t.Name, &excCopy, opts.Idempotent))
@@ -288,7 +288,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var idxStmts []string
 	for i := range tables {
 		t := &tables[i]
-		idxs := sortedIndexes(t.Indexes)
+		idxs := model.SortedIndexes(t.Indexes)
 		for _, idx := range idxs {
 			idxCopy := idx
 			idxStmts = append(idxStmts, sql.CreateIndex(t.Schema, &idxCopy, t.Name, opts.Idempotent, false))
@@ -438,7 +438,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var policyStmts []string
 	for i := range tables {
 		t := &tables[i]
-		policies := sortedPolicies(t.Policies)
+		policies := model.SortedPolicies(t.Policies)
 		for _, p := range policies {
 			policyStmts = append(policyStmts, sql.CreatePolicy(t.Schema, t.Name, p, opts.Idempotent, opts.PGVersion))
 		}
@@ -563,7 +563,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var triggerStmts []string
 	for i := range tables {
 		t := &tables[i]
-		triggers := sortedTriggers(t.Triggers)
+		triggers := model.SortedTriggers(t.Triggers)
 		for _, trig := range triggers {
 			if strings.HasPrefix(trig.Name, "_pgdesign_sm_") {
 				continue
@@ -576,76 +576,6 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	}
 
 	return strings.Join(sections, "\n\n") + "\n", diags
-}
-
-// sortedFKs returns FKs sorted alphabetically by name.
-func sortedFKs(fks []model.FK) []model.FK {
-	result := make([]model.FK, len(fks))
-	copy(result, fks)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-// sortedUniques returns unique constraints sorted alphabetically by name.
-func sortedUniques(uqs []model.UniqueConstraint) []model.UniqueConstraint {
-	result := make([]model.UniqueConstraint, len(uqs))
-	copy(result, uqs)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-// sortedChecks returns check constraints sorted alphabetically by name.
-func sortedChecks(cks []model.CheckConstraint) []model.CheckConstraint {
-	result := make([]model.CheckConstraint, len(cks))
-	copy(result, cks)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-// sortedExclusions returns exclusion constraints sorted alphabetically by name.
-func sortedExclusions(excls []model.ExclusionConstraint) []model.ExclusionConstraint {
-	sorted := make([]model.ExclusionConstraint, len(excls))
-	copy(sorted, excls)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Name < sorted[j].Name
-	})
-	return sorted
-}
-
-// sortedIndexes returns indexes sorted alphabetically by name.
-func sortedIndexes(idxs []model.Index) []model.Index {
-	result := make([]model.Index, len(idxs))
-	copy(result, idxs)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-// sortedPolicies returns policies sorted alphabetically by name.
-func sortedPolicies(pols []model.Policy) []model.Policy {
-	result := make([]model.Policy, len(pols))
-	copy(result, pols)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-// sortedTriggers returns triggers sorted alphabetically by name.
-func sortedTriggers(trigs []model.Trigger) []model.Trigger {
-	result := make([]model.Trigger, len(trigs))
-	copy(result, trigs)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
 }
 
 // collectPartitionChildren recursively emits CREATE TABLE ... PARTITION OF

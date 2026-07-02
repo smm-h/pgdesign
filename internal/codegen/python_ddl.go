@@ -257,7 +257,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 6. ALTER TABLE ADD CONSTRAINT FK (phase 6)
 	for i := range tables {
 		t := &tables[i]
-		fks := sortedFKs(t.FKs)
+		fks := model.SortedFKs(t.FKs)
 		for _, fk := range fks {
 			fkCopy := fk
 			constraintName := fk.Name
@@ -280,7 +280,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 7. ALTER TABLE ADD CONSTRAINT UNIQUE (phase 7)
 	for i := range tables {
 		t := &tables[i]
-		uqs := sortedUniques(t.Uniques)
+		uqs := model.SortedUniques(t.Uniques)
 		for _, uq := range uqs {
 			uqCopy := uq
 			constraintName := uq.Name
@@ -303,7 +303,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 8. ALTER TABLE ADD CONSTRAINT CHECK (phase 8)
 	for i := range tables {
 		t := &tables[i]
-		cks := sortedChecks(t.Checks)
+		cks := model.SortedChecks(t.Checks)
 		for _, ck := range cks {
 			ckCopy := ck
 			constraintName := ck.Name
@@ -326,7 +326,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 8b. ALTER TABLE ADD CONSTRAINT EXCLUDE (phase 8)
 	for i := range tables {
 		t := &tables[i]
-		excls := sortedExclusions(t.Exclusions)
+		excls := model.SortedExclusions(t.Exclusions)
 		for _, exc := range excls {
 			excCopy := exc
 			constraintName := exc.Name
@@ -349,7 +349,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 9. CREATE INDEX (phase 9)
 	for i := range tables {
 		t := &tables[i]
-		idxs := sortedIndexes(t.Indexes)
+		idxs := model.SortedIndexes(t.Indexes)
 		for _, idx := range idxs {
 			idxCopy := idx
 			idxName := idx.Name
@@ -528,7 +528,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 13. CREATE POLICY (phase 13)
 	for i := range tables {
 		t := &tables[i]
-		policies := sortedPolicies(t.Policies)
+		policies := model.SortedPolicies(t.Policies)
 		for _, p := range policies {
 			tuples = append(tuples, ddlTuple{
 				SQL:           sql.CreatePolicy(t.Schema, t.Name, p, false, schema.PGVersion),
@@ -697,7 +697,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 17. CREATE TRIGGER (phase 17)
 	for i := range tables {
 		t := &tables[i]
-		triggers := sortedTriggers(t.Triggers)
+		triggers := model.SortedTriggers(t.Triggers)
 		for _, trig := range triggers {
 			tuples = append(tuples, ddlTuple{
 				SQL:           sql.CreateTrigger(t.Schema, t.Name, trig, false, schema.PGVersion),
@@ -1572,70 +1572,6 @@ func hasExtension(schema *model.Schema, name string) bool {
 		}
 	}
 	return false
-}
-
-// Helper sort functions (duplicated from generate package to avoid circular deps).
-func sortedFKs(fks []model.FK) []model.FK {
-	result := make([]model.FK, len(fks))
-	copy(result, fks)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-func sortedUniques(uqs []model.UniqueConstraint) []model.UniqueConstraint {
-	result := make([]model.UniqueConstraint, len(uqs))
-	copy(result, uqs)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-func sortedChecks(cks []model.CheckConstraint) []model.CheckConstraint {
-	result := make([]model.CheckConstraint, len(cks))
-	copy(result, cks)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-func sortedExclusions(excls []model.ExclusionConstraint) []model.ExclusionConstraint {
-	sorted := make([]model.ExclusionConstraint, len(excls))
-	copy(sorted, excls)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Name < sorted[j].Name
-	})
-	return sorted
-}
-
-func sortedIndexes(idxs []model.Index) []model.Index {
-	result := make([]model.Index, len(idxs))
-	copy(result, idxs)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-func sortedPolicies(pols []model.Policy) []model.Policy {
-	result := make([]model.Policy, len(pols))
-	copy(result, pols)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
-}
-
-func sortedTriggers(trigs []model.Trigger) []model.Trigger {
-	result := make([]model.Trigger, len(trigs))
-	copy(result, trigs)
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
-	return result
 }
 
 // topoSortViews sorts views by DependsOn.
