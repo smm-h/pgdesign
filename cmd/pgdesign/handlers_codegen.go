@@ -34,6 +34,13 @@ func handleCodegen(kwargs map[string]interface{}) int {
 	mode := kwargs["mode"].(string)
 	quiet := kwargs["quiet"].(bool)
 	splitMode, _ := kwargs["split_mode"].(string)
+	checkOnly := kwargs["check"].(bool)
+	outputPath, _ := kwargs["output"].(string)
+
+	if checkOnly && outputPath == "" {
+		fmt.Fprintln(os.Stderr, "error: --check requires --output (the path to verify against)")
+		return 1
+	}
 
 	gen, err := SelectGenerator(lang, mode)
 	if err != nil {
@@ -56,7 +63,18 @@ func handleCodegen(kwargs map[string]interface{}) int {
 		for _, d := range diags {
 			fmt.Fprintf(os.Stderr, "%s: %s\n", d.Severity, d.Message)
 		}
-		outputPath, _ := kwargs["output"].(string)
+		if checkOnly {
+			// --check: compare each generated file against disk and orphan-scan
+			// the output directory (same ownership rules as `pgdesign build`).
+			// Writes nothing; exits 1 on any missing, stale, or orphan file.
+			planned := make(map[string][]byte, len(files))
+			owned := make(map[string]bool, len(files))
+			for relPath, data := range files {
+				planned[filepath.Join(outputPath, relPath)] = data
+				owned[filepath.ToSlash(filepath.Clean(relPath))] = true
+			}
+			return reportFreshness(planned, map[string]map[string]bool{outputPath: owned}, quiet)
+		}
 		if outputPath == "" {
 			// Without -o, print each file to stdout with a header.
 			for relPath, data := range files {
@@ -90,7 +108,13 @@ func handleCodegen(kwargs map[string]interface{}) int {
 		fmt.Fprintf(os.Stderr, "%s: %s\n", d.Severity, d.Message)
 	}
 
-	if outputPath, ok := kwargs["output"].(string); ok && outputPath != "" {
+	if checkOnly {
+		// --check for single-file output: byte-exact comparison only. Plain
+		// file paths get no directory ownership scanning (see freshness.go).
+		return reportFreshness(map[string][]byte{outputPath: out}, nil, quiet)
+	}
+
+	if outputPath != "" {
 		if err := os.WriteFile(outputPath, out, 0o644); err != nil {
 			fmt.Fprintf(os.Stderr, "error: cannot write output file: %v\n", err)
 			return 1

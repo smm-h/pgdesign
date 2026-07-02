@@ -173,6 +173,7 @@ func main() {
 			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toInterfaceSlice(SupportedModeNames())...)),
 			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
 			strictcli.StringFlag("split-mode", "Split Python DDL output mode", strictcli.Default(nil), strictcli.Choices("faceted", "self-contained")),
+			strictcli.BoolFlag("check", "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file", strictcli.Default(false)),
 		),
 	)
 

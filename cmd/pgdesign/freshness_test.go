@@ -375,3 +375,147 @@ func TestPlan_OwnedDirs_ConfiguredSVGInsideOwnedDirIsNotOrphan(t *testing.T) {
 		t.Errorf("rendered SVG inside owned dir must not be an orphan, got %v", orphans)
 	}
 }
+
+// codegenKwargs returns the kwargs handleCodegen expects. End-to-end CLI
+// invocation is exercised at the handler level here (the --split-mode flag
+// currently breaks CLI parsing pending a strictcli upgrade).
+func codegenKwargs(schemaPath, lang, mode, output string, check bool) map[string]interface{} {
+	kwargs := map[string]interface{}{
+		"path":  []interface{}{schemaPath},
+		"lang":  lang,
+		"mode":  mode,
+		"quiet": true,
+		"check": check,
+	}
+	if output != "" {
+		kwargs["output"] = output
+	}
+	return kwargs
+}
+
+func TestHandleCodegenCheck_RequiresOutput(t *testing.T) {
+	dir := writeFreshnessProject(t, "")
+	schemaPath := filepath.Join(dir, "schema.toml")
+	if code := handleCodegen(codegenKwargs(schemaPath, "go", "constants", "", true)); code != 1 {
+		t.Fatalf("--check without --output must exit 1, got %d", code)
+	}
+}
+
+// TestHandleCodegenCheck_MultiFile covers the full --check lifecycle for a
+// multi-file mode: missing before generation, fresh after, stale after edit,
+// orphan after planting an unowned file, and __pycache__ exemption.
+func TestHandleCodegenCheck_MultiFile(t *testing.T) {
+	dir := writeFreshnessProject(t, "")
+	schemaPath := filepath.Join(dir, "schema.toml")
+	outDir := filepath.Join(dir, "out")
+	kwCheck := func() map[string]interface{} {
+		kw := codegenKwargs(schemaPath, "python", "ddl", outDir, true)
+		kw["split_mode"] = "faceted"
+		return kw
+	}
+	kwWrite := func() map[string]interface{} {
+		kw := codegenKwargs(schemaPath, "python", "ddl", outDir, false)
+		kw["split_mode"] = "faceted"
+		return kw
+	}
+
+	// Before generation: everything is missing.
+	if code := handleCodegen(kwCheck()); code != 1 {
+		t.Fatalf("--check before generation must exit 1, got %d", code)
+	}
+
+	// Generate, then check: clean.
+	if code := handleCodegen(kwWrite()); code != 0 {
+		t.Fatalf("codegen write failed with exit code %d", code)
+	}
+	if code := handleCodegen(kwCheck()); code != 0 {
+		t.Fatalf("--check on fresh output must exit 0, got %d", code)
+	}
+
+	// Corrupt one generated file: stale.
+	entries, err := os.ReadDir(outDir)
+	if err != nil || len(entries) == 0 {
+		t.Fatalf("read out dir: %v (%d entries)", err, len(entries))
+	}
+	victim := filepath.Join(outDir, entries[0].Name())
+	original, err := os.ReadFile(victim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(victim, append(original, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := handleCodegen(kwCheck()); code != 1 {
+		t.Fatalf("--check with stale file must exit 1, got %d", code)
+	}
+	if err := os.WriteFile(victim, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Plant an orphan: fail.
+	orphanPath := filepath.Join(outDir, "leftover.py")
+	if err := os.WriteFile(orphanPath, []byte("# leftover\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := handleCodegen(kwCheck()); code != 1 {
+		t.Fatalf("--check with orphan must exit 1, got %d", code)
+	}
+	if _, err := os.Stat(orphanPath); err != nil {
+		t.Fatalf("--check must never delete anything: %v", err)
+	}
+	if err := os.Remove(orphanPath); err != nil {
+		t.Fatal(err)
+	}
+
+	// __pycache__ and *.pyc are exempt.
+	if err := os.MkdirAll(filepath.Join(outDir, "__pycache__"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "__pycache__", "x.cpython-312.pyc"), []byte("bc"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "stray.pyc"), []byte("bc"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := handleCodegen(kwCheck()); code != 0 {
+		t.Fatalf("--check must ignore __pycache__ and *.pyc, got exit %d", code)
+	}
+}
+
+// TestHandleCodegenCheck_SingleFile covers --check for a single-file mode:
+// byte-exact comparison, no directory ownership.
+func TestHandleCodegenCheck_SingleFile(t *testing.T) {
+	dir := writeFreshnessProject(t, "")
+	schemaPath := filepath.Join(dir, "schema.toml")
+	outFile := filepath.Join(dir, "out", "constants.go")
+
+	if code := handleCodegen(codegenKwargs(schemaPath, "go", "constants", outFile, true)); code != 1 {
+		t.Fatalf("--check with missing file must exit 1, got %d", code)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if code := handleCodegen(codegenKwargs(schemaPath, "go", "constants", outFile, false)); code != 0 {
+		t.Fatalf("codegen write failed")
+	}
+	if code := handleCodegen(codegenKwargs(schemaPath, "go", "constants", outFile, true)); code != 0 {
+		t.Fatalf("--check on fresh single file must exit 0, got %d", code)
+	}
+
+	// A sibling file next to a single-file output is NOT an orphan: plain
+	// file paths get no directory ownership.
+	if err := os.WriteFile(filepath.Join(dir, "out", "unrelated.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := handleCodegen(codegenKwargs(schemaPath, "go", "constants", outFile, true)); code != 0 {
+		t.Fatalf("sibling files must not affect single-file --check, got exit %d", code)
+	}
+
+	if err := os.WriteFile(outFile, []byte("// tampered\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := handleCodegen(codegenKwargs(schemaPath, "go", "constants", outFile, true)); code != 1 {
+		t.Fatalf("--check on stale single file must exit 1, got %d", code)
+	}
+}
