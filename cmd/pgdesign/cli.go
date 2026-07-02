@@ -43,23 +43,23 @@ func main() {
 	app.RegisterCheck("workload", checkWorkload)
 	app.RegisterCheck("build", checkBuild)
 
-	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output"))
+	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output", strictcli.Default(false)))
 	app.GlobalFlag(strictcli.StringFlag("config", "Path to pgdesign.toml (bypasses directory search)", strictcli.Default(nil)))
 
 	app.Command("generate", "Generate SQL DDL from TOML schema file(s) or directory", handleGenerate,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all generated DDL statements"),
-			strictcli.BoolFlag("no-comments", "Exclude COMMENT ON statements from the generated output"),
+			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all generated DDL statements", strictcli.Default(false)),
+			strictcli.BoolFlag("no-comments", "Exclude COMMENT ON statements from the generated output", strictcli.Default(false)),
 			strictcli.StringFlag("format", "Output format for the generated schema representation", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg", "doc", "graphql")),
-			strictcli.BoolFlag("strict-nf", "Promote normal form violations to errors instead of warnings"),
+			strictcli.BoolFlag("strict-nf", "Promote normal form violations to errors instead of warnings", strictcli.Default(false)),
 		),
 	)
 
 	app.Command("fmt", "Format a pgdesign TOML schema file or directory in place", handleFmt,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to the TOML schema file or directory to format")),
 		strictcli.WithFlags(
-			strictcli.BoolFlag("check", "Check if file is already formatted (exit 1 if not)"),
+			strictcli.BoolFlag("check", "Check if file is already formatted (exit 1 if not)", strictcli.Default(false)),
 			strictcli.StringFlag("table-order", "Table ordering strategy: dependency-based or alphabetical",
 				strictcli.Default("dependency"), strictcli.Choices("dependency", "alphabetical")),
 			strictcli.StringFlag("column-order", "Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve",
@@ -72,14 +72,14 @@ func main() {
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
 			strictcli.StringFlag("schema", "PostgreSQL schema name(s) to introspect (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.BoolFlag("extensions", "Discover extension types, functions, and opclasses"),
+			strictcli.BoolFlag("extensions", "Discover extension types, functions, and opclasses", strictcli.Default(false)),
 		),
 	)
 
 	app.Command("diff", "Compare schema file(s) or directory against another target", handleDiff,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(
-			strictcli.BoolFlag("json", "Output the schema diff in machine-readable JSON format"),
+			strictcli.BoolFlag("json", "Output the schema diff in machine-readable JSON format", strictcli.Default(false)),
 			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil)),
 			strictcli.StringFlag("against", "Path to TOML schema file or directory to compare against", strictcli.Default(nil)),
 			strictcli.StringFlag("base", "Git ref to compare the current schema against (e.g., main)", strictcli.Default(nil)),
@@ -106,7 +106,7 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
-			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing"),
+			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing", strictcli.Default(false)),
 			strictcli.IntFlag("timeout", "Advisory lock acquisition timeout in seconds before aborting", strictcli.Default(30)),
 		),
 	)
@@ -137,7 +137,7 @@ func main() {
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database"),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
 			strictcli.IntFlag("timeout", "Maximum time in seconds before the test run is aborted", strictcli.Default(60)),
-			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema"),
+			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema", strictcli.Default(false)),
 		),
 	)
 
@@ -147,11 +147,11 @@ func main() {
 			strictcli.IntFlag("rows", "Number of rows to generate per table in the schema", strictcli.Default(10)),
 			strictcli.IntFlag("seed", "Random number generator seed for deterministic output", strictcli.Default(nil)),
 			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.BoolFlag("apply", "Insert generated seed data directly into the database"),
+			strictcli.BoolFlag("apply", "Insert generated seed data directly into the database", strictcli.Default(false)),
 			strictcli.StringFlag("db", "PostgreSQL connection URL, required when using --apply", strictcli.Default(nil)),
 			strictcli.StringFlag("schema", "PostgreSQL schema name to filter seed generation to", strictcli.Repeatable(), strictcli.Unique(true), strictcli.Default(nil)),
 			strictcli.StringFlag("format", "SQL output format for generated seed data statements", strictcli.Default("insert"), strictcli.Choices("insert", "copy")),
-			strictcli.BoolFlag("clean", "Emit TRUNCATE CASCADE statements before inserting seeds"),
+			strictcli.BoolFlag("clean", "Emit TRUNCATE CASCADE statements before inserting seeds", strictcli.Default(false)),
 			strictcli.StringFlag("mode", "Data generation strategy: normal values or edge-cases", strictcli.Default("normal"), strictcli.Choices("normal", "edge-cases")),
 		),
 	)
@@ -178,15 +178,15 @@ func main() {
 
 	app.Command("build", "Generate all configured outputs from pgdesign.toml", handleBuild,
 		strictcli.WithFlags(
-			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files"),
-			strictcli.BoolFlag("no-commit", "Skip the automatic git commit of generated output files"),
+			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files", strictcli.Default(false)),
+			strictcli.BoolFlag("no-commit", "Skip the automatic git commit of generated output files", strictcli.Default(false)),
 		),
 	)
 
 	app.Command("stats", "Analyze database statistics, index usage, and health", handleStats,
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.BoolFlag("json", "Output all statistics in machine-readable JSON format"),
+			strictcli.BoolFlag("json", "Output all statistics in machine-readable JSON format", strictcli.Default(false)),
 			strictcli.StringFlag("schema", "PostgreSQL schema name to analyze (repeatable for multiple)", strictcli.Repeatable(), strictcli.Unique(true)),
 		),
 		strictcli.WithArgs(strictcli.NewArg("path", "TOML schema file(s) for cross-referencing with live data", strictcli.Variadic(), strictcli.ArgRequired(false))),
@@ -214,7 +214,7 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.StringFlag("language", "Target programming language(s) for wrapper generation", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Default(nil)),
-			strictcli.BoolFlag("force", "Overwrite existing wrapper files without prompting"),
+			strictcli.BoolFlag("force", "Overwrite existing wrapper files without prompting", strictcli.Default(false)),
 			strictcli.StringFlag("ci", "CI provider for workflow generation (e.g., github-actions)", strictcli.Default(nil)),
 		),
 	)
