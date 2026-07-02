@@ -1,0 +1,62 @@
+# Fixture for the build-freshness and orphan-detection tests.
+# Deliberately contains NO state machine type: state ordering is currently
+# nondeterministic across schema builds (parse/convert.go iterates the states
+# map), which would make byte-exact freshness comparison flap.
+
+[meta]
+schema = "freshness"
+
+[types.role]
+kind = "enum"
+values = ["admin", "user", "guest"]
+comment = "Account role"
+
+[types.int_val]
+kind = "scalar"
+base_type = "integer"
+comment = "Plain integer"
+
+[tables.accounts]
+comment = "Registered accounts"
+
+[tables.accounts.columns.id]
+type = "id"
+
+[tables.accounts.columns.name]
+type = "short_text"
+
+[tables.accounts.columns.role]
+type = "role"
+
+[tables.accounts.columns.slug]
+type = "short_text"
+
+[tables.accounts.unique.uq_accounts_slug]
+columns = ["slug"]
+
+[tables.accounts.checks.ck_accounts_slug_len]
+expr = "LENGTH(slug) <= 100"
+
+[tables.orders]
+comment = "Account orders"
+
+[tables.orders.columns.id]
+type = "id"
+
+[tables.orders.columns.account_id]
+type = "ref"
+
+[tables.orders.columns.total_cents]
+type = "int_val"
+
+[tables.orders.fks.fk_orders_accounts]
+columns = ["account_id"]
+ref_table = "accounts"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.orders.checks.ck_orders_total_positive]
+expr = "total_cents >= 0"
+
+[tables.orders.indexes.idx_orders_account]
+columns = ["account_id"]

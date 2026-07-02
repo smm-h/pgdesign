@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/smm-h/pgdesign/internal/codegen"
 	"github.com/smm-h/pgdesign/internal/config"
@@ -20,6 +21,14 @@ import (
 type PlanResult struct {
 	// Files maps absolute file path to planned content.
 	Files map[string][]byte
+	// OwnedDirs maps each output directory owned by a multi-file codegen
+	// output to the set of slash-separated relative file paths planned
+	// inside it. Files found on disk inside an owned directory that are
+	// neither in this set nor on the orphan ignore list (see orphanIgnored)
+	// are orphans -- a hard error during build and check. Single-file
+	// outputs own nothing; only MultiFileGenerator outputs own their
+	// directory. Two outputs sharing a directory union their sets.
+	OwnedDirs map[string]map[string]bool
 	// Diagnostics collected during generation (warnings, info).
 	Diagnostics []diagnostic.Diagnostic
 }
@@ -31,7 +40,8 @@ type PlanResult struct {
 // across runs), making byte-for-byte comparison unreliable.
 func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Registry, pgVersion int) (*PlanResult, error) {
 	result := &PlanResult{
-		Files: make(map[string][]byte),
+		Files:     make(map[string][]byte),
+		OwnedDirs: make(map[string]map[string]bool),
 	}
 
 	// Sort output names for deterministic ordering.
@@ -108,7 +118,37 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 		}
 	}
 
+	// Any configured output path (any format, including SVG outputs that are
+	// skipped from planning because d2 rendering is non-deterministic) that
+	// falls inside an owned directory is treated as owned, not orphaned. The
+	// same applies to companion files already in the plan (e.g., .sqlsplit).
+	if len(result.OwnedDirs) > 0 {
+		for _, name := range names {
+			result.markOwnedIfInside(string(cfg.Output[name].Path))
+		}
+		for fp := range result.Files {
+			result.markOwnedIfInside(fp)
+		}
+	}
+
 	return result, nil
+}
+
+// markOwnedIfInside adds path to the owned set of any owned directory that
+// contains it, so planned or configured outputs inside an owned directory are
+// never classified as orphans.
+func (r *PlanResult) markOwnedIfInside(path string) {
+	for dir, owned := range r.OwnedDirs {
+		rel, err := filepath.Rel(dir, path)
+		if err != nil || rel == "." {
+			continue
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == ".." || strings.HasPrefix(rel, "../") {
+			continue
+		}
+		owned[rel] = true
+	}
 }
 
 // planGenerate handles generation via generate.Generate for a single format.
@@ -181,13 +221,21 @@ func planCodegen(name string, schema *model.Schema, out config.OutputConfig[conf
 		ddlGen.SplitMode = codegen.SplitMode(out.SplitMode)
 	}
 
-	// MultiFileGenerator: collect all files into the plan.
+	// MultiFileGenerator: collect all files into the plan. The output path is
+	// a directory that the output now owns (see PlanResult.OwnedDirs); when
+	// two outputs share a directory, their owned sets are unioned.
 	if mfg, ok := gen.(codegen.MultiFileGenerator); ok {
 		files, diags := mfg.GenerateFiles(schema)
 		result.Diagnostics = append(result.Diagnostics, diags...)
+		owned := result.OwnedDirs[outPath]
+		if owned == nil {
+			owned = make(map[string]bool, len(files))
+			result.OwnedDirs[outPath] = owned
+		}
 		for relPath, data := range files {
 			fp := filepath.Join(outPath, relPath)
 			result.Files[fp] = data
+			owned[filepath.ToSlash(filepath.Clean(relPath))] = true
 		}
 		return nil
 	}

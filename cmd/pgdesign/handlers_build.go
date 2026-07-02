@@ -98,8 +98,30 @@ func handleBuild(kwargs map[string]interface{}) int {
 	}
 	sort.Strings(paths)
 
+	// Orphan detection: files on disk inside owned multi-file codegen output
+	// directories that the current configuration does not produce.
+	orphans, orphanErr := scanAllOrphans(plan.OwnedDirs)
+	if orphanErr != nil {
+		fmt.Fprintf(os.Stderr, "build: orphan scan: %v\n", orphanErr)
+		return 1
+	}
+
 	if dryRun {
-		return handleBuildDryRun(paths, plan, quiet)
+		return handleBuildDryRun(paths, plan, orphans, quiet)
+	}
+
+	// Orphans are a hard error and block the build BEFORE anything is written:
+	// with unexpected files inside an owned output directory the desired tree
+	// state is ambiguous, so the consumer must resolve the orphans first.
+	// pgdesign never deletes the orphans itself.
+	if len(orphans) > 0 {
+		fmt.Fprintln(os.Stderr, "build: orphan file(s) found in owned output directories:")
+		for _, p := range orphans {
+			fmt.Fprintf(os.Stderr, "  %s\n", p)
+		}
+		fmt.Fprintln(os.Stderr, orphanExplanation)
+		fmt.Fprintln(os.Stderr, "error: refusing to write any outputs while orphans exist")
+		return 1
 	}
 
 	// Handle SVG outputs that were excluded from Plan (non-deterministic rendering).
@@ -140,8 +162,11 @@ func handleBuild(kwargs map[string]interface{}) int {
 	return 0
 }
 
-// handleBuildDryRun compares planned files against disk and reports per-file status.
-func handleBuildDryRun(paths []string, plan *PlanResult, quiet bool) int {
+// handleBuildDryRun compares planned files against disk and reports per-file
+// status. Missing and stale files keep exit code 0 (previewing what a build
+// would write is the point of --dry-run), but orphans exit 1: they are a hard
+// error that would also block the real build.
+func handleBuildDryRun(paths []string, plan *PlanResult, orphans []string, quiet bool) int {
 	var missing, stale, fresh int
 	for _, p := range paths {
 		existing, err := os.ReadFile(p)
@@ -159,7 +184,16 @@ func handleBuildDryRun(paths []string, plan *PlanResult, quiet bool) int {
 			fresh++
 		}
 	}
-	fmt.Fprintf(os.Stderr, "\n%d file(s): %d missing, %d stale, %d fresh\n", missing+stale+fresh, missing, stale, fresh)
+	for _, p := range orphans {
+		fmt.Fprintf(os.Stderr, "[orphan]  %s\n", p)
+	}
+	if len(orphans) > 0 {
+		fmt.Fprintln(os.Stderr, orphanExplanation)
+	}
+	fmt.Fprintf(os.Stderr, "\n%d file(s): %d missing, %d stale, %d fresh; %d orphan(s)\n", missing+stale+fresh, missing, stale, fresh, len(orphans))
+	if len(orphans) > 0 {
+		return 1
+	}
 	return 0
 }
 

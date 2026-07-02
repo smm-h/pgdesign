@@ -610,7 +610,17 @@ func checkBuild(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	if len(staleFiles) == 0 && len(missingFiles) == 0 {
+	// Orphan detection: files on disk inside owned multi-file codegen output
+	// directories that the current configuration does not produce. Hard error.
+	orphans, orphanErr := scanAllOrphans(plan.OwnedDirs)
+	if orphanErr != nil {
+		return strictcli.CheckResult{
+			Status:  "fail",
+			Message: fmt.Sprintf("orphan scan failed: %v", orphanErr),
+		}
+	}
+
+	if len(staleFiles) == 0 && len(missingFiles) == 0 && len(orphans) == 0 {
 		return strictcli.CheckResult{
 			Status:  "pass",
 			Message: "all build outputs are fresh",
@@ -624,10 +634,16 @@ func checkBuild(ctx strictcli.CheckContext) strictcli.CheckResult {
 	for _, p := range staleFiles {
 		details = append(details, fmt.Sprintf("[stale] %s", p))
 	}
+	for _, p := range orphans {
+		details = append(details, fmt.Sprintf("[orphan] %s", p))
+	}
+	if len(orphans) > 0 {
+		details = append(details, "orphans: "+orphanExplanation)
+	}
 
 	return strictcli.CheckResult{
 		Status:  "fail",
-		Message: fmt.Sprintf("working tree is not a fixed point of pgdesign build: %d file(s) would change, %d file(s) missing", len(staleFiles), len(missingFiles)),
+		Message: fmt.Sprintf("working tree is not a fixed point of pgdesign build: %d file(s) would change, %d file(s) missing, %d orphan file(s)", len(staleFiles), len(missingFiles), len(orphans)),
 		Details: details,
 	}
 }
