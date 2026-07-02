@@ -1,0 +1,144 @@
+# Representative schema for the codegen determinism contract test.
+# Deliberately exercises: multiple enums, multiple CHECK constraints,
+# a scalar domain type, a state machine, FKs, uniques, and indexes --
+# the constructs whose extraction involves maps and therefore risks
+# nondeterministic iteration order in generators.
+
+[meta]
+version = 1
+schema = "determinism"
+
+[types.role]
+kind = "enum"
+values = ["admin", "user", "guest"]
+comment = "Account role"
+
+[types.plan]
+kind = "enum"
+values = ["free", "pro", "enterprise"]
+comment = "Billing plan"
+
+[types.region]
+kind = "enum"
+values = ["eu", "us", "apac"]
+comment = "Deployment region"
+
+[types.email_addr]
+kind = "scalar"
+base_type = "text"
+check = "VALUE LIKE '%@%'"
+comment = "Email address domain"
+
+[types.int_val]
+kind = "scalar"
+base_type = "integer"
+comment = "Plain integer"
+
+[types.order_status]
+kind = "state_machine"
+initial = "pending"
+comment = "Order lifecycle"
+
+[types.order_status.states.pending]
+[types.order_status.states.processing]
+[types.order_status.states.shipped]
+[types.order_status.states.cancelled]
+terminal = true
+[types.order_status.states.delivered]
+terminal = true
+
+[[types.order_status.transitions]]
+name = "start_processing"
+from = ["pending"]
+to = "processing"
+
+[[types.order_status.transitions]]
+name = "ship"
+from = ["processing"]
+to = "shipped"
+
+[[types.order_status.transitions]]
+name = "deliver"
+from = ["shipped"]
+to = "delivered"
+
+[[types.order_status.transitions]]
+name = "cancel"
+from = ["pending", "processing"]
+to = "cancelled"
+
+[tables.accounts]
+comment = "Registered accounts"
+
+[tables.accounts.columns.id]
+type = "id"
+
+[tables.accounts.columns.name]
+type = "short_text"
+
+[tables.accounts.columns.email]
+type = "email_addr"
+
+[tables.accounts.columns.slug]
+type = "short_text"
+
+[tables.accounts.columns.role]
+type = "role"
+
+[tables.accounts.columns.plan]
+type = "plan"
+
+[tables.accounts.columns.region]
+type = "region"
+
+[tables.accounts.columns.age]
+type = "int_val"
+
+[tables.accounts.columns.score]
+type = "int_val"
+
+[tables.accounts.columns.created_at]
+type = "timestamp"
+
+[tables.accounts.unique.uq_accounts_slug]
+columns = ["slug"]
+
+[tables.accounts.checks.ck_accounts_age_range]
+expr = "age >= 0 AND age <= 150"
+
+[tables.accounts.checks.ck_accounts_score_min]
+expr = "score >= 0"
+
+[tables.accounts.checks.ck_accounts_slug_len]
+expr = "LENGTH(slug) <= 100"
+
+[tables.orders]
+comment = "Account orders"
+
+[tables.orders.columns.id]
+type = "id"
+
+[tables.orders.columns.account_id]
+type = "ref"
+
+[tables.orders.columns.status]
+type = "order_status"
+
+[tables.orders.columns.total_cents]
+type = "int_val"
+
+[tables.orders.columns.note]
+type = "short_text"
+nullable = true
+
+[tables.orders.fks.fk_orders_accounts]
+columns = ["account_id"]
+ref_table = "accounts"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.orders.checks.ck_orders_total_positive]
+expr = "total_cents >= 0"
+
+[tables.orders.indexes.idx_orders_account]
+columns = ["account_id"]
