@@ -1,5 +1,17 @@
 {
   "checks": {
+    "build": {
+      "depends_on": [
+        "validation"
+      ],
+      "fast": true,
+      "needs_network": false,
+      "pure": true,
+      "severity": "error",
+      "tags": [
+        "build"
+      ]
+    },
     "coverage": {
       "depends_on": [
         "validation"
@@ -80,9 +92,9 @@
           "type": "bool"
         },
         {
-          "default": false,
-          "help": "Skip the automatic git commit of generated output files",
-          "name": "no-commit",
+          "default": true,
+          "help": "Automatically git commit generated output files",
+          "name": "auto-commit",
           "negatable": true,
           "type": "bool"
         }
@@ -183,6 +195,7 @@
             "constraints",
             "ddl",
             "drizzle",
+            "enums",
             "gorm",
             "jpa",
             "query-layer",
@@ -198,6 +211,15 @@
         {
           "help": "Write output to a file at this path instead of stdout",
           "name": "output",
+          "type": "str"
+        },
+        {
+          "choices": [
+            "faceted",
+            "self-contained"
+          ],
+          "help": "Split Python DDL output mode",
+          "name": "split-mode",
           "type": "str"
         }
       ],
@@ -297,9 +319,9 @@
           "type": "bool"
         },
         {
-          "default": false,
-          "help": "Exclude COMMENT ON statements from the generated output",
-          "name": "no-comments",
+          "default": true,
+          "help": "Include COMMENT ON statements in the generated output",
+          "name": "comments",
           "negatable": true,
           "type": "bool"
         },
@@ -553,6 +575,11 @@
       "name": "quiet",
       "negatable": true,
       "type": "bool"
+    },
+    {
+      "help": "Path to pgdesign.toml (bypasses directory search)",
+      "name": "config",
+      "type": "str"
     }
   ],
   "groups": {
@@ -785,7 +812,7 @@
             {
               "default": false,
               "help": "Overwrite existing wrapper files without prompting",
-              "name": "force",
+              "name": "force-overwrite",
               "negatable": true,
               "type": "bool"
             },
@@ -834,5 +861,5 @@
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
   "schema_version": 1,
-  "version": "0.16.2-0.20260625093253-5337c899fb17+dirty"
+  "version": ""
 }
