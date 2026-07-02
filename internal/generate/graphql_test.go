@@ -64,7 +64,7 @@ func TestGraphQLEnums(t *testing.T) {
 				Schema: "app",
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
-					{Name: "status", PGType: typeinfo.MustParse("status"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("status"), NotNull: true, TypeKind: "enum"},
 				},
 				PK: []string{"id"},
 			},
@@ -84,6 +84,71 @@ func TestGraphQLEnums(t *testing.T) {
 		if !strings.Contains(out, c) {
 			t.Errorf("expected %q in output, got:\n%s", c, out)
 		}
+	}
+}
+
+func TestGraphQLStateMachine(t *testing.T) {
+	// State machine types appear in schema.Enums (build.go appends them) and
+	// their columns carry TypeKind "state_machine". They render like enums.
+	schema := &model.Schema{
+		Name: "app",
+		Enums: []model.Enum{
+			{Schema: "app", Name: "order_state", Values: []string{"pending", "shipped", "delivered"}},
+		},
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "state", PGType: typeinfo.MustParse("order_state"), NotNull: true, TypeKind: "state_machine"},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	out := mustGenerate(t, schema, Options{Format: "graphql"})
+
+	checks := []string{
+		"enum OrderState {",
+		"  PENDING",
+		"  SHIPPED",
+		"  DELIVERED",
+		"state: OrderState!",
+	}
+	for _, c := range checks {
+		if !strings.Contains(out, c) {
+			t.Errorf("expected %q in output, got:\n%s", c, out)
+		}
+	}
+}
+
+func TestGraphQLEnumWithoutTypeKind(t *testing.T) {
+	// A column of a custom type without TypeKind (e.g., hand-constructed
+	// schemas) falls back to String, even if an enum with that name exists.
+	schema := &model.Schema{
+		Name: "app",
+		Enums: []model.Enum{
+			{Schema: "app", Name: "mood", Values: []string{"happy", "sad"}},
+		},
+		Tables: []model.Table{
+			{
+				Name:   "entries",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "mood", PGType: typeinfo.MustParse("mood"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	out := mustGenerate(t, schema, Options{Format: "graphql"})
+
+	if !strings.Contains(out, "mood: String!") {
+		t.Errorf("expected mood: String! for column without TypeKind, got:\n%s", out)
 	}
 }
 
@@ -262,7 +327,7 @@ func TestGraphQLGoldenFile(t *testing.T) {
 					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
 					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
 					{Name: "email", PGType: typeinfo.MustParse("varchar"), NotNull: true},
-					{Name: "role", PGType: typeinfo.MustParse("user_role"), NotNull: true},
+					{Name: "role", PGType: typeinfo.MustParse("user_role"), NotNull: true, TypeKind: "enum"},
 					{Name: "metadata", PGType: typeinfo.MustParse("jsonb"), NotNull: false},
 					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
 				},
@@ -274,7 +339,7 @@ func TestGraphQLGoldenFile(t *testing.T) {
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
 					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
-					{Name: "status", PGType: typeinfo.MustParse("order_status"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("order_status"), NotNull: true, TypeKind: "enum"},
 					{Name: "total", PGType: typeinfo.MustParse("numeric"), NotNull: true},
 					{Name: "tags", PGType: typeinfo.MustParse("text"), NotNull: true, Array: true},
 					{Name: "notes", PGType: typeinfo.MustParse("text"), NotNull: false},

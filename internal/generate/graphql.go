@@ -27,9 +27,11 @@ func toCamelCase(s string) string {
 	return strings.ToLower(pascal[:1]) + pascal[1:]
 }
 
-// pgTypeToGraphQL maps a PostgreSQL type to a GraphQL type.
-func pgTypeToGraphQL(pgType string, isPK bool, enumNames map[string]bool) string {
-	switch pgType {
+// pgTypeToGraphQL maps a column's PostgreSQL type to a GraphQL type. Enum and
+// state machine columns are detected via Column.TypeKind (set by both
+// Schema.Build and introspection), not by name lookup against schema.Enums.
+func pgTypeToGraphQL(col *model.Column, isPK bool) string {
+	switch col.PGType.Base {
 	case "int4", "int2":
 		return "Int"
 	case "int8":
@@ -56,8 +58,8 @@ func pgTypeToGraphQL(pgType string, isPK bool, enumNames map[string]bool) string
 	case "bytea":
 		return "String"
 	}
-	if enumNames[pgType] {
-		return toPascalCase(pgType)
+	if col.TypeKind == "enum" || col.TypeKind == "state_machine" {
+		return toPascalCase(col.PGType.Base)
 	}
 	return "String"
 }
@@ -65,12 +67,6 @@ func pgTypeToGraphQL(pgType string, isPK bool, enumNames map[string]bool) string
 // generateGraphQL produces a GraphQL schema from the resolved schema.
 func generateGraphQL(schema *model.Schema) string {
 	var b strings.Builder
-
-	// Build set of enum names for type lookup.
-	enumNames := make(map[string]bool, len(schema.Enums))
-	for _, e := range schema.Enums {
-		enumNames[e.Name] = true
-	}
 
 	if schema.FKGraph == nil {
 		schema.BuildFKGraph()
@@ -119,13 +115,14 @@ func generateGraphQL(schema *model.Schema) string {
 		}
 
 		// Columns.
-		for _, col := range t.Columns {
+		for i := range t.Columns {
+			col := &t.Columns[i]
 			isPK := pkCols[col.Name]
 			var gqlType string
 			if isPK {
 				gqlType = "ID"
 			} else {
-				gqlType = pgTypeToGraphQL(col.PGType.Base, false, enumNames)
+				gqlType = pgTypeToGraphQL(col, false)
 			}
 
 			b.WriteString("  ")
