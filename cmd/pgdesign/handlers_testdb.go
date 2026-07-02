@@ -170,7 +170,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 		}
 	}
 
-	force, _ := kwargs["force"].(bool)
+	force, _ := kwargs["force_overwrite"].(bool)
 	outputName, _ := kwargs["output"].(string)
 	ciProvider, _ := kwargs["ci"].(string)
 
@@ -267,7 +267,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 
 		// Check if file exists.
 		if _, err := os.Stat(absPath); err == nil && !force {
-			fmt.Fprintf(os.Stderr, "error: %s already exists (use --force to overwrite)\n", relPath)
+			fmt.Fprintf(os.Stderr, "error: %s already exists (use --force-overwrite to overwrite)\n", relPath)
 			return 1
 		}
 
@@ -312,7 +312,7 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 		ciAbsPath := filepath.Join(cwd, ciRelPath)
 
 		if _, err := os.Stat(ciAbsPath); err == nil && !force {
-			fmt.Fprintf(os.Stderr, "error: %s already exists (use --force to overwrite)\n", ciRelPath)
+			fmt.Fprintf(os.Stderr, "error: %s already exists (use --force-overwrite to overwrite)\n", ciRelPath)
 			return 1
 		}
 

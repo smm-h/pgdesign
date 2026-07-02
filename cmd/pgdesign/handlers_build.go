@@ -20,7 +20,7 @@ import (
 func handleBuild(kwargs map[string]interface{}) int {
 	quiet := kwargs["quiet"].(bool)
 	dryRun := kwargs["dry_run"].(bool)
-	noCommit := kwargs["no_commit"].(bool)
+	autoCommit := kwargs["auto_commit"].(bool)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -126,7 +126,7 @@ func handleBuild(kwargs map[string]interface{}) int {
 	}
 	writtenFiles = append(writtenFiles, svgFiles...)
 
-	if !noCommit && len(writtenFiles) > 0 {
+	if autoCommit && len(writtenFiles) > 0 {
 		args := []string{"commit", "-m", "pgdesign build: regenerate outputs", "--"}
 		args = append(args, writtenFiles...)
 		cmd := exec.Command("safegit", args...)

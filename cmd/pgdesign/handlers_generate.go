@@ -50,7 +50,7 @@ func handleGenerate(kwargs map[string]interface{}) int {
 
 	opts := generate.Options{
 		Idempotent:      kwargs["idempotent"].(bool),
-		IncludeComments: !kwargs["no_comments"].(bool),
+		IncludeComments: kwargs["comments"].(bool),
 		Format:          kwargs["format"].(string),
 		PGVersion:       pgVersion,
 		TypeRegistry:    typeReg,

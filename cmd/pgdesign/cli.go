@@ -50,7 +50,7 @@ func main() {
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all generated DDL statements", strictcli.Default(false)),
-			strictcli.BoolFlag("no-comments", "Exclude COMMENT ON statements from the generated output", strictcli.Default(false)),
+			strictcli.BoolFlag("comments", "Include COMMENT ON statements in the generated output", strictcli.Default(true)),
 			strictcli.StringFlag("format", "Output format for the generated schema representation", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg", "doc", "graphql")),
 			strictcli.BoolFlag("strict-nf", "Promote normal form violations to errors instead of warnings", strictcli.Default(false)),
 		),
@@ -179,7 +179,7 @@ func main() {
 	app.Command("build", "Generate all configured outputs from pgdesign.toml", handleBuild,
 		strictcli.WithFlags(
 			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files", strictcli.Default(false)),
-			strictcli.BoolFlag("no-commit", "Skip the automatic git commit of generated output files", strictcli.Default(false)),
+			strictcli.BoolFlag("auto-commit", "Automatically git commit generated output files", strictcli.Default(true)),
 		),
 	)
 
@@ -214,7 +214,7 @@ func main() {
 		strictcli.WithFlags(
 			strictcli.StringFlag("language", "Target programming language(s) for wrapper generation", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Default(nil)),
-			strictcli.BoolFlag("force", "Overwrite existing wrapper files without prompting", strictcli.Default(false)),
+			strictcli.BoolFlag("force-overwrite", "Overwrite existing wrapper files without prompting", strictcli.Default(false)),
 			strictcli.StringFlag("ci", "CI provider for workflow generation (e.g., github-actions)", strictcli.Default(nil)),
 		),
 	)
