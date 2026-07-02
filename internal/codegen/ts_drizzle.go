@@ -72,6 +72,35 @@ func (g *TSDrizzleGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		Manys    []manyRelation
 	}
 
+	// Enum declarations: schema.Enums covers both enum and state_machine kinds
+	// (build.go appends state machines to Enums). Each entry becomes a local
+	// pgEnum const used as the column builder for columns of that type. The
+	// "Enum" suffix avoids collisions with table variable names.
+	type enumDecl struct {
+		ConstName string
+		TypeName  string
+		Values    []string
+	}
+	var enumDecls []enumDecl
+	// enumConstNames maps a column's PGType.Base to the local const name.
+	// Keyed by both bare and schema-qualified names because introspection may
+	// schema-qualify types outside the search path.
+	enumConstNames := make(map[string]string, len(schema.Enums)*2)
+	if len(schema.Enums) > 0 {
+		pgCoreImports["pgEnum"] = true
+		sortedEnums := make([]model.Enum, len(schema.Enums))
+		copy(sortedEnums, schema.Enums)
+		sort.Slice(sortedEnums, func(i, j int) bool { return sortedEnums[i].Name < sortedEnums[j].Name })
+		for _, e := range sortedEnums {
+			constName := toCamelCase(e.Name) + "Enum"
+			enumDecls = append(enumDecls, enumDecl{ConstName: constName, TypeName: e.Name, Values: e.Values})
+			enumConstNames[e.Name] = constName
+			if e.Schema != "" {
+				enumConstNames[e.Schema+"."+e.Name] = constName
+			}
+		}
+	}
+
 	var tables []tableInfo
 	relationsMap := make(map[string]*relationInfo) // keyed by table name
 
@@ -98,8 +127,16 @@ func (g *TSDrizzleGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 		isSinglePK := len(tbl.PK) == 1
 
 		for _, col := range tbl.Columns {
-			builder, comment := pgTypeToDrizzleBuilder(col.PGType.Base)
-			pgCoreImports[builder] = true
+			var builder, comment string
+			if constName, ok := enumConstNames[col.PGType.Base]; ok &&
+				(col.TypeKind == "enum" || col.TypeKind == "state_machine") {
+				// Local pgEnum const as builder. Must NOT be registered in
+				// pgCoreImports -- it is a local declaration, not an import.
+				builder = constName
+			} else {
+				builder, comment = pgTypeToDrizzleBuilder(col.PGType.Base)
+				pgCoreImports[builder] = true
+			}
 
 			var mods strings.Builder
 
@@ -239,6 +276,18 @@ func (g *TSDrizzleGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 	}
 	if needSqlTemplate {
 		buf.WriteString("import { sql } from \"drizzle-orm\";\n")
+	}
+
+	// Write enum declarations before table definitions.
+	if len(enumDecls) > 0 {
+		buf.WriteString("\n")
+		for _, d := range enumDecls {
+			quoted := make([]string, len(d.Values))
+			for i, v := range d.Values {
+				quoted[i] = fmt.Sprintf("%q", v)
+			}
+			fmt.Fprintf(&buf, "export const %s = pgEnum(%q, [%s]);\n", d.ConstName, d.TypeName, strings.Join(quoted, ", "))
+		}
 	}
 
 	// Write table definitions.

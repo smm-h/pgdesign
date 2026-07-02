@@ -452,6 +452,154 @@ func TestTSDrizzleGenerator_TypeMapping(t *testing.T) {
 	}
 }
 
+func TestTSDrizzleGenerator_Enums(t *testing.T) {
+	schema := &model.Schema{
+		Enums: []model.Enum{
+			{Name: "user_role", Values: []string{"admin", "editor", "viewer"}},
+			{Name: "account_status", Values: []string{"active", "inactive"}},
+		},
+		Tables: []model.Table{{
+			Name:    "users",
+			Comment: "Users",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "role", PGType: typeinfo.MustParse("user_role"), NotNull: true, TypeKind: "enum"},
+				{Name: "status", PGType: typeinfo.MustParse("account_status"), NotNull: true, TypeKind: "enum"},
+				{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+			},
+		}},
+	}
+
+	gen := &TSDrizzleGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// pgEnum declarations, sorted by name, before table definitions.
+	if !strings.Contains(result, `export const accountStatusEnum = pgEnum("account_status", ["active", "inactive"]);`) {
+		t.Error("missing accountStatusEnum declaration")
+	}
+	if !strings.Contains(result, `export const userRoleEnum = pgEnum("user_role", ["admin", "editor", "viewer"]);`) {
+		t.Error("missing userRoleEnum declaration")
+	}
+	declIdx := strings.Index(result, "export const accountStatusEnum")
+	sortedIdx := strings.Index(result, "export const userRoleEnum")
+	tableIdx := strings.Index(result, "export const users = pgTable")
+	if declIdx == -1 || sortedIdx == -1 || tableIdx == -1 {
+		t.Fatal("missing expected declarations")
+	}
+	if !(declIdx < sortedIdx && sortedIdx < tableIdx) {
+		t.Error("enum declarations must be sorted by name and precede table definitions")
+	}
+
+	// Enum columns use the local const as builder.
+	if !strings.Contains(result, `role: userRoleEnum("role").notNull(),`) {
+		t.Error("missing role column using userRoleEnum builder")
+	}
+	if !strings.Contains(result, `status: accountStatusEnum("status").notNull(),`) {
+		t.Error("missing status column using accountStatusEnum builder")
+	}
+
+	// pgEnum is imported from pg-core; local const names are NOT.
+	importLine := ""
+	for _, line := range strings.Split(result, "\n") {
+		if strings.Contains(line, `from "drizzle-orm/pg-core"`) {
+			importLine = line
+			break
+		}
+	}
+	if importLine == "" {
+		t.Fatal("missing pg-core import line")
+	}
+	if !strings.Contains(importLine, "pgEnum") {
+		t.Error("missing pgEnum in pg-core imports")
+	}
+	if strings.Contains(importLine, "userRoleEnum") || strings.Contains(importLine, "accountStatusEnum") {
+		t.Errorf("local enum const leaked into imports: %s", importLine)
+	}
+
+	// Non-enum column behavior unchanged.
+	if !strings.Contains(result, `name: text("name").notNull(),`) {
+		t.Error("missing name column with text builder")
+	}
+}
+
+func TestTSDrizzleGenerator_StateMachine(t *testing.T) {
+	// State machine types appear in schema.Enums (build.go appends them) and
+	// their columns carry TypeKind "state_machine".
+	schema := &model.Schema{
+		Enums: []model.Enum{
+			{Name: "order_state", Values: []string{"pending", "shipped", "delivered"}},
+		},
+		Tables: []model.Table{{
+			Name:    "orders",
+			Comment: "Orders",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "state", PGType: typeinfo.MustParse("order_state"), NotNull: true, TypeKind: "state_machine"},
+			},
+		}},
+	}
+
+	gen := &TSDrizzleGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	if !strings.Contains(result, `export const orderStateEnum = pgEnum("order_state", ["pending", "shipped", "delivered"]);`) {
+		t.Error("missing orderStateEnum declaration for state machine type")
+	}
+	if !strings.Contains(result, `state: orderStateEnum("state").notNull(),`) {
+		t.Error("missing state column using orderStateEnum builder")
+	}
+}
+
+func TestTSDrizzleGenerator_EnumColumnWithoutTypeKind(t *testing.T) {
+	// A column referencing an unknown type without TypeKind must keep the
+	// text fallback even when unrelated enums exist in the schema.
+	schema := &model.Schema{
+		Enums: []model.Enum{
+			{Name: "user_role", Values: []string{"admin", "viewer"}},
+		},
+		Tables: []model.Table{{
+			Name:    "items",
+			Comment: "Items",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				{Name: "kind", PGType: typeinfo.MustParse("my_custom"), NotNull: true},
+			},
+		}},
+	}
+
+	gen := &TSDrizzleGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	found := false
+	for _, line := range strings.Split(result, "\n") {
+		if strings.Contains(line, `kind: text("kind")`) && strings.Contains(line, "// my_custom") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("missing kind text fallback with // my_custom comment")
+	}
+}
+
 func TestTSDrizzleGenerator_DefaultExpr(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{{
