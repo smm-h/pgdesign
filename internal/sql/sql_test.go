@@ -422,8 +422,22 @@ func TestCreateEnum(t *testing.T) {
 func TestCreateEnum_Idempotent(t *testing.T) {
 	got := CreateEnum("game", "status", []string{"active"}, true)
 
-	if !strings.Contains(got, "IF NOT EXISTS") {
-		t.Errorf("expected IF NOT EXISTS, got:\n%s", got)
+	// PostgreSQL has never supported CREATE TYPE IF NOT EXISTS; the
+	// idempotent form must be a DO block guarded by a pg_type catalog check.
+	if strings.Contains(got, "CREATE TYPE IF NOT EXISTS") {
+		t.Errorf("CREATE TYPE IF NOT EXISTS is invalid PostgreSQL syntax, got:\n%s", got)
+	}
+	if !strings.Contains(got, "DO $$") {
+		t.Errorf("expected DO $$ block, got:\n%s", got)
+	}
+	if !strings.Contains(got, "pg_type") || !strings.Contains(got, "typtype = 'e'") {
+		t.Errorf("expected pg_type catalog check with typtype = 'e', got:\n%s", got)
+	}
+	if !strings.Contains(got, "typname = 'status'") || !strings.Contains(got, "nspname = 'game'") {
+		t.Errorf("expected typname/nspname predicates, got:\n%s", got)
+	}
+	if !strings.Contains(got, "EXECUTE 'CREATE TYPE game.status AS ENUM (''active'');';") {
+		t.Errorf("expected EXECUTE of escaped CREATE TYPE statement, got:\n%s", got)
 	}
 }
 
@@ -624,10 +638,14 @@ func TestIdempotentMode(t *testing.T) {
 		t.Errorf("CreateIndex idempotent should have IF NOT EXISTS, got: %s", got)
 	}
 
-	// CreateEnum
+	// CreateEnum: PostgreSQL has no CREATE TYPE IF NOT EXISTS; idempotency
+	// must come from a DO block with a pg_type catalog check.
 	got = CreateEnum("public", "mood", []string{"happy", "sad"}, true)
-	if !strings.Contains(got, "IF NOT EXISTS") {
-		t.Errorf("CreateEnum idempotent should have IF NOT EXISTS, got: %s", got)
+	if strings.Contains(got, "CREATE TYPE IF NOT EXISTS") {
+		t.Errorf("CreateEnum idempotent must not use CREATE TYPE IF NOT EXISTS, got: %s", got)
+	}
+	if !strings.Contains(got, "DO $$") || !strings.Contains(got, "typtype = 'e'") {
+		t.Errorf("CreateEnum idempotent should be a DO block with pg_type check, got: %s", got)
 	}
 }
 

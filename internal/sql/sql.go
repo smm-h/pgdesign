@@ -159,11 +159,10 @@ func CreateExtension(name string, idempotent bool) string {
 }
 
 // CreateEnum generates a CREATE TYPE ... AS ENUM statement.
+// PostgreSQL does not support CREATE TYPE IF NOT EXISTS, so when idempotent
+// is true, the statement is wrapped in a DO $$ block that checks pg_type
+// before creating (same approach as CreateDomain and CreateCompositeType).
 func CreateEnum(schema, name string, values []string, idempotent bool) string {
-	ifne := ""
-	if idempotent {
-		ifne = " IF NOT EXISTS"
-	}
 	qualified := QualifiedName(schema, name)
 
 	quotedValues := make([]string, len(values))
@@ -172,8 +171,18 @@ func CreateEnum(schema, name string, values []string, idempotent bool) string {
 		quotedValues[i] = "'" + escaped + "'"
 	}
 
-	return fmt.Sprintf("CREATE TYPE%s %s AS ENUM (%s);",
-		ifne, qualified, strings.Join(quotedValues, ", "))
+	stmt := fmt.Sprintf("CREATE TYPE %s AS ENUM (%s);",
+		qualified, strings.Join(quotedValues, ", "))
+
+	if idempotent {
+		escapedType := strings.ReplaceAll(name, "'", "''")
+		escapedSchema := strings.ReplaceAll(schema, "'", "''")
+		catalogCheck := fmt.Sprintf(
+			"SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = '%s' AND n.nspname = '%s' AND t.typtype = 'e'",
+			escapedType, escapedSchema)
+		return wrapIdempotentCatalogCheck(catalogCheck, stmt)
+	}
+	return stmt
 }
 
 // CreateDomain generates a CREATE DOMAIN statement.

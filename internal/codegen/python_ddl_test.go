@@ -511,10 +511,38 @@ func TestPythonDDL_Executor_IdempotentSQL(t *testing.T) {
 		t.Error("executor should contain IF NOT EXISTS idempotent SQL")
 	}
 
+	// PostgreSQL has no CREATE TYPE IF NOT EXISTS; enum idempotency uses a
+	// DO block with a pg_type catalog check instead.
+	if strings.Contains(executor, "CREATE TYPE IF NOT EXISTS") {
+		t.Error("executor must not contain invalid CREATE TYPE IF NOT EXISTS syntax")
+	}
+
 	// Domains and composites have no idempotent variant; they should have None.
 	// Check for at least one DDLOp with None as idempotent_sql.
 	if !strings.Contains(executor, ", None, ") {
 		t.Error("executor should contain ops with None idempotent_sql (domains, etc.)")
+	}
+}
+
+// TestPythonDDL_EnumIdempotentDOBlock verifies that enum idempotent SQL in the
+// default two-file output is the valid DO-block form with a pg_type catalog
+// check, never the invalid CREATE TYPE IF NOT EXISTS syntax.
+func TestPythonDDL_EnumIdempotentDOBlock(t *testing.T) {
+	schema := loadSplitTestSchema(t) // has the trace_status enum
+	gen := &PythonDDLGenerator{}
+	files, _ := gen.GenerateFiles(schema)
+
+	for _, name := range []string{"schema_ddl.py", "schema_executor.py"} {
+		content := string(files[name])
+		if strings.Contains(content, "CREATE TYPE IF NOT EXISTS") {
+			t.Errorf("%s must not contain invalid CREATE TYPE IF NOT EXISTS syntax", name)
+		}
+		if !strings.Contains(content, "DO $$") || !strings.Contains(content, "typtype = 'e'") {
+			t.Errorf("%s should contain a DO block with pg_type check for the enum", name)
+		}
+		if !strings.Contains(content, "typname = 'trace_status'") {
+			t.Errorf("%s enum DO block should reference trace_status", name)
+		}
 	}
 }
 
@@ -993,6 +1021,17 @@ func TestPythonDDL_SelfContainedPreambleIdempotent(t *testing.T) {
 		// Schema creation should be idempotent.
 		if !strings.Contains(content, "IF NOT EXISTS") {
 			t.Errorf("%s preamble should use IF NOT EXISTS for idempotent SQL", name)
+		}
+		// The enum preamble must use the valid DO-block form, never the
+		// invalid CREATE TYPE IF NOT EXISTS syntax.
+		if strings.Contains(content, "CREATE TYPE IF NOT EXISTS") {
+			t.Errorf("%s preamble must not contain invalid CREATE TYPE IF NOT EXISTS syntax", name)
+		}
+		if !strings.Contains(content, "DO $$") || !strings.Contains(content, "typtype = 'e'") {
+			t.Errorf("%s preamble enum should be a DO block with pg_type check", name)
+		}
+		if !strings.Contains(content, "typname = 'trace_status'") {
+			t.Errorf("%s preamble enum DO block should reference trace_status", name)
 		}
 	}
 }

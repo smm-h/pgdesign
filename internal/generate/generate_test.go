@@ -276,14 +276,87 @@ func TestIdempotentMode(t *testing.T) {
 	if !strings.Contains(out, "CREATE EXTENSION IF NOT EXISTS") {
 		t.Errorf("expected IF NOT EXISTS on extension, got:\n%s", out)
 	}
-	if !strings.Contains(out, "CREATE TYPE IF NOT EXISTS") {
-		t.Errorf("expected IF NOT EXISTS on type, got:\n%s", out)
+	// PostgreSQL has no CREATE TYPE IF NOT EXISTS; enums must use a DO block
+	// guarded by a pg_type catalog check instead.
+	if strings.Contains(out, "CREATE TYPE IF NOT EXISTS") {
+		t.Errorf("CREATE TYPE IF NOT EXISTS is invalid PostgreSQL syntax, got:\n%s", out)
+	}
+	if !strings.Contains(out, "DO $$") || !strings.Contains(out, "typtype = 'e'") {
+		t.Errorf("expected DO block with pg_type check for enum, got:\n%s", out)
+	}
+	if !strings.Contains(out, "typname = 'role'") || !strings.Contains(out, "nspname = 'app'") {
+		t.Errorf("expected pg_type predicates for app.role enum, got:\n%s", out)
 	}
 	if !strings.Contains(out, "CREATE TABLE IF NOT EXISTS") {
 		t.Errorf("expected IF NOT EXISTS on table, got:\n%s", out)
 	}
 	if !strings.Contains(out, "CREATE INDEX IF NOT EXISTS") {
 		t.Errorf("expected IF NOT EXISTS on index, got:\n%s", out)
+	}
+}
+
+// TestIdempotentMode_StateMachineEnum verifies that a state machine type
+// (which materializes as an enum during Build) also gets the valid DO-block
+// idempotent form, never CREATE TYPE IF NOT EXISTS.
+func TestIdempotentMode_StateMachineEnum(t *testing.T) {
+	content := `[meta]
+version = 1
+schema = "app"
+
+[types.ticket_status]
+kind = "state_machine"
+initial = "open"
+
+[types.ticket_status.states.open]
+
+[types.ticket_status.states.closed]
+terminal = true
+
+[[types.ticket_status.transitions]]
+name = "close"
+from = ["open"]
+to = "closed"
+
+[tables.tickets]
+comment = "Support tickets"
+
+[tables.tickets.columns.id]
+type = "id"
+
+[tables.tickets.columns.status]
+type = "ticket_status"
+`
+	raw, parseDiags := parse.Bytes([]byte(content))
+	if raw == nil {
+		t.Fatalf("parse failed: %v", parseDiags)
+	}
+	for _, d := range parseDiags {
+		if d.Severity == diagnostic.Error {
+			t.Fatalf("parse error: %s", d.Message)
+		}
+	}
+
+	reg := semtype.NewBuiltinRegistry()
+	userTypes := parse.CollectUserTypes(raw)
+	if loadDiags := reg.LoadUserTypes(userTypes); loadDiags.HasErrors() {
+		t.Fatalf("LoadUserTypes errors: %v", loadDiags)
+	}
+	schema, buildDiags := model.Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("build errors: %v", buildDiags)
+	}
+
+	opts := Options{Idempotent: true, Format: "sql", TypeRegistry: reg}
+	out := mustGenerate(t, schema, opts)
+
+	if strings.Contains(out, "CREATE TYPE IF NOT EXISTS") {
+		t.Errorf("CREATE TYPE IF NOT EXISTS is invalid PostgreSQL syntax, got:\n%s", out)
+	}
+	if !strings.Contains(out, "DO $$") || !strings.Contains(out, "typtype = 'e'") {
+		t.Errorf("expected DO block with pg_type check for state machine enum, got:\n%s", out)
+	}
+	if !strings.Contains(out, "typname = 'ticket_status'") || !strings.Contains(out, "nspname = 'app'") {
+		t.Errorf("expected pg_type predicates for app.ticket_status, got:\n%s", out)
 	}
 }
 
