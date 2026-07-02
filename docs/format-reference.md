@@ -466,8 +466,40 @@ path = "out/schema.json"
 | `format` | string | Output format: `sql`, `d2`, `json`, `svg`, `doc`, or `codegen` |
 | `path` | string | Output file path relative to project root (required) |
 | `lang` | string | Target language for codegen: `go`, `ts`, `java`, `kotlin`, `python`, `zig` (required when format is `codegen`) |
-| `mode` | string | Codegen mode: `validators`, `constants`, or `types` (required when format is `codegen`) |
+| `mode` | string | Codegen mode: `validators`, `constants`, `types`, `constraints`, `enums`, `gorm`, `drizzle`, `sqlalchemy`, `jpa`, `ddl`, or `query-layer` (required when format is `codegen`) |
 | `idempotent` | boolean | For `sql` format: add `IF NOT EXISTS` guards |
 | `comments` | boolean | For `sql` format: include `COMMENT ON` statements (default: true) |
 
 Running `pgdesign build` generates all configured outputs. Use `--dry-run` to preview what would be generated without writing files.
+
+### Freshness checking: `check --tag build` as a CI drift guard
+
+Once outputs are configured under `[output]`, `pgdesign check --tag build` verifies that the working tree is a fixed point of `pgdesign build`: it regenerates every configured output in memory and compares each file byte-for-byte against disk. Any `[missing]` or `[stale]` file fails the check, making it a zero-configuration CI drift guard — commit the generated outputs, run the check in CI, and a schema change that was not followed by a `pgdesign build` (or a hand-edited generated file) fails the pipeline. SVG outputs are excluded from the comparison because d2 rendering is not deterministic across runs; all other formats participate.
+
+Byte-for-byte comparison is only sound because generator determinism is a tested contract: every codegen (mode, language) combination is covered by a determinism test asserting that repeated generation of the same schema produces byte-identical output. A generated file is either exactly what `build` would write, or it is stale — there is no "close enough".
+
+### Orphan detection in owned output directories
+
+Multi-file codegen outputs (currently Python `ddl` and `query-layer`) treat `path` as a directory, and that directory is **owned by pgdesign build**. Every file found inside an owned directory must be produced by the current configuration; anything else is an **orphan** and a hard error. Orphans typically appear when a schema source file is renamed or an output's `split_mode` changes — without this check, the files from the previous configuration would stay on disk forever, committed and green.
+
+Orphan handling rules:
+
+- `pgdesign check --tag build` fails and lists each orphan as `[orphan] <path>`.
+- `pgdesign build` refuses to write **anything** while orphans exist and exits 1; with unexpected files in an owned directory the desired tree state is ambiguous, so the orphans must be resolved first. `pgdesign build --dry-run` reports orphans and also exits 1.
+- pgdesign never deletes orphans itself. Remove or relocate them manually.
+- The only exemptions are `__pycache__/` directories (including their contents) and `*.pyc` files.
+- Two outputs sharing the same directory union their file sets — neither output's files are orphans of the other.
+- A configured output path of any format that falls inside an owned directory (for example an SVG diagram rendered into the codegen directory) counts as owned, not orphaned.
+- Single-file outputs (a plain file path rather than a directory) own nothing; files next to them are never scanned.
+
+### `codegen --check` for imperative workflows
+
+Projects that invoke `pgdesign codegen` directly instead of configuring `[output]` sections get the same guarantee from `pgdesign codegen --check`. It requires `--output`, generates in memory, and compares each generated file byte-exactly against the file on disk instead of writing. For multi-file modes it additionally orphan-scans the output directory with the same ownership and ignore rules as `pgdesign build`. Each file is reported as `[missing]`, `[stale]`, `[orphan]`, or `[fresh]` with a summary line; the command writes nothing and exits 1 on any mismatch, 0 when everything is clean.
+
+```sh
+# CI drift guard, config-driven projects
+pgdesign check --tag build
+
+# CI drift guard, imperative codegen invocations
+pgdesign codegen schema.toml --lang python --mode ddl --output gen/ --check
+```
