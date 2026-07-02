@@ -25,10 +25,31 @@ type saTypeInfo struct {
 }
 
 // pgTypeToSA maps a column's PostgreSQL type to SQLAlchemy type info.
-func pgTypeToSA(col model.Column) saTypeInfo {
-	// Semantic type overrides.
+// enumsByName maps enum type names (bare and schema-qualified) to their
+// model.Enum definitions; it covers both enum and state_machine kinds.
+func pgTypeToSA(col model.Column, enumsByName map[string]*model.Enum) saTypeInfo {
+	// Semantic type overrides. The money mapping lives here (not in codegen's
+	// TypeResolver) because it selects the ORM column type (sa.Integer), not
+	// the language type -- TypeResolver only resolves native/language types.
 	if col.SemanticTypeName == "money" {
 		return saTypeInfo{SAColumnType: "Integer", PythonType: "int", SAImport: "Integer"}
+	}
+
+	// Enum and state machine columns map to sa.Enum with the declared values.
+	// The Python type stays str: sa.Enum stores/returns plain strings.
+	if col.TypeKind == "enum" || col.TypeKind == "state_machine" {
+		if e, ok := enumsByName[col.PGType.Base]; ok {
+			parts := make([]string, 0, len(e.Values)+1)
+			for _, v := range e.Values {
+				parts = append(parts, fmt.Sprintf("%q", v))
+			}
+			parts = append(parts, fmt.Sprintf("name=%q", e.Name))
+			return saTypeInfo{
+				SAColumnType: "Enum(" + strings.Join(parts, ", ") + ")",
+				PythonType:   "str",
+				SAImport:     "Enum",
+			}
+		}
 	}
 
 	pgType := col.PGType.Base
@@ -82,6 +103,19 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 		schema.BuildFKGraph()
 	}
 
+	// Name -> enum lookup built from the schema.Enums slice; covers enum and
+	// state_machine kinds (build.go appends state machines to Enums). Keyed by
+	// both bare and schema-qualified names because introspection may
+	// schema-qualify types outside the search path.
+	enumsByName := make(map[string]*model.Enum, len(schema.Enums)*2)
+	for i := range schema.Enums {
+		e := &schema.Enums[i]
+		enumsByName[e.Name] = e
+		if e.Schema != "" {
+			enumsByName[e.Schema+"."+e.Name] = e
+		}
+	}
+
 	// First pass: collect column and relationship info per table, track imports.
 	type colField struct {
 		Name       string
@@ -132,7 +166,7 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 
 		// Generate column fields.
 		for _, col := range tbl.Columns {
-			info := pgTypeToSA(col)
+			info := pgTypeToSA(col, enumsByName)
 
 			// Track imports.
 			if info.SAImport != "" {

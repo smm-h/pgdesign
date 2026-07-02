@@ -252,6 +252,89 @@ func TestPythonSQLAlchemyGenerator_MoneySemanticType(t *testing.T) {
 	}
 }
 
+func TestPythonSQLAlchemyGenerator_Enums(t *testing.T) {
+	schema := &model.Schema{
+		Enums: []model.Enum{
+			{Name: "account_status", Values: []string{"active", "inactive", "banned"}},
+		},
+		Tables: []model.Table{
+			{
+				Name:    "accounts",
+				Comment: "Accounts",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "status", PGType: typeinfo.MustParse("account_status"), NotNull: true, TypeKind: "enum"},
+				},
+			},
+		},
+	}
+
+	gen := &PythonSQLAlchemyGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	// sa.Enum column type with declared values and type name.
+	if !strings.Contains(result, `Enum("active", "inactive", "banned", name="account_status")`) {
+		t.Errorf("missing sa.Enum column type with values and name, got:\n%s", result)
+	}
+
+	// Python type stays str.
+	if !containsSAField(result, "status", "str") {
+		t.Error("missing or incorrect status field (expected str)")
+	}
+
+	// Enum must be in the sqlalchemy imports.
+	importFound := false
+	for _, line := range strings.Split(result, "\n") {
+		if strings.HasPrefix(line, "from sqlalchemy import ") && strings.Contains(line, "Enum") {
+			importFound = true
+			break
+		}
+	}
+	if !importFound {
+		t.Error("missing Enum in sqlalchemy imports")
+	}
+}
+
+func TestPythonSQLAlchemyGenerator_StateMachine(t *testing.T) {
+	// State machine types appear in schema.Enums (build.go appends them) and
+	// their columns carry TypeKind "state_machine".
+	schema := &model.Schema{
+		Enums: []model.Enum{
+			{Name: "order_state", Values: []string{"pending", "shipped", "delivered"}},
+		},
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Comment: "Orders",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "state", PGType: typeinfo.MustParse("order_state"), NotNull: true, TypeKind: "state_machine"},
+				},
+			},
+		},
+	}
+
+	gen := &PythonSQLAlchemyGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+
+	result := string(out)
+
+	if !strings.Contains(result, `Enum("pending", "shipped", "delivered", name="order_state")`) {
+		t.Errorf("missing sa.Enum column type for state machine, got:\n%s", result)
+	}
+	if !containsSAField(result, "state", "str") {
+		t.Error("missing or incorrect state field (expected str)")
+	}
+}
+
 func TestPythonSQLAlchemyGenerator_ForeignKeys(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{
