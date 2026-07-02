@@ -1,0 +1,188 @@
+# Fixture for the execution-backed DDL matrix test (python_ddl_exec_test.go).
+# Exercises every DDL tuple kind that is executable on a vanilla PostgreSQL
+# server without extra extensions or cluster-wide state:
+#   schema, sequence, enum, domain (scalar with CHECK), composite,
+#   state machine (column CHECK), table, append-only table, fk, unique,
+#   check, exclusion, index, append_only_trigger, comment, statistics,
+#   rls_enable, rls_force, policy, view, materialized_view (+ index),
+#   function (SQL and PL/pgSQL), trigger.
+# Intentionally NOT covered (see the matrix test for rationale):
+#   extension, partition, partman, owner.
+
+[meta]
+schema = "exec_matrix"
+
+[types.account_role]
+kind = "enum"
+values = ["admin", "member", "guest"]
+comment = "Account role"
+
+[types.email_addr]
+kind = "scalar"
+base_type = "text"
+check = "VALUE LIKE '%@%'"
+comment = "Email address domain"
+
+[types.busy_period]
+kind = "scalar"
+base_type = "tsrange"
+comment = "Time period during which a resource is busy"
+
+[types.cents]
+kind = "scalar"
+base_type = "integer"
+comment = "Money amount in cents"
+
+[types.full_name]
+kind = "composite"
+comment = "First and last name"
+
+[types.full_name.fields]
+first = "text"
+last = "text"
+
+[types.order_status]
+kind = "state_machine"
+initial = "pending"
+comment = "Order lifecycle"
+
+[types.order_status.states.pending]
+[types.order_status.states.processing]
+[types.order_status.states.shipped]
+[types.order_status.states.cancelled]
+terminal = true
+[types.order_status.states.delivered]
+terminal = true
+
+[[types.order_status.transitions]]
+name = "start_processing"
+from = ["pending"]
+to = "processing"
+
+[[types.order_status.transitions]]
+name = "ship"
+from = ["processing"]
+to = "shipped"
+
+[[types.order_status.transitions]]
+name = "deliver"
+from = ["shipped"]
+to = "delivered"
+
+[[types.order_status.transitions]]
+name = "cancel"
+from = ["pending", "processing"]
+to = "cancelled"
+
+[sequences.invoice_seq]
+start = 1000
+increment = 1
+cache = 10
+comment = "Invoice number allocation"
+
+[tables.accounts]
+comment = "Registered accounts"
+enable_rls = true
+force_rls = true
+
+[tables.accounts.columns.id]
+type = "id"
+
+[tables.accounts.columns.name]
+type = "short_text"
+comment = "Display name"
+statistics = 500
+
+[tables.accounts.columns.email]
+type = "email_addr"
+
+[tables.accounts.columns.role]
+type = "account_role"
+
+[tables.accounts.columns.created_at]
+type = "timestamp"
+
+[tables.accounts.unique.uq_accounts_email]
+columns = ["email"]
+
+[tables.accounts.checks.ck_accounts_name_len]
+expr = "LENGTH(name) >= 1"
+
+[tables.accounts.indexes.idx_accounts_role]
+columns = ["role"]
+
+[tables.accounts.policies.p_accounts_all]
+for = "all"
+using = "true"
+
+[tables.accounts.triggers.trg_accounts_noop]
+function = "noop_trigger"
+events = ["UPDATE"]
+timing = "BEFORE"
+for_each = "ROW"
+
+[tables.orders]
+comment = "Account orders"
+
+[tables.orders.columns.id]
+type = "id"
+
+[tables.orders.columns.account_id]
+type = "ref"
+
+[tables.orders.columns.status]
+type = "order_status"
+
+[tables.orders.columns.total_cents]
+type = "cents"
+
+[tables.orders.columns.busy]
+type = "busy_period"
+
+[tables.orders.fks.fk_orders_accounts]
+columns = ["account_id"]
+ref_table = "accounts"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.orders.checks.ck_orders_total_nonnegative]
+expr = "total_cents >= 0"
+
+[tables.orders.exclusions.excl_orders_busy_overlap]
+columns = ["busy"]
+operators = ["&&"]
+method = "gist"
+
+[tables.audit_log]
+comment = "Append-only audit trail"
+append_only = true
+
+[tables.audit_log.columns.id]
+type = "id"
+
+[tables.audit_log.columns.message]
+type = "short_text"
+
+[views.account_emails]
+query = "SELECT id, email FROM exec_matrix.accounts"
+comment = "Account id and email pairs"
+
+[materialized_views.order_counts]
+query = "SELECT account_id, count(*) AS order_count FROM exec_matrix.orders GROUP BY account_id"
+with_data = true
+comment = "Orders per account"
+
+[materialized_views.order_counts.indexes.idx_order_counts_account]
+columns = ["account_id"]
+
+[functions.account_count]
+language = "sql"
+returns = "bigint"
+body = "SELECT count(*) FROM exec_matrix.accounts"
+comment = "Total number of accounts"
+
+[functions.noop_trigger]
+language = "plpgsql"
+returns = "trigger"
+body = "BEGIN RETURN NEW; END;"
+comment = "Trigger function that does nothing"
