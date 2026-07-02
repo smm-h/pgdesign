@@ -2,8 +2,6 @@ package parse
 
 import (
 	"testing"
-
-	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 func TestCollectUserTypes_Empty(t *testing.T) {
@@ -153,10 +151,10 @@ func TestCollectUserTypes_StateMachine(t *testing.T) {
 		Types: []RawType{{
 			Name: "ticket_status",
 			Kind: "state_machine",
-			States: map[string]RawSMState{
-				"draft":  {Terminal: &nonTerminal},
-				"active": {Terminal: &nonTerminal},
-				"done":   {Terminal: &terminal, Comment: &stateComment},
+			States: []RawSMState{
+				{Name: "draft", Terminal: &nonTerminal},
+				{Name: "active", Terminal: &nonTerminal},
+				{Name: "done", Terminal: &terminal, Comment: &stateComment},
 			},
 			Transitions: []RawSMTransition{
 				{Name: "activate", From: []string{"draft"}, To: "active"},
@@ -189,27 +187,21 @@ func TestCollectUserTypes_StateMachine(t *testing.T) {
 		t.Error("EnforceTrigger should be true")
 	}
 
-	// States (map iteration order varies, so check by name).
+	// States: declaration order must be preserved (it is the enum value order).
 	if len(ut.States) != 3 {
 		t.Fatalf("expected 3 states, got %d", len(ut.States))
 	}
-	stateMap := make(map[string]semtype.UserSMState)
-	for _, s := range ut.States {
-		stateMap[s.Name] = s
-	}
-	if s, ok := stateMap["done"]; !ok {
-		t.Error("missing state 'done'")
-	} else {
-		if !s.Terminal {
-			t.Error("state 'done' should be terminal")
-		}
-		if s.Comment != "the final state" {
-			t.Errorf("state 'done' Comment = %q, want %q", s.Comment, "the final state")
+	for i, want := range []string{"draft", "active", "done"} {
+		if ut.States[i].Name != want {
+			t.Fatalf("States[%d].Name = %q, want %q (declaration order)", i, ut.States[i].Name, want)
 		}
 	}
-	if s, ok := stateMap["draft"]; !ok {
-		t.Error("missing state 'draft'")
-	} else if s.Terminal {
+	if s := ut.States[2]; !s.Terminal {
+		t.Error("state 'done' should be terminal")
+	} else if s.Comment != "the final state" {
+		t.Errorf("state 'done' Comment = %q, want %q", s.Comment, "the final state")
+	}
+	if ut.States[0].Terminal {
 		t.Error("state 'draft' should not be terminal")
 	}
 

@@ -2398,14 +2398,17 @@ comment = "Cancel the order"
 		t.Errorf("enforce = %v, want true", rt.EnforceTrigger)
 	}
 
-	// States
+	// States: declaration order must be preserved (it is the enum value order).
 	if len(rt.States) != 5 {
 		t.Fatalf("states count = %d, want 5", len(rt.States))
 	}
-	pendingState, ok := rt.States["pending"]
-	if !ok {
-		t.Fatal("expected state 'pending'")
+	wantStateOrder := []string{"pending", "processing", "shipped", "delivered", "cancelled"}
+	for i, want := range wantStateOrder {
+		if rt.States[i].Name != want {
+			t.Fatalf("states[%d].Name = %q, want %q (declaration order)", i, rt.States[i].Name, want)
+		}
 	}
+	pendingState := rt.States[0]
 	if pendingState.Comment == nil || *pendingState.Comment != "Order created" {
 		t.Errorf("pending.comment = %v, want %q", pendingState.Comment, "Order created")
 	}
@@ -2413,18 +2416,12 @@ comment = "Cancel the order"
 		t.Errorf("pending.terminal should be nil, got %v", pendingState.Terminal)
 	}
 
-	deliveredState, ok := rt.States["delivered"]
-	if !ok {
-		t.Fatal("expected state 'delivered'")
-	}
+	deliveredState := rt.States[3]
 	if deliveredState.Terminal == nil || !*deliveredState.Terminal {
 		t.Errorf("delivered.terminal = %v, want true", deliveredState.Terminal)
 	}
 
-	cancelledState, ok := rt.States["cancelled"]
-	if !ok {
-		t.Fatal("expected state 'cancelled'")
-	}
+	cancelledState := rt.States[4]
 	if cancelledState.Terminal == nil || !*cancelledState.Terminal {
 		t.Errorf("cancelled.terminal = %v, want true", cancelledState.Terminal)
 	}

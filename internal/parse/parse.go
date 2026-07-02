@@ -272,10 +272,7 @@ func (p *parser) parseTypes() []RawType {
 				p.warnf("W001", "", "", "[types.%s.states.%s] has no parent [types.%s] section", typeName, stateName, typeName)
 				continue
 			}
-			if types[idx].States == nil {
-				types[idx].States = make(map[string]RawSMState)
-			}
-			state := RawSMState{}
+			state := RawSMState{Name: stateName}
 			for _, fc := range tbl.Children {
 				kv, ok := fc.(*tomledit.KeyValueNode)
 				if !ok {
@@ -299,7 +296,10 @@ func (p *parser) parseTypes() []RawType {
 					p.warnf("W001", "", "", "unknown key in [types.%s.states.%s]: %q", typeName, stateName, key)
 				}
 			}
-			types[idx].States[stateName] = state
+			// Append in document order: state order is semantic (it becomes
+			// the PostgreSQL enum value order). Duplicate state names are
+			// rejected downstream by semtype (E111).
+			types[idx].States = append(types[idx].States, state)
 		}
 	}
 

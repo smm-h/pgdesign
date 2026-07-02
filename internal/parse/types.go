@@ -25,6 +25,7 @@ type RawMeta struct {
 
 // RawSMState holds a state in a state machine type from [types.*.states.*].
 type RawSMState struct {
+	Name     string
 	Terminal *bool
 	Comment  *string
 }
@@ -46,7 +47,7 @@ type RawType struct {
 	BaseType   string
 	Values     []string
 	Fields     map[string]string // composite fields: field name -> PG type
-	States         map[string]RawSMState  // state machine states: state name -> definition
+	States         []RawSMState           // state machine states, in TOML declaration order (order is semantic: it becomes PostgreSQL enum value order)
 	Transitions    []RawSMTransition      // state machine transitions
 	InitialState   *string                // state machine initial state
 	EnforceTrigger *bool                  // state machine: generate enforcement trigger

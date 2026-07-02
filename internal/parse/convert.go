@@ -45,17 +45,15 @@ func CollectUserTypes(raw *RawSchema) []semtype.UserTypeDef {
 			ut.InitialState = *rt.InitialState
 		}
 		ut.EnforceTrigger = rt.EnforceTrigger
-		if len(rt.States) > 0 {
-			for name, s := range rt.States {
-				us := semtype.UserSMState{Name: name}
-				if s.Terminal != nil {
-					us.Terminal = *s.Terminal
-				}
-				if s.Comment != nil {
-					us.Comment = *s.Comment
-				}
-				ut.States = append(ut.States, us)
+		for _, s := range rt.States {
+			us := semtype.UserSMState{Name: s.Name}
+			if s.Terminal != nil {
+				us.Terminal = *s.Terminal
 			}
+			if s.Comment != nil {
+				us.Comment = *s.Comment
+			}
+			ut.States = append(ut.States, us)
 		}
 		for _, tr := range rt.Transitions {
 			utTr := semtype.UserSMTransition{
