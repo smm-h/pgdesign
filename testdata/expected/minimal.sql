@@ -4,7 +4,7 @@ CREATE DOMAIN public.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\.[^@]+$');
 
 CREATE TABLE public.users (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    email email NOT NULL,
+    email public.email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_users PRIMARY KEY (id)
 );

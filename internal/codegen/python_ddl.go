@@ -199,8 +199,8 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 4. CREATE TABLE (phase 4)
 	for i := range tables {
 		tuples = append(tuples, ddlTuple{
-			SQL:           sql.CreateTable(&tables[i], tables[i].Schema, false, schema.PGVersion, schema.Enums),
-			IdempotentSQL: sql.CreateTable(&tables[i], tables[i].Schema, true, schema.PGVersion, schema.Enums),
+			SQL:           sql.CreateTable(&tables[i], tables[i].Schema, false, schema.PGVersion, schema.Enums, schema.Domains),
+			IdempotentSQL: sql.CreateTable(&tables[i], tables[i].Schema, true, schema.PGVersion, schema.Enums, schema.Domains),
 			Kind:          "table",
 			Name:          tables[i].Name,
 			Table:         tables[i].Name,

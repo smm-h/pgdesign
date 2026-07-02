@@ -7,8 +7,8 @@ CREATE DOMAIN shop.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\.[^@]+$');
 
 CREATE TABLE shop.customers (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    name short_text NOT NULL,
-    email email NOT NULL,
+    name shop.short_text NOT NULL,
+    email shop.email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_customers PRIMARY KEY (id)
 );

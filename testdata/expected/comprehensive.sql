@@ -10,8 +10,8 @@ CREATE DOMAIN app.short_text AS text CHECK (LENGTH(VALUE) <= 255);
 CREATE TABLE app.projects (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     owner_id uuid NOT NULL,
-    name short_text NOT NULL,
-    description short_text,
+    name app.short_text NOT NULL,
+    description app.short_text,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_projects PRIMARY KEY (id)
 );
@@ -19,7 +19,7 @@ CREATE TABLE app.projects (
 CREATE TABLE app.tasks (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     project_id uuid NOT NULL,
-    title short_text NOT NULL,
+    title app.short_text NOT NULL,
     priority app.priority NOT NULL DEFAULT 'medium',
     estimated_hours int8 NOT NULL DEFAULT 0,
     hourly_rate int8 NOT NULL DEFAULT 0,
@@ -32,7 +32,7 @@ CREATE TABLE app.audit_log (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     project_id uuid NOT NULL,
     actor_id uuid NOT NULL,
-    action short_text NOT NULL,
+    action app.short_text NOT NULL,
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_audit_log PRIMARY KEY (id)
@@ -41,7 +41,7 @@ CREATE TABLE app.audit_log (
 CREATE TABLE app.events (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     project_id uuid NOT NULL,
-    event_type short_text NOT NULL,
+    event_type app.short_text NOT NULL,
     payload jsonb NOT NULL DEFAULT '{}'::jsonb,
     occurred_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_events PRIMARY KEY (id, occurred_at)
@@ -51,8 +51,8 @@ CREATE TABLE app.comments (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     task_id uuid NOT NULL,
     author_id uuid NOT NULL,
-    body short_text NOT NULL,
-    tags short_text[] NOT NULL,
+    body app.short_text NOT NULL,
+    tags app.short_text[] NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_comments PRIMARY KEY (id)
 );

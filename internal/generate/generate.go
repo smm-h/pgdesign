@@ -183,7 +183,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	if len(tables) > 0 {
 		var tableStmts []string
 		for i := range tables {
-			tableStmts = append(tableStmts, sql.CreateTable(&tables[i], tables[i].Schema, opts.Idempotent, opts.PGVersion, schema.Enums))
+			tableStmts = append(tableStmts, sql.CreateTable(&tables[i], tables[i].Schema, opts.Idempotent, opts.PGVersion, schema.Enums, schema.Domains))
 		}
 		sections = append(sections, strings.Join(tableStmts, "\n\n"))
 	}

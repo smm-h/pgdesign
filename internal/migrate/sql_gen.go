@@ -164,7 +164,7 @@ func IsNonTransactional(op DDLOp) bool {
 func opCreateTable(op DDLOp) string {
 	if op.TableDef != nil {
 		schema, _ := splitQualifiedName(op.Table)
-		return sql.CreateTable(op.TableDef, schema, false, 0, nil)
+		return sql.CreateTable(op.TableDef, schema, false, 0, nil, nil)
 	}
 
 	// Consolidation path: build a table from the create_table op's fields
@@ -276,7 +276,7 @@ func opCreateTableConsolidated(op DDLOp) string {
 		}
 	}
 
-	return sql.CreateTable(tbl, schema, false, 0, nil)
+	return sql.CreateTable(tbl, schema, false, 0, nil, nil)
 }
 
 func opCreatePartition(op DDLOp) string {

@@ -23,14 +23,14 @@ BEGIN
 END $$;""", "domain", "email", None, 3, True),
     DDLStmt("""CREATE TABLE shop.customers (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    name short_text NOT NULL,
-    email email NOT NULL,
+    name shop.short_text NOT NULL,
+    email shop.email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_customers PRIMARY KEY (id)
 );""", """CREATE TABLE IF NOT EXISTS shop.customers (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    name short_text NOT NULL,
-    email email NOT NULL,
+    name shop.short_text NOT NULL,
+    email shop.email NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT pk_customers PRIMARY KEY (id)
 );""", "table", "customers", "customers", 4, True),

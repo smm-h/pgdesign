@@ -2,6 +2,7 @@ package generate
 
 import (
 	"encoding/json"
+	"flag"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1338,6 +1339,10 @@ func TestAppendOnlyTrigger(t *testing.T) {
 	}
 }
 
+// updateGolden regenerates golden files when true (same convention as
+// internal/test/golden_test.go: go test -run TestGoldenFile -update).
+var updateGolden = flag.Bool("update", false, "update golden files")
+
 func TestGoldenFile(t *testing.T) {
 	inputPath := filepath.Join("testdata", "simple_input.toml")
 
@@ -1361,9 +1366,15 @@ func TestGoldenFile(t *testing.T) {
 	got := mustGenerate(t, schema, opts)
 
 	expectedPath := filepath.Join("testdata", "simple_expected.sql")
+	if *updateGolden {
+		if err := os.WriteFile(expectedPath, []byte(got), 0644); err != nil {
+			t.Fatalf("cannot update golden file: %v", err)
+		}
+		t.Logf("updated %s", expectedPath)
+	}
 	expectedBytes, err := os.ReadFile(expectedPath)
 	if err != nil {
-		t.Fatalf("cannot read expected file: %v", err)
+		t.Fatalf("cannot read expected file (run with -update to create): %v", err)
 	}
 	expected := string(expectedBytes)
 
@@ -2121,12 +2132,13 @@ func TestDomainResolution_DDL(t *testing.T) {
 		t.Errorf("expected CREATE DOMAIN for email, got:\n%s", out)
 	}
 
-	// Columns should reference domain names, not base types.
-	if !strings.Contains(out, "handle slug NOT NULL") {
-		t.Errorf("expected column to use domain name 'slug', got:\n%s", out)
+	// Columns should reference schema-qualified domain names, not base types,
+	// so the DDL works without relying on search_path (same as enum columns).
+	if !strings.Contains(out, "handle app.slug NOT NULL") {
+		t.Errorf("expected column to use qualified domain name 'app.slug', got:\n%s", out)
 	}
-	if !strings.Contains(out, "contact email NOT NULL") {
-		t.Errorf("expected column to use domain name 'email', got:\n%s", out)
+	if !strings.Contains(out, "contact app.email NOT NULL") {
+		t.Errorf("expected column to use qualified domain name 'app.email', got:\n%s", out)
 	}
 
 	// No semantic CHECK constraints on the table.

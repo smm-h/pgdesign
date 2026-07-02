@@ -271,9 +271,10 @@ func DropDomain(schemaName, name string, cascade bool) string {
 // PARTITION BY. Foreign keys are NOT included (they use ALTER TABLE for cycle safety).
 // pgVersion controls version-specific DDL: when the target version lacks identity
 // column support (pre-PG10), identity columns fall back to bigserial.
-// enums is the list of enum types defined in the schema; when a column's PG type
-// matches an enum name, the type is emitted with its schema prefix.
-func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersion int, enums []model.Enum) string {
+// enums and domains are the enum and domain types defined in the schema; when a
+// column's PG type matches an enum or domain name, the type is emitted with its
+// schema prefix so the DDL works without relying on search_path.
+func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersion int, enums []model.Enum, domains []model.Domain) string {
 	ifne := ""
 	if idempotent {
 		ifne = " IF NOT EXISTS"
@@ -285,7 +286,7 @@ func CreateTable(table *model.Table, schemaName string, idempotent bool, pgVersi
 
 	// Column definitions.
 	for _, col := range table.Columns {
-		lines = append(lines, "    "+columnDef(col, pgVersion, enums))
+		lines = append(lines, "    "+columnDef(col, pgVersion, enums, domains))
 	}
 
 	// Inline PRIMARY KEY constraint.
@@ -351,7 +352,7 @@ func GeneratedStorageKeyword(stored bool, pgVersion int) string {
 	return "STORED"
 }
 
-func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
+func columnDef(col model.Column, pgVersion int, enums []model.Enum, domains []model.Domain) string {
 	// Pre-PG10 identity fallback: replace identity column with bigserial.
 	if col.Identity != "" && !pgcap.Has(pgVersion, pgcap.IdentityColumns) {
 		var parts []string
@@ -367,7 +368,7 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 	}
 
 	var parts []string
-	pgType := resolveColumnType(typeinfo.Reconstruct(col.PGType), enums)
+	pgType := resolveColumnType(typeinfo.Reconstruct(col.PGType), enums, domains)
 	if col.Array {
 		pgType += "[]"
 	}
@@ -396,12 +397,17 @@ func columnDef(col model.Column, pgVersion int, enums []model.Enum) string {
 }
 
 // resolveColumnType returns the SQL type string for a column. If the type
-// matches a known enum, the enum's schema-qualified name is returned so that
-// the DDL works without relying on search_path.
-func resolveColumnType(pgType string, enums []model.Enum) string {
+// matches a known enum or domain, its schema-qualified name is returned so
+// that the DDL works without relying on search_path.
+func resolveColumnType(pgType string, enums []model.Enum, domains []model.Domain) string {
 	for _, e := range enums {
 		if e.Name == pgType {
 			return QualifiedName(e.Schema, e.Name)
+		}
+	}
+	for _, d := range domains {
+		if d.Name == pgType {
+			return QualifiedName(d.Schema, d.Name)
 		}
 	}
 	return pgType
