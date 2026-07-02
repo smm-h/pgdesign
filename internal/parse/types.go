@@ -39,6 +39,12 @@ type RawSMTransition struct {
 	Comment  *string
 }
 
+// RawCompositeField holds one composite type field from [types.*.fields].
+type RawCompositeField struct {
+	Name string
+	Type string // PG type
+}
+
 // RawType holds a user-defined type from [types.*].
 type RawType struct {
 	Name       string
@@ -46,7 +52,7 @@ type RawType struct {
 	Extends    *string
 	BaseType   string
 	Values     []string
-	Fields     map[string]string // composite fields: field name -> PG type
+	Fields     []RawCompositeField // composite fields, in TOML declaration order (order is semantic: it becomes the PostgreSQL composite field order)
 	States         []RawSMState           // state machine states, in TOML declaration order (order is semantic: it becomes PostgreSQL enum value order)
 	Transitions    []RawSMTransition      // state machine transitions
 	InitialState   *string                // state machine initial state

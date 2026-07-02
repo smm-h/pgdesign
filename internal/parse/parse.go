@@ -248,7 +248,10 @@ func (p *parser) parseTypes() []RawType {
 				p.warnf("W001", "", "", "[types.%s.fields] has no parent [types.%s] section", typeName, typeName)
 				continue
 			}
-			fields := make(map[string]string)
+			// Append in document order: field order is semantic (it becomes
+			// the PostgreSQL composite field order). Duplicate field names
+			// are rejected downstream by semtype (E103).
+			var fields []RawCompositeField
 			for _, fc := range tbl.Children {
 				kv, ok := fc.(*tomledit.KeyValueNode)
 				if !ok {
@@ -256,7 +259,7 @@ func (p *parser) parseTypes() []RawType {
 				}
 				fieldName := kv.Key.Parts[0]
 				if v, ok := nodeString(kv.Val); ok {
-					fields[fieldName] = v
+					fields = append(fields, RawCompositeField{Name: fieldName, Type: v})
 				} else {
 					p.errorf("E010", "", "", "[types.%s.fields].%s must be a string", typeName, fieldName)
 				}

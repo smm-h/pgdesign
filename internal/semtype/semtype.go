@@ -329,7 +329,7 @@ type UserTypeDef struct {
 	Extends     string // parent type name for type derivation
 	Base        string // PG base type (for scalars)
 	Values      []string // enum values
-	Fields      map[string]string // composite fields: field name -> PG type
+	Fields      []CompositeField // composite fields, in declaration order (order is semantic: it becomes the PostgreSQL composite field order)
 	States         []UserSMState    // state machine states
 	Transitions    []UserSMTransition // state machine transitions
 	InitialState   string           // state machine initial state
@@ -688,17 +688,32 @@ func mergeCompositeType(parent *TypeDef, child UserTypeDef) (*TypeDef, diagnosti
 		Source:   "extended",
 	}
 
-	// Check for field name collisions.
+	// Check for duplicate field names within the child itself (fields are a
+	// declaration-ordered slice, so duplicates are no longer structurally
+	// impossible the way they were with a map).
+	childFieldSet := make(map[string]bool, len(child.Fields))
+	for _, f := range child.Fields {
+		if childFieldSet[f.Name] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E103",
+				Message:  fmt.Sprintf("composite type %q: duplicate field name %q", child.Name, f.Name),
+			})
+		}
+		childFieldSet[f.Name] = true
+	}
+
+	// Check for field name collisions with the parent.
 	parentFieldSet := make(map[string]bool, len(parent.Fields))
 	for _, f := range parent.Fields {
 		parentFieldSet[f.Name] = true
 	}
-	for name := range child.Fields {
-		if parentFieldSet[name] {
+	for _, f := range child.Fields {
+		if parentFieldSet[f.Name] {
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity: diagnostic.Error,
 				Code:     "E118",
-				Message:  fmt.Sprintf("composite type %q extends %q: field %q exists in both parent and child", child.Name, child.Extends, name),
+				Message:  fmt.Sprintf("composite type %q extends %q: field %q exists in both parent and child", child.Name, child.Extends, f.Name),
 			})
 		}
 	}
@@ -706,19 +721,12 @@ func mergeCompositeType(parent *TypeDef, child UserTypeDef) (*TypeDef, diagnosti
 		return nil, diags
 	}
 
-	// Copy parent fields.
+	// Copy parent fields (in parent declaration order), then append child
+	// fields in child declaration order. Order is semantic: it becomes the
+	// PostgreSQL composite field order.
 	td.Fields = make([]CompositeField, len(parent.Fields))
 	copy(td.Fields, parent.Fields)
-
-	// Append child fields, sorted for determinism.
-	childNames := make([]string, 0, len(child.Fields))
-	for name := range child.Fields {
-		childNames = append(childNames, name)
-	}
-	sort.Strings(childNames)
-	for _, name := range childNames {
-		td.Fields = append(td.Fields, CompositeField{Name: name, PGType: child.Fields[name]})
-	}
+	td.Fields = append(td.Fields, child.Fields...)
 
 	// Override non-zero fields from child.
 	if child.Comment != "" {
@@ -969,17 +977,27 @@ func (r *Registry) loadCompositeType(ut UserTypeDef) diagnostic.Diagnostics {
 		return diags
 	}
 
-	// Sort field names for deterministic output
-	fieldNames := make([]string, 0, len(ut.Fields))
-	for name := range ut.Fields {
-		fieldNames = append(fieldNames, name)
+	// Check for duplicate field names. Fields arrive in declaration order
+	// (order is semantic: it becomes the PostgreSQL composite field order).
+	fieldSet := make(map[string]bool, len(ut.Fields))
+	for _, f := range ut.Fields {
+		if fieldSet[f.Name] {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E103",
+				Message:  fmt.Sprintf("composite type %q: duplicate field name %q", ut.Name, f.Name),
+			})
+		}
+		fieldSet[f.Name] = true
 	}
-	sort.Strings(fieldNames)
+	if diags.HasErrors() {
+		return diags
+	}
 
-	// Validate each field's PG type and build the sorted field list
+	// Validate each field's PG type and build the field list in declaration order.
 	fields := make([]CompositeField, 0, len(ut.Fields))
-	for _, name := range fieldNames {
-		pgType := ut.Fields[name]
+	for _, f := range ut.Fields {
+		pgType := f.PGType
 		baseForCheck := strings.ToLower(pgType)
 		if idx := strings.IndexByte(baseForCheck, '('); idx != -1 {
 			baseForCheck = baseForCheck[:idx]
@@ -988,12 +1006,12 @@ func (r *Registry) loadCompositeType(ut UserTypeDef) diagnostic.Diagnostics {
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity:   diagnostic.Error,
 				Code:       "E103",
-				Message:    fmt.Sprintf("composite type %q field %q: unknown base type %q", ut.Name, name, pgType),
+				Message:    fmt.Sprintf("composite type %q field %q: unknown base type %q", ut.Name, f.Name, pgType),
 				Suggestion: "field type must be a valid PostgreSQL type",
 			})
 			continue
 		}
-		fields = append(fields, CompositeField{Name: name, PGType: pgType})
+		fields = append(fields, CompositeField{Name: f.Name, PGType: pgType})
 	}
 
 	if diags.HasErrors() {

@@ -1372,16 +1372,16 @@ func TestBuild_ExtendsComposite(t *testing.T) {
 		{
 			Name: "base_comp",
 			Kind: "composite",
-			Fields: map[string]string{
-				"x": "integer",
-				"y": "text",
+			Fields: []semtype.CompositeField{
+				{Name: "x", PGType: "integer"},
+				{Name: "y", PGType: "text"},
 			},
 		},
 		{
 			Name:    "ext_comp",
 			Extends: "base_comp",
-			Fields: map[string]string{
-				"z": "boolean",
+			Fields: []semtype.CompositeField{
+				{Name: "z", PGType: "boolean"},
 			},
 		},
 	}
@@ -1394,8 +1394,8 @@ func TestBuild_ExtendsComposite(t *testing.T) {
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
 		Types: []parse.RawType{
-			{Name: "base_comp", Kind: "composite", Fields: map[string]string{"x": "integer", "y": "text"}},
-			{Name: "ext_comp", Extends: &extends, Fields: map[string]string{"z": "boolean"}},
+			{Name: "base_comp", Kind: "composite", Fields: []parse.RawCompositeField{{Name: "x", Type: "integer"}, {Name: "y", Type: "text"}}},
+			{Name: "ext_comp", Extends: &extends, Fields: []parse.RawCompositeField{{Name: "z", Type: "boolean"}}},
 		},
 	}
 
@@ -1435,6 +1435,55 @@ func TestBuild_ExtendsComposite(t *testing.T) {
 		}
 		if ext.Fields[i].PGType != f.PGType {
 			t.Errorf("ext_comp fields[%d].PGType = %v, want %v", i, ext.Fields[i].PGType, f.PGType)
+		}
+	}
+}
+
+// TestBuild_CompositeFieldDeclarationOrder verifies that composite type
+// fields survive the full parse -> Build pipeline in TOML declaration order.
+// Order is semantic: it becomes the PostgreSQL composite field order in
+// CREATE TYPE ... AS (...), ROW(...) construction, and tuple comparison.
+// Fields are declared deliberately non-alphabetically.
+func TestBuild_CompositeFieldDeclarationOrder(t *testing.T) {
+	const src = `
+[meta]
+version = 1
+schema = "public"
+
+[types.mailing_address]
+kind = "composite"
+comment = "Postal address"
+
+[types.mailing_address.fields]
+street = "text"
+city = "text"
+zip = "text"
+building = "integer"
+apartment = "integer"
+`
+	raw, parseDiags := parse.Bytes([]byte(src))
+	if raw == nil {
+		t.Fatalf("parse failed: %v", parseDiags)
+	}
+	reg := semtype.NewBuiltinRegistry()
+	if diags := reg.LoadUserTypes(parse.CollectUserTypes(raw)); diags.HasErrors() {
+		t.Fatalf("LoadUserTypes errors: %v", diags)
+	}
+	schema, buildDiags := Build(raw, reg)
+	if buildDiags.HasErrors() {
+		t.Fatalf("unexpected build errors: %v", buildDiags)
+	}
+	if len(schema.CompositeTypes) != 1 {
+		t.Fatalf("expected 1 composite type, got %d", len(schema.CompositeTypes))
+	}
+	want := []string{"street", "city", "zip", "building", "apartment"}
+	ct := schema.CompositeTypes[0]
+	if len(ct.Fields) != len(want) {
+		t.Fatalf("fields count = %d, want %d; fields = %v", len(ct.Fields), len(want), ct.Fields)
+	}
+	for i, name := range want {
+		if ct.Fields[i].Name != name {
+			t.Errorf("fields[%d].Name = %q, want %q (declaration order lost)", i, ct.Fields[i].Name, name)
 		}
 	}
 }

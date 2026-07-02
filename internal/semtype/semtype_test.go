@@ -642,10 +642,10 @@ func TestLoadUserCompositeType(t *testing.T) {
 		{
 			Name: "address",
 			Kind: "composite",
-			Fields: map[string]string{
-				"street": "text",
-				"city":   "text",
-				"zip":    "varchar(10)",
+			Fields: []CompositeField{
+				{Name: "street", PGType: "text"},
+				{Name: "city", PGType: "text"},
+				{Name: "zip", PGType: "varchar(10)"},
 			},
 			Comment: "Mailing address",
 		},
@@ -672,10 +672,10 @@ func TestLoadUserCompositeType(t *testing.T) {
 	if len(td.Fields) != 3 {
 		t.Fatalf("Fields length = %d, want 3", len(td.Fields))
 	}
-	// Fields should be sorted by name: city, street, zip
+	// Fields keep declaration order: street, city, zip
 	expected := []CompositeField{
-		{Name: "city", PGType: "text"},
 		{Name: "street", PGType: "text"},
+		{Name: "city", PGType: "text"},
 		{Name: "zip", PGType: "varchar(10)"},
 	}
 	for i, f := range td.Fields {
@@ -692,7 +692,7 @@ func TestLoadUserCompositeType_NoFields(t *testing.T) {
 		{
 			Name:   "empty_composite",
 			Kind:   "composite",
-			Fields: map[string]string{},
+			Fields: []CompositeField{},
 		},
 	}
 
@@ -747,9 +747,9 @@ func TestLoadUserCompositeType_InvalidFieldType(t *testing.T) {
 		{
 			Name: "bad_composite",
 			Kind: "composite",
-			Fields: map[string]string{
-				"good_field": "text",
-				"bad_field":  "not_a_pg_type",
+			Fields: []CompositeField{
+				{Name: "good_field", PGType: "text"},
+				{Name: "bad_field", PGType: "not_a_pg_type"},
 			},
 		},
 	}
@@ -1878,16 +1878,16 @@ func TestExtendsCompositeBasic(t *testing.T) {
 		{
 			Name: "base_addr",
 			Kind: "composite",
-			Fields: map[string]string{
-				"x": "integer",
-				"y": "text",
+			Fields: []CompositeField{
+				{Name: "x", PGType: "integer"},
+				{Name: "y", PGType: "text"},
 			},
 		},
 		{
 			Name:    "ext_addr",
 			Extends: "base_addr",
-			Fields: map[string]string{
-				"z": "boolean",
+			Fields: []CompositeField{
+				{Name: "z", PGType: "boolean"},
 			},
 		},
 	}
@@ -1907,11 +1907,12 @@ func TestExtendsCompositeBasic(t *testing.T) {
 	if td.Source != "extended" {
 		t.Errorf("Source = %q, want %q", td.Source, "extended")
 	}
-	// Parent fields sorted: x, y. Child field: z. Total: 3.
+	// Parent fields: x, y. Child field: z. Total: 3.
 	if len(td.Fields) != 3 {
 		t.Fatalf("Fields length = %d, want 3", len(td.Fields))
 	}
-	// Parent fields come first (sorted: x, y), then child fields (sorted: z).
+	// Parent fields come first (in parent declaration order), then child
+	// fields (in child declaration order).
 	expectedFields := []CompositeField{
 		{Name: "x", PGType: "integer"},
 		{Name: "y", PGType: "text"},
@@ -1931,15 +1932,15 @@ func TestExtendsCompositeFieldCollision_E118(t *testing.T) {
 		{
 			Name: "base_addr",
 			Kind: "composite",
-			Fields: map[string]string{
-				"x": "integer",
+			Fields: []CompositeField{
+				{Name: "x", PGType: "integer"},
 			},
 		},
 		{
 			Name:    "ext_addr",
 			Extends: "base_addr",
-			Fields: map[string]string{
-				"x": "text",
+			Fields: []CompositeField{
+				{Name: "x", PGType: "text"},
 			},
 		},
 	}
@@ -1967,16 +1968,16 @@ func TestExtendsCompositeOverrideComment(t *testing.T) {
 		{
 			Name: "base_addr",
 			Kind: "composite",
-			Fields: map[string]string{
-				"x": "integer",
+			Fields: []CompositeField{
+				{Name: "x", PGType: "integer"},
 			},
 			Comment: "base comment",
 		},
 		{
 			Name:    "ext_addr",
 			Extends: "base_addr",
-			Fields: map[string]string{
-				"y": "text",
+			Fields: []CompositeField{
+				{Name: "y", PGType: "text"},
 			},
 			Comment: "extended comment",
 		},

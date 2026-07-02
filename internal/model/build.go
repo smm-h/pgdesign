@@ -271,17 +271,13 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 			if rt.Comment != nil {
 				ct.Comment = *rt.Comment
 			}
-			// Fields come from the parsed RawType.Fields map.
-			// Sort field names for deterministic output.
-			var fieldNames []string
-			for name := range rt.Fields {
-				fieldNames = append(fieldNames, name)
-			}
-			sort.Strings(fieldNames)
-			for _, name := range fieldNames {
+			// Fields come from the parsed RawType.Fields slice, in TOML
+			// declaration order (order is semantic: it becomes the
+			// PostgreSQL composite field order).
+			for _, f := range rt.Fields {
 				ct.Fields = append(ct.Fields, CompositeField{
-					Name:   name,
-					PGType: typeinfo.Parse(rt.Fields[name]),
+					Name:   f.Name,
+					PGType: typeinfo.Parse(f.Type),
 				})
 			}
 			compositeTypes = append(compositeTypes, ct)

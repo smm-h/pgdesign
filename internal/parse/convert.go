@@ -13,7 +13,9 @@ func CollectUserTypes(raw *RawSchema) []semtype.UserTypeDef {
 			Kind:   rt.Kind,
 			Base:   rt.BaseType,
 			Values: rt.Values,
-			Fields: rt.Fields,
+		}
+		for _, f := range rt.Fields {
+			ut.Fields = append(ut.Fields, semtype.CompositeField{Name: f.Name, PGType: f.Type})
 		}
 		if rt.Extends != nil {
 			ut.Extends = *rt.Extends

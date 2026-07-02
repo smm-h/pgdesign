@@ -2,6 +2,8 @@ package parse
 
 import (
 	"testing"
+
+	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 func TestCollectUserTypes_Empty(t *testing.T) {
@@ -108,10 +110,10 @@ func TestCollectUserTypes_Composite(t *testing.T) {
 		Types: []RawType{{
 			Name: "address",
 			Kind: "composite",
-			Fields: map[string]string{
-				"street": "text",
-				"city":   "text",
-				"zip":    "varchar",
+			Fields: []RawCompositeField{
+				{Name: "street", Type: "text"},
+				{Name: "city", Type: "text"},
+				{Name: "zip", Type: "varchar"},
 			},
 		}},
 	}
@@ -125,17 +127,18 @@ func TestCollectUserTypes_Composite(t *testing.T) {
 	if ut.Kind != "composite" {
 		t.Errorf("Kind = %q, want %q", ut.Kind, "composite")
 	}
-	if len(ut.Fields) != 3 {
-		t.Fatalf("expected 3 fields, got %d", len(ut.Fields))
+	expectedFields := []semtype.CompositeField{
+		{Name: "street", PGType: "text"},
+		{Name: "city", PGType: "text"},
+		{Name: "zip", PGType: "varchar"},
 	}
-	if ut.Fields["street"] != "text" {
-		t.Errorf("Fields[street] = %q, want %q", ut.Fields["street"], "text")
+	if len(ut.Fields) != len(expectedFields) {
+		t.Fatalf("expected %d fields, got %d", len(expectedFields), len(ut.Fields))
 	}
-	if ut.Fields["city"] != "text" {
-		t.Errorf("Fields[city] = %q, want %q", ut.Fields["city"], "text")
-	}
-	if ut.Fields["zip"] != "varchar" {
-		t.Errorf("Fields[zip] = %q, want %q", ut.Fields["zip"], "varchar")
+	for i, f := range expectedFields {
+		if ut.Fields[i] != f {
+			t.Errorf("Fields[%d] = %+v, want %+v", i, ut.Fields[i], f)
+		}
 	}
 }
 
