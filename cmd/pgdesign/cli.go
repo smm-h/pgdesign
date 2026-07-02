@@ -43,8 +43,7 @@ func main() {
 	app.RegisterCheck("workload", checkWorkload)
 	app.RegisterCheck("build", checkBuild)
 
-	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output", strictcli.Default(false)))
-	app.GlobalFlag(strictcli.StringFlag("config", "Path to pgdesign.toml (bypasses directory search)", strictcli.Default(nil)))
+	strictcli.RegisterGlobals[Globals](app)
 
 	app.Command("generate", "Generate SQL DDL from TOML schema file(s) or directory", handleGenerate,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
