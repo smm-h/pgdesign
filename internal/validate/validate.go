@@ -128,6 +128,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"E224", checkSMDefaultMismatch},
 		{"E225", checkFKInvalidOnDelete},
 		{"E226", checkSMReservedTriggerPrefix},
+		{"E228", checkCascadeIntoAppendOnly},
 	}
 
 	for _, r := range rules {
@@ -2774,6 +2775,64 @@ func checkSMReservedTriggerPrefix(schema *model.Schema, _ *Config) []diagnostic.
 				})
 			}
 		}
+	}
+	return diags
+}
+
+// checkCascadeIntoAppendOnly (E228): an append-only table declares an FK
+// whose on_delete action (CASCADE, SET NULL, or SET DEFAULT) would write into
+// it when the referenced row is deleted. The append-only BEFORE UPDATE OR
+// DELETE trigger blocks that write, so a DELETE from the referenced table --
+// or from any table whose CASCADE deletes propagate down to it -- fails at
+// runtime. Every reachable table is a delete origin: the first hop out of the
+// append-only table counts all three write-into-child actions, while
+// propagation hops count only CASCADE (only deletes propagate further).
+func checkCascadeIntoAppendOnly(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
+	if schema.FKGraph == nil {
+		return nil
+	}
+	firstHopActions := map[string]bool{"CASCADE": true, "SET NULL": true, "SET DEFAULT": true}
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if !t.AppendOnly {
+			continue
+		}
+		seen := make(map[string]bool) // dedupe: one diagnostic per (first-hop FK, delete origin)
+		schema.FKGraph.WalkCascade(t.Name, model.TowardReferenced, func(edge model.FKEdge, firstHop bool) bool {
+			action := strings.ToUpper(strings.TrimSpace(edge.OnDelete))
+			if action == "" {
+				return false // E201 handles missing on_delete
+			}
+			if firstHop {
+				return firstHopActions[action]
+			}
+			return action == "CASCADE"
+		}, func(path []model.FKEdge) {
+			first := path[0]
+			origin := path[len(path)-1].ToTable
+			key := first.FKName + "\x00" + origin
+			if seen[key] {
+				return
+			}
+			seen[key] = true
+			// Render the chain from the delete origin down into the append-only table.
+			names := make([]string, 0, len(path)+1)
+			names = append(names, origin)
+			for i := len(path) - 2; i >= 0; i-- {
+				names = append(names, path[i].ToTable)
+			}
+			names = append(names, t.Name)
+			action := strings.ToUpper(strings.TrimSpace(first.OnDelete))
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E228",
+				Table:    t.Name,
+				Column:   first.FromColumn,
+				Message: fmt.Sprintf("append-only table %q declares FK %s with on_delete %s: DELETE from %q would write into it via %s and fail against the append-only trigger",
+					t.Name, first.FKName, action, origin, strings.Join(names, " -> ")),
+				Suggestion: "Use RESTRICT or NO ACTION on FKs from append-only tables",
+			})
+		})
 	}
 	return diags
 }

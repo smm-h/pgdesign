@@ -331,6 +331,7 @@ var designCodes = map[string]bool{
 	"E223": true, // SM requires column missing
 	"E224": true, // SM default mismatch
 	"E226": true, // SM reserved trigger prefix
+	"E228": true, // Cascade writes into append-only table
 }
 
 func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {

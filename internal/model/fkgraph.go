@@ -20,31 +20,75 @@ type FKGraph struct {
 	FanOut  map[string]int      // table -> count of outgoing FK constraints
 }
 
-// CascadeDepth returns the max depth of the ON DELETE CASCADE chain triggered
-// by deleting rows from the given table. ON DELETE actions flow from a
-// referenced table into the tables that reference it, so the walk follows
-// Reverse edges. Uses DFS with a visited set to handle cycles defensively.
-func (g *FKGraph) CascadeDepth(table string) int {
-	visited := make(map[string]bool)
-	return g.cascadeDepthDFS(table, visited)
-}
+// WalkDirection selects which way WalkCascade traverses FK edges.
+type WalkDirection int
 
-func (g *FKGraph) cascadeDepthDFS(table string, visited map[string]bool) int {
-	visited[table] = true
-	maxDepth := 0
-	for _, edge := range g.Reverse[table] {
-		if !strings.EqualFold(edge.OnDelete, "CASCADE") {
-			continue
+const (
+	// TowardReferencing follows Reverse edges: from a referenced table into
+	// the tables whose FKs point at it. This is the direction ON DELETE
+	// actions propagate at runtime (deleting a referenced row mutates rows in
+	// the referencing tables).
+	TowardReferencing WalkDirection = iota
+	// TowardReferenced follows Forward edges: from a referencing table out to
+	// the tables it references (toward the potential delete origins whose
+	// DELETE would write into the start table).
+	TowardReferenced
+)
+
+// WalkCascade explores every simple path out of start, following FK edges in
+// the given direction. follow reports whether an edge may be traversed;
+// firstHop is true for edges directly attached to start. visit is invoked at
+// every step with the full edge path from start (len(path) >= 1); the slice
+// is reused between calls, so callers must copy it if they retain it. Cycles
+// are cut by never revisiting a table already on the current path. Exploring
+// all simple paths is worst-case exponential, but FK graphs are small and
+// sparse in practice.
+func (g *FKGraph) WalkCascade(start string, dir WalkDirection, follow func(edge FKEdge, firstHop bool) bool, visit func(path []FKEdge)) {
+	onPath := map[string]bool{start: true}
+	var path []FKEdge
+	var dfs func(table string)
+	dfs = func(table string) {
+		edges := g.Reverse[table]
+		if dir == TowardReferenced {
+			edges = g.Forward[table]
 		}
-		if visited[edge.FromTable] {
-			continue
-		}
-		depth := 1 + g.cascadeDepthDFS(edge.FromTable, visited)
-		if depth > maxDepth {
-			maxDepth = depth
+		for _, edge := range edges {
+			next := edge.FromTable
+			if dir == TowardReferenced {
+				next = edge.ToTable
+			}
+			if onPath[next] {
+				continue
+			}
+			if !follow(edge, len(path) == 0) {
+				continue
+			}
+			path = append(path, edge)
+			onPath[next] = true
+			visit(path)
+			dfs(next)
+			delete(onPath, next)
+			path = path[:len(path)-1]
 		}
 	}
-	visited[table] = false
+	dfs(start)
+}
+
+// followCascadeOnly traverses only ON DELETE CASCADE edges: deletes are the
+// only action that propagates deletion to further tables.
+func followCascadeOnly(edge FKEdge, _ bool) bool {
+	return strings.EqualFold(edge.OnDelete, "CASCADE")
+}
+
+// CascadeDepth returns the length of the longest ON DELETE CASCADE chain
+// triggered by deleting rows from the given table.
+func (g *FKGraph) CascadeDepth(table string) int {
+	maxDepth := 0
+	g.WalkCascade(table, TowardReferencing, followCascadeOnly, func(path []FKEdge) {
+		if len(path) > maxDepth {
+			maxDepth = len(path)
+		}
+	})
 	return maxDepth
 }
 
@@ -55,30 +99,19 @@ func (g *FKGraph) CascadeBreadth(table string) int {
 	return len(g.CascadeChain(table))
 }
 
-// CascadeChain returns an ordered list of tables affected by deleting rows
-// from the given table (BFS order over Reverse CASCADE edges). Does NOT
-// include the starting table. Returns nil if no cascade edges exist.
+// CascadeChain returns the distinct tables affected by deleting rows from the
+// given table, in first-reached DFS order. Does NOT include the starting
+// table. Returns nil if no cascade edges exist.
 func (g *FKGraph) CascadeChain(table string) []string {
-	visited := map[string]bool{table: true}
-	queue := []string{table}
+	seen := make(map[string]bool)
 	var result []string
-
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		for _, edge := range g.Reverse[current] {
-			if !strings.EqualFold(edge.OnDelete, "CASCADE") {
-				continue
-			}
-			if visited[edge.FromTable] {
-				continue
-			}
-			visited[edge.FromTable] = true
-			result = append(result, edge.FromTable)
-			queue = append(queue, edge.FromTable)
+	g.WalkCascade(table, TowardReferencing, followCascadeOnly, func(path []FKEdge) {
+		t := path[len(path)-1].FromTable
+		if !seen[t] {
+			seen[t] = true
+			result = append(result, t)
 		}
-	}
-
+	})
 	if len(result) == 0 {
 		return nil
 	}

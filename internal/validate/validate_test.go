@@ -2178,6 +2178,175 @@ func TestW014_CascadeBreadthBelowThreshold_NoDiag(t *testing.T) {
 	}
 }
 
+// --- E228: FK on append-only table lets deletes write into it ---
+
+// e228Table builds a table with an optional single-column FK to ref with the
+// given on_delete action.
+func e228Table(name string, appendOnly bool, ref, onDelete string) model.Table {
+	t := model.Table{Name: name, Schema: "public", Comment: name, PK: []string{"id"},
+		AppendOnly: appendOnly,
+		Columns:    []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}},
+	}
+	if ref != "" {
+		t.Columns = append(t.Columns, model.Column{Name: ref + "_id", PGType: typeinfo.T("uuid"), NotNull: true})
+		t.FKs = []model.FK{{
+			Name: "fk_" + name + "_" + ref, Columns: []string{ref + "_id"},
+			RefSchema: "public", RefTable: ref, RefColumns: []string{"id"}, OnDelete: onDelete,
+		}}
+	}
+	return t
+}
+
+func TestE228_DirectHop_AllBlockedActions(t *testing.T) {
+	// All three write-into-child actions on an append-only table's FK must be
+	// flagged: the deny-mutation trigger blocks the write at runtime.
+	for _, action := range []string{"CASCADE", "SET NULL", "SET DEFAULT"} {
+		t.Run(action, func(t *testing.T) {
+			schema := &model.Schema{Tables: []model.Table{
+				e228Table("users", false, "", ""),
+				e228Table("audit_log", true, "users", action),
+			}}
+			schema.BuildFKGraph()
+			diags, _ := Validate(schema, nil)
+			found := findByCode(diags, "E228")
+			if len(found) != 1 {
+				t.Fatalf("expected exactly 1 E228, got %d: %v", len(found), found)
+			}
+			d := found[0]
+			if d.Severity != diagnostic.Error {
+				t.Errorf("expected severity Error, got %v", d.Severity)
+			}
+			if d.Table != "audit_log" {
+				t.Errorf("expected E228 attributed to append-only table 'audit_log', got %q", d.Table)
+			}
+			if d.Column != "users_id" {
+				t.Errorf("expected Column 'users_id' (the FK column), got %q", d.Column)
+			}
+			if !strings.Contains(d.Message, `"users"`) {
+				t.Errorf("expected message to name delete origin 'users', got: %s", d.Message)
+			}
+			if !strings.Contains(d.Message, "users -> audit_log") {
+				t.Errorf("expected message to name the FK chain, got: %s", d.Message)
+			}
+			if !strings.Contains(d.Suggestion, "RESTRICT or NO ACTION") {
+				t.Errorf("expected suggestion to mention RESTRICT or NO ACTION, got: %s", d.Suggestion)
+			}
+		})
+	}
+}
+
+func TestE228_TransitiveChain(t *testing.T) {
+	// audit_log (append-only) references users with SET NULL; users references
+	// tenants with CASCADE. Deleting from tenants deletes users rows, whose
+	// deletion then tries to SET NULL into audit_log. Both users and tenants
+	// are delete origins whose DELETE fails at runtime.
+	schema := &model.Schema{Tables: []model.Table{
+		e228Table("tenants", false, "", ""),
+		e228Table("users", false, "tenants", "CASCADE"),
+		e228Table("audit_log", true, "users", "SET NULL"),
+	}}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E228")
+	if len(found) != 2 {
+		t.Fatalf("expected 2 E228 (origins users and tenants), got %d: %v", len(found), found)
+	}
+	origins := map[string]string{} // origin named in message -> full message
+	for _, d := range found {
+		if d.Table != "audit_log" {
+			t.Errorf("expected E228 attributed to 'audit_log', got %q", d.Table)
+		}
+		origins[d.Message] = d.Message
+	}
+	var hasUsers, hasTenants bool
+	for msg := range origins {
+		if strings.Contains(msg, "users -> audit_log") && !strings.Contains(msg, "tenants") {
+			hasUsers = true
+		}
+		if strings.Contains(msg, "tenants -> users -> audit_log") {
+			hasTenants = true
+		}
+	}
+	if !hasUsers {
+		t.Errorf("expected an E228 with chain 'users -> audit_log', got: %v", origins)
+	}
+	if !hasTenants {
+		t.Errorf("expected an E228 with chain 'tenants -> users -> audit_log', got: %v", origins)
+	}
+}
+
+func TestE228_PropagationOnlyCascade(t *testing.T) {
+	// Propagation hops count only CASCADE: users references tenants with
+	// SET NULL, so deleting from tenants does NOT delete users rows and never
+	// reaches audit_log. Only users is a delete origin.
+	schema := &model.Schema{Tables: []model.Table{
+		e228Table("tenants", false, "", ""),
+		e228Table("users", false, "tenants", "SET NULL"),
+		e228Table("audit_log", true, "users", "CASCADE"),
+	}}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E228")
+	if len(found) != 1 {
+		t.Fatalf("expected exactly 1 E228 (origin users only), got %d: %v", len(found), found)
+	}
+	if strings.Contains(found[0].Message, "tenants") {
+		t.Errorf("tenants must not be a delete origin (SET NULL does not propagate): %s", found[0].Message)
+	}
+}
+
+func TestE228_RestrictNoAction_NotFlagged(t *testing.T) {
+	for _, action := range []string{"RESTRICT", "NO ACTION", ""} {
+		name := action
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			schema := &model.Schema{Tables: []model.Table{
+				e228Table("users", false, "", ""),
+				e228Table("audit_log", true, "users", action),
+			}}
+			schema.BuildFKGraph()
+			diags, _ := Validate(schema, nil)
+			if found := findByCode(diags, "E228"); len(found) != 0 {
+				t.Fatalf("unexpected E228 for on_delete %q: %v", action, found)
+			}
+		})
+	}
+}
+
+func TestE228_AppendOnlyToAppendOnly_Flagged(t *testing.T) {
+	// Even though the referenced table is itself append-only (so its rows can
+	// never be deleted and the cascade can never actually fire), the
+	// declaration is contradictory and must be flagged.
+	schema := &model.Schema{Tables: []model.Table{
+		e228Table("events", true, "", ""),
+		e228Table("event_log", true, "events", "CASCADE"),
+	}}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "E228")
+	if len(found) != 1 {
+		t.Fatalf("expected 1 E228 for append-only -> append-only CASCADE, got %d: %v", len(found), found)
+	}
+	if found[0].Table != "event_log" {
+		t.Errorf("expected E228 on 'event_log', got %q", found[0].Table)
+	}
+}
+
+func TestE228_NoAppendOnly_Clean(t *testing.T) {
+	schema := &model.Schema{Tables: []model.Table{
+		e228Table("users", false, "", ""),
+		e228Table("orders", false, "users", "CASCADE"),
+		e228Table("items", false, "orders", "SET NULL"),
+	}}
+	schema.BuildFKGraph()
+	diags, _ := Validate(schema, nil)
+	if found := findByCode(diags, "E228"); len(found) != 0 {
+		t.Fatalf("unexpected E228 in schema with no append-only tables: %v", found)
+	}
+}
+
 // --- W015: Mixed ON DELETE actions ---
 
 func TestW015_MixedOnDeleteActions(t *testing.T) {

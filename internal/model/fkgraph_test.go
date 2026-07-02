@@ -268,6 +268,56 @@ func TestFKGraph_CascadeDirection(t *testing.T) {
 	}
 }
 
+// TestFKGraph_WalkCascade exercises the generic walker directly: direction
+// selection, first-hop-sensitive edge filtering, and path tracking.
+func TestFKGraph_WalkCascade(t *testing.T) {
+	// x references y (SET NULL), y references z (CASCADE).
+	s := &Schema{
+		Tables: []Table{
+			{Name: "z", Schema: "public"},
+			{Name: "y", Schema: "public", FKs: []FK{{Name: "fk_y_z", Columns: []string{"z_id"}, RefTable: "z", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "x", Schema: "public", FKs: []FK{{Name: "fk_x_y", Columns: []string{"y_id"}, RefTable: "y", RefColumns: []string{"id"}, OnDelete: "SET NULL"}}},
+		},
+	}
+	s.BuildFKGraph()
+	g := s.FKGraph
+
+	// TowardReferenced from x, first hop accepts SET NULL, later hops only
+	// CASCADE: paths [x->y] and [x->y, y->z].
+	var paths [][]string
+	g.WalkCascade("x", TowardReferenced, func(edge FKEdge, firstHop bool) bool {
+		if firstHop {
+			return edge.OnDelete == "SET NULL" || edge.OnDelete == "CASCADE"
+		}
+		return edge.OnDelete == "CASCADE"
+	}, func(path []FKEdge) {
+		var tables []string
+		for _, e := range path {
+			tables = append(tables, e.ToTable)
+		}
+		paths = append(paths, tables)
+	})
+	if len(paths) != 2 {
+		t.Fatalf("expected 2 paths, got %d: %v", len(paths), paths)
+	}
+	if len(paths[0]) != 1 || paths[0][0] != "y" {
+		t.Errorf("expected first path [y], got %v", paths[0])
+	}
+	if len(paths[1]) != 2 || paths[1][0] != "y" || paths[1][1] != "z" {
+		t.Errorf("expected second path [y z], got %v", paths[1])
+	}
+
+	// TowardReferencing from z with CASCADE-only: reaches y (CASCADE) but not
+	// x (the y<-x edge is SET NULL).
+	var reached []string
+	g.WalkCascade("z", TowardReferencing, followCascadeOnly, func(path []FKEdge) {
+		reached = append(reached, path[len(path)-1].FromTable)
+	})
+	if len(reached) != 1 || reached[0] != "y" {
+		t.Errorf("expected TowardReferencing walk from z to reach only [y], got %v", reached)
+	}
+}
+
 func TestFKGraph_CascadeHandlesCycles(t *testing.T) {
 	s := &Schema{
 		Tables: []Table{
