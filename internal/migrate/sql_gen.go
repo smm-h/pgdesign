@@ -551,7 +551,8 @@ func opAlterEnumAddValue(op DDLOp) string {
 	var stmts []string
 	for _, v := range op.Values {
 		escaped := strings.ReplaceAll(v, "'", "''")
-		stmts = append(stmts, fmt.Sprintf("ALTER TYPE %s ADD VALUE '%s';", qualified, escaped))
+		// IF NOT EXISTS (PG 9.3+) makes failed-then-retried migrations safe.
+		stmts = append(stmts, fmt.Sprintf("ALTER TYPE %s ADD VALUE IF NOT EXISTS '%s';", qualified, escaped))
 	}
 	return strings.Join(stmts, "\n")
 }

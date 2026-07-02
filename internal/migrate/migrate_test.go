@@ -826,6 +826,23 @@ func TestOpToSQL_CreateIndex(t *testing.T) {
 	}
 }
 
+func TestOpToSQL_AlterEnumAddValue(t *testing.T) {
+	op := DDLOp{
+		Op:     "alter_enum_add_value",
+		Schema: "game",
+		Name:   "status",
+		Values: []string{"archived", "it's new"},
+	}
+	got := OpToSQL(op)
+	// IF NOT EXISTS (PG 9.3+) makes failed-then-retried migrations safe.
+	if !strings.Contains(got, "ALTER TYPE game.status ADD VALUE IF NOT EXISTS 'archived';") {
+		t.Errorf("expected ADD VALUE IF NOT EXISTS for archived, got:\n%s", got)
+	}
+	if !strings.Contains(got, "ALTER TYPE game.status ADD VALUE IF NOT EXISTS 'it''s new';") {
+		t.Errorf("expected escaped ADD VALUE IF NOT EXISTS for it's new, got:\n%s", got)
+	}
+}
+
 func TestOpToSQL_CreateIndexConcurrently(t *testing.T) {
 	op := DDLOp{
 		Op:      "create_index_concurrently",
