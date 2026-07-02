@@ -1,0 +1,4 @@
+{"commits":["28fc387c7e0a0e06dd133cb954e739cec93cee60"],"user_facing":true,"description":"**Fix.** `testdb gc --older-than` was silently broken \u2014 the kwargs key used hyphens instead of underscores, causing the flag to always be ignored.","type":"fix"}
+{"commits":["84c259bdfca53726d651a380764aedb9c2a41f4b"],"user_facing":true,"description":"**Breaking change.** Three flags renamed for strictcli v0.18.0 compliance: `--no-comments` becomes `--comments` (default true, negate with `--no-comments`), `--no-commit` becomes `--auto-commit` (default true, negate with `--no-auto-commit`), `--force` becomes `--force-overwrite`.","type":"breaking"}
+{"commits":["7ffe306d16934c702b527d1c28343476b7988b46","3e612142c8995a58a282824ba3a1c5a68330b46b","96b0220207d77866097cf2a82365b4b5431526ef"],"user_facing":false}
+{"commits":["c1d585f62c37ac9744e0a4d040e633f7d4c27d3c"],"user_facing":false}
