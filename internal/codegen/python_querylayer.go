@@ -29,9 +29,9 @@ func (g *PythonQueryLayerGenerator) Generate(schema *model.Schema) ([]byte, []di
 		return nil, diags
 	}
 	var buf bytes.Buffer
-	for name, data := range files {
+	for _, name := range sortedKeys(files) {
 		fmt.Fprintf(&buf, "# === %s ===\n", name)
-		buf.Write(data)
+		buf.Write(files[name])
 		buf.WriteString("\n")
 	}
 	return buf.Bytes(), diags

@@ -104,27 +104,27 @@ func writeJavaValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) 
 	}
 
 	// Enum checks.
-	for col, values := range cs.EnumFields {
-		javaField := toCamelCase(col)
-		quoted := make([]string, len(values))
-		for i, v := range values {
+	for _, ef := range cs.SortedEnumFields() {
+		javaField := toCamelCase(ef.Column)
+		quoted := make([]string, len(ef.Values))
+		for i, v := range ef.Values {
 			quoted[i] = fmt.Sprintf("%q", v)
 		}
 		fmt.Fprintf(buf, "        if (row.%s() != null && !Set.of(%s).contains(row.%s())) {\n",
 			javaField, strings.Join(quoted, ", "), javaField)
-		fmt.Fprintf(buf, "            errors.add(new ValidationError(%q, \"invalid value \\\"\" + row.%s() + \"\\\"\"));\n", col, javaField)
+		fmt.Fprintf(buf, "            errors.add(new ValidationError(%q, \"invalid value \\\"\" + row.%s() + \"\\\"\"));\n", ef.Column, javaField)
 		buf.WriteString("        }\n")
 	}
 
 	// CHECK constraint checks.
-	for col, expr := range cs.CheckExprs {
-		javaField := toCamelCase(col)
-		pat := classifyCheck(expr)
+	for _, ce := range cs.SortedCheckExprs() {
+		javaField := toCamelCase(ce.Column)
+		pat := classifyCheck(ce.Expr)
 		if pat == nil {
-			fmt.Fprintf(buf, "        // CHECK on %s: %s (unrecognized pattern, skipped)\n", col, expr)
+			fmt.Fprintf(buf, "        // CHECK on %s: %s (unrecognized pattern, skipped)\n", ce.Column, ce.Expr)
 			continue
 		}
-		writeJavaCheckPattern(buf, col, javaField, pat)
+		writeJavaCheckPattern(buf, ce.Column, javaField, pat)
 	}
 
 	buf.WriteString("        return errors;\n")

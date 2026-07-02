@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -19,6 +20,52 @@ type ConstraintSet struct {
 // HasConstraints reports whether any constraints were extracted.
 func (cs ConstraintSet) HasConstraints() bool {
 	return len(cs.NotNullFields) > 0 || len(cs.EnumFields) > 0 || len(cs.CheckExprs) > 0 || len(cs.JSONSchemas) > 0 || len(cs.DomainBaseTypes) > 0
+}
+
+// EnumField pairs a column name with its valid enum values.
+type EnumField struct {
+	Column string
+	Values []string
+}
+
+// CheckExpr pairs a column name with its CHECK expression.
+type CheckExpr struct {
+	Column string
+	Expr   string
+}
+
+// SortedEnumFields returns the enum-typed columns ordered by column name.
+// Generators must iterate this instead of ranging EnumFields directly so
+// that output is deterministic (Go map iteration order is randomized).
+func (cs ConstraintSet) SortedEnumFields() []EnumField {
+	cols := sortedKeys(cs.EnumFields)
+	fields := make([]EnumField, 0, len(cols))
+	for _, col := range cols {
+		fields = append(fields, EnumField{Column: col, Values: cs.EnumFields[col]})
+	}
+	return fields
+}
+
+// SortedCheckExprs returns the single-column CHECK expressions ordered by
+// column name. Generators must iterate this instead of ranging CheckExprs
+// directly so that output is deterministic.
+func (cs ConstraintSet) SortedCheckExprs() []CheckExpr {
+	cols := sortedKeys(cs.CheckExprs)
+	exprs := make([]CheckExpr, 0, len(cols))
+	for _, col := range cols {
+		exprs = append(exprs, CheckExpr{Column: col, Expr: cs.CheckExprs[col]})
+	}
+	return exprs
+}
+
+// sortedKeys returns the sorted keys of a map[string]T.
+func sortedKeys[T any](m map[string]T) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // ExtractConstraints collects constraint metadata from a table for code generation.

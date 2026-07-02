@@ -90,9 +90,10 @@ func writePythonValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet
 	}
 
 	// Enum checks.
-	for col, values := range cs.EnumFields {
-		quoted := make([]string, len(values))
-		for i, v := range values {
+	for _, ef := range cs.SortedEnumFields() {
+		col := ef.Column
+		quoted := make([]string, len(ef.Values))
+		for i, v := range ef.Values {
 			quoted[i] = fmt.Sprintf("%q", v)
 		}
 		fmt.Fprintf(buf, "    if row.%s is not None and row.%s not in {%s}:\n",
@@ -101,13 +102,13 @@ func writePythonValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet
 	}
 
 	// CHECK constraint checks.
-	for col, expr := range cs.CheckExprs {
-		pat := classifyCheck(expr)
+	for _, ce := range cs.SortedCheckExprs() {
+		pat := classifyCheck(ce.Expr)
 		if pat == nil {
-			fmt.Fprintf(buf, "    # CHECK on %s: %s (unrecognized pattern, skipped)\n", col, expr)
+			fmt.Fprintf(buf, "    # CHECK on %s: %s (unrecognized pattern, skipped)\n", ce.Column, ce.Expr)
 			continue
 		}
-		writePythonCheckPattern(buf, col, pat)
+		writePythonCheckPattern(buf, ce.Column, pat)
 	}
 
 	buf.WriteString("    return errors\n")

@@ -78,27 +78,27 @@ func writeTSValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 	}
 
 	// Enum checks.
-	for col, values := range cs.EnumFields {
-		tsField := toCamelCase(col)
-		quoted := make([]string, len(values))
-		for i, v := range values {
+	for _, ef := range cs.SortedEnumFields() {
+		tsField := toCamelCase(ef.Column)
+		quoted := make([]string, len(ef.Values))
+		for i, v := range ef.Values {
 			quoted[i] = fmt.Sprintf("%q", v)
 		}
 		fmt.Fprintf(buf, "  if (row.%s != null && ![%s].includes(row.%s)) {\n",
 			tsField, strings.Join(quoted, ", "), tsField)
-		fmt.Fprintf(buf, "    errors.push({ field: %q, message: `invalid value \"${row.%s}\"` })\n", col, tsField)
+		fmt.Fprintf(buf, "    errors.push({ field: %q, message: `invalid value \"${row.%s}\"` })\n", ef.Column, tsField)
 		buf.WriteString("  }\n")
 	}
 
 	// CHECK constraint checks.
-	for col, expr := range cs.CheckExprs {
-		tsField := toCamelCase(col)
-		pat := classifyCheck(expr)
+	for _, ce := range cs.SortedCheckExprs() {
+		tsField := toCamelCase(ce.Column)
+		pat := classifyCheck(ce.Expr)
 		if pat == nil {
-			fmt.Fprintf(buf, "  // CHECK on %s: %s (unrecognized pattern, skipped)\n", col, expr)
+			fmt.Fprintf(buf, "  // CHECK on %s: %s (unrecognized pattern, skipped)\n", ce.Column, ce.Expr)
 			continue
 		}
-		writeTSCheckPattern(buf, col, tsField, pat)
+		writeTSCheckPattern(buf, ce.Column, tsField, pat)
 	}
 
 	buf.WriteString("  return errors\n")

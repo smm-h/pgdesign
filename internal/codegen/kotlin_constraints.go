@@ -105,26 +105,26 @@ func writeKotlinValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet
 	}
 
 	// Enum checks.
-	for col, values := range cs.EnumFields {
-		kotlinField := toCamelCase(col)
+	for _, ef := range cs.SortedEnumFields() {
+		kotlinField := toCamelCase(ef.Column)
 		fmt.Fprintf(buf, "    when (%s) {\n", kotlinField)
-		for _, v := range values {
+		for _, v := range ef.Values {
 			fmt.Fprintf(buf, "        %q -> {}\n", v)
 		}
 		buf.WriteString("        null -> {}\n")
-		fmt.Fprintf(buf, "        else -> errors.add(ValidationError(field = %q, message = \"invalid value \\\"$%s\\\"\"))\n", col, kotlinField)
+		fmt.Fprintf(buf, "        else -> errors.add(ValidationError(field = %q, message = \"invalid value \\\"$%s\\\"\"))\n", ef.Column, kotlinField)
 		buf.WriteString("    }\n")
 	}
 
 	// CHECK constraint checks.
-	for col, expr := range cs.CheckExprs {
-		kotlinField := toCamelCase(col)
-		pat := classifyCheck(expr)
+	for _, ce := range cs.SortedCheckExprs() {
+		kotlinField := toCamelCase(ce.Column)
+		pat := classifyCheck(ce.Expr)
 		if pat == nil {
-			fmt.Fprintf(buf, "    // CHECK on %s: %s (unrecognized pattern, skipped)\n", col, expr)
+			fmt.Fprintf(buf, "    // CHECK on %s: %s (unrecognized pattern, skipped)\n", ce.Column, ce.Expr)
 			continue
 		}
-		writeKotlinCheckPattern(buf, col, kotlinField, pat)
+		writeKotlinCheckPattern(buf, ce.Column, kotlinField, pat)
 	}
 
 	buf.WriteString("    return errors\n")

@@ -119,30 +119,26 @@ func writeTableConstraints(buf *bytes.Buffer, tbl *model.Table, schema *model.Sc
 	}
 
 	// ENUM constraints.
-	enumCols := sortedKeys(cs.EnumFields)
-	for _, col := range enumCols {
-		values := cs.EnumFields[col]
-		quoted := make([]string, len(values))
-		for i, v := range values {
+	for _, ef := range cs.SortedEnumFields() {
+		quoted := make([]string, len(ef.Values))
+		for i, v := range ef.Values {
 			quoted[i] = fmt.Sprintf("%q", v)
 		}
 		entries = append(entries, constraintEntry{
 			kind:    "ENUM",
-			columns: []string{col},
+			columns: []string{ef.Column},
 			params:  fmt.Sprintf("{\"values\": [%s]}", strings.Join(quoted, ", ")),
-			message: fmt.Sprintf("%s must be one of the allowed values", col),
+			message: fmt.Sprintf("%s must be one of the allowed values", ef.Column),
 		})
 	}
 
 	// CHECK constraints (from table checks and domain checks).
-	checkCols := sortedKeys(cs.CheckExprs)
-	for _, col := range checkCols {
-		expr := cs.CheckExprs[col]
-		pat := classifyCheck(expr)
+	for _, ce := range cs.SortedCheckExprs() {
+		pat := classifyCheck(ce.Expr)
 		if pat == nil {
 			continue
 		}
-		entry := checkPatternToConstraint(col, pat)
+		entry := checkPatternToConstraint(ce.Column, pat)
 		if entry != nil {
 			entries = append(entries, *entry)
 		}
@@ -311,16 +307,6 @@ func pyStringList(ss []string) string {
 		quoted[i] = fmt.Sprintf("%q", s)
 	}
 	return "[" + strings.Join(quoted, ", ") + "]"
-}
-
-// sortedKeys returns the sorted keys of a map[string]T.
-func sortedKeys[T any](m map[string]T) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // writeConstraintEngine generates the ConstraintEngine class.

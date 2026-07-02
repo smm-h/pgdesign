@@ -104,11 +104,11 @@ func writeGoValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 	}
 
 	// Enum checks.
-	for col, values := range cs.EnumFields {
-		goField := toPascalCase(col)
+	for _, ef := range cs.SortedEnumFields() {
+		goField := toPascalCase(ef.Column)
 		fmt.Fprintf(buf, "\tswitch row.%s {\n", goField)
 		fmt.Fprintf(buf, "\tcase ")
-		for i, v := range values {
+		for i, v := range ef.Values {
 			if i > 0 {
 				buf.WriteString(", ")
 			}
@@ -117,19 +117,19 @@ func writeGoValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 		buf.WriteString(":\n")
 		buf.WriteString("\t\t// valid\n")
 		buf.WriteString("\tdefault:\n")
-		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: fmt.Sprintf(\"invalid value %%q\", row.%s)})\n", col, goField)
+		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: fmt.Sprintf(\"invalid value %%q\", row.%s)})\n", ef.Column, goField)
 		buf.WriteString("\t}\n")
 	}
 
 	// CHECK constraint checks.
-	for col, expr := range cs.CheckExprs {
-		goField := toPascalCase(col)
-		pat := classifyCheck(expr)
+	for _, ce := range cs.SortedCheckExprs() {
+		goField := toPascalCase(ce.Column)
+		pat := classifyCheck(ce.Expr)
 		if pat == nil {
-			fmt.Fprintf(buf, "\t// CHECK on %s: %s (unrecognized pattern, skipped)\n", col, expr)
+			fmt.Fprintf(buf, "\t// CHECK on %s: %s (unrecognized pattern, skipped)\n", ce.Column, ce.Expr)
 			continue
 		}
-		writeGoCheckPattern(buf, col, goField, pat)
+		writeGoCheckPattern(buf, ce.Column, goField, pat)
 	}
 
 	buf.WriteString("\treturn errs\n")

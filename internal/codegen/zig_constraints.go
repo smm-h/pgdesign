@@ -78,10 +78,10 @@ func writeZigValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 	}
 
 	// Enum checks.
-	for col, values := range cs.EnumFields {
+	for _, ef := range cs.SortedEnumFields() {
 		fmt.Fprintf(buf, "    {\n")
 		fmt.Fprintf(buf, "        const valid = [_][]const u8{ ")
-		for i, v := range values {
+		for i, v := range ef.Values {
 			if i > 0 {
 				buf.WriteString(", ")
 			}
@@ -90,25 +90,25 @@ func writeZigValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 		buf.WriteString(" };\n")
 		buf.WriteString("        var found = false;\n")
 		fmt.Fprintf(buf, "        for (valid) |v| {\n")
-		fmt.Fprintf(buf, "            if (std.mem.eql(u8, row.%s, v)) {\n", col)
+		fmt.Fprintf(buf, "            if (std.mem.eql(u8, row.%s, v)) {\n", ef.Column)
 		buf.WriteString("                found = true;\n")
 		buf.WriteString("                break;\n")
 		buf.WriteString("            }\n")
 		buf.WriteString("        }\n")
 		buf.WriteString("        if (!found) {\n")
-		fmt.Fprintf(buf, "            try errors.append(.{ .field = %q, .message = \"invalid enum value\" });\n", col)
+		fmt.Fprintf(buf, "            try errors.append(.{ .field = %q, .message = \"invalid enum value\" });\n", ef.Column)
 		buf.WriteString("        }\n")
 		buf.WriteString("    }\n")
 	}
 
 	// CHECK constraint checks.
-	for col, expr := range cs.CheckExprs {
-		pat := classifyCheck(expr)
+	for _, ce := range cs.SortedCheckExprs() {
+		pat := classifyCheck(ce.Expr)
 		if pat == nil {
-			fmt.Fprintf(buf, "    // CHECK on %s: %s (unrecognized pattern, skipped)\n", col, expr)
+			fmt.Fprintf(buf, "    // CHECK on %s: %s (unrecognized pattern, skipped)\n", ce.Column, ce.Expr)
 			continue
 		}
-		writeZigCheckPattern(buf, col, pat)
+		writeZigCheckPattern(buf, ce.Column, pat)
 	}
 
 	buf.WriteString("    return errors;\n")
