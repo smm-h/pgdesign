@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,6 +38,10 @@ func loadTestSchema(t *testing.T) *model.Schema {
 	return schema
 }
 
+// updateGolden regenerates golden files when true (same convention as
+// internal/test/golden_test.go: go test -run TestPythonDDL_GoldenFile -update).
+var updateGolden = flag.Bool("update", false, "update golden files")
+
 func TestPythonDDL_GoldenFile(t *testing.T) {
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
@@ -46,9 +51,15 @@ func TestPythonDDL_GoldenFile(t *testing.T) {
 	}
 
 	expectedPath := filepath.Join("testdata", "ddl_expected.py")
+	if *updateGolden {
+		if err := os.WriteFile(expectedPath, out, 0644); err != nil {
+			t.Fatalf("cannot update golden file: %v", err)
+		}
+		t.Logf("updated %s", expectedPath)
+	}
 	expectedBytes, err := os.ReadFile(expectedPath)
 	if err != nil {
-		t.Fatalf("cannot read expected file: %v", err)
+		t.Fatalf("cannot read expected file (run with -update to create): %v", err)
 	}
 
 	got := string(out)
@@ -1158,4 +1169,41 @@ func fileNames(files map[string][]byte) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// TestPythonDDL_SequenceIdempotentSQL verifies that standalone sequence tuples
+// carry an idempotent variant (CREATE SEQUENCE IF NOT EXISTS). Regression test:
+// sequence tuples used to set only SQL, leaving IdempotentSQL empty even though
+// sql.CreateSequence supports an idempotent form.
+func TestPythonDDL_SequenceIdempotentSQL(t *testing.T) {
+	start := int64(100)
+	schema := &model.Schema{
+		Name: "test",
+		Sequences: []model.Sequence{{
+			Name:   "invoice_seq",
+			Schema: "test",
+			Start:  &start,
+		}},
+	}
+	tuples, _, diags := buildTuples(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	found := false
+	for _, tu := range tuples {
+		if tu.Kind != "sequence" {
+			continue
+		}
+		found = true
+		if tu.IdempotentSQL == "" {
+			t.Error("sequence tuple has empty IdempotentSQL; want CREATE SEQUENCE IF NOT EXISTS variant")
+			continue
+		}
+		if !strings.Contains(tu.IdempotentSQL, "IF NOT EXISTS") {
+			t.Errorf("sequence IdempotentSQL missing IF NOT EXISTS: %q", tu.IdempotentSQL)
+		}
+	}
+	if !found {
+		t.Fatal("no sequence tuple found")
+	}
 }

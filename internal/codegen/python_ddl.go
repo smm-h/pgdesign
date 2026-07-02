@@ -39,7 +39,7 @@ type PythonDDLGenerator struct {
 // ddlTuple holds one DDL statement with its metadata.
 type ddlTuple struct {
 	SQL           string
-	IdempotentSQL string // empty means no idempotent variant available
+	IdempotentSQL string // empty means SQL itself is inherently re-runnable (see buildTuples contract)
 	Kind          string
 	Name          string // human-readable name for the DDL op (e.g. table name, constraint name)
 	Table         string // empty string means None
@@ -51,6 +51,27 @@ type ddlTuple struct {
 // buildTuples collects all DDL statements from the schema into a flat list of
 // ddlTuples. Each tuple has both normal and idempotent SQL (when available),
 // a human-readable name, and transactional metadata.
+//
+// IdempotentSQL contract: a tuple's IdempotentSQL is populated whenever the
+// underlying sql function has an idempotent form (IF NOT EXISTS, CREATE OR
+// REPLACE, or a DO-block catalog check). Kinds that INTENTIONALLY leave
+// IdempotentSQL empty because their plain SQL is inherently re-runnable
+// (executing it a second time is harmless and converges to the same state):
+//
+//   - "comment":    COMMENT ON overwrites the existing comment
+//   - "statistics": ALTER TABLE ... SET STATISTICS re-sets the same value
+//   - "owner":      ALTER TABLE ... OWNER TO re-assigns the same owner
+//   - "rls_enable": ALTER TABLE ... ENABLE ROW LEVEL SECURITY is a no-op if enabled
+//   - "rls_force":  ALTER TABLE ... FORCE ROW LEVEL SECURITY is a no-op if forced
+//   - "partman" (the "<table>_config" UPDATE): plain UPDATE, re-runs converge
+//
+// Known gap: the "partman" create_parent tuple (SELECT partman.create_parent(...))
+// is NOT idempotent -- pg_partman raises if the parent is already registered --
+// and pg_partman offers no IF NOT EXISTS form. Re-running it under idempotent
+// execution fails. The generate package has the same limitation.
+//
+// The generated executor falls back to op.sql when op.idempotent_sql is None,
+// which is correct for the inherently re-runnable kinds listed above.
 func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.Diagnostic) {
 	var tuples []ddlTuple
 	var diags []diagnostic.Diagnostic
@@ -125,6 +146,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 		seq := &schema.Sequences[i]
 		tuples = append(tuples, ddlTuple{
 			SQL:           sql.CreateSequence(seq.Schema, seq, false),
+			IdempotentSQL: sql.CreateSequence(seq.Schema, seq, true),
 			Kind:          "sequence",
 			Name:          seq.Name,
 			Phase:         2,
@@ -362,8 +384,11 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 			}
 			sort.Strings(schemaNames)
 			for _, s := range schemaNames {
+				// CREATE OR REPLACE FUNCTION is its own idempotent form.
+				denyFuncSQL := sql.CreateDenyMutationFunction(s)
 				tuples = append(tuples, ddlTuple{
-					SQL:           sql.CreateDenyMutationFunction(s),
+					SQL:           denyFuncSQL,
+					IdempotentSQL: denyFuncSQL,
 					Kind:          "append_only_trigger",
 					Name:          s + ".pgdesign_deny_mutation",
 					Phase:         9,
@@ -374,7 +399,8 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				t := &tables[i]
 				if t.AppendOnly {
 					tuples = append(tuples, ddlTuple{
-						SQL:           sql.CreateAppendOnlyTrigger(t.Schema, t.Name, false, 0),
+						SQL:           sql.CreateAppendOnlyTrigger(t.Schema, t.Name, false, schema.PGVersion),
+						IdempotentSQL: sql.CreateAppendOnlyTrigger(t.Schema, t.Name, true, schema.PGVersion),
 						Kind:          "append_only_trigger",
 						Name:          t.Name + ".deny_mutation",
 						Table:         t.Name,
@@ -505,7 +531,8 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 		policies := sortedPolicies(t.Policies)
 		for _, p := range policies {
 			tuples = append(tuples, ddlTuple{
-				SQL:           sql.CreatePolicy(t.Schema, t.Name, p, false, 0),
+				SQL:           sql.CreatePolicy(t.Schema, t.Name, p, false, schema.PGVersion),
+				IdempotentSQL: sql.CreatePolicy(t.Schema, t.Name, p, true, schema.PGVersion),
 				Kind:          "policy",
 				Name:          p.Name,
 				Table:         t.Name,
@@ -580,6 +607,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 			}
 			tuples = append(tuples, ddlTuple{
 				SQL:           sql.CreateMaterializedView(schemaName, mv, false),
+				IdempotentSQL: sql.CreateMaterializedView(schemaName, mv, true),
 				Kind:          "materialized_view",
 				Name:          mv.Name,
 				Phase:         15,
@@ -651,10 +679,11 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				if f.IsProc {
 					kind = "PROCEDURE"
 				}
+				// Like all "comment" tuples, IdempotentSQL stays empty:
+				// COMMENT ON is inherently re-runnable.
 				commentSQL := sql.CommentOn(kind, sql.QualifiedName(schemaName, f.Name), f.Comment)
 				tuples = append(tuples, ddlTuple{
 					SQL:           commentSQL,
-					IdempotentSQL: commentSQL,
 					Kind:          "comment",
 					Name:          "func." + f.Name,
 					Phase:         16,
@@ -671,7 +700,8 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 		triggers := sortedTriggers(t.Triggers)
 		for _, trig := range triggers {
 			tuples = append(tuples, ddlTuple{
-				SQL:           sql.CreateTrigger(t.Schema, t.Name, trig, false, 0),
+				SQL:           sql.CreateTrigger(t.Schema, t.Name, trig, false, schema.PGVersion),
+				IdempotentSQL: sql.CreateTrigger(t.Schema, t.Name, trig, true, schema.PGVersion),
 				Kind:          "trigger",
 				Name:          trig.Name,
 				Table:         t.Name,
@@ -927,7 +957,12 @@ func writeExecuteFunction(buf *bytes.Buffer) {
 	buf.WriteString(") -> ExecutionResult:\n")
 	buf.WriteString("    \"\"\"Execute DDL sections.\n\n")
 	buf.WriteString("    Two-phase execution: transactional sections run inside a single\n")
-	buf.WriteString("    transaction, non-transactional sections run outside afterward.\n")
+	buf.WriteString("    transaction, non-transactional sections run outside afterward.\n\n")
+	buf.WriteString("    Ops with idempotent_sql=None are inherently re-runnable statements\n")
+	buf.WriteString("    (COMMENT ON, SET STATISTICS, OWNER TO, ENABLE/FORCE ROW LEVEL SECURITY,\n")
+	buf.WriteString("    partman config UPDATE); for those, executing op.sql again is harmless,\n")
+	buf.WriteString("    so idempotent=True falls back to op.sql. Exception: partman\n")
+	buf.WriteString("    create_parent has no idempotent form and errors if re-run.\n")
 	buf.WriteString("    \"\"\"\n")
 	buf.WriteString("    if sections is not None and exclude_sections is not None:\n")
 	buf.WriteString("        raise ValueError(\"Cannot specify both sections and exclude_sections\")\n")
@@ -948,6 +983,7 @@ func writeExecuteFunction(buf *bytes.Buffer) {
 	buf.WriteString("        async with conn.transaction() as tx:\n")
 	buf.WriteString("            for sec in transactional:\n")
 	buf.WriteString("                for op in sec.ops:\n")
+	buf.WriteString("                    # idempotent_sql=None means op.sql is inherently re-runnable.\n")
 	buf.WriteString("                    stmt = op.idempotent_sql if idempotent and op.idempotent_sql else op.sql\n")
 	buf.WriteString("                    if extension_stubs is not None and sec.kind == \"extensions\" and op.name in extension_stubs:\n")
 	buf.WriteString("                        stmt = extension_stubs[op.name]\n")
@@ -964,6 +1000,7 @@ func writeExecuteFunction(buf *bytes.Buffer) {
 	buf.WriteString("    # Phase 2: non-transactional ops outside any transaction.\n")
 	buf.WriteString("    for sec in non_transactional:\n")
 	buf.WriteString("        for op in sec.ops:\n")
+	buf.WriteString("            # idempotent_sql=None means op.sql is inherently re-runnable.\n")
 	buf.WriteString("            stmt = op.idempotent_sql if idempotent and op.idempotent_sql else op.sql\n")
 	buf.WriteString("            if extension_stubs is not None and sec.kind == \"extensions\" and op.name in extension_stubs:\n")
 	buf.WriteString("                stmt = extension_stubs[op.name]\n")
@@ -1235,11 +1272,21 @@ func (g *PythonDDLGenerator) generateFacetedFiles(schema *model.Schema) (map[str
 	return files, diags
 }
 
-// generateSelfContainedFiles produces per-source-file output where each file is
-// independently executable. Each file gets a preamble of ALL extension + schema +
-// type tuples (using IdempotentSQL) followed by its own table tuples (using SQL).
-// No shared executor is generated.
-func (g *PythonDDLGenerator) generateSelfContainedFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+// selfContainedGroup is one independently-executable tuple group for
+// SplitModeSelfContained output: the shared idempotent preamble followed by
+// one source file's own tuples.
+type selfContainedGroup struct {
+	base   string // output file base name (without .py)
+	source string // originating TOML source file ("__post_tables__" for the pseudo-source)
+	tuples []ddlTuple
+}
+
+// selfContainedTupleGroups partitions the schema's tuples into per-source
+// groups. Each group starts with a preamble of ALL extension + schema + type
+// tuples (converted to their idempotent SQL where available) followed by the
+// source file's table and post-table tuples. Returns an error diagnostic on
+// base-name collisions.
+func selfContainedTupleGroups(schema *model.Schema) ([]selfContainedGroup, []model.Table, []diagnostic.Diagnostic) {
 	tuples, tables, diags := buildTuples(schema)
 
 	// Separate preamble tuples (extensions/schemas/types) from table-associated tuples.
@@ -1292,15 +1339,9 @@ func (g *PythonDDLGenerator) generateSelfContainedFiles(schema *model.Schema) (m
 				Severity: diagnostic.Error,
 				Message:  fmt.Sprintf("self-contained output: source files %q and %q produce the same base name %q", existing, src, base),
 			})
-			return nil, diags
+			return nil, tables, diags
 		}
 		baseToSource[base] = src
-	}
-
-	// Build table lists per source file for TABLE_NAMES.
-	tablesBySourceFile := make(map[string][]model.Table)
-	for _, tbl := range tables {
-		tablesBySourceFile[tbl.SourceFile] = append(tablesBySourceFile[tbl.SourceFile], tbl)
 	}
 
 	// Convert preamble tuples to use IdempotentSQL where available.
@@ -1312,8 +1353,7 @@ func (g *PythonDDLGenerator) generateSelfContainedFiles(schema *model.Schema) (m
 		}
 	}
 
-	files := make(map[string][]byte)
-
+	var groups []selfContainedGroup
 	for _, src := range sourceOrder {
 		base := sourceBaseName(src)
 		if base == "" {
@@ -1322,14 +1362,35 @@ func (g *PythonDDLGenerator) generateSelfContainedFiles(schema *model.Schema) (m
 		if src == "__post_tables__" {
 			base = "post_tables"
 		}
-		fileName := base + ".py"
 
 		// Combine idempotent preamble + source-specific tuples.
 		combined := make([]ddlTuple, 0, len(idempotentPreamble)+len(tablesBySource[src]))
 		combined = append(combined, idempotentPreamble...)
 		combined = append(combined, tablesBySource[src]...)
 
-		files[fileName] = renderFacetFile(combined, tablesBySourceFile[src])
+		groups = append(groups, selfContainedGroup{base: base, source: src, tuples: combined})
+	}
+
+	return groups, tables, diags
+}
+
+// generateSelfContainedFiles renders the self-contained tuple groups, one
+// Python file per group. No shared executor is generated.
+func (g *PythonDDLGenerator) generateSelfContainedFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+	groups, tables, diags := selfContainedTupleGroups(schema)
+	if groups == nil && len(diags) > 0 {
+		return nil, diags
+	}
+
+	// Build table lists per source file for TABLE_NAMES.
+	tablesBySourceFile := make(map[string][]model.Table)
+	for _, tbl := range tables {
+		tablesBySourceFile[tbl.SourceFile] = append(tablesBySourceFile[tbl.SourceFile], tbl)
+	}
+
+	files := make(map[string][]byte)
+	for _, grp := range groups {
+		files[grp.base+".py"] = renderFacetFile(grp.tuples, tablesBySourceFile[grp.source])
 	}
 
 	return files, diags
