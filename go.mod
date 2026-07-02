@@ -6,7 +6,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/pganalyze/pg_query_go/v6 v6.2.2
 	github.com/smm-h/go-toml-edit v0.2.1
-	github.com/smm-h/strictcli/go v0.18.0
+	github.com/smm-h/strictcli/go v0.19.0
 	github.com/wasilibs/go-pgquery v0.0.0-20260616022436-0b34969e40e5
 	oss.terrastruct.com/d2 v0.7.1
 )

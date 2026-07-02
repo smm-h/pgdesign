@@ -53,6 +53,8 @@ github.com/smm-h/go-toml-edit v0.2.1 h1:KXzKYuzDnw7XHCzPNtw9DQzf+PpwPISvSVDns6ze
 github.com/smm-h/go-toml-edit v0.2.1/go.mod h1:ateUuu33c4CaaB3XUQgsyuPEsIkAWRV8nahfZqpNhm4=
 github.com/smm-h/strictcli/go v0.18.0 h1:njESSqUnQVXc5tWqeQI9lDV4wAmVH5jH0a3SJBp3Kbc=
 github.com/smm-h/strictcli/go v0.18.0/go.mod h1:dMXXawbT6mstBeQ9yKQaaqTkL1/qQ28FCV47TxKYWL4=
+github.com/smm-h/strictcli/go v0.19.0 h1:TJMXiomZfJDlunkG9ObPBZ+kvW/+q08x76tHsuHlk3Q=
+github.com/smm-h/strictcli/go v0.19.0/go.mod h1:dMXXawbT6mstBeQ9yKQaaqTkL1/qQ28FCV47TxKYWL4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
