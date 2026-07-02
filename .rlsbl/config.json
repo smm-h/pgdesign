@@ -13,7 +13,8 @@
   "pipelines": {
     "go": {
       "type": "go",
-      "local": true
+      "local": true,
+      "install_paths": ["./cmd/pgdesign"]
     },
     "npm": {
       "type": "npm",
