@@ -63,12 +63,46 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		config.NamingPattern = "snake_case"
 	}
 
+	var diags []diagnostic.Diagnostic
+
+	// E-codes are hard errors and can be neither disabled nor suppressed
+	// (E229): a schema that fails validation must be fixed, not configured
+	// around. Offending config entries are themselves hard errors, and the
+	// targeted rules still run.
 	disabled := make(map[string]bool, len(config.Disabled))
 	for _, code := range config.Disabled {
+		if isErrorCode(code) {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity:   diagnostic.Error,
+				Code:       "E229",
+				Message:    fmt.Sprintf("[validate] disable lists error code %s: errors cannot be disabled; fix the schema", code),
+				Suggestion: "Remove the code from [validate] disable and fix the underlying schema error",
+			})
+			continue
+		}
 		disabled[code] = true
 	}
-
-	var diags []diagnostic.Diagnostic
+	if len(config.Suppress) > 0 {
+		keys := make([]string, 0, len(config.Suppress))
+		for key := range config.Suppress {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			code := key
+			if idx := strings.LastIndex(key, "."); idx >= 0 {
+				code = key[idx+1:]
+			}
+			if isErrorCode(code) {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity:   diagnostic.Error,
+					Code:       "E229",
+					Message:    fmt.Sprintf("[suppress] key %q targets error code %s: errors cannot be suppressed; fix the schema", key, code),
+					Suggestion: "Remove the suppress entry and fix the underlying schema error",
+				})
+			}
+		}
+	}
 
 	// Collect all rules and run non-disabled ones.
 	type rule struct {
@@ -149,7 +183,8 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 			})
 			continue
 		}
-		if config.Suppress != nil {
+		// Errors are never suppressible, regardless of what keys exist.
+		if config.Suppress != nil && d.Severity != diagnostic.Error {
 			// Try table.column.CODE first (most specific).
 			if d.Table != "" && d.Column != "" {
 				key := d.Table + "." + d.Column + "." + d.Code
@@ -2838,6 +2873,20 @@ func checkCascadeIntoAppendOnly(schema *model.Schema, _ *Config) []diagnostic.Di
 }
 
 // --- Helpers ---
+
+// isErrorCode reports whether s is a diagnostic error code: "E" followed by
+// digits only. Distinguishes E-codes from W/I-codes and from rule names.
+func isErrorCode(s string) bool {
+	if len(s) < 2 || s[0] != 'E' {
+		return false
+	}
+	for _, r := range s[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
 
 // isPrefix returns true if a is a prefix of b (element-wise).
 func isPrefix(a, b []string) bool {

@@ -591,29 +591,32 @@ func TestW007_DifferentMethod_NoDiag(t *testing.T) {
 }
 
 func TestDisabledRules(t *testing.T) {
+	// Only warning/info rules can be disabled; E-codes in the disable list
+	// are a hard error (see TestE229_DisableECode_HardError).
 	schema := &model.Schema{
 		Tables: []model.Table{{
-			Name:   "users",
-			Schema: "public",
-			PK:     []string{"id"},
+			Name:    "users",
+			Schema:  "public",
+			Comment: "Users table",
+			PK:      []string{"id"},
 			Columns: []model.Column{
 				{Name: "id", PGType: typeinfo.T("uuid")},
 				{Name: "created_at", PGType: typeinfo.T("timestamptz")},
 			},
-			// Comment is empty -- would trigger E202
+			// No FK relationships -- would trigger W002 (orphan table)
 		}},
 	}
 
 	config := &Config{
-		Disabled:      []string{"E202"},
+		Disabled:      []string{"W002"},
 		NamingPattern: "snake_case",
 		MaxColumns:    30,
 	}
 
 	diags, _ := Validate(schema, config)
-	found := findByCode(diags, "E202")
+	found := findByCode(diags, "W002")
 	if len(found) > 0 {
-		t.Fatal("expected E202 to be suppressed when disabled")
+		t.Fatal("expected W002 to be skipped when disabled")
 	}
 }
 
@@ -2175,6 +2178,92 @@ func TestW014_CascadeBreadthBelowThreshold_NoDiag(t *testing.T) {
 		if d.Code == "W014" {
 			t.Fatalf("unexpected W014 with breadth 3 < 5: %v", d)
 		}
+	}
+}
+
+// --- E229: E-codes can be neither suppressed nor disabled ---
+
+// e229Schema returns a schema that reliably violates E202 (missing table
+// comment) and W002 (orphan table).
+func e229Schema() *model.Schema {
+	return &model.Schema{Tables: []model.Table{{
+		Name: "users", Schema: "public", PK: []string{"id"},
+		Columns: []model.Column{
+			{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
+			{Name: "created_at", PGType: typeinfo.T("timestamptz"), NotNull: true},
+		},
+	}}}
+}
+
+func TestE229_SuppressKeyTargetingECode_HardError(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Suppress = map[string]string{"users.E202": "comments are annoying"}
+	diags, suppressed := Validate(e229Schema(), cfg)
+	if len(findByCode(diags, "E229")) != 1 {
+		t.Fatalf("expected exactly 1 E229 for suppress key targeting an E-code, got: %v", findByCode(diags, "E229"))
+	}
+	if len(findByCode(diags, "E202")) == 0 {
+		t.Fatal("expected E202 to remain active despite the suppress key")
+	}
+	for _, s := range suppressed {
+		if s.Code == "E202" {
+			t.Fatalf("E202 must not be suppressed: %v", s)
+		}
+	}
+}
+
+func TestE229_SuppressColumnKeyTargetingECode_HardError(t *testing.T) {
+	// The table.column.CODE key shape must be rejected too.
+	cfg := DefaultConfig()
+	cfg.Suppress = map[string]string{"users.id.E200": "who needs types"}
+	diags, _ := Validate(e229Schema(), cfg)
+	if len(findByCode(diags, "E229")) != 1 {
+		t.Fatalf("expected exactly 1 E229 for column-form suppress key targeting an E-code, got: %v", findByCode(diags, "E229"))
+	}
+}
+
+func TestE229_SuppressWCode_StillWorks(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Suppress = map[string]string{"users.W002": "orphan by design"}
+	diags, suppressed := Validate(e229Schema(), cfg)
+	if len(findByCode(diags, "E229")) != 0 {
+		t.Fatalf("unexpected E229 for W-code suppress key: %v", findByCode(diags, "E229"))
+	}
+	if len(findByCode(diags, "W002")) != 0 {
+		t.Fatal("expected W002 to be suppressed")
+	}
+	found := false
+	for _, s := range suppressed {
+		if s.Code == "W002" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected W002 in the suppressed list")
+	}
+}
+
+func TestE229_DisableECode_HardError(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Disabled = []string{"E202"}
+	diags, _ := Validate(e229Schema(), cfg)
+	if len(findByCode(diags, "E229")) != 1 {
+		t.Fatalf("expected exactly 1 E229 for disabled E-code, got: %v", findByCode(diags, "E229"))
+	}
+	if len(findByCode(diags, "E202")) == 0 {
+		t.Fatal("expected E202 to still run despite being listed in disable")
+	}
+}
+
+func TestE229_DisableWCode_StillWorks(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Disabled = []string{"W002"}
+	diags, _ := Validate(e229Schema(), cfg)
+	if len(findByCode(diags, "E229")) != 0 {
+		t.Fatalf("unexpected E229 for disabled W-code: %v", findByCode(diags, "E229"))
+	}
+	if len(findByCode(diags, "W002")) != 0 {
+		t.Fatal("expected W002 to be disabled")
 	}
 }
 
