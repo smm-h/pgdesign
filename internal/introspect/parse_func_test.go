@@ -41,10 +41,12 @@ func TestParseFunctionArgs_ParenthesizedType(t *testing.T) {
 	if len(args) != 2 {
 		t.Fatalf("expected 2 args, got %d", len(args))
 	}
-	if args[0].Name != "price" || args[0].Type != typeinfo.MustParse("numeric(10,2)") {
+	// Use Equal, not ==: parameterized types carry *int params, so struct
+	// equality would compare pointer identity instead of values.
+	if args[0].Name != "price" || !args[0].Type.Equal(typeinfo.MustParse("numeric(10,2)")) {
 		t.Errorf("arg[0] = %+v, want name=price type=numeric(10,2)", args[0])
 	}
-	if args[1].Name != "name" || args[1].Type != typeinfo.MustParse("varchar(255)") {
+	if args[1].Name != "name" || !args[1].Type.Equal(typeinfo.MustParse("varchar(255)")) {
 		t.Errorf("arg[1] = %+v, want name=name type=varchar(255)", args[1])
 	}
 }
