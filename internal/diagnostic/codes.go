@@ -73,6 +73,19 @@ package diagnostic
 // E219  Index method requires undeclared extension
 // E220  depends_on references non-existent entity
 // E221  FD references unknown column name
+// E222  RESTRICTIVE RLS policy requires PG 10+
+// E223  State machine transition requires a column missing from the table
+// E224  Column default doesn't match state machine's initial state
+// E225  FK on_delete value is not a valid PostgreSQL action
+// E226  Trigger name uses reserved "_pgdesign_sm_" prefix
+// E227  [groups] references unknown table
+//       NOTE: E227 is emitted by internal/model (build.go resolveGroups),
+//       not internal/validate, despite living in the E200-E299 validate
+//       range. Left in place deliberately -- do not move.
+// E228  Append-only table FK on_delete (CASCADE/SET NULL/SET DEFAULT) lets
+//       a DELETE elsewhere write into it, blocked by the append-only trigger
+// E229  [suppress] key or [validate] disable targets an E-code (errors can
+//       be neither suppressed nor disabled)
 //
 // === Migration safety errors (E300-E399) ===
 //
