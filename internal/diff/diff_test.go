@@ -662,6 +662,34 @@ func TestIndexChanged(t *testing.T) {
 	}
 }
 
+// TestColumnTypeKindIgnored locks in that TypeKind does NOT participate in
+// column comparison. This is load-bearing for diff --live: introspection can
+// only classify enum-backed types as "enum" (pgdesign state machines are
+// indistinguishable from plain enums in pg_catalog, both typtype = 'e'), so a
+// TOML column with TypeKind "state_machine" compared against the introspected
+// "enum" column must not report a spurious type change.
+func TestColumnTypeKindIgnored(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Columns: []model.Column{
+				{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, TypeKind: "state_machine"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "orders", Schema: "public", Columns: []model.Column{
+				{Name: "status", PGType: typeinfo.T("order_status"), NotNull: true, TypeKind: "enum"},
+			}},
+		},
+	}
+
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("expected empty diff for columns differing only in TypeKind, got: %s", d.Summary())
+	}
+}
+
 func TestColumnCommentChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{

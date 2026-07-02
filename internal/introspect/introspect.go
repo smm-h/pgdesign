@@ -127,7 +127,37 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		schema.Functions = append(schema.Functions, fns...)
 	}
 
+	applyEnumTypeKinds(schema)
+
 	return schema, diags, nil
+}
+
+// applyEnumTypeKinds sets Column.TypeKind = "enum" on every table column whose
+// type matches an introspected enum, keeping TypeKind an invariant of
+// model.Column regardless of source (TOML build or live introspection).
+// pg_catalog cannot distinguish pgdesign state machine types from plain enums
+// (both are typtype = 'e'), so "enum" is the only kind introspection can
+// assign; diff must therefore never treat TypeKind as a column difference.
+func applyEnumTypeKinds(schema *model.Schema) {
+	if len(schema.Enums) == 0 {
+		return
+	}
+	enumNames := make(map[string]bool, len(schema.Enums)*2)
+	for _, e := range schema.Enums {
+		enumNames[e.Name] = true
+		if e.Schema != "" {
+			// format_type schema-qualifies types outside the search path.
+			enumNames[e.Schema+"."+e.Name] = true
+		}
+	}
+	for ti := range schema.Tables {
+		cols := schema.Tables[ti].Columns
+		for ci := range cols {
+			if enumNames[cols[ci].PGType.Base] {
+				cols[ci].TypeKind = "enum"
+			}
+		}
+	}
 }
 
 // queryPGVersion returns the major PostgreSQL version number.

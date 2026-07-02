@@ -380,6 +380,68 @@ func TestIntrospectEnums(t *testing.T) {
 	}
 }
 
+func TestIntrospectColumnTypeKind(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	users := findTable(schema.Tables, "users")
+	if users == nil {
+		t.Fatal("users table not found")
+	}
+
+	// status column uses the "status" enum type: TypeKind must be "enum".
+	statusCol := users.Columns[3]
+	if statusCol.Name != "status" {
+		t.Fatalf("Columns[3].Name = %q, want %q", statusCol.Name, "status")
+	}
+	if statusCol.TypeKind != "enum" {
+		t.Errorf("status.TypeKind = %q, want %q", statusCol.TypeKind, "enum")
+	}
+
+	// Builtin-typed columns keep an empty TypeKind from introspection.
+	nameCol := users.Columns[1]
+	if nameCol.TypeKind != "" {
+		t.Errorf("name.TypeKind = %q, want empty", nameCol.TypeKind)
+	}
+	createdCol := users.Columns[6]
+	if createdCol.TypeKind != "" {
+		t.Errorf("created_at.TypeKind = %q, want empty", createdCol.TypeKind)
+	}
+}
+
+func TestApplyEnumTypeKinds_SchemaQualified(t *testing.T) {
+	// format_type schema-qualifies enum types outside the search path;
+	// matching must handle both bare and qualified names.
+	schema := &model.Schema{
+		Enums: []model.Enum{
+			{Schema: "app", Name: "mood", Values: []string{"happy", "sad"}},
+		},
+		Tables: []model.Table{{
+			Name: "entries",
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+				{Name: "mood_bare", PGType: typeinfo.T("mood"), NotNull: true},
+				{Name: "mood_qualified", PGType: typeinfo.T("app.mood"), NotNull: true},
+			},
+		}},
+	}
+
+	applyEnumTypeKinds(schema)
+
+	cols := schema.Tables[0].Columns
+	if cols[0].TypeKind != "" {
+		t.Errorf("id.TypeKind = %q, want empty", cols[0].TypeKind)
+	}
+	if cols[1].TypeKind != "enum" {
+		t.Errorf("mood_bare.TypeKind = %q, want %q", cols[1].TypeKind, "enum")
+	}
+	if cols[2].TypeKind != "enum" {
+		t.Errorf("mood_qualified.TypeKind = %q, want %q", cols[2].TypeKind, "enum")
+	}
+}
+
 func TestIntrospectTableComment(t *testing.T) {
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
