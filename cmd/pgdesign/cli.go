@@ -53,14 +53,9 @@ func main() {
 		return &fmtHandler{}
 	})
 
-	app.Command("introspect", "Introspect a live PostgreSQL database into TOML schema", handleIntrospect,
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("schema", "PostgreSQL schema name(s) to introspect (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
-			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.BoolFlag("extensions", "Discover extension types, functions, and opclasses", strictcli.Default(false)),
-		),
-	)
+	app.RegisterHandler("introspect", "Introspect a live PostgreSQL database into TOML schema", func() strictcli.Handler {
+		return &introspectHandler{}
+	})
 
 	app.Command("diff", "Compare schema file(s) or directory against another target", handleDiff,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),

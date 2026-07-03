@@ -370,7 +370,7 @@
           "help": "PostgreSQL schema name(s) to introspect (repeatable)",
           "name": "schema",
           "repeatable": true,
-          "type": "str",
+          "type": "list[str]",
           "unique": true
         },
         {

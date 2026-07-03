@@ -9,10 +9,20 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/introspect"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleIntrospect(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type introspectHandler struct {
+	DB         string   `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Schemas    []string `cli:"schema" help:"PostgreSQL schema name(s) to introspect (repeatable)"`
+	Output     *string  `cli:"output" help:"Write output to a file at this path instead of stdout"`
+	Extensions bool     `cli:"extensions" help:"Discover extension types, functions, and opclasses" default:"false"`
+}
+
+func (h *introspectHandler) Run(cliCtx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](cliCtx)
+
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for introspect")
 		return 1
@@ -22,14 +32,7 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 	cfg := loadProjectConfig(".")
 
 	// Collect schema names from repeatable --schema flag.
-	var schemaNames []string
-	if raw, ok := kwargs["schema"].([]interface{}); ok {
-		for _, v := range raw {
-			if s, ok := v.(string); ok {
-				schemaNames = append(schemaNames, s)
-			}
-		}
-	}
+	schemaNames := h.Schemas
 	if len(schemaNames) == 0 {
 		schemaNames = configSchemaNames(cfg)
 	}
@@ -59,8 +62,8 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 	}
 
 	// Write to file or stdout.
-	if outputPath, ok := kwargs["output"].(string); ok && outputPath != "" {
-		if err := os.WriteFile(outputPath, data, 0o644); err != nil {
+	if h.Output != nil && *h.Output != "" {
+		if err := os.WriteFile(*h.Output, data, 0o644); err != nil {
 			fmt.Fprintf(os.Stderr, "error: cannot write output file: %v\n", err)
 			return 1
 		}
@@ -69,7 +72,7 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 	}
 
 	// Extension discovery (--extensions flag)
-	if kwargs["extensions"].(bool) {
+	if h.Extensions {
 		conn, err := pgx.Connect(ctx, dbURL)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: connect for extension discovery: %v\n", err)
@@ -101,7 +104,7 @@ func handleIntrospect(kwargs map[string]interface{}) int {
 		}
 
 		if len(extNames) == 0 {
-			if !kwargs["quiet"].(bool) {
+			if !g.Quiet {
 				fmt.Fprintln(os.Stderr, "# No extensions found (excluding plpgsql).")
 			}
 			return 0
