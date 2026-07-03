@@ -1,8 +1,8 @@
 {
   "VERSION": "464863ee696ca862f6ae2bfee9728ebbd84463597825442efc62838d945b00fb",
   ".github/workflows/ci.yml": "f6692741d41b6a316433da0ec3e3f3b3c13c4abe0a480c4265a1694de65b926f",
-  ".github/workflows/publish.yml": "88b9e0c22ac08b1c43850700d69dfb1e2cfe39a45eecf88263fe1a3d5a2ba3b4",
-  ".goreleaser.yml": "4268bbd1f0bfdef08f297aa817ad79a8df2492a50857e277c9d128c28c9b2a26",
+  ".github/workflows/publish.yml": "c3f617a07511f120e9423cf37e76204b51b37b7ea9a298bbfe75113a7f01ac86",
+  ".goreleaser.yml": "cff25efee366e2ae9b1fca8a9210296481dbfa71c52f9ee63f90873a73a6d36f",
   "version.go": "66f79bab8610a681f17894668192f0c646b2c8c046092e857179265693a71cc3",
   "CHANGELOG.md": "cf60f7487d1f20d1342676f9546bda156a4680b09dd9d7fd87acd3df8991b89f",
   ".gitignore": "808423d1630a94ffd12443b4e3869a2d4dc407119470d70fecd2c22a750dfbad",
