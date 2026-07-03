@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/workload"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
 // formatNumber formats an integer with comma separators.
@@ -80,37 +81,29 @@ type vacuumCandidate struct {
 	DeadRatio  float64 `json:"dead_ratio"`
 }
 
-func handleStats(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type statsHandler struct {
+	DB      string   `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	JSON    bool     `cli:"json" help:"Output all statistics in machine-readable JSON format" default:"false"`
+	Schemas []string `cli:"schema" help:"PostgreSQL schema name to analyze (repeatable for multiple)"`
+	Paths   []string `arg:"path" help:"TOML schema file(s) for cross-referencing with live data" variadic:"true" required:"false"`
+}
+
+func (h *statsHandler) Run(_ *strictcli.Context) int {
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for stats")
 		return 1
 	}
 
-	jsonOutput := kwargs["json"].(bool)
+	jsonOutput := h.JSON
 
-	var schemaNames []string
-	if raw, ok := kwargs["schema"].([]interface{}); ok {
-		for _, v := range raw {
-			if s, ok := v.(string); ok {
-				schemaNames = append(schemaNames, s)
-			}
-		}
-	}
+	schemaNames := h.Schemas
 	if len(schemaNames) == 0 {
 		schemaNames = []string{"public"}
 	}
 
-	// path is optional variadic -- nil when not provided
-	var paths []string
-	if raw, ok := kwargs["path"].([]interface{}); ok {
-		for _, v := range raw {
-			if s, ok := v.(string); ok {
-				paths = append(paths, s)
-			}
-		}
-	}
-	_ = paths // reserved for future cross-reference with schema files
+	// path is optional variadic -- empty when not provided
+	_ = h.Paths // reserved for future cross-reference with schema files
 
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, dbURL)

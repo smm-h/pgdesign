@@ -183,14 +183,9 @@ func main() {
 		),
 	)
 
-	app.Command("stats", "Analyze database statistics, index usage, and health", handleStats,
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.BoolFlag("json", "Output all statistics in machine-readable JSON format", strictcli.Default(false)),
-			strictcli.StringFlag("schema", "PostgreSQL schema name to analyze (repeatable for multiple)", strictcli.Repeatable(), strictcli.Unique(true)),
-		),
-		strictcli.WithArgs(strictcli.NewArg("path", "TOML schema file(s) for cross-referencing with live data", strictcli.Variadic(), strictcli.ArgRequired(false))),
-	)
+	app.RegisterHandler("stats", "Analyze database statistics, index usage, and health", func() strictcli.Handler {
+		return &statsHandler{}
+	})
 
 	tdb := app.Group("testdb", "Manage ephemeral test databases for schema testing")
 	tdb.RegisterHandler("setup", "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.", func() strictcli.Handler {
