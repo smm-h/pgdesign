@@ -194,8 +194,17 @@ func (h *migratePlanHandler) Run(cliCtx *strictcli.Context) int {
 	return 0
 }
 
-func handleMigrateGenerate(kwargs map[string]interface{}) int {
-	paths := extractPaths(kwargs)
+type migrateGenerateHandler struct {
+	DB      string   `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Version *string  `cli:"version" help:"Semantic version string for the generated migration"`
+	Dir     string   `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
+	Paths   []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
+}
+
+func (h *migrateGenerateHandler) Run(cliCtx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](cliCtx)
+
+	paths := h.Paths
 	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
@@ -204,19 +213,22 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 	// Load config for migrations dir and schema name defaults.
 	cfg := loadProjectConfig(paths[0])
 
-	dbURL, _ := kwargs["db"].(string)
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate generate")
 		return 1
 	}
 
-	version, _ := kwargs["version"].(string)
+	var version string
+	if h.Version != nil {
+		version = *h.Version
+	}
 	if version == "" {
 		fmt.Fprintln(os.Stderr, "error: --version is required for migrate generate")
 		return 1
 	}
 
-	dir := kwargs["dir"].(string)
+	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
 		dir = string(cfg.Project.MigrationsDir)
 	}
@@ -296,7 +308,7 @@ func handleMigrateGenerate(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	if !kwargs["quiet"].(bool) {
+	if !g.Quiet {
 		fmt.Printf("Generated migration: %s\n", path)
 		fmt.Printf("  Description: %s\n", m.Description)
 		fmt.Printf("  DDL ops: %d\n", len(m.DDLOps))

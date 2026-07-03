@@ -65,14 +65,9 @@ func main() {
 	mig.RegisterHandler("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.", func() strictcli.Handler {
 		return &migratePlanHandler{}
 	})
-	mig.Command("generate", "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.", handleMigrateGenerate,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("version", "Semantic version string for the generated migration", strictcli.Default(nil)),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
-		),
-	)
+	mig.RegisterHandler("generate", "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.", func() strictcli.Handler {
+		return &migrateGenerateHandler{}
+	})
 	mig.Command("apply", "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.", handleMigrateApply,
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
