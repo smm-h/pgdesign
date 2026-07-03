@@ -750,27 +750,36 @@ func (h *migrateSquashHandler) Run(cliCtx *strictcli.Context) int {
 	return 0
 }
 
-func handleMigrateTest(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type migrateTestHandler struct {
+	DB      string   `cli:"db" help:"PostgreSQL connection URL for the staging test database"`
+	Dir     string   `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
+	Timeout int      `cli:"timeout" help:"Maximum time in seconds before the test run is aborted" default:"60"`
+	Shadow  bool     `cli:"shadow" help:"Test by replaying migrations into a shadow database and diffing against TOML schema" default:"false"`
+	Paths   []string `arg:"path" help:"Schema file(s) or directory (required with --shadow)" variadic:"true" required:"false"`
+}
+
+func (h *migrateTestHandler) Run(cliCtx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](cliCtx)
+
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate test")
 		return 1
 	}
 
-	shadow, _ := kwargs["shadow"].(bool)
-	if shadow {
-		return handleMigrateTestShadow(kwargs)
+	if h.Shadow {
+		return h.runShadow(g.Quiet)
 	}
 
 	cfg := loadProjectConfig(".")
 
-	dir := kwargs["dir"].(string)
+	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
 		dir = string(cfg.Project.MigrationsDir)
 	}
 
-	timeout := kwargs["timeout"].(int)
-	quiet := kwargs["quiet"].(bool)
+	timeout := h.Timeout
+	quiet := g.Quiet
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
@@ -939,20 +948,17 @@ func handleMigrateTest(kwargs map[string]interface{}) int {
 	return 0
 }
 
-func handleMigrateTestShadow(kwargs map[string]interface{}) int {
-	dbURL := kwargs["db"].(string)
-	quiet := kwargs["quiet"].(bool)
-	timeout := kwargs["timeout"].(int)
+// runShadow implements --shadow mode: replay all migrations into a fresh
+// shadow database and diff the result against the TOML schema.
+func (h *migrateTestHandler) runShadow(quiet bool) int {
+	dbURL := h.DB
+	timeout := h.Timeout
 
 	// Require path arg for shadow mode.
-	rawPaths, ok := kwargs["path"].([]interface{})
-	if !ok || len(rawPaths) == 0 {
+	paths := h.Paths
+	if len(paths) == 0 {
 		fmt.Fprintln(os.Stderr, "error: schema path is required for --shadow mode")
 		return 1
-	}
-	paths := make([]string, len(rawPaths))
-	for i, v := range rawPaths {
-		paths[i] = v.(string)
 	}
 
 	// Build desired schema from TOML.
@@ -963,7 +969,7 @@ func handleMigrateTestShadow(kwargs map[string]interface{}) int {
 
 	cfg := loadProjectConfig(paths[0])
 
-	dir := kwargs["dir"].(string)
+	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
 		dir = string(cfg.Project.MigrationsDir)
 	}

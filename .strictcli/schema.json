@@ -755,6 +755,7 @@
               "help": "Schema file(s) or directory (required with --shadow)",
               "name": "path",
               "required": false,
+              "type": "list[str]",
               "variadic": true
             }
           ],

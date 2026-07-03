@@ -80,15 +80,9 @@ func main() {
 	mig.RegisterHandler("squash", "Consolidate a range of sequential migration files into a single optimized migration. Recognizes 12 types of inverse operation pairs for cancellation, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.", func() strictcli.Handler {
 		return &migrateSquashHandler{}
 	})
-	mig.Command("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.", handleMigrateTest,
-		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) or directory (required with --shadow)", strictcli.Variadic(), strictcli.ArgRequired(false))),
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
-			strictcli.IntFlag("timeout", "Maximum time in seconds before the test run is aborted", strictcli.Default(60)),
-			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema", strictcli.Default(false)),
-		),
-	)
+	mig.RegisterHandler("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.", func() strictcli.Handler {
+		return &migrateTestHandler{}
+	})
 
 	app.RegisterHandler("seed", "Generate type-aware test data for all schema tables", func() strictcli.Handler {
 		return &seedHandler{}
