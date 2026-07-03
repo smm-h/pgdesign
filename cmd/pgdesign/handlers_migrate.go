@@ -629,26 +629,35 @@ func opSummary(op migrate.DDLOp) string {
 	return target
 }
 
-func handleMigrateSquash(kwargs map[string]interface{}) int {
+type migrateSquashHandler struct {
+	From string `cli:"from" help:"First migration version to include in the squash range"`
+	To   string `cli:"to" help:"Last migration version to include in the squash range"`
+	Dir  string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
+	DB   string `cli:"db" help:"PostgreSQL connection URL for pre-squash safety check"`
+}
+
+func (h *migrateSquashHandler) Run(cliCtx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](cliCtx)
+
 	cfg := loadProjectConfig(".")
 
-	dir := kwargs["dir"].(string)
+	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
 		dir = string(cfg.Project.MigrationsDir)
 	}
 
-	from, _ := kwargs["from"].(string)
+	from := h.From
 	if from == "" {
 		fmt.Fprintln(os.Stderr, "error: --from is required")
 		return 1
 	}
-	to, _ := kwargs["to"].(string)
+	to := h.To
 	if to == "" {
 		fmt.Fprintln(os.Stderr, "error: --to is required")
 		return 1
 	}
 
-	dbURL, _ := kwargs["db"].(string)
+	dbURL := h.DB
 	if dbURL != "" {
 		ctx := context.Background()
 		conn, err := pgx.Connect(ctx, dbURL)
@@ -722,7 +731,7 @@ func handleMigrateSquash(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	if !kwargs["quiet"].(bool) {
+	if !g.Quiet {
 		fmt.Printf("Squashed %d migrations into %s\n", result.OriginalCount, outputPath)
 		fmt.Printf("  Description: %s\n", result.Squashed.Description)
 		fmt.Printf("  DDL ops: %d\n", len(result.Squashed.DDLOps))

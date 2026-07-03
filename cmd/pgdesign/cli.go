@@ -77,14 +77,9 @@ func main() {
 	mig.RegisterHandler("status", "Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.", func() strictcli.Handler {
 		return &migrateStatusHandler{}
 	})
-	mig.Command("squash", "Consolidate a range of sequential migration files into a single optimized migration. Recognizes 12 types of inverse operation pairs for cancellation, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.", handleMigrateSquash,
-		strictcli.WithFlags(
-			strictcli.StringFlag("from", "First migration version to include in the squash range"),
-			strictcli.StringFlag("to", "Last migration version to include in the squash range"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
-			strictcli.StringFlag("db", "PostgreSQL connection URL for pre-squash safety check"),
-		),
-	)
+	mig.RegisterHandler("squash", "Consolidate a range of sequential migration files into a single optimized migration. Recognizes 12 types of inverse operation pairs for cancellation, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.", func() strictcli.Handler {
+		return &migrateSquashHandler{}
+	})
 	mig.Command("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.", handleMigrateTest,
 		strictcli.WithArgs(strictcli.NewArg("path", "Schema file(s) or directory (required with --shadow)", strictcli.Variadic(), strictcli.ArgRequired(false))),
 		strictcli.WithFlags(
