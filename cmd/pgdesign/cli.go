@@ -62,13 +62,9 @@ func main() {
 	})
 
 	mig := app.Group("migrate", "Database migration planning, generation, and execution")
-	mig.Command("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.", handleMigratePlan,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
-		),
-	)
+	mig.RegisterHandler("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.", func() strictcli.Handler {
+		return &migratePlanHandler{}
+	})
 	mig.Command("generate", "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.", handleMigrateGenerate,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
 		strictcli.WithFlags(

@@ -17,10 +17,21 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/introspect"
 	"github.com/smm-h/pgdesign/internal/migrate"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleMigratePlan(kwargs map[string]interface{}) int {
-	paths := extractPaths(kwargs)
+type migratePlanHandler struct {
+	DB string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	// Dir is registered but not currently consumed by plan; kept for CLI
+	// schema compatibility.
+	Dir   string   `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
+	Paths []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
+}
+
+func (h *migratePlanHandler) Run(cliCtx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](cliCtx)
+
+	paths := h.Paths
 	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
@@ -29,7 +40,7 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 	// Load config for schema name defaults.
 	cfg := loadProjectConfig(paths[0])
 
-	dbURL, _ := kwargs["db"].(string)
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate plan")
 		return 1
@@ -57,7 +68,7 @@ func handleMigratePlan(kwargs map[string]interface{}) int {
 
 	d := diff.Diff(schema, actual)
 	if d.IsEmpty() {
-		if !kwargs["quiet"].(bool) {
+		if !g.Quiet {
 			fmt.Println("No changes detected. Schema is up to date.")
 		}
 		return 0
