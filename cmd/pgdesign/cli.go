@@ -55,16 +55,9 @@ func main() {
 		),
 	)
 
-	app.Command("fmt", "Format a pgdesign TOML schema file or directory in place", handleFmt,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path to the TOML schema file or directory to format")),
-		strictcli.WithFlags(
-			strictcli.BoolFlag("check", "Check if file is already formatted (exit 1 if not)", strictcli.Default(false)),
-			strictcli.StringFlag("table-order", "Table ordering strategy: dependency-based or alphabetical",
-				strictcli.Default("dependency"), strictcli.Choices("dependency", "alphabetical")),
-			strictcli.StringFlag("column-order", "Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve",
-				strictcli.Default("pk_fk_alpha"), strictcli.Choices("pk_fk_alpha", "alphabetical", "fk_last", "preserve")),
-		),
-	)
+	app.RegisterHandler("fmt", "Format a pgdesign TOML schema file or directory in place", func() strictcli.Handler {
+		return &fmtHandler{}
+	})
 
 	app.Command("introspect", "Introspect a live PostgreSQL database into TOML schema", handleIntrospect,
 		strictcli.WithFlags(

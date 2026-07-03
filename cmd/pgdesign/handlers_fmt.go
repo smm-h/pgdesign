@@ -8,20 +8,28 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/format"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleFmt(kwargs map[string]interface{}) int {
-	target := kwargs["path"].(string)
+type fmtHandler struct {
+	Path        string `arg:"path" help:"Path to the TOML schema file or directory to format"`
+	Check       bool   `cli:"check" help:"Check if file is already formatted (exit 1 if not)" default:"false"`
+	TableOrder  string `cli:"table-order" help:"Table ordering strategy: dependency-based or alphabetical" default:"dependency" choices:"dependency,alphabetical"`
+	ColumnOrder string `cli:"column-order" help:"Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve" default:"pk_fk_alpha" choices:"pk_fk_alpha,alphabetical,fk_last,preserve"`
+}
+
+func (h *fmtHandler) Run(_ *strictcli.Context) int {
+	target := h.Path
 
 	// Load config for format defaults.
 	cfg := loadProjectConfig(target)
 
 	// CLI flags override config; config overrides strictcli defaults.
-	tableOrder := kwargs["table_order"].(string)
+	tableOrder := h.TableOrder
 	if tableOrder == "dependency" && cfg.Format.TableOrder != "" {
 		tableOrder = cfg.Format.TableOrder
 	}
-	columnOrder := kwargs["column_order"].(string)
+	columnOrder := h.ColumnOrder
 	if columnOrder == "pk_fk_alpha" && cfg.Format.ColumnOrder != "" {
 		columnOrder = cfg.Format.ColumnOrder
 	}
@@ -38,9 +46,9 @@ func handleFmt(kwargs map[string]interface{}) int {
 	}
 
 	if info.IsDir() {
-		return fmtDir(target, fmtConfig, kwargs["check"].(bool))
+		return fmtDir(target, fmtConfig, h.Check)
 	}
-	return fmtFile(target, fmtConfig, kwargs["check"].(bool))
+	return fmtFile(target, fmtConfig, h.Check)
 }
 
 func fmtFile(filePath string, cfg *format.Config, checkOnly bool) int {
