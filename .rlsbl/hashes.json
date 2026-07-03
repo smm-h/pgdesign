@@ -1,11 +1,11 @@
 {
-  "VERSION": "f7af902eefb89f3a2216d798078294bb927e71c64bad70551f80effabd375875",
+  "VERSION": "464863ee696ca862f6ae2bfee9728ebbd84463597825442efc62838d945b00fb",
   ".github/workflows/ci.yml": "f6692741d41b6a316433da0ec3e3f3b3c13c4abe0a480c4265a1694de65b926f",
-  ".github/workflows/publish.yml": "5e4d8a569750bc4bbbdcd00f51d77337c7efc48a84820115be4e970b84925fa2",
-  ".goreleaser.yml": "49a17f63827a3a396d1f9d20e91d79d43a7473880a4ebc0b93f250c1455abf65",
+  ".github/workflows/publish.yml": "88b9e0c22ac08b1c43850700d69dfb1e2cfe39a45eecf88263fe1a3d5a2ba3b4",
+  ".goreleaser.yml": "4268bbd1f0bfdef08f297aa817ad79a8df2492a50857e277c9d128c28c9b2a26",
   "version.go": "66f79bab8610a681f17894668192f0c646b2c8c046092e857179265693a71cc3",
-  "CHANGELOG.md": "fca781960bc4a70fce00e622926810542c6c62b34357a1228fa2e8432108c013",
-  ".gitignore": "c89d76c6c43e7f0897b3472a15b7c0103e0be5b3a04c2b44e585fa48bdcda2bb",
+  "CHANGELOG.md": "cf60f7487d1f20d1342676f9546bda156a4680b09dd9d7fd87acd3df8991b89f",
+  ".gitignore": "808423d1630a94ffd12443b4e3869a2d4dc407119470d70fecd2c22a750dfbad",
   ".rlsbl/hooks/pre-checks.sh": "60c57d4563263124530e6f33aca77550ea2161ad3b33b3ba6ad1c03fea9eb6e2",
   ".rlsbl/hooks/pre-release.sh": "799fe9a8ed742f5b4f7bc32856df8487b05ab28a37aaa0e9ecf854ea289c5305",
   ".rlsbl/hooks/post-release.sh": "b455f8511e0b2655509ecf5dcb0ab7da5bb7c961f47910ff8e00cab5bd51f833",
@@ -13,5 +13,7 @@
   ".rlsbl/lint/go.toml": "807d5cf760baad6d571a5bfd43cb163efe356f7462ba9f1918d72de45f62339f",
   ".rlsbl/lint/npm.toml": "baa36014e65923d8cc5c8b83c77fa651da79351627570476402da66840027645",
   ".rlsbl/changes/unreleased.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  ".npmignore": "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3"
+  ".npmignore": "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3",
+  ".github/workflows/ci-go.yml": "100a3bb7fec1a2d9a798dc9f8d1693c1ca500f5c7a82dec683682261af2aca92",
+  ".github/workflows/ci-pypi.yml": "2b9fe58419677f4e0997aeb49337cb40dccee6f28b044bd75838abfc51a6c2b9"
 }
