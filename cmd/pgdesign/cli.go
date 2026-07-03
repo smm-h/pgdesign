@@ -135,17 +135,9 @@ func main() {
 		return &serveHandler{}
 	})
 
-	app.Command("codegen", "Generate type-safe application code from schema definitions", handleCodegen,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil)),
-			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
-			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toInterfaceSlice(SupportedModeNames())...)),
-			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.StringFlag("split-mode", "Split Python DDL output mode", strictcli.Default(nil), strictcli.Choices("faceted", "self-contained")),
-			strictcli.BoolFlag("check", "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file", strictcli.Default(false)),
-		),
-	)
+	app.RegisterHandler("codegen", "Generate type-safe application code from schema definitions", func() strictcli.Handler {
+		return &codegenHandler{}
+	})
 
 	app.RegisterHandler("build", "Generate all configured outputs from pgdesign.toml", func() strictcli.Handler {
 		return &buildHandler{}

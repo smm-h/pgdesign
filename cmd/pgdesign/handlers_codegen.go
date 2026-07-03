@@ -7,10 +7,34 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/codegen"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleCodegen(kwargs map[string]interface{}) int {
-	paths := extractPaths(kwargs)
+type codegenHandler struct {
+	DB        *string  `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Lang      string   `cli:"lang" help:"Target programming language for the generated code" choices:"python,zig,go,ts,java,kotlin"`
+	Mode      string   `cli:"mode" help:"Code generation mode determining what code to produce" default:"validators" choices_from:"ModeChoices"`
+	Output    *string  `cli:"output" help:"Write output to a file at this path instead of stdout"`
+	SplitMode *string  `cli:"split-mode" help:"Split Python DDL output mode" choices:"faceted,self-contained"`
+	Check     bool     `cli:"check" help:"Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file" default:"false"`
+	Paths     []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
+}
+
+// ModeChoices supplies the valid --mode values for the choices_from tag; it is
+// resolved once at registration time.
+func (h *codegenHandler) ModeChoices() []string {
+	return SupportedModeNames()
+}
+
+func (h *codegenHandler) Run(ctx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](ctx)
+	return h.run(g.Quiet)
+}
+
+// run contains the codegen logic; tests call it directly with an explicit
+// quiet value instead of going through a CLI parse.
+func (h *codegenHandler) run(quiet bool) int {
+	paths := h.Paths
 	schema, typeReg, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
@@ -30,12 +54,17 @@ func handleCodegen(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	lang := kwargs["lang"].(string)
-	mode := kwargs["mode"].(string)
-	quiet := kwargs["quiet"].(bool)
-	splitMode, _ := kwargs["split_mode"].(string)
-	checkOnly := kwargs["check"].(bool)
-	outputPath, _ := kwargs["output"].(string)
+	lang := h.Lang
+	mode := h.Mode
+	var splitMode string
+	if h.SplitMode != nil {
+		splitMode = *h.SplitMode
+	}
+	checkOnly := h.Check
+	var outputPath string
+	if h.Output != nil {
+		outputPath = *h.Output
+	}
 
 	if checkOnly && outputPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --check requires --output (the path to verify against)")
