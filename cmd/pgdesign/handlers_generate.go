@@ -7,10 +7,19 @@ import (
 	"github.com/smm-h/pgdesign/internal/audit"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/generate"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleGenerate(kwargs map[string]interface{}) int {
-	paths := extractPaths(kwargs)
+type generateHandler struct {
+	Idempotent bool     `cli:"idempotent" help:"Add IF NOT EXISTS guards to all generated DDL statements" default:"false"`
+	Comments   bool     `cli:"comments" help:"Include COMMENT ON statements in the generated output" default:"true"`
+	Format     string   `cli:"format" help:"Output format for the generated schema representation" default:"sql" choices:"sql,json,d2,svg,doc,graphql"`
+	StrictNF   bool     `cli:"strict-nf" help:"Promote normal form violations to errors instead of warnings" default:"false"`
+	Paths      []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
+}
+
+func (h *generateHandler) Run(_ *strictcli.Context) int {
+	paths := h.Paths
 	schema, typeReg, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
@@ -19,7 +28,7 @@ func handleGenerate(kwargs map[string]interface{}) int {
 	// Load config for PGVersion fallback.
 	cfg := loadProjectConfig(paths[0])
 
-	if kwargs["strict_nf"].(bool) {
+	if h.StrictNF {
 		diags := audit.Audit(schema)
 		diags = promoteNFViolations(diags)
 		if len(diags) > 0 {
@@ -49,9 +58,9 @@ func handleGenerate(kwargs map[string]interface{}) int {
 	}
 
 	opts := generate.Options{
-		Idempotent:      kwargs["idempotent"].(bool),
-		IncludeComments: kwargs["comments"].(bool),
-		Format:          kwargs["format"].(string),
+		Idempotent:      h.Idempotent,
+		IncludeComments: h.Comments,
+		Format:          h.Format,
 		PGVersion:       pgVersion,
 		TypeRegistry:    typeReg,
 	}

@@ -45,15 +45,9 @@ func main() {
 
 	strictcli.RegisterGlobals[Globals](app)
 
-	app.Command("generate", "Generate SQL DDL from TOML schema file(s) or directory", handleGenerate,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
-		strictcli.WithFlags(
-			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all generated DDL statements", strictcli.Default(false)),
-			strictcli.BoolFlag("comments", "Include COMMENT ON statements in the generated output", strictcli.Default(true)),
-			strictcli.StringFlag("format", "Output format for the generated schema representation", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg", "doc", "graphql")),
-			strictcli.BoolFlag("strict-nf", "Promote normal form violations to errors instead of warnings", strictcli.Default(false)),
-		),
-	)
+	app.RegisterHandler("generate", "Generate SQL DDL from TOML schema file(s) or directory", func() strictcli.Handler {
+		return &generateHandler{}
+	})
 
 	app.RegisterHandler("fmt", "Format a pgdesign TOML schema file or directory in place", func() strictcli.Handler {
 		return &fmtHandler{}
