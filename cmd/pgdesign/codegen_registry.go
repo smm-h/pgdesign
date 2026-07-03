@@ -160,12 +160,3 @@ func SelectGenerator(lang, mode string) (codegen.Generator, error) {
 		return nil, fmt.Errorf("unsupported codegen mode: %s", mode)
 	}
 }
-
-// toInterfaceSlice converts a string slice to an interface slice for variadic calls.
-func toInterfaceSlice(ss []string) []interface{} {
-	result := make([]interface{}, len(ss))
-	for i, s := range ss {
-		result[i] = s
-	}
-	return result
-}
