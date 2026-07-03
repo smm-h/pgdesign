@@ -15,13 +15,22 @@ import (
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleBuild(kwargs map[string]interface{}) int {
-	quiet := kwargs["quiet"].(bool)
-	dryRun := kwargs["dry_run"].(bool)
-	autoCommit := kwargs["auto_commit"].(bool)
+type buildHandler struct {
+	DryRun     bool `cli:"dry-run" help:"Show what would be generated without writing any files" default:"false"`
+	AutoCommit bool `cli:"auto-commit" help:"Automatically git commit generated output files" default:"true"`
+}
 
+func (h *buildHandler) Run(ctx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](ctx)
+	return runBuild(g.Quiet, h.DryRun, h.AutoCommit)
+}
+
+// runBuild is the typed entry point for the build command; tests call it
+// directly to exercise the build flow without a CLI parse.
+func runBuild(quiet, dryRun, autoCommit bool) int {
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)

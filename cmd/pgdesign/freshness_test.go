@@ -48,14 +48,10 @@ split_mode = %q
 	return dir
 }
 
-// buildKwargs returns the kwargs handleBuild expects, with auto-commit off
-// (temp dirs are not git repos).
-func buildKwargs() map[string]interface{} {
-	return map[string]interface{}{
-		"quiet":       true,
-		"dry_run":     false,
-		"auto_commit": false,
-	}
+// testBuild runs the build flow quietly with auto-commit off (temp dirs are
+// not git repos).
+func testBuild(dryRun bool) int {
+	return runBuild(true, dryRun, false)
 }
 
 // facetedOnlyFile generates both split modes for the project's schema and
@@ -89,7 +85,7 @@ func TestCheckBuild_DetectsOrphanAfterSplitModeSwitch(t *testing.T) {
 	t.Chdir(dir)
 
 	// Materialize the current (self-contained) outputs so the tree is fresh.
-	if code := handleBuild(buildKwargs()); code != 0 {
+	if code := testBuild(false); code != 0 {
 		t.Fatalf("initial build failed with exit code %d", code)
 	}
 
@@ -139,7 +135,7 @@ func TestHandleBuild_OrphanBlocksBuildBeforeWriting(t *testing.T) {
 		t.Fatalf("write orphan: %v", err)
 	}
 
-	if code := handleBuild(buildKwargs()); code != 1 {
+	if code := testBuild(false); code != 1 {
 		t.Fatalf("expected exit code 1 with orphan present, got %d", code)
 	}
 
@@ -163,7 +159,7 @@ func TestHandleBuild_OrphanBlocksBuildBeforeWriting(t *testing.T) {
 	if err := os.Remove(orphanPath); err != nil {
 		t.Fatalf("remove orphan: %v", err)
 	}
-	if code := handleBuild(buildKwargs()); code != 0 {
+	if code := testBuild(false); code != 0 {
 		t.Fatalf("expected build to succeed after orphan removal, got exit code %d", code)
 	}
 }
@@ -174,20 +170,18 @@ func TestHandleBuild_DryRunReportsOrphans(t *testing.T) {
 	dir := writeFreshnessProject(t, "self-contained")
 	t.Chdir(dir)
 
-	if code := handleBuild(buildKwargs()); code != 0 {
+	if code := testBuild(false); code != 0 {
 		t.Fatalf("initial build failed")
 	}
 
-	kwargs := buildKwargs()
-	kwargs["dry_run"] = true
-	if code := handleBuild(kwargs); code != 0 {
+	if code := testBuild(true); code != 0 {
 		t.Fatalf("dry-run on fresh tree should exit 0, got %d", code)
 	}
 
 	if err := os.WriteFile(filepath.Join(dir, "gen", "stale_leftover.py"), []byte("# stale\n"), 0o644); err != nil {
 		t.Fatalf("write orphan: %v", err)
 	}
-	if code := handleBuild(kwargs); code != 1 {
+	if code := testBuild(true); code != 1 {
 		t.Fatalf("dry-run with orphan should exit 1, got %d", code)
 	}
 }

@@ -169,12 +169,9 @@ func main() {
 		),
 	)
 
-	app.Command("build", "Generate all configured outputs from pgdesign.toml", handleBuild,
-		strictcli.WithFlags(
-			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files", strictcli.Default(false)),
-			strictcli.BoolFlag("auto-commit", "Automatically git commit generated output files", strictcli.Default(true)),
-		),
-	)
+	app.RegisterHandler("build", "Generate all configured outputs from pgdesign.toml", func() strictcli.Handler {
+		return &buildHandler{}
+	})
 
 	app.RegisterHandler("stats", "Analyze database statistics, index usage, and health", func() strictcli.Handler {
 		return &statsHandler{}
