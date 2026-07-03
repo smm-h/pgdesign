@@ -468,8 +468,16 @@ func handleMigrateApplyDryRun(ctx context.Context, conn *pgx.Conn, dir string, q
 	return 0
 }
 
-func handleMigrateRollback(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type migrateRollbackHandler struct {
+	DB  string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Dir string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
+	To  string `cli:"to" help:"Target version to rollback to (exclusive — this version stays applied)"`
+}
+
+func (h *migrateRollbackHandler) Run(cliCtx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](cliCtx)
+
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate rollback")
 		return 1
@@ -478,7 +486,7 @@ func handleMigrateRollback(kwargs map[string]interface{}) int {
 	// Load config for migrations dir and lock timeout.
 	cfg := loadProjectConfig(".")
 
-	dir := kwargs["dir"].(string)
+	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
 		dir = string(cfg.Project.MigrationsDir)
 	}
@@ -493,7 +501,7 @@ func handleMigrateRollback(kwargs map[string]interface{}) int {
 	}
 	defer conn.Close(ctx)
 
-	toVersion, _ := kwargs["to"].(string)
+	toVersion := h.To
 	if toVersion != "" {
 		// Multi-step rollback to a target version.
 		rolledBack, err := migrate.RollbackTo(ctx, conn, dir, toVersion, lockTimeout)
@@ -504,7 +512,7 @@ func handleMigrateRollback(kwargs map[string]interface{}) int {
 			}
 			return 1
 		}
-		if !kwargs["quiet"].(bool) {
+		if !g.Quiet {
 			fmt.Printf("Rolled back %d migration(s) to %s:\n", len(rolledBack), toVersion)
 			for _, v := range rolledBack {
 				fmt.Printf("  - %s\n", v)
@@ -520,7 +528,7 @@ func handleMigrateRollback(kwargs map[string]interface{}) int {
 		return 1
 	}
 
-	if !kwargs["quiet"].(bool) {
+	if !g.Quiet {
 		fmt.Printf("Rolled back: %s\n", version)
 	}
 	return 0
