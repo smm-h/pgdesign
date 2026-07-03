@@ -13,12 +13,12 @@ import (
 // for the constants generator.
 type ConstantsLang struct {
 	Lang            Lang
-	CommentPrefix  string
-	TableConstFmt  func(name, fqn string) string
+	CommentPrefix   string
+	TableConstFmt   func(name, fqn string) string
 	ColumnsConstFmt func(name, joined string) string
-	ColConstFmt    func(tableName, colName, rawColName string) string
-	CaseFn         func(string) string
-	RegenCmd       string
+	ColConstFmt     func(tableName, colName, rawColName string) string
+	CaseFn          func(string) string
+	RegenCmd        string
 }
 
 // PythonConstantsGenerator generates Python constants for table and column names.

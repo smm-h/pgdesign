@@ -1094,10 +1094,10 @@ func (g *PythonDDLGenerator) GenerateFiles(schema *model.Schema) (map[string][]b
 
 // facetKind classifies a tuple into one of four facet categories.
 const (
-	facetExtensions  = "extensions"
-	facetTypes       = "types"
-	facetTables      = "tables"
-	facetPostTables  = "post_tables"
+	facetExtensions = "extensions"
+	facetTypes      = "types"
+	facetTables     = "tables"
+	facetPostTables = "post_tables"
 )
 
 // tupleFacet returns the facet category for a tuple.

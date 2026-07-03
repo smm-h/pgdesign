@@ -13,41 +13,41 @@ import (
 
 // SchemaDiff describes the differences between a desired and actual schema.
 type SchemaDiff struct {
-	TablesAdded       []string    `json:"tables_added"`
-	TablesRemoved     []string    `json:"tables_removed"`
-	TablesChanged     []TableDiff `json:"tables_changed"`
-	EnumsAdded        []string    `json:"enums_added"`
-	EnumsRemoved      []string    `json:"enums_removed"`
-	EnumsChanged      []EnumDiff  `json:"enums_changed"`
-	ExtensionsAdded   []string    `json:"extensions_added"`
-	ExtensionsRemoved []string    `json:"extensions_removed"`
-	ViewsAdded        []string    `json:"views_added,omitempty"`
-	ViewsRemoved      []string    `json:"views_removed,omitempty"`
-	ViewsChanged      []ViewDiff  `json:"views_changed,omitempty"`
+	TablesAdded              []string               `json:"tables_added"`
+	TablesRemoved            []string               `json:"tables_removed"`
+	TablesChanged            []TableDiff            `json:"tables_changed"`
+	EnumsAdded               []string               `json:"enums_added"`
+	EnumsRemoved             []string               `json:"enums_removed"`
+	EnumsChanged             []EnumDiff             `json:"enums_changed"`
+	ExtensionsAdded          []string               `json:"extensions_added"`
+	ExtensionsRemoved        []string               `json:"extensions_removed"`
+	ViewsAdded               []string               `json:"views_added,omitempty"`
+	ViewsRemoved             []string               `json:"views_removed,omitempty"`
+	ViewsChanged             []ViewDiff             `json:"views_changed,omitempty"`
 	MaterializedViewsAdded   []string               `json:"materialized_views_added,omitempty"`
 	MaterializedViewsRemoved []string               `json:"materialized_views_removed,omitempty"`
 	MaterializedViewsChanged []MaterializedViewDiff `json:"materialized_views_changed,omitempty"`
-	SequencesAdded   []string       `json:"sequences_added,omitempty"`
-	SequencesRemoved []string       `json:"sequences_removed,omitempty"`
-	SequencesChanged []SequenceDiff `json:"sequences_changed,omitempty"`
-	CompositeTypesAdded   []string            `json:"composite_types_added,omitempty"`
-	CompositeTypesRemoved []string            `json:"composite_types_removed,omitempty"`
-	CompositeTypesChanged []CompositeTypeDiff `json:"composite_types_changed,omitempty"`
-	DomainsAdded          []string            `json:"domains_added,omitempty"`
-	DomainsRemoved        []string            `json:"domains_removed,omitempty"`
-	DomainsChanged        []DomainDiff        `json:"domains_changed,omitempty"`
-	FunctionsAdded        []string            `json:"functions_added,omitempty"`
-	FunctionsRemoved      []string            `json:"functions_removed,omitempty"`
-	FunctionsChanged      []FunctionDiff      `json:"functions_changed,omitempty"`
-	SMTransitionsChanged  []SMTransitionDiff  `json:"sm_transitions_changed,omitempty"`
+	SequencesAdded           []string               `json:"sequences_added,omitempty"`
+	SequencesRemoved         []string               `json:"sequences_removed,omitempty"`
+	SequencesChanged         []SequenceDiff         `json:"sequences_changed,omitempty"`
+	CompositeTypesAdded      []string               `json:"composite_types_added,omitempty"`
+	CompositeTypesRemoved    []string               `json:"composite_types_removed,omitempty"`
+	CompositeTypesChanged    []CompositeTypeDiff    `json:"composite_types_changed,omitempty"`
+	DomainsAdded             []string               `json:"domains_added,omitempty"`
+	DomainsRemoved           []string               `json:"domains_removed,omitempty"`
+	DomainsChanged           []DomainDiff           `json:"domains_changed,omitempty"`
+	FunctionsAdded           []string               `json:"functions_added,omitempty"`
+	FunctionsRemoved         []string               `json:"functions_removed,omitempty"`
+	FunctionsChanged         []FunctionDiff         `json:"functions_changed,omitempty"`
+	SMTransitionsChanged     []SMTransitionDiff     `json:"sm_transitions_changed,omitempty"`
 }
 
 // SMTransitionDiff describes changes to a state machine type's transitions.
 // Enum value changes (states added/removed) are tracked separately in EnumsChanged.
 type SMTransitionDiff struct {
-	TypeName            string           `json:"type_name"`
-	TransitionsAdded    []SMTransitionRef `json:"transitions_added,omitempty"`
-	TransitionsRemoved  []SMTransitionRef `json:"transitions_removed,omitempty"`
+	TypeName           string            `json:"type_name"`
+	TransitionsAdded   []SMTransitionRef `json:"transitions_added,omitempty"`
+	TransitionsRemoved []SMTransitionRef `json:"transitions_removed,omitempty"`
 }
 
 // SMTransitionRef identifies a single directed transition edge (from -> to).
@@ -58,47 +58,47 @@ type SMTransitionRef struct {
 
 // TableDiff describes the differences within a single table.
 type TableDiff struct {
-	Name           string                   `json:"name"`
-	ColumnsAdded   []model.Column           `json:"columns_added"`
-	ColumnsRemoved []string                 `json:"columns_removed"`
-	ColumnsChanged []ColumnChange           `json:"columns_changed"`
-	FKsAdded       []model.FK               `json:"fks_added"`
-	FKsRemoved     []string                 `json:"fks_removed"`
-	FKsChanged     []FKChange               `json:"fks_changed"`
-	IndexesAdded   []model.Index            `json:"indexes_added"`
-	IndexesRemoved []string                 `json:"indexes_removed"`
-	IndexesChanged []IndexChange            `json:"indexes_changed"`
-	UniquesAdded   []model.UniqueConstraint `json:"uniques_added"`
-	UniquesRemoved []string                 `json:"uniques_removed"`
-	ChecksAdded    []model.CheckConstraint  `json:"checks_added"`
-	ChecksRemoved     []string                    `json:"checks_removed"`
-	ExclusionsAdded   []model.ExclusionConstraint `json:"exclusions_added"`
-	ExclusionsRemoved []string                    `json:"exclusions_removed"`
-	TriggersAdded   []model.Trigger `json:"triggers_added,omitempty"`
-	TriggersRemoved []string        `json:"triggers_removed,omitempty"`
-	TriggersChanged []TriggerChange `json:"triggers_changed,omitempty"`
-	PoliciesAdded    []model.Policy `json:"policies_added,omitempty"`
-	PoliciesRemoved  []string       `json:"policies_removed,omitempty"`
-	PoliciesChanged  []PolicyDiff   `json:"policies_changed,omitempty"`
-	EnableRLSChanged *[2]bool       `json:"enable_rls_changed,omitempty"`
-	ForceRLSChanged  *[2]bool       `json:"force_rls_changed,omitempty"`
-	CommentChanged      *[2]string               `json:"comment_changed"`                // [old, new]
-	PKChanged           *[2][]string             `json:"pk_changed"`                     // [old, new]
-	OwnerChanged        *[2]string               `json:"owner_changed"`
-	PartitioningChanged *PartitionDiff           `json:"partitioning_changed,omitempty"`
-	AppendOnlyChanged   *[2]bool                 `json:"append_only_changed,omitempty"`
+	Name                string                      `json:"name"`
+	ColumnsAdded        []model.Column              `json:"columns_added"`
+	ColumnsRemoved      []string                    `json:"columns_removed"`
+	ColumnsChanged      []ColumnChange              `json:"columns_changed"`
+	FKsAdded            []model.FK                  `json:"fks_added"`
+	FKsRemoved          []string                    `json:"fks_removed"`
+	FKsChanged          []FKChange                  `json:"fks_changed"`
+	IndexesAdded        []model.Index               `json:"indexes_added"`
+	IndexesRemoved      []string                    `json:"indexes_removed"`
+	IndexesChanged      []IndexChange               `json:"indexes_changed"`
+	UniquesAdded        []model.UniqueConstraint    `json:"uniques_added"`
+	UniquesRemoved      []string                    `json:"uniques_removed"`
+	ChecksAdded         []model.CheckConstraint     `json:"checks_added"`
+	ChecksRemoved       []string                    `json:"checks_removed"`
+	ExclusionsAdded     []model.ExclusionConstraint `json:"exclusions_added"`
+	ExclusionsRemoved   []string                    `json:"exclusions_removed"`
+	TriggersAdded       []model.Trigger             `json:"triggers_added,omitempty"`
+	TriggersRemoved     []string                    `json:"triggers_removed,omitempty"`
+	TriggersChanged     []TriggerChange             `json:"triggers_changed,omitempty"`
+	PoliciesAdded       []model.Policy              `json:"policies_added,omitempty"`
+	PoliciesRemoved     []string                    `json:"policies_removed,omitempty"`
+	PoliciesChanged     []PolicyDiff                `json:"policies_changed,omitempty"`
+	EnableRLSChanged    *[2]bool                    `json:"enable_rls_changed,omitempty"`
+	ForceRLSChanged     *[2]bool                    `json:"force_rls_changed,omitempty"`
+	CommentChanged      *[2]string                  `json:"comment_changed"` // [old, new]
+	PKChanged           *[2][]string                `json:"pk_changed"`      // [old, new]
+	OwnerChanged        *[2]string                  `json:"owner_changed"`
+	PartitioningChanged *PartitionDiff              `json:"partitioning_changed,omitempty"`
+	AppendOnlyChanged   *[2]bool                    `json:"append_only_changed,omitempty"`
 }
 
 // ColumnChange describes a change to a single column, with risk classification.
 type ColumnChange struct {
-	Name            string              `json:"name"`
-	TypeChanged     *[2]string          `json:"type_changed"`     // [old, new]
-	NullableChanged *[2]bool            `json:"nullable_changed"` // [old, new]
-	DefaultChanged  *[2]string          `json:"default_changed"`  // [old, new]
-	CommentChanged   *[2]string          `json:"comment_changed"`   // [old, new]
-	GeneratedChanged *[2]string          `json:"generated_changed,omitempty"` // [old, new]
-	StoredChanged    *[2]bool            `json:"stored_changed,omitempty"`    // [old, new]
-	IdentityChanged  *[2]string          `json:"identity_changed,omitempty"`  // [old, new]
+	Name              string              `json:"name"`
+	TypeChanged       *[2]string          `json:"type_changed"`                // [old, new]
+	NullableChanged   *[2]bool            `json:"nullable_changed"`            // [old, new]
+	DefaultChanged    *[2]string          `json:"default_changed"`             // [old, new]
+	CommentChanged    *[2]string          `json:"comment_changed"`             // [old, new]
+	GeneratedChanged  *[2]string          `json:"generated_changed,omitempty"` // [old, new]
+	StoredChanged     *[2]bool            `json:"stored_changed,omitempty"`    // [old, new]
+	IdentityChanged   *[2]string          `json:"identity_changed,omitempty"`  // [old, new]
 	ArrayChanged      *[2]bool            `json:"array_changed,omitempty"`
 	CollationChanged  *[2]string          `json:"collation_changed,omitempty"`
 	JSONSchemaChanged *[2]string          `json:"json_schema_changed,omitempty"`
@@ -194,9 +194,9 @@ type DomainDiff struct {
 	Name            string     `json:"name"`
 	BaseTypeChanged *[2]string `json:"base_type_changed,omitempty"`
 	CheckChanged    *[2]string `json:"check_changed,omitempty"`
-	DefaultChanged *[2]string `json:"default_changed,omitempty"`
-	NotNullChanged *[2]bool   `json:"not_null_changed,omitempty"`
-	CommentChanged *[2]string `json:"comment_changed,omitempty"`
+	DefaultChanged  *[2]string `json:"default_changed,omitempty"`
+	NotNullChanged  *[2]bool   `json:"not_null_changed,omitempty"`
+	CommentChanged  *[2]string `json:"comment_changed,omitempty"`
 }
 
 // FKChange describes a changed foreign key constraint.

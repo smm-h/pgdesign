@@ -10,11 +10,11 @@ import (
 
 // ConstraintSet holds extracted constraint information for a single table.
 type ConstraintSet struct {
-	NotNullFields  []string            // column names that are NOT NULL (excludes PK/identity/generated)
-	EnumFields     map[string][]string // column name -> valid enum values
-	CheckExprs     map[string]string   // column name -> CHECK expression (single-column checks only)
-	JSONSchemas    map[string]string   // column name -> JSON schema file path
-	DomainBaseTypes map[string]string  // domain-backed column name -> base PG type (for numeric comparison type-mapping)
+	NotNullFields   []string            // column names that are NOT NULL (excludes PK/identity/generated)
+	EnumFields      map[string][]string // column name -> valid enum values
+	CheckExprs      map[string]string   // column name -> CHECK expression (single-column checks only)
+	JSONSchemas     map[string]string   // column name -> JSON schema file path
+	DomainBaseTypes map[string]string   // domain-backed column name -> base PG type (for numeric comparison type-mapping)
 }
 
 // HasConstraints reports whether any constraints were extracted.

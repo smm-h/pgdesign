@@ -151,7 +151,7 @@ func TestCreateTable_WithPartitioning(t *testing.T) {
 		PK: []string{"id"},
 		Partitioning: &model.PartitionSpec{
 			Strategy: "range",
-			Columns: []string{"created_at"},
+			Columns:  []string{"created_at"},
 		},
 	}
 

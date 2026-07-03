@@ -48,7 +48,7 @@ type existsLookup struct {
 // orCompound describes a top-level OR expression with ownership on one side
 // and an exists-lookup on the other. Semantics: return true if EITHER passes.
 type orCompound struct {
-	ownership   *ownershipCheck
+	ownership    *ownershipCheck
 	existsLookup *existsLookup
 }
 

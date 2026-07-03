@@ -841,8 +841,8 @@ func TestBuild_IndexDESCEndToEnd(t *testing.T) {
 		Meta: parse.RawMeta{Schema: "public"},
 		Tables: []parse.RawTable{
 			{
-				Name:    "messages",
-				PK:      []string{"id"},
+				Name: "messages",
+				PK:   []string{"id"},
 				Columns: []parse.RawColumn{
 					{Name: "id", Type: "id"},
 					{Name: "channel", Type: "short_text"},

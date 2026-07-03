@@ -2049,16 +2049,16 @@ func TestW013_CascadeDepthExceedsThreshold(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "a", Schema: "public", Comment: "A", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "b_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "b", Schema: "public", Comment: "B", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "c_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "c", Schema: "public", Comment: "C", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "d_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "d", Schema: "public", Comment: "D", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "e_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_e", Columns: []string{"e_id"}, RefSchema: "public", RefTable: "e", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_e", Columns: []string{"e_id"}, RefSchema: "public", RefTable: "e", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "e", Schema: "public", Comment: "E", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 		},
@@ -2093,13 +2093,13 @@ func TestW013_CascadeDepthAtThreshold_NoDiag(t *testing.T) {
 		Tables: []model.Table{
 			{Name: "a", Schema: "public", Comment: "A", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "b_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "b", Schema: "public", Comment: "B", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "c_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "c", Schema: "public", Comment: "C", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "d_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "d", Schema: "public", Comment: "D", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 		},
@@ -2446,10 +2446,10 @@ func TestW015_MixedOnDeleteActions(t *testing.T) {
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 			{Name: "child_a", Schema: "public", Comment: "Child A", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "child_b", Schema: "public", Comment: "Child B", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "RESTRICT"}}},
+				FKs:     []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "RESTRICT"}}},
 		},
 	}
 	schema.BuildFKGraph()
@@ -2474,10 +2474,10 @@ func TestW015_ConsistentOnDelete_NoDiag(t *testing.T) {
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
 			{Name: "child_a", Schema: "public", Comment: "Child A", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 			{Name: "child_b", Schema: "public", Comment: "Child B", PK: []string{"id"},
 				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
-				FKs: []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+				FKs:     []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: "public", RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
 		},
 	}
 	schema.BuildFKGraph()
@@ -3065,7 +3065,7 @@ func TestI003_RowSizeToastThreshold(t *testing.T) {
 	for i := 0; i < 32; i++ {
 		cols = append(cols, model.Column{
 			Name:    fmt.Sprintf("data_%d", i),
-			PGType: typeinfo.T("jsonb"),
+			PGType:  typeinfo.T("jsonb"),
 			NotNull: true,
 		})
 	}
@@ -3073,7 +3073,7 @@ func TestI003_RowSizeToastThreshold(t *testing.T) {
 		Tables: []model.Table{
 			{
 				Name: "wide_table", Schema: "public", Comment: "Wide table",
-				PK: []string{"id"},
+				PK:      []string{"id"},
 				Columns: cols,
 			},
 		},
@@ -3092,7 +3092,7 @@ func TestW021_RowSizeExceedsPage(t *testing.T) {
 	for i := 0; i < 130; i++ {
 		cols = append(cols, model.Column{
 			Name:    fmt.Sprintf("blob_%d", i),
-			PGType: typeinfo.T("jsonb"),
+			PGType:  typeinfo.T("jsonb"),
 			NotNull: true,
 		})
 	}
@@ -3100,7 +3100,7 @@ func TestW021_RowSizeExceedsPage(t *testing.T) {
 		Tables: []model.Table{
 			{
 				Name: "mega_table", Schema: "public", Comment: "Mega table",
-				PK: []string{"id"},
+				PK:      []string{"id"},
 				Columns: cols,
 			},
 		},

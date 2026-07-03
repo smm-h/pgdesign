@@ -67,7 +67,7 @@ type FormatConfig struct {
 
 // ValidateConfig holds [validate] section values.
 type ValidateConfig struct {
-	Disable       []string `toml:"disable"`        // error codes OR rule names
+	Disable       []string `toml:"disable"` // error codes OR rule names
 	NamingPattern string   `toml:"naming_pattern"`
 	MaxColumns    int      `toml:"max_columns"`
 }

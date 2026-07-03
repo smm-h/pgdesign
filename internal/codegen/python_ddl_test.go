@@ -11,10 +11,10 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
-	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // loadTestSchema parses and builds the DDL test input schema.

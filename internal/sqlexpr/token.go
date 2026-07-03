@@ -31,10 +31,10 @@ const (
 	tokenLessEqual
 	tokenGreaterEqual
 	tokenEOF
-	tokenTilde             // ~
-	tokenTildeAsterisk     // ~*
-	tokenNotTilde          // !~
-	tokenNotTildeAsterisk  // !~*
+	tokenTilde            // ~
+	tokenTildeAsterisk    // ~*
+	tokenNotTilde         // !~
+	tokenNotTildeAsterisk // !~*
 )
 
 type token struct {
@@ -83,7 +83,7 @@ func tokenize(input string) ([]token, error) {
 				i++
 			}
 
-		case runes[i] == '=' :
+		case runes[i] == '=':
 			tokens = append(tokens, token{kind: tokenEquals, value: "=", pos: pos})
 			i++
 

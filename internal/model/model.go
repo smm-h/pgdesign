@@ -2,15 +2,15 @@
 //
 // Adding a new schema object type (e.g., domain, sequence, composite type):
 //
-//  1.  parse/types.go          — raw TOML struct for the new object
-//  2.  parse/parse.go          — parse function to populate the raw struct
-//  3.  model/model.go          — model struct + field on Schema
-//  4.  model/build.go          — resolve function (type resolution, dependency wiring)
-//  5.  validate/validate.go    — validation checks (E-codes)
-//  6.  generate/generate.go    — DDL generation section
-//  7.  sql/sql.go              — DDL helper functions (CREATE, ALTER, DROP)
-//  8.  diff/diff.go            — diff fields + comparison (use matchObjects[T])
-//  9.  migrate/generate.go     — migration op generation
+//  1. parse/types.go          — raw TOML struct for the new object
+//  2. parse/parse.go          — parse function to populate the raw struct
+//  3. model/model.go          — model struct + field on Schema
+//  4. model/build.go          — resolve function (type resolution, dependency wiring)
+//  5. validate/validate.go    — validation checks (E-codes)
+//  6. generate/generate.go    — DDL generation section
+//  7. sql/sql.go              — DDL helper functions (CREATE, ALTER, DROP)
+//  8. diff/diff.go            — diff fields + comparison (use matchObjects[T])
+//  9. migrate/generate.go     — migration op generation
 //  10. migrate/sql_gen.go      — op-to-SQL rendering
 //  11. migrate/parse_migration.go — TOML serialization (tomlDDL fields)
 //  12. risk/risk.go            — risk classification for new ops
@@ -39,30 +39,30 @@ type NamedTransition struct {
 // SMTransitionMap holds the allowed transitions for a state machine type.
 // Keys are source state names, values are the set of reachable target states.
 type SMTransitionMap struct {
-	TypeName          string              // PascalCase-friendly type name (e.g., "order_status")
-	Transitions       map[string][]string // from-state -> []to-state, sorted deterministically
-	States            []string            // all states in declaration order
-	NamedTransitions  []NamedTransition   // named transitions with metadata (for codegen)
-	EnforceTrigger    bool                // whether to generate transition-enforcement trigger
+	TypeName         string              // PascalCase-friendly type name (e.g., "order_status")
+	Transitions      map[string][]string // from-state -> []to-state, sorted deterministically
+	States           []string            // all states in declaration order
+	NamedTransitions []NamedTransition   // named transitions with metadata (for codegen)
+	EnforceTrigger   bool                // whether to generate transition-enforcement trigger
 }
 
 // Schema is the top-level resolved schema.
 type Schema struct {
-	Name        string     `json:"name"`
-	Extensions  []string   `json:"extensions"`
-	Enums       []Enum     `json:"enums"`
-	Domains        []Domain        `json:"domains,omitempty"`
-	CompositeTypes []CompositeType `json:"composite_types,omitempty"`
-	Tables         []Table         `json:"tables"`
-	Views              []View              `json:"views,omitempty"`
-	MaterializedViews  []MaterializedView  `json:"materialized_views,omitempty"`
-	Sequences          []Sequence          `json:"sequences,omitempty"`
-	Functions          []Function          `json:"functions,omitempty"`
-	Groups             map[string][]string `json:"groups,omitempty"`
-	CycleGroups        [][]string          `json:"cycle_groups,omitempty"`
-	PGVersion   int        `json:"pg_version"`
-	TablesByName map[string]*Table `json:"-"`
-	FKGraph      *FKGraph          `json:"-"`
+	Name              string              `json:"name"`
+	Extensions        []string            `json:"extensions"`
+	Enums             []Enum              `json:"enums"`
+	Domains           []Domain            `json:"domains,omitempty"`
+	CompositeTypes    []CompositeType     `json:"composite_types,omitempty"`
+	Tables            []Table             `json:"tables"`
+	Views             []View              `json:"views,omitempty"`
+	MaterializedViews []MaterializedView  `json:"materialized_views,omitempty"`
+	Sequences         []Sequence          `json:"sequences,omitempty"`
+	Functions         []Function          `json:"functions,omitempty"`
+	Groups            map[string][]string `json:"groups,omitempty"`
+	CycleGroups       [][]string          `json:"cycle_groups,omitempty"`
+	PGVersion         int                 `json:"pg_version"`
+	TablesByName      map[string]*Table   `json:"-"`
+	FKGraph           *FKGraph            `json:"-"`
 	// StateMachineTransitions maps type names to their transition maps.
 	// Populated during Build() from the semtype registry for KindStateMachine types.
 	StateMachineTransitions []SMTransitionMap `json:"state_machine_transitions,omitempty"`
@@ -73,21 +73,21 @@ type View struct {
 	Name       string   `json:"name"`
 	Schema     string   `json:"schema,omitempty"`
 	SourceFile string   `json:"source_file,omitempty"`
-	Query     string   `json:"query"`
-	Comment   string   `json:"comment,omitempty"`
-	DependsOn []string `json:"depends_on,omitempty"`
+	Query      string   `json:"query"`
+	Comment    string   `json:"comment,omitempty"`
+	DependsOn  []string `json:"depends_on,omitempty"`
 }
 
 // MaterializedView represents a resolved materialized view definition.
 type MaterializedView struct {
-	Name       string  `json:"name"`
-	Schema     string  `json:"schema,omitempty"`
-	SourceFile string  `json:"source_file,omitempty"`
-	Query     string  `json:"query"`
-	Comment   string  `json:"comment,omitempty"`
-	DependsOn []string `json:"depends_on,omitempty"`
-	WithData  bool    `json:"with_data"`
-	Indexes   []Index `json:"indexes,omitempty"`
+	Name       string   `json:"name"`
+	Schema     string   `json:"schema,omitempty"`
+	SourceFile string   `json:"source_file,omitempty"`
+	Query      string   `json:"query"`
+	Comment    string   `json:"comment,omitempty"`
+	DependsOn  []string `json:"depends_on,omitempty"`
+	WithData   bool     `json:"with_data"`
+	Indexes    []Index  `json:"indexes,omitempty"`
 }
 
 // TableOrder returns tables in dependency order (topo-sorted).
@@ -169,26 +169,26 @@ func (s *Schema) FilterBySource(sources []string) *Schema {
 
 // Table represents a resolved table definition.
 type Table struct {
-	Name         string             `json:"name"`
-	Schema       string             `json:"schema"`
-	SourceFile   string             `json:"source_file,omitempty"`
-	Comment      string             `json:"comment"`
-	Columns      []Column           `json:"columns"`
-	PK           []string           `json:"pk"`
-	FKs          []FK               `json:"fks"`
-	Indexes      []Index            `json:"indexes"`
-	Uniques      []UniqueConstraint `json:"uniques"`
-	Checks       []CheckConstraint    `json:"checks"`
+	Name         string                `json:"name"`
+	Schema       string                `json:"schema"`
+	SourceFile   string                `json:"source_file,omitempty"`
+	Comment      string                `json:"comment"`
+	Columns      []Column              `json:"columns"`
+	PK           []string              `json:"pk"`
+	FKs          []FK                  `json:"fks"`
+	Indexes      []Index               `json:"indexes"`
+	Uniques      []UniqueConstraint    `json:"uniques"`
+	Checks       []CheckConstraint     `json:"checks"`
 	Exclusions   []ExclusionConstraint `json:"exclusions"`
-	Partitioning *PartitionSpec       `json:"partitioning,omitempty"`
-	Dependencies []fd.FuncDep       `json:"dependencies,omitempty"`
-	Maintenance  *MaintenanceConfig `json:"maintenance,omitempty"`
-	Owner        string             `json:"owner,omitempty"`
-	Policies     []Policy           `json:"policies,omitempty"`
-	Triggers     []Trigger          `json:"triggers,omitempty"`
-	EnableRLS    bool               `json:"enable_rls,omitempty"`
-	ForceRLS     bool               `json:"force_rls,omitempty"`
-	AppendOnly   bool               `json:"append_only,omitempty"`
+	Partitioning *PartitionSpec        `json:"partitioning,omitempty"`
+	Dependencies []fd.FuncDep          `json:"dependencies,omitempty"`
+	Maintenance  *MaintenanceConfig    `json:"maintenance,omitempty"`
+	Owner        string                `json:"owner,omitempty"`
+	Policies     []Policy              `json:"policies,omitempty"`
+	Triggers     []Trigger             `json:"triggers,omitempty"`
+	EnableRLS    bool                  `json:"enable_rls,omitempty"`
+	ForceRLS     bool                  `json:"force_rls,omitempty"`
+	AppendOnly   bool                  `json:"append_only,omitempty"`
 
 	candidateKeys [][]string // cached result of CandidateKeys()
 }
@@ -238,19 +238,19 @@ func (t *Table) CandidateKeys() [][]string {
 type Column struct {
 	Name             string        `json:"name"`
 	PGType           typeinfo.Type `json:"pg_type"`
-	Collation        string `json:"collation,omitempty"`
-	NotNull          bool   `json:"not_null"`
-	Default          *string `json:"default,omitempty"`
-	DefaultExpr      string `json:"default_expr,omitempty"`
-	Generated        string `json:"generated,omitempty"`
-	Stored           bool   `json:"stored,omitempty"`
-	Identity         string `json:"identity,omitempty"` // "ALWAYS" or "BY DEFAULT" for identity columns
-	Comment          string `json:"comment,omitempty"`
-	SemanticTypeName string `json:"semantic_type_name,omitempty"`
-	Array            bool   `json:"array,omitempty"`
-	JSONSchema       string `json:"json_schema,omitempty"`
-	Statistics       *int   `json:"statistics,omitempty"`
-	TypeKind         string `json:"type_kind,omitempty"`
+	Collation        string        `json:"collation,omitempty"`
+	NotNull          bool          `json:"not_null"`
+	Default          *string       `json:"default,omitempty"`
+	DefaultExpr      string        `json:"default_expr,omitempty"`
+	Generated        string        `json:"generated,omitempty"`
+	Stored           bool          `json:"stored,omitempty"`
+	Identity         string        `json:"identity,omitempty"` // "ALWAYS" or "BY DEFAULT" for identity columns
+	Comment          string        `json:"comment,omitempty"`
+	SemanticTypeName string        `json:"semantic_type_name,omitempty"`
+	Array            bool          `json:"array,omitempty"`
+	JSONSchema       string        `json:"json_schema,omitempty"`
+	Statistics       *int          `json:"statistics,omitempty"`
+	TypeKind         string        `json:"type_kind,omitempty"`
 }
 
 // FK represents a resolved foreign key constraint.
@@ -265,17 +265,17 @@ type FK struct {
 
 // Index represents a resolved index definition.
 type Index struct {
-	Name      string            `json:"name"`
-	Columns   []string          `json:"columns"`
-	Desc      []bool            `json:"desc,omitempty"` // parallel to Columns; true if DESC
-	Method    string            `json:"method,omitempty"`
+	Name       string            `json:"name"`
+	Columns    []string          `json:"columns"`
+	Desc       []bool            `json:"desc,omitempty"` // parallel to Columns; true if DESC
+	Method     string            `json:"method,omitempty"`
 	Opclasses  map[string]string `json:"opclasses,omitempty"`
 	Collations map[string]string `json:"collations,omitempty"`
-	Where     string            `json:"where,omitempty"`
-	Include   []string          `json:"include,omitempty"`
-	With      map[string]string `json:"with,omitempty"`
-	Unique    bool              `json:"unique"`
-	IsAutoFK  bool              `json:"is_auto_fk"`
+	Where      string            `json:"where,omitempty"`
+	Include    []string          `json:"include,omitempty"`
+	With       map[string]string `json:"with,omitempty"`
+	Unique     bool              `json:"unique"`
+	IsAutoFK   bool              `json:"is_auto_fk"`
 }
 
 // UniqueConstraint represents a unique constraint.
@@ -311,12 +311,12 @@ type ExclusionConstraint struct {
 // Policy represents a row-level security (RLS) policy.
 type Policy struct {
 	Name         string `json:"name"`
-	Type         string `json:"type,omitempty"`           // PERMISSIVE (default) or RESTRICTIVE
+	Type         string `json:"type,omitempty"`          // PERMISSIVE (default) or RESTRICTIVE
 	Operation    string `json:"operation"`               // SELECT, INSERT, UPDATE, DELETE, ALL
-	Role         string `json:"role,omitempty"`           // PG role the policy applies to (e.g., "game_app")
-	Using        string `json:"using,omitempty"`          // SQL expression for existing rows (SELECT/UPDATE/DELETE)
-	WithCheck    string `json:"with_check,omitempty"`     // SQL expression for new rows (INSERT/UPDATE)
-	ErrorCode    string `json:"error_code,omitempty"`     // Application-level error code (e.g., "chat_disabled")
+	Role         string `json:"role,omitempty"`          // PG role the policy applies to (e.g., "game_app")
+	Using        string `json:"using,omitempty"`         // SQL expression for existing rows (SELECT/UPDATE/DELETE)
+	WithCheck    string `json:"with_check,omitempty"`    // SQL expression for new rows (INSERT/UPDATE)
+	ErrorCode    string `json:"error_code,omitempty"`    // Application-level error code (e.g., "chat_disabled")
 	ErrorMessage string `json:"error_message,omitempty"` // Human-readable error message
 }
 
@@ -341,8 +341,8 @@ type Enum struct {
 	Schema     string   `json:"schema,omitempty"`
 	Name       string   `json:"name"`
 	SourceFile string   `json:"source_file,omitempty"`
-	Values  []string `json:"values"`
-	Comment string   `json:"comment,omitempty"`
+	Values     []string `json:"values"`
+	Comment    string   `json:"comment,omitempty"`
 }
 
 // Sequence represents a standalone PostgreSQL sequence.
@@ -350,14 +350,14 @@ type Sequence struct {
 	Name       string `json:"name"`
 	Schema     string `json:"schema,omitempty"`
 	SourceFile string `json:"source_file,omitempty"`
-	Start     *int64 `json:"start,omitempty"`
-	Increment *int64 `json:"increment,omitempty"`
-	MinValue  *int64 `json:"min_value,omitempty"`
-	MaxValue  *int64 `json:"max_value,omitempty"`
-	Cache     *int64 `json:"cache,omitempty"`
-	Cycle     bool   `json:"cycle,omitempty"`
-	OwnedBy   string `json:"owned_by,omitempty"`
-	Comment   string `json:"comment,omitempty"`
+	Start      *int64 `json:"start,omitempty"`
+	Increment  *int64 `json:"increment,omitempty"`
+	MinValue   *int64 `json:"min_value,omitempty"`
+	MaxValue   *int64 `json:"max_value,omitempty"`
+	Cache      *int64 `json:"cache,omitempty"`
+	Cycle      bool   `json:"cycle,omitempty"`
+	OwnedBy    string `json:"owned_by,omitempty"`
+	Comment    string `json:"comment,omitempty"`
 }
 
 // FunctionArg represents a single argument to a function or procedure.
@@ -392,11 +392,11 @@ type Domain struct {
 	Schema      string        `json:"schema,omitempty"`
 	SourceFile  string        `json:"source_file,omitempty"`
 	BaseType    typeinfo.Type `json:"base_type"`
-	NotNull     bool   `json:"not_null,omitempty"`
-	Default     string `json:"default,omitempty"`
-	DefaultExpr string `json:"default_expr,omitempty"`
-	Check       string `json:"check,omitempty"`
-	Comment     string `json:"comment,omitempty"`
+	NotNull     bool          `json:"not_null,omitempty"`
+	Default     string        `json:"default,omitempty"`
+	DefaultExpr string        `json:"default_expr,omitempty"`
+	Check       string        `json:"check,omitempty"`
+	Comment     string        `json:"comment,omitempty"`
 }
 
 // CompositeField represents a single field in a composite type.
@@ -410,8 +410,8 @@ type CompositeType struct {
 	Name       string           `json:"name"`
 	Schema     string           `json:"schema,omitempty"`
 	SourceFile string           `json:"source_file,omitempty"`
-	Fields  []CompositeField `json:"fields"`
-	Comment string           `json:"comment,omitempty"`
+	Fields     []CompositeField `json:"fields"`
+	Comment    string           `json:"comment,omitempty"`
 }
 
 // PartitionSpec represents partitioning configuration.

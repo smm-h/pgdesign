@@ -16,9 +16,9 @@ const testSchema = "public"
 
 // Package-level state set by TestMain.
 var (
-	ephemeralDB  *testdb.EphemeralDB
-	testConnStr  string
-	testManager  *testdb.Manager
+	ephemeralDB *testdb.EphemeralDB
+	testConnStr string
+	testManager *testdb.Manager
 )
 
 func TestMain(m *testing.M) {

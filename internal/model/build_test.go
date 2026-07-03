@@ -877,8 +877,8 @@ func TestBuild_SequenceOwnedByIdentityColumn(t *testing.T) {
 	}
 }
 
-func strPtr(s string) *string  { return &s }
-func boolPtr(b bool) *bool     { return &b }
+func strPtr(s string) *string { return &s }
+func boolPtr(b bool) *bool    { return &b }
 
 func TestBuildFunctions(t *testing.T) {
 	lang := "plpgsql"

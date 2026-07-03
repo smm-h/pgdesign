@@ -29,26 +29,26 @@ type Type struct {
 // aliases maps long-form and alternate type names to canonical short forms.
 // All keys are lowercase.
 var aliases = map[string]string{
-	"character varying":            "varchar",
-	"character":                    "char",
-	"char":                         "char",
-	"double precision":             "float8",
-	"boolean":                      "bool",
-	"integer":                      "int4",
-	"smallint":                     "int2",
-	"bigint":                       "int8",
-	"real":                         "float4",
-	"timestamp with time zone":     "timestamptz",
-	"timestamp without time zone":  "timestamp",
-	"time with time zone":          "timetz",
-	"time without time zone":       "time",
-	"bit varying":                  "varbit",
-	"int":                          "int4",
-	"float":                        "float8",
-	"decimal":                      "numeric",
-	"serial":                       "serial",
-	"bigserial":                    "bigserial",
-	"smallserial":                  "smallserial",
+	"character varying":           "varchar",
+	"character":                   "char",
+	"char":                        "char",
+	"double precision":            "float8",
+	"boolean":                     "bool",
+	"integer":                     "int4",
+	"smallint":                    "int2",
+	"bigint":                      "int8",
+	"real":                        "float4",
+	"timestamp with time zone":    "timestamptz",
+	"timestamp without time zone": "timestamp",
+	"time with time zone":         "timetz",
+	"time without time zone":      "time",
+	"bit varying":                 "varbit",
+	"int":                         "int4",
+	"float":                       "float8",
+	"decimal":                     "numeric",
+	"serial":                      "serial",
+	"bigserial":                   "bigserial",
+	"smallserial":                 "smallserial",
 }
 
 // multiWordTypes lists canonical multi-word type suffixes (lowercase) that
@@ -56,8 +56,8 @@ var aliases = map[string]string{
 // For example, "timestamp(3) with time zone" has base word "timestamp",
 // interior params "(3)", and suffix "with time zone".
 var multiWordSuffixes = map[string]string{
-	"with time zone":    "tz",    // timestamp/time + "with time zone" → timestamptz/timetz
-	"without time zone": "",      // timestamp/time + "without time zone" → timestamp/time (no change)
+	"with time zone":    "tz", // timestamp/time + "with time zone" → timestamptz/timetz
+	"without time zone": "",   // timestamp/time + "without time zone" → timestamp/time (no change)
 }
 
 // multiWordPrefixes lists types whose first word can start a multi-word type

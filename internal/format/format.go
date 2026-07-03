@@ -111,7 +111,7 @@ func topoSortTables(tables []parse.RawTable) []string {
 type sectionKind int
 
 const (
-	kindOther  sectionKind = iota
+	kindOther sectionKind = iota
 	kindMeta
 	kindTypes
 	kindTables
@@ -159,15 +159,15 @@ type tableSubSectionKind int
 
 const (
 	subHeader       tableSubSectionKind = iota // [tables.X] itself
-	subColumns                                  // [tables.X.columns.*]
-	subFKs                                      // [tables.X.fks.*]
-	subIndexes                                  // [tables.X.indexes.*]
-	subUnique                                   // [tables.X.unique.*]
-	subChecks                                   // [tables.X.checks.*]
-	subPartitioning                             // [tables.X.partitioning] and partitions
-	subMaintenance                              // [tables.X.maintenance]
-	subDependencies                             // [[tables.X.dependencies]]
-	subOther                                    // anything else
+	subColumns                                 // [tables.X.columns.*]
+	subFKs                                     // [tables.X.fks.*]
+	subIndexes                                 // [tables.X.indexes.*]
+	subUnique                                  // [tables.X.unique.*]
+	subChecks                                  // [tables.X.checks.*]
+	subPartitioning                            // [tables.X.partitioning] and partitions
+	subMaintenance                             // [tables.X.maintenance]
+	subDependencies                            // [[tables.X.dependencies]]
+	subOther                                   // anything else
 )
 
 // classifyTableSub classifies a node that belongs to a specific table.
@@ -237,9 +237,9 @@ func classifyTableSub(node tomledit.Node, tableName string) (tableSubSectionKind
 // 3. [tables.*] in the specified order, with sub-sections in canonical order
 func reorderDocument(doc *tomledit.DocumentNode, raw *parse.RawSchema, tableOrder []string, config *Config) {
 	// Partition children by section kind.
-	var others []tomledit.Node  // top-level KVs, comments before any section
+	var others []tomledit.Node // top-level KVs, comments before any section
 	var metaNodes []tomledit.Node
-	typeNodes := map[string][]tomledit.Node{} // keyed by type name
+	typeNodes := map[string][]tomledit.Node{}  // keyed by type name
 	tableNodes := map[string][]tomledit.Node{} // keyed by table name
 
 	for _, child := range doc.Children {

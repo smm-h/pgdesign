@@ -99,12 +99,12 @@ func TestParseName_Valid(t *testing.T) {
 
 func TestParseName_Invalid(t *testing.T) {
 	cases := []string{
-		"mydb",                          // no _test_ segment
-		"mydb_test_123_abcd1234",        // timestamp too short
-		"mydb_test_1234567890_abc",      // random too short
+		"mydb",                           // no _test_ segment
+		"mydb_test_123_abcd1234",         // timestamp too short
+		"mydb_test_1234567890_abc",       // random too short
 		"mydb_test_1234567890_abcd12345", // random too long
-		"mydb_test_1234567890_ABCD1234", // uppercase in random
-		"",                              // empty
+		"mydb_test_1234567890_ABCD1234",  // uppercase in random
+		"",                               // empty
 	}
 	for _, c := range cases {
 		_, _, _, ok := ParseName(c)

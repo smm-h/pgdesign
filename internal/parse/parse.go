@@ -1020,10 +1020,10 @@ func (p *parser) parseGroups() map[string][]string {
 
 func (p *parser) parseTable(name string) RawTable {
 	rt := RawTable{
-		Name:     name,
-		FKs:      make(map[string]RawFK),
-		Indexes:  make(map[string]RawIndex),
-		Uniques:  make(map[string]RawUnique),
+		Name:       name,
+		FKs:        make(map[string]RawFK),
+		Indexes:    make(map[string]RawIndex),
+		Uniques:    make(map[string]RawUnique),
 		Checks:     make(map[string]RawCheck),
 		Exclusions: make(map[string]RawExclusion),
 		Policies:   make(map[string]RawPolicy),
@@ -2122,4 +2122,3 @@ func nodeStringMap(n tomledit.Node) (map[string]string, bool) {
 	}
 	return result, true
 }
-

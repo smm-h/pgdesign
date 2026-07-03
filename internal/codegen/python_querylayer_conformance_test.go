@@ -194,11 +194,11 @@ func TestConformance_InMemoryDelegatesToConstraintEngine(t *testing.T) {
 
 	// Tables we expect to have write operations.
 	tables := []struct {
-		name          string
-		hasCreate     bool
-		hasUpdate     bool
-		hasDelete     bool
-		hasSM         bool
+		name      string
+		hasCreate bool
+		hasUpdate bool
+		hasDelete bool
+		hasSM     bool
 	}{
 		{"users", true, true, true, false},
 		{"orders", true, false, false, true}, // append-only: no update/delete

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
-	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestGenerateD2TwoTables(t *testing.T) {

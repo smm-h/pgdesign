@@ -228,4 +228,3 @@ func RenderSVG(d2Source string) ([]byte, error) {
 
 	return svg, nil
 }
-

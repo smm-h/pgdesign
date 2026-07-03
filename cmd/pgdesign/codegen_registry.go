@@ -10,17 +10,17 @@ import (
 // SupportedModes returns a map of codegen mode to the languages it supports.
 func SupportedModes() map[string][]string {
 	return map[string][]string{
-		"validators":   {"go", "java", "kotlin", "python", "ts", "zig"},
-		"constants":    {"go", "java", "kotlin", "python", "ts", "zig"},
-		"types":        {"go", "java", "kotlin", "python", "ts", "zig"},
-		"constraints":  {"go", "java", "kotlin", "python", "ts", "zig"},
-		"gorm":         {"go"},
-		"drizzle":      {"ts"},
-		"sqlalchemy":   {"python"},
-		"jpa":          {"java"},
-		"ddl":          {"python"},
-		"query-layer":  {"python"},
-		"enums":         {"go", "java", "kotlin", "python", "ts", "zig"},
+		"validators":  {"go", "java", "kotlin", "python", "ts", "zig"},
+		"constants":   {"go", "java", "kotlin", "python", "ts", "zig"},
+		"types":       {"go", "java", "kotlin", "python", "ts", "zig"},
+		"constraints": {"go", "java", "kotlin", "python", "ts", "zig"},
+		"gorm":        {"go"},
+		"drizzle":     {"ts"},
+		"sqlalchemy":  {"python"},
+		"jpa":         {"java"},
+		"ddl":         {"python"},
+		"query-layer": {"python"},
+		"enums":       {"go", "java", "kotlin", "python", "ts", "zig"},
 	}
 }
 

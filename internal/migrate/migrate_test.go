@@ -642,9 +642,9 @@ func TestMigrationRoundTrip_DownInline_Columns(t *testing.T) {
 		Description: "Drop exclusion with inline down",
 		DDLOps: []DDLOp{
 			{
-				Op:   "drop_constraint",
+				Op:    "drop_constraint",
 				Table: "public.reservations",
-				Name: "excl_reservation",
+				Name:  "excl_reservation",
 				Down: &DownOp{
 					Ops: []DDLOp{{
 						Op:                "add_exclusion",
@@ -2498,9 +2498,9 @@ func TestGeneratedStorageKeyword(t *testing.T) {
 		{true, 18, "STORED"},
 		{false, 18, "VIRTUAL"},
 		{false, 19, "VIRTUAL"},
-		{false, 17, "STORED"},  // pre-PG18 defensive
-		{false, 12, "STORED"},  // pre-PG18 defensive
-		{false, 0, "STORED"},   // unknown version, conservative (pgcap.Has returns false)
+		{false, 17, "STORED"}, // pre-PG18 defensive
+		{false, 12, "STORED"}, // pre-PG18 defensive
+		{false, 0, "STORED"},  // unknown version, conservative (pgcap.Has returns false)
 	}
 
 	for _, tt := range tests {
@@ -3931,12 +3931,12 @@ func TestGenerateMigration_DisableRLS(t *testing.T) {
 func TestGenerateMigration_ForceRLSChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{{
-			Name:      "documents",
-			Schema:    "public",
-			Comment:   "docs table",
-			Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("int4"), NotNull: true}},
-			PK:        []string{"id"},
-			ForceRLS:  true,
+			Name:     "documents",
+			Schema:   "public",
+			Comment:  "docs table",
+			Columns:  []model.Column{{Name: "id", PGType: typeinfo.T("int4"), NotNull: true}},
+			PK:       []string{"id"},
+			ForceRLS: true,
 		}},
 	}
 	d := &diff.SchemaDiff{
@@ -3967,12 +3967,12 @@ func TestGenerateMigration_ForceRLSChanged(t *testing.T) {
 func TestGenerateMigration_NoForceRLS(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{{
-			Name:      "documents",
-			Schema:    "public",
-			Comment:   "docs table",
-			Columns:   []model.Column{{Name: "id", PGType: typeinfo.T("int4"), NotNull: true}},
-			PK:        []string{"id"},
-			ForceRLS:  false,
+			Name:     "documents",
+			Schema:   "public",
+			Comment:  "docs table",
+			Columns:  []model.Column{{Name: "id", PGType: typeinfo.T("int4"), NotNull: true}},
+			PK:       []string{"id"},
+			ForceRLS: false,
 		}},
 	}
 	d := &diff.SchemaDiff{

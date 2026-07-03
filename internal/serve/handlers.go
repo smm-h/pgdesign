@@ -54,8 +54,8 @@ func (s *Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type schemaResponse struct {
-		Schema      *model.Schema            `json:"schema"`
-		Diagnostics []diagnostic.Diagnostic  `json:"diagnostics,omitempty"`
+		Schema      *model.Schema           `json:"schema"`
+		Diagnostics []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 	}
 	writeJSON(w, http.StatusOK, schemaResponse{Schema: schema, Diagnostics: diags})
 }

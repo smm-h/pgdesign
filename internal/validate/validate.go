@@ -20,15 +20,15 @@ import (
 
 // Config controls which rules run and their parameters.
 type Config struct {
-	Disabled          []string              // codes to skip, e.g. ["W002", "W005"]
-	Suppress          map[string]string     // per-table/column suppression, key: "table.column.CODE" or "table.CODE", value: reason
-	NamingPattern     string                // "snake_case" (default)
-	MaxColumns        int                   // default 30
-	CascadeMaxDepth   int                   // default 3
-	CascadeMaxBreadth int                   // default 5
-	Extensions        []string              // declared extensions (from meta)
+	Disabled          []string          // codes to skip, e.g. ["W002", "W005"]
+	Suppress          map[string]string // per-table/column suppression, key: "table.column.CODE" or "table.CODE", value: reason
+	NamingPattern     string            // "snake_case" (default)
+	MaxColumns        int               // default 30
+	CascadeMaxDepth   int               // default 3
+	CascadeMaxBreadth int               // default 5
+	Extensions        []string          // declared extensions (from meta)
 	ExtRegistry       *extregistry.Registry
-	TypeRegistry      *semtype.Registry     // semantic type registry (for state machine checks)
+	TypeRegistry      *semtype.Registry // semantic type registry (for state machine checks)
 }
 
 // SuppressedDiagnostic pairs a diagnostic with the reason it was suppressed.
@@ -968,7 +968,7 @@ func checkPolicyExprMismatch(schema *model.Schema, _ *Config) []diagnostic.Diagn
 						Suggestion: "DELETE policies filter existing rows; use using instead of with_check",
 					})
 				}
-			// UPDATE and ALL can have both -- no check needed.
+				// UPDATE and ALL can have both -- no check needed.
 			}
 		}
 	}
@@ -1864,8 +1864,8 @@ func checkRangeSubsumption(schema *model.Schema, _ *Config) []diagnostic.Diagnos
 		}
 		// Extract range info for each single-column CHECK.
 		type checkRange struct {
-			name  string
-			rng   *rangeInfo
+			name string
+			rng  *rangeInfo
 		}
 		var ranges []checkRange
 		for _, chk := range t.Checks {
@@ -2328,64 +2328,64 @@ type pgTypeInfo struct {
 }
 
 var pgTypeWidths = map[string]pgTypeInfo{
-	"boolean":           {1, 'c'},
-	"bool":              {1, 'c'},
-	"smallint":          {2, 's'},
-	"int2":              {2, 's'},
-	"integer":           {4, 'i'},
-	"int":               {4, 'i'},
-	"int4":              {4, 'i'},
-	"bigint":            {8, 'd'},
-	"int8":              {8, 'd'},
-	"real":              {4, 'i'},
-	"float4":            {4, 'i'},
-	"float8":            {8, 'd'},
-	"double precision":  {8, 'd'},
-	"date":              {4, 'i'},
-	"time":              {8, 'd'},
-	"timetz":            {12, 'd'},
-	"timestamp":         {8, 'd'},
-	"timestamptz":       {8, 'd'},
-	"uuid":              {16, 'c'},
-	"text":              {-1, 'i'},
-	"varchar":           {-1, 'i'},
-	"char":              {-1, 'i'},
-	"jsonb":             {-1, 'i'},
-	"json":              {-1, 'i'},
-	"numeric":           {-1, 'i'},
-	"decimal":           {-1, 'i'},
-	"bytea":             {-1, 'i'},
-	"interval":          {16, 'd'},
-	"inet":              {-1, 'i'},
-	"cidr":              {-1, 'i'},
-	"macaddr":           {6, 'i'},
-	"macaddr8":          {8, 'd'},
-	"bit":               {-1, 'i'},
-	"varbit":            {-1, 'i'},
-	"point":             {16, 'd'},
-	"line":              {24, 'd'},
-	"lseg":              {32, 'd'},
-	"box":               {32, 'd'},
-	"path":              {-1, 'i'},
-	"polygon":           {-1, 'i'},
-	"circle":            {24, 'd'},
-	"money":             {8, 'd'},
-	"oid":               {4, 'i'},
-	"xml":               {-1, 'i'},
-	"tsquery":           {-1, 'i'},
-	"tsvector":          {-1, 'i'},
-	"int4range":         {-1, 'i'},
-	"int8range":         {-1, 'i'},
-	"numrange":          {-1, 'i'},
-	"tsrange":           {-1, 'i'},
-	"tstzrange":         {-1, 'i'},
-	"daterange":         {-1, 'i'},
-	"int4multirange":    {-1, 'i'},
-	"int8multirange":    {-1, 'i'},
-	"nummultirange":     {-1, 'i'},
-	"tsmultirange":      {-1, 'i'},
-	"tstzmultirange":    {-1, 'i'},
-	"datemultirange":    {-1, 'i'},
+	"boolean":          {1, 'c'},
+	"bool":             {1, 'c'},
+	"smallint":         {2, 's'},
+	"int2":             {2, 's'},
+	"integer":          {4, 'i'},
+	"int":              {4, 'i'},
+	"int4":             {4, 'i'},
+	"bigint":           {8, 'd'},
+	"int8":             {8, 'd'},
+	"real":             {4, 'i'},
+	"float4":           {4, 'i'},
+	"float8":           {8, 'd'},
+	"double precision": {8, 'd'},
+	"date":             {4, 'i'},
+	"time":             {8, 'd'},
+	"timetz":           {12, 'd'},
+	"timestamp":        {8, 'd'},
+	"timestamptz":      {8, 'd'},
+	"uuid":             {16, 'c'},
+	"text":             {-1, 'i'},
+	"varchar":          {-1, 'i'},
+	"char":             {-1, 'i'},
+	"jsonb":            {-1, 'i'},
+	"json":             {-1, 'i'},
+	"numeric":          {-1, 'i'},
+	"decimal":          {-1, 'i'},
+	"bytea":            {-1, 'i'},
+	"interval":         {16, 'd'},
+	"inet":             {-1, 'i'},
+	"cidr":             {-1, 'i'},
+	"macaddr":          {6, 'i'},
+	"macaddr8":         {8, 'd'},
+	"bit":              {-1, 'i'},
+	"varbit":           {-1, 'i'},
+	"point":            {16, 'd'},
+	"line":             {24, 'd'},
+	"lseg":             {32, 'd'},
+	"box":              {32, 'd'},
+	"path":             {-1, 'i'},
+	"polygon":          {-1, 'i'},
+	"circle":           {24, 'd'},
+	"money":            {8, 'd'},
+	"oid":              {4, 'i'},
+	"xml":              {-1, 'i'},
+	"tsquery":          {-1, 'i'},
+	"tsvector":         {-1, 'i'},
+	"int4range":        {-1, 'i'},
+	"int8range":        {-1, 'i'},
+	"numrange":         {-1, 'i'},
+	"tsrange":          {-1, 'i'},
+	"tstzrange":        {-1, 'i'},
+	"daterange":        {-1, 'i'},
+	"int4multirange":   {-1, 'i'},
+	"int8multirange":   {-1, 'i'},
+	"nummultirange":    {-1, 'i'},
+	"tsmultirange":     {-1, 'i'},
+	"tstzmultirange":   {-1, 'i'},
+	"datemultirange":   {-1, 'i'},
 }
 
 // estimateVarlenaSize returns the estimated average byte size for a varlena column type.

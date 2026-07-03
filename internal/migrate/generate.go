@@ -362,8 +362,8 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			if table.EnableRLS {
 				schema, _ := splitQualifiedName(tableName)
 				rlsOp := DDLOp{
-					Op:    "enable_rls",
-					Table: tableName,
+					Op:     "enable_rls",
+					Table:  tableName,
 					Schema: schema,
 					Down: &DownOp{
 						Ops: []DDLOp{{Op: "disable_rls", Table: tableName, Schema: schema}},
@@ -376,8 +376,8 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			if table.ForceRLS {
 				schema, _ := splitQualifiedName(tableName)
 				forceOp := DDLOp{
-					Op:    "force_rls",
-					Table: tableName,
+					Op:     "force_rls",
+					Table:  tableName,
 					Schema: schema,
 					Down: &DownOp{
 						Ops: []DDLOp{{Op: "no_force_rls", Table: tableName, Schema: schema}},
@@ -1521,7 +1521,7 @@ func makeUniqueOp(tableName string, uq model.UniqueConstraint) DDLOp {
 
 func makeCheckOp(tableName string, ck model.CheckConstraint) DDLOp {
 	return DDLOp{
-		Op:   "add_check",
+		Op:    "add_check",
 		Table: tableName,
 		Name:  ck.Name,
 		Expr:  ck.Expr,

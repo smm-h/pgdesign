@@ -375,10 +375,10 @@ func TestParseCoverage_BetweenRanges(t *testing.T) {
 // by the analysis layer.
 func TestParseCoverage_CompoundWithNewOps(t *testing.T) {
 	cases := []struct {
-		name            string
-		expr            string
-		expectMatched   bool
-		matchReason     string
+		name          string
+		expr          string
+		expectMatched bool
+		matchReason   string
 	}{
 		{
 			name:          "IS NULL AND ownership",

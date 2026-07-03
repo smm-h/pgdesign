@@ -993,4 +993,3 @@ func TestResolveNonPathFieldsPreserved(t *testing.T) {
 		t.Errorf("Suppress not preserved: %v", resolved.Suppress)
 	}
 }
-

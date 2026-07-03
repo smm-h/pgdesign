@@ -12,11 +12,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/dbutil"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
-	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/introspect"
 	"github.com/smm-h/pgdesign/internal/migrate"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 

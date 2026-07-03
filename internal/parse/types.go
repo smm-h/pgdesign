@@ -5,8 +5,8 @@ package parse
 
 // RawSchema is the top-level result of parsing one or more TOML schema files.
 type RawSchema struct {
-	Meta   RawMeta
-	Types  []RawType
+	Meta              RawMeta
+	Types             []RawType
 	Tables            []RawTable
 	Views             []RawView
 	MaterializedViews []RawMaterializedView
@@ -47,23 +47,23 @@ type RawCompositeField struct {
 
 // RawType holds a user-defined type from [types.*].
 type RawType struct {
-	Name       string
-	Kind       string
-	Extends    *string
-	BaseType   string
-	Values     []string
-	Fields     []RawCompositeField // composite fields, in TOML declaration order (order is semantic: it becomes the PostgreSQL composite field order)
-	States         []RawSMState           // state machine states, in TOML declaration order (order is semantic: it becomes PostgreSQL enum value order)
-	Transitions    []RawSMTransition      // state machine transitions
-	InitialState   *string                // state machine initial state
-	EnforceTrigger *bool                  // state machine: generate enforcement trigger
-	NotNull    *bool
-	Default    *string
-	DefaultExpr *string
-	Check      *string
-	Unique     *bool
-	Array      *bool
-	Comment    *string
+	Name           string
+	Kind           string
+	Extends        *string
+	BaseType       string
+	Values         []string
+	Fields         []RawCompositeField // composite fields, in TOML declaration order (order is semantic: it becomes the PostgreSQL composite field order)
+	States         []RawSMState        // state machine states, in TOML declaration order (order is semantic: it becomes PostgreSQL enum value order)
+	Transitions    []RawSMTransition   // state machine transitions
+	InitialState   *string             // state machine initial state
+	EnforceTrigger *bool               // state machine: generate enforcement trigger
+	NotNull        *bool
+	Default        *string
+	DefaultExpr    *string
+	Check          *string
+	Unique         *bool
+	Array          *bool
+	Comment        *string
 }
 
 // RawView holds a view definition from [views.*].
@@ -120,17 +120,17 @@ type RawTable struct {
 
 // RawColumn holds a column definition from [tables.*.columns.*].
 type RawColumn struct {
-	Name       string
-	Type       string
-	Nullable   *bool
-	Default    *string
-	DefaultExpr *string
-	Generated  *string
-	Stored     *bool
-	Array      *bool
-	Collation  *string
-	Statistics *int
-	Comment    *string
+	Name              string
+	Type              string
+	Nullable          *bool
+	Default           *string
+	DefaultExpr       *string
+	Generated         *string
+	Stored            *bool
+	Array             *bool
+	Collation         *string
+	Statistics        *int
+	Comment           *string
 	JSONSchema        *string
 	JSONSchemaContent []byte // populated during File() parse when json_schema file is read successfully
 }
@@ -146,17 +146,17 @@ type RawFK struct {
 
 // RawIndex holds an index definition from [tables.*.indexes.*].
 type RawIndex struct {
-	Name       string
-	Columns    []string
-	Method     *string
-	Opclass      *string            // single opclass (applied to all columns)
-	OpclassMap   map[string]string  // per-column opclass map
-	Collation    *string            // single collation (applied to all columns)
-	CollationMap map[string]string  // per-column collation map
+	Name         string
+	Columns      []string
+	Method       *string
+	Opclass      *string           // single opclass (applied to all columns)
+	OpclassMap   map[string]string // per-column opclass map
+	Collation    *string           // single collation (applied to all columns)
+	CollationMap map[string]string // per-column collation map
 	Where        *string
-	Include    []string
-	Unique     *bool
-	With       map[string]string  // storage parameters, e.g. { m = "16", ef_construction = "200" }
+	Include      []string
+	Unique       *bool
+	With         map[string]string // storage parameters, e.g. { m = "16", ef_construction = "200" }
 }
 
 // RawUnique holds a unique constraint from [tables.*.unique.*].

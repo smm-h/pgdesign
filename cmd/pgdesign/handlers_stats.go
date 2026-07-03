@@ -48,12 +48,12 @@ func formatRelativeTime(t time.Time) string {
 }
 
 type statsOutput struct {
-	Database         string             `json:"database"`
-	CacheHitRatio    float64            `json:"cache_hit_ratio"`
-	Tables           []tableStats       `json:"tables"`
-	UnusedIndexes    []unusedIndex      `json:"unused_indexes"`
-	VacuumCandidates []vacuumCandidate  `json:"vacuum_candidates"`
-	DuplicateIndexes []workload.DuplicateIndex   `json:"duplicate_indexes"`
+	Database         string                    `json:"database"`
+	CacheHitRatio    float64                   `json:"cache_hit_ratio"`
+	Tables           []tableStats              `json:"tables"`
+	UnusedIndexes    []unusedIndex             `json:"unused_indexes"`
+	VacuumCandidates []vacuumCandidate         `json:"vacuum_candidates"`
+	DuplicateIndexes []workload.DuplicateIndex `json:"duplicate_indexes"`
 }
 
 type tableStats struct {

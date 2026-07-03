@@ -61,26 +61,26 @@ type SMTransitionDef struct {
 
 // TypeDef defines a semantic type with its PostgreSQL mapping and constraints.
 type TypeDef struct {
-	Name        string
-	Kind        Kind
-	BaseType    typeinfo.Type    // PG type (e.g., "uuid", "text", "bigint")
-	NotNull     bool
-	Default     *string          // literal default value
-	DefaultExpr string           // SQL expression default (e.g., "gen_random_uuid()")
-	Check       string           // check constraint expression (VALUE placeholder)
-	Unique      bool
-	Comment     string
-	EnumValues  []string         // values for enum types
-	Fields      []CompositeField // fields for composite types
-	States         []SMStateDef     // states for state machine types
+	Name           string
+	Kind           Kind
+	BaseType       typeinfo.Type // PG type (e.g., "uuid", "text", "bigint")
+	NotNull        bool
+	Default        *string // literal default value
+	DefaultExpr    string  // SQL expression default (e.g., "gen_random_uuid()")
+	Check          string  // check constraint expression (VALUE placeholder)
+	Unique         bool
+	Comment        string
+	EnumValues     []string          // values for enum types
+	Fields         []CompositeField  // fields for composite types
+	States         []SMStateDef      // states for state machine types
 	Transitions    []SMTransitionDef // transitions for state machine types
-	InitialState   string           // initial state for state machine types
-	EnforceTrigger bool             // whether to generate transition-enforcement trigger
-	Generated   string           // generated expression (e.g., "price * 0.2")
-	Stored      bool             // whether generated column is stored
-	Identity    string           // identity generation: "ALWAYS" or "BY DEFAULT"
-	Array       bool
-	Source      string           // "builtin" or "user" — metadata, not compared by typeDefsEqual
+	InitialState   string            // initial state for state machine types
+	EnforceTrigger bool              // whether to generate transition-enforcement trigger
+	Generated      string            // generated expression (e.g., "price * 0.2")
+	Stored         bool              // whether generated column is stored
+	Identity       string            // identity generation: "ALWAYS" or "BY DEFAULT"
+	Array          bool
+	Source         string // "builtin" or "user" — metadata, not compared by typeDefsEqual
 }
 
 // Registry holds named TypeDefs with thread-safe read access.
@@ -324,70 +324,70 @@ type UserSMTransition struct {
 
 // UserTypeDef represents a user-defined type loaded from configuration.
 type UserTypeDef struct {
-	Name        string
-	Kind        string // "scalar", "enum", "composite", "state_machine"
-	Extends     string // parent type name for type derivation
-	Base        string // PG base type (for scalars)
-	Values      []string // enum values
-	Fields      []CompositeField // composite fields, in declaration order (order is semantic: it becomes the PostgreSQL composite field order)
-	States         []UserSMState    // state machine states
+	Name           string
+	Kind           string             // "scalar", "enum", "composite", "state_machine"
+	Extends        string             // parent type name for type derivation
+	Base           string             // PG base type (for scalars)
+	Values         []string           // enum values
+	Fields         []CompositeField   // composite fields, in declaration order (order is semantic: it becomes the PostgreSQL composite field order)
+	States         []UserSMState      // state machine states
 	Transitions    []UserSMTransition // state machine transitions
-	InitialState   string           // state machine initial state
-	EnforceTrigger *bool            // state machine: generate enforcement trigger (nil = not set)
-	NotNull     *bool
-	Default     *string
-	DefaultExpr string
-	Check       string
-	Unique      bool
-	Array       bool
-	Comment     string
+	InitialState   string             // state machine initial state
+	EnforceTrigger *bool              // state machine: generate enforcement trigger (nil = not set)
+	NotNull        *bool
+	Default        *string
+	DefaultExpr    string
+	Check          string
+	Unique         bool
+	Array          bool
+	Comment        string
 }
 
 // pgTypeAllowlist contains valid PostgreSQL base types for user-defined scalars.
 var pgTypeAllowlist = map[string]bool{
-	"bigint":          true,
-	"bigserial":       true,
-	"boolean":         true,
-	"bytea":           true,
-	"char":            true,
-	"citext":          true,
-	"date":            true,
-	"datemultirange":  true,
-	"daterange":       true,
-	"float4":          true,
-	"float8":          true,
-	"inet":            true,
-	"int4multirange":  true,
-	"int4range":       true,
-	"int8multirange":  true,
-	"int8range":       true,
-	"integer":         true,
-	"interval":        true,
-	"json":            true,
-	"jsonb":           true,
-	"macaddr":         true,
-	"numeric":         true,
-	"nummultirange":   true,
-	"numrange":        true,
-	"oid":             true,
-	"real":            true,
-	"serial":          true,
-	"smallint":        true,
-	"smallserial":     true,
-	"text":            true,
-	"time":            true,
-	"timetz":          true,
-	"timestamp":       true,
-	"timestamptz":     true,
-	"tsmultirange":    true,
-	"tsquery":         true,
-	"tsrange":         true,
-	"tstzmultirange":  true,
-	"tstzrange":       true,
-	"tsvector":        true,
-	"uuid":            true,
-	"varchar":         true,
-	"xml":             true,
+	"bigint":         true,
+	"bigserial":      true,
+	"boolean":        true,
+	"bytea":          true,
+	"char":           true,
+	"citext":         true,
+	"date":           true,
+	"datemultirange": true,
+	"daterange":      true,
+	"float4":         true,
+	"float8":         true,
+	"inet":           true,
+	"int4multirange": true,
+	"int4range":      true,
+	"int8multirange": true,
+	"int8range":      true,
+	"integer":        true,
+	"interval":       true,
+	"json":           true,
+	"jsonb":          true,
+	"macaddr":        true,
+	"numeric":        true,
+	"nummultirange":  true,
+	"numrange":       true,
+	"oid":            true,
+	"real":           true,
+	"serial":         true,
+	"smallint":       true,
+	"smallserial":    true,
+	"text":           true,
+	"time":           true,
+	"timetz":         true,
+	"timestamp":      true,
+	"timestamptz":    true,
+	"tsmultirange":   true,
+	"tsquery":        true,
+	"tsrange":        true,
+	"tstzmultirange": true,
+	"tstzrange":      true,
+	"tsvector":       true,
+	"uuid":           true,
+	"varchar":        true,
+	"xml":            true,
 }
 
 // LoadUserTypes validates and registers user-defined types into the registry.

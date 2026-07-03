@@ -17,40 +17,40 @@ type tomlMigration struct {
 }
 
 type tomlDDL struct {
-	Op       string      `toml:"op"`
-	Phase    string      `toml:"phase,omitempty"`
-	Table    string      `toml:"table,omitempty"`
-	Column   string      `toml:"column,omitempty"`
-	Type      string      `toml:"type,omitempty"`
-	Collation string      `toml:"collation,omitempty"`
-	Statistics *int       `toml:"statistics,omitempty"`
-	Default  interface{} `toml:"default,omitempty"`
-	NotNull   bool        `toml:"not_null,omitempty"`
-	Generated string      `toml:"generated,omitempty"`
-	Stored    bool        `toml:"stored"`
-	PGVersion int         `toml:"pg_version,omitempty"`
-	Name     string      `toml:"name,omitempty"`
-	Columns  []string    `toml:"columns,omitempty"`
-	RefTable string      `toml:"ref_table,omitempty"`
-	RefCols  []string    `toml:"ref_cols,omitempty"`
-	OnDelete string      `toml:"on_delete,omitempty"`
-	Method   string      `toml:"method,omitempty"`
-	Where    string      `toml:"where,omitempty"`
-	Opclass       interface{} `toml:"opclass,omitempty"`
-	IdxCollation  interface{} `toml:"collations,omitempty"`
-	Desc     []bool            `toml:"desc,omitempty"`
-	Include  []string          `toml:"include,omitempty"`
-	With     map[string]string `toml:"with,omitempty"`
-	Comment  string            `toml:"comment,omitempty"`
-	PK       []string    `toml:"pk,omitempty"`
-	Values   []string    `toml:"values,omitempty"`
-	Schema   string      `toml:"schema,omitempty"`
-	Expr     string      `toml:"expr,omitempty"`
-	Operators         []string `toml:"operators,omitempty"`
-	Deferrable        bool     `toml:"deferrable,omitempty"`
-	InitiallyDeferred bool     `toml:"initially_deferred,omitempty"`
-	Consolidated []tomlDDL `toml:"consolidated,omitempty"`
-	Down     *tomlDown   `toml:"down,omitempty"`
+	Op                string            `toml:"op"`
+	Phase             string            `toml:"phase,omitempty"`
+	Table             string            `toml:"table,omitempty"`
+	Column            string            `toml:"column,omitempty"`
+	Type              string            `toml:"type,omitempty"`
+	Collation         string            `toml:"collation,omitempty"`
+	Statistics        *int              `toml:"statistics,omitempty"`
+	Default           interface{}       `toml:"default,omitempty"`
+	NotNull           bool              `toml:"not_null,omitempty"`
+	Generated         string            `toml:"generated,omitempty"`
+	Stored            bool              `toml:"stored"`
+	PGVersion         int               `toml:"pg_version,omitempty"`
+	Name              string            `toml:"name,omitempty"`
+	Columns           []string          `toml:"columns,omitempty"`
+	RefTable          string            `toml:"ref_table,omitempty"`
+	RefCols           []string          `toml:"ref_cols,omitempty"`
+	OnDelete          string            `toml:"on_delete,omitempty"`
+	Method            string            `toml:"method,omitempty"`
+	Where             string            `toml:"where,omitempty"`
+	Opclass           interface{}       `toml:"opclass,omitempty"`
+	IdxCollation      interface{}       `toml:"collations,omitempty"`
+	Desc              []bool            `toml:"desc,omitempty"`
+	Include           []string          `toml:"include,omitempty"`
+	With              map[string]string `toml:"with,omitempty"`
+	Comment           string            `toml:"comment,omitempty"`
+	PK                []string          `toml:"pk,omitempty"`
+	Values            []string          `toml:"values,omitempty"`
+	Schema            string            `toml:"schema,omitempty"`
+	Expr              string            `toml:"expr,omitempty"`
+	Operators         []string          `toml:"operators,omitempty"`
+	Deferrable        bool              `toml:"deferrable,omitempty"`
+	InitiallyDeferred bool              `toml:"initially_deferred,omitempty"`
+	Consolidated      []tomlDDL         `toml:"consolidated,omitempty"`
+	Down              *tomlDown         `toml:"down,omitempty"`
 }
 
 type tomlDML struct {
@@ -62,16 +62,16 @@ type tomlDML struct {
 }
 
 type tomlDown struct {
-	Irreversible bool      `toml:"irreversible,omitempty"`
-	Op           string    `toml:"op,omitempty"`
-	Table        string    `toml:"table,omitempty"`
-	Column       string    `toml:"column,omitempty"`
-	Name         string    `toml:"name,omitempty"`
-	Columns      []string  `toml:"columns,omitempty"`
-	Operators         []string `toml:"operators,omitempty"`
-	Deferrable        bool     `toml:"deferrable,omitempty"`
-	InitiallyDeferred bool     `toml:"initially_deferred,omitempty"`
-	Ops          []tomlDDL `toml:"ops,omitempty"`
+	Irreversible      bool      `toml:"irreversible,omitempty"`
+	Op                string    `toml:"op,omitempty"`
+	Table             string    `toml:"table,omitempty"`
+	Column            string    `toml:"column,omitempty"`
+	Name              string    `toml:"name,omitempty"`
+	Columns           []string  `toml:"columns,omitempty"`
+	Operators         []string  `toml:"operators,omitempty"`
+	Deferrable        bool      `toml:"deferrable,omitempty"`
+	InitiallyDeferred bool      `toml:"initially_deferred,omitempty"`
+	Ops               []tomlDDL `toml:"ops,omitempty"`
 }
 
 // ParseMigrationFile reads and parses a TOML migration file.
@@ -120,32 +120,32 @@ func ParseMigration(data string) (*Migration, error) {
 
 func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 	op := DDLOp{
-		Op:         td.Op,
-		Phase:      td.Phase,
-		Table:      td.Table,
-		Column:     td.Column,
-		Type:       td.Type,
-		Collation:  td.Collation,
-		Statistics: td.Statistics,
-		Default:    td.Default,
-		NotNull:    td.NotNull,
-		Generated:  td.Generated,
-		Stored:     td.Stored,
-		PGVersion:  td.PGVersion,
-		Name:       td.Name,
-		Columns:    td.Columns,
-		RefTable:   td.RefTable,
-		RefCols:    td.RefCols,
-		OnDelete:   td.OnDelete,
-		Method:     td.Method,
-		Where:      td.Where,
-		Desc:       td.Desc,
-		Include:    td.Include,
-		With:       td.With,
-		Comment:    td.Comment,
-		PK:         td.PK,
-		Values:     td.Values,
-		Schema:     td.Schema,
+		Op:                td.Op,
+		Phase:             td.Phase,
+		Table:             td.Table,
+		Column:            td.Column,
+		Type:              td.Type,
+		Collation:         td.Collation,
+		Statistics:        td.Statistics,
+		Default:           td.Default,
+		NotNull:           td.NotNull,
+		Generated:         td.Generated,
+		Stored:            td.Stored,
+		PGVersion:         td.PGVersion,
+		Name:              td.Name,
+		Columns:           td.Columns,
+		RefTable:          td.RefTable,
+		RefCols:           td.RefCols,
+		OnDelete:          td.OnDelete,
+		Method:            td.Method,
+		Where:             td.Where,
+		Desc:              td.Desc,
+		Include:           td.Include,
+		With:              td.With,
+		Comment:           td.Comment,
+		PK:                td.PK,
+		Values:            td.Values,
+		Schema:            td.Schema,
 		Expr:              td.Expr,
 		Operators:         td.Operators,
 		Deferrable:        td.Deferrable,

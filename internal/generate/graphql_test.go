@@ -290,20 +290,20 @@ func TestGraphQLAllTypes(t *testing.T) {
 	out := mustGenerate(t, schema, Options{Format: "graphql"})
 
 	checks := map[string]string{
-		"pkId: ID!":         "PK uuid -> ID",
-		"intCol: Int!":      "integer -> Int",
-		"bigintCol: Int!":   "bigint -> Int",
-		"textCol: String!":  "text -> String",
-		"boolCol: Boolean!": "boolean -> Boolean",
-		"uuidCol: String!":  "non-PK uuid -> String",
-		"floatCol: Float!":  "float8 -> Float",
+		"pkId: ID!":          "PK uuid -> ID",
+		"intCol: Int!":       "integer -> Int",
+		"bigintCol: Int!":    "bigint -> Int",
+		"textCol: String!":   "text -> String",
+		"boolCol: Boolean!":  "boolean -> Boolean",
+		"uuidCol: String!":   "non-PK uuid -> String",
+		"floatCol: Float!":   "float8 -> Float",
 		"numericCol: Float!": "numeric -> Float",
-		"tsCol: DateTime!":  "timestamptz -> DateTime",
-		"jsonCol: JSON!":    "jsonb -> JSON",
-		"byteaCol: String!": "bytea -> String",
+		"tsCol: DateTime!":   "timestamptz -> DateTime",
+		"jsonCol: JSON!":     "jsonb -> JSON",
+		"byteaCol: String!":  "bytea -> String",
 		"dateCol: DateTime!": "date -> DateTime",
-		"smallintCol: Int!": "smallint -> Int",
-		"realCol: Float!":   "real -> Float",
+		"smallintCol: Int!":  "smallint -> Int",
+		"realCol: Float!":    "real -> Float",
 	}
 	for expected, desc := range checks {
 		if !strings.Contains(out, expected) {

@@ -521,8 +521,8 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 
 	default:
 		return Classification{
-			RiskLevel: Dangerous,
-			LockType:  LockAccessExclusive,
+			RiskLevel:  Dangerous,
+			LockType:   LockAccessExclusive,
 			Suggestion: "Unknown operation type",
 		}
 	}

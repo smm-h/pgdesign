@@ -629,7 +629,7 @@ func parseSimpleDefault(pgExpr string) (rawValue string, isSimple bool) {
 }
 
 // parseQuotedDefault extracts the value from a single-quoted PG literal,
-// handling escaped quotes (''), chained ::type casts, and COLLATE clauses.
+// handling escaped quotes (”), chained ::type casts, and COLLATE clauses.
 // Returns the unquoted value and true if the expression is a simple quoted
 // literal (with optional casts/collation), or ("", false) if there's trailing
 // content that makes it complex (operators, etc).

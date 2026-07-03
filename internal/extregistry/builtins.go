@@ -28,7 +28,7 @@ func NewBuiltinRegistry() *Registry {
 	})
 
 	r.Register(&Extension{
-		Name:      "btree_gin",
+		Name: "btree_gin",
 		Opclasses: []string{
 			"int2_ops", "int4_ops", "int8_ops",
 			"float4_ops", "float8_ops", "numeric_ops",
@@ -42,7 +42,7 @@ func NewBuiltinRegistry() *Registry {
 	})
 
 	r.Register(&Extension{
-		Name:      "btree_gist",
+		Name: "btree_gist",
 		Opclasses: []string{
 			"gist_int2_ops", "gist_int4_ops", "gist_int8_ops",
 			"gist_float4_ops", "gist_float8_ops", "gist_numeric_ops",

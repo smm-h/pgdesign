@@ -137,9 +137,9 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 	var classes []classInfo
 
 	// Import tracking.
-	saImports := make(map[string]bool)       // sqlalchemy core imports (String, Integer, etc.)
-	dialectImports := make(map[string]bool)   // sqlalchemy.dialects.postgresql (UUID, JSONB)
-	pyStdImports := make(map[string]bool)     // Python stdlib import tokens
+	saImports := make(map[string]bool)      // sqlalchemy core imports (String, Integer, etc.)
+	dialectImports := make(map[string]bool) // sqlalchemy.dialects.postgresql (UUID, JSONB)
+	pyStdImports := make(map[string]bool)   // Python stdlib import tokens
 	needOptional := false
 	needAny := false
 	needText := false

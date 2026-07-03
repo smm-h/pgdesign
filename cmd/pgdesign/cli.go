@@ -289,7 +289,6 @@ func resolveFromConfig(configPath string) ([]string, error) {
 	return resolved.SchemaFiles(), nil
 }
 
-
 // parseAndBuild is a shared helper for commands that need a resolved schema.
 // It accepts one or more paths (files or a directory) and returns the built
 // schema. configOverride (the --config global flag) replaces the walk-up

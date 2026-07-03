@@ -13,8 +13,8 @@ type StatementStats struct {
 	QueryID       int64
 	Query         string
 	Calls         int64
-	TotalExecTime float64  // milliseconds
-	MeanExecTime  float64  // milliseconds
+	TotalExecTime float64 // milliseconds
+	MeanExecTime  float64 // milliseconds
 	Rows          int64
 	Tables        []string // extracted table references
 }

@@ -6,23 +6,23 @@ import "sort"
 type Capability int
 
 const (
-	IdentityColumns       Capability = iota // PG 10
-	RestrictiveRLS                          // PG 10
-	SequenceIfNotExists                     // PG 10
-	MetadataOnlyDefault                     // PG 11
-	AttGeneratedColumn                      // PG 12
-	TransactionalEnumAdd                    // PG 12
-	DropDBForce                             // PG 13
-	CreateOrReplaceTrigger                  // PG 14
-	CreateOrReplacePolicy                   // PG 15
-	VirtualGeneratedCols                    // PG 18
+	IdentityColumns        Capability = iota // PG 10
+	RestrictiveRLS                           // PG 10
+	SequenceIfNotExists                      // PG 10
+	MetadataOnlyDefault                      // PG 11
+	AttGeneratedColumn                       // PG 12
+	TransactionalEnumAdd                     // PG 12
+	DropDBForce                              // PG 13
+	CreateOrReplaceTrigger                   // PG 14
+	CreateOrReplacePolicy                    // PG 15
+	VirtualGeneratedCols                     // PG 18
 )
 
 // CapabilityInfo describes a PostgreSQL capability and the minimum version
 // that introduced it.
 type CapabilityInfo struct {
-	Name       string
-	MinVersion int
+	Name        string
+	MinVersion  int
 	Description string
 }
 

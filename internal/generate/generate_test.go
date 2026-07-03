@@ -10,13 +10,13 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
-	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // intPtr returns a pointer to the given int.
-func intPtr(n int) *int { return &n }
+func intPtr(n int) *int    { return &n }
 func boolPtr(b bool) *bool { return &b }
 
 // mustGenerate calls Generate and fails the test on error.
@@ -1781,10 +1781,10 @@ func TestGenerate_Views(t *testing.T) {
 		},
 		Views: []model.View{
 			{
-				Name:    "user_stats",
-				Schema:  "app",
-				Query:   "SELECT count(*) AS total FROM active_users",
-				Comment: "Aggregate user statistics",
+				Name:      "user_stats",
+				Schema:    "app",
+				Query:     "SELECT count(*) AS total FROM active_users",
+				Comment:   "Aggregate user statistics",
 				DependsOn: []string{"active_users"},
 			},
 			{

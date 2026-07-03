@@ -696,7 +696,6 @@ func toAnySlice(ss []string) []any {
 	return result
 }
 
-
 // indexColumnsWithDir returns column strings with " DESC" appended for
 // columns that have desc=true. ASC columns are returned bare (PostgreSQL default).
 func indexColumnsWithDir(columns []string, desc []bool) []string {

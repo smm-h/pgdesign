@@ -400,7 +400,7 @@ func pgTypeToDrizzleBuilder(pgType string) (builder string, comment string) {
 }
 
 // drizzleDefault converts a PostgreSQL default value to a Drizzle modifier string.
-// It sets *needSql to true if the sql`` template tag is required.
+// It sets *needSql to true if the sql“ template tag is required.
 func drizzleDefault(def string, needSql *bool) string {
 	lower := strings.ToLower(strings.TrimSpace(def))
 

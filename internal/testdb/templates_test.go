@@ -144,12 +144,12 @@ func TestTemplateTruncationUTF8Safe(t *testing.T) {
 	baseName := strings.Repeat("a", 36) + "éé"
 
 	checks := map[string][]string{
-		"go": {"0xC0", "0x80"},
+		"go":     {"0xC0", "0x80"},
 		"python": {"encode", "decode", "ignore"},
-		"ts": {"Buffer.from", "subarray", "0xC0", "0x80"},
-		"java": {"0xC0", "0x80"},
+		"ts":     {"Buffer.from", "subarray", "0xC0", "0x80"},
+		"java":   {"0xC0", "0x80"},
 		"kotlin": {"0xC0", "0x80"},
-		"zig": {"0xC0", "0x80"},
+		"zig":    {"0xC0", "0x80"},
 	}
 
 	for _, lang := range SupportedLanguages() {

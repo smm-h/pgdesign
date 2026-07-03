@@ -137,7 +137,7 @@ func TestDeparseExpr(t *testing.T) {
 	t.Run("function call with arguments", func(t *testing.T) {
 		node := &pg.Node{Node: &pg.Node_FuncCall{FuncCall: &pg.FuncCall{
 			Funcname: []*pg.Node{{Node: &pg.Node_String_{String_: &pg.String{Sval: "lower"}}}},
-			Args: []*pg.Node{{Node: &pg.Node_AConst{AConst: &pg.A_Const{Val: &pg.A_Const_Sval{Sval: &pg.String{Sval: "HELLO"}}}}}},
+			Args:     []*pg.Node{{Node: &pg.Node_AConst{AConst: &pg.A_Const{Val: &pg.A_Const_Sval{Sval: &pg.String{Sval: "HELLO"}}}}}},
 		}}}
 		got, err := DeparseExpr(node)
 		if err != nil {

@@ -996,7 +996,7 @@ func TestGenerate_PerTableRowCount(t *testing.T) {
 func TestGenerate_FKCycleHandling(t *testing.T) {
 	// Two tables that reference each other (cycle).
 	schema := &model.Schema{
-		Name: "public",
+		Name:        "public",
 		CycleGroups: [][]string{{"departments", "employees"}},
 		Tables: []model.Table{
 			{
@@ -1056,7 +1056,7 @@ func TestGenerate_FKCycleHandling(t *testing.T) {
 
 func TestGenerate_FKCycleNotNull(t *testing.T) {
 	schema := &model.Schema{
-		Name: "public",
+		Name:        "public",
 		CycleGroups: [][]string{{"alpha", "beta"}},
 		Tables: []model.Table{
 			{

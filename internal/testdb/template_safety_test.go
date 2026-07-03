@@ -74,9 +74,9 @@ func TestTemplateNoSQLInterpolation(t *testing.T) {
 
 		// Per-language: interpolation pattern to flag, and safe patterns to exempt.
 		type interpCheck struct {
-			lang       string
-			pattern    *regexp.Regexp
-			safeWords  []string // lines containing any of these words are exempt
+			lang      string
+			pattern   *regexp.Regexp
+			safeWords []string // lines containing any of these words are exempt
 		}
 
 		checks := []interpCheck{

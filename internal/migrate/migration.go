@@ -29,50 +29,50 @@ type Migration struct {
 
 // DDLOp represents a single DDL operation in a migration.
 type DDLOp struct {
-	Op       string      // "create_table", "add_column", "drop_table", etc.
-	Phase    string      // "expand", "migrate", "contract", or "" (single-phase)
-	Table    string      // schema-qualified table name
-	Column   string      // for column ops
-	Type       string      // for add_column
-	Collation  string      // for column collation (ALTER COLUMN TYPE ... COLLATE)
-	Statistics *int        // for set_statistics ops
-	Default    interface{} // for add_column
-	NotNull    bool
-	Generated  string // for add_column: GENERATED ALWAYS AS (expr)
-	Stored     bool   // for add_column: true=STORED, false=VIRTUAL
-	PGVersion  int    // target PG version for version-gated DDL
-	Name     string   // for constraints/indexes
-	Columns  []string // for indexes, FKs
-	RefTable string   // for FKs
-	RefCols  []string // for FKs
-	OnDelete string   // for FKs
-	Method    string            // for indexes
-	Where     string            // for partial indexes
-	Opclasses  map[string]string // per-column opclass
-	Collations map[string]string // per-column collation for indexes
-	Desc       []bool            // per-column DESC (parallel to Columns)
-	Include   []string
-	With      map[string]string // index storage parameters (WITH clause)
-	Comment  string   // for tables
-	PK       []string // for create_table
-	Values   []string // for create_enum, alter_enum_add_value
-	Schema   string   // for enums (schema-qualified ops)
-	Expr              string   // for check constraints
-	Operators         []string // for exclusion constraints
-	Deferrable        bool     // for exclusion and unique constraints
-	InitiallyDeferred bool     // for exclusion and unique constraints
+	Op                string      // "create_table", "add_column", "drop_table", etc.
+	Phase             string      // "expand", "migrate", "contract", or "" (single-phase)
+	Table             string      // schema-qualified table name
+	Column            string      // for column ops
+	Type              string      // for add_column
+	Collation         string      // for column collation (ALTER COLUMN TYPE ... COLLATE)
+	Statistics        *int        // for set_statistics ops
+	Default           interface{} // for add_column
+	NotNull           bool
+	Generated         string            // for add_column: GENERATED ALWAYS AS (expr)
+	Stored            bool              // for add_column: true=STORED, false=VIRTUAL
+	PGVersion         int               // target PG version for version-gated DDL
+	Name              string            // for constraints/indexes
+	Columns           []string          // for indexes, FKs
+	RefTable          string            // for FKs
+	RefCols           []string          // for FKs
+	OnDelete          string            // for FKs
+	Method            string            // for indexes
+	Where             string            // for partial indexes
+	Opclasses         map[string]string // per-column opclass
+	Collations        map[string]string // per-column collation for indexes
+	Desc              []bool            // per-column DESC (parallel to Columns)
+	Include           []string
+	With              map[string]string // index storage parameters (WITH clause)
+	Comment           string            // for tables
+	PK                []string          // for create_table
+	Values            []string          // for create_enum, alter_enum_add_value
+	Schema            string            // for enums (schema-qualified ops)
+	Expr              string            // for check constraints
+	Operators         []string          // for exclusion constraints
+	Deferrable        bool              // for exclusion and unique constraints
+	InitiallyDeferred bool              // for exclusion and unique constraints
 
-	TableDef          *model.Table          // full table def for create_table (not serialized)
-	PartitionChildSpec *model.PartitionSpec // child spec for create_partition (not serialized)
-	ParentTable       string               // parent table for create_partition
-	ViewDef              *model.View              // full view def for create_view/drop_view (not serialized)
-	MaterializedViewDef  *model.MaterializedView  // full matview def for create/drop materialized view (not serialized)
-	SequenceDef          *model.Sequence          // full sequence def for create/alter sequence (not serialized)
-	CompositeTypeDef     *model.CompositeType         // full composite type def (not serialized)
-	DomainDef            *model.Domain                // full domain def (not serialized)
-	FunctionDef          *model.Function              // full function def for create/drop function (not serialized)
-	TriggerDef           *model.Trigger               // full trigger def for create/drop trigger (not serialized)
-	PolicyDef            *model.Policy                // full policy def for create/drop policy (not serialized)
+	TableDef            *model.Table            // full table def for create_table (not serialized)
+	PartitionChildSpec  *model.PartitionSpec    // child spec for create_partition (not serialized)
+	ParentTable         string                  // parent table for create_partition
+	ViewDef             *model.View             // full view def for create_view/drop_view (not serialized)
+	MaterializedViewDef *model.MaterializedView // full matview def for create/drop materialized view (not serialized)
+	SequenceDef         *model.Sequence         // full sequence def for create/alter sequence (not serialized)
+	CompositeTypeDef    *model.CompositeType    // full composite type def (not serialized)
+	DomainDef           *model.Domain           // full domain def (not serialized)
+	FunctionDef         *model.Function         // full function def for create/drop function (not serialized)
+	TriggerDef          *model.Trigger          // full trigger def for create/drop trigger (not serialized)
+	PolicyDef           *model.Policy           // full policy def for create/drop policy (not serialized)
 
 	ConsolidatedOps []DDLOp // ops absorbed into create_table during squash consolidation
 	RawSQL          string  // pre-rendered SQL for ops that generate complex DDL (e.g., SM triggers)
