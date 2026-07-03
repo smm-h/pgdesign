@@ -116,20 +116,9 @@ func main() {
 		),
 	)
 
-	app.Command("seed", "Generate type-aware test data for all schema tables", handleSeed,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory for seed generation", strictcli.Variadic())),
-		strictcli.WithFlags(
-			strictcli.IntFlag("rows", "Number of rows to generate per table in the schema", strictcli.Default(10)),
-			strictcli.IntFlag("seed", "Random number generator seed for deterministic output", strictcli.Default(nil)),
-			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.BoolFlag("apply", "Insert generated seed data directly into the database", strictcli.Default(false)),
-			strictcli.StringFlag("db", "PostgreSQL connection URL, required when using --apply", strictcli.Default(nil)),
-			strictcli.StringFlag("schema", "PostgreSQL schema name to filter seed generation to", strictcli.Repeatable(), strictcli.Unique(true), strictcli.Default(nil)),
-			strictcli.StringFlag("format", "SQL output format for generated seed data statements", strictcli.Default("insert"), strictcli.Choices("insert", "copy")),
-			strictcli.BoolFlag("clean", "Emit TRUNCATE CASCADE statements before inserting seeds", strictcli.Default(false)),
-			strictcli.StringFlag("mode", "Data generation strategy: normal values or edge-cases", strictcli.Default("normal"), strictcli.Choices("normal", "edge-cases")),
-		),
-	)
+	app.RegisterHandler("seed", "Generate type-aware test data for all schema tables", func() strictcli.Handler {
+		return &seedHandler{}
+	})
 
 	app.RegisterHandler("serve", "Start the pgdesign HTTP API server and web interface", func() strictcli.Handler {
 		return &serveHandler{}

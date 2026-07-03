@@ -396,6 +396,7 @@
         {
           "help": "Path to TOML schema file(s) or directory for seed generation",
           "name": "path",
+          "type": "list[str]",
           "variadic": true
         }
       ],
@@ -429,10 +430,11 @@
           "type": "str"
         },
         {
+          "default": [],
           "help": "PostgreSQL schema name to filter seed generation to",
           "name": "schema",
           "repeatable": true,
-          "type": "str",
+          "type": "list[str]",
           "unique": true
         },
         {
