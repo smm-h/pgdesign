@@ -12,16 +12,22 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/testdb"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleTestdbSetup(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type testdbSetupHandler struct {
+	DB  string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	DDL string `cli:"ddl" help:"Path to the SQL DDL file to apply to the test database"`
+}
+
+func (h *testdbSetupHandler) Run(_ *strictcli.Context) int {
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for testdb setup")
 		return 1
 	}
 
-	ddlPath, _ := kwargs["ddl"].(string)
+	ddlPath := h.DDL
 	if ddlPath == "" {
 		fmt.Fprintln(os.Stderr, "error: --ddl is required for testdb setup")
 		return 1
@@ -51,8 +57,12 @@ func handleTestdbSetup(kwargs map[string]interface{}) int {
 	return 0
 }
 
-func handleTestdbTeardown(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type testdbTeardownHandler struct {
+	DB string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+}
+
+func (h *testdbTeardownHandler) Run(_ *strictcli.Context) int {
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for testdb teardown")
 		return 1
@@ -84,14 +94,19 @@ func handleTestdbTeardown(kwargs map[string]interface{}) int {
 	return 0
 }
 
-func handleTestdbGC(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type testdbGCHandler struct {
+	DB        string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	OlderThan string `cli:"older-than" help:"Drop databases older than this duration (e.g., 2h, 30m)"`
+}
+
+func (h *testdbGCHandler) Run(_ *strictcli.Context) int {
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for testdb gc")
 		return 1
 	}
 
-	olderThanStr, _ := kwargs["older_than"].(string)
+	olderThanStr := h.OlderThan
 	if olderThanStr == "" {
 		fmt.Fprintln(os.Stderr, "error: --older-than is required for testdb gc")
 		return 1
@@ -142,16 +157,15 @@ func handleTestdbGC(kwargs map[string]interface{}) int {
 	return 0
 }
 
-func handleTestdbInit(kwargs map[string]interface{}) int {
-	// Extract --language repeatable flag.
-	var languages []string
-	if raw, ok := kwargs["language"].([]interface{}); ok {
-		for _, v := range raw {
-			if s, ok := v.(string); ok {
-				languages = append(languages, s)
-			}
-		}
-	}
+type testdbInitHandler struct {
+	Languages      []string `cli:"language" help:"Target programming language(s) for wrapper generation"`
+	Output         *string  `cli:"output" help:"Name of the SQL output section (for disambiguation)"`
+	ForceOverwrite bool     `cli:"force-overwrite" help:"Overwrite existing wrapper files without prompting" default:"false"`
+	CI             *string  `cli:"ci" help:"CI provider for workflow generation (e.g., github-actions)"`
+}
+
+func (h *testdbInitHandler) Run(_ *strictcli.Context) int {
+	languages := h.Languages
 	if len(languages) == 0 {
 		fmt.Fprintln(os.Stderr, "error: at least one --language is required")
 		return 1
@@ -170,9 +184,15 @@ func handleTestdbInit(kwargs map[string]interface{}) int {
 		}
 	}
 
-	force, _ := kwargs["force_overwrite"].(bool)
-	outputName, _ := kwargs["output"].(string)
-	ciProvider, _ := kwargs["ci"].(string)
+	force := h.ForceOverwrite
+	outputName := ""
+	if h.Output != nil {
+		outputName = *h.Output
+	}
+	ciProvider := ""
+	if h.CI != nil {
+		ciProvider = *h.CI
+	}
 
 	// Find pgdesign.toml.
 	cwd, err := os.Getwd()

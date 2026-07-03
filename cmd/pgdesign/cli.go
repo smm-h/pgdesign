@@ -193,31 +193,18 @@ func main() {
 	)
 
 	tdb := app.Group("testdb", "Manage ephemeral test databases for schema testing")
-	tdb.Command("setup", "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.", handleTestdbSetup,
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("ddl", "Path to the SQL DDL file to apply to the test database"),
-		),
-	)
-	tdb.Command("teardown", "Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.", handleTestdbTeardown,
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-		),
-	)
-	tdb.Command("gc", "Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.", handleTestdbGC,
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("older-than", "Drop databases older than this duration (e.g., 2h, 30m)"),
-		),
-	)
-	tdb.Command("init", "Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.", handleTestdbInit,
-		strictcli.WithFlags(
-			strictcli.StringFlag("language", "Target programming language(s) for wrapper generation", strictcli.Repeatable(), strictcli.Unique(true)),
-			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Default(nil)),
-			strictcli.BoolFlag("force-overwrite", "Overwrite existing wrapper files without prompting", strictcli.Default(false)),
-			strictcli.StringFlag("ci", "CI provider for workflow generation (e.g., github-actions)", strictcli.Default(nil)),
-		),
-	)
+	tdb.RegisterHandler("setup", "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.", func() strictcli.Handler {
+		return &testdbSetupHandler{}
+	})
+	tdb.RegisterHandler("teardown", "Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.", func() strictcli.Handler {
+		return &testdbTeardownHandler{}
+	})
+	tdb.RegisterHandler("gc", "Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.", func() strictcli.Handler {
+		return &testdbGCHandler{}
+	})
+	tdb.RegisterHandler("init", "Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.", func() strictcli.Handler {
+		return &testdbInitHandler{}
+	})
 
 	app.Run()
 }
