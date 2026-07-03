@@ -16,19 +16,37 @@ import (
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleDiff(kwargs map[string]interface{}) int {
-	paths := extractPaths(kwargs)
+type diffHandler struct {
+	JSON    bool     `cli:"json" help:"Output the schema diff in machine-readable JSON format" default:"false"`
+	Live    *string  `cli:"live" help:"PostgreSQL connection URL for live database comparison"`
+	Against *string  `cli:"against" help:"Path to TOML schema file or directory to compare against"`
+	Base    *string  `cli:"base" help:"Git ref to compare the current schema against (e.g., main)"`
+	Paths   []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
+}
+
+func (h *diffHandler) Run(_ *strictcli.Context) int {
+	paths := h.Paths
 	schema, _, exitCode := parseAndBuild(paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
 	// Determine which mode we're in. Exactly one of --live, --against, --base.
-	liveURL, _ := kwargs["live"].(string)
-	againstPath, _ := kwargs["against"].(string)
-	baseRef, _ := kwargs["base"].(string)
+	// Empty-string values are treated as absent, matching the pre-struct
+	// handler behavior.
+	var liveURL, againstPath, baseRef string
+	if h.Live != nil {
+		liveURL = *h.Live
+	}
+	if h.Against != nil {
+		againstPath = *h.Against
+	}
+	if h.Base != nil {
+		baseRef = *h.Base
+	}
 
 	modeCount := 0
 	if liveURL != "" {
@@ -77,7 +95,7 @@ func handleDiff(kwargs map[string]interface{}) int {
 
 	d := diff.Diff(schema, actual)
 
-	if kwargs["json"].(bool) {
+	if h.JSON {
 		fmt.Println(diff.FormatJSON(d))
 		return 0
 	}

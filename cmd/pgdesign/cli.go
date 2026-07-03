@@ -57,15 +57,9 @@ func main() {
 		return &introspectHandler{}
 	})
 
-	app.Command("diff", "Compare schema file(s) or directory against another target", handleDiff,
-		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
-		strictcli.WithFlags(
-			strictcli.BoolFlag("json", "Output the schema diff in machine-readable JSON format", strictcli.Default(false)),
-			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil)),
-			strictcli.StringFlag("against", "Path to TOML schema file or directory to compare against", strictcli.Default(nil)),
-			strictcli.StringFlag("base", "Git ref to compare the current schema against (e.g., main)", strictcli.Default(nil)),
-		),
-	)
+	app.RegisterHandler("diff", "Compare schema file(s) or directory against another target", func() strictcli.Handler {
+		return &diffHandler{}
+	})
 
 	mig := app.Group("migrate", "Database migration planning, generation, and execution")
 	mig.Command("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.", handleMigratePlan,

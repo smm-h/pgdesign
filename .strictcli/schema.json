@@ -238,6 +238,7 @@
         {
           "help": "Path to TOML schema file(s) or directory containing them",
           "name": "path",
+          "type": "list[str]",
           "variadic": true
         }
       ],
