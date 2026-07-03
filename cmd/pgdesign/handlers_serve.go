@@ -5,10 +5,22 @@ import (
 	"os"
 
 	"github.com/smm-h/pgdesign/internal/serve"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-func handleServe(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type serveHandler struct {
+	DB      string   `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Port    int      `cli:"port" help:"TCP port number for the HTTP API server to listen on" default:"8080"`
+	Schemas []string `cli:"schema" help:"PostgreSQL schema name to serve via the API (repeatable)"`
+	// Timeout is registered but not currently consumed by the server
+	// implementation; kept for CLI schema compatibility.
+	Timeout int `cli:"timeout" help:"Maximum time in seconds for each HTTP request to complete" default:"30"`
+}
+
+func (h *serveHandler) Run(ctx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](ctx)
+
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for serve")
 		return 1
@@ -17,17 +29,10 @@ func handleServe(kwargs map[string]interface{}) int {
 	// Load config for default schema names and migrations dir.
 	cfg := loadProjectConfig(".")
 
-	port := kwargs["port"].(int)
+	port := h.Port
 
 	// Collect schema names from repeatable --schema flag.
-	var schemaNames []string
-	if raw, ok := kwargs["schema"].([]interface{}); ok {
-		for _, v := range raw {
-			if s, ok := v.(string); ok {
-				schemaNames = append(schemaNames, s)
-			}
-		}
-	}
+	schemaNames := h.Schemas
 	if len(schemaNames) == 0 {
 		schemaNames = configSchemaNames(cfg)
 	}
@@ -52,7 +57,7 @@ func handleServe(kwargs map[string]interface{}) int {
 	defer srv.Close()
 
 	addr := fmt.Sprintf(":%d", port)
-	if !kwargs["quiet"].(bool) {
+	if !g.Quiet {
 		fmt.Printf("pgdesign serving on http://localhost:%d\n", port)
 	}
 	if err := srv.ListenAndServe(addr); err != nil {

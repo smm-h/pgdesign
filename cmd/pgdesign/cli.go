@@ -131,14 +131,9 @@ func main() {
 		),
 	)
 
-	app.Command("serve", "Start the pgdesign HTTP API server and web interface", handleServe,
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.IntFlag("port", "TCP port number for the HTTP API server to listen on", strictcli.Default(8080)),
-			strictcli.StringFlag("schema", "PostgreSQL schema name to serve via the API (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
-			strictcli.IntFlag("timeout", "Maximum time in seconds for each HTTP request to complete", strictcli.Default(30)),
-		),
-	)
+	app.RegisterHandler("serve", "Start the pgdesign HTTP API server and web interface", func() strictcli.Handler {
+		return &serveHandler{}
+	})
 
 	app.Command("codegen", "Generate type-safe application code from schema definitions", handleCodegen,
 		strictcli.WithArgs(strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic())),
