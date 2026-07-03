@@ -534,8 +534,13 @@ func (h *migrateRollbackHandler) Run(cliCtx *strictcli.Context) int {
 	return 0
 }
 
-func handleMigrateStatus(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type migrateStatusHandler struct {
+	DB  string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Dir string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
+}
+
+func (h *migrateStatusHandler) Run(_ *strictcli.Context) int {
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate status")
 		return 1
@@ -544,7 +549,7 @@ func handleMigrateStatus(kwargs map[string]interface{}) int {
 	// Load config for migrations dir.
 	cfg := loadProjectConfig(".")
 
-	dir := kwargs["dir"].(string)
+	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
 		dir = string(cfg.Project.MigrationsDir)
 	}
