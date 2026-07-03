@@ -138,20 +138,6 @@ func loadProjectConfig(path string) *config.RawConfig {
 	return cfg
 }
 
-// loadProjectConfigFromKwargs checks for the --config global flag first, then
-// falls back to loadProjectConfig with the given path.
-func loadProjectConfigFromKwargs(kwargs map[string]interface{}, fallbackPath string) *config.RawConfig {
-	if configPath, ok := kwargs["config"].(string); ok && configPath != "" {
-		cfg, err := config.Load(configPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: cannot load config %q: %v\n", configPath, err)
-			return &config.RawConfig{}
-		}
-		return cfg
-	}
-	return loadProjectConfig(fallbackPath)
-}
-
 // configSchemaNames derives PostgreSQL schema names from config.Project.Schemas
 // by stripping the .toml extension from each file basename. Returns nil if no
 // schemas are configured.
@@ -165,17 +151,6 @@ func configSchemaNames[P config.PathKind](cfg *config.Config[P]) []string {
 		names[i] = strings.TrimSuffix(base, ".toml")
 	}
 	return names
-}
-
-// extractPaths extracts the path(s) from kwargs. Handles the variadic "path"
-// arg which returns []interface{}.
-func extractPaths(kwargs map[string]interface{}) []string {
-	raw := kwargs["path"].([]interface{})
-	paths := make([]string, len(raw))
-	for i, v := range raw {
-		paths[i] = v.(string)
-	}
-	return paths
 }
 
 // resolveSchemaPaths resolves the given CLI paths into a list of .toml schema

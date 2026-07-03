@@ -181,12 +181,12 @@ func diffBase(paths []string, ref string) (*model.Schema, int) {
 
 	if configErr == nil {
 		// pgdesign.toml exists at this ref -- parse it to find schema files.
-		extractPaths, err := parseSchemasFromConfigBytes(configBytes, schemaDir)
+		refSchemaPaths, err := parseSchemasFromConfigBytes(configBytes, schemaDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: parsing pgdesign.toml from %s: %v\n", ref, err)
 			return nil, 1
 		}
-		filesToExtract = extractPaths
+		filesToExtract = refSchemaPaths
 	} else {
 		// No pgdesign.toml at this ref -- use the same file paths as the working tree.
 		filesToExtract = resolvedPaths
