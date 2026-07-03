@@ -30,7 +30,7 @@ Generate test database wrapper code for consumer projects that need to run integ
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--language` |  | str |  |  | Target programming language(s) for wrapper generation |
+| `--language` |  | list[str] |  |  | Target programming language(s) for wrapper generation |
 | `--output` |  | str |  |  | Name of the SQL output section (for disambiguation) |
 | `--force-overwrite` |  | bool |  |  | Overwrite existing wrapper files without prompting |
 | `--ci` |  | str |  |  | CI provider for workflow generation (e.g., github-actions) |

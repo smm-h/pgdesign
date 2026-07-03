@@ -17,7 +17,7 @@ Analyze database statistics, index usage, and health
 | --- | --- | --- | --- | --- | --- |
 | `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
 | `--json` |  | bool |  |  | Output all statistics in machine-readable JSON format |
-| `--schema` |  | str |  |  | PostgreSQL schema name to analyze (repeatable for multiple) |
+| `--schema` |  | list[str] |  |  | PostgreSQL schema name to analyze (repeatable for multiple) |
 
 ## Arguments
 

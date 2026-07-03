@@ -16,6 +16,6 @@ Introspect a live PostgreSQL database into TOML schema
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
-| `--schema` |  | str |  |  | PostgreSQL schema name(s) to introspect (repeatable) |
+| `--schema` |  | list[str] |  |  | PostgreSQL schema name(s) to introspect (repeatable) |
 | `--output` |  | str |  |  | Write output to a file at this path instead of stdout |
 | `--extensions` |  | bool |  |  | Discover extension types, functions, and opclasses |

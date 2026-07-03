@@ -20,7 +20,7 @@ Generate type-aware test data for all schema tables
 | `--output` |  | str |  |  | Write output to a file at this path instead of stdout |
 | `--apply` |  | bool |  |  | Insert generated seed data directly into the database |
 | `--db` |  | str |  |  | PostgreSQL connection URL, required when using --apply |
-| `--schema` |  | str |  |  | PostgreSQL schema name to filter seed generation to |
+| `--schema` |  | list[str] |  |  | PostgreSQL schema name to filter seed generation to |
 | `--format` |  | str | insert |  | SQL output format for generated seed data statements |
 | `--clean` |  | bool |  |  | Emit TRUNCATE CASCADE statements before inserting seeds |
 | `--mode` |  | str | normal |  | Data generation strategy: normal values or edge-cases |
