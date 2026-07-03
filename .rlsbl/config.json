@@ -30,34 +30,6 @@
   "private": false,
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "**Improvement.** CLI struct-handler migration wave 2: generate, introspect, diff, serve, codegen, seed. The codegen `--mode` choices are now registry-driven via choices_from.",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 15
-          }
-        ]
-      },
-      {
-        "reason": "**Improvement.** CLI struct-handler migration wave 3: all seven migrate subcommands; the legacy kwargs map API is fully retired from the codebase.",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 16
-          }
-        ]
-      },
-      {
-        "reason": "non-user-facing batch",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 17
-          }
-        ]
-      }
-    ]
+    "exclusions": []
   }
 }
