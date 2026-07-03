@@ -1,0 +1,20 @@
+# Version bump type: patch, minor, major, hotfix, or prerelease
+bump = "minor"
+# Short description of this release (required)
+description = "Valid idempotent enum DDL, E228 cascade guardrail, unsuppressible errors, ORM enum support, orphan detection, codegen --check, declaration-order preservation, and full struct-handler CLI."
+# Optional context explaining why these changes were made
+context = """
+Driven by a consumer's Python-DDL adoption report and a full CLI-safety overhaul.
+
+DDL correctness: idempotent enum DDL was invalid SQL on every PG version (CREATE TYPE IF NOT EXISTS); now DO-block catalog checks, proven by an execution-backed matrix that runs every emitted statement against live PostgreSQL. Constraints codegen was non-deterministic; state machine states and composite fields lost TOML declaration order. Domain columns were unqualified in CREATE TABLE.
+
+Guardrails: E228 rejects cascade-into-append-only contradictions (consumer schemas fixed first); E-codes can no longer be suppressed or disabled; owned output directories hard-error on orphan files; codegen --check verifies committed output without writing.
+
+CLI: migrated to strictcli v0.19.0 struct handlers end-to-end, retiring the kwargs map API that produced two shipped bugs (hyphen/underscore key mismatches, nil type assertions). The --split-mode parse-time catch-22 is fixed at the strictcli root; --config is wired for real.
+"""
+# Pre-release identifier: alpha, beta, rc, or stable
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["go", "npm", "pypi"]
+exclude = []
