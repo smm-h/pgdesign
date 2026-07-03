@@ -68,14 +68,9 @@ func main() {
 	mig.RegisterHandler("generate", "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.", func() strictcli.Handler {
 		return &migrateGenerateHandler{}
 	})
-	mig.Command("apply", "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.", handleMigrateApply,
-		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
-			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing", strictcli.Default(false)),
-			strictcli.IntFlag("timeout", "Advisory lock acquisition timeout in seconds before aborting", strictcli.Default(30)),
-		),
-	)
+	mig.RegisterHandler("apply", "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.", func() strictcli.Handler {
+		return &migrateApplyHandler{}
+	})
 	mig.Command("rollback", "Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.", handleMigrateRollback,
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),

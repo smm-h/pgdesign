@@ -318,8 +318,19 @@ func (h *migrateGenerateHandler) Run(cliCtx *strictcli.Context) int {
 	return 0
 }
 
-func handleMigrateApply(kwargs map[string]interface{}) int {
-	dbURL, _ := kwargs["db"].(string)
+type migrateApplyHandler struct {
+	DB     string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Dir    string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
+	DryRun bool   `cli:"dry-run" help:"Preview the migration SQL statements without executing" default:"false"`
+	// Timeout is registered but not currently consumed by apply (the lock
+	// timeout comes from pgdesign.toml); kept for CLI schema compatibility.
+	Timeout int `cli:"timeout" help:"Advisory lock acquisition timeout in seconds before aborting" default:"30"`
+}
+
+func (h *migrateApplyHandler) Run(cliCtx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](cliCtx)
+
+	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate apply")
 		return 1
@@ -328,12 +339,12 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 	// Load config for migrations dir and lock timeout.
 	cfg := loadProjectConfig(".")
 
-	dir := kwargs["dir"].(string)
+	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
 		dir = string(cfg.Project.MigrationsDir)
 	}
 
-	dryRun := kwargs["dry_run"].(bool)
+	dryRun := h.DryRun
 
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, dbURL)
@@ -344,7 +355,7 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 	defer conn.Close(ctx)
 
 	if dryRun {
-		return handleMigrateApplyDryRun(ctx, conn, dir, kwargs["quiet"].(bool))
+		return handleMigrateApplyDryRun(ctx, conn, dir, g.Quiet)
 	}
 
 	lockTimeout := cfg.Migrate.LockTimeout
@@ -359,13 +370,13 @@ func handleMigrateApply(kwargs map[string]interface{}) int {
 	}
 
 	if len(applied) == 0 {
-		if !kwargs["quiet"].(bool) {
+		if !g.Quiet {
 			fmt.Println("No pending migrations.")
 		}
 		return 0
 	}
 
-	if !kwargs["quiet"].(bool) {
+	if !g.Quiet {
 		fmt.Printf("Applied %d migration(s):\n", len(applied))
 		for _, v := range applied {
 			fmt.Printf("  - %s\n", v)
