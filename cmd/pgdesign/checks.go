@@ -28,12 +28,19 @@ func (c *pgdesignCheckContext) ProjectRoot() string { return c.root }
 // loadSchemaForCheck resolves schema paths from the project root directory,
 // parses, and builds the schema. This is the shared entry point for check
 // functions that need a resolved schema.
+//
+// Check functions receive a strictcli.CheckContext, not a *strictcli.Context:
+// strictcli's built-in check command is a plain command handler (no struct
+// handler dispatch), so parsed global flags — including the --config override
+// — are not reachable here. Checks therefore always use walk-up config
+// discovery from the project root, and all config-discovery calls in this file
+// pass a nil override.
 func loadSchemaForCheck(root string) ([]string, error) {
 	configPath, hasConfig := config.FindConfig(root)
 	if hasConfig {
 		return resolveFromConfig(configPath)
 	}
-	return resolveSchemaPaths([]string{root})
+	return resolveSchemaPaths(nil, []string{root})
 }
 
 // diagDetails converts diagnostics to string details for CheckResult.
@@ -67,7 +74,7 @@ func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, typeReg, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -75,7 +82,9 @@ func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	cfg := loadProjectConfig(root)
+	// nil override: globals are not reachable in check functions (see
+	// loadSchemaForCheck); with a nil override the error is always nil.
+	cfg, _ := loadProjectConfig(nil, root)
 
 	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
 	if pgErr != nil {
@@ -131,7 +140,7 @@ func checkNF(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -139,7 +148,9 @@ func checkNF(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	cfg := loadProjectConfig(root)
+	// nil override: globals are not reachable in check functions (see
+	// loadSchemaForCheck); with a nil override the error is always nil.
+	cfg, _ := loadProjectConfig(nil, root)
 	dbURL := resolveDBURL(cfg)
 
 	// If a DB URL is available, discover FDs for tables without declared dependencies.
@@ -345,7 +356,7 @@ func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, typeReg, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -353,7 +364,9 @@ func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	cfg := loadProjectConfig(root)
+	// nil override: globals are not reachable in check functions (see
+	// loadSchemaForCheck); with a nil override the error is always nil.
+	cfg, _ := loadProjectConfig(nil, root)
 
 	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
 	if pgErr != nil {
@@ -399,7 +412,7 @@ func checkCoverage(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -441,7 +454,7 @@ func checkStructural(ctx strictcli.CheckContext) strictcli.CheckResult {
 			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
 		}
 	}
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -476,7 +489,7 @@ func checkWorkload(ctx strictcli.CheckContext) strictcli.CheckResult {
 			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
 		}
 	}
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",
@@ -484,7 +497,9 @@ func checkWorkload(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	cfg := loadProjectConfig(root)
+	// nil override: globals are not reachable in check functions (see
+	// loadSchemaForCheck); with a nil override the error is always nil.
+	cfg, _ := loadProjectConfig(nil, root)
 	dbURL := resolveDBURL(cfg)
 	if dbURL == "" {
 		return strictcli.CheckResult{
@@ -568,7 +583,7 @@ func checkBuild(ctx strictcli.CheckContext) strictcli.CheckResult {
 		}
 	}
 
-	schema, typeReg, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
 		return strictcli.CheckResult{
 			Status:  "fail",

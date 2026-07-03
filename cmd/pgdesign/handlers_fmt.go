@@ -18,11 +18,15 @@ type fmtHandler struct {
 	ColumnOrder string `cli:"column-order" help:"Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve" default:"pk_fk_alpha" choices:"pk_fk_alpha,alphabetical,fk_last,preserve"`
 }
 
-func (h *fmtHandler) Run(_ *strictcli.Context) int {
+func (h *fmtHandler) Run(ctx *strictcli.Context) int {
 	target := h.Path
 
 	// Load config for format defaults.
-	cfg := loadProjectConfig(target)
+	cfg, cfgErr := loadProjectConfig(configOverride(ctx), target)
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	// CLI flags override config; config overrides strictcli defaults.
 	tableOrder := h.TableOrder

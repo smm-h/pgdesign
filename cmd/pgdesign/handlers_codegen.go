@@ -28,20 +28,24 @@ func (h *codegenHandler) ModeChoices() []string {
 
 func (h *codegenHandler) Run(ctx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](ctx)
-	return h.run(g.Quiet)
+	return h.run(g.Config, g.Quiet)
 }
 
-// run contains the codegen logic; tests call it directly with an explicit
-// quiet value instead of going through a CLI parse.
-func (h *codegenHandler) run(quiet bool) int {
+// run contains the codegen logic; tests call it directly with explicit
+// configOverride and quiet values instead of going through a CLI parse.
+func (h *codegenHandler) run(configOverride *string, quiet bool) int {
 	paths := h.Paths
-	schema, typeReg, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(configOverride, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
 	// Load config and validate schema before generating code.
-	cfg := loadProjectConfig(paths[0])
+	cfg, cfgErr := loadProjectConfig(configOverride, paths[0])
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
 	schema.PGVersion = pgVersion
 

@@ -29,7 +29,11 @@ func (h *introspectHandler) Run(cliCtx *strictcli.Context) int {
 	}
 
 	// Load config for default schema names.
-	cfg := loadProjectConfig(".")
+	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	// Collect schema names from repeatable --schema flag.
 	schemaNames := h.Schemas

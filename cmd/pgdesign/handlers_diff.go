@@ -27,9 +27,11 @@ type diffHandler struct {
 	Paths   []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
 }
 
-func (h *diffHandler) Run(_ *strictcli.Context) int {
+func (h *diffHandler) Run(ctx *strictcli.Context) int {
+	cfgOverride := configOverride(ctx)
+
 	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(cfgOverride, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
@@ -73,21 +75,21 @@ func (h *diffHandler) Run(_ *strictcli.Context) int {
 	switch {
 	case liveURL != "":
 		var code int
-		actual, code = diffLive(paths, schema, liveURL)
+		actual, code = diffLive(cfgOverride, paths, schema, liveURL)
 		if code != 0 {
 			return code
 		}
 
 	case againstPath != "":
 		var code int
-		actual, code = diffAgainst(againstPath)
+		actual, code = diffAgainst(cfgOverride, againstPath)
 		if code != 0 {
 			return code
 		}
 
 	case baseRef != "":
 		var code int
-		actual, code = diffBase(paths, baseRef)
+		actual, code = diffBase(cfgOverride, paths, baseRef)
 		if code != 0 {
 			return code
 		}
@@ -105,8 +107,12 @@ func (h *diffHandler) Run(_ *strictcli.Context) int {
 }
 
 // diffLive introspects a live database and returns the "actual" schema.
-func diffLive(paths []string, schema *model.Schema, dbURL string) (*model.Schema, int) {
-	cfg := loadProjectConfig(paths[0])
+func diffLive(configOverride *string, paths []string, schema *model.Schema, dbURL string) (*model.Schema, int) {
+	cfg, cfgErr := loadProjectConfig(configOverride, paths[0])
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return nil, 1
+	}
 
 	schemaNames := []string{"public"}
 	if schema.Name != "" && schema.Name != "public" {
@@ -132,13 +138,13 @@ func diffLive(paths []string, schema *model.Schema, dbURL string) (*model.Schema
 }
 
 // diffAgainst parses a TOML schema from the --against path and returns the "actual" schema.
-func diffAgainst(againstPath string) (*model.Schema, int) {
-	schema, _, exitCode := parseAndBuild([]string{againstPath})
+func diffAgainst(configOverride *string, againstPath string) (*model.Schema, int) {
+	schema, _, exitCode := parseAndBuild(configOverride, []string{againstPath})
 	return schema, exitCode
 }
 
 // diffBase extracts schema files from a git ref and returns the parsed/built "actual" schema.
-func diffBase(paths []string, ref string) (*model.Schema, int) {
+func diffBase(configOverride *string, paths []string, ref string) (*model.Schema, int) {
 	if _, err := exec.LookPath("git"); err != nil {
 		fmt.Fprintln(os.Stderr, "error: git is not available")
 		return nil, 1
@@ -151,7 +157,7 @@ func diffBase(paths []string, ref string) (*model.Schema, int) {
 	}
 
 	// Resolve the paths to determine what schema files we need from the ref.
-	resolvedPaths, err := resolveSchemaPaths(paths)
+	resolvedPaths, err := resolveSchemaPaths(configOverride, paths)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return nil, 1
@@ -238,7 +244,11 @@ func diffBase(paths []string, ref string) (*model.Schema, int) {
 			}
 		}
 	} else {
-		cfg := loadProjectConfig(resolvedPaths[0])
+		cfg, cfgErr := loadProjectConfig(configOverride, resolvedPaths[0])
+		if cfgErr != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+			return nil, 1
+		}
 		for _, ext := range cfg.Extensions {
 			reg.AddExtensionTypes(ext.Types)
 		}

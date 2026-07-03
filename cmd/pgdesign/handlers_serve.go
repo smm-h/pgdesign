@@ -27,7 +27,11 @@ func (h *serveHandler) Run(ctx *strictcli.Context) int {
 	}
 
 	// Load config for default schema names and migrations dir.
-	cfg := loadProjectConfig(".")
+	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	port := h.Port
 

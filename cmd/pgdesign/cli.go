@@ -121,10 +121,49 @@ func main() {
 	app.Run()
 }
 
-// loadProjectConfig attempts to load pgdesign.toml from the directory containing
-// the given path (or the path itself if it's a directory). Returns a zero-valued
-// config silently if no config file is found.
-func loadProjectConfig(path string) *config.RawConfig {
+// configOverride returns the --config global flag value from the CLI context.
+func configOverride(ctx *strictcli.Context) *string {
+	return strictcli.Globals[Globals](ctx).Config
+}
+
+// resolveConfigPath returns the pgdesign.toml path to use for config discovery.
+// When override is non-nil (the --config global flag), the file must exist and
+// be a regular file — a missing or unusable override is a hard error, never a
+// silent fall back to directory search. When override is nil, it walks up from
+// startDir via config.FindConfig.
+func resolveConfigPath(override *string, startDir string) (string, bool, error) {
+	if override != nil {
+		info, err := os.Stat(*override)
+		if err != nil {
+			return "", false, fmt.Errorf("--config %q: %w", *override, err)
+		}
+		if info.IsDir() {
+			return "", false, fmt.Errorf("--config %q is a directory, expected a pgdesign.toml file", *override)
+		}
+		return *override, true, nil
+	}
+	path, found := config.FindConfig(startDir)
+	return path, found, nil
+}
+
+// loadProjectConfig loads the project's pgdesign.toml. When configOverride
+// (the --config global flag) is non-nil, that exact file is loaded and any
+// failure (missing or malformed) is a hard error. Without an override, the
+// config is discovered from the directory containing path (or path itself if
+// it's a directory): a missing config yields a zero-valued config, and a
+// malformed one falls back to defaults (pre-existing lenient behavior).
+func loadProjectConfig(configOverride *string, path string) (*config.RawConfig, error) {
+	if configOverride != nil {
+		configPath, _, err := resolveConfigPath(configOverride, "")
+		if err != nil {
+			return nil, err
+		}
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return nil, fmt.Errorf("--config %q: %w", *configOverride, err)
+		}
+		return cfg, nil
+	}
 	dir := path
 	info, err := os.Stat(path)
 	if err == nil && !info.IsDir() {
@@ -133,9 +172,9 @@ func loadProjectConfig(path string) *config.RawConfig {
 	cfg, err := config.LoadOrDefault(dir)
 	if err != nil {
 		// Config exists but is malformed; fall back to defaults.
-		return &config.RawConfig{}
+		return &config.RawConfig{}, nil
 	}
-	return cfg
+	return cfg, nil
 }
 
 // configSchemaNames derives PostgreSQL schema names from config.Project.Schemas
@@ -155,8 +194,10 @@ func configSchemaNames[P config.PathKind](cfg *config.Config[P]) []string {
 
 // resolveSchemaPaths resolves the given CLI paths into a list of .toml schema
 // file paths. Handles single files, multiple files, directories (with optional
-// pgdesign.toml config), and pgdesign.toml files directly.
-func resolveSchemaPaths(paths []string) ([]string, error) {
+// pgdesign.toml config), and pgdesign.toml files directly. configOverride (the
+// --config global flag) replaces the walk-up config search for directory paths;
+// explicit schema file paths are unaffected.
+func resolveSchemaPaths(configOverride *string, paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, fmt.Errorf("at least one path is required")
 	}
@@ -185,13 +226,21 @@ func resolveSchemaPaths(paths []string) ([]string, error) {
 	if !info.IsDir() {
 		// Single file. Check if it's pgdesign.toml itself.
 		if filepath.Base(p) == "pgdesign.toml" {
+			// A positional config file and a --config override are two explicit
+			// config sources; silently preferring one would hide the conflict.
+			if configOverride != nil && !samePath(*configOverride, p) {
+				return nil, fmt.Errorf("conflicting config sources: positional %q and --config %q", p, *configOverride)
+			}
 			return resolveFromConfig(p)
 		}
 		return []string{p}, nil
 	}
 
-	// Directory: look for pgdesign.toml.
-	configPath, hasConfig := config.FindConfig(p)
+	// Directory: look for pgdesign.toml (or use the --config override).
+	configPath, hasConfig, err := resolveConfigPath(configOverride, p)
+	if err != nil {
+		return nil, err
+	}
 	if hasConfig {
 		return resolveFromConfig(configPath)
 	}
@@ -217,6 +266,17 @@ func resolveSchemaPaths(paths []string) ([]string, error) {
 	return filePaths, nil
 }
 
+// samePath reports whether two paths refer to the same file after absolute
+// path normalization.
+func samePath(a, b string) bool {
+	absA, errA := filepath.Abs(a)
+	absB, errB := filepath.Abs(b)
+	if errA != nil || errB != nil {
+		return a == b
+	}
+	return absA == absB
+}
+
 // resolveFromConfig loads pgdesign.toml and returns the resolved schema file paths.
 func resolveFromConfig(configPath string) ([]string, error) {
 	resolved, err := config.LoadAndResolve(configPath)
@@ -231,9 +291,11 @@ func resolveFromConfig(configPath string) ([]string, error) {
 
 
 // parseAndBuild is a shared helper for commands that need a resolved schema.
-// It accepts one or more paths (files or a directory) and returns the built schema.
-func parseAndBuild(paths []string) (*model.Schema, *semtype.Registry, int) {
-	resolvedPaths, err := resolveSchemaPaths(paths)
+// It accepts one or more paths (files or a directory) and returns the built
+// schema. configOverride (the --config global flag) replaces the walk-up
+// config search for both schema path resolution and project config loading.
+func parseAndBuild(configOverride *string, paths []string) (*model.Schema, *semtype.Registry, int) {
+	resolvedPaths, err := resolveSchemaPaths(configOverride, paths)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return nil, nil, 1
@@ -268,7 +330,11 @@ func parseAndBuild(paths []string) (*model.Schema, *semtype.Registry, int) {
 	reg := semtype.NewBuiltinRegistry()
 
 	// Register extension-provided types so they pass the base type allowlist.
-	cfg := loadProjectConfig(resolvedPaths[0])
+	cfg, cfgErr := loadProjectConfig(configOverride, resolvedPaths[0])
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return nil, nil, 1
+	}
 	for _, ext := range cfg.Extensions {
 		reg.AddExtensionTypes(ext.Types)
 	}

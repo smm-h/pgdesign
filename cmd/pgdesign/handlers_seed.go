@@ -31,7 +31,7 @@ func (h *seedHandler) Run(cliCtx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](cliCtx)
 
 	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(g.Config, paths)
 	if exitCode != 0 {
 		return exitCode
 	}

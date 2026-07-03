@@ -25,19 +25,25 @@ type buildHandler struct {
 
 func (h *buildHandler) Run(ctx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](ctx)
-	return runBuild(g.Quiet, h.DryRun, h.AutoCommit)
+	return runBuild(g.Config, g.Quiet, h.DryRun, h.AutoCommit)
 }
 
 // runBuild is the typed entry point for the build command; tests call it
-// directly to exercise the build flow without a CLI parse.
-func runBuild(quiet, dryRun, autoCommit bool) int {
+// directly to exercise the build flow without a CLI parse. configOverride is
+// the --config global flag: when set, it names the exact pgdesign.toml to use
+// instead of the walk-up search.
+func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
 
-	configPath, found := config.FindConfig(cwd)
+	configPath, found, err := resolveConfigPath(configOverride, cwd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
 	if !found {
 		fmt.Fprintln(os.Stderr, "error: pgdesign.toml not found in current directory or any ancestor")
 		return 1
@@ -66,7 +72,7 @@ func runBuild(quiet, dryRun, autoCommit bool) int {
 		}
 	}
 
-	schema, typeReg, exitCode := parseAndBuild(schemaPaths)
+	schema, typeReg, exitCode := parseAndBuild(configOverride, schemaPaths)
 	if exitCode != 0 {
 		return exitCode
 	}

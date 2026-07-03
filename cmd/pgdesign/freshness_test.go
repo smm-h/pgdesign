@@ -51,7 +51,7 @@ split_mode = %q
 // testBuild runs the build flow quietly with auto-commit off (temp dirs are
 // not git repos).
 func testBuild(dryRun bool) int {
-	return runBuild(true, dryRun, false)
+	return runBuild(nil, true, dryRun, false)
 }
 
 // facetedOnlyFile generates both split modes for the project's schema and
@@ -60,7 +60,7 @@ func testBuild(dryRun bool) int {
 // switch strands on disk.
 func facetedOnlyFile(t *testing.T, projectDir string) (string, []byte) {
 	t.Helper()
-	schema, _, exitCode := parseAndBuild([]string{filepath.Join(projectDir, "schema.toml")})
+	schema, _, exitCode := parseAndBuild(nil, []string{filepath.Join(projectDir, "schema.toml")})
 	if exitCode != 0 {
 		t.Fatalf("parseAndBuild failed with exit code %d", exitCode)
 	}
@@ -256,7 +256,7 @@ func TestPlan_OwnedDirs_SingleFileOutputsOwnNothing(t *testing.T) {
 // output's files are flagged as orphans of the other.
 func TestPlan_OwnedDirs_SharedDirectoryUnion(t *testing.T) {
 	dir := writeFreshnessProject(t, "")
-	schema, _, exitCode := parseAndBuild([]string{filepath.Join(dir, "schema.toml")})
+	schema, _, exitCode := parseAndBuild(nil, []string{filepath.Join(dir, "schema.toml")})
 	if exitCode != 0 {
 		t.Fatalf("parseAndBuild failed")
 	}
@@ -316,7 +316,7 @@ func TestPlan_OwnedDirs_SharedDirectoryUnion(t *testing.T) {
 // is treated as owned, not orphaned.
 func TestPlan_OwnedDirs_ConfiguredSVGInsideOwnedDirIsNotOrphan(t *testing.T) {
 	dir := writeFreshnessProject(t, "")
-	schema, _, exitCode := parseAndBuild([]string{filepath.Join(dir, "schema.toml")})
+	schema, _, exitCode := parseAndBuild(nil, []string{filepath.Join(dir, "schema.toml")})
 	if exitCode != 0 {
 		t.Fatalf("parseAndBuild failed")
 	}
@@ -388,7 +388,7 @@ func newCodegenHandler(schemaPath, lang, mode, output string, check bool) *codeg
 func TestHandleCodegenCheck_RequiresOutput(t *testing.T) {
 	dir := writeFreshnessProject(t, "")
 	schemaPath := filepath.Join(dir, "schema.toml")
-	if code := newCodegenHandler(schemaPath, "go", "constants", "", true).run(true); code != 1 {
+	if code := newCodegenHandler(schemaPath, "go", "constants", "", true).run(nil, true); code != 1 {
 		t.Fatalf("--check without --output must exit 1, got %d", code)
 	}
 }
@@ -413,15 +413,15 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 	}
 
 	// Before generation: everything is missing.
-	if code := hCheck().run(true); code != 1 {
+	if code := hCheck().run(nil, true); code != 1 {
 		t.Fatalf("--check before generation must exit 1, got %d", code)
 	}
 
 	// Generate, then check: clean.
-	if code := hWrite().run(true); code != 0 {
+	if code := hWrite().run(nil, true); code != 0 {
 		t.Fatalf("codegen write failed with exit code %d", code)
 	}
-	if code := hCheck().run(true); code != 0 {
+	if code := hCheck().run(nil, true); code != 0 {
 		t.Fatalf("--check on fresh output must exit 0, got %d", code)
 	}
 
@@ -438,7 +438,7 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 	if err := os.WriteFile(victim, append(original, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := hCheck().run(true); code != 1 {
+	if code := hCheck().run(nil, true); code != 1 {
 		t.Fatalf("--check with stale file must exit 1, got %d", code)
 	}
 	if err := os.WriteFile(victim, original, 0o644); err != nil {
@@ -450,7 +450,7 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 	if err := os.WriteFile(orphanPath, []byte("# leftover\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := hCheck().run(true); code != 1 {
+	if code := hCheck().run(nil, true); code != 1 {
 		t.Fatalf("--check with orphan must exit 1, got %d", code)
 	}
 	if _, err := os.Stat(orphanPath); err != nil {
@@ -470,7 +470,7 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(outDir, "stray.pyc"), []byte("bc"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := hCheck().run(true); code != 0 {
+	if code := hCheck().run(nil, true); code != 0 {
 		t.Fatalf("--check must ignore __pycache__ and *.pyc, got exit %d", code)
 	}
 }
@@ -482,17 +482,17 @@ func TestHandleCodegenCheck_SingleFile(t *testing.T) {
 	schemaPath := filepath.Join(dir, "schema.toml")
 	outFile := filepath.Join(dir, "out", "constants.go")
 
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(true); code != 1 {
+	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(nil, true); code != 1 {
 		t.Fatalf("--check with missing file must exit 1, got %d", code)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(outFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, false).run(true); code != 0 {
+	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, false).run(nil, true); code != 0 {
 		t.Fatalf("codegen write failed")
 	}
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(true); code != 0 {
+	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(nil, true); code != 0 {
 		t.Fatalf("--check on fresh single file must exit 0, got %d", code)
 	}
 
@@ -501,14 +501,14 @@ func TestHandleCodegenCheck_SingleFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "out", "unrelated.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(true); code != 0 {
+	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(nil, true); code != 0 {
 		t.Fatalf("sibling files must not affect single-file --check, got exit %d", code)
 	}
 
 	if err := os.WriteFile(outFile, []byte("// tampered\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(true); code != 1 {
+	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(nil, true); code != 1 {
 		t.Fatalf("--check on stale single file must exit 1, got %d", code)
 	}
 }

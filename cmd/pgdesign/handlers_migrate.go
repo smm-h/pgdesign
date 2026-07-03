@@ -32,13 +32,17 @@ func (h *migratePlanHandler) Run(cliCtx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](cliCtx)
 
 	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(g.Config, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
 	// Load config for schema name defaults.
-	cfg := loadProjectConfig(paths[0])
+	cfg, cfgErr := loadProjectConfig(g.Config, paths[0])
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	dbURL := h.DB
 	if dbURL == "" {
@@ -205,13 +209,17 @@ func (h *migrateGenerateHandler) Run(cliCtx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](cliCtx)
 
 	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(g.Config, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
 	// Load config for migrations dir and schema name defaults.
-	cfg := loadProjectConfig(paths[0])
+	cfg, cfgErr := loadProjectConfig(g.Config, paths[0])
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	dbURL := h.DB
 	if dbURL == "" {
@@ -337,7 +345,11 @@ func (h *migrateApplyHandler) Run(cliCtx *strictcli.Context) int {
 	}
 
 	// Load config for migrations dir and lock timeout.
-	cfg := loadProjectConfig(".")
+	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
@@ -484,7 +496,11 @@ func (h *migrateRollbackHandler) Run(cliCtx *strictcli.Context) int {
 	}
 
 	// Load config for migrations dir and lock timeout.
-	cfg := loadProjectConfig(".")
+	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
@@ -539,7 +555,7 @@ type migrateStatusHandler struct {
 	Dir string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
 }
 
-func (h *migrateStatusHandler) Run(_ *strictcli.Context) int {
+func (h *migrateStatusHandler) Run(cliCtx *strictcli.Context) int {
 	dbURL := h.DB
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for migrate status")
@@ -547,7 +563,11 @@ func (h *migrateStatusHandler) Run(_ *strictcli.Context) int {
 	}
 
 	// Load config for migrations dir.
-	cfg := loadProjectConfig(".")
+	cfg, cfgErr := loadProjectConfig(configOverride(cliCtx), ".")
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
@@ -639,7 +659,11 @@ type migrateSquashHandler struct {
 func (h *migrateSquashHandler) Run(cliCtx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](cliCtx)
 
-	cfg := loadProjectConfig(".")
+	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
@@ -768,10 +792,14 @@ func (h *migrateTestHandler) Run(cliCtx *strictcli.Context) int {
 	}
 
 	if h.Shadow {
-		return h.runShadow(g.Quiet)
+		return h.runShadow(g.Config, g.Quiet)
 	}
 
-	cfg := loadProjectConfig(".")
+	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
@@ -950,7 +978,7 @@ func (h *migrateTestHandler) Run(cliCtx *strictcli.Context) int {
 
 // runShadow implements --shadow mode: replay all migrations into a fresh
 // shadow database and diff the result against the TOML schema.
-func (h *migrateTestHandler) runShadow(quiet bool) int {
+func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 	dbURL := h.DB
 	timeout := h.Timeout
 
@@ -962,12 +990,16 @@ func (h *migrateTestHandler) runShadow(quiet bool) int {
 	}
 
 	// Build desired schema from TOML.
-	schema, _, exitCode := parseAndBuild(paths)
+	schema, _, exitCode := parseAndBuild(configOverride, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
-	cfg := loadProjectConfig(paths[0])
+	cfg, cfgErr := loadProjectConfig(configOverride, paths[0])
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {

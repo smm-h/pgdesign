@@ -18,15 +18,21 @@ type generateHandler struct {
 	Paths      []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
 }
 
-func (h *generateHandler) Run(_ *strictcli.Context) int {
+func (h *generateHandler) Run(ctx *strictcli.Context) int {
+	cfgOverride := configOverride(ctx)
+
 	paths := h.Paths
-	schema, typeReg, exitCode := parseAndBuild(paths)
+	schema, typeReg, exitCode := parseAndBuild(cfgOverride, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
 	// Load config for PGVersion fallback.
-	cfg := loadProjectConfig(paths[0])
+	cfg, cfgErr := loadProjectConfig(cfgOverride, paths[0])
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
 
 	if h.StrictNF {
 		diags := audit.Audit(schema)

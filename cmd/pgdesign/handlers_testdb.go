@@ -164,7 +164,9 @@ type testdbInitHandler struct {
 	CI             *string  `cli:"ci" help:"CI provider for workflow generation (e.g., github-actions)"`
 }
 
-func (h *testdbInitHandler) Run(_ *strictcli.Context) int {
+func (h *testdbInitHandler) Run(ctx *strictcli.Context) int {
+	cfgOverride := configOverride(ctx)
+
 	languages := h.Languages
 	if len(languages) == 0 {
 		fmt.Fprintln(os.Stderr, "error: at least one --language is required")
@@ -201,7 +203,11 @@ func (h *testdbInitHandler) Run(_ *strictcli.Context) int {
 		return 1
 	}
 
-	configPath, found := config.FindConfig(cwd)
+	configPath, found, err := resolveConfigPath(cfgOverride, cwd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
 	if !found {
 		fmt.Fprintln(os.Stderr, "error: pgdesign.toml not found in current directory or any ancestor")
 		return 1
