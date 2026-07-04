@@ -159,3 +159,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER user_audit AFTER UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION audit_user_changes();
+
+-- Function with explicit volatility and parallel safety (regression test for
+-- provolatile/proparallel "char" column scanning).
+CREATE FUNCTION test_volatile_func() RETURNS int LANGUAGE sql IMMUTABLE PARALLEL SAFE AS 'SELECT 1';

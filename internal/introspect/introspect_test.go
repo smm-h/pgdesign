@@ -1523,3 +1523,33 @@ func TestIntrospectTriggerFilter_StateMachine(t *testing.T) {
 		}
 	}
 }
+
+func TestIntrospectFunctionVolatileParallel(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	// Find test_volatile_func which is IMMUTABLE PARALLEL SAFE.
+	var found *model.Function
+	for i := range schema.Functions {
+		if schema.Functions[i].Name == "test_volatile_func" {
+			found = &schema.Functions[i]
+			break
+		}
+	}
+	if found == nil {
+		names := make([]string, len(schema.Functions))
+		for i, f := range schema.Functions {
+			names[i] = f.Name
+		}
+		t.Fatalf("test_volatile_func not found in introspected functions; got: %v", names)
+	}
+
+	if found.Volatility != "IMMUTABLE" {
+		t.Errorf("Volatility = %q, want %q", found.Volatility, "IMMUTABLE")
+	}
+	if found.Parallel != "SAFE" {
+		t.Errorf("Parallel = %q, want %q", found.Parallel, "SAFE")
+	}
+}
