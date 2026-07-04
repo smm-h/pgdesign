@@ -83,6 +83,9 @@ func main() {
 	mig.RegisterHandler("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.", func() strictcli.Handler {
 		return &migrateTestHandler{}
 	})
+	mig.RegisterHandler("baseline", "Mark an existing database as being at a specific migration version without executing any migration SQL. Use this when adopting pgdesign migrations for a database whose schema was already created by other means. Idempotent: re-running with the same version succeeds; a different version errors.", func() strictcli.Handler {
+		return &migrateBaselineHandler{}
+	})
 
 	app.RegisterHandler("seed", "Generate type-aware test data for all schema tables", func() strictcli.Handler {
 		return &seedHandler{}

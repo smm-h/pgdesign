@@ -1271,3 +1271,43 @@ func printSchemaDiffSummary(d *diff.SchemaDiff) {
 		fmt.Printf("  Composite types in shadow but not in TOML: %s\n", strings.Join(d.CompositeTypesRemoved, ", "))
 	}
 }
+
+type migrateBaselineHandler struct {
+	DB          string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Version     string `cli:"version" help:"Version label for the baseline record"`
+	Description string `cli:"description" help:"Human-readable description" default:"Initial baseline"`
+}
+
+func (h *migrateBaselineHandler) Run(cliCtx *strictcli.Context) int {
+	g := strictcli.Globals[Globals](cliCtx)
+
+	dbURL := h.DB
+	if dbURL == "" {
+		fmt.Fprintln(os.Stderr, "error: --db is required for migrate baseline")
+		return 1
+	}
+
+	version := h.Version
+	if version == "" {
+		fmt.Fprintln(os.Stderr, "error: --version is required for migrate baseline")
+		return 1
+	}
+
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+		return 1
+	}
+	defer conn.Close(ctx)
+
+	if err := migrate.Baseline(ctx, conn, version, h.Description); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
+	if !g.Quiet {
+		fmt.Printf("Baseline recorded: %s (%s)\n", version, h.Description)
+	}
+	return 0
+}

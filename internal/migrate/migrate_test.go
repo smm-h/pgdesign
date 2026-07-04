@@ -4603,3 +4603,78 @@ func TestGenerateMigration_SMTransitionChangeOpToSQL(t *testing.T) {
 		t.Errorf("expected fallback comment for missing RawSQL, got: %s", sql)
 	}
 }
+
+func TestIntegration_Baseline(t *testing.T) {
+	ephDB := setupEphemeralDB(t)
+	ctx := context.Background()
+
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
+
+	// Baseline a fresh database.
+	if err := Baseline(ctx, conn, "1.0.0", "Initial baseline"); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+
+	// Verify the record exists.
+	versions, err := AppliedVersions(ctx, conn)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(versions) != 1 || versions[0] != "1.0.0" {
+		t.Errorf("versions = %v, want [1.0.0]", versions)
+	}
+}
+
+func TestIntegration_BaselineIdempotent(t *testing.T) {
+	ephDB := setupEphemeralDB(t)
+	ctx := context.Background()
+
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
+
+	// Baseline twice with the same version: should succeed.
+	if err := Baseline(ctx, conn, "1.0.0", "Initial baseline"); err != nil {
+		t.Fatalf("first baseline: %v", err)
+	}
+	if err := Baseline(ctx, conn, "1.0.0", "Initial baseline"); err != nil {
+		t.Fatalf("second baseline (idempotent): %v", err)
+	}
+
+	// Verify only one record exists.
+	versions, err := AppliedVersions(ctx, conn)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(versions) != 1 {
+		t.Errorf("versions = %v, want exactly [1.0.0]", versions)
+	}
+}
+
+func TestIntegration_BaselineConflict(t *testing.T) {
+	ephDB := setupEphemeralDB(t)
+	ctx := context.Background()
+
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
+
+	// Baseline with one version.
+	if err := Baseline(ctx, conn, "1.0.0", "Initial baseline"); err != nil {
+		t.Fatalf("first baseline: %v", err)
+	}
+
+	// Baseline with a different version: should error.
+	err = Baseline(ctx, conn, "2.0.0", "Different version")
+	if err == nil {
+		t.Fatal("expected error for conflicting baseline version, got nil")
+	}
+	if !strings.Contains(err.Error(), "baseline conflict") {
+		t.Errorf("expected 'baseline conflict' in error, got: %v", err)
+	}
+}
