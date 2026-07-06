@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pgdesign"
-version = "0.23.0"
+version = "0.23.1"
 description = "PostgreSQL schema compiler with strict enforcement, NF auditing, and declarative migrations"
 license = "MIT"
 requires-python = ">=3.8"

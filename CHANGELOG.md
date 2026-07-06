@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 0.23.1
+
+Fix pypi CI to run in the pypi/ working directory
+
+<details>
+<summary>Context</summary>
+
+The pypi CI job ran `uv sync --locked` at the repo root where there is no pyproject.toml (it lives in pypi/), failing CI and gating npm/pypi publish. No library code changed.
+
+</details>
+
+### Hotfix
+
+- Fix pypi CI to run in the pypi/ working directory
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.23.0
 
 migrate baseline command; fix live-diff crash on provolatile/proparallel columns
@@ -20,12 +41,6 @@ The provolatile/proparallel char-column cast fix unblocks downstream deploy pipe
 ### Fixes
 
 - **Fixed `diff --live` crash on databases with functions.** Introspection no longer errors with `cannot scan char (OID 18)` on the `provolatile`/`proparallel` columns.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.22.0
 
