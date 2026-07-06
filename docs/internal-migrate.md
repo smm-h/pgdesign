@@ -1,6 +1,6 @@
 ---
 title: internal/migrate
-description: "Package migrate provides migration generation, application, rollback, squash consolidation, baseline recording, and safety linting with risk classification for schema changes."
+description: "Package migrate provides migration generation, application, rollback, squash, baseline recording, and safety linting with risk classification."
 generated: true
 nav_group: "API Reference"
 nav_order: 14

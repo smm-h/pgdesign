@@ -1,6 +1,6 @@
 ---
 title: internal/diff
-description: "Package diff compares two resolved schemas or a schema against a live database and produces a structured diff with risk annotations, including partition and maintenance changes."
+description: "Package diff compares two resolved schemas or a schema against a live database, producing a structured diff with risk annotations and partition changes."
 generated: true
 nav_group: "API Reference"
 nav_order: 6
