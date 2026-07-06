@@ -880,6 +880,7 @@ func TestPartmanGeneration(t *testing.T) {
 					Columns:  []string{"created_at"},
 				},
 				Maintenance: &model.MaintenanceConfig{
+					Interval:           "1 month",
 					Premake:            4,
 					Retention:          "6 months",
 					RetentionKeepTable: true,
@@ -899,6 +900,9 @@ func TestPartmanGeneration(t *testing.T) {
 	}
 	if !strings.Contains(out, "p_control := 'created_at'") {
 		t.Errorf("expected p_control, got:\n%s", out)
+	}
+	if !strings.Contains(out, "p_interval := '1 month'") {
+		t.Errorf("expected p_interval with interval value, got:\n%s", out)
 	}
 	if !strings.Contains(out, "p_premake := 4") {
 		t.Errorf("expected p_premake, got:\n%s", out)
@@ -939,6 +943,7 @@ func TestPartmanNotEmittedWithoutExtension(t *testing.T) {
 					Columns:  []string{"created_at"},
 				},
 				Maintenance: &model.MaintenanceConfig{
+					Interval:           "1 month",
 					Premake:            4,
 					Retention:          "6 months",
 					RetentionKeepTable: true,
@@ -974,6 +979,7 @@ func TestPartmanMultiColumnError(t *testing.T) {
 					Columns:  []string{"year", "region"},
 				},
 				Maintenance: &model.MaintenanceConfig{
+					Interval:  "1 month",
 					Premake:   3,
 					Retention: "90 days",
 				},
@@ -998,6 +1004,53 @@ func TestPartmanMultiColumnError(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected pg_partman multi-column error diagnostic (E010), got: %v", diags)
+	}
+}
+
+func TestPartmanSeparateIntervalRetention(t *testing.T) {
+	// Verify that interval and retention are distinct in the generated DDL.
+	// interval controls partition width (p_interval in create_parent),
+	// retention controls how long old partitions are kept (part_config.retention).
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pg_partman"},
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
+				},
+				PK: []string{"id"},
+				Partitioning: &model.PartitionSpec{
+					Strategy: "range",
+					Columns:  []string{"created_at"},
+				},
+				Maintenance: &model.MaintenanceConfig{
+					Interval:           "1 month",
+					Premake:            4,
+					Retention:          "6 months",
+					RetentionKeepTable: false,
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	// p_interval should be the interval value, not the retention value.
+	if !strings.Contains(out, "p_interval := '1 month'") {
+		t.Errorf("expected p_interval := '1 month', got:\n%s", out)
+	}
+	// retention in part_config should be the retention value.
+	if !strings.Contains(out, "retention = '6 months'") {
+		t.Errorf("expected retention = '6 months', got:\n%s", out)
+	}
+	// The two values must be distinct -- interval should NOT appear as retention value.
+	if strings.Contains(out, "p_interval := '6 months'") {
+		t.Errorf("p_interval should be '1 month', not '6 months' (retention)")
 	}
 }
 

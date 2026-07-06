@@ -220,5 +220,6 @@ name = "events_2024_q2"
 bound = "FROM ('2024-04-01') TO ('2024-07-01')"
 
 [tables.events.maintenance]
+interval = "1 month"
 premake = 3
 retention = "90 days"

@@ -65,7 +65,7 @@ CREATE TABLE app.events_2024_q2 PARTITION OF app.events
 SELECT partman.create_parent(
   p_parent_table := 'app.events',
   p_control := 'occurred_at',
-  p_interval := '90 days',
+  p_interval := '1 month',
   p_premake := 3
 );
 

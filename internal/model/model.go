@@ -425,6 +425,7 @@ type PartitionSpec struct {
 
 // MaintenanceConfig represents maintenance configuration for a table.
 type MaintenanceConfig struct {
+	Interval           string `json:"interval"`
 	Premake            int    `json:"premake"`
 	Retention          string `json:"retention"`
 	RetentionKeepTable bool   `json:"retention_keep_table"`

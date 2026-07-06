@@ -230,6 +230,7 @@ type RawDependency struct {
 
 // RawMaintenance holds maintenance configuration from [tables.*.maintenance].
 type RawMaintenance struct {
+	Interval           *string
 	Premake            *int
 	Retention          *string
 	RetentionKeepTable *bool

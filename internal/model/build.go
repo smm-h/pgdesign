@@ -695,6 +695,9 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, s
 	// Resolve maintenance.
 	if rt.Maintenance != nil {
 		mc := &MaintenanceConfig{}
+		if rt.Maintenance.Interval != nil {
+			mc.Interval = *rt.Maintenance.Interval
+		}
 		if rt.Maintenance.Premake != nil {
 			mc.Premake = *rt.Maintenance.Premake
 		}
@@ -703,6 +706,15 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, s
 		}
 		if rt.Maintenance.RetentionKeepTable != nil {
 			mc.RetentionKeepTable = *rt.Maintenance.RetentionKeepTable
+		}
+		// interval is required for any partman-managed table.
+		if mc.Interval == "" {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E010",
+				Table:    rt.Name,
+				Message:  fmt.Sprintf("[tables.%s.maintenance] requires \"interval\" key for partman-managed tables", rt.Name),
+			})
 		}
 		t.Maintenance = mc
 	}

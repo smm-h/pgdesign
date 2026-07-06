@@ -216,7 +216,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			}
 			partmanStmts = append(partmanStmts,
 				sql.CreatePartmanParent(t.Schema, t.Name, t.Partitioning.Columns[0],
-					t.Maintenance.Retention, t.Maintenance.Premake))
+					t.Maintenance.Interval, t.Maintenance.Premake))
 			if t.Maintenance.Retention != "" {
 				partmanStmts = append(partmanStmts,
 					sql.UpdatePartmanConfig(t.Schema, t.Name,

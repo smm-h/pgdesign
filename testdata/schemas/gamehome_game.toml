@@ -321,6 +321,7 @@ strategy = "range"
 column = "sent_at"
 
 [tables.chat_messages.maintenance]
+interval = "1 month"
 premake = 3
 retention = "90 days"
 

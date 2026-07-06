@@ -1947,6 +1947,12 @@ func (p *parser) parseMaintenance(tableName string, rt *RawTable) {
 		}
 		key := kv.Key.Parts[0]
 		switch key {
+		case "interval":
+			if v, ok := nodeString(kv.Val); ok {
+				maint.Interval = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.maintenance].interval must be a string", tableName)
+			}
 		case "premake":
 			if v, ok := nodeInt(kv.Val); ok {
 				iv := int(v)

@@ -341,7 +341,7 @@ CREATE TABLE game.state_snapshot (
 SELECT partman.create_parent(
   p_parent_table := 'game.chat_messages',
   p_control := 'sent_at',
-  p_interval := '90 days',
+  p_interval := '1 month',
   p_premake := 3
 );
 

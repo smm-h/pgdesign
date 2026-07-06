@@ -522,6 +522,7 @@
         ]
       },
       "maintenance": {
+        "interval": "1 month",
         "premake": 3,
         "retention": "90 days",
         "retention_keep_table": false
