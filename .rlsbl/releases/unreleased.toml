@@ -1,9 +1,9 @@
 # Version bump type: patch, minor, major, hotfix, or prerelease
-bump = ""
+bump = "hotfix"
 # Short description of this release (required)
-description = ""
+description = "Fix pypi CI to run in the pypi/ working directory"
 # Optional context explaining why these changes were made
-context = ""
+context = "The pypi CI job ran `uv sync --locked` at the repo root where there is no pyproject.toml (it lives in pypi/), failing CI and gating npm/pypi publish. No library code changed."
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
