@@ -943,6 +943,12 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			md := td.MaintenanceChanged
 
 			// Interval change: hard error (requires repartitioning).
+			// TODO(phase4b): Once TestPartmanForwardOnlyInterval passes on live PG
+			// (see internal/test/partman_interval_test.go), downgrade this to a
+			// Caution classification gated on partman_version. Forward-only interval
+			// changes produce mixed-width children, which is operationally surprising
+			// but may work correctly with partman >= 5.x. The experiment needs live
+			// verification before relaxing this guard.
 			if md.IntervalChanged != nil {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity: diagnostic.Error,
