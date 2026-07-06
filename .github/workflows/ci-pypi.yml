@@ -20,6 +20,11 @@ jobs:
       matrix:
         # requires-python: >= 3.8
         python-version: ["3.12", "3.13", "3.14"]
+    defaults:
+      run:
+        # The pypi target lives in pypi/ (see .rlsbl/config.json target path);
+        # pyproject.toml and uv.lock are there, not at the repo root.
+        working-directory: pypi
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
