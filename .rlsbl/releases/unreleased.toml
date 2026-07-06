@@ -1,9 +1,9 @@
 # Version bump type: patch, minor, major, hotfix, or prerelease
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "migrate baseline command; fix live-diff crash on provolatile/proparallel columns"
 # Optional context explaining why these changes were made
-context = ""
+context = "The provolatile/proparallel char-column cast fix unblocks downstream deploy pipelines whose post-deploy audit runs `pgdesign diff --live` against a database containing functions."
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
