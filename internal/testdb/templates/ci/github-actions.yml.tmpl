@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
+{{PARTMAN_INSTALL}}
       - name: Setup Go
         if: matrix.language == 'go'
         uses: actions/setup-go@v5

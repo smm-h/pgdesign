@@ -67,9 +67,17 @@ var ciTemplates = map[string]string{
 	"github-actions": "github-actions.yml.tmpl",
 }
 
+// CITemplateOptions configures CI template rendering beyond basic placeholders.
+type CITemplateOptions struct {
+	// Partman adds pg_partman installation steps to the CI workflow.
+	// When true, a docker exec step installs postgresql-<version>-partman
+	// inside the postgres service container.
+	Partman bool
+}
+
 // RenderCITemplate reads a CI workflow template for the given provider and
 // substitutes placeholders. Only "github-actions" is supported.
-func RenderCITemplate(provider, pgVersion string, languages []string) ([]byte, error) {
+func RenderCITemplate(provider, pgVersion string, languages []string, opts CITemplateOptions) ([]byte, error) {
 	filename, ok := ciTemplates[provider]
 	if !ok {
 		return nil, fmt.Errorf("unsupported CI provider %q (supported: github-actions)", provider)
@@ -83,6 +91,18 @@ func RenderCITemplate(provider, pgVersion string, languages []string) ([]byte, e
 	s := string(data)
 	s = strings.ReplaceAll(s, "{{PG_VERSION}}", pgVersion)
 	s = strings.ReplaceAll(s, "{{LANGUAGES}}", strings.Join(languages, ", "))
+
+	if opts.Partman {
+		partmanBlock := fmt.Sprintf(`
+      - name: Install pg_partman extension
+        run: |
+          docker exec ${{ job.services.postgres.id }} bash -c \
+            "apt-get update && apt-get install -y --no-install-recommends postgresql-%s-partman && rm -rf /var/lib/apt/lists/*"
+`, pgVersion)
+		s = strings.ReplaceAll(s, "{{PARTMAN_INSTALL}}", partmanBlock)
+	} else {
+		s = strings.ReplaceAll(s, "{{PARTMAN_INSTALL}}", "")
+	}
 
 	return []byte(s), nil
 }

@@ -88,7 +88,7 @@ func TestWrapperOutputPathUnknown(t *testing.T) {
 }
 
 func TestRenderCITemplate(t *testing.T) {
-	out, err := RenderCITemplate("github-actions", "16", []string{"go", "python", "ts"})
+	out, err := RenderCITemplate("github-actions", "16", []string{"go", "python", "ts"}, CITemplateOptions{})
 	if err != nil {
 		t.Fatalf("RenderCITemplate: %v", err)
 	}
@@ -124,10 +124,39 @@ func TestRenderCITemplate(t *testing.T) {
 	if strings.Contains(s, "{{") {
 		t.Error("unreplaced {{ placeholder in output")
 	}
+
+	// Without partman, no partman install step.
+	if strings.Contains(s, "partman") {
+		t.Error("unexpected partman reference without Partman option")
+	}
+}
+
+func TestRenderCITemplateWithPartman(t *testing.T) {
+	out, err := RenderCITemplate("github-actions", "17", []string{"go"}, CITemplateOptions{Partman: true})
+	if err != nil {
+		t.Fatalf("RenderCITemplate with Partman: %v", err)
+	}
+	s := string(out)
+
+	// Partman install step present.
+	if !strings.Contains(s, "Install pg_partman extension") {
+		t.Error("expected partman install step in output")
+	}
+	if !strings.Contains(s, "postgresql-17-partman") {
+		t.Error("expected postgresql-17-partman package name in output")
+	}
+
+	// No unreplaced pgdesign placeholders ({{WORD}} style).
+	// GitHub Actions uses ${{ expr }} which is not a pgdesign placeholder.
+	for _, ph := range []string{"{{PG_VERSION}}", "{{LANGUAGES}}", "{{PARTMAN_INSTALL}}"} {
+		if strings.Contains(s, ph) {
+			t.Errorf("unreplaced pgdesign placeholder %s in output", ph)
+		}
+	}
 }
 
 func TestRenderCITemplateUnsupportedProvider(t *testing.T) {
-	_, err := RenderCITemplate("gitlab", "16", []string{"go"})
+	_, err := RenderCITemplate("gitlab", "16", []string{"go"}, CITemplateOptions{})
 	if err == nil {
 		t.Fatal("expected error for unsupported CI provider")
 	}

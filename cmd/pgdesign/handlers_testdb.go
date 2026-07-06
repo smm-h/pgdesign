@@ -162,6 +162,7 @@ type testdbInitHandler struct {
 	Output         *string  `cli:"output" help:"Name of the SQL output section (for disambiguation)"`
 	ForceOverwrite bool     `cli:"force-overwrite" help:"Overwrite existing wrapper files without prompting" default:"false"`
 	CI             *string  `cli:"ci" help:"CI provider for workflow generation (e.g., github-actions)"`
+	Partman        bool     `cli:"partman" help:"Include pg_partman installation step in CI workflow" default:"false"`
 }
 
 func (h *testdbInitHandler) Run(ctx *strictcli.Context) int {
@@ -328,7 +329,9 @@ func (h *testdbInitHandler) Run(ctx *strictcli.Context) int {
 		}
 		pgVersion := fmt.Sprintf("%d", cfg.Database.PGVersion)
 
-		content, err := testdb.RenderCITemplate(ciProvider, pgVersion, languages)
+		content, err := testdb.RenderCITemplate(ciProvider, pgVersion, languages, testdb.CITemplateOptions{
+			Partman: h.Partman,
+		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: render CI template: %v\n", err)
 			return 1
