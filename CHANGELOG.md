@@ -2,6 +2,41 @@
 
 # Changelog
 
+## 0.24.0
+
+Partition lifecycle completeness, migrate baseline fix, library promotion (pkg/diff, pkg/genkit, pkg/diagnostic).
+
+<details>
+<summary>Context</summary>
+
+Partman integration reaches end-to-end coverage: CI template gains --partman flag with postgres+partman service, introspection excludes partman-managed children from drift, MaintenanceDiff safely updates part_config with hard error on interval changes, and extension setup is schema-qualified. Partition interval is now separated from retention and required explicitly (breaking). Migrate baseline records all versions with additive idempotency and out-of-order guard. Three internal packages promoted to shared libraries: pkg/diff, pkg/genkit, pkg/diagnostic.
+
+</details>
+
+### Breaking
+
+- **Separate partition interval from retention.** `interval` is now a required field, independent of retention policy.
+
+### Features
+
+- **Partman-capable CI.** Consumer CI template gains `--partman` flag for postgres+partman service, `SkipIfNoPartman` test guard, and `REQUIRE` env vars.
+- **Faceted codegen `__init__.py`.** Generate `__init__.py` in faceted output directories; fix executor type annotations for mypy.
+- **MaintenanceDiff.** Safe `part_config` updates with hard error on interval changes that require manual partition restructuring.
+- **Partman-aware introspection.** Exclude partman-managed partition children from drift detection.
+- **Extension schema qualification.** Schema-qualified `CREATE EXTENSION` for partman setup; scheduling docs.
+- **Partition interval caution classification.** Forward-only experiment guard for interval changes.
+- **Library promotion.** `pkg/diagnostic`, `pkg/genkit`, and `pkg/diff` promoted to shared packages with stable interfaces.
+
+### Fixes
+
+- **Migrate baseline fix.** Record all versions in migration history, enforce additive idempotency, add out-of-order guard.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.23.1
 
 Fix pypi CI to run in the pypi/ working directory
@@ -16,12 +51,6 @@ The pypi CI job ran `uv sync --locked` at the repo root where there is no pyproj
 ### Hotfix
 
 - Fix pypi CI to run in the pypi/ working directory
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.23.0
 
