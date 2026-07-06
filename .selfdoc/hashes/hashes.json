@@ -44,7 +44,7 @@
     "description": "1a99db90102a65a1567c98b6eeba97192156325e57b3434abb2be322416ab779"
   },
   "en/cli-migrate.md": {
-    "content": "371d4d3c16964085d3129376e6df9658a3fb3bcaa1fbd48682c2b8098a666480",
+    "content": "31ac63857c1a697ae55702ab55341a9ba177329e44e2b52051d8be895305825c",
     "description": "1a3026fbd049706b0487173a0dfe7740951aa2e722e32d9fab0258136c7c3071"
   },
   "en/cli-seed.md": {
@@ -176,7 +176,7 @@
     "source_docstring": "c3ae968a040f235b893613040acec8b0e4dff972744550b626b13a5a17b74db4"
   },
   "en/internal-migrate.md": {
-    "content": "226d761beab64bea4f5eaced39d1091eb8285f864a21b8833f94dafb4e41bf65",
+    "content": "2125b411aec141dbdb168105d908cd9d224e892dbe9bb55ae4c4a4ac2937894e",
     "description": "1feb0e7786e8815cbecf055fa5a724efecf0ba9fb1c240233cfe0af631aac753",
     "source_docstring": "1feb0e7786e8815cbecf055fa5a724efecf0ba9fb1c240233cfe0af631aac753"
   },

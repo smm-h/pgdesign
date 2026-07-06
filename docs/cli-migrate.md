@@ -24,6 +24,18 @@ Apply all pending migrations to the target database in order. Each migration run
 | `--dry-run` |  | bool |  |  | Preview the migration SQL statements without executing |
 | `--timeout` |  | int | 30 |  | Advisory lock acquisition timeout in seconds before aborting |
 
+## migrate baseline
+
+Mark an existing database as being at a specific migration version without executing any migration SQL. Use this when adopting pgdesign migrations for a database whose schema was already created by other means. Idempotent: re-running with the same version succeeds; a different version errors.
+
+### Flags
+
+| Name | Short | Type | Default | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--version` |  | str |  |  | Version label for the baseline record |
+| `--description` |  | str | Initial baseline |  | Human-readable description |
+
 ## migrate generate
 
 Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.
