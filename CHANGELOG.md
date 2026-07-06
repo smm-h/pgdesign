@@ -2,6 +2,31 @@
 
 # Changelog
 
+## 0.23.0
+
+migrate baseline command; fix live-diff crash on provolatile/proparallel columns
+
+<details>
+<summary>Context</summary>
+
+The provolatile/proparallel char-column cast fix unblocks downstream deploy pipelines whose post-deploy audit runs `pgdesign diff --live` against a database containing functions.
+
+</details>
+
+### Features
+
+- **Added `migrate baseline` command.** Marks an existing database as being at a specific migration version without executing any SQL, so projects with pre-existing schema can adopt pgdesign-native migrations going forward. Idempotent.
+
+### Fixes
+
+- **Fixed `diff --live` crash on databases with functions.** Introspection no longer errors with `cannot scan char (OID 18)` on the `provolatile`/`proparallel` columns.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.22.0
 
 Valid idempotent enum DDL, E228 cascade guardrail, unsuppressible errors, ORM enum support, orphan detection, codegen --check, declaration-order preservation, and full struct-handler CLI.
@@ -43,12 +68,6 @@ CLI: migrated to strictcli v0.19.0 struct handlers end-to-end, retiring the kwar
 - **Fix.** State machine states and composite type fields now preserve TOML declaration order end-to-end. Previously states were randomized per build (flapping freshness checks) and composite fields were silently alphabetized — both semantically wrong since PostgreSQL enum order and composite field order are meaningful. Duplicate composite field names are now rejected (E103).
 - **Fix.** W013/W014 cascade warnings attributed cascades to the wrong end of the FK chain (walkers traversed child-to-parent while ON DELETE CASCADE flows parent-to-child). Messages now name the true delete origin.
 - **Fix.** Python DDL tuples for sequences, policies, triggers, materialized views, and append-only triggers now carry real `idempotent_sql` (previously silently fell back to non-idempotent SQL). Domain-backed columns are schema-qualified in CREATE TABLE (generated DDL failed on fresh databases without search_path luck). An execution-backed test matrix now runs every emitted statement — idempotent variants twice — against live PostgreSQL.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.21.0
 

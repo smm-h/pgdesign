@@ -628,6 +628,28 @@
           "help": "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.",
           "name": "apply"
         },
+        "baseline": {
+          "flags": [
+            {
+              "help": "PostgreSQL connection URL for the target database server",
+              "name": "db",
+              "type": "str"
+            },
+            {
+              "help": "Version label for the baseline record",
+              "name": "version",
+              "type": "str"
+            },
+            {
+              "default": "Initial baseline",
+              "help": "Human-readable description",
+              "name": "description",
+              "type": "str"
+            }
+          ],
+          "help": "Mark an existing database as being at a specific migration version without executing any migration SQL. Use this when adopting pgdesign migrations for a database whose schema was already created by other means. Idempotent: re-running with the same version succeeds; a different version errors.",
+          "name": "baseline"
+        },
         "generate": {
           "args": [
             {
