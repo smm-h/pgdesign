@@ -1274,6 +1274,7 @@ func printSchemaDiffSummary(d *diff.SchemaDiff) {
 
 type migrateBaselineHandler struct {
 	DB          string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
+	Dir         string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
 	Version     string `cli:"version" help:"Version label for the baseline record"`
 	Description string `cli:"description" help:"Human-readable description" default:"Initial baseline"`
 }
@@ -1293,6 +1294,18 @@ func (h *migrateBaselineHandler) Run(cliCtx *strictcli.Context) int {
 		return 1
 	}
 
+	// Load config for migrations dir.
+	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+		return 1
+	}
+
+	dir := h.Dir
+	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+		dir = string(cfg.Project.MigrationsDir)
+	}
+
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, dbURL)
 	if err != nil {
@@ -1301,7 +1314,7 @@ func (h *migrateBaselineHandler) Run(cliCtx *strictcli.Context) int {
 	}
 	defer conn.Close(ctx)
 
-	if err := migrate.Baseline(ctx, conn, version, h.Description); err != nil {
+	if err := migrate.Baseline(ctx, conn, dir, version, h.Description); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}

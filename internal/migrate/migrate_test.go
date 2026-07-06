@@ -4604,6 +4604,21 @@ func TestGenerateMigration_SMTransitionChangeOpToSQL(t *testing.T) {
 	}
 }
 
+// createMigrationDir creates a temporary migrations directory with the given
+// versions. Each version gets a minimal valid migration TOML file.
+func createMigrationDir(t *testing.T, versions ...string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, v := range versions {
+		content := fmt.Sprintf("description = %q\n\n[[ddl]]\nop = \"create_table\"\ntable = \"public.t_%s\"\ndown = { op = \"drop_table\", table = \"public.t_%s\" }\n",
+			"Migration "+v, strings.ReplaceAll(v, ".", "_"), strings.ReplaceAll(v, ".", "_"))
+		if err := os.WriteFile(filepath.Join(dir, v+".toml"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
 func TestIntegration_Baseline(t *testing.T) {
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
@@ -4613,8 +4628,10 @@ func TestIntegration_Baseline(t *testing.T) {
 		t.Fatalf("connect to ephemeral DB: %v", err)
 	}
 
+	dir := createMigrationDir(t, "1.0.0")
+
 	// Baseline a fresh database.
-	if err := Baseline(ctx, conn, "1.0.0", "Initial baseline"); err != nil {
+	if err := Baseline(ctx, conn, dir, "1.0.0", "Initial baseline"); err != nil {
 		t.Fatalf("baseline: %v", err)
 	}
 
@@ -4637,11 +4654,13 @@ func TestIntegration_BaselineIdempotent(t *testing.T) {
 		t.Fatalf("connect to ephemeral DB: %v", err)
 	}
 
+	dir := createMigrationDir(t, "1.0.0")
+
 	// Baseline twice with the same version: should succeed.
-	if err := Baseline(ctx, conn, "1.0.0", "Initial baseline"); err != nil {
+	if err := Baseline(ctx, conn, dir, "1.0.0", "Initial baseline"); err != nil {
 		t.Fatalf("first baseline: %v", err)
 	}
-	if err := Baseline(ctx, conn, "1.0.0", "Initial baseline"); err != nil {
+	if err := Baseline(ctx, conn, dir, "1.0.0", "Initial baseline"); err != nil {
 		t.Fatalf("second baseline (idempotent): %v", err)
 	}
 
@@ -4655,7 +4674,10 @@ func TestIntegration_BaselineIdempotent(t *testing.T) {
 	}
 }
 
-func TestIntegration_BaselineConflict(t *testing.T) {
+// TestIntegration_BaselineRecordsAllVersions is the core regression test for
+// the history-coverage bug: baseline must record ALL discovered versions <=
+// target so that a subsequent Apply finds zero pending migrations.
+func TestIntegration_BaselineRecordsAllVersions(t *testing.T) {
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -4664,17 +4686,139 @@ func TestIntegration_BaselineConflict(t *testing.T) {
 		t.Fatalf("connect to ephemeral DB: %v", err)
 	}
 
-	// Baseline with one version.
-	if err := Baseline(ctx, conn, "1.0.0", "Initial baseline"); err != nil {
+	dir := createMigrationDir(t, "0.1.0", "0.2.0", "0.3.0")
+
+	// Baseline to v0.3.0 -- should record all three versions.
+	if err := Baseline(ctx, conn, dir, "0.3.0", "Adopt existing schema"); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+
+	// Verify all three versions are recorded.
+	versions, err := AppliedVersions(ctx, conn)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(versions) != 3 {
+		t.Fatalf("versions = %v, want [0.1.0, 0.2.0, 0.3.0]", versions)
+	}
+	if versions[0] != "0.1.0" || versions[1] != "0.2.0" || versions[2] != "0.3.0" {
+		t.Errorf("versions = %v, want [0.1.0, 0.2.0, 0.3.0]", versions)
+	}
+
+	// Apply should find zero pending migrations.
+	applied, err := Apply(ctx, conn, dir, "")
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if len(applied) != 0 {
+		t.Errorf("apply returned %v, want zero pending migrations after baseline", applied)
+	}
+}
+
+// TestIntegration_BaselineAdditiveRerun tests additive idempotency: re-running
+// baseline after new migration files are added records the missing versions.
+func TestIntegration_BaselineAdditiveRerun(t *testing.T) {
+	ephDB := setupEphemeralDB(t)
+	ctx := context.Background()
+
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
+
+	// First baseline with only v0.1.0 and v0.2.0.
+	dir := createMigrationDir(t, "0.1.0", "0.2.0")
+	if err := Baseline(ctx, conn, dir, "0.2.0", "Initial baseline"); err != nil {
 		t.Fatalf("first baseline: %v", err)
 	}
 
-	// Baseline with a different version: should error.
-	err = Baseline(ctx, conn, "2.0.0", "Different version")
-	if err == nil {
-		t.Fatal("expected error for conflicting baseline version, got nil")
+	versions, err := AppliedVersions(ctx, conn)
+	if err != nil {
+		t.Fatalf("query: %v", err)
 	}
-	if !strings.Contains(err.Error(), "baseline conflict") {
-		t.Errorf("expected 'baseline conflict' in error, got: %v", err)
+	if len(versions) != 2 {
+		t.Fatalf("after first baseline: versions = %v, want [0.1.0, 0.2.0]", versions)
+	}
+
+	// Add v0.3.0 migration file and re-baseline to v0.3.0.
+	content := fmt.Sprintf("description = %q\n\n[[ddl]]\nop = \"create_table\"\ntable = \"public.t_0_3_0\"\ndown = { op = \"drop_table\", table = \"public.t_0_3_0\" }\n", "Migration 0.3.0")
+	if err := os.WriteFile(filepath.Join(dir, "0.3.0.toml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Baseline(ctx, conn, dir, "0.3.0", "Re-baseline with new version"); err != nil {
+		t.Fatalf("re-baseline: %v", err)
+	}
+
+	versions, err = AppliedVersions(ctx, conn)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if len(versions) != 3 {
+		t.Fatalf("after re-baseline: versions = %v, want [0.1.0, 0.2.0, 0.3.0]", versions)
+	}
+}
+
+// TestIntegration_BaselineOutOfOrderGuard tests that baseline detects when a
+// migration file with version < max-applied was added after later versions
+// were applied.
+func TestIntegration_BaselineOutOfOrderGuard(t *testing.T) {
+	ephDB := setupEphemeralDB(t)
+	ctx := context.Background()
+
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
+
+	// Baseline with v0.2.0 and v0.3.0 (no v0.1.0).
+	dir := createMigrationDir(t, "0.2.0", "0.3.0")
+	if err := Baseline(ctx, conn, dir, "0.3.0", "Initial baseline"); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+
+	// Now add v0.1.0 migration file (added after v0.3.0 was applied).
+	content := fmt.Sprintf("description = %q\n\n[[ddl]]\nop = \"create_table\"\ntable = \"public.t_0_1_0\"\ndown = { op = \"drop_table\", table = \"public.t_0_1_0\" }\n", "Migration 0.1.0")
+	if err := os.WriteFile(filepath.Join(dir, "0.1.0.toml"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Re-baseline with v0.3.0: should detect the out-of-order v0.1.0.
+	err = Baseline(ctx, conn, dir, "0.3.0", "Re-baseline")
+	if err == nil {
+		t.Fatal("expected out-of-order error, got nil")
+	}
+	if !strings.Contains(err.Error(), "out-of-order") {
+		t.Errorf("expected 'out-of-order' in error, got: %v", err)
+	}
+}
+
+// TestIntegration_BaselineDivergence tests that baseline detects when a
+// previously recorded version has no corresponding migration file (deleted).
+func TestIntegration_BaselineDivergence(t *testing.T) {
+	ephDB := setupEphemeralDB(t)
+	ctx := context.Background()
+
+	conn, err := ephDB.Connect(ctx)
+	if err != nil {
+		t.Fatalf("connect to ephemeral DB: %v", err)
+	}
+
+	// Baseline with v0.1.0 and v0.2.0.
+	dir := createMigrationDir(t, "0.1.0", "0.2.0")
+	if err := Baseline(ctx, conn, dir, "0.2.0", "Initial baseline"); err != nil {
+		t.Fatalf("baseline: %v", err)
+	}
+
+	// Delete v0.1.0 migration file.
+	os.Remove(filepath.Join(dir, "0.1.0.toml"))
+
+	// Re-baseline: should detect divergence (v0.1.0 recorded but file missing).
+	err = Baseline(ctx, conn, dir, "0.2.0", "Re-baseline")
+	if err == nil {
+		t.Fatal("expected divergence error, got nil")
+	}
+	if !strings.Contains(err.Error(), "divergence") {
+		t.Errorf("expected 'divergence' in error, got: %v", err)
 	}
 }
