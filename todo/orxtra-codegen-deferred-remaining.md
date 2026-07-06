@@ -1,23 +1,8 @@
-# orxtra codegen wishlist: deferred items (15, 17-22)
+# orxtra codegen wishlist: deferred items (17-22)
 
-> Split from `orxtra-codegen-wishlist.md`: these items were consciously deferred during
-> triage (low value, better solved elsewhere, or very large scope). The implemented
-> portion (items 1-14, 16) lives in `todo/.done/orxtra-codegen-wishlist-implemented.md`.
-> Original text preserved.
-
-## Large features
-
-### 15. rlsbl check integration
-
-**Status:** Not implemented.
-
-**What:** pgdesign registers as an rlsbl check provider. When `rlsbl check --tag quality` runs (or a new `--tag schema` tag), it invokes `pgdesign check --tag build` automatically if a `pgdesign.toml` exists.
-
-**Why we need it:** orxtra uses rlsbl for release orchestration. rlsbl already runs tests, lint, selfdoc check, and changelog validation during releases. Schema staleness should be checked at the same gate. Currently it requires a separate CI job and a separate pre-checks hook invocation. With rlsbl integration, schema freshness is just another rlsbl check — no extra wiring.
-
-**The hole it fills:** Eliminates the need to separately wire pgdesign checks into CI and release hooks. The release pipeline becomes: `rlsbl release run` → runs all checks including schema staleness → no stale DDL can ship.
-
----
+> Split from `orxtra-codegen-deferred.md`: item 15 (rlsbl check integration)
+> moved to `todo/.done/rlsbl-check-integration.md`. These items (17-22) remain
+> deferred. Original text preserved.
 
 ## Outlandish but correct
 

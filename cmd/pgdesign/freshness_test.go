@@ -512,3 +512,81 @@ func TestHandleCodegenCheck_SingleFile(t *testing.T) {
 		t.Fatalf("--check on stale single file must exit 1, got %d", code)
 	}
 }
+
+// TestCheckBuild_FreshPassStaleFailLifecycle exercises the exact behavior that
+// rlsbl gates on when using pgdesign as an external check provider: checkBuild
+// must return "pass" when all build outputs match the schema, and "fail" when
+// any output is stale or missing. This is the contract that
+// `pgdesign check --tag build` (exit 0 / non-zero) exposes.
+func TestCheckBuild_FreshPassStaleFailLifecycle(t *testing.T) {
+	dir := writeFreshnessProject(t, "self-contained")
+	t.Chdir(dir)
+
+	// Before any build: outputs are missing, check must fail.
+	res := checkBuild(&pgdesignCheckContext{root: dir})
+	if res.Status == "pass" {
+		t.Fatalf("expected check to fail before build, got pass")
+	}
+
+	// Run build to materialize all outputs.
+	if code := testBuild(false); code != 0 {
+		t.Fatalf("build failed with exit code %d", code)
+	}
+
+	// After a fresh build: check must pass.
+	res = checkBuild(&pgdesignCheckContext{root: dir})
+	if res.Status != "pass" {
+		t.Fatalf("expected pass after fresh build, got %s: %s %v", res.Status, res.Message, res.Details)
+	}
+
+	// Corrupt a generated file to simulate schema drift: check must fail.
+	genDir := filepath.Join(dir, "gen")
+	entries, err := os.ReadDir(genDir)
+	if err != nil || len(entries) == 0 {
+		t.Fatalf("read gen dir: %v (%d entries)", err, len(entries))
+	}
+	// Find a regular file (not a directory) to corrupt.
+	var victim string
+	for _, e := range entries {
+		if !e.IsDir() {
+			victim = filepath.Join(genDir, e.Name())
+			break
+		}
+	}
+	if victim == "" {
+		t.Fatal("no regular file found in gen/ to corrupt")
+	}
+	original, err := os.ReadFile(victim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(victim, append(original, []byte("\n# stale\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	res = checkBuild(&pgdesignCheckContext{root: dir})
+	if res.Status != "fail" {
+		t.Fatalf("expected fail after corrupting %s, got %s: %s", filepath.Base(victim), res.Status, res.Message)
+	}
+
+	// Verify the failure mentions the stale file.
+	staleFound := false
+	for _, d := range res.Details {
+		if strings.Contains(d, "[stale]") {
+			staleFound = true
+			break
+		}
+	}
+	if !staleFound {
+		t.Errorf("expected [stale] in check details, got: %v", res.Details)
+	}
+
+	// Restore the original content: check must pass again.
+	if err := os.WriteFile(victim, original, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res = checkBuild(&pgdesignCheckContext{root: dir})
+	if res.Status != "pass" {
+		t.Fatalf("expected pass after restoring %s, got %s: %s", filepath.Base(victim), res.Status, res.Message)
+	}
+}
