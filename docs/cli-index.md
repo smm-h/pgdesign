@@ -2,6 +2,7 @@
 title: pgdesign CLI Reference
 description: "Complete CLI reference for pgdesign — all available commands, subcommands, flags, arguments, and usage examples with detailed descriptions."
 generated: true
+seeded: true
 nav_group: "CLI Reference"
 nav_order: 0
 order: 91
