@@ -302,19 +302,27 @@ dependent = ["student_name"]
 
 ## Maintenance
 
-Partition lifecycle configuration controls automatic partition management for time-series and append-only tables. The maintenance section specifies how many future partitions to pre-create ahead of the current period, the retention duration after which old partitions are eligible for cleanup, and whether expired partitions should be preserved as detached tables rather than dropped entirely. These settings integrate with pg_partman when available.
+Partition lifecycle configuration controls automatic partition management for time-series and append-only tables. The maintenance section configures pg_partman: `interval` sets the partition width (how wide each child partition is), `premake` controls how many future partitions are pre-created, `retention` sets how long old partitions are kept before cleanup, and `retention_keep_table` controls whether expired partitions are detached or dropped. These settings require the `pg_partman` extension.
+
+The `interval` key is required for all partman-managed tables. It controls the `p_interval` argument to `partman.create_parent()`, while `retention` is stored separately in `partman.part_config.retention`. This allows configurations like "monthly partitions, keep 6 months" where the partition width differs from the retention period.
+
+pg_partman requires a background process to run `partman.run_maintenance_proc()` on a regular schedule (e.g., every 30 minutes via pg_cron). Without this, partitions are not automatically created or expired. The scheduling SQL is: `SELECT cron.schedule('partman-maintenance', '*/30 * * * *', $$CALL partman.run_maintenance_proc()$$);`. This is not emitted in the generated DDL because it requires pg_cron and is a one-time setup operation.
+
+The pg_partman extension is installed into a dedicated `partman` schema. The generated DDL emits `CREATE SCHEMA IF NOT EXISTS partman` followed by `CREATE EXTENSION pg_partman SCHEMA partman` to keep partman functions isolated from the application schema.
 
 ```toml
 [tables.events.maintenance]
+interval = "1 month"
 premake = 3
-retention = "90d"
-retention_keep_table = true
+retention = "6 months"
+retention_keep_table = false
 ```
 
 | Key | Type | Description |
 |-----|------|-------------|
+| `interval` | string | Partition width (e.g., `"1 month"`, `"1 week"`). **Required.** |
 | `premake` | integer | Number of future partitions to pre-create |
-| `retention` | string | Retention period (e.g., `"90d"`, `"1y"`) |
+| `retention` | string | Retention period (e.g., `"90 days"`, `"6 months"`) |
 | `retention_keep_table` | boolean | Keep expired partition tables instead of dropping |
 
 ## [views.*]

@@ -1,6 +1,8 @@
 CREATE SCHEMA game;
 
-CREATE EXTENSION pg_partman;
+CREATE SCHEMA IF NOT EXISTS partman;
+
+CREATE EXTENSION pg_partman SCHEMA partman;
 
 CREATE TYPE game.friendship_status AS ENUM ('pending', 'accepted', 'blocked');
 CREATE TYPE game.generation_status AS ENUM ('pending', 'running', 'completed', 'failed');

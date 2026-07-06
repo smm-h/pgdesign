@@ -2522,3 +2522,26 @@ func TestCreateTable_DomainColumnSchemaQualified(t *testing.T) {
 		t.Errorf("expected plain uuid type, got:\n%s", got)
 	}
 }
+
+func TestCreateExtensionInSchema(t *testing.T) {
+	got := CreateExtensionInSchema("pg_partman", "partman", false)
+	want := "CREATE EXTENSION pg_partman SCHEMA partman;"
+	if got != want {
+		t.Errorf("CreateExtensionInSchema:\n  got:  %s\n  want: %s", got, want)
+	}
+
+	gotIdem := CreateExtensionInSchema("pg_partman", "partman", true)
+	wantIdem := "CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman;"
+	if gotIdem != wantIdem {
+		t.Errorf("CreateExtensionInSchema idempotent:\n  got:  %s\n  want: %s", gotIdem, wantIdem)
+	}
+}
+
+func TestPartmanRunMaintenanceCron(t *testing.T) {
+	got := PartmanRunMaintenanceCron()
+	// Golden assertion: exact SQL output for pg_cron scheduling of partman maintenance.
+	want := `SELECT cron.schedule('partman-maintenance', '*/30 * * * *', $$CALL partman.run_maintenance_proc()$$);`
+	if got != want {
+		t.Errorf("PartmanRunMaintenanceCron:\n  got:  %s\n  want: %s", got, want)
+	}
+}

@@ -1,7 +1,9 @@
 CREATE SCHEMA app;
 
+CREATE SCHEMA IF NOT EXISTS partman;
+
 CREATE EXTENSION pgcrypto;
-CREATE EXTENSION pg_partman;
+CREATE EXTENSION pg_partman SCHEMA partman;
 
 CREATE TYPE app.priority AS ENUM ('low', 'medium', 'high', 'critical');
 

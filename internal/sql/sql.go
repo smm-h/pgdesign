@@ -158,6 +158,16 @@ func CreateExtension(name string, idempotent bool) string {
 	return fmt.Sprintf("CREATE EXTENSION%s %s;", ifne, QuoteIdent(name))
 }
 
+// CreateExtensionInSchema generates a CREATE EXTENSION ... SCHEMA statement
+// that installs the extension into a specific schema.
+func CreateExtensionInSchema(name, schema string, idempotent bool) string {
+	ifne := ""
+	if idempotent {
+		ifne = " IF NOT EXISTS"
+	}
+	return fmt.Sprintf("CREATE EXTENSION%s %s SCHEMA %s;", ifne, QuoteIdent(name), QuoteIdent(schema))
+}
+
 // CreateEnum generates a CREATE TYPE ... AS ENUM statement.
 // PostgreSQL does not support CREATE TYPE IF NOT EXISTS, so when idempotent
 // is true, the statement is wrapped in a DO $$ block that checks pg_type
@@ -709,6 +719,13 @@ func UpdatePartmanConfig(schemaName, tableName, retention string, keepTable bool
 SET retention = '%s',
     retention_keep_table = %s
 WHERE parent_table = '%s';`, escapedRetention, keepTableStr, escapedQualified)
+}
+
+// PartmanRunMaintenanceCron generates a SELECT cron.schedule() call to create
+// a pg_cron job that runs partman.run_maintenance_proc() on a regular schedule.
+// This is golden-tested only; live cron verification is out of scope.
+func PartmanRunMaintenanceCron() string {
+	return `SELECT cron.schedule('partman-maintenance', '*/30 * * * *', $$CALL partman.run_maintenance_proc()$$);`
 }
 
 // AlterTableOwner generates an ALTER TABLE ... OWNER TO statement.

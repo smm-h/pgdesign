@@ -132,11 +132,20 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		}
 	}
 
+	// 1b. CREATE SCHEMA partman (before CREATE EXTENSION pg_partman which needs it)
+	if hasExtension(schema, "pg_partman") {
+		sections = append(sections, sql.CreateSchema("partman", true))
+	}
+
 	// 2. CREATE EXTENSION
 	if len(schema.Extensions) > 0 {
 		var extStmts []string
 		for _, ext := range schema.Extensions {
-			extStmts = append(extStmts, sql.CreateExtension(ext, opts.Idempotent))
+			if ext == "pg_partman" {
+				extStmts = append(extStmts, sql.CreateExtensionInSchema(ext, "partman", opts.Idempotent))
+			} else {
+				extStmts = append(extStmts, sql.CreateExtension(ext, opts.Idempotent))
+			}
 		}
 		sections = append(sections, strings.Join(extStmts, "\n"))
 	}

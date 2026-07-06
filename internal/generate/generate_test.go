@@ -1007,6 +1007,55 @@ func TestPartmanMultiColumnError(t *testing.T) {
 	}
 }
 
+func TestPartmanSchemaSetup(t *testing.T) {
+	// Verify that pg_partman extension setup emits:
+	// 1. CREATE SCHEMA IF NOT EXISTS partman; (before CREATE EXTENSION)
+	// 2. CREATE EXTENSION pg_partman SCHEMA partman;
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pg_partman"},
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
+				},
+				PK: []string{"id"},
+				Partitioning: &model.PartitionSpec{
+					Strategy: "range",
+					Columns:  []string{"created_at"},
+				},
+				Maintenance: &model.MaintenanceConfig{
+					Interval: "1 month",
+					Premake:  4,
+				},
+			},
+		},
+	}
+
+	opts := Options{Format: "sql"}
+	out := mustGenerate(t, schema, opts)
+
+	// CREATE SCHEMA partman must appear.
+	if !strings.Contains(out, "CREATE SCHEMA IF NOT EXISTS partman;") {
+		t.Errorf("expected CREATE SCHEMA IF NOT EXISTS partman, got:\n%s", out)
+	}
+
+	// CREATE EXTENSION must use SCHEMA partman.
+	if !strings.Contains(out, "CREATE EXTENSION pg_partman SCHEMA partman;") {
+		t.Errorf("expected CREATE EXTENSION pg_partman SCHEMA partman, got:\n%s", out)
+	}
+
+	// Schema creation must come before extension creation.
+	schemaPos := strings.Index(out, "CREATE SCHEMA IF NOT EXISTS partman;")
+	extPos := strings.Index(out, "CREATE EXTENSION pg_partman SCHEMA partman;")
+	if schemaPos >= extPos {
+		t.Errorf("CREATE SCHEMA partman should come before CREATE EXTENSION pg_partman, schema=%d ext=%d", schemaPos, extPos)
+	}
+}
+
 func TestPartmanSeparateIntervalRetention(t *testing.T) {
 	// Verify that interval and retention are distinct in the generated DDL.
 	// interval controls partition width (p_interval in create_parent),
