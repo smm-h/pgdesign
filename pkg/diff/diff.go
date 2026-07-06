@@ -2,6 +2,14 @@
 // implementation lives in internal/diff; this package provides the abstract
 // contracts that make the differ engine reusable for non-PG schema models.
 //
+// # Stability
+//
+// This package follows semver 0.x: breaking changes bump the minor version.
+// The interfaces (TypeComparer, Classifier, Model) are under active design
+// and WILL change as the genericization proceeds. RiskLevel, Classification,
+// and ColumnChange structs are more stable but may gain fields. Do not depend
+// on exhaustive field lists.
+//
 // # Interface design
 //
 // The differ algorithm is parameterized over three interfaces:

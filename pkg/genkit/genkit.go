@@ -1,6 +1,14 @@
 // Package genkit provides the generator interface contract and freshness/orphan
 // orchestration for deterministic code generation pipelines.
 //
+// # Stability
+//
+// This package follows semver 0.x: breaking changes bump the minor version.
+// The Generator and MultiFileGenerator interfaces are the stable core.
+// FreshnessResult, CompareFreshness, ScanOrphans, and ScanAllOrphans are
+// stable utilities. OrphanIgnored's ignore list may expand (but not shrink)
+// between minor versions.
+//
 // # Generator contract
 //
 // All generators must produce deterministic output: given the same input schema,

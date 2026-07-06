@@ -1,6 +1,13 @@
 // Package diagnostic provides shared error, warning, and hint reporting types
 // used by schema compiler passes. This is the public API surface; internal
 // packages re-export these types.
+//
+// # Stability
+//
+// This package follows semver 0.x: breaking changes bump the minor version.
+// The Severity enum values, Diagnostic struct fields, and Diagnostics methods
+// are the stable core. Rendering functions (RenderTerminal, RenderJSON) may
+// change output format between minor versions.
 package diagnostic
 
 import (
