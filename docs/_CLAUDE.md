@@ -90,6 +90,7 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Python query-layer codegen: `--mode query-layer --lang python`. Generates Protocol definitions (Backend, per-table Writer/Reader), Row dataclasses, PgBackend (asyncpg parameterized queries), InMemoryBackend (constraint registry enforcement). Context+delegate+forwarding architecture avoids MRO complexity. Dual-backend conformance tested at codegen level.
 - Constraint codegen for Python/Java/Kotlin: Python uses `_constraints.py` with ConstraintKind enum, per-table constraint lists, and ConstraintEngine class. Java and Kotlin generate constraint validators; Kotlin uses extension functions.
 - MultiFileGenerator interface for codegen modes that produce multiple output files (Python DDL, Python query-layer). Returns `map[string][]byte` of relative file paths to contents.
+- Consumer regeneration: when bumping the pgdesign version, consumers must regenerate all codegen output (run `pgdesign codegen` or `pgdesign build`) in the same PR as the version bump. Generated code is version-coupled to the pgdesign binary that produced it; stale output from a previous version may have different type annotations, import patterns, or executor structure. Use `pgdesign codegen --check` in CI to catch stale output.
 
 ## Testing
 
