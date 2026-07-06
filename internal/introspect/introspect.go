@@ -129,7 +129,95 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 
 	applyEnumTypeKinds(schema)
 
+	// Annotate partman-managed partition children so the diff can exclude
+	// them from existence drift. This is a best-effort query: if partman
+	// is not installed, the query silently returns nothing.
+	if hasExtension(exts, "pg_partman") {
+		annotatePartmanChildren(ctx, conn, schema)
+	}
+
 	return schema, diags, nil
+}
+
+// hasExtension returns true if the given extension name is in the list.
+func hasExtension(exts []string, name string) bool {
+	for _, ext := range exts {
+		if ext == name {
+			return true
+		}
+	}
+	return false
+}
+
+// annotatePartmanChildren queries partman.part_config for managed parents and
+// marks introspected children of those parents as PartmanManaged. This allows
+// the diff system to exclude them from existence drift (partman creates and
+// drops children automatically; they should not appear as added/removed).
+func annotatePartmanChildren(ctx context.Context, conn *pgx.Conn, schema *model.Schema) {
+	// Query partman.part_config to find managed parent tables.
+	// The parent_table column contains schema-qualified names like "public.events".
+	rows, err := conn.Query(ctx, `
+		SELECT parent_table FROM partman.part_config
+	`)
+	if err != nil {
+		// partman schema might not be accessible; silently skip.
+		return
+	}
+	defer rows.Close()
+
+	managedParents := make(map[string]bool)
+	for rows.Next() {
+		var parentTable string
+		if err := rows.Scan(&parentTable); err != nil {
+			return
+		}
+		managedParents[parentTable] = true
+	}
+	if rows.Err() != nil || len(managedParents) == 0 {
+		return
+	}
+
+	// Build a map of table OID/name to check if they inherit from a managed parent.
+	// We query pg_inherits to find child -> parent relationships, then cross-reference
+	// with the managed parents set.
+	childRows, err := conn.Query(ctx, `
+		SELECT child_ns.nspname || '.' || child_cl.relname AS child_table,
+		       parent_ns.nspname || '.' || parent_cl.relname AS parent_table
+		FROM pg_inherits inh
+		JOIN pg_class child_cl ON inh.inhrelid = child_cl.oid
+		JOIN pg_namespace child_ns ON child_cl.relnamespace = child_ns.oid
+		JOIN pg_class parent_cl ON inh.inhparent = parent_cl.oid
+		JOIN pg_namespace parent_ns ON parent_cl.relnamespace = parent_ns.oid
+	`)
+	if err != nil {
+		return
+	}
+	defer childRows.Close()
+
+	// Map child qualified name -> parent qualified name.
+	childToParent := make(map[string]string)
+	for childRows.Next() {
+		var childTable, parentTable string
+		if err := childRows.Scan(&childTable, &parentTable); err != nil {
+			return
+		}
+		if managedParents[parentTable] {
+			childToParent[childTable] = parentTable
+		}
+	}
+	if childRows.Err() != nil || len(childToParent) == 0 {
+		return
+	}
+
+	// Annotate matching tables in the schema.
+	for i := range schema.Tables {
+		t := &schema.Tables[i]
+		qualified := t.Schema + "." + t.Name
+		if parent, ok := childToParent[qualified]; ok {
+			t.PartmanManaged = true
+			t.PartmanParent = parent
+		}
+	}
 }
 
 // applyEnumTypeKinds sets Column.TypeKind = "enum" on every table column whose

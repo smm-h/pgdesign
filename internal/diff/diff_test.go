@@ -4310,6 +4310,60 @@ func TestVarcharUnlimitedVsLimitedDiff(t *testing.T) {
 	}
 }
 
+func TestPartmanChildrenExcludedFromDrift(t *testing.T) {
+	// When a table in the actual schema is a partman-managed child, it should
+	// not appear in TablesRemoved even though it's absent from desired.
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			}},
+			{Name: "events_p2024_01", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			}, PartmanManaged: true, PartmanParent: "public.events"},
+			{Name: "events_p2024_02", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			}, PartmanManaged: true, PartmanParent: "public.events"},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesRemoved) != 0 {
+		t.Errorf("partman-managed children should not appear in TablesRemoved, got: %v", d.TablesRemoved)
+	}
+}
+
+func TestNonPartmanChildrenStillFlagged(t *testing.T) {
+	// Non-partman tables that exist in actual but not desired should still be flagged.
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			}},
+			{Name: "orphan_table", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	if len(d.TablesRemoved) != 1 || d.TablesRemoved[0] != "orphan_table" {
+		t.Errorf("non-partman table should appear in TablesRemoved, got: %v", d.TablesRemoved)
+	}
+}
+
 func TestMaintenanceDiff_RetentionChange(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{{

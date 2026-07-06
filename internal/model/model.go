@@ -188,7 +188,9 @@ type Table struct {
 	Triggers     []Trigger             `json:"triggers,omitempty"`
 	EnableRLS    bool                  `json:"enable_rls,omitempty"`
 	ForceRLS     bool                  `json:"force_rls,omitempty"`
-	AppendOnly   bool                  `json:"append_only,omitempty"`
+	AppendOnly      bool                  `json:"append_only,omitempty"`
+	PartmanManaged  bool                  `json:"partman_managed,omitempty"`  // true if this is a child of a partman-managed parent
+	PartmanParent   string                `json:"partman_parent,omitempty"`   // schema-qualified parent table name (set on partman children)
 
 	candidateKeys [][]string // cached result of CandidateKeys()
 }

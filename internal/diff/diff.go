@@ -406,6 +406,9 @@ func Diff(desired, actual *model.Schema) *SchemaDiff {
 }
 
 // diffTables matches tables by schema-qualified name and diffs matched pairs.
+// Partman-managed children (detected during introspection) are excluded from
+// existence drift: they appear in the live DB but are created/dropped by partman,
+// so they should not be flagged as added or removed.
 func diffTables(d *SchemaDiff, desired, actual *model.Schema) {
 	added, removed, matched := matchObjects(desired.Tables, actual.Tables, func(t model.Table) string {
 		return tableKey(&t)
@@ -414,6 +417,10 @@ func diffTables(d *SchemaDiff, desired, actual *model.Schema) {
 		d.TablesAdded = append(d.TablesAdded, tableKey(&t))
 	}
 	for _, t := range removed {
+		// Exclude partman-managed children from existence drift.
+		if t.PartmanManaged {
+			continue
+		}
 		d.TablesRemoved = append(d.TablesRemoved, tableKey(&t))
 	}
 	for _, p := range matched {
