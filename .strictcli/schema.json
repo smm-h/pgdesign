@@ -636,6 +636,12 @@
               "type": "str"
             },
             {
+              "default": "migrations",
+              "help": "Directory containing migration files to read or write",
+              "name": "dir",
+              "type": "str"
+            },
+            {
               "help": "Version label for the baseline record",
               "name": "version",
               "type": "str"
@@ -858,6 +864,13 @@
               "help": "CI provider for workflow generation (e.g., github-actions)",
               "name": "ci",
               "type": "str"
+            },
+            {
+              "default": false,
+              "help": "Include pg_partman installation step in CI workflow",
+              "name": "partman",
+              "negatable": true,
+              "type": "bool"
             }
           ],
           "help": "Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.",

@@ -1,6 +1,6 @@
 ---
 title: internal/diagnostic
-description: "Package diagnostic provides shared error, warning, and hint reporting types used by all pgdesign compiler passes from parsing through code generation."
+description: "Package diagnostic re-exports shared diagnostic types from pkg/diagnostic and defines PG-specific diagnostic codes used by all pgdesign compiler passes."
 generated: true
 nav_group: "API Reference"
 nav_order: 5

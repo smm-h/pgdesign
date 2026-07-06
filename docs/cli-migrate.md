@@ -1,6 +1,6 @@
 ---
 title: pgdesign migrate
-description: "Reference for the pgdesign migrate command group — subcommands, flags, arguments, and usage details for the migrate group in the pgdesign CLI."
+description: "Reference for the pgdesign migrate command group — plan, generate, apply, rollback, baseline, squash, status, and test subcommands with flags and usage."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 8
@@ -33,6 +33,7 @@ Mark an existing database as being at a specific migration version without execu
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | migrations |  | Directory containing migration files to read or write |
 | `--version` |  | str |  |  | Version label for the baseline record |
 | `--description` |  | str | Initial baseline |  | Human-readable description |
 

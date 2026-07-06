@@ -1,6 +1,6 @@
 ---
 title: internal/testdb
-description: "API reference for the internal/testdb module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Package testdb provides ephemeral test database management, CI workflow generation with optional partman support, and test skip guards."
 generated: true
 nav_group: "API Reference"
 nav_order: 25

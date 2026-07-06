@@ -1,6 +1,6 @@
 ---
 title: pgdesign testdb
-description: "Reference for the pgdesign testdb command group — subcommands, flags, arguments, and usage details for the testdb group in the pgdesign CLI."
+description: "Reference for the pgdesign testdb command group — init, setup, teardown, and gc subcommands for ephemeral test databases with optional partman CI support."
 generated: true
 nav_group: "CLI Reference"
 nav_order: 12
@@ -34,6 +34,7 @@ Generate test database wrapper code for consumer projects that need to run integ
 | `--output` |  | str |  |  | Name of the SQL output section (for disambiguation) |
 | `--force-overwrite` |  | bool |  |  | Overwrite existing wrapper files without prompting |
 | `--ci` |  | str |  |  | CI provider for workflow generation (e.g., github-actions) |
+| `--partman` |  | bool |  |  | Include pg_partman installation step in CI workflow |
 
 ## testdb setup
 

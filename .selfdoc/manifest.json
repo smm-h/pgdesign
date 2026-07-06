@@ -243,6 +243,11 @@
       "type": "doc"
     },
     {
+      "path": "rlsbl-integration.md",
+      "title": "rlsbl Release Integration",
+      "type": "doc"
+    },
+    {
       "path": "seed-generation.md",
       "title": "Seed Data Generation",
       "type": "doc"
@@ -284,5 +289,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-07-06T08:02:46.905135+00:00"
+  "last_gen": "2026-07-06T15:37:14.139867+00:00"
 }
