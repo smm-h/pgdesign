@@ -888,10 +888,10 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		if td.PartitioningChanged != nil {
 			pd := td.PartitioningChanged
 
-			// Strategy change: emit warning, not yet supported.
+			// Strategy change: hard error, requires table rebuild.
 			if pd.StrategyChanged != nil {
 				diags = append(diags, diagnostic.Diagnostic{
-					Severity: diagnostic.Warning,
+					Severity: diagnostic.Error,
 					Code:     "PARTITION_STRATEGY_CHANGE",
 					Table:    td.Name,
 					Message:  fmt.Sprintf("partition strategy change on %s (%s -> %s) requires table rebuild (not yet supported)", td.Name, pd.StrategyChanged[0], pd.StrategyChanged[1]),
@@ -935,6 +935,62 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				}
 				m.DDLOps = append(m.DDLOps, op)
 				diags = append(diags, classifyOp(op, risk.OpDropTable, ctx)...)
+			}
+		}
+
+		// Maintenance (partman config) changes.
+		if td.MaintenanceChanged != nil {
+			md := td.MaintenanceChanged
+
+			// Interval change: hard error (requires repartitioning).
+			if md.IntervalChanged != nil {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "MAINTENANCE_INTERVAL_CHANGE",
+					Table:    td.Name,
+					Message:  fmt.Sprintf("partition interval change on %s (%q -> %q) requires repartitioning (not yet supported)", td.Name, md.IntervalChanged[0], md.IntervalChanged[1]),
+				})
+			}
+
+			// Retention change: safe UPDATE partman.part_config.
+			if md.RetentionChanged != nil || md.RetentionKeepTableChanged != nil {
+				parentTable := findTable(desired, td.Name)
+				retention := ""
+				keepTable := false
+				schemaName := ""
+				if parentTable != nil {
+					schemaName = parentTable.Schema
+					if parentTable.Maintenance != nil {
+						retention = parentTable.Maintenance.Retention
+						keepTable = parentTable.Maintenance.RetentionKeepTable
+					}
+				}
+				op := DDLOp{
+					Op:     "update_partman_retention",
+					Table:  td.Name,
+					RawSQL: pgsql.UpdatePartmanConfig(schemaName, td.Name, retention, keepTable),
+				}
+				m.DDLOps = append(m.DDLOps, op)
+			}
+
+			// Premake change: safe UPDATE partman.part_config.
+			if md.PremakeChanged != nil {
+				parentTable := findTable(desired, td.Name)
+				premake := 0
+				schemaName := ""
+				if parentTable != nil {
+					schemaName = parentTable.Schema
+					if parentTable.Maintenance != nil {
+						premake = parentTable.Maintenance.Premake
+					}
+				}
+				qualified := pgsql.QualifiedName(schemaName, td.Name)
+				op := DDLOp{
+					Op:     "update_partman_premake",
+					Table:  td.Name,
+					RawSQL: fmt.Sprintf("UPDATE partman.part_config SET premake = %d WHERE parent_table = '%s';", premake, qualified),
+				}
+				m.DDLOps = append(m.DDLOps, op)
 			}
 		}
 

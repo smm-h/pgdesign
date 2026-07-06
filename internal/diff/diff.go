@@ -85,8 +85,9 @@ type TableDiff struct {
 	CommentChanged      *[2]string                  `json:"comment_changed"` // [old, new]
 	PKChanged           *[2][]string                `json:"pk_changed"`      // [old, new]
 	OwnerChanged        *[2]string                  `json:"owner_changed"`
-	PartitioningChanged *PartitionDiff              `json:"partitioning_changed,omitempty"`
-	AppendOnlyChanged   *[2]bool                    `json:"append_only_changed,omitempty"`
+	PartitioningChanged  *PartitionDiff              `json:"partitioning_changed,omitempty"`
+	MaintenanceChanged   *MaintenanceDiff            `json:"maintenance_changed,omitempty"`
+	AppendOnlyChanged    *[2]bool                    `json:"append_only_changed,omitempty"`
 }
 
 // ColumnChange describes a change to a single column, with risk classification.
@@ -237,6 +238,14 @@ type PartitionDiff struct {
 	KeyChanged      *[2]string `json:"key_changed,omitempty"`
 	ChildrenAdded   []string   `json:"children_added,omitempty"`
 	ChildrenRemoved []string   `json:"children_removed,omitempty"`
+}
+
+// MaintenanceDiff describes changes to a table's partman maintenance configuration.
+type MaintenanceDiff struct {
+	IntervalChanged  *[2]string `json:"interval_changed,omitempty"`
+	PremakeChanged   *[2]int    `json:"premake_changed,omitempty"`
+	RetentionChanged *[2]string `json:"retention_changed,omitempty"`
+	RetentionKeepTableChanged *[2]bool `json:"retention_keep_table_changed,omitempty"`
 }
 
 // IsEmpty returns true if the diff contains no changes.
@@ -453,6 +462,9 @@ func diffTable(desired, actual *model.Table) TableDiff {
 	// Partitioning
 	diffPartitioning(&td, desired, actual)
 
+	// Maintenance (partman config)
+	td.MaintenanceChanged = diffMaintenance(desired.Maintenance, actual.Maintenance)
+
 	// AppendOnly
 	if desired.AppendOnly != actual.AppendOnly {
 		td.AppendOnlyChanged = &[2]bool{actual.AppendOnly, desired.AppendOnly}
@@ -499,6 +511,7 @@ func isTableDiffEmpty(td *TableDiff) bool {
 		td.PKChanged == nil &&
 		td.OwnerChanged == nil &&
 		td.PartitioningChanged == nil &&
+		td.MaintenanceChanged == nil &&
 		td.AppendOnlyChanged == nil
 }
 
@@ -1131,6 +1144,61 @@ func diffPartitioning(td *TableDiff, desired, actual *model.Table) {
 	if changed {
 		td.PartitioningChanged = pd
 	}
+}
+
+// diffMaintenance compares maintenance (partman) configuration between two tables.
+// Returns nil if both are nil or identical.
+func diffMaintenance(desired, actual *model.MaintenanceConfig) *MaintenanceDiff {
+	if desired == nil && actual == nil {
+		return nil
+	}
+
+	md := &MaintenanceDiff{}
+	changed := false
+
+	// Get effective values (zero values for nil configs).
+	var dInterval, aInterval string
+	var dPremake, aPremake int
+	var dRetention, aRetention string
+	var dKeepTable, aKeepTable bool
+
+	if desired != nil {
+		dInterval = desired.Interval
+		dPremake = desired.Premake
+		dRetention = desired.Retention
+		dKeepTable = desired.RetentionKeepTable
+	}
+	if actual != nil {
+		aInterval = actual.Interval
+		aPremake = actual.Premake
+		aRetention = actual.Retention
+		aKeepTable = actual.RetentionKeepTable
+	}
+
+	if dInterval != aInterval {
+		md.IntervalChanged = &[2]string{aInterval, dInterval}
+		changed = true
+	}
+
+	if dPremake != aPremake {
+		md.PremakeChanged = &[2]int{aPremake, dPremake}
+		changed = true
+	}
+
+	if dRetention != aRetention {
+		md.RetentionChanged = &[2]string{aRetention, dRetention}
+		changed = true
+	}
+
+	if dKeepTable != aKeepTable {
+		md.RetentionKeepTableChanged = &[2]bool{aKeepTable, dKeepTable}
+		changed = true
+	}
+
+	if !changed {
+		return nil
+	}
+	return md
 }
 
 // partitionChildKey returns an identifier for a partition child.

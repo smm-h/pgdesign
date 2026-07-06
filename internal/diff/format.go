@@ -450,6 +450,26 @@ func formatTableDiff(b *strings.Builder, td *TableDiff) {
 		}
 	}
 
+	// Maintenance (partman config)
+	if md := td.MaintenanceChanged; md != nil {
+		if md.IntervalChanged != nil {
+			fmt.Fprintf(b, "  %s~ maintenance.interval: %q -> %q%s\n", colorYellow,
+				md.IntervalChanged[0], md.IntervalChanged[1], colorReset)
+		}
+		if md.PremakeChanged != nil {
+			fmt.Fprintf(b, "  %s~ maintenance.premake: %d -> %d%s\n", colorYellow,
+				md.PremakeChanged[0], md.PremakeChanged[1], colorReset)
+		}
+		if md.RetentionChanged != nil {
+			fmt.Fprintf(b, "  %s~ maintenance.retention: %q -> %q%s\n", colorYellow,
+				md.RetentionChanged[0], md.RetentionChanged[1], colorReset)
+		}
+		if md.RetentionKeepTableChanged != nil {
+			fmt.Fprintf(b, "  %s~ maintenance.retention_keep_table: %s -> %s%s\n", colorYellow,
+				boolStr(md.RetentionKeepTableChanged[0]), boolStr(md.RetentionKeepTableChanged[1]), colorReset)
+		}
+	}
+
 	// AppendOnly
 	if td.AppendOnlyChanged != nil {
 		old := "false"

@@ -4309,3 +4309,136 @@ func TestVarcharUnlimitedVsLimitedDiff(t *testing.T) {
 		t.Fatal("expected TypeChanged to be set for varchar length change")
 	}
 }
+
+func TestMaintenanceDiff_RetentionChange(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 month", Premake: 4, Retention: "12 months",
+			},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 month", Premake: 4, Retention: "6 months",
+			},
+		}},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("retention change should produce a diff")
+	}
+	if len(d.TablesChanged) != 1 {
+		t.Fatalf("expected 1 table changed, got %d", len(d.TablesChanged))
+	}
+	md := d.TablesChanged[0].MaintenanceChanged
+	if md == nil {
+		t.Fatal("expected MaintenanceChanged to be set")
+	}
+	if md.RetentionChanged == nil {
+		t.Fatal("expected RetentionChanged to be set")
+	}
+	if md.RetentionChanged[0] != "6 months" || md.RetentionChanged[1] != "12 months" {
+		t.Errorf("expected retention change from '6 months' to '12 months', got %v", *md.RetentionChanged)
+	}
+	if md.IntervalChanged != nil {
+		t.Error("IntervalChanged should be nil when interval didn't change")
+	}
+}
+
+func TestMaintenanceDiff_IntervalChange(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 week", Premake: 4, Retention: "6 months",
+			},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 month", Premake: 4, Retention: "6 months",
+			},
+		}},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("interval change should produce a diff")
+	}
+	md := d.TablesChanged[0].MaintenanceChanged
+	if md == nil {
+		t.Fatal("expected MaintenanceChanged to be set")
+	}
+	if md.IntervalChanged == nil {
+		t.Fatal("expected IntervalChanged to be set")
+	}
+	if md.IntervalChanged[0] != "1 month" || md.IntervalChanged[1] != "1 week" {
+		t.Errorf("expected interval change from '1 month' to '1 week', got %v", *md.IntervalChanged)
+	}
+}
+
+func TestMaintenanceDiff_PremakeChange(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 month", Premake: 6, Retention: "6 months",
+			},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 month", Premake: 4, Retention: "6 months",
+			},
+		}},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("premake change should produce a diff")
+	}
+	md := d.TablesChanged[0].MaintenanceChanged
+	if md == nil {
+		t.Fatal("expected MaintenanceChanged to be set")
+	}
+	if md.PremakeChanged == nil {
+		t.Fatal("expected PremakeChanged to be set")
+	}
+	if md.PremakeChanged[0] != 4 || md.PremakeChanged[1] != 6 {
+		t.Errorf("expected premake change from 4 to 6, got %v", *md.PremakeChanged)
+	}
+}
+
+func TestMaintenanceDiff_NoChange(t *testing.T) {
+	mc := &model.MaintenanceConfig{Interval: "1 month", Premake: 4, Retention: "6 months"}
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns:    []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: mc,
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns:    []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: &model.MaintenanceConfig{Interval: "1 month", Premake: 4, Retention: "6 months"},
+		}},
+	}
+	d := Diff(desired, actual)
+	if !d.IsEmpty() {
+		t.Errorf("identical maintenance config should produce empty diff, got: %s", d.Summary())
+	}
+}

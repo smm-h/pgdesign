@@ -416,19 +416,155 @@ func TestGenerateMigration_PartitionStrategyChanged(t *testing.T) {
 
 	_, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 
-	// Should have a warning about strategy change.
-	hasWarning := false
+	// Should have an error about strategy change.
+	hasError := false
 	for _, diag := range diags {
 		if diag.Code == "PARTITION_STRATEGY_CHANGE" {
-			hasWarning = true
+			hasError = true
+			if diag.Severity != diagnostic.Error {
+				t.Errorf("expected Error severity for PARTITION_STRATEGY_CHANGE, got %d", diag.Severity)
+			}
 			if !strings.Contains(diag.Message, "requires table rebuild") {
 				t.Errorf("expected 'requires table rebuild' in message, got: %s", diag.Message)
 			}
 			break
 		}
 	}
-	if !hasWarning {
+	if !hasError {
 		t.Error("expected PARTITION_STRATEGY_CHANGE diagnostic")
+	}
+}
+
+func TestGenerateMigration_MaintenanceRetentionChange(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "public",
+				Maintenance: &model.MaintenanceConfig{
+					Interval: "1 month", Premake: 4, Retention: "12 months",
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "events",
+				MaintenanceChanged: &diff.MaintenanceDiff{
+					RetentionChanged: &[2]string{"6 months", "12 months"},
+				},
+			},
+		},
+	}
+
+	m, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if diagnostic.Diagnostics(diags).HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	// Should produce an update_partman_retention op with safe SQL.
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "update_partman_retention" {
+			found = true
+			if !strings.Contains(op.RawSQL, "retention = '12 months'") {
+				t.Errorf("expected retention = '12 months' in SQL, got: %s", op.RawSQL)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected update_partman_retention op")
+	}
+}
+
+func TestGenerateMigration_MaintenancePremakeChange(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "public",
+				Maintenance: &model.MaintenanceConfig{
+					Interval: "1 month", Premake: 6, Retention: "6 months",
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "events",
+				MaintenanceChanged: &diff.MaintenanceDiff{
+					PremakeChanged: &[2]int{4, 6},
+				},
+			},
+		},
+	}
+
+	m, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if diagnostic.Diagnostics(diags).HasErrors() {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	found := false
+	for _, op := range m.DDLOps {
+		if op.Op == "update_partman_premake" {
+			found = true
+			if !strings.Contains(op.RawSQL, "premake = 6") {
+				t.Errorf("expected premake = 6 in SQL, got: %s", op.RawSQL)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected update_partman_premake op")
+	}
+}
+
+func TestGenerateMigration_MaintenanceIntervalChangeError(t *testing.T) {
+	desired := &model.Schema{
+		Name: "public",
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "public",
+				Maintenance: &model.MaintenanceConfig{
+					Interval: "1 week", Premake: 4, Retention: "6 months",
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "events",
+				MaintenanceChanged: &diff.MaintenanceDiff{
+					IntervalChanged: &[2]string{"1 month", "1 week"},
+				},
+			},
+		},
+	}
+
+	_, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	hasError := false
+	for _, diag := range diags {
+		if diag.Code == "MAINTENANCE_INTERVAL_CHANGE" {
+			hasError = true
+			if diag.Severity != diagnostic.Error {
+				t.Errorf("expected Error severity, got %d", diag.Severity)
+			}
+			if !strings.Contains(diag.Message, "requires repartitioning") {
+				t.Errorf("expected 'requires repartitioning' in message, got: %s", diag.Message)
+			}
+			break
+		}
+	}
+	if !hasError {
+		t.Error("expected MAINTENANCE_INTERVAL_CHANGE error diagnostic")
 	}
 }
 
