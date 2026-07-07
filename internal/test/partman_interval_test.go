@@ -86,8 +86,14 @@ func TestPartmanForwardOnlyInterval(t *testing.T) {
 	}
 	defer conn.Close(ctx)
 
-	// Step 1: Install pg_partman extension.
-	_, err = conn.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pg_partman")
+	// Step 1: Install pg_partman extension into a dedicated partman schema.
+	// Without SCHEMA partman the extension lands in public and the
+	// schema-qualified partman.create_parent calls below fail.
+	_, err = conn.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS partman")
+	if err != nil {
+		t.Fatalf("create partman schema: %v", err)
+	}
+	_, err = conn.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman")
 	if err != nil {
 		t.Fatalf("create pg_partman extension: %v", err)
 	}
