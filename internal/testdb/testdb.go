@@ -341,13 +341,25 @@ func (m *Manager) ListOrphans(ctx context.Context, olderThan time.Duration) ([]*
 	}
 	defer rows.Close()
 
-	var orphans []*EphemeralDB
+	// Pass 1: drain the datname result set completely. pgx forbids issuing
+	// another query on the same connection while rows are open ("conn busy"),
+	// so the per-database connection counts are queried in a second pass.
+	var datnames []string
 	for rows.Next() {
 		var datname string
 		if err := rows.Scan(&datname); err != nil {
 			return nil, fmt.Errorf("scan datname: %w", err)
 		}
+		datnames = append(datnames, datname)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate pg_database: %w", err)
+	}
+	rows.Close()
 
+	// Pass 2: filter and query per-database connection counts.
+	var orphans []*EphemeralDB
+	for _, datname := range datnames {
 		_, created, _, ok := ParseName(datname)
 		if !ok {
 			continue
@@ -378,9 +390,6 @@ func (m *Manager) ListOrphans(ctx context.Context, olderThan time.Duration) ([]*
 			ActiveConnections: &connCount,
 			manager:           m,
 		})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate pg_database: %w", err)
 	}
 
 	return orphans, nil
