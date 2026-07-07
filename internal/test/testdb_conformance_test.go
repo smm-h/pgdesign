@@ -519,6 +519,7 @@ class ConformanceTest {
 repositories { mavenCentral() }
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.postgresql:postgresql:42.7.2")
 }
 tasks.test { useJUnitPlatform() }
@@ -631,6 +632,7 @@ class ConformanceTest {
 repositories { mavenCentral() }
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.postgresql:postgresql:42.7.2")
 }
 tasks.test { useJUnitPlatform() }
