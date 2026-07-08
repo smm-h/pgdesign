@@ -1,0 +1,3 @@
+{"id":"18c01feacdbb502a29cb43cc89dd4082a34c612a25ceb4f8","commits":["24f3a4f7a0d42a7ad50e6503d349bc577687bb98","94245e25cc3e8d6b1d6f264e3ce0c90b42344f13","385c84ded8bbdb35ebaa65b41be5d0e6a8dca277"],"user_facing":true,"description":"**Bug fix.** testdb ListOrphans no longer fails with 'conn busy'; partman and JVM conformance test fixes.","type":"fix"}
+{"id":"18c03d954c02966967d3ae5c38044920912c4763720f38f8","commits":["5f3cbf5fd6436a5d4598b0f6169b3fcef3d955f8"],"user_facing":false}
+{"id":"18c03d9554196fdcbee11d28b88e497aa6935bedb089c82f","commits":["dee4e957309f4dbbb8c93ec8105f755c70a30f7d"],"user_facing":false}
