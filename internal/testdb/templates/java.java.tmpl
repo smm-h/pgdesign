@@ -157,18 +157,63 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
     /**
      * Convert a postgres:// URL to a jdbc:postgresql:// URL.
      * JDBC requires the jdbc: prefix; pg connection URLs typically use postgres://.
+     * The JDBC PostgreSQL driver does not parse user:password from the URL's
+     * authority section, so credentials are extracted from userinfo and appended
+     * as query parameters (?user=X&password=Y).
      */
     private static String toJdbcUrl(String pgUrl) {
         if (pgUrl.startsWith("jdbc:")) {
             return pgUrl;
         }
-        if (pgUrl.startsWith("postgres://")) {
-            return "jdbc:postgresql://" + pgUrl.substring("postgres://".length());
+        // Normalize scheme to postgresql:// for URI parsing.
+        String normalized = pgUrl;
+        if (normalized.startsWith("postgres://")) {
+            normalized = "postgresql://" + normalized.substring("postgres://".length());
         }
-        if (pgUrl.startsWith("postgresql://")) {
-            return "jdbc:postgresql://" + pgUrl.substring("postgresql://".length());
+        if (!normalized.startsWith("postgresql://")) {
+            return "jdbc:" + pgUrl;
         }
-        return "jdbc:" + pgUrl;
+        URI uri = URI.create(normalized);
+        String userInfo = uri.getUserInfo();
+
+        // Rebuild URL without userinfo.
+        String host = uri.getHost();
+        int port = uri.getPort();
+        String path = uri.getPath();
+        String query = uri.getQuery();
+
+        StringBuilder sb = new StringBuilder("jdbc:postgresql://");
+        sb.append(host);
+        if (port > 0) {
+            sb.append(':').append(port);
+        }
+        if (path != null) {
+            sb.append(path);
+        }
+
+        // Build query string: preserve existing params, then add credentials.
+        boolean hasQuery = query != null && !query.isEmpty();
+        if (hasQuery) {
+            sb.append('?').append(query);
+        }
+        if (userInfo != null && !userInfo.isEmpty()) {
+            String user;
+            String password = null;
+            int colonIdx = userInfo.indexOf(':');
+            if (colonIdx >= 0) {
+                user = userInfo.substring(0, colonIdx);
+                password = userInfo.substring(colonIdx + 1);
+            } else {
+                user = userInfo;
+            }
+            sb.append(hasQuery ? '&' : '?');
+            sb.append("user=").append(user);
+            if (password != null && !password.isEmpty()) {
+                sb.append("&password=").append(password);
+            }
+        }
+
+        return sb.toString();
     }
 
     /**

@@ -149,14 +149,51 @@ class TestDB : BeforeAllCallback, AfterAllCallback {
         /**
          * Convert a postgres:// URL to a jdbc:postgresql:// URL.
          * JDBC requires the jdbc: prefix; pg connection URLs typically use postgres://.
+         * The JDBC PostgreSQL driver does not parse user:password from the URL's
+         * authority section, so credentials are extracted from userinfo and appended
+         * as query parameters (?user=X&password=Y).
          */
-        private fun toJdbcUrl(pgUrl: String): String = when {
-            pgUrl.startsWith("jdbc:") -> pgUrl
-            pgUrl.startsWith("postgres://") ->
-                "jdbc:postgresql://" + pgUrl.removePrefix("postgres://")
-            pgUrl.startsWith("postgresql://") ->
-                "jdbc:postgresql://" + pgUrl.removePrefix("postgresql://")
-            else -> "jdbc:$pgUrl"
+        private fun toJdbcUrl(pgUrl: String): String {
+            if (pgUrl.startsWith("jdbc:")) return pgUrl
+
+            // Normalize scheme to postgresql:// for URI parsing.
+            val normalized = when {
+                pgUrl.startsWith("postgres://") ->
+                    "postgresql://" + pgUrl.removePrefix("postgres://")
+                pgUrl.startsWith("postgresql://") -> pgUrl
+                else -> return "jdbc:$pgUrl"
+            }
+            val uri = URI.create(normalized)
+            val userInfo = uri.userInfo
+
+            // Rebuild URL without userinfo.
+            val sb = StringBuilder("jdbc:postgresql://")
+            sb.append(uri.host)
+            if (uri.port > 0) sb.append(':').append(uri.port)
+            if (uri.path != null) sb.append(uri.path)
+
+            // Build query string: preserve existing params, then add credentials.
+            val hasQuery = !uri.query.isNullOrEmpty()
+            if (hasQuery) sb.append('?').append(uri.query)
+            if (!userInfo.isNullOrEmpty()) {
+                val colonIdx = userInfo.indexOf(':')
+                val user: String
+                val password: String?
+                if (colonIdx >= 0) {
+                    user = userInfo.substring(0, colonIdx)
+                    password = userInfo.substring(colonIdx + 1)
+                } else {
+                    user = userInfo
+                    password = null
+                }
+                sb.append(if (hasQuery) '&' else '?')
+                sb.append("user=").append(user)
+                if (!password.isNullOrEmpty()) {
+                    sb.append("&password=").append(password)
+                }
+            }
+
+            return sb.toString()
         }
 
         /**
