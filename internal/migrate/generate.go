@@ -975,12 +975,10 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			md := td.MaintenanceChanged
 
 			// Interval change: hard error (requires repartitioning).
-			// TODO(phase4b): Once TestPartmanForwardOnlyInterval passes on live PG
-			// (see internal/test/partman_interval_test.go), downgrade this to a
-			// Caution classification gated on partman_version. Forward-only interval
-			// changes produce mixed-width children, which is operationally surprising
-			// but may work correctly with partman >= 5.x. The experiment needs live
-			// verification before relaxing this guard.
+			// pg_partman does not support forward-only interval changes. Verified
+			// empirically against pg_partman 5.4.3: empty partition sets cause
+			// maintenance to be a silent no-op; non-empty sets fail with a
+			// partition overlap error. This hard error is correct and permanent.
 			if md.IntervalChanged != nil {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity: diagnostic.Error,
