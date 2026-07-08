@@ -1,0 +1,1 @@
+{"id":"18c06060cb13c2b5fc507a12087c4d649fa01caf29fbe67a","commits":["fe7479fecb39217376cec18cfc5d0505ab62b0e3"],"user_facing":true,"description":"**Fix.** JDBC testdb templates now correctly handle PostgreSQL URLs with embedded credentials by encoding user/password as query parameters instead of passing userinfo in the authority.","type":"fix"}
