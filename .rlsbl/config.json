@@ -31,5 +31,6 @@
   "push_timeout": 120,
   "batch_limits": {
     "exclusions": []
-  }
+  },
+  "coverage_unit": "commit"
 }
