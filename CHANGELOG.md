@@ -2,6 +2,28 @@
 
 # Changelog
 
+## 0.24.2
+
+Bug fixes for JDBC testdb URL handling and migrate generate column serialization.
+
+<details>
+<summary>Context</summary>
+
+Java and Kotlin testdb consumers should re-run `pgdesign testdb init` to pick up the JDBC URL fix. No codegen template changes in this release.
+
+</details>
+
+### Fixes
+
+- **Fix.** JDBC testdb templates now correctly handle PostgreSQL URLs with embedded credentials by encoding user/password as query parameters instead of passing userinfo in the authority.
+- **Fix.** Migration files generated for new tables now include column definitions in serialized operations, fixing a roundtrip loss where re-read migrations produced empty tables.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.24.1
 
 CI fixes: partman schema-qualified extension install, JUnit Platform launcher for JVM conformance, ListOrphans conn-busy fix.
@@ -9,12 +31,6 @@ CI fixes: partman schema-qualified extension install, JUnit Platform launcher fo
 ### Fixes
 
 - **Bug fix.** testdb ListOrphans no longer fails with 'conn busy'; partman and JVM conformance test fixes.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.24.0
 
