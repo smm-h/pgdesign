@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.24.1
+
+CI fixes: partman schema-qualified extension install, JUnit Platform launcher for JVM conformance, ListOrphans conn-busy fix.
+
+### Fixes
+
+- **Bug fix.** testdb ListOrphans no longer fails with 'conn busy'; partman and JVM conformance test fixes.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.24.0
 
 Partition lifecycle completeness, migrate baseline fix, library promotion (pkg/diff, pkg/genkit, pkg/diagnostic).
@@ -30,12 +44,6 @@ Partman integration reaches end-to-end coverage: CI template gains --partman fla
 ### Fixes
 
 - **Migrate baseline fix.** Record all versions in migration history, enforce additive idempotency, add out-of-order guard.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.23.1
 
