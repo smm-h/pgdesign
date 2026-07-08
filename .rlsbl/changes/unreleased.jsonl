@@ -2,3 +2,4 @@
 {"id":"18c06061ec29e25513c3f26f56f24feabb1f993da46a37f2","commits":["95827b878f4b61fc8f8f5ba828c20df31d6d28cf"],"user_facing":true,"description":"**Fix.** Migration files generated for new tables now include column definitions in serialized operations, fixing a roundtrip loss where re-read migrations produced empty tables.","type":"fix"}
 {"id":"18c060659d3f8f4bc5bc0375e2a045af98920dc62ad3ede1","commits":["0c6bdd8dcbaf8873afb8e8cc42e32d350097ce79"],"user_facing":false}
 {"id":"18c060669f1b836f5f2eaa6b3b03407988ed2b57f4bcf86e","commits":["20722d991511def3ebf96490d34ea171667942fe"],"user_facing":false}
+{"id":"18c06067a12b8d7f94babde6a3f444bf89d0fc73bf813a15","commits":["3221a4e76f3f9648b2f828d143bede4b0a2bb854","0b0c311cafae4eae568a9fb678826008af9681fd"],"user_facing":false}
