@@ -306,6 +306,38 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				Ops: []DDLOp{{Op: "drop_table", Table: tableName}},
 			},
 		}
+
+		// Populate ConsolidatedOps with add_column ops so columns survive
+		// the WriteMigrationFile -> ParseMigrationFile round trip. TableDef
+		// is not serialized, so without this the file would produce empty
+		// CREATE TABLE statements on apply.
+		if table != nil {
+			for _, col := range table.Columns {
+				colType := typeinfo.Reconstruct(col.PGType)
+				if col.Array {
+					colType += "[]"
+				}
+				colOp := DDLOp{
+					Op:        "add_column",
+					Table:     tableName,
+					Column:    col.Name,
+					Type:      colType,
+					Collation: col.Collation,
+					NotNull:   col.NotNull,
+				}
+				if col.Generated != "" {
+					colOp.Generated = col.Generated
+					colOp.Stored = col.Stored
+					colOp.PGVersion = desired.PGVersion
+				} else if col.Default != nil {
+					colOp.Default = *col.Default
+				} else if col.DefaultExpr != "" {
+					colOp.Default = col.DefaultExpr
+				}
+				op.ConsolidatedOps = append(op.ConsolidatedOps, colOp)
+			}
+		}
+
 		m.DDLOps = append(m.DDLOps, op)
 		diags = append(diags, classifyOp(op, risk.OpCreateTable, ctx)...)
 
