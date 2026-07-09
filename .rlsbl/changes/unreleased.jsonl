@@ -1,1 +1,2 @@
 {"id":"18c0c48ed4a19709f0d5e2656233488dbfd869c404583349","commits":["8ca041735be380a26343680207c68c973c072575","44f565fdf8a07f6546cbd0995df3494756e6ec58","924ee73a9fd57421b5035cef0a0710f00c658463"],"user_facing":true,"description":"**Fix.** Idempotent mode now emits `ADD COLUMN IF NOT EXISTS` guards for every column, preventing silent column drift on re-apply.","type":"fix"}
+{"id":"18c0c48fa56c10bb9c6a9c9fe06746e89bbe19b8b0b53527","commits":["dd1f55ba2faf7304ef300a0304427addbb47a872"],"user_facing":false}
