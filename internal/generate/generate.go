@@ -200,6 +200,20 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		sections = append(sections, strings.Join(tableStmts, "\n\n"))
 	}
 
+	// 4b. ALTER TABLE ADD COLUMN IF NOT EXISTS (idempotent column guards)
+	if opts.Idempotent && len(tables) > 0 {
+		var colStmts []string
+		for i := range tables {
+			t := &tables[i]
+			for _, col := range t.Columns {
+				colStmts = append(colStmts, sql.AlterTableAddColumnIfNotExists(t.Name, t.Schema, col, opts.PGVersion, schema.Enums, schema.Domains))
+			}
+		}
+		if len(colStmts) > 0 {
+			sections = append(sections, strings.Join(colStmts, "\n"))
+		}
+	}
+
 	// 5. CREATE TABLE ... PARTITION OF (child partitions)
 	var partStmts []string
 	for i := range tables {
