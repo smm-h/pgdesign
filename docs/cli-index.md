@@ -1,6 +1,6 @@
 ---
 title: pgdesign CLI Reference
-description: "Complete CLI reference for pgdesign — all available commands, subcommands, flags, arguments, and usage examples with detailed descriptions."
+description: "Complete CLI reference for pgdesign — all available commands, subcommands, flags, arguments, and usage examples."
 generated: true
 seeded: true
 nav_group: "CLI Reference"
@@ -12,6 +12,8 @@ order: 91
 # pgdesign CLI Reference
 
 PostgreSQL schema compiler
+
+Version: 0.24.3
 
 ## Commands
 
