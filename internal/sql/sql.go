@@ -423,6 +423,14 @@ func resolveColumnType(pgType string, enums []model.Enum, domains []model.Domain
 	return pgType
 }
 
+// AlterTableAddColumnIfNotExists generates an ALTER TABLE ... ADD COLUMN IF NOT EXISTS statement.
+// This is used in idempotent mode to ensure columns exist without erroring if they already do.
+// The column definition reuses the same columnDef logic as CreateTable.
+func AlterTableAddColumnIfNotExists(tableName, schemaName string, col model.Column, pgVersion int, enums []model.Enum, domains []model.Domain) string {
+	qualified := QualifiedName(schemaName, tableName)
+	return fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s;", qualified, columnDef(col, pgVersion, enums, domains))
+}
+
 // AlterTableAddFK generates an ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY statement.
 // When idempotent is true, wraps the statement in a DO $$ block that checks
 // pg_constraint before adding.
