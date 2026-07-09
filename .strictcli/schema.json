@@ -113,7 +113,7 @@
         },
         {
           "default": "",
-          "help": "Tag DSL expression to select checks (e.g. 'changelog \u0026 !quality')",
+          "help": "Tag DSL expression to select checks (e.g. 'changelog & !quality')",
           "name": "tag",
           "type": "str"
         },
@@ -725,7 +725,7 @@
               "type": "str"
             },
             {
-              "help": "Target version to rollback to (exclusive — this version stays applied)",
+              "help": "Target version to rollback to (exclusive \u2014 this version stays applied)",
               "name": "to",
               "type": "str"
             }
@@ -912,5 +912,5 @@
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
   "schema_version": 1,
-  "version": ""
+  "version": "0.24.3"
 }
