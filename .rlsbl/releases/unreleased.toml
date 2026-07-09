@@ -1,7 +1,7 @@
 # Version bump type: patch, minor, major, hotfix, or prerelease
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "Fix extension DDL name resolution (e.g., pgvector generates CREATE EXTENSION vector instead of pgvector)."
 # Optional context explaining why these changes were made
 context = ""
 # Pre-release identifier: alpha, beta, rc, or stable
