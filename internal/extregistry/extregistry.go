@@ -4,6 +4,7 @@ package extregistry
 // Extension describes what a PostgreSQL extension provides.
 type Extension struct {
 	Name         string
+	DDLName      string // PostgreSQL CREATE EXTENSION name, if different from Name (e.g. "vector" for pgvector)
 	Types        []string
 	Opclasses    []string
 	Functions    []string
@@ -51,6 +52,22 @@ func (r *Registry) Register(ext *Extension) {
 	for method, params := range ext.IndexParams {
 		r.indexParamMap[method] = append(r.indexParamMap[method], params...)
 	}
+}
+
+// ResolveDDLName returns the PostgreSQL extension name to use in CREATE EXTENSION
+// statements. Three-tier fallback:
+//   - If extension found and ext.DDLName non-empty, return ext.DDLName
+//   - If extension found and ext.DDLName empty, return ext.Name
+//   - If extension not found (user-defined), return input name as-is
+func (r *Registry) ResolveDDLName(name string) string {
+	ext, ok := r.extensions[name]
+	if !ok {
+		return name
+	}
+	if ext.DDLName != "" {
+		return ext.DDLName
+	}
+	return ext.Name
 }
 
 // RequiredExtension returns which extension provides the given opclass.

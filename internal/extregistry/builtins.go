@@ -108,8 +108,9 @@ func NewBuiltinRegistry() *Registry {
 	})
 
 	r.Register(&Extension{
-		Name:  "pgvector",
-		Types: []string{"vector", "halfvec", "sparsevec"},
+		Name:    "pgvector",
+		DDLName: "vector",
+		Types:   []string{"vector", "halfvec", "sparsevec"},
 		Opclasses: []string{
 			"vector_l2_ops", "vector_ip_ops", "vector_cosine_ops", "vector_l1_ops",
 			"halfvec_l2_ops", "halfvec_ip_ops", "halfvec_cosine_ops",

@@ -324,3 +324,22 @@ func TestLoadUserExtensions_IndexMethods(t *testing.T) {
 		t.Fatalf("expected my_ext, got %s", ext)
 	}
 }
+
+func TestResolveDDLName(t *testing.T) {
+	r := NewBuiltinRegistry()
+
+	// Tier 1: extension found with explicit DDLName (pgvector -> "vector")
+	if got := r.ResolveDDLName("pgvector"); got != "vector" {
+		t.Errorf("tier 1: expected \"vector\", got %q", got)
+	}
+
+	// Tier 2: extension found without DDLName (pg_trgm -> "pg_trgm")
+	if got := r.ResolveDDLName("pg_trgm"); got != "pg_trgm" {
+		t.Errorf("tier 2: expected \"pg_trgm\", got %q", got)
+	}
+
+	// Tier 3: extension not found (user-defined, passthrough)
+	if got := r.ResolveDDLName("my_unknown_ext"); got != "my_unknown_ext" {
+		t.Errorf("tier 3: expected \"my_unknown_ext\", got %q", got)
+	}
+}
