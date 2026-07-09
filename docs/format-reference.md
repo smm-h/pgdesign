@@ -475,8 +475,30 @@ path = "out/schema.json"
 | `path` | string | Output file path relative to project root (required) |
 | `lang` | string | Target language for codegen: `go`, `ts`, `java`, `kotlin`, `python`, `zig` (required when format is `codegen`) |
 | `mode` | string | Codegen mode: `validators`, `constants`, `types`, `constraints`, `enums`, `gorm`, `drizzle`, `sqlalchemy`, `jpa`, `ddl`, or `query-layer` (required when format is `codegen`) |
-| `idempotent` | boolean | For `sql` format: add `IF NOT EXISTS` guards |
+| `idempotent` | boolean | For `sql` format: add idempotent guards (see below) |
 | `comments` | boolean | For `sql` format: include `COMMENT ON` statements (default: true) |
+
+#### Idempotent mode coverage
+
+When `idempotent = true`, the generated SQL includes guards that make re-running the DDL safe against an existing database:
+
+**Covered:**
+- Table creation (`CREATE TABLE IF NOT EXISTS`)
+- Column addition (`ALTER TABLE ADD COLUMN IF NOT EXISTS` for every column, emitted after table creation)
+- Extensions (`CREATE EXTENSION IF NOT EXISTS`)
+- Schemas (`CREATE SCHEMA IF NOT EXISTS`)
+- Indexes (`CREATE INDEX IF NOT EXISTS`)
+- Enums, domains, composite types (DO $$ blocks with pg_type catalog checks)
+- Foreign key, unique, check, and exclusion constraints (DO $$ blocks with pg_constraint checks)
+- Views (`CREATE OR REPLACE VIEW`)
+- Materialized views (DO $$ blocks with pg_matviews checks)
+- Sequences (`CREATE SEQUENCE IF NOT EXISTS`)
+- Triggers (`CREATE OR REPLACE TRIGGER` on PG 14+, `DROP IF EXISTS` + `CREATE` on older versions)
+- RLS policies (`CREATE OR REPLACE POLICY` on PG 15+, DO $$ blocks on older versions)
+
+**Not covered:**
+- Column type changes (altering an existing column's type)
+- Column drops (removing columns that no longer appear in the schema)
 
 Running `pgdesign build` generates all configured outputs. Use `--dry-run` to preview what would be generated without writing files.
 
