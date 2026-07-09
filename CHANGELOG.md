@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.24.3
+
+Fix extension DDL name resolution (e.g., pgvector generates CREATE EXTENSION vector instead of pgvector).
+
+### Fixes
+
+- **Fix.** Extension names with DDL/TOML mismatches (e.g., pgvector → vector) now generate correct CREATE EXTENSION statements.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.24.2
 
 Bug fixes for JDBC testdb URL handling and migrate generate column serialization.
@@ -17,12 +31,6 @@ Java and Kotlin testdb consumers should re-run `pgdesign testdb init` to pick up
 
 - **Fix.** JDBC testdb templates now correctly handle PostgreSQL URLs with embedded credentials by encoding user/password as query parameters instead of passing userinfo in the authority.
 - **Fix.** Migration files generated for new tables now include column definitions in serialized operations, fixing a roundtrip loss where re-read migrations produced empty tables.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.24.1
 
