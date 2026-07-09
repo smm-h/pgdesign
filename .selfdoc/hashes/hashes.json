@@ -42,8 +42,8 @@
     "schema_hash": "7fd5c5cd03065042ca66736287518f7b3f0c7d15f760a070a63e8581963447fc"
   },
   "en/cli-index.md": {
-    "content": "4539e0084d0001718aa70013018dc4950ab9abd7b07ee8017dbae81c4fb3d7d1",
-    "description": "21ea011b2e49377a6fb312d304039b369ad173fc2c521da6668369e573bff900"
+    "content": "4f63918b7c3ff3b4a3f0f60c71a893b72d975870783ea0312d5546f1927d5053",
+    "description": "9cad7754013b69219b0722945a040382b6fdca4ca878bfdad54760604ef7ac5a"
   },
   "en/cli-introspect.md": {
     "content": "d667af4fb538def434de8c223c8e28fed9d85c0af1597625bbaf0680c4c3c072",
@@ -158,8 +158,8 @@
     "source_docstring": "b9925e96e2ff11309d932cca91a8827495d4c1aab666df0ba008fa19197e0c3a"
   },
   "en/internal-extregistry.md": {
-    "content": "d1f3ce2ff2cc8ea72c81f6e2a4a304df793198fc175c5889aeea00373aae203f",
-    "description": "89a0822a0c0a20d3ac9946b82542a0200de071884d00e1551d1d7efdb6a5616d",
+    "content": "98bcc8a0f451862c67d91827226448eda53ca9ba068e8c1a4c4d62cd4ec18ace",
+    "description": "185e7a827ec382422fba6ea462c8d1d572623252b7eca753cb4062e3f1fe9af6",
     "source_docstring": "89a0822a0c0a20d3ac9946b82542a0200de071884d00e1551d1d7efdb6a5616d"
   },
   "en/internal-fd.md": {
