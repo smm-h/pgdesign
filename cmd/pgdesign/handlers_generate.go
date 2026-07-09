@@ -6,6 +6,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/audit"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
@@ -63,12 +64,16 @@ func (h *generateHandler) Run(ctx *strictcli.Context) int {
 		return 1
 	}
 
+	extReg := extregistry.NewBuiltinRegistry()
+	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
+
 	opts := generate.Options{
 		Idempotent:      h.Idempotent,
 		IncludeComments: h.Comments,
 		Format:          h.Format,
 		PGVersion:       pgVersion,
 		TypeRegistry:    typeReg,
+		ExtRegistry:     extReg,
 	}
 
 	out, genDiags, err := generate.Generate(schema, opts)

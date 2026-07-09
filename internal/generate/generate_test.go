@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -2582,5 +2583,134 @@ func TestStateMachineTriggerGeneration_FilterFromSection17(t *testing.T) {
 	count := strings.Count(got, "CREATE TRIGGER _pgdesign_sm_orders_status")
 	if count != 1 {
 		t.Errorf("expected exactly 1 SM trigger statement (from section 9c), got %d:\n%s", count, got)
+	}
+}
+
+func TestExtensionDDLNameResolution(t *testing.T) {
+	// Schema declares "pgvector" as extension name (the config/registry name).
+	// The generated DDL must use "vector" (the PostgreSQL CREATE EXTENSION name).
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pgvector"},
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	extReg := extregistry.NewBuiltinRegistry()
+
+	opts := Options{
+		Format:      "sql",
+		ExtRegistry: extReg,
+	}
+
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "CREATE EXTENSION vector;") {
+		t.Errorf("expected CREATE EXTENSION vector, got:\n%s", out)
+	}
+	if strings.Contains(out, "CREATE EXTENSION pgvector") {
+		t.Errorf("DDL must not contain CREATE EXTENSION pgvector (wrong name), got:\n%s", out)
+	}
+}
+
+func TestExtensionDDLNamePassthrough(t *testing.T) {
+	// Extensions without DDLName should use their Name directly.
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pg_trgm"},
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	extReg := extregistry.NewBuiltinRegistry()
+
+	opts := Options{
+		Format:      "sql",
+		ExtRegistry: extReg,
+	}
+
+	out := mustGenerate(t, schema, opts)
+
+	if !strings.Contains(out, "CREATE EXTENSION pg_trgm;") {
+		t.Errorf("expected CREATE EXTENSION pg_trgm, got:\n%s", out)
+	}
+}
+
+func TestExtensionDDLNamePgPartman(t *testing.T) {
+	// pg_partman has special schema handling; verify DDL name resolution
+	// still applies through the schema path.
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pg_partman"},
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	extReg := extregistry.NewBuiltinRegistry()
+
+	opts := Options{
+		Format:      "sql",
+		ExtRegistry: extReg,
+	}
+
+	out := mustGenerate(t, schema, opts)
+
+	// pg_partman's DDLName is not set, so it should use its Name.
+	if !strings.Contains(out, "CREATE EXTENSION pg_partman SCHEMA partman;") {
+		t.Errorf("expected CREATE EXTENSION pg_partman SCHEMA partman, got:\n%s", out)
+	}
+}
+
+func TestExtensionDDLNameNilRegistry(t *testing.T) {
+	// When ExtRegistry is nil (backward compat), extension names pass through.
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pgvector"},
+		Tables: []model.Table{
+			{
+				Name:   "items",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	opts := Options{
+		Format: "sql",
+		// ExtRegistry is nil
+	}
+
+	out := mustGenerate(t, schema, opts)
+
+	// Without registry, name passes through unchanged.
+	if !strings.Contains(out, "CREATE EXTENSION pgvector;") {
+		t.Errorf("expected CREATE EXTENSION pgvector (nil registry passthrough), got:\n%s", out)
 	}
 }

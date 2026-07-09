@@ -12,6 +12,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/codegen"
 	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -140,7 +141,9 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 	}
 
 	// Handle SVG outputs that were excluded from Plan (non-deterministic rendering).
-	svgFiles, svgExit := handleBuildSVG(cfg, schema, typeReg, pgVersion, quiet)
+	extReg := extregistry.NewBuiltinRegistry()
+	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
+	svgFiles, svgExit := handleBuildSVG(cfg, schema, typeReg, extReg, pgVersion, quiet)
 	if svgExit != 0 {
 		return svgExit
 	}
@@ -214,7 +217,7 @@ func handleBuildDryRun(paths []string, plan *PlanResult, orphans []string, quiet
 
 // handleBuildSVG generates SVG outputs that are excluded from Plan due to
 // non-deterministic d2 rendering. These are still written during non-dry-run builds.
-func handleBuildSVG(cfg *config.ResolvedConfig, schema *model.Schema, typeReg *semtype.Registry, pgVersion int, quiet bool) ([]string, int) {
+func handleBuildSVG(cfg *config.ResolvedConfig, schema *model.Schema, typeReg *semtype.Registry, extReg *extregistry.Registry, pgVersion int, quiet bool) ([]string, int) {
 	var written []string
 	for name, out := range cfg.Output {
 		if out.Format != "svg" {
@@ -230,6 +233,7 @@ func handleBuildSVG(cfg *config.ResolvedConfig, schema *model.Schema, typeReg *s
 			Format:       "svg",
 			PGVersion:    pgVersion,
 			TypeRegistry: typeReg,
+			ExtRegistry:  extReg,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "build: output %q: %v\n", name, err)

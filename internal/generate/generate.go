@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/graph"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -20,7 +21,8 @@ type Options struct {
 	IncludeComments bool
 	Format          string // "sql", "json", "d2", "svg", "doc", "graphql"
 	PGVersion       int
-	TypeRegistry    *semtype.Registry // optional: enables state machine trigger generation and D2 state diagrams
+	TypeRegistry    *semtype.Registry      // optional: enables state machine trigger generation and D2 state diagrams
+	ExtRegistry     *extregistry.Registry  // optional: resolves extension DDL names (e.g. pgvector -> vector)
 }
 
 // Generate produces DDL output for the given schema according to opts.
@@ -141,10 +143,11 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	if len(schema.Extensions) > 0 {
 		var extStmts []string
 		for _, ext := range schema.Extensions {
+			ddlName := resolveExtDDLName(opts.ExtRegistry, ext)
 			if ext == "pg_partman" {
-				extStmts = append(extStmts, sql.CreateExtensionInSchema(ext, "partman", opts.Idempotent))
+				extStmts = append(extStmts, sql.CreateExtensionInSchema(ddlName, "partman", opts.Idempotent))
 			} else {
-				extStmts = append(extStmts, sql.CreateExtension(ext, opts.Idempotent))
+				extStmts = append(extStmts, sql.CreateExtension(ddlName, opts.Idempotent))
 			}
 		}
 		sections = append(sections, strings.Join(extStmts, "\n"))
@@ -602,6 +605,16 @@ func collectPartitionChildren(schemaName, parentTable string, children []model.P
 }
 
 // hasExtension returns true if the schema declares the named extension.
+// resolveExtDDLName returns the PostgreSQL DDL name for an extension.
+// If a registry is provided, it delegates to ResolveDDLName; otherwise
+// it returns the name unchanged (backward-compatible default).
+func resolveExtDDLName(reg *extregistry.Registry, name string) string {
+	if reg == nil {
+		return name
+	}
+	return reg.ResolveDDLName(name)
+}
+
 func hasExtension(schema *model.Schema, name string) bool {
 	for _, ext := range schema.Extensions {
 		if ext == name {
