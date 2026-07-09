@@ -1,0 +1,2 @@
+{"id":"18c0912c5e11fc557bb2712719ca4462b95419c72515cd74","commits":["b3f08446c214134c27cfba839777ca1fa1a1d881"],"user_facing":false}
+{"id":"18c0912dc420ad3a1efdaf609f2e4c9184a110d28c5b4b79","commits":["52b3451dd36f2d303cd07f684de3d95e1b2eeedc"],"user_facing":true,"description":"**Fix.** Extension names with DDL/TOML mismatches (e.g., pgvector \u2192 vector) now generate correct CREATE EXTENSION statements.","type":"fix"}
