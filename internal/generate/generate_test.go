@@ -13,6 +13,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/internal/sql"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
@@ -2713,4 +2714,82 @@ func TestExtensionDDLNameNilRegistry(t *testing.T) {
 	if !strings.Contains(out, "CREATE EXTENSION pgvector;") {
 		t.Errorf("expected CREATE EXTENSION pgvector (nil registry passthrough), got:\n%s", out)
 	}
+}
+
+func TestIdempotentAddColumnGuards(t *testing.T) {
+	defVal := "active"
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "things",
+				Schema: "app",
+				Columns: []model.Column{
+					// Regular column
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					// NOT NULL column
+					{Name: "name", PGType: typeinfo.MustParse("text"), NotNull: true},
+					// DEFAULT literal
+					{Name: "status", PGType: typeinfo.MustParse("text"), NotNull: true, Default: &defVal},
+					// DEFAULT expression
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true, DefaultExpr: "now()"},
+					// COLLATION
+					{Name: "title", PGType: typeinfo.MustParse("text"), Collation: "en_US"},
+					// ARRAY
+					{Name: "tags", PGType: typeinfo.MustParse("text"), Array: true},
+					// GENERATED STORED
+					{Name: "full_name", PGType: typeinfo.MustParse("text"), Generated: "name || ' ' || title", Stored: true},
+					// Identity column
+					{Name: "seq", PGType: typeinfo.MustParse("bigint"), NotNull: true, Identity: "ALWAYS"},
+				},
+				PK: []string{"id"},
+				FKs: []model.FK{
+					{
+						Name:       "fk_things_parent",
+						Columns:    []string{"id"},
+						RefSchema:  "app",
+						RefTable:   "things",
+						RefColumns: []string{"id"},
+						OnDelete:   "CASCADE",
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("idempotent emits ADD COLUMN IF NOT EXISTS", func(t *testing.T) {
+		opts := Options{Idempotent: true, Format: "sql", PGVersion: 15}
+		out := mustGenerate(t, schema, opts)
+
+		// Each column should have an ADD COLUMN IF NOT EXISTS guard.
+		expectedCols := []string{"id", "name", "status", "created_at", "title", "tags", "full_name", "seq"}
+		for _, col := range expectedCols {
+			needle := "ADD COLUMN IF NOT EXISTS " + sql.QuoteIdent(col)
+			if !strings.Contains(out, needle) {
+				t.Errorf("expected %q in output, not found.\nOutput:\n%s", needle, out)
+			}
+		}
+
+		// Verify ADD COLUMN guards appear BEFORE FK constraint DO-blocks.
+		addColIdx := strings.Index(out, "ADD COLUMN IF NOT EXISTS")
+		fkIdx := strings.Index(out, "fk_things_parent")
+		if addColIdx < 0 {
+			t.Fatal("ADD COLUMN IF NOT EXISTS not found in output")
+		}
+		if fkIdx < 0 {
+			t.Fatal("FK constraint not found in output")
+		}
+		if addColIdx >= fkIdx {
+			t.Errorf("ADD COLUMN guards (pos %d) should appear before FK constraints (pos %d)", addColIdx, fkIdx)
+		}
+	})
+
+	t.Run("non-idempotent does NOT emit ADD COLUMN", func(t *testing.T) {
+		opts := Options{Idempotent: false, Format: "sql", PGVersion: 15}
+		out := mustGenerate(t, schema, opts)
+
+		if strings.Contains(out, "ADD COLUMN IF NOT EXISTS") {
+			t.Errorf("non-idempotent mode should not emit ADD COLUMN IF NOT EXISTS.\nOutput:\n%s", out)
+		}
+	})
 }
