@@ -2,6 +2,27 @@
 
 # Changelog
 
+## 0.24.4
+
+Idempotent mode now emits ADD COLUMN IF NOT EXISTS guards for every column.
+
+<details>
+<summary>Context</summary>
+
+Previously, idempotent mode generated CREATE TABLE IF NOT EXISTS but plain ADD COLUMN for alter statements, causing silent column drift on re-apply. All column additions now use IF NOT EXISTS guards.
+
+</details>
+
+### Fixes
+
+- **Fix.** Idempotent mode now emits `ADD COLUMN IF NOT EXISTS` guards for every column, preventing silent column drift on re-apply.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.24.3
 
 Fix extension DDL name resolution (e.g., pgvector generates CREATE EXTENSION vector instead of pgvector).
@@ -9,12 +30,6 @@ Fix extension DDL name resolution (e.g., pgvector generates CREATE EXTENSION vec
 ### Fixes
 
 - **Fix.** Extension names with DDL/TOML mismatches (e.g., pgvector → vector) now generate correct CREATE EXTENSION statements.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.24.2
 
