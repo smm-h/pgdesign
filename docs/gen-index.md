@@ -1,7 +1,8 @@
 ---
 title: API Reference
-description: "Auto-generated API reference index for the selfdoc package — browse all public modules with their docstrings and source locations."
+description: "API reference index for pgdesign covering 27 modules"
 generated: true
+seeded: true
 nav_group: "API Reference"
 nav_order: 0
 order: 90

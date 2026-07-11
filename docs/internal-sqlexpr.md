@@ -1,7 +1,8 @@
 ---
 title: internal/sqlexpr
-description: "API reference for the internal/sqlexpr module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Package sqlexpr is a recursive descent parser for a subset of PostgreSQL SQL expressions."
 generated: true
+seeded: true
 nav_group: "API Reference"
 nav_order: 22
 ---

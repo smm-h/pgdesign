@@ -2,6 +2,7 @@
 title: internal/dbutil
 description: "API reference for the internal/dbutil module — auto-generated documentation covering public functions, classes, and type signatures."
 generated: true
+seeded: true
 nav_group: "API Reference"
 nav_order: 4
 ---
