@@ -1,4 +1,5 @@
 {
+  "name": "pgdesign",
   "version": "0.24.4",
   "base_url": "https://pgdesign.smmh.dev",
   "root_files": [
