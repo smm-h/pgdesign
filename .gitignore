@@ -16,3 +16,6 @@ dist/
 /pgdesign
 
 .rlsbl-monorepo/lock
+
+build/
+target/
