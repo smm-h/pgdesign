@@ -28,7 +28,7 @@ func (h *codegenHandler) ModeChoices() []string {
 
 func (h *codegenHandler) Run(ctx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](ctx)
-	return h.run(g.Config, g.Quiet)
+	return h.run(g.ProjectConfig, g.Quiet)
 }
 
 // run contains the codegen logic; tests call it directly with explicit

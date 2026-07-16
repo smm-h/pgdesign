@@ -26,12 +26,12 @@ type buildHandler struct {
 
 func (h *buildHandler) Run(ctx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](ctx)
-	return runBuild(g.Config, g.Quiet, h.DryRun, h.AutoCommit)
+	return runBuild(g.ProjectConfig, g.Quiet, h.DryRun, h.AutoCommit)
 }
 
 // runBuild is the typed entry point for the build command; tests call it
 // directly to exercise the build flow without a CLI parse. configOverride is
-// the --config global flag: when set, it names the exact pgdesign.toml to use
+// the --project-config global flag: when set, it names the exact pgdesign.toml to use
 // instead of the walk-up search.
 func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 	cwd, err := os.Getwd()

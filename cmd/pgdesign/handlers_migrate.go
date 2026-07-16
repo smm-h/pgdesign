@@ -32,13 +32,13 @@ func (h *migratePlanHandler) Run(cliCtx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](cliCtx)
 
 	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(g.Config, paths)
+	schema, _, exitCode := parseAndBuild(g.ProjectConfig, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
 	// Load config for schema name defaults.
-	cfg, cfgErr := loadProjectConfig(g.Config, paths[0])
+	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, paths[0])
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return 1
@@ -209,13 +209,13 @@ func (h *migrateGenerateHandler) Run(cliCtx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](cliCtx)
 
 	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(g.Config, paths)
+	schema, _, exitCode := parseAndBuild(g.ProjectConfig, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
 	// Load config for migrations dir and schema name defaults.
-	cfg, cfgErr := loadProjectConfig(g.Config, paths[0])
+	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, paths[0])
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return 1
@@ -345,7 +345,7 @@ func (h *migrateApplyHandler) Run(cliCtx *strictcli.Context) int {
 	}
 
 	// Load config for migrations dir and lock timeout.
-	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return 1
@@ -496,7 +496,7 @@ func (h *migrateRollbackHandler) Run(cliCtx *strictcli.Context) int {
 	}
 
 	// Load config for migrations dir and lock timeout.
-	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return 1
@@ -659,7 +659,7 @@ type migrateSquashHandler struct {
 func (h *migrateSquashHandler) Run(cliCtx *strictcli.Context) int {
 	g := strictcli.Globals[Globals](cliCtx)
 
-	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return 1
@@ -792,10 +792,10 @@ func (h *migrateTestHandler) Run(cliCtx *strictcli.Context) int {
 	}
 
 	if h.Shadow {
-		return h.runShadow(g.Config, g.Quiet)
+		return h.runShadow(g.ProjectConfig, g.Quiet)
 	}
 
-	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return 1
@@ -1295,7 +1295,7 @@ func (h *migrateBaselineHandler) Run(cliCtx *strictcli.Context) int {
 	}
 
 	// Load config for migrations dir.
-	cfg, cfgErr := loadProjectConfig(g.Config, ".")
+	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return 1

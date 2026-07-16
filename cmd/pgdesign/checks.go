@@ -31,7 +31,7 @@ func (c *pgdesignCheckContext) ProjectRoot() string { return c.root }
 //
 // Check functions receive a strictcli.CheckContext, not a *strictcli.Context:
 // strictcli's built-in check command is a plain command handler (no struct
-// handler dispatch), so parsed global flags — including the --config override
+// handler dispatch), so parsed global flags — including the --project-config override
 // — are not reachable here. Checks therefore always use walk-up config
 // discovery from the project root, and all config-discovery calls in this file
 // pass a nil override.
@@ -43,43 +43,34 @@ func loadSchemaForCheck(root string) ([]string, error) {
 	return resolveSchemaPaths(nil, []string{root})
 }
 
-// diagDetails converts diagnostics to string details for CheckResult.
-func diagDetails(diags []diagnostic.Diagnostic) []string {
-	details := make([]string, 0, len(diags))
-	for _, d := range diags {
-		loc := ""
-		if d.Table != "" {
-			loc = d.Table
-		}
-		if d.Column != "" {
-			loc += "." + d.Column
-		}
-		if loc != "" {
-			details = append(details, fmt.Sprintf("[%s] %s: %s", d.Code, loc, d.Message))
-		} else {
-			details = append(details, fmt.Sprintf("[%s] %s", d.Code, d.Message))
-		}
+// diagDetail formats a single diagnostic as a string.
+func diagDetail(d diagnostic.Diagnostic) string {
+	loc := ""
+	if d.Table != "" {
+		loc = d.Table
 	}
-	return details
+	if d.Column != "" {
+		loc += "." + d.Column
+	}
+	if loc != "" {
+		return fmt.Sprintf("[%s] %s: %s", d.Code, loc, d.Message)
+	}
+	return fmt.Sprintf("[%s] %s", d.Code, d.Message)
 }
 
-func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
+func checkValidation(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 
 	paths, err := loadSchemaForCheck(root)
 	if err != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
-		}
+		r.Error(fmt.Sprintf("cannot resolve schema paths: %v", err))
+		return r.Found("schema resolution failed")
 	}
 
 	schema, typeReg, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "schema parse/build failed",
-		}
+		r.Error("schema parse/build failed")
+		return r.Found("schema parse/build failed")
 	}
 
 	// nil override: globals are not reachable in check functions (see
@@ -88,36 +79,32 @@ func checkValidation(ctx strictcli.CheckContext) strictcli.CheckResult {
 
 	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
 	if pgErr != nil {
-		return strictcli.CheckResult{
-			Status:  "skip",
-			Message: pgErr.Error(),
-		}
+		return r.Skipped(pgErr.Error())
 	}
 	schema.PGVersion = pgVersion
 
 	diags := validateSchema(schema, typeReg, cfg, pgVersion)
 
 	if diagnostic.Diagnostics(diags).HasErrors() {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "validation errors found",
-			Details: diagDetails(diags),
+		for _, d := range diags {
+			if d.Severity == diagnostic.Error {
+				r.Error(diagDetail(d))
+			} else {
+				r.Warn(diagDetail(d))
+			}
 		}
+		return r.Found("validation errors found")
 	}
 
 	warnings := diagnostic.Diagnostics(diags).Warnings()
 	if len(warnings) > 0 {
-		return strictcli.CheckResult{
-			Status:  "warn",
-			Message: fmt.Sprintf("%d validation warning(s)", len(warnings)),
-			Details: diagDetails(warnings),
+		for _, w := range warnings {
+			r.Warn(diagDetail(w))
 		}
+		return r.Found(fmt.Sprintf("%d validation warning(s)", len(warnings)))
 	}
 
-	return strictcli.CheckResult{
-		Status:  "pass",
-		Message: "all validation checks passed",
-	}
+	return r.Passed("all validation checks passed")
 }
 
 // resolveDBURL looks for a database connection URL in the config file or
@@ -129,23 +116,17 @@ func resolveDBURL[P config.PathKind](cfg *config.Config[P]) string {
 	return os.Getenv("PGDESIGN_DB")
 }
 
-func checkNF(ctx strictcli.CheckContext) strictcli.CheckResult {
+func checkNF(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 
 	paths, err := loadSchemaForCheck(root)
 	if err != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
-		}
+		return r.Skipped(fmt.Sprintf("cannot resolve schema paths: %v", err))
 	}
 
 	schema, _, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "schema parse/build failed",
-		}
+		return r.Skipped("schema parse/build failed")
 	}
 
 	// nil override: globals are not reachable in check functions (see
@@ -158,10 +139,7 @@ func checkNF(ctx strictcli.CheckContext) strictcli.CheckResult {
 		bgCtx := context.Background()
 		conn, connErr := pgx.Connect(bgCtx, dbURL)
 		if connErr != nil {
-			return strictcli.CheckResult{
-				Status:  "fail",
-				Message: fmt.Sprintf("cannot connect to database: %v", connErr),
-			}
+			return r.Skipped(fmt.Sprintf("cannot connect to database: %v", connErr))
 		}
 		defer conn.Close(bgCtx)
 
@@ -199,17 +177,13 @@ func checkNF(ctx strictcli.CheckContext) strictcli.CheckResult {
 	}
 
 	if len(nfDiags) > 0 {
-		return strictcli.CheckResult{
-			Status:  "warn",
-			Message: fmt.Sprintf("%d normal form violation(s)", len(nfDiags)),
-			Details: diagDetails(nfDiags),
+		for _, d := range nfDiags {
+			r.Warn(diagDetail(d))
 		}
+		return r.Found(fmt.Sprintf("%d normal form violation(s)", len(nfDiags)))
 	}
 
-	return strictcli.CheckResult{
-		Status:  "pass",
-		Message: "no normal form violations",
-	}
+	return r.Passed("no normal form violations")
 }
 
 // analyzeCoverage checks constraint completeness and returns diagnostics with codes C100-C104.
@@ -345,23 +319,17 @@ var designCodes = map[string]bool{
 	"E228": true, // Cascade writes into append-only table
 }
 
-func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
+func checkDesign(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 
 	paths, err := loadSchemaForCheck(root)
 	if err != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
-		}
+		return r.Skipped(fmt.Sprintf("cannot resolve schema paths: %v", err))
 	}
 
 	schema, typeReg, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "schema parse/build failed",
-		}
+		return r.Skipped("schema parse/build failed")
 	}
 
 	// nil override: globals are not reachable in check functions (see
@@ -370,10 +338,7 @@ func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
 
 	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
 	if pgErr != nil {
-		return strictcli.CheckResult{
-			Status:  "skip",
-			Message: pgErr.Error(),
-		}
+		return r.Skipped(pgErr.Error())
 	}
 	schema.PGVersion = pgVersion
 
@@ -388,78 +353,49 @@ func checkDesign(ctx strictcli.CheckContext) strictcli.CheckResult {
 	}
 
 	if len(designDiags) == 0 {
-		return strictcli.CheckResult{
-			Status:  "pass",
-			Message: "no design issues found",
-		}
+		return r.Passed("no design issues found")
 	}
 
-	return strictcli.CheckResult{
-		Status:  "warn",
-		Message: fmt.Sprintf("%d design issue(s) found", len(designDiags)),
-		Details: diagDetails(designDiags),
+	for _, d := range designDiags {
+		r.Warn(diagDetail(d))
 	}
+	return r.Found(fmt.Sprintf("%d design issue(s) found", len(designDiags)))
 }
 
-func checkCoverage(ctx strictcli.CheckContext) strictcli.CheckResult {
+func checkCoverage(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 
 	paths, err := loadSchemaForCheck(root)
 	if err != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
-		}
+		return r.Skipped(fmt.Sprintf("cannot resolve schema paths: %v", err))
 	}
 
 	schema, _, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "schema parse/build failed",
-		}
+		return r.Skipped("schema parse/build failed")
 	}
 
 	allDiags := analyzeCoverage(schema)
 
-	if diagnostic.Diagnostics(allDiags).HasErrors() {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "coverage errors found",
-			Details: diagDetails(allDiags),
+	if len(allDiags) > 0 {
+		for _, d := range allDiags {
+			r.Warn(diagDetail(d))
 		}
+		return r.Found(fmt.Sprintf("%d coverage issue(s) found", len(allDiags)))
 	}
 
-	warnings := diagnostic.Diagnostics(allDiags).Warnings()
-	if len(warnings) > 0 {
-		return strictcli.CheckResult{
-			Status:  "warn",
-			Message: fmt.Sprintf("%d coverage issue(s) found", len(warnings)),
-			Details: diagDetails(allDiags),
-		}
-	}
-
-	return strictcli.CheckResult{
-		Status:  "pass",
-		Message: "all coverage checks passed",
-	}
+	return r.Passed("all coverage checks passed")
 }
 
-func checkStructural(ctx strictcli.CheckContext) strictcli.CheckResult {
+func checkStructural(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 	paths, err := loadSchemaForCheck(root)
 	if err != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
-		}
+		return r.Skipped(fmt.Sprintf("cannot resolve schema paths: %v", err))
 	}
 	schema, _, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "schema parse/build failed",
-		}
+		return r.Skipped("schema parse/build failed")
 	}
 
 	var allDiags []diagnostic.Diagnostic
@@ -468,33 +404,23 @@ func checkStructural(ctx strictcli.CheckContext) strictcli.CheckResult {
 	allDiags = append(allDiags, workload.DetectExcessiveIndexes(schema)...)
 
 	if len(allDiags) == 0 {
-		return strictcli.CheckResult{
-			Status:  "pass",
-			Message: "no structural issues found",
-		}
+		return r.Passed("no structural issues found")
 	}
-	return strictcli.CheckResult{
-		Status:  "warn",
-		Message: fmt.Sprintf("%d structural issue(s) found", len(allDiags)),
-		Details: diagDetails(allDiags),
+	for _, d := range allDiags {
+		r.Warn(diagDetail(d))
 	}
+	return r.Found(fmt.Sprintf("%d structural issue(s) found", len(allDiags)))
 }
 
-func checkWorkload(ctx strictcli.CheckContext) strictcli.CheckResult {
+func checkWorkload(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 	paths, err := loadSchemaForCheck(root)
 	if err != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
-		}
+		return r.Skipped(fmt.Sprintf("cannot resolve schema paths: %v", err))
 	}
 	schema, _, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "schema parse/build failed",
-		}
+		return r.Skipped("schema parse/build failed")
 	}
 
 	// nil override: globals are not reachable in check functions (see
@@ -502,19 +428,13 @@ func checkWorkload(ctx strictcli.CheckContext) strictcli.CheckResult {
 	cfg, _ := loadProjectConfig(nil, root)
 	dbURL := resolveDBURL(cfg)
 	if dbURL == "" {
-		return strictcli.CheckResult{
-			Status:  "skip",
-			Message: "no database URL configured (set database.url in pgdesign.toml or PGDESIGN_DB env)",
-		}
+		return r.Skipped("no database URL configured (set database.url in pgdesign.toml or PGDESIGN_DB env)")
 	}
 
 	bgCtx := context.Background()
 	conn, connErr := pgx.Connect(bgCtx, dbURL)
 	if connErr != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot connect to database: %v", connErr),
-		}
+		return r.Skipped(fmt.Sprintf("cannot connect to database: %v", connErr))
 	}
 	defer conn.Close(bgCtx)
 
@@ -537,75 +457,54 @@ func checkWorkload(ctx strictcli.CheckContext) strictcli.CheckResult {
 	}
 
 	if len(allDiags) == 0 {
-		return strictcli.CheckResult{
-			Status:  "pass",
-			Message: "no workload issues found",
-		}
+		return r.Passed("no workload issues found")
 	}
-	return strictcli.CheckResult{
-		Status:  "warn",
-		Message: fmt.Sprintf("%d workload issue(s) found", len(allDiags)),
-		Details: diagDetails(allDiags),
+	for _, d := range allDiags {
+		r.Warn(diagDetail(d))
 	}
+	return r.Found(fmt.Sprintf("%d workload issue(s) found", len(allDiags)))
 }
 
-func checkBuild(ctx strictcli.CheckContext) strictcli.CheckResult {
+func checkBuild(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 
 	configPath, found := config.FindConfig(root)
 	if !found {
-		return strictcli.CheckResult{
-			Status:  "skip",
-			Message: "no pgdesign.toml found",
-		}
+		return r.Skipped("no pgdesign.toml found")
 	}
 
 	cfg, err := config.LoadAndResolve(configPath)
 	if err != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot load config: %v", err),
-		}
+		r.Error(fmt.Sprintf("cannot load config: %v", err))
+		return r.Found("config loading failed")
 	}
 
 	if len(cfg.Output) == 0 {
-		return strictcli.CheckResult{
-			Status:  "skip",
-			Message: "no [output] section in pgdesign.toml",
-		}
+		return r.Skipped("no [output] section in pgdesign.toml")
 	}
 
 	paths, err := loadSchemaForCheck(root)
 	if err != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("cannot resolve schema paths: %v", err),
-		}
+		r.Error(fmt.Sprintf("cannot resolve schema paths: %v", err))
+		return r.Found("schema resolution failed")
 	}
 
 	schema, typeReg, exitCode := parseAndBuild(nil, paths)
 	if exitCode != 0 {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: "schema parse/build failed",
-		}
+		r.Error("schema parse/build failed")
+		return r.Found("schema parse/build failed")
 	}
 
 	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
 	if pgErr != nil {
-		return strictcli.CheckResult{
-			Status:  "skip",
-			Message: pgErr.Error(),
-		}
+		return r.Skipped(pgErr.Error())
 	}
 	schema.PGVersion = pgVersion
 
 	plan, planErr := Plan(schema, cfg, typeReg, pgVersion)
 	if planErr != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("plan failed: %v", planErr),
-		}
+		r.Error(fmt.Sprintf("plan failed: %v", planErr))
+		return r.Found("plan generation failed")
 	}
 
 	// Sort paths for deterministic detail ordering.
@@ -629,36 +528,26 @@ func checkBuild(ctx strictcli.CheckContext) strictcli.CheckResult {
 	// directories that the current configuration does not produce. Hard error.
 	orphans, orphanErr := scanAllOrphans(plan.OwnedDirs)
 	if orphanErr != nil {
-		return strictcli.CheckResult{
-			Status:  "fail",
-			Message: fmt.Sprintf("orphan scan failed: %v", orphanErr),
-		}
+		r.Error(fmt.Sprintf("orphan scan failed: %v", orphanErr))
+		return r.Found("orphan scan failed")
 	}
 
 	if len(staleFiles) == 0 && len(missingFiles) == 0 && len(orphans) == 0 {
-		return strictcli.CheckResult{
-			Status:  "pass",
-			Message: "all build outputs are fresh",
-		}
+		return r.Passed("all build outputs are fresh")
 	}
 
-	var details []string
 	for _, p := range missingFiles {
-		details = append(details, fmt.Sprintf("[missing] %s", p))
+		r.Error(fmt.Sprintf("[missing] %s", p))
 	}
 	for _, p := range staleFiles {
-		details = append(details, fmt.Sprintf("[stale] %s", p))
+		r.Error(fmt.Sprintf("[stale] %s", p))
 	}
 	for _, p := range orphans {
-		details = append(details, fmt.Sprintf("[orphan] %s", p))
+		r.Error(fmt.Sprintf("[orphan] %s", p))
 	}
 	if len(orphans) > 0 {
-		details = append(details, "orphans: "+orphanExplanation)
+		r.Error("orphans: " + orphanExplanation)
 	}
 
-	return strictcli.CheckResult{
-		Status:  "fail",
-		Message: fmt.Sprintf("working tree is not a fixed point of pgdesign build: %d file(s) would change, %d file(s) missing, %d orphan file(s)", len(staleFiles), len(missingFiles), len(orphans)),
-		Details: details,
-	}
+	return r.Found(fmt.Sprintf("working tree is not a fixed point of pgdesign build: %d file(s) would change, %d file(s) missing, %d orphan file(s)", len(staleFiles), len(missingFiles), len(orphans)))
 }

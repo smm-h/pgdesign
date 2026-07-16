@@ -35,13 +35,13 @@ func main() {
 		return &pgdesignCheckContext{root: cwd}
 	})
 
-	app.RegisterCheck("validation", checkValidation)
-	app.RegisterCheck("nf", checkNF)
-	app.RegisterCheck("coverage", checkCoverage)
-	app.RegisterCheck("design", checkDesign)
-	app.RegisterCheck("structural", checkStructural)
-	app.RegisterCheck("workload", checkWorkload)
-	app.RegisterCheck("build", checkBuild)
+	app.RegisterErrorCheck("validation", checkValidation)
+	app.RegisterWarnCheck("nf", checkNF)
+	app.RegisterWarnCheck("coverage", checkCoverage)
+	app.RegisterWarnCheck("design", checkDesign)
+	app.RegisterWarnCheck("structural", checkStructural)
+	app.RegisterWarnCheck("workload", checkWorkload)
+	app.RegisterErrorCheck("build", checkBuild)
 
 	strictcli.RegisterGlobals[Globals](app)
 
@@ -124,13 +124,13 @@ func main() {
 	app.Run()
 }
 
-// configOverride returns the --config global flag value from the CLI context.
+// configOverride returns the --project-config global flag value from the CLI context.
 func configOverride(ctx *strictcli.Context) *string {
-	return strictcli.Globals[Globals](ctx).Config
+	return strictcli.Globals[Globals](ctx).ProjectConfig
 }
 
 // resolveConfigPath returns the pgdesign.toml path to use for config discovery.
-// When override is non-nil (the --config global flag), the file must exist and
+// When override is non-nil (the --project-config global flag), the file must exist and
 // be a regular file — a missing or unusable override is a hard error, never a
 // silent fall back to directory search. When override is nil, it walks up from
 // startDir via config.FindConfig.
@@ -138,10 +138,10 @@ func resolveConfigPath(override *string, startDir string) (string, bool, error) 
 	if override != nil {
 		info, err := os.Stat(*override)
 		if err != nil {
-			return "", false, fmt.Errorf("--config %q: %w", *override, err)
+			return "", false, fmt.Errorf("--project-config %q: %w", *override, err)
 		}
 		if info.IsDir() {
-			return "", false, fmt.Errorf("--config %q is a directory, expected a pgdesign.toml file", *override)
+			return "", false, fmt.Errorf("--project-config %q is a directory, expected a pgdesign.toml file", *override)
 		}
 		return *override, true, nil
 	}
@@ -150,7 +150,7 @@ func resolveConfigPath(override *string, startDir string) (string, bool, error) 
 }
 
 // loadProjectConfig loads the project's pgdesign.toml. When configOverride
-// (the --config global flag) is non-nil, that exact file is loaded and any
+// (the --project-config global flag) is non-nil, that exact file is loaded and any
 // failure (missing or malformed) is a hard error. Without an override, the
 // config is discovered from the directory containing path (or path itself if
 // it's a directory): a missing config yields a zero-valued config, and a
@@ -163,7 +163,7 @@ func loadProjectConfig(configOverride *string, path string) (*config.RawConfig, 
 		}
 		cfg, err := config.Load(configPath)
 		if err != nil {
-			return nil, fmt.Errorf("--config %q: %w", *configOverride, err)
+			return nil, fmt.Errorf("--project-config %q: %w", *configOverride, err)
 		}
 		return cfg, nil
 	}
@@ -198,7 +198,7 @@ func configSchemaNames[P config.PathKind](cfg *config.Config[P]) []string {
 // resolveSchemaPaths resolves the given CLI paths into a list of .toml schema
 // file paths. Handles single files, multiple files, directories (with optional
 // pgdesign.toml config), and pgdesign.toml files directly. configOverride (the
-// --config global flag) replaces the walk-up config search for directory paths;
+// --project-config global flag) replaces the walk-up config search for directory paths;
 // explicit schema file paths are unaffected.
 func resolveSchemaPaths(configOverride *string, paths []string) ([]string, error) {
 	if len(paths) == 0 {
@@ -229,17 +229,17 @@ func resolveSchemaPaths(configOverride *string, paths []string) ([]string, error
 	if !info.IsDir() {
 		// Single file. Check if it's pgdesign.toml itself.
 		if filepath.Base(p) == "pgdesign.toml" {
-			// A positional config file and a --config override are two explicit
+			// A positional config file and a --project-config override are two explicit
 			// config sources; silently preferring one would hide the conflict.
 			if configOverride != nil && !samePath(*configOverride, p) {
-				return nil, fmt.Errorf("conflicting config sources: positional %q and --config %q", p, *configOverride)
+				return nil, fmt.Errorf("conflicting config sources: positional %q and --project-config %q", p, *configOverride)
 			}
 			return resolveFromConfig(p)
 		}
 		return []string{p}, nil
 	}
 
-	// Directory: look for pgdesign.toml (or use the --config override).
+	// Directory: look for pgdesign.toml (or use the --project-config override).
 	configPath, hasConfig, err := resolveConfigPath(configOverride, p)
 	if err != nil {
 		return nil, err
@@ -294,7 +294,7 @@ func resolveFromConfig(configPath string) ([]string, error) {
 
 // parseAndBuild is a shared helper for commands that need a resolved schema.
 // It accepts one or more paths (files or a directory) and returns the built
-// schema. configOverride (the --config global flag) replaces the walk-up
+// schema. configOverride (the --project-config global flag) replaces the walk-up
 // config search for both schema path resolution and project config loading.
 func parseAndBuild(configOverride *string, paths []string) (*model.Schema, *semtype.Registry, int) {
 	resolvedPaths, err := resolveSchemaPaths(configOverride, paths)

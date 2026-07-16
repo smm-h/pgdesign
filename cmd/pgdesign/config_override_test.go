@@ -13,7 +13,7 @@ import (
 //   - walkup/: contains a pgdesign.toml (pg_version 15) discoverable by
 //     FindConfig walk-up search from walkup/
 //   - elsewhere/override-config.toml: a config file at a non-standard name and
-//     location (pg_version 16), only reachable via the --config override
+//     location (pg_version 16), only reachable via the --project-config override
 //
 // Returns (walkupDir, overridePath).
 func writeConfigOverrideTree(t *testing.T) (string, string) {
@@ -196,7 +196,7 @@ path = "out.sql"
 
 	// With the override, build must succeed (dry-run exits 0 on missing files).
 	if code := runBuild(&cfgPath, true, true, false); code != 0 {
-		t.Errorf("expected build with --config override to succeed, got exit code %d", code)
+		t.Errorf("expected build with --project-config override to succeed, got exit code %d", code)
 	}
 }
 
@@ -206,6 +206,6 @@ func TestRunBuild_MissingConfigOverrideIsHardError(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	if code := runBuild(&missing, true, true, false); code == 0 {
-		t.Error("expected build with missing --config override to fail")
+		t.Error("expected build with missing --project-config override to fail")
 	}
 }

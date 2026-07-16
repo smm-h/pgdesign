@@ -9,7 +9,27 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/codegen"
 	"github.com/smm-h/pgdesign/internal/config"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
+
+// checkBuildResult is a test helper that calls checkBuild with a fresh ErrorReporter
+// and returns the derived status and the outcome for inspection.
+type checkBuildResult struct {
+	status  string
+	outcome strictcli.CheckOutcome
+	result  strictcli.CheckRunResult
+}
+
+func runCheckBuild(ctx strictcli.CheckContext) checkBuildResult {
+	r := &strictcli.ErrorReporter{}
+	outcome := checkBuild(ctx, r)
+	res := strictcli.CheckRunResult{Name: "build", Outcome: outcome}
+	return checkBuildResult{
+		status:  res.Status(),
+		outcome: outcome,
+		result:  res,
+	}
+}
 
 // writeFreshnessProject creates a temp project directory containing a copy of
 // the freshness fixture schema plus a pgdesign.toml with a single multi-file
@@ -89,9 +109,9 @@ func TestCheckBuild_DetectsOrphanAfterSplitModeSwitch(t *testing.T) {
 		t.Fatalf("initial build failed with exit code %d", code)
 	}
 
-	res := checkBuild(&pgdesignCheckContext{root: dir})
-	if res.Status != "pass" {
-		t.Fatalf("sanity: expected fresh tree to pass, got %s: %s %v", res.Status, res.Message, res.Details)
+	cbr := runCheckBuild(&pgdesignCheckContext{root: dir})
+	if cbr.status != "pass" {
+		t.Fatalf("sanity: expected fresh tree to pass, got %s", cbr.status)
 	}
 
 	// Simulate the leftover from an earlier faceted build.
@@ -104,18 +124,13 @@ func TestCheckBuild_DetectsOrphanAfterSplitModeSwitch(t *testing.T) {
 		t.Fatalf("write leftover: %v", err)
 	}
 
-	res = checkBuild(&pgdesignCheckContext{root: dir})
-	if res.Status != "fail" {
-		t.Fatalf("expected orphan %q to fail the build check, got %s: %s", leftover, res.Status, res.Message)
+	cbr = runCheckBuild(&pgdesignCheckContext{root: dir})
+	if cbr.status != "fail" {
+		t.Fatalf("expected orphan %q to fail the build check, got %s", leftover, cbr.status)
 	}
-	found := false
-	for _, d := range res.Details {
-		if strings.Contains(d, "[orphan]") && strings.Contains(d, leftover) {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("expected an [orphan] detail naming %q, got details: %v", leftover, res.Details)
+	formatted := strictcli.FormatCheckResults([]strictcli.CheckRunResult{cbr.result}, true)
+	if !strings.Contains(formatted, "[orphan]") || !strings.Contains(formatted, leftover) {
+		t.Errorf("expected an [orphan] detail naming %q in formatted output:\n%s", leftover, formatted)
 	}
 }
 
@@ -523,8 +538,8 @@ func TestCheckBuild_FreshPassStaleFailLifecycle(t *testing.T) {
 	t.Chdir(dir)
 
 	// Before any build: outputs are missing, check must fail.
-	res := checkBuild(&pgdesignCheckContext{root: dir})
-	if res.Status == "pass" {
+	cbr := runCheckBuild(&pgdesignCheckContext{root: dir})
+	if cbr.status == "pass" {
 		t.Fatalf("expected check to fail before build, got pass")
 	}
 
@@ -534,9 +549,9 @@ func TestCheckBuild_FreshPassStaleFailLifecycle(t *testing.T) {
 	}
 
 	// After a fresh build: check must pass.
-	res = checkBuild(&pgdesignCheckContext{root: dir})
-	if res.Status != "pass" {
-		t.Fatalf("expected pass after fresh build, got %s: %s %v", res.Status, res.Message, res.Details)
+	cbr = runCheckBuild(&pgdesignCheckContext{root: dir})
+	if cbr.status != "pass" {
+		t.Fatalf("expected pass after fresh build, got %s", cbr.status)
 	}
 
 	// Corrupt a generated file to simulate schema drift: check must fail.
@@ -564,29 +579,23 @@ func TestCheckBuild_FreshPassStaleFailLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res = checkBuild(&pgdesignCheckContext{root: dir})
-	if res.Status != "fail" {
-		t.Fatalf("expected fail after corrupting %s, got %s: %s", filepath.Base(victim), res.Status, res.Message)
+	cbr = runCheckBuild(&pgdesignCheckContext{root: dir})
+	if cbr.status != "fail" {
+		t.Fatalf("expected fail after corrupting %s, got %s", filepath.Base(victim), cbr.status)
 	}
 
 	// Verify the failure mentions the stale file.
-	staleFound := false
-	for _, d := range res.Details {
-		if strings.Contains(d, "[stale]") {
-			staleFound = true
-			break
-		}
-	}
-	if !staleFound {
-		t.Errorf("expected [stale] in check details, got: %v", res.Details)
+	formatted := strictcli.FormatCheckResults([]strictcli.CheckRunResult{cbr.result}, true)
+	if !strings.Contains(formatted, "[stale]") {
+		t.Errorf("expected [stale] in check details, got:\n%s", formatted)
 	}
 
 	// Restore the original content: check must pass again.
 	if err := os.WriteFile(victim, original, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	res = checkBuild(&pgdesignCheckContext{root: dir})
-	if res.Status != "pass" {
-		t.Fatalf("expected pass after restoring %s, got %s: %s", filepath.Base(victim), res.Status, res.Message)
+	cbr = runCheckBuild(&pgdesignCheckContext{root: dir})
+	if cbr.status != "pass" {
+		t.Fatalf("expected pass after restoring %s, got %s", filepath.Base(victim), cbr.status)
 	}
 }
