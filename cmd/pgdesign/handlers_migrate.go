@@ -20,381 +20,383 @@ import (
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-type migratePlanHandler struct {
-	DB string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
-	// Dir is registered but not currently consumed by plan; kept for CLI
-	// schema compatibility.
-	Dir   string   `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
-	Paths []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
-}
+func registerMigratePlanCmd(g *strictcli.Group) {
+	g.Command("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
 
-func (h *migratePlanHandler) Run(cliCtx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](cliCtx)
+			paths := kwargsStrSlice(kwargs["path"])
+			schema, _, exitCode := parseAndBuild(cfgOverride, paths)
+			if exitCode != 0 {
+				return strictcli.Exit(exitCode)
+			}
 
-	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(g.ProjectConfig, paths)
-	if exitCode != 0 {
-		return exitCode
-	}
+			cfg, cfgErr := loadProjectConfig(cfgOverride, paths[0])
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
 
-	// Load config for schema name defaults.
-	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, paths[0])
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
+			dbURL := kwargs["db"].(string)
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate plan")
+				return strictcli.Exit(1)
+			}
 
-	dbURL := h.DB
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: --db is required for migrate plan")
-		return 1
-	}
+			schemaNames := []string{"public"}
+			if schema.Name != "" && schema.Name != "public" {
+				schemaNames = []string{schema.Name}
+			} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
+				schemaNames = cfgNames
+			}
 
-	schemaNames := []string{"public"}
-	if schema.Name != "" && schema.Name != "public" {
-		schemaNames = []string{schema.Name}
-	} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
-		schemaNames = cfgNames
-	}
-
-	ctx := context.Background()
-	actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
-	if len(diags) > 0 {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
-	}
-	if diagnostic.Diagnostics(diags).HasErrors() {
-		return 1
-	}
-
-	d := diff.Diff(schema, actual)
-	if d.IsEmpty() {
-		if !g.Quiet {
-			fmt.Println("No changes detected. Schema is up to date.")
-		}
-		return 0
-	}
-
-	// Query table stats for row estimates.
-	var tableStats migrate.TableStats
-	statsConn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: cannot connect for table stats: %v\n", err)
-	} else {
-		for _, sn := range schemaNames {
-			stats, err := migrate.QueryTableStats(ctx, statsConn, sn)
+			ctx := context.Background()
+			actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "warning: cannot query table stats for %s: %v\n", sn, err)
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			if len(diags) > 0 {
+				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+			}
+			if diagnostic.Diagnostics(diags).HasErrors() {
+				return strictcli.Exit(1)
+			}
+
+			d := diff.Diff(schema, actual)
+			if d.IsEmpty() {
+				if !quiet {
+					fmt.Println("No changes detected. Schema is up to date.")
+				}
+				return strictcli.Exit(0)
+			}
+
+			var tableStats migrate.TableStats
+			statsConn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: cannot connect for table stats: %v\n", err)
 			} else {
-				if tableStats == nil {
-					tableStats = stats
-				} else {
-					for k, v := range stats {
-						tableStats[k] = v
-					}
-				}
-			}
-		}
-		statsConn.Close(ctx)
-	}
-
-	// Resolve PGVersion: live (from introspect) > config > TOML schema.
-	pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
-	if pgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
-		return 1
-	}
-	schema.PGVersion = pgVersion
-
-	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
-
-	// Print the plan.
-	fmt.Println("Migration plan:")
-	fmt.Printf("  Description: %s\n", m.Description)
-	fmt.Println()
-
-	if migrate.HasPhases(m) {
-		ddlIdx := 0
-		dmlIdx := 0
-		for _, phase := range []string{migrate.PhaseExpand, migrate.PhaseMigrate, migrate.PhaseContract} {
-			// Check if this phase has any ops.
-			hasOps := false
-			for _, op := range m.DDLOps {
-				if op.Phase == phase {
-					hasOps = true
-					break
-				}
-			}
-			if !hasOps {
-				for _, op := range m.DMLOps {
-					if op.Phase == phase {
-						hasOps = true
-						break
-					}
-				}
-			}
-			if !hasOps {
-				continue
-			}
-
-			fmt.Printf("  -- Phase: %s --\n", phase)
-			for _, op := range m.DDLOps {
-				if op.Phase != phase {
-					continue
-				}
-				ddlIdx++
-				sqlStmt := migrate.OpToSQL(op)
-				fmt.Printf("  %d. [%s] %s\n", ddlIdx, op.Op, opSummary(op))
-				fmt.Printf("     SQL: %s\n", sqlStmt)
-				if op.Down != nil {
-					if op.Down.Irreversible {
-						fmt.Println("     Down: IRREVERSIBLE")
+				for _, sn := range schemaNames {
+					stats, err := migrate.QueryTableStats(ctx, statsConn, sn)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "warning: cannot query table stats for %s: %v\n", sn, err)
 					} else {
-						fmt.Println("     Down: reversible")
+						if tableStats == nil {
+							tableStats = stats
+						} else {
+							for k, v := range stats {
+								tableStats[k] = v
+							}
+						}
 					}
 				}
-				fmt.Println()
+				statsConn.Close(ctx)
 			}
-			for _, op := range m.DMLOps {
-				if op.Phase != phase {
-					continue
-				}
-				dmlIdx++
-				fmt.Printf("  DML %d. [%s]\n", dmlIdx, op.Op)
-				fmt.Printf("     SQL: %s\n", op.SQL)
-				fmt.Println()
+
+			pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+			if pgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+				return strictcli.Exit(1)
 			}
-		}
-	} else {
-		for i, op := range m.DDLOps {
-			sqlStmt := migrate.OpToSQL(op)
-			fmt.Printf("  %d. [%s] %s\n", i+1, op.Op, opSummary(op))
-			fmt.Printf("     SQL: %s\n", sqlStmt)
-			if op.Down != nil {
-				if op.Down.Irreversible {
-					fmt.Println("     Down: IRREVERSIBLE")
-				} else {
-					fmt.Println("     Down: reversible")
-				}
-			}
+			schema.PGVersion = pgVersion
+
+			m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
+
+			fmt.Println("Migration plan:")
+			fmt.Printf("  Description: %s\n", m.Description)
 			fmt.Println()
-		}
 
-		for i, op := range m.DMLOps {
-			fmt.Printf("  DML %d. [%s]\n", i+1, op.Op)
-			fmt.Printf("     SQL: %s\n", op.SQL)
-			fmt.Println()
-		}
-	}
+			if migrate.HasPhases(m) {
+				ddlIdx := 0
+				dmlIdx := 0
+				for _, phase := range []string{migrate.PhaseExpand, migrate.PhaseMigrate, migrate.PhaseContract} {
+					hasOps := false
+					for _, op := range m.DDLOps {
+						if op.Phase == phase {
+							hasOps = true
+							break
+						}
+					}
+					if !hasOps {
+						for _, op := range m.DMLOps {
+							if op.Phase == phase {
+								hasOps = true
+								break
+							}
+						}
+					}
+					if !hasOps {
+						continue
+					}
 
-	if len(migDiags) > 0 {
-		fmt.Println("Diagnostics:")
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
-	}
-
-	return 0
-}
-
-type migrateGenerateHandler struct {
-	DB      string   `cli:"db" help:"PostgreSQL connection URL for the target database server"`
-	Version *string  `cli:"version" help:"Semantic version string for the generated migration"`
-	Dir     string   `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
-	Paths   []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
-}
-
-func (h *migrateGenerateHandler) Run(cliCtx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](cliCtx)
-
-	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(g.ProjectConfig, paths)
-	if exitCode != 0 {
-		return exitCode
-	}
-
-	// Load config for migrations dir and schema name defaults.
-	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, paths[0])
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
-
-	dbURL := h.DB
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: --db is required for migrate generate")
-		return 1
-	}
-
-	var version string
-	if h.Version != nil {
-		version = *h.Version
-	}
-	if version == "" {
-		fmt.Fprintln(os.Stderr, "error: --version is required for migrate generate")
-		return 1
-	}
-
-	dir := h.Dir
-	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = string(cfg.Project.MigrationsDir)
-	}
-
-	schemaNames := []string{"public"}
-	if schema.Name != "" && schema.Name != "public" {
-		schemaNames = []string{schema.Name}
-	} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
-		schemaNames = cfgNames
-	}
-
-	ctx := context.Background()
-	actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
-	if len(diags) > 0 {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
-	}
-	if diagnostic.Diagnostics(diags).HasErrors() {
-		return 1
-	}
-
-	d := diff.Diff(schema, actual)
-	if d.IsEmpty() {
-		fmt.Println("No changes detected. Nothing to generate.")
-		return 0
-	}
-
-	// Query table stats for row estimates.
-	var tableStats migrate.TableStats
-	statsConn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: cannot connect for table stats: %v\n", err)
-	} else {
-		for _, sn := range schemaNames {
-			stats, err := migrate.QueryTableStats(ctx, statsConn, sn)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "warning: cannot query table stats for %s: %v\n", sn, err)
+					fmt.Printf("  -- Phase: %s --\n", phase)
+					for _, op := range m.DDLOps {
+						if op.Phase != phase {
+							continue
+						}
+						ddlIdx++
+						sqlStmt := migrate.OpToSQL(op)
+						fmt.Printf("  %d. [%s] %s\n", ddlIdx, op.Op, opSummary(op))
+						fmt.Printf("     SQL: %s\n", sqlStmt)
+						if op.Down != nil {
+							if op.Down.Irreversible {
+								fmt.Println("     Down: IRREVERSIBLE")
+							} else {
+								fmt.Println("     Down: reversible")
+							}
+						}
+						fmt.Println()
+					}
+					for _, op := range m.DMLOps {
+						if op.Phase != phase {
+							continue
+						}
+						dmlIdx++
+						fmt.Printf("  DML %d. [%s]\n", dmlIdx, op.Op)
+						fmt.Printf("     SQL: %s\n", op.SQL)
+						fmt.Println()
+					}
+				}
 			} else {
-				if tableStats == nil {
-					tableStats = stats
-				} else {
-					for k, v := range stats {
-						tableStats[k] = v
+				for i, op := range m.DDLOps {
+					sqlStmt := migrate.OpToSQL(op)
+					fmt.Printf("  %d. [%s] %s\n", i+1, op.Op, opSummary(op))
+					fmt.Printf("     SQL: %s\n", sqlStmt)
+					if op.Down != nil {
+						if op.Down.Irreversible {
+							fmt.Println("     Down: IRREVERSIBLE")
+						} else {
+							fmt.Println("     Down: reversible")
+						}
 					}
+					fmt.Println()
+				}
+
+				for i, op := range m.DMLOps {
+					fmt.Printf("  DML %d. [%s]\n", i+1, op.Op)
+					fmt.Printf("     SQL: %s\n", op.SQL)
+					fmt.Println()
 				}
 			}
-		}
-		statsConn.Close(ctx)
-	}
 
-	// Resolve PGVersion: live (from introspect) > config > TOML schema.
-	pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
-	if pgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
-		return 1
-	}
-	schema.PGVersion = pgVersion
+			if len(migDiags) > 0 {
+				fmt.Println("Diagnostics:")
+				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
+			}
 
-	m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
-
-	if len(migDiags) > 0 {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
-	}
-
-	// Ensure migrations directory exists.
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "error: create migrations dir: %v\n", err)
-		return 1
-	}
-
-	path := filepath.Join(dir, version+".toml")
-	if err := migrate.WriteMigrationFile(path, m); err != nil {
-		fmt.Fprintf(os.Stderr, "error: write migration: %v\n", err)
-		return 1
-	}
-
-	if !g.Quiet {
-		fmt.Printf("Generated migration: %s\n", path)
-		fmt.Printf("  Description: %s\n", m.Description)
-		fmt.Printf("  DDL ops: %d\n", len(m.DDLOps))
-		fmt.Printf("  DML ops: %d\n", len(m.DMLOps))
-	}
-
-	return 0
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+		),
+	)
 }
 
-type migrateApplyHandler struct {
-	DB     string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
-	Dir    string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
-	DryRun bool   `cli:"dry-run" help:"Preview the migration SQL statements without executing" default:"false"`
-	// Timeout is registered but not currently consumed by apply (the lock
-	// timeout comes from pgdesign.toml); kept for CLI schema compatibility.
-	Timeout int `cli:"timeout" help:"Advisory lock acquisition timeout in seconds before aborting" default:"30"`
+func registerMigrateGenerateCmd(g *strictcli.Group) {
+	g.Command("generate", "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
+
+			paths := kwargsStrSlice(kwargs["path"])
+			schema, _, exitCode := parseAndBuild(cfgOverride, paths)
+			if exitCode != 0 {
+				return strictcli.Exit(exitCode)
+			}
+
+			cfg, cfgErr := loadProjectConfig(cfgOverride, paths[0])
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
+
+			dbURL := kwargs["db"].(string)
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate generate")
+				return strictcli.Exit(1)
+			}
+
+			version := ""
+			if v := kwargsOptString(kwargs, "version"); v != nil {
+				version = *v
+			}
+			if version == "" {
+				fmt.Fprintln(os.Stderr, "error: --version is required for migrate generate")
+				return strictcli.Exit(1)
+			}
+
+			dir := kwargs["dir"].(string)
+			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+				dir = string(cfg.Project.MigrationsDir)
+			}
+
+			schemaNames := []string{"public"}
+			if schema.Name != "" && schema.Name != "public" {
+				schemaNames = []string{schema.Name}
+			} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
+				schemaNames = cfgNames
+			}
+
+			ctx := context.Background()
+			actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			if len(diags) > 0 {
+				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+			}
+			if diagnostic.Diagnostics(diags).HasErrors() {
+				return strictcli.Exit(1)
+			}
+
+			d := diff.Diff(schema, actual)
+			if d.IsEmpty() {
+				fmt.Println("No changes detected. Nothing to generate.")
+				return strictcli.Exit(0)
+			}
+
+			var tableStats migrate.TableStats
+			statsConn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: cannot connect for table stats: %v\n", err)
+			} else {
+				for _, sn := range schemaNames {
+					stats, err := migrate.QueryTableStats(ctx, statsConn, sn)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "warning: cannot query table stats for %s: %v\n", sn, err)
+					} else {
+						if tableStats == nil {
+							tableStats = stats
+						} else {
+							for k, v := range stats {
+								tableStats[k] = v
+							}
+						}
+					}
+				}
+				statsConn.Close(ctx)
+			}
+
+			pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+			if pgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+				return strictcli.Exit(1)
+			}
+			schema.PGVersion = pgVersion
+
+			m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
+
+			if len(migDiags) > 0 {
+				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
+			}
+
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				fmt.Fprintf(os.Stderr, "error: create migrations dir: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			path := filepath.Join(dir, version+".toml")
+			if err := migrate.WriteMigrationFile(path, m); err != nil {
+				fmt.Fprintf(os.Stderr, "error: write migration: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			if !quiet {
+				fmt.Printf("Generated migration: %s\n", path)
+				fmt.Printf("  Description: %s\n", m.Description)
+				fmt.Printf("  DDL ops: %d\n", len(m.DDLOps))
+				fmt.Printf("  DML ops: %d\n", len(m.DMLOps))
+			}
+
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("version", "Semantic version string for the generated migration", strictcli.Default(nil)),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+		),
+	)
 }
 
-func (h *migrateApplyHandler) Run(cliCtx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](cliCtx)
+func registerMigrateApplyCmd(g *strictcli.Group) {
+	g.Command("apply", "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
 
-	dbURL := h.DB
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: --db is required for migrate apply")
-		return 1
-	}
+			dbURL := kwargs["db"].(string)
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate apply")
+				return strictcli.Exit(1)
+			}
 
-	// Load config for migrations dir and lock timeout.
-	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
+			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
 
-	dir := h.Dir
-	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = string(cfg.Project.MigrationsDir)
-	}
+			dir := kwargs["dir"].(string)
+			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+				dir = string(cfg.Project.MigrationsDir)
+			}
 
-	dryRun := h.DryRun
+			dryRun := kwargs["dry_run"].(bool)
 
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
-		return 1
-	}
-	defer conn.Close(ctx)
+			ctx := context.Background()
+			conn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			defer conn.Close(ctx)
 
-	if dryRun {
-		return handleMigrateApplyDryRun(ctx, conn, dir, g.Quiet)
-	}
+			if dryRun {
+				return strictcli.Exit(handleMigrateApplyDryRun(ctx, conn, dir, quiet))
+			}
 
-	lockTimeout := cfg.Migrate.LockTimeout
+			lockTimeout := cfg.Migrate.LockTimeout
 
-	applied, err := migrate.Apply(ctx, conn, dir, lockTimeout)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		if len(applied) > 0 {
-			fmt.Fprintf(os.Stderr, "Applied before failure: %v\n", applied)
-		}
-		return 1
-	}
+			applied, err := migrate.Apply(ctx, conn, dir, lockTimeout)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				if len(applied) > 0 {
+					fmt.Fprintf(os.Stderr, "Applied before failure: %v\n", applied)
+				}
+				return strictcli.Exit(1)
+			}
 
-	if len(applied) == 0 {
-		if !g.Quiet {
-			fmt.Println("No pending migrations.")
-		}
-		return 0
-	}
+			if len(applied) == 0 {
+				if !quiet {
+					fmt.Println("No pending migrations.")
+				}
+				return strictcli.Exit(0)
+			}
 
-	if !g.Quiet {
-		fmt.Printf("Applied %d migration(s):\n", len(applied))
-		for _, v := range applied {
-			fmt.Printf("  - %s\n", v)
-		}
-	}
-	return 0
+			if !quiet {
+				fmt.Printf("Applied %d migration(s):\n", len(applied))
+				for _, v := range applied {
+					fmt.Printf("  - %s\n", v)
+				}
+			}
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing", strictcli.Default(false)),
+			strictcli.IntFlag("timeout", "Advisory lock acquisition timeout in seconds before aborting", strictcli.Default(30)),
+		),
+	)
 }
 
 // handleMigrateApplyDryRun shows the SQL that would be executed without
@@ -415,7 +417,6 @@ func handleMigrateApplyDryRun(ctx context.Context, conn *pgx.Conn, dir string, q
 		appliedSet[v] = true
 	}
 
-	// Discover migration files.
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: read migrations dir: %v\n", err)
@@ -480,162 +481,166 @@ func handleMigrateApplyDryRun(ctx context.Context, conn *pgx.Conn, dir string, q
 	return 0
 }
 
-type migrateRollbackHandler struct {
-	DB  string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
-	Dir string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
-	To  string `cli:"to" help:"Target version to rollback to (exclusive — this version stays applied)"`
-}
+func registerMigrateRollbackCmd(g *strictcli.Group) {
+	g.Command("rollback", "Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
 
-func (h *migrateRollbackHandler) Run(cliCtx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](cliCtx)
-
-	dbURL := h.DB
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: --db is required for migrate rollback")
-		return 1
-	}
-
-	// Load config for migrations dir and lock timeout.
-	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
-
-	dir := h.Dir
-	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = string(cfg.Project.MigrationsDir)
-	}
-
-	lockTimeout := cfg.Migrate.LockTimeout
-
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
-		return 1
-	}
-	defer conn.Close(ctx)
-
-	toVersion := h.To
-	if toVersion != "" {
-		// Multi-step rollback to a target version.
-		rolledBack, err := migrate.RollbackTo(ctx, conn, dir, toVersion, lockTimeout)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			if len(rolledBack) > 0 {
-				fmt.Fprintf(os.Stderr, "Rolled back before failure: %v\n", rolledBack)
+			dbURL := kwargs["db"].(string)
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate rollback")
+				return strictcli.Exit(1)
 			}
-			return 1
-		}
-		if !g.Quiet {
-			fmt.Printf("Rolled back %d migration(s) to %s:\n", len(rolledBack), toVersion)
-			for _, v := range rolledBack {
-				fmt.Printf("  - %s\n", v)
+
+			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
 			}
-		}
-		return 0
-	}
 
-	// Single-step rollback (existing behavior).
-	version, err := migrate.Rollback(ctx, conn, dir, lockTimeout)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
+			dir := kwargs["dir"].(string)
+			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+				dir = string(cfg.Project.MigrationsDir)
+			}
 
-	if !g.Quiet {
-		fmt.Printf("Rolled back: %s\n", version)
-	}
-	return 0
+			lockTimeout := cfg.Migrate.LockTimeout
+
+			ctx := context.Background()
+			conn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			defer conn.Close(ctx)
+
+			toVersion := kwargs["to"].(string)
+			if toVersion != "" {
+				rolledBack, err := migrate.RollbackTo(ctx, conn, dir, toVersion, lockTimeout)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					if len(rolledBack) > 0 {
+						fmt.Fprintf(os.Stderr, "Rolled back before failure: %v\n", rolledBack)
+					}
+					return strictcli.Exit(1)
+				}
+				if !quiet {
+					fmt.Printf("Rolled back %d migration(s) to %s:\n", len(rolledBack), toVersion)
+					for _, v := range rolledBack {
+						fmt.Printf("  - %s\n", v)
+					}
+				}
+				return strictcli.Exit(0)
+			}
+
+			version, err := migrate.Rollback(ctx, conn, dir, lockTimeout)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			if !quiet {
+				fmt.Printf("Rolled back: %s\n", version)
+			}
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("to", "Target version to rollback to (exclusive -- this version stays applied)", strictcli.Default("")),
+		),
+	)
 }
 
-type migrateStatusHandler struct {
-	DB  string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
-	Dir string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
-}
+func registerMigrateStatusCmd(g *strictcli.Group) {
+	g.Command("status", "Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			cfgOverride := kwargsConfigOverride(kwargs)
 
-func (h *migrateStatusHandler) Run(cliCtx *strictcli.Context) int {
-	dbURL := h.DB
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: --db is required for migrate status")
-		return 1
-	}
+			dbURL := kwargs["db"].(string)
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate status")
+				return strictcli.Exit(1)
+			}
 
-	// Load config for migrations dir.
-	cfg, cfgErr := loadProjectConfig(configOverride(cliCtx), ".")
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
+			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
 
-	dir := h.Dir
-	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = string(cfg.Project.MigrationsDir)
-	}
+			dir := kwargs["dir"].(string)
+			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+				dir = string(cfg.Project.MigrationsDir)
+			}
 
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
-		return 1
-	}
-	defer conn.Close(ctx)
+			ctx := context.Background()
+			conn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			defer conn.Close(ctx)
 
-	if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
+			if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 
-	applied, err := migrate.AppliedVersions(ctx, conn)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
+			applied, err := migrate.AppliedVersions(ctx, conn)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 
-	appliedSet := make(map[string]bool, len(applied))
-	for _, v := range applied {
-		appliedSet[v] = true
-	}
+			appliedSet := make(map[string]bool, len(applied))
+			for _, v := range applied {
+				appliedSet[v] = true
+			}
 
-	// Discover migration files.
-	entries, err := os.ReadDir(dir)
-	if err != nil && !os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "error: read migrations dir: %v\n", err)
-		return 1
-	}
+			entries, readErr := os.ReadDir(dir)
+			if readErr != nil && !os.IsNotExist(readErr) {
+				fmt.Fprintf(os.Stderr, "error: read migrations dir: %v\n", readErr)
+				return strictcli.Exit(1)
+			}
 
-	var allVersions []string
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".toml" {
-			continue
-		}
-		v := e.Name()[:len(e.Name())-5] // strip .toml
-		allVersions = append(allVersions, v)
-	}
+			var allVersions []string
+			for _, e := range entries {
+				if e.IsDir() || filepath.Ext(e.Name()) != ".toml" {
+					continue
+				}
+				v := e.Name()[:len(e.Name())-5]
+				allVersions = append(allVersions, v)
+			}
 
-	fmt.Printf("Applied migrations: %d\n", len(applied))
-	for _, v := range applied {
-		fmt.Printf("  [applied] %s\n", v)
-	}
+			fmt.Printf("Applied migrations: %d\n", len(applied))
+			for _, v := range applied {
+				fmt.Printf("  [applied] %s\n", v)
+			}
 
-	pendingCount := 0
-	for _, v := range allVersions {
-		if !appliedSet[v] {
-			fmt.Printf("  [pending] %s\n", v)
-			pendingCount++
-		}
-	}
+			pendingCount := 0
+			for _, v := range allVersions {
+				if !appliedSet[v] {
+					fmt.Printf("  [pending] %s\n", v)
+					pendingCount++
+				}
+			}
 
-	if pendingCount == 0 && len(applied) > 0 {
-		fmt.Println("All migrations applied.")
-	} else if pendingCount > 0 {
-		fmt.Printf("\n%d pending migration(s).\n", pendingCount)
-	} else if len(applied) == 0 {
-		fmt.Println("No migrations found or applied.")
-	}
+			if pendingCount == 0 && len(applied) > 0 {
+				fmt.Println("All migrations applied.")
+			} else if pendingCount > 0 {
+				fmt.Printf("\n%d pending migration(s).\n", pendingCount)
+			} else if len(applied) == 0 {
+				fmt.Println("No migrations found or applied.")
+			}
 
-	return 0
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+		),
+	)
 }
 
 func opSummary(op migrate.DDLOp) string {
@@ -649,347 +654,343 @@ func opSummary(op migrate.DDLOp) string {
 	return target
 }
 
-type migrateSquashHandler struct {
-	From string `cli:"from" help:"First migration version to include in the squash range"`
-	To   string `cli:"to" help:"Last migration version to include in the squash range"`
-	Dir  string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
-	DB   string `cli:"db" help:"PostgreSQL connection URL for pre-squash safety check"`
-}
+func registerMigrateSquashCmd(g *strictcli.Group) {
+	g.Command("squash", "Consolidate a range of sequential migration files into a single optimized migration. Recognizes 12 types of inverse operation pairs for cancellation, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
 
-func (h *migrateSquashHandler) Run(cliCtx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](cliCtx)
-
-	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
-
-	dir := h.Dir
-	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = string(cfg.Project.MigrationsDir)
-	}
-
-	from := h.From
-	if from == "" {
-		fmt.Fprintln(os.Stderr, "error: --from is required")
-		return 1
-	}
-	to := h.To
-	if to == "" {
-		fmt.Fprintln(os.Stderr, "error: --to is required")
-		return 1
-	}
-
-	dbURL := h.DB
-	if dbURL != "" {
-		ctx := context.Background()
-		conn, err := pgx.Connect(ctx, dbURL)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: connect for safety check: %v\n", err)
-			return 1
-		}
-		defer conn.Close(ctx)
-
-		if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
-		}
-
-		applied, err := migrate.AppliedVersions(ctx, conn)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
-		}
-
-		// Check if any migration in the [from, to] range has been applied.
-		var appliedInRange []string
-		for _, v := range applied {
-			if migrate.InSemverRange(v, from, to) {
-				appliedInRange = append(appliedInRange, v)
+			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
 			}
-		}
 
-		if len(appliedInRange) > 0 {
-			diags := []diagnostic.Diagnostic{{
-				Severity: diagnostic.Error,
-				Code:     "M200",
-				Message:  fmt.Sprintf("cannot squash: %d migration(s) in range [%s, %s] have been applied: %v; squashing would desynchronize the tracking table", len(appliedInRange), from, to, appliedInRange),
-			}}
-			fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
-			return 1
-		}
-	}
+			dir := kwargs["dir"].(string)
+			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+				dir = string(cfg.Project.MigrationsDir)
+			}
 
-	result, err := migrate.SquashMigrations(dir, from, to)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
+			from := kwargs["from"].(string)
+			if from == "" {
+				fmt.Fprintln(os.Stderr, "error: --from is required")
+				return strictcli.Exit(1)
+			}
+			to := kwargs["to"].(string)
+			if to == "" {
+				fmt.Fprintln(os.Stderr, "error: --to is required")
+				return strictcli.Exit(1)
+			}
 
-	// Write squashed migration to a temp file first, since the output path
-	// ({to}.toml) is one of the original files being archived.
-	outputPath := migrate.OutputPath(dir, to)
-	tmpPath := outputPath + ".squash-tmp"
-	if err := migrate.WriteMigrationFile(tmpPath, result.Squashed); err != nil {
-		fmt.Fprintf(os.Stderr, "error: write squashed migration: %v\n", err)
-		return 1
-	}
-
-	// Archive original migration files with saferm.
-	args := []string{"delete", "--description", fmt.Sprintf("Squashed into %s (from %s to %s)", to, from, to)}
-	args = append(args, result.OriginalPaths...)
-	cmd := exec.Command("saferm", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		// Clean up temp file on failure.
-		os.Remove(tmpPath)
-		fmt.Fprintf(os.Stderr, "error: archive originals: %v\n", err)
-		return 1
-	}
-
-	// Move temp file to final output path.
-	if err := os.Rename(tmpPath, outputPath); err != nil {
-		fmt.Fprintf(os.Stderr, "error: rename squashed migration: %v\n", err)
-		return 1
-	}
-
-	if !g.Quiet {
-		fmt.Printf("Squashed %d migrations into %s\n", result.OriginalCount, outputPath)
-		fmt.Printf("  Description: %s\n", result.Squashed.Description)
-		fmt.Printf("  DDL ops: %d\n", len(result.Squashed.DDLOps))
-		fmt.Printf("  DML ops: %d\n", len(result.Squashed.DMLOps))
-		if result.CancelledPairs > 0 {
-			fmt.Printf("  Cancelled inverse pairs: %d\n", result.CancelledPairs)
-		}
-		if result.MergedOps > 0 {
-			fmt.Printf("  Merged ops: %d\n", result.MergedOps)
-		}
-		if result.ConsolidatedOps > 0 {
-			fmt.Printf("  Consolidated into CREATE TABLE: %d\n", result.ConsolidatedOps)
-		}
-	}
-
-	return 0
-}
-
-type migrateTestHandler struct {
-	DB      string   `cli:"db" help:"PostgreSQL connection URL for the staging test database"`
-	Dir     string   `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
-	Timeout int      `cli:"timeout" help:"Maximum time in seconds before the test run is aborted" default:"60"`
-	Shadow  bool     `cli:"shadow" help:"Test by replaying migrations into a shadow database and diffing against TOML schema" default:"false"`
-	Paths   []string `arg:"path" help:"Schema file(s) or directory (required with --shadow)" variadic:"true" required:"false"`
-}
-
-func (h *migrateTestHandler) Run(cliCtx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](cliCtx)
-
-	dbURL := h.DB
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: --db is required for migrate test")
-		return 1
-	}
-
-	if h.Shadow {
-		return h.runShadow(g.ProjectConfig, g.Quiet)
-	}
-
-	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
-
-	dir := h.Dir
-	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = string(cfg.Project.MigrationsDir)
-	}
-
-	timeout := h.Timeout
-	quiet := g.Quiet
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-	defer cancel()
-
-	conn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
-		return 1
-	}
-	defer conn.Close(ctx)
-
-	if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
-
-	applied, err := migrate.AppliedVersions(ctx, conn)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
-	appliedSet := make(map[string]bool, len(applied))
-	for _, v := range applied {
-		appliedSet[v] = true
-	}
-
-	// Discover migration files.
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: read migrations dir: %v\n", err)
-		return 1
-	}
-
-	type pendingMigration struct {
-		version string
-		path    string
-	}
-	var pending []pendingMigration
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".toml" {
-			continue
-		}
-		version := e.Name()[:len(e.Name())-5]
-		if appliedSet[version] {
-			continue
-		}
-		pending = append(pending, pendingMigration{
-			version: version,
-			path:    filepath.Join(dir, e.Name()),
-		})
-	}
-
-	if len(pending) == 0 {
-		if !quiet {
-			fmt.Println("No pending migrations to test.")
-		}
-		return 0
-	}
-
-	if !quiet {
-		fmt.Printf("Testing %d pending migration(s)...\n", len(pending))
-	}
-
-	totalStart := time.Now()
-
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: begin transaction: %v\n", err)
-		return 1
-	}
-	defer tx.Rollback(ctx)
-
-	failed := false
-	skippedNonTx := 0
-
-	for _, pm := range pending {
-		start := time.Now()
-
-		m, err := migrate.ParseMigrationFile(pm.path)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "  [fail] %s: parse error: %v\n", pm.version, err)
-			failed = true
-			break
-		}
-
-		migFailed := false
-		for _, op := range m.DDLOps {
-			if migrate.IsNonTransactional(op) {
-				skippedNonTx++
-				if !quiet {
-					fmt.Printf("  [skip] Non-transactional op (would run outside transaction): %s\n", op.Op)
+			dbURL := kwargs["db"].(string)
+			if dbURL != "" {
+				ctx := context.Background()
+				conn, err := pgx.Connect(ctx, dbURL)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: connect for safety check: %v\n", err)
+					return strictcli.Exit(1)
 				}
-				continue
+				defer conn.Close(ctx)
+
+				if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+
+				applied, err := migrate.AppliedVersions(ctx, conn)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+
+				var appliedInRange []string
+				for _, v := range applied {
+					if migrate.InSemverRange(v, from, to) {
+						appliedInRange = append(appliedInRange, v)
+					}
+				}
+
+				if len(appliedInRange) > 0 {
+					diags := []diagnostic.Diagnostic{{
+						Severity: diagnostic.Error,
+						Code:     "M200",
+						Message:  fmt.Sprintf("cannot squash: %d migration(s) in range [%s, %s] have been applied: %v; squashing would desynchronize the tracking table", len(appliedInRange), from, to, appliedInRange),
+					}}
+					fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+					return strictcli.Exit(1)
+				}
 			}
 
-			sqlStmt := migrate.OpToSQL(op)
-			if sqlStmt == "" {
-				continue
-			}
-
-			stmts, err := sqlparse.SplitStatements(sqlStmt)
+			result, err := migrate.SquashMigrations(dir, from, to)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "  [fail] %s: parse error: %v\n", pm.version, err)
-				migFailed = true
-				break
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
 			}
-			for _, stmt := range stmts {
-				if _, err := tx.Exec(ctx, stmt); err != nil {
-					fmt.Fprintf(os.Stderr, "  [fail] %s: %v\n    SQL: %s\n", pm.version, err, stmt)
-					migFailed = true
-					break
+
+			outputPath := migrate.OutputPath(dir, to)
+			tmpPath := outputPath + ".squash-tmp"
+			if err := migrate.WriteMigrationFile(tmpPath, result.Squashed); err != nil {
+				fmt.Fprintf(os.Stderr, "error: write squashed migration: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			args := []string{"delete", "--description", fmt.Sprintf("Squashed into %s (from %s to %s)", to, from, to)}
+			args = append(args, result.OriginalPaths...)
+			cmd := exec.Command("saferm", args...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				os.Remove(tmpPath)
+				fmt.Fprintf(os.Stderr, "error: archive originals: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			if err := os.Rename(tmpPath, outputPath); err != nil {
+				fmt.Fprintf(os.Stderr, "error: rename squashed migration: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			if !quiet {
+				fmt.Printf("Squashed %d migrations into %s\n", result.OriginalCount, outputPath)
+				fmt.Printf("  Description: %s\n", result.Squashed.Description)
+				fmt.Printf("  DDL ops: %d\n", len(result.Squashed.DDLOps))
+				fmt.Printf("  DML ops: %d\n", len(result.Squashed.DMLOps))
+				if result.CancelledPairs > 0 {
+					fmt.Printf("  Cancelled inverse pairs: %d\n", result.CancelledPairs)
+				}
+				if result.MergedOps > 0 {
+					fmt.Printf("  Merged ops: %d\n", result.MergedOps)
+				}
+				if result.ConsolidatedOps > 0 {
+					fmt.Printf("  Consolidated into CREATE TABLE: %d\n", result.ConsolidatedOps)
 				}
 			}
-			if migFailed {
-				break
-			}
-		}
 
-		if !migFailed {
-			for _, op := range m.DMLOps {
-				if op.SQL == "" {
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("from", "First migration version to include in the squash range"),
+			strictcli.StringFlag("to", "Last migration version to include in the squash range"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for pre-squash safety check", strictcli.Default("")),
+		),
+	)
+}
+
+func registerMigrateTestCmd(g *strictcli.Group) {
+	g.Command("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
+
+			dbURL := kwargs["db"].(string)
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate test")
+				return strictcli.Exit(1)
+			}
+
+			shadow := kwargs["shadow"].(bool)
+			dir := kwargs["dir"].(string)
+			timeout := kwargs["timeout"].(int)
+			paths := kwargsStrSlice(kwargs["path"])
+
+			if shadow {
+				return strictcli.Exit(runMigrateTestShadow(dbURL, dir, timeout, paths, cfgOverride, quiet))
+			}
+
+			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
+
+			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+				dir = string(cfg.Project.MigrationsDir)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+			defer cancel()
+
+			conn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			defer conn.Close(ctx)
+
+			if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			applied, err := migrate.AppliedVersions(ctx, conn)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			appliedSet := make(map[string]bool, len(applied))
+			for _, v := range applied {
+				appliedSet[v] = true
+			}
+
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: read migrations dir: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			type pendingMigration struct {
+				version string
+				path    string
+			}
+			var pending []pendingMigration
+			for _, e := range entries {
+				if e.IsDir() || filepath.Ext(e.Name()) != ".toml" {
 					continue
 				}
-				if _, err := tx.Exec(ctx, op.SQL); err != nil {
-					fmt.Fprintf(os.Stderr, "  [fail] %s: DML error: %v\n    SQL: %s\n", pm.version, err, op.SQL)
-					migFailed = true
+				version := e.Name()[:len(e.Name())-5]
+				if appliedSet[version] {
+					continue
+				}
+				pending = append(pending, pendingMigration{
+					version: version,
+					path:    filepath.Join(dir, e.Name()),
+				})
+			}
+
+			if len(pending) == 0 {
+				if !quiet {
+					fmt.Println("No pending migrations to test.")
+				}
+				return strictcli.Exit(0)
+			}
+
+			if !quiet {
+				fmt.Printf("Testing %d pending migration(s)...\n", len(pending))
+			}
+
+			totalStart := time.Now()
+
+			tx, err := conn.Begin(ctx)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: begin transaction: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			defer tx.Rollback(ctx)
+
+			failed := false
+			skippedNonTx := 0
+
+			for _, pm := range pending {
+				start := time.Now()
+
+				m, err := migrate.ParseMigrationFile(pm.path)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "  [fail] %s: parse error: %v\n", pm.version, err)
+					failed = true
 					break
 				}
+
+				migFailed := false
+				for _, op := range m.DDLOps {
+					if migrate.IsNonTransactional(op) {
+						skippedNonTx++
+						if !quiet {
+							fmt.Printf("  [skip] Non-transactional op (would run outside transaction): %s\n", op.Op)
+						}
+						continue
+					}
+
+					sqlStmt := migrate.OpToSQL(op)
+					if sqlStmt == "" {
+						continue
+					}
+
+					stmts, err := sqlparse.SplitStatements(sqlStmt)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "  [fail] %s: parse error: %v\n", pm.version, err)
+						migFailed = true
+						break
+					}
+					for _, stmt := range stmts {
+						if _, err := tx.Exec(ctx, stmt); err != nil {
+							fmt.Fprintf(os.Stderr, "  [fail] %s: %v\n    SQL: %s\n", pm.version, err, stmt)
+							migFailed = true
+							break
+						}
+					}
+					if migFailed {
+						break
+					}
+				}
+
+				if !migFailed {
+					for _, op := range m.DMLOps {
+						if op.SQL == "" {
+							continue
+						}
+						if _, err := tx.Exec(ctx, op.SQL); err != nil {
+							fmt.Fprintf(os.Stderr, "  [fail] %s: DML error: %v\n    SQL: %s\n", pm.version, err, op.SQL)
+							migFailed = true
+							break
+						}
+					}
+				}
+
+				elapsed := time.Since(start)
+
+				if migFailed {
+					failed = true
+					break
+				}
+
+				if !quiet {
+					fmt.Printf("  [pass] %s (%s)\n", pm.version, elapsed.Round(time.Millisecond))
+				}
 			}
-		}
 
-		elapsed := time.Since(start)
+			tx.Rollback(ctx)
 
-		if migFailed {
-			failed = true
-			break
-		}
+			totalElapsed := time.Since(totalStart)
 
-		if !quiet {
-			fmt.Printf("  [pass] %s (%s)\n", pm.version, elapsed.Round(time.Millisecond))
-		}
-	}
+			if !quiet {
+				fmt.Println()
+				if failed {
+					fmt.Println("Result: FAIL")
+				} else {
+					fmt.Println("Result: PASS")
+				}
+				fmt.Printf("Migrations tested: %d\n", len(pending))
+				fmt.Printf("Total time: %s\n", totalElapsed.Round(time.Millisecond))
+				if skippedNonTx > 0 {
+					fmt.Printf("Skipped non-transactional ops: %d\n", skippedNonTx)
+				}
+			}
 
-	// Roll back explicitly (deferred rollback also covers this).
-	tx.Rollback(ctx)
-
-	totalElapsed := time.Since(totalStart)
-
-	if !quiet {
-		fmt.Println()
-		if failed {
-			fmt.Println("Result: FAIL")
-		} else {
-			fmt.Println("Result: PASS")
-		}
-		fmt.Printf("Migrations tested: %d\n", len(pending))
-		fmt.Printf("Total time: %s\n", totalElapsed.Round(time.Millisecond))
-		if skippedNonTx > 0 {
-			fmt.Printf("Skipped non-transactional ops: %d\n", skippedNonTx)
-		}
-	}
-
-	if failed {
-		return 1
-	}
-	return 0
+			if failed {
+				return strictcli.Exit(1)
+			}
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.IntFlag("timeout", "Maximum time in seconds before the test run is aborted", strictcli.Default(60)),
+			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema", strictcli.Default(false)),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "Schema file(s) or directory (required with --shadow)", strictcli.Variadic(), strictcli.ArgRequired(false)),
+		),
+	)
 }
 
-// runShadow implements --shadow mode: replay all migrations into a fresh
-// shadow database and diff the result against the TOML schema.
-func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
-	dbURL := h.DB
-	timeout := h.Timeout
-
-	// Require path arg for shadow mode.
-	paths := h.Paths
+// runMigrateTestShadow implements --shadow mode.
+func runMigrateTestShadow(dbURL, dir string, timeout int, paths []string, configOverride *string, quiet bool) int {
 	if len(paths) == 0 {
 		fmt.Fprintln(os.Stderr, "error: schema path is required for --shadow mode")
 		return 1
 	}
 
-	// Build desired schema from TOML.
 	schema, _, exitCode := parseAndBuild(configOverride, paths)
 	if exitCode != 0 {
 		return exitCode
@@ -1001,7 +1002,6 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 		return 1
 	}
 
-	dir := h.Dir
 	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
 		dir = string(cfg.Project.MigrationsDir)
 	}
@@ -1016,7 +1016,6 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	// Connect to the source database for admin operations (CREATE/DROP DATABASE).
 	conn, err := pgx.Connect(ctx, dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
@@ -1024,7 +1023,6 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 	}
 	defer conn.Close(ctx)
 
-	// Check for stale shadow databases.
 	rows, err := conn.Query(ctx, "SELECT datname FROM pg_database WHERE datname LIKE 'pgdesign_shadow_%'")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: cannot check for stale shadow databases: %v\n", err)
@@ -1046,21 +1044,17 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 		}
 	}
 
-	// Create shadow database.
 	shadowName := fmt.Sprintf("pgdesign_shadow_%d", time.Now().Unix())
 	if !quiet {
 		fmt.Printf("Creating shadow database: %s\n", shadowName)
 	}
 
-	// CREATE DATABASE cannot run inside a transaction.
 	if _, err := conn.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s", shadowName)); err != nil {
 		fmt.Fprintf(os.Stderr, "error: create shadow database: %v\n", err)
 		return 1
 	}
 
-	// Ensure cleanup on exit.
 	defer func() {
-		// Use a fresh context for cleanup in case the original was cancelled.
 		cleanCtx := context.Background()
 		if _, err := conn.Exec(cleanCtx, fmt.Sprintf("DROP DATABASE IF EXISTS %s", shadowName)); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to drop shadow database %s: %v\n", shadowName, err)
@@ -1070,14 +1064,12 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 		}
 	}()
 
-	// Build connection string for the shadow database.
 	shadowURL, err := buildShadowURL(dbURL, shadowName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: build shadow URL: %v\n", err)
 		return 1
 	}
 
-	// Connect to shadow and replay migrations.
 	shadowConn, err := pgx.Connect(ctx, shadowURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: connect to shadow: %v\n", err)
@@ -1090,7 +1082,7 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 
 	lockTimeout := cfg.Migrate.LockTimeout
 	applied, err := migrate.Apply(ctx, shadowConn, dir, lockTimeout)
-	shadowConn.Close(ctx) // Must close before DROP DATABASE.
+	shadowConn.Close(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: replay migrations: %v\n", err)
 		if len(applied) > 0 {
@@ -1103,7 +1095,6 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 		fmt.Printf("Applied %d migration(s) to shadow.\n", len(applied))
 	}
 
-	// Introspect the shadow database.
 	if !quiet {
 		fmt.Println("Introspecting shadow database...")
 	}
@@ -1119,7 +1110,6 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 		return 1
 	}
 
-	// Resolve PGVersion.
 	pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
 	if pgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
@@ -1127,7 +1117,6 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 	}
 	schema.PGVersion = pgVersion
 
-	// Diff shadow against desired.
 	d := diff.Diff(schema, actual)
 	if d.IsEmpty() {
 		if !quiet {
@@ -1137,7 +1126,6 @@ func (h *migrateTestHandler) runShadow(configOverride *string, quiet bool) int {
 		return 0
 	}
 
-	// Report discrepancies.
 	fmt.Println("\nResult: FAIL")
 	fmt.Println("Shadow database diverges from desired schema:")
 	printSchemaDiffSummary(d)
@@ -1272,55 +1260,60 @@ func printSchemaDiffSummary(d *diff.SchemaDiff) {
 	}
 }
 
-type migrateBaselineHandler struct {
-	DB          string `cli:"db" help:"PostgreSQL connection URL for the target database server"`
-	Dir         string `cli:"dir" help:"Directory containing migration files to read or write" default:"migrations"`
-	Version     string `cli:"version" help:"Version label for the baseline record"`
-	Description string `cli:"description" help:"Human-readable description" default:"Initial baseline"`
-}
+func registerMigrateBaselineCmd(g *strictcli.Group) {
+	g.Command("baseline", "Mark an existing database as being at a specific migration version without executing any migration SQL. Use this when adopting pgdesign migrations for a database whose schema was already created by other means. Idempotent: re-running with the same version succeeds; a different version errors.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
 
-func (h *migrateBaselineHandler) Run(cliCtx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](cliCtx)
+			dbURL := kwargs["db"].(string)
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate baseline")
+				return strictcli.Exit(1)
+			}
 
-	dbURL := h.DB
-	if dbURL == "" {
-		fmt.Fprintln(os.Stderr, "error: --db is required for migrate baseline")
-		return 1
-	}
+			version := kwargs["version"].(string)
+			if version == "" {
+				fmt.Fprintln(os.Stderr, "error: --version is required for migrate baseline")
+				return strictcli.Exit(1)
+			}
 
-	version := h.Version
-	if version == "" {
-		fmt.Fprintln(os.Stderr, "error: --version is required for migrate baseline")
-		return 1
-	}
+			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
 
-	// Load config for migrations dir.
-	cfg, cfgErr := loadProjectConfig(g.ProjectConfig, ".")
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
+			dir := kwargs["dir"].(string)
+			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
+				dir = string(cfg.Project.MigrationsDir)
+			}
 
-	dir := h.Dir
-	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = string(cfg.Project.MigrationsDir)
-	}
+			description := kwargs["description"].(string)
 
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
-		return 1
-	}
-	defer conn.Close(ctx)
+			ctx := context.Background()
+			conn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			defer conn.Close(ctx)
 
-	if err := migrate.Baseline(ctx, conn, dir, version, h.Description); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
+			if err := migrate.Baseline(ctx, conn, dir, version, description); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 
-	if !g.Quiet {
-		fmt.Printf("Baseline recorded: %s (%s)\n", version, h.Description)
-	}
-	return 0
+			if !quiet {
+				fmt.Printf("Baseline recorded: %s (%s)\n", version, description)
+			}
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("version", "Version label for the baseline record"),
+			strictcli.StringFlag("description", "Human-readable description", strictcli.Default("Initial baseline")),
+		),
+	)
 }

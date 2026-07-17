@@ -19,14 +19,16 @@ import (
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-type buildHandler struct {
-	DryRun     bool `cli:"dry-run" help:"Show what would be generated without writing any files" default:"false"`
-	AutoCommit bool `cli:"auto-commit" help:"Automatically git commit generated output files" default:"true"`
-}
-
-func (h *buildHandler) Run(ctx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](ctx)
-	return runBuild(g.ProjectConfig, g.Quiet, h.DryRun, h.AutoCommit)
+func registerBuildCmd(app *strictcli.App) {
+	app.Command("build", "Generate all configured outputs from pgdesign.toml",
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			return strictcli.Exit(runBuild(kwargsConfigOverride(kwargs), kwargsQuiet(kwargs), kwargs["dry_run"].(bool), kwargs["auto_commit"].(bool)))
+		},
+		strictcli.WithFlags(
+			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files", strictcli.Default(false)),
+			strictcli.BoolFlag("auto-commit", "Automatically git commit generated output files", strictcli.Default(true)),
+		),
+	)
 }
 
 // runBuild is the typed entry point for the build command; tests call it

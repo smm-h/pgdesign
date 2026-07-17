@@ -11,48 +11,53 @@ import (
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-type fmtHandler struct {
-	Path        string `arg:"path" help:"Path to the TOML schema file or directory to format"`
-	Check       bool   `cli:"check" help:"Check if file is already formatted (exit 1 if not)" default:"false"`
-	TableOrder  string `cli:"table-order" help:"Table ordering strategy: dependency-based or alphabetical" default:"dependency" choices:"dependency,alphabetical"`
-	ColumnOrder string `cli:"column-order" help:"Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve" default:"pk_fk_alpha" choices:"pk_fk_alpha,alphabetical,fk_last,preserve"`
-}
+func registerFmtCmd(app *strictcli.App) {
+	app.Command("fmt", "Format a pgdesign TOML schema file or directory in place",
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			target := kwargs["path"].(string)
 
-func (h *fmtHandler) Run(ctx *strictcli.Context) int {
-	target := h.Path
+			cfg, cfgErr := loadProjectConfig(kwargsConfigOverride(kwargs), target)
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
 
-	// Load config for format defaults.
-	cfg, cfgErr := loadProjectConfig(configOverride(ctx), target)
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return 1
-	}
+			tableOrder := kwargs["table_order"].(string)
+			if tableOrder == "dependency" && cfg.Format.TableOrder != "" {
+				tableOrder = cfg.Format.TableOrder
+			}
+			columnOrder := kwargs["column_order"].(string)
+			if columnOrder == "pk_fk_alpha" && cfg.Format.ColumnOrder != "" {
+				columnOrder = cfg.Format.ColumnOrder
+			}
 
-	// CLI flags override config; config overrides strictcli defaults.
-	tableOrder := h.TableOrder
-	if tableOrder == "dependency" && cfg.Format.TableOrder != "" {
-		tableOrder = cfg.Format.TableOrder
-	}
-	columnOrder := h.ColumnOrder
-	if columnOrder == "pk_fk_alpha" && cfg.Format.ColumnOrder != "" {
-		columnOrder = cfg.Format.ColumnOrder
-	}
+			fmtConfig := &format.Config{
+				TableOrder:  tableOrder,
+				ColumnOrder: columnOrder,
+			}
 
-	fmtConfig := &format.Config{
-		TableOrder:  tableOrder,
-		ColumnOrder: columnOrder,
-	}
+			check := kwargs["check"].(bool)
 
-	info, err := os.Stat(target)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: cannot stat %q: %v\n", target, err)
-		return 1
-	}
+			info, err := os.Stat(target)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: cannot stat %q: %v\n", target, err)
+				return strictcli.Exit(1)
+			}
 
-	if info.IsDir() {
-		return fmtDir(target, fmtConfig, h.Check)
-	}
-	return fmtFile(target, fmtConfig, h.Check)
+			if info.IsDir() {
+				return strictcli.Exit(fmtDir(target, fmtConfig, check))
+			}
+			return strictcli.Exit(fmtFile(target, fmtConfig, check))
+		},
+		strictcli.WithFlags(
+			strictcli.BoolFlag("check", "Check if file is already formatted (exit 1 if not)", strictcli.Default(false)),
+			strictcli.StringFlag("table-order", "Table ordering strategy: dependency-based or alphabetical", strictcli.Default("dependency"), strictcli.Choices("dependency", "alphabetical")),
+			strictcli.StringFlag("column-order", "Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve", strictcli.Default("pk_fk_alpha"), strictcli.Choices("pk_fk_alpha", "alphabetical", "fk_last", "preserve")),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "Path to the TOML schema file or directory to format"),
+		),
+	)
 }
 
 func fmtFile(filePath string, cfg *format.Config, checkOnly bool) int {

@@ -1,8 +1,70 @@
 package main
 
-// Globals holds the app-wide global flags. Handlers read them via
-// strictcli.Globals[Globals](ctx).
-type Globals struct {
-	Quiet         bool    `cli:"quiet" help:"Suppress non-error output" default:"false"`
-	ProjectConfig *string `cli:"project-config" help:"Path to pgdesign.toml (bypasses directory search)"`
+import "github.com/smm-h/strictcli/go/strictcli"
+
+// registerGlobals adds app-wide global flags. Handlers read them from kwargs:
+//
+//	quiet          -> kwargs["quiet"].(bool)
+//	project_config -> kwargs["project_config"] (nil when not provided, string when set)
+func registerGlobals(app *strictcli.App) {
+	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output", strictcli.Default(false)))
+	app.GlobalFlag(strictcli.StringFlag("project-config", "Path to pgdesign.toml (bypasses directory search)", strictcli.Default(nil)))
+}
+
+// kwargsQuiet extracts the quiet global flag from kwargs.
+func kwargsQuiet(kwargs map[string]interface{}) bool {
+	return kwargs["quiet"].(bool)
+}
+
+// kwargsConfigOverride extracts the project-config global flag from kwargs.
+// Returns nil when not provided.
+func kwargsConfigOverride(kwargs map[string]interface{}) *string {
+	v := kwargs["project_config"]
+	if v == nil {
+		return nil
+	}
+	s := v.(string)
+	return &s
+}
+
+// kwargsStrSlice converts a variadic arg ([]interface{} of strings) to []string.
+func kwargsStrSlice(v interface{}) []string {
+	if v == nil {
+		return nil
+	}
+	raw := v.([]interface{})
+	out := make([]string, len(raw))
+	for i, r := range raw {
+		out[i] = r.(string)
+	}
+	return out
+}
+
+// kwargsOptString extracts an optional string flag. Returns nil when not provided.
+func kwargsOptString(kwargs map[string]interface{}, key string) *string {
+	v := kwargs[key]
+	if v == nil {
+		return nil
+	}
+	s := v.(string)
+	return &s
+}
+
+// kwargsOptInt extracts an optional int flag. Returns nil when not provided.
+func kwargsOptInt(kwargs map[string]interface{}, key string) *int {
+	v := kwargs[key]
+	if v == nil {
+		return nil
+	}
+	i := v.(int)
+	return &i
+}
+
+// toIfaces converts []string to []interface{} for strictcli.Choices().
+func toIfaces(ss []string) []interface{} {
+	out := make([]interface{}, len(ss))
+	for i, s := range ss {
+		out[i] = s
+	}
+	return out
 }

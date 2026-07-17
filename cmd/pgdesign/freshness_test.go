@@ -385,25 +385,36 @@ func TestPlan_OwnedDirs_ConfiguredSVGInsideOwnedDirIsNotOrphan(t *testing.T) {
 	}
 }
 
-// newCodegenHandler builds a codegenHandler the way a CLI parse would; tests
-// exercise the handler's typed run entry point directly.
-func newCodegenHandler(schemaPath, lang, mode, output string, check bool) *codegenHandler {
-	h := &codegenHandler{
-		Paths: []string{schemaPath},
-		Lang:  lang,
-		Mode:  mode,
-		Check: check,
+// makeCodegenKwargs builds a kwargs map the way a CLI parse would; tests call
+// runCodegen directly with these values.
+func makeCodegenKwargs(schemaPath, lang, mode, output string, check bool) map[string]interface{} {
+	kwargs := map[string]interface{}{
+		"path":       []interface{}{schemaPath},
+		"lang":       lang,
+		"mode":       mode,
+		"check":      check,
+		"split_mode": nil,
+		"db":         nil,
 	}
 	if output != "" {
-		h.Output = &output
+		kwargs["output"] = output
+	} else {
+		kwargs["output"] = nil
 	}
-	return h
+	return kwargs
+}
+
+// makeCodegenKwargsWithSplit is like makeCodegenKwargs but sets split-mode.
+func makeCodegenKwargsWithSplit(schemaPath, lang, mode, output, splitMode string, check bool) map[string]interface{} {
+	kwargs := makeCodegenKwargs(schemaPath, lang, mode, output, check)
+	kwargs["split_mode"] = splitMode
+	return kwargs
 }
 
 func TestHandleCodegenCheck_RequiresOutput(t *testing.T) {
 	dir := writeFreshnessProject(t, "")
 	schemaPath := filepath.Join(dir, "schema.toml")
-	if code := newCodegenHandler(schemaPath, "go", "constants", "", true).run(nil, true); code != 1 {
+	if code := runCodegen(nil, true, makeCodegenKwargs(schemaPath, "go", "constants", "", true)); code != 1 {
 		t.Fatalf("--check without --output must exit 1, got %d", code)
 	}
 }
@@ -416,27 +427,23 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 	schemaPath := filepath.Join(dir, "schema.toml")
 	outDir := filepath.Join(dir, "out")
 	splitMode := "faceted"
-	hCheck := func() *codegenHandler {
-		h := newCodegenHandler(schemaPath, "python", "ddl", outDir, true)
-		h.SplitMode = &splitMode
-		return h
+	hCheck := func() map[string]interface{} {
+		return makeCodegenKwargsWithSplit(schemaPath, "python", "ddl", outDir, splitMode, true)
 	}
-	hWrite := func() *codegenHandler {
-		h := newCodegenHandler(schemaPath, "python", "ddl", outDir, false)
-		h.SplitMode = &splitMode
-		return h
+	hWrite := func() map[string]interface{} {
+		return makeCodegenKwargsWithSplit(schemaPath, "python", "ddl", outDir, splitMode, false)
 	}
 
 	// Before generation: everything is missing.
-	if code := hCheck().run(nil, true); code != 1 {
+	if code := runCodegen(nil, true, hCheck()); code != 1 {
 		t.Fatalf("--check before generation must exit 1, got %d", code)
 	}
 
 	// Generate, then check: clean.
-	if code := hWrite().run(nil, true); code != 0 {
+	if code := runCodegen(nil, true, hWrite()); code != 0 {
 		t.Fatalf("codegen write failed with exit code %d", code)
 	}
-	if code := hCheck().run(nil, true); code != 0 {
+	if code := runCodegen(nil, true, hCheck()); code != 0 {
 		t.Fatalf("--check on fresh output must exit 0, got %d", code)
 	}
 
@@ -453,7 +460,7 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 	if err := os.WriteFile(victim, append(original, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := hCheck().run(nil, true); code != 1 {
+	if code := runCodegen(nil, true, hCheck()); code != 1 {
 		t.Fatalf("--check with stale file must exit 1, got %d", code)
 	}
 	if err := os.WriteFile(victim, original, 0o644); err != nil {
@@ -465,7 +472,7 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 	if err := os.WriteFile(orphanPath, []byte("# leftover\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := hCheck().run(nil, true); code != 1 {
+	if code := runCodegen(nil, true, hCheck()); code != 1 {
 		t.Fatalf("--check with orphan must exit 1, got %d", code)
 	}
 	if _, err := os.Stat(orphanPath); err != nil {
@@ -485,7 +492,7 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(outDir, "stray.pyc"), []byte("bc"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := hCheck().run(nil, true); code != 0 {
+	if code := runCodegen(nil, true, hCheck()); code != 0 {
 		t.Fatalf("--check must ignore __pycache__ and *.pyc, got exit %d", code)
 	}
 }
@@ -497,17 +504,17 @@ func TestHandleCodegenCheck_SingleFile(t *testing.T) {
 	schemaPath := filepath.Join(dir, "schema.toml")
 	outFile := filepath.Join(dir, "out", "constants.go")
 
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(nil, true); code != 1 {
+	if code := runCodegen(nil, true, makeCodegenKwargs(schemaPath, "go", "constants", outFile, true)); code != 1 {
 		t.Fatalf("--check with missing file must exit 1, got %d", code)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(outFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, false).run(nil, true); code != 0 {
+	if code := runCodegen(nil, true, makeCodegenKwargs(schemaPath, "go", "constants", outFile, false)); code != 0 {
 		t.Fatalf("codegen write failed")
 	}
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(nil, true); code != 0 {
+	if code := runCodegen(nil, true, makeCodegenKwargs(schemaPath, "go", "constants", outFile, true)); code != 0 {
 		t.Fatalf("--check on fresh single file must exit 0, got %d", code)
 	}
 
@@ -516,14 +523,14 @@ func TestHandleCodegenCheck_SingleFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "out", "unrelated.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(nil, true); code != 0 {
+	if code := runCodegen(nil, true, makeCodegenKwargs(schemaPath, "go", "constants", outFile, true)); code != 0 {
 		t.Fatalf("sibling files must not affect single-file --check, got exit %d", code)
 	}
 
 	if err := os.WriteFile(outFile, []byte("// tampered\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := newCodegenHandler(schemaPath, "go", "constants", outFile, true).run(nil, true); code != 1 {
+	if code := runCodegen(nil, true, makeCodegenKwargs(schemaPath, "go", "constants", outFile, true)); code != 1 {
 		t.Fatalf("--check on stale single file must exit 1, got %d", code)
 	}
 }

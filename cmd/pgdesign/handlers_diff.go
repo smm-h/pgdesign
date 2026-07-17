@@ -19,91 +19,93 @@ import (
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-type diffHandler struct {
-	JSON    bool     `cli:"json" help:"Output the schema diff in machine-readable JSON format" default:"false"`
-	Live    *string  `cli:"live" help:"PostgreSQL connection URL for live database comparison"`
-	Against *string  `cli:"against" help:"Path to TOML schema file or directory to compare against"`
-	Base    *string  `cli:"base" help:"Git ref to compare the current schema against (e.g., main)"`
-	Paths   []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
-}
+func registerDiffCmd(app *strictcli.App) {
+	app.Command("diff", "Compare schema file(s) or directory against another target",
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			cfgOverride := kwargsConfigOverride(kwargs)
 
-func (h *diffHandler) Run(ctx *strictcli.Context) int {
-	cfgOverride := configOverride(ctx)
+			paths := kwargsStrSlice(kwargs["path"])
+			schema, _, exitCode := parseAndBuild(cfgOverride, paths)
+			if exitCode != 0 {
+				return strictcli.Exit(exitCode)
+			}
 
-	paths := h.Paths
-	schema, _, exitCode := parseAndBuild(cfgOverride, paths)
-	if exitCode != 0 {
-		return exitCode
-	}
+			var liveURL, againstPath, baseRef string
+			if v := kwargsOptString(kwargs, "live"); v != nil {
+				liveURL = *v
+			}
+			if v := kwargsOptString(kwargs, "against"); v != nil {
+				againstPath = *v
+			}
+			if v := kwargsOptString(kwargs, "base"); v != nil {
+				baseRef = *v
+			}
 
-	// Determine which mode we're in. Exactly one of --live, --against, --base.
-	// Empty-string values are treated as absent, matching the pre-struct
-	// handler behavior.
-	var liveURL, againstPath, baseRef string
-	if h.Live != nil {
-		liveURL = *h.Live
-	}
-	if h.Against != nil {
-		againstPath = *h.Against
-	}
-	if h.Base != nil {
-		baseRef = *h.Base
-	}
+			modeCount := 0
+			if liveURL != "" {
+				modeCount++
+			}
+			if againstPath != "" {
+				modeCount++
+			}
+			if baseRef != "" {
+				modeCount++
+			}
 
-	modeCount := 0
-	if liveURL != "" {
-		modeCount++
-	}
-	if againstPath != "" {
-		modeCount++
-	}
-	if baseRef != "" {
-		modeCount++
-	}
+			if modeCount == 0 {
+				fmt.Fprintln(os.Stderr, "error: specify one of --live <url>, --against <path>, or --base <ref>")
+				return strictcli.Exit(1)
+			}
+			if modeCount > 1 {
+				fmt.Fprintln(os.Stderr, "error: --live, --against, and --base are mutually exclusive")
+				return strictcli.Exit(1)
+			}
 
-	if modeCount == 0 {
-		fmt.Fprintln(os.Stderr, "error: specify one of --live <url>, --against <path>, or --base <ref>")
-		return 1
-	}
-	if modeCount > 1 {
-		fmt.Fprintln(os.Stderr, "error: --live, --against, and --base are mutually exclusive")
-		return 1
-	}
+			var actual *model.Schema
 
-	var actual *model.Schema
+			switch {
+			case liveURL != "":
+				var code int
+				actual, code = diffLive(cfgOverride, paths, schema, liveURL)
+				if code != 0 {
+					return strictcli.Exit(code)
+				}
 
-	switch {
-	case liveURL != "":
-		var code int
-		actual, code = diffLive(cfgOverride, paths, schema, liveURL)
-		if code != 0 {
-			return code
-		}
+			case againstPath != "":
+				var code int
+				actual, code = diffAgainst(cfgOverride, againstPath)
+				if code != 0 {
+					return strictcli.Exit(code)
+				}
 
-	case againstPath != "":
-		var code int
-		actual, code = diffAgainst(cfgOverride, againstPath)
-		if code != 0 {
-			return code
-		}
+			case baseRef != "":
+				var code int
+				actual, code = diffBase(cfgOverride, paths, baseRef)
+				if code != 0 {
+					return strictcli.Exit(code)
+				}
+			}
 
-	case baseRef != "":
-		var code int
-		actual, code = diffBase(cfgOverride, paths, baseRef)
-		if code != 0 {
-			return code
-		}
-	}
+			d := diff.Diff(schema, actual)
 
-	d := diff.Diff(schema, actual)
+			if kwargs["json"].(bool) {
+				fmt.Println(diff.FormatJSON(d))
+				return strictcli.Exit(0)
+			}
 
-	if h.JSON {
-		fmt.Println(diff.FormatJSON(d))
-		return 0
-	}
-
-	fmt.Print(diff.FormatTerminal(d))
-	return 0
+			fmt.Print(diff.FormatTerminal(d))
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.BoolFlag("json", "Output the schema diff in machine-readable JSON format", strictcli.Default(false)),
+			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil)),
+			strictcli.StringFlag("against", "Path to TOML schema file or directory to compare against", strictcli.Default(nil)),
+			strictcli.StringFlag("base", "Git ref to compare the current schema against (e.g., main)", strictcli.Default(nil)),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+		),
+	)
 }
 
 // diffLive introspects a live database and returns the "actual" schema.
@@ -156,14 +158,12 @@ func diffBase(configOverride *string, paths []string, ref string) (*model.Schema
 		return nil, 1
 	}
 
-	// Resolve the paths to determine what schema files we need from the ref.
 	resolvedPaths, err := resolveSchemaPaths(configOverride, paths)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return nil, 1
 	}
 
-	// Make all resolved paths absolute so filepath.Rel against repoRoot works.
 	for i, p := range resolvedPaths {
 		abs, err := filepath.Abs(p)
 		if err != nil {
@@ -173,7 +173,6 @@ func diffBase(configOverride *string, paths []string, ref string) (*model.Schema
 		resolvedPaths[i] = abs
 	}
 
-	// Try to get pgdesign.toml from the ref to discover schema files.
 	schemaDir := filepath.Dir(resolvedPaths[0])
 	configRelPath, err := filepath.Rel(repoRoot, filepath.Join(schemaDir, "pgdesign.toml"))
 	if err != nil {
@@ -186,7 +185,6 @@ func diffBase(configOverride *string, paths []string, ref string) (*model.Schema
 	var filesToExtract []string
 
 	if configErr == nil {
-		// pgdesign.toml exists at this ref -- parse it to find schema files.
 		refSchemaPaths, err := parseSchemasFromConfigBytes(configBytes, schemaDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: parsing pgdesign.toml from %s: %v\n", ref, err)
@@ -194,11 +192,9 @@ func diffBase(configOverride *string, paths []string, ref string) (*model.Schema
 		}
 		filesToExtract = refSchemaPaths
 	} else {
-		// No pgdesign.toml at this ref -- use the same file paths as the working tree.
 		filesToExtract = resolvedPaths
 	}
 
-	// Extract and parse each schema file from the git ref.
 	var raws []*parse.RawSchema
 	var allDiags diagnostic.Diagnostics
 
@@ -234,8 +230,6 @@ func diffBase(configOverride *string, paths []string, ref string) (*model.Schema
 
 	reg := semtype.NewBuiltinRegistry()
 
-	// Register extension-provided types so they pass the base type allowlist.
-	// Prefer the config from the git ref; fall back to the working tree config.
 	if configErr == nil {
 		refCfg, err := config.LoadBytes(configBytes)
 		if err == nil {

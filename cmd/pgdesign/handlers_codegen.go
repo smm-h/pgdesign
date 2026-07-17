@@ -10,37 +10,35 @@ import (
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
-type codegenHandler struct {
-	DB        *string  `cli:"db" help:"PostgreSQL connection URL for the target database server"`
-	Lang      string   `cli:"lang" help:"Target programming language for the generated code" choices:"python,zig,go,ts,java,kotlin"`
-	Mode      string   `cli:"mode" help:"Code generation mode determining what code to produce" default:"validators" choices_from:"ModeChoices"`
-	Output    *string  `cli:"output" help:"Write output to a file at this path instead of stdout"`
-	SplitMode *string  `cli:"split-mode" help:"Split Python DDL output mode" choices:"faceted,self-contained"`
-	Check     bool     `cli:"check" help:"Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file" default:"false"`
-	Paths     []string `arg:"path" help:"Path to TOML schema file(s) or directory containing them" variadic:"true"`
+func registerCodegenCmd(app *strictcli.App) {
+	app.Command("codegen", "Generate type-safe application code from schema definitions",
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
+			return strictcli.Exit(runCodegen(cfgOverride, quiet, kwargs))
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil)),
+			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
+			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toIfaces(SupportedModeNames())...)),
+			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
+			strictcli.StringFlag("split-mode", "Split Python DDL output mode", strictcli.Default(nil), strictcli.Choices("faceted", "self-contained")),
+			strictcli.BoolFlag("check", "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file", strictcli.Default(false)),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+		),
+	)
 }
 
-// ModeChoices supplies the valid --mode values for the choices_from tag; it is
-// resolved once at registration time.
-func (h *codegenHandler) ModeChoices() []string {
-	return SupportedModeNames()
-}
-
-func (h *codegenHandler) Run(ctx *strictcli.Context) int {
-	g := strictcli.Globals[Globals](ctx)
-	return h.run(g.ProjectConfig, g.Quiet)
-}
-
-// run contains the codegen logic; tests call it directly with explicit
-// configOverride and quiet values instead of going through a CLI parse.
-func (h *codegenHandler) run(configOverride *string, quiet bool) int {
-	paths := h.Paths
+// runCodegen contains the codegen logic; tests call it directly.
+func runCodegen(configOverride *string, quiet bool, kwargs map[string]interface{}) int {
+	paths := kwargsStrSlice(kwargs["path"])
 	schema, typeReg, exitCode := parseAndBuild(configOverride, paths)
 	if exitCode != 0 {
 		return exitCode
 	}
 
-	// Load config and validate schema before generating code.
 	cfg, cfgErr := loadProjectConfig(configOverride, paths[0])
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
@@ -58,16 +56,16 @@ func (h *codegenHandler) run(configOverride *string, quiet bool) int {
 		return 1
 	}
 
-	lang := h.Lang
-	mode := h.Mode
-	var splitMode string
-	if h.SplitMode != nil {
-		splitMode = *h.SplitMode
+	lang := kwargs["lang"].(string)
+	mode := kwargs["mode"].(string)
+	splitMode := ""
+	if v := kwargsOptString(kwargs, "split_mode"); v != nil {
+		splitMode = *v
 	}
-	checkOnly := h.Check
-	var outputPath string
-	if h.Output != nil {
-		outputPath = *h.Output
+	checkOnly := kwargs["check"].(bool)
+	outputPath := ""
+	if v := kwargsOptString(kwargs, "output"); v != nil {
+		outputPath = *v
 	}
 
 	if checkOnly && outputPath == "" {
@@ -97,9 +95,6 @@ func (h *codegenHandler) run(configOverride *string, quiet bool) int {
 			fmt.Fprintf(os.Stderr, "%s: %s\n", d.Severity, d.Message)
 		}
 		if checkOnly {
-			// --check: compare each generated file against disk and orphan-scan
-			// the output directory (same ownership rules as `pgdesign build`).
-			// Writes nothing; exits 1 on any missing, stale, or orphan file.
 			planned := make(map[string][]byte, len(files))
 			owned := make(map[string]bool, len(files))
 			for relPath, data := range files {
@@ -109,7 +104,6 @@ func (h *codegenHandler) run(configOverride *string, quiet bool) int {
 			return reportFreshness(planned, map[string]map[string]bool{outputPath: owned}, quiet)
 		}
 		if outputPath == "" {
-			// Without -o, print each file to stdout with a header.
 			for relPath, data := range files {
 				fmt.Printf("==> %s <==\n%s\n", relPath, data)
 			}
@@ -142,8 +136,6 @@ func (h *codegenHandler) run(configOverride *string, quiet bool) int {
 	}
 
 	if checkOnly {
-		// --check for single-file output: byte-exact comparison only. Plain
-		// file paths get no directory ownership scanning (see freshness.go).
 		return reportFreshness(map[string][]byte{outputPath: out}, nil, quiet)
 	}
 

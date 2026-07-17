@@ -81,42 +81,49 @@ type vacuumCandidate struct {
 	DeadRatio  float64 `json:"dead_ratio"`
 }
 
-type statsHandler struct {
-	DB      string   `cli:"db" help:"PostgreSQL connection URL for the target database server"`
-	JSON    bool     `cli:"json" help:"Output all statistics in machine-readable JSON format" default:"false"`
-	Schemas []string `cli:"schema" help:"PostgreSQL schema name to analyze (repeatable for multiple)"`
-	Paths   []string `arg:"path" help:"TOML schema file(s) for cross-referencing with live data" variadic:"true" required:"false"`
+func registerStatsCmd(app *strictcli.App) {
+	app.Command("stats", "Analyze database statistics, index usage, and health",
+		handleStats,
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.BoolFlag("json", "Output all statistics in machine-readable JSON format", strictcli.Default(false)),
+			strictcli.StringFlag("schema", "PostgreSQL schema name to analyze (repeatable for multiple)", strictcli.Repeatable(), strictcli.Unique(true)),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "TOML schema file(s) for cross-referencing with live data", strictcli.Variadic(), strictcli.ArgRequired(false)),
+		),
+	)
 }
 
-func (h *statsHandler) Run(_ *strictcli.Context) int {
-	dbURL := h.DB
+func handleStats(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+	dbURL := kwargs["db"].(string)
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for stats")
-		return 1
+		return strictcli.Exit(1)
 	}
 
-	jsonOutput := h.JSON
+	jsonOutput := kwargs["json"].(bool)
 
-	schemaNames := h.Schemas
+	schemaNames := kwargsStrSlice(kwargs["schema"])
 	if len(schemaNames) == 0 {
 		schemaNames = []string{"public"}
 	}
 
-	// path is optional variadic -- empty when not provided
-	_ = h.Paths // reserved for future cross-reference with schema files
+	// path is optional variadic -- reserved for future cross-reference
+	_ = kwargsStrSlice(kwargs["path"])
 
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 	defer conn.Close(ctx)
 
 	var dbName string
 	if err := conn.QueryRow(ctx, "SELECT current_database()").Scan(&dbName); err != nil {
 		fmt.Fprintf(os.Stderr, "error: query database name: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 
 	rows, err := conn.Query(ctx,
@@ -126,7 +133,7 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		 ORDER BY schemaname, relname`, schemaNames)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: query table stats: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 
 	type tableRow struct {
@@ -144,14 +151,14 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		if err := rows.Scan(&r.schema, &r.name, &r.liveTuples, &r.deadTuples, &r.seqScans, &r.lastVacuum, &r.lastAutovacuum); err != nil {
 			rows.Close()
 			fmt.Fprintf(os.Stderr, "error: scan table stats: %v\n", err)
-			return 1
+			return strictcli.Exit(1)
 		}
 		tables = append(tables, r)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: iterate table stats: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 
 	rows, err = conn.Query(ctx,
@@ -161,7 +168,7 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		 ORDER BY schemaname, indexrelname`, schemaNames)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: query index stats: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 	type indexRow struct {
 		schema    string
@@ -175,14 +182,14 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		if err := rows.Scan(&r.schema, &r.table, &r.indexName, &r.scans); err != nil {
 			rows.Close()
 			fmt.Fprintf(os.Stderr, "error: scan index stats: %v\n", err)
-			return 1
+			return strictcli.Exit(1)
 		}
 		indexes = append(indexes, r)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: iterate index stats: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 
 	var blksHit, blksRead int64
@@ -190,7 +197,7 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		"SELECT blks_hit, blks_read FROM pg_stat_database WHERE datname = current_database()").
 		Scan(&blksHit, &blksRead); err != nil {
 		fmt.Fprintf(os.Stderr, "error: query cache stats: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 	var cacheHitRatio float64
 	if blksHit+blksRead > 0 {
@@ -211,7 +218,7 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		 ORDER BY n.nspname, t.relname, i.relname`, schemaNames)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: query index columns: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 	var indexInfos []workload.IndexInfo
 	for indexColRows.Next() {
@@ -220,7 +227,7 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		if err := indexColRows.Scan(&info.Schema, &info.Table, &info.Name, &columns); err != nil {
 			indexColRows.Close()
 			fmt.Fprintf(os.Stderr, "error: scan index columns: %v\n", err)
-			return 1
+			return strictcli.Exit(1)
 		}
 		info.Columns = columns
 		indexInfos = append(indexInfos, info)
@@ -228,7 +235,7 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 	indexColRows.Close()
 	if err := indexColRows.Err(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: iterate index columns: %v\n", err)
-		return 1
+		return strictcli.Exit(1)
 	}
 
 	// Analyze: unused indexes
@@ -326,9 +333,9 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(out); err != nil {
 			fmt.Fprintf(os.Stderr, "error: encode JSON: %v\n", err)
-			return 1
+			return strictcli.Exit(1)
 		}
-		return 0
+		return strictcli.Exit(0)
 	}
 
 	fmt.Printf("Database: %s\n", dbName)
@@ -400,5 +407,5 @@ func (h *statsHandler) Run(_ *strictcli.Context) int {
 		fmt.Println()
 	}
 
-	return 0
+	return strictcli.Exit(0)
 }

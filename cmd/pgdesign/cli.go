@@ -43,90 +43,36 @@ func main() {
 	app.RegisterWarnCheck("workload", checkWorkload)
 	app.RegisterErrorCheck("build", checkBuild)
 
-	strictcli.RegisterGlobals[Globals](app)
+	registerGlobals(app)
 
-	app.RegisterHandler("generate", "Generate SQL DDL from TOML schema file(s) or directory", func() strictcli.Handler {
-		return &generateHandler{}
-	})
-
-	app.RegisterHandler("fmt", "Format a pgdesign TOML schema file or directory in place", func() strictcli.Handler {
-		return &fmtHandler{}
-	})
-
-	app.RegisterHandler("introspect", "Introspect a live PostgreSQL database into TOML schema", func() strictcli.Handler {
-		return &introspectHandler{}
-	})
-
-	app.RegisterHandler("diff", "Compare schema file(s) or directory against another target", func() strictcli.Handler {
-		return &diffHandler{}
-	})
+	registerGenerateCmd(app)
+	registerFmtCmd(app)
+	registerIntrospectCmd(app)
+	registerDiffCmd(app)
 
 	mig := app.Group("migrate", "Database migration planning, generation, and execution")
-	mig.RegisterHandler("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.", func() strictcli.Handler {
-		return &migratePlanHandler{}
-	})
-	mig.RegisterHandler("generate", "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.", func() strictcli.Handler {
-		return &migrateGenerateHandler{}
-	})
-	mig.RegisterHandler("apply", "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.", func() strictcli.Handler {
-		return &migrateApplyHandler{}
-	})
-	mig.RegisterHandler("rollback", "Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.", func() strictcli.Handler {
-		return &migrateRollbackHandler{}
-	})
-	mig.RegisterHandler("status", "Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.", func() strictcli.Handler {
-		return &migrateStatusHandler{}
-	})
-	mig.RegisterHandler("squash", "Consolidate a range of sequential migration files into a single optimized migration. Recognizes 12 types of inverse operation pairs for cancellation, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.", func() strictcli.Handler {
-		return &migrateSquashHandler{}
-	})
-	mig.RegisterHandler("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.", func() strictcli.Handler {
-		return &migrateTestHandler{}
-	})
-	mig.RegisterHandler("baseline", "Mark an existing database as being at a specific migration version without executing any migration SQL. Use this when adopting pgdesign migrations for a database whose schema was already created by other means. Idempotent: re-running with the same version succeeds; a different version errors.", func() strictcli.Handler {
-		return &migrateBaselineHandler{}
-	})
+	registerMigratePlanCmd(mig)
+	registerMigrateGenerateCmd(mig)
+	registerMigrateApplyCmd(mig)
+	registerMigrateRollbackCmd(mig)
+	registerMigrateStatusCmd(mig)
+	registerMigrateSquashCmd(mig)
+	registerMigrateTestCmd(mig)
+	registerMigrateBaselineCmd(mig)
 
-	app.RegisterHandler("seed", "Generate type-aware test data for all schema tables", func() strictcli.Handler {
-		return &seedHandler{}
-	})
-
-	app.RegisterHandler("serve", "Start the pgdesign HTTP API server and web interface", func() strictcli.Handler {
-		return &serveHandler{}
-	})
-
-	app.RegisterHandler("codegen", "Generate type-safe application code from schema definitions", func() strictcli.Handler {
-		return &codegenHandler{}
-	})
-
-	app.RegisterHandler("build", "Generate all configured outputs from pgdesign.toml", func() strictcli.Handler {
-		return &buildHandler{}
-	})
-
-	app.RegisterHandler("stats", "Analyze database statistics, index usage, and health", func() strictcli.Handler {
-		return &statsHandler{}
-	})
+	registerSeedCmd(app)
+	registerServeCmd(app)
+	registerCodegenCmd(app)
+	registerBuildCmd(app)
+	registerStatsCmd(app)
 
 	tdb := app.Group("testdb", "Manage ephemeral test databases for schema testing")
-	tdb.RegisterHandler("setup", "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.", func() strictcli.Handler {
-		return &testdbSetupHandler{}
-	})
-	tdb.RegisterHandler("teardown", "Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.", func() strictcli.Handler {
-		return &testdbTeardownHandler{}
-	})
-	tdb.RegisterHandler("gc", "Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.", func() strictcli.Handler {
-		return &testdbGCHandler{}
-	})
-	tdb.RegisterHandler("init", "Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.", func() strictcli.Handler {
-		return &testdbInitHandler{}
-	})
+	registerTestdbSetupCmd(tdb)
+	registerTestdbTeardownCmd(tdb)
+	registerTestdbGCCmd(tdb)
+	registerTestdbInitCmd(tdb)
 
 	app.Run()
-}
-
-// configOverride returns the --project-config global flag value from the CLI context.
-func configOverride(ctx *strictcli.Context) *string {
-	return strictcli.Globals[Globals](ctx).ProjectConfig
 }
 
 // resolveConfigPath returns the pgdesign.toml path to use for config discovery.
