@@ -17,7 +17,8 @@
       "local": true,
       "install_paths": [
         "./cmd/pgdesign"
-      ]
+      ],
+      "artifact": "binary"
     },
     "npm": {
       "type": "npm",
