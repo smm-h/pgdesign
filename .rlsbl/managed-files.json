@@ -6,10 +6,10 @@
     "VERSION": "08e28f8503f363471bc01c1cee45ec3ed52297bb08c4544dfd79f6a77d1fa239",
     ".goreleaser.yml": "cff25efee366e2ae9b1fca8a9210296481dbfa71c52f9ee63f90873a73a6d36f",
     ".npmignore": "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3",
-    ".github/workflows/publish.yml": "7aaddbf799b97be796c49437c716dadc9ccfd8414627b72d11053f794a5f8d34",
+    ".github/workflows/publish.yml": "5d0b9f0ae5e52ab87efedaa242c26c581c7fd4d87c4e746af66c0db6b51175ff",
     "CHANGELOG.md": "4348142876dec4802bf104cb5f8b4bfcd238ae46fbe523ff1a515cdacb6433be",
     ".gitignore": "eaef9dcf74bcc7b0f9eaed90fab7aac363646cc479f2c6d9c9a2ac1230a0e983",
-    ".rlsbl/changes/unreleased.jsonl": "41f0ce387b2d09f13742481d3410f933cb29dc2b18e7fec0ff7666b74dd70179",
+    ".rlsbl/changes/unreleased.jsonl": "04aae02996e455581881a7adb22f899d62a9355fcea04f16bbf1f710cb020c0c",
     ".rlsbl/lint/python.toml": "9cfbcef2e010d5fad243437bf2fd8df54a1fae70ee0762f9d11da70fe207501c",
     ".rlsbl/lint/npm.toml": "baa36014e65923d8cc5c8b83c77fa651da79351627570476402da66840027645",
     ".rlsbl/lint/go.toml": "807d5cf760baad6d571a5bfd43cb163efe356f7462ba9f1918d72de45f62339f"
