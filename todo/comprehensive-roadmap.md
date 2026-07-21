@@ -67,6 +67,27 @@ intent. `[deliberate]` decisions were the owner's own.
   missing schedule without acknowledgment = warning.
 - `[%%]` pkg/diff deleted; promotion trigger recorded (second flat-schema consumer).
 - `[%%]` Web UI frontend deferred; only the DB-free API contract is built.
+- `[deliberate]` (2026-07-21) ONE release for the whole roadmap, at the very end —
+  never per-phase releases. Global rule in ~/Projects/CLAUDE_ADDITIONS.md.
+- `[deliberate]` (2026-07-21) No backward compat anywhere (global rule): `migrate
+  upgrade` DROPS the old tracking table after migrating rows; all internal callers
+  (serve, AppliedVersions, status) updated; no compat-named objects, no dual
+  recognition. An earlier "compat-named view" idea is withdrawn as compat-in-disguise.
+- `[%%]` (askme round) Grandfather boundary = verify-then-stamp: `migrate upgrade`
+  requires a clean TOML<->DB reconcile, then stamps the boundary revision =
+  revision(current TOML model); refuses with the drift report otherwise.
+- `[%%]` (askme round) Journal = table `pgdesign_migration_ops` + summary view
+  `pgdesign_applied_migrations` (view exists on merit: one SQL-level definition of
+  "applied migrations + status" shared by apply/rollback/status/serve).
+- `[%%]` (askme round) strictcli work handed off via a generically-worded todo filed
+  in the strictcli repo when phase 2 starts; a strictcli session implements and
+  releases; pgdesign adopts the released version.
+- `[%%]` (askme round) Migration slugs auto-derived from the diff's dominant change,
+  optional override flag. Manifest = `migrations/manifest.jsonl` (JSONL, atomic line
+  appends). Archive = `migrations/.archive/`. Commands: `import lock` /
+  `import update`, `migrate upgrade`.
+- `[%%]` (askme round) Consumer regeneration+adaptation todos filed in consumer
+  repos at the single final release.
 
 ## Grounding facts (verified in source 2026-07-19; corrected by critique 2026-07-21)
 
@@ -287,7 +308,10 @@ honest so later phases inherit honesty instead of re-implementing it.
   CheckContext plus reconciling the two context construction paths (the check command
   builds a fully-populated *Context and discards it) — more than "stop discarding."
   No new provenance machinery: per-flag source labels already exist
-  (Context.Source(), env>config>default). Released as a strictcli version.
+  (Context.Source(), env>config>default). Execution: handed off via a
+  generically-worded todo filed in the strictcli repo (no pgdesign references, per
+  todo confidentiality); a strictcli session implements and releases; pgdesign then
+  bumps and adopts (internal deps always latest).
 - **Why:** A connection URL is precisely what --hermetic should suppress, yet both
   existing primitives survive hermetic and flag Env() is unavailable to checks. The
   framework-level fix gives every strictcli consumer principled connection semantics.
@@ -415,17 +439,21 @@ revision stamping — consumers regenerate and adapt exactly once.
   stampable output stale exactly once; json revision field present; svg documented
   exempt; stamp format-version present.
 
-### 4.3 One coordinated breaking release
-- **What:** Branding + wording + stamps in a single version bump; changelog entries
-  typed breaking; regeneration notes for consumers (modes in the wild: python ddl
-  faceted; python validators+constants; zig constants; generated SQL headers) —
-  including the ADAPTATION notes, not just regeneration: TS consumers with exhaustive
+### 4.3 Breaking-change packaging (lands in the single final release)
+- **What:** Branding + wording + stamps carry breaking-typed changelog entries; the
+  consumer-facing material ships in THE one roadmap-end release (per the release-once
+  rule — this subphase is packaging, not a release event). At that release, file a
+  todo in each consumer repo (naming pgdesign there is fine — it is their declared
+  dependency) with regeneration + ADAPTATION notes: TS consumers with exhaustive
   switch-on-string-literals stop compiling and must switch on branded constants;
-  Python consumers constructing enums from raw strings must move to parse().
+  Python consumers constructing enums from raw strings must move to parse(). Modes in
+  the wild: python ddl faceted; python validators+constants; zig constants; generated
+  SQL headers.
 - **Why:** Three consumer-visible changes, one break, one adaptation — and honest
-  notes because regeneration alone is not enough for TS/Python call sites.
-- **Verify:** rlsbl changelog coverage passes with breaking entries; consumer
-  drift-check scripts pass after regeneration.
+  handoff, because regeneration alone is not enough for TS/Python call sites and red
+  CI is a hostile messenger.
+- **Verify:** rlsbl changelog coverage passes with breaking entries; consumer todos
+  filed at release; consumer drift-check scripts pass after regeneration.
 
 ## Phase 5 — Migrate integrity
 
@@ -451,16 +479,23 @@ format it enforces).
   gone (grep + tests); write-time invariant green.
 
 ### 5.2 Chain format, manifest, and adoption path
-- **What:** New file format: sequence+slug filenames (cosmetic), from_revision/
-  to_revision pair, parent linkage. The chain's home is a small committed APPEND-ONLY
-  MANIFEST (sequence, filename, from/to revision, superseded-by) — doubling as
+- **What:** New file format: sequence+slug filenames (cosmetic; slug auto-derived
+  from the diff's dominant change, optional override flag), from_revision/
+  to_revision pair, parent linkage. The chain's home is `migrations/manifest.jsonl`
+  — a committed APPEND-ONLY manifest (sequence, filename, from/to revision,
+  superseded-by; JSONL so appends are atomic single-line writes) — doubling as
   lineage record and head source; chain-head/find-heads API exposed (genesis: empty
   chain -> null parent) for 6.1. Discovery/ordering rewritten off semver (today ~7
   functions rely on semver sorting and discovery skips non-semver names — sequence
   files would be silently ignored without this). Adoption path for existing users:
-  a one-time explicit `migrate upgrade` — recomputes stored file checksums, backfills
-  the grandfather-boundary revision (existing semver files become a linear chain
-  prefix), and builds the manifest. Manifest<->files consistency check.
+  a one-time explicit `migrate upgrade` — verify-then-stamp: requires a clean
+  TOML<->DB reconcile (uses 5.7's normalization primitive; the command completes
+  when both land, invisible externally under the single-release cadence), then
+  stamps the boundary revision = revision(current TOML model), refusing with the
+  drift report otherwise; recomputes stored file checksums; migrates tracking rows
+  into `pgdesign_migration_ops` and DROPS the old `pgdesign_migrations` table (no
+  compat objects — all internal callers updated); existing semver files become a
+  linear chain prefix; builds the manifest. Manifest<->files consistency check.
 - **Why:** Revision pairs give migrations real identity tied to the schemas they
   transform; the manifest answers "where does the chain live" (scan-derivation breaks
   once 5.3 archives files) and later "which edge applies to this DB." The adoption
@@ -474,7 +509,7 @@ format it enforces).
 ### 5.3 Append-only squash (consolidation edges)
 - **What:** Squash reimplemented: a consolidation migration is an ADDITIONAL chain
   edge (recorded in the manifest with superseded-by lineage); superseded files retire
-  to an archive directory INTACT and remain reachable via the manifest — a database
+  to `migrations/.archive/` INTACT and remain reachable via the manifest — a database
   mid-way through a squashed range applies the remaining originals (edge matching its
   current revision), everyone else takes the consolidation edge. Tracking-table
   lineage handled: no orphaned rows. Files are never rewritten, period.
@@ -499,10 +534,11 @@ format it enforces).
   report; upgraded-fixture applies cleanly.
 
 ### 5.5 Applied-op journal
-- **What:** ONE per-op journal table (plus a summary view for "is migration applied";
-  AppliedVersions reads the view) recording, as each op commits: op identity
-  (migration ref, phase, sequence, op kind, target) AND the serialized down-op as
-  applied. Covers per-phase commits and non-transactional breakouts. Re-apply resumes
+- **What:** ONE per-op journal table, `pgdesign_migration_ops`, plus the summary
+  view `pgdesign_applied_migrations` ("applied migrations + status"; AppliedVersions,
+  status, and serve read the view — the old table is gone per 5.2), recording, as
+  each op commits: op identity (migration ref, phase, sequence, op kind, target) AND
+  the serialized down-op as applied. Covers per-phase commits and non-transactional breakouts. Re-apply resumes
   by skipping journaled ops. Covered by 0.5's managed-object filter automatically.
 - **Why:** The version row is written LAST; every committed phase or non-transactional
   op before a failure is real DDL with no durable record, and re-apply restarts at op
@@ -648,8 +684,9 @@ format it enforces).
 ### 7.2 Surface snapshot and pinning
 - **What:** Import-surface extraction (only referenced objects) serialized via the
   3.1 PER-OBJECT primitive into committed vendored snapshots with per-object hashes +
-  source pin (git URL + ref) — no second serialization dialect. Lock/update
-  subcommands (names need owner approval). `check --tag imports` re-derives the
+  source pin (git URL + ref) — no second serialization dialect. Subcommands:
+  `pgdesign import lock` (resolve + pin) and `pgdesign import update` (re-pin to
+  newer upstream). `check --tag imports` re-derives the
   surface and reports semantic drift at column level, hard-failing CI. Requirement
   granularity: extensions inferred PER REFERENCED OBJECT from the surface (the
   extraction knows referenced types); pg_version carried as the framework's floor
@@ -839,3 +876,10 @@ languages + consumer coordination). Phase 5: 5-7 sessions (largest; includes the
 adoption path, manifest, and DB-backed test expansion). Phase 6: 1-2. Phase 7: 3-4.
 Phase 8: 1. Phase 9: 2-3. Parallelization per the DAG can overlap 4.1, 5, 7, 8 after
 phase 3 lands.
+
+Release: exactly ONE rlsbl release at the very end of the roadmap (global
+release-once rule). Everything accumulates as unreleased commits until then;
+consumer regeneration todos are filed at that release. A useful consequence: no
+intermediate state (e.g., checksums before append-only) can ever reach a consumer —
+the phase-5 sub-ordering protects repo-internal integrity, and the single release
+eliminates external exposure entirely.
