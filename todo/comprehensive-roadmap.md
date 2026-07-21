@@ -56,6 +56,9 @@ violate?
 - **diff**: (Model, Model) -> Delta. A Delta is a flat description of change,
   NOT a morphism: Deltas do not compose or invert; all composition happens on
   op-lists. diff's specification is L10; diff(a,a) = empty is a pinned test.
+- **gen**: Delta -> op-list, the lowering whose contract IS L10 (a primitive,
+  since the round-trip theorem specifies it jointly with diff); ops carry
+  their L4 invertibility class and reference objects by content id.
 - **apply**: the map from chain edges into the world (codomain defined in L5).
 - **journal**: the durable trace of apply's actions, with recorded inverses.
 - **stamp**: artifact -> revision-that-produced-it (provenance).
@@ -99,11 +102,17 @@ violate?
   decode∘enc = id on canonicalized models. Content ids are EPOCH-RELATIVE:
   every stored form carries its codec version, and a change to enc or N
   re-keys the world — recovered by `migrate rekey`, the ONE sanctioned
-  re-encode (old-id -> new-id map recorded; everything else is append-only).
-  Mutation of STORE CONTENT (objects, manifests) is not an operation this
-  structure has. Chain-edge FILES are location-addressed — their
-  append-onlyness is CHECKED POLICY (the consistency checker, incl. its
-  edge-endpoint check), not structural impossibility.
+  rewrite, whose mutation scope is TOTAL: store objects, manifests, AND
+  chain-edge files all re-encode under the new epoch (a partial re-key would
+  break Merkle closure — edges would reference old-epoch ids). rekey and
+  rebase write into ONE unified revision-remap table in the chain, consulted
+  by both apply and the consistency checker, so a database whose
+  chain_position holds a pre-rewrite revision (rekeyed OR rebased-away) is
+  served forward, never orphaned. Outside an epoch bump, mutation of STORE
+  CONTENT (objects, manifests) is not an operation this structure has.
+  Chain-edge FILES are location-addressed — their append-onlyness is CHECKED
+  POLICY (the consistency checker, incl. its edge-endpoint check), not
+  structural impossibility.
 - **L3 (The chain is the free category on the edge graph).** Composition =
   path concatenation; identities = empty paths — VIRTUAL: never files, never
   applied (these laws hold trivially and are not what needs testing). The
@@ -171,10 +180,12 @@ violate?
   injective up to ≈_syn on the states exercised (it is NOT globally — SM
   types introspect as plain enums), and (ii) bridge completeness on the
   expressions exercised (the bridge is documented-incomplete). Therefore the
-  randomized test (modelgen pairs -> diff -> apply -> verify) restricts its
-  generator to the injective, bridge-proven fragment AND uses a second
-  oracle: the recorded to-revision manifest, compared object-by-object, not
-  only re-introspection. Corollaries: diff(a,a) = empty (pinned);
+  randomized test (modelgen pairs -> diff -> apply -> verify) splits its
+  oracles by soundness domain: the MANIFEST oracle (recorded to-revision
+  manifest, compared object-by-object — not lossy) runs over the UNRESTRICTED
+  generator, giving SM types randomized coverage; only the RE-INTROSPECTION
+  oracle restricts to the injective, bridge-proven fragment. Corollaries:
+  diff(a,a) = empty (pinned);
   squash-commutation; diff MINIMALITY as a non-normative quality property
   (mutation-tested: delete any op, the oracle must fail).
 
@@ -230,10 +241,13 @@ reversible, never to be cited as deliberate intent.
   journal-driven rollback reads no files, so no rollback checksum surface
   exists.)
 - Content ids are EPOCH-RELATIVE; an enc/N change re-keys the world; recovery
-  is `migrate rekey` (re-encode under the new codec with a recorded
-  old-id -> new-id map) — the ONE sanctioned exception to append-onlyness —
-  L2+L9. Every stored form carries its codec version so the store is
-  self-describing enough to drive the re-key.
+  is `migrate rekey` with TOTAL mutation scope (store objects + manifests +
+  chain-edge files re-encode under the new epoch; a recorded remap) — the ONE
+  sanctioned exception to append-onlyness — L2+L9. Every stored form carries
+  its codec version so the store is self-describing enough to drive the
+  re-key. The rekey remap and the rebase remap are ONE mechanism: a unified
+  revision-remap table in the chain, consulted by apply and the consistency
+  checker alike.
 - Squash = a consolidation edge (composition), never a rewrite — L3.
 - Consolidation downs derived by manifest diff ONLY for fully-mechanically-
   invertible ranges; ranges containing declared-inverse ops (incl. vacuous
@@ -257,9 +271,10 @@ reversible, never to be cited as deliberate intent.
   opaque blobs (which satisfies by-content-id; "no inline blobs" scopes to
   STRUCTURED op payloads) — L1+L2.
 - Revision = hash of canonical bytes; every artifact stamped with a producing
-  revision; enforcement taxonomy (full regenerators / partial writers /
-  source editors / scaffolding writers) derived from provenance totality —
-  L6. (The stamp's SCOPE — full-project rather than per-output — is NOT
+  revision; enforcement taxonomy (SIX writer classes, enumerated totally:
+  full regenerators / partial writers / source editors / scaffolding writers /
+  stamped-unenforced writers (seed) / append-only stores (checker-covered))
+  derived from provenance totality — L6. (The stamp's SCOPE — full-project rather than per-output — is NOT
   law-derived; L6 is satisfied by either; the full-project choice is
   engineering, justified by the filtered-output paradox — see the [%%]
   section.)
@@ -271,7 +286,9 @@ reversible, never to be cited as deliberate intent.
 - One normalization primitive consumed by differ, predicates, upgrade
   reconcile, and shadow test; predicate IR = one structured definition with a
   Go executor (structured diagnostics; shares a catalog-query layer with
-  introspect) and a SQL renderer, conformance-matrixed — L1. (The Go executor
+  introspect, and gates version-conditional queries through the EXISTING
+  internal/pgcap capability registry — one version->capability truth) and a
+  SQL renderer, conformance-matrixed — L1. (The Go executor
   exists for structured object/expected/found diagnostics, not DB-freedom —
   dropping it in favor of SQL-only evaluation is ruled out; the matrix exists
   because the SQL renderer is a second computation of ≈_syn in another
@@ -294,8 +311,9 @@ reversible, never to be cited as deliberate intent.
 - Fail-closed imports: owned tables in Tables, imported in ImportedTables;
   every consumer iterating Tables is correct by omission; the union is wired
   at the ENUMERATED resolution sites (buildTablesByName, BuildFKGraph, seed
-  pools, D2/GraphQL edge emitters, W002 orphan detection) — L6-style totality
-  applied to name resolution.
+  pools, D2/GraphQL edge emitters, W002 orphan detection, C103 orphan check,
+  the I002 dead-column referenced-set) — L6-style totality applied to name
+  resolution.
 - Header/stamp grammar with one writer and one reader (pkg/genkit); one
   wording, adopted in a single pass (the one-release axiom makes any staged
   transition pure double work) — L6+L9.
@@ -399,15 +417,21 @@ implementors.
   last is the tie-break blueprint to reuse). Topo tie-break is input-order:
   TOML declaration vs introspect ORDER BY name diverge; introspected
   functions lack DependsOn; Extensions ordering diverges the same way (and
-  Extensions are in identity). Top-level type collections: DDL
-  declaration-order vs JSON name-sorted. The DDL emitter's determinism rests
+  Extensions are in identity). Top-level type collections: THREE ordering
+  schemes, not two — DDL declaration-order, JSON name-sorted, and domain
+  DDL in first-use-across-tables order. The DDL emitter's determinism rests
   on ~7 inline Sorted* calls; generateJSON additionally carries its own
   copy-and-sort block (generate.go:56-99) that dies with Canonicalize. The
   existing determinism test hand-builds structs and can never fail.
   Constraint auto-naming is content-derived (build.go:1350-1376), never
   positional — alphabetizing canonical-only collections is name-stable (one
   assertion retires the reorder-renames-constraints hazard).
-- Two divergent JSON serializers (generate json sorts; serve emits raw).
+- Two divergent JSON serializers (generate json sorts; serve emits raw —
+  and serve's raw emitter also serves the TOML-build path via its local
+  parseAndBuild, not only the introspect endpoint). Desired content-derived
+  constraint/index names can exceed 63 bytes while introspected names are
+  NAMEDATALEN-truncated — a name-matching false-drift class N alone cannot
+  fix (1.2 adds truncation-aware matching).
 - The differ compares expressions by RAW STRING against PG-rewritten forms
   (pg_get_constraintdef/expr/indexdef) — live false-drift bug on
   CHECKs/partial indexes/policies; only types normalize. The differ is BLIND
@@ -449,7 +473,8 @@ implementors.
   rewriter: pair cancellation examines only the two endpoint ops via
   sameTarget (squash.go:131-146,249) — `add column x; create index on x;
   drop column x` cancels the add/drop pair and ORPHANS the index op (a live
-  squash bug); the "references" relation needed for the side condition spans
+  squash bug; a second orphan variant: duplicate `add column x` — the first
+  add pairs with the drop, the second survives); the "references" relation needed for the side condition spans
   RefTable/RefCols, trigger function, view/function bodies, and depends_on
   (DDLOp carries these as distinct fields a naive name check misses); no
   associativity, confluence, or order-independence tests exist.
@@ -477,7 +502,9 @@ implementors.
   create_function/create_trigger parsed from disk fall back to emitting the
   WRONG OBJECT (deny-mutation / append-only); sequences lose parameters.
   opCreateTable passes nil enum/domain lists (unqualified type rendering)
-  and hardcodes pgVersion=0 despite DDLOp.PGVersion existing.
+  and hardcodes pgVersion=0 despite DDLOp.PGVersion existing — and OpToSQL
+  consumes PGVersion INCONSISTENTLY (honored for some ops, hardcoded zero
+  for others).
 
 **L5 violations (the functor reads or trusts the world wrongly):**
 - Generation consumes live TableStats (pg_stat_user_tables) to choose
@@ -498,11 +525,18 @@ implementors.
   — rollback-after-baseline executes DROPs against objects pgdesign never
   created (a live data-loss bug; red test in 5.6). Tracking writes:
   state.go's RecordMigration/RemoveMigration helpers vs inline SQL in
-  apply/rollback — and RemoveMigration has zero production callers (dead).
+  apply/rollback — RemoveMigration has zero production callers (dead;
+  RecordMigration is alive — baseline calls it). PGVersion is assigned
+  AFTER diff.Diff runs in migrate plan/generate — version-dependent diff
+  classification runs at version 0 today (red test rides 0.2's pg_version
+  seam). Two dead CLI artifacts: apply --timeout is registered but never
+  read (lock timeout comes from config), and baseline --adopt is named in
+  an error message but never registered (a phantom flag).
 - Introspect has NO table-level filtering — the tracking table introspects as
-  a user table; function/trigger filters use the LEADING-underscore
-  `_pgdesign_sm_%` pattern (a `pgdesign_%` table pattern does not cover it;
-  view filtering needs its own treatment). Introspect constructs Schema
+  a user table; the TRIGGER filter uses the LEADING-underscore
+  `_pgdesign_sm_%` pattern while FUNCTIONS are excluded differently (by
+  trigger return type plus a pgdesign_deny_mutation name check) — 0.4's
+  one-predicate unification covers both plus the missing table/view classes. Introspect constructs Schema
   directly (never Build): nil FKGraph/TablesByName, raw order; the
   copy-pasted finalize is four steps, two of which (SM transitions, group
   resolution) need raw/registry inputs introspect lacks. Introspect's ~45
@@ -580,9 +614,11 @@ serve's payload key changes are an API-consumer-visible change to note in
   .String() switches, AND a rework of the NOT-NULL zero-value check. ILLEGAL
   JAVA (multiple public types per file) in THREE modes: java_jpa,
   java_types, java_constraints. The conformance tests compile HAND-AUTHORED
-  templates, never codegen output, are DB-gated AND self-skip without
-  python3/psycopg/node — and they cover Python+TS only, so 4.0's compile
-  checks are the FIRST-EVER validation for four of six languages. Python
+  templates for all six languages (Java/Kotlin toolchain-gated; Zig renders
+  then skips), NEVER codegen output, and are DB-gated AND self-skip without
+  python3/psycopg/node — the true fact is stronger than any per-language
+  count: NO codegen output is compiled anywhere today, for ANY language, so
+  4.0's compile checks are new for all six. Python
   query-layer neither imports nor defines the enum classes it annotates
   (survives via future annotations); BOTH PgBackend and InMemoryBackend
   build rows uncoerced (Row __post_init__ covers both); _constraints.py
@@ -593,7 +629,10 @@ serve's payload key changes are an API-consumer-visible change to note in
   W002 orphan detection builds its referenced-set from raw
   fk.RefSchema+"."+fk.RefTable strings, bypassing TableByName
   (validate.go:1054-1063); GraphQL relation fields use bare fk.RefTable
-  (graphql.go:164-165) — both are import-resolution sites beyond the D2 one.
+  (graphql.go:164-165) — both are import-resolution sites beyond the D2 one;
+  so are the C103 orphan check (checks.go:266-294 — W002's twin in a
+  separate path) and the I002 dead-column referenced-set
+  (validate.go:2264-2273 — bare RefTable, RefSchema ignored).
   C104 continues (silently skips) on unresolved refs (checks.go:218-220).
 - strictcli: the check command builds a fully-populated *Context and
   discards it; infra roots + handshake envs hermetic-IMMUNE, flag Env()
@@ -601,6 +640,12 @@ serve's payload key changes are an API-consumer-visible change to note in
   provenance already exists (Context.Source()). SEVENTEEN DB-URL flags (16
   --db + 1 --live), three default semantics — the adoption target is the
   mechanical assertion "no DB-URL flag registers unbound," not a count.
+  internal/dbutil.ResolveURL is a DEAD first-non-empty URL resolver with
+  zero production callers (2.2 absorbs or deletes it). internal/pgcap is a
+  LIVE 10-capability version-gate registry imported by risk, sql,
+  introspect, validate, migrate, testdb — the predicate IR and
+  internal/catalog must gate version-conditional queries through it, not
+  regrow capability logic.
 - Partition bugs: python_ddl passes Retention as p_interval (sibling of the
   fixed generate path); omitted premake emits p_premake := 0 (disables
   partman); silent skip when pg_partman undeclared; maintenance + manual
@@ -665,8 +710,8 @@ argument, and items that become property-checkable are demoted to the kernel.
     containing scripted `pgdesign codegen --check` invocations; the pass
     itself is the consumers' half (4.3).
 11. **External milestone**: strictcli must ship the connection-env kind
-    before phases 6.1/7.4/seed-tier-1 finalize (todo filed at phase-0
-    start).
+    before the DB TIERS of 6.1/7.4/seed-tier-1 finalize (the pure tiers
+    have no phase-2 dependency; todo filed at phase-0 start).
 12. **go-pgquery deparse stability** — N (and hence identity) is DEFINED by
     an externally-pinned parser's deparse output; a version bump can shift
     ≈_syn. Check: the golden normalized-expression corpus (CI-red on shift);
@@ -702,9 +747,9 @@ item 11) is filed at phase-0 start.
   import internal/codegen; the stamp helper is a PURE STRING FORMATTER — it
   must not drag diagnostics types across the internal/pkg boundary).
   Absorbing genkit's duplicated Generator/MultiFileGenerator interfaces is an
-  INTERFACE-UNIFICATION decision (genkit takes schema interface{}, codegen
-  takes *model.Schema; genkit has one consumer today) — decided here, not
-  discovered mid-edit. Final wording adopted immediately in ONE pass —
+  INTERFACE-UNIFICATION decision, DECIDED: unify on Generate(*model.Schema)
+  (genkit's schema interface{} exists for one consumer — freshness.go — and
+  concrete typing is strictly better; genkit may import model). Final wording adopted immediately in ONE pass —
   `Code generated by pgdesign. DO NOT EDIT.` (Go-tooling-recognized),
   per-language comment prefix, free-text parameter for seed — routed through
   all 36 codegen sites, the CLI planner-prepend path (sql/d2/graphql),
@@ -726,8 +771,13 @@ item 11) is filed at phase-0 start.
   per-table collections (incl. matview indexes), top-level type collections,
   and Extensions; topological ordering with ALPHABETICAL tie-break for
   tables/views/matviews/functions — reusing internal/format's
-  pre-sort-then-TopoSort pattern; all FOUR topo paths collapse here
-  (CycleGroups semantics preserved); introspected functions (no DependsOn)
+  pre-sort-then-TopoSort pattern; THREE topo paths collapse here (build.go,
+  generate.go, python_ddl.go — CycleGroups semantics preserved);
+  internal/format's path CANNOT collapse (it sorts pre-Build parse.RawTable
+  for fmt) and shares only the tie-break helper; semtype's extends-resolution
+  TopoSort is a distinct domain, identity-irrelevant today because extends is
+  eagerly inlined — noted so 1.1's composition-closure work re-checks it;
+  introspected functions (no DependsOn)
   fall back to alphabetical; columns source-ordered; derived structures
   (FKGraph, TablesByName) built here — WITH a red test first for the live
   filter bug (FilterByGroups/FilterBySource never call BuildFKGraph today;
@@ -767,9 +817,12 @@ item 11) is filed at phase-0 start.
   gain a depth-bounded signature. Plus the FKGraph PROJECTION SERIALIZER
   (deterministic, (schema,name)-keyed; excluded from identity, included in
   the API payload) — owned here. BLAST RADIUS NAMED: every consumer of
-  FKGraph.Reverse[name] rekeys — ~11 codegen files (gorm, jpa, sqlalchemy,
+  FKGraph.Reverse[name] rekeys — 8 codegen files (gorm, jpa, sqlalchemy,
   drizzle, the python query-layer family, querylayer constraints) plus
-  workload's N+1 analysis — not just the validate/check consumers.
+  generate/graphql.go plus workload's N+1 analysis — not just the
+  validate/check consumers. Rekeying FKEdge.FromTable/ToTable also changes
+  CascadeChain's RETURNED STRINGS, rippling into W013/W014/W015 diagnostic
+  text — a behavior change this subphase's verify pins.
 - **Why:** Two identity schemes for one object is a latent bug today and a
   guaranteed one under imports; designing the end-state API in one pass
   prevents repeated churn over the same surface (the collapse-multi-pass
@@ -822,7 +875,12 @@ item 11) is filed at phase-0 start.
   until phase 5: --db and the M200 check mandatory (a SIGNATURE change —
   SquashMigrations gains a DB parameter; stated limits: blocks offline
   squash of never-applied ranges; doesn't fix the rewrite mechanics); first
-  squash-CLI test.
+  squash-CLI test. (e) Serve/apply hardening that must not wait for phase
+  5: the migration-version endpoint joins a RAW path parameter into
+  migrationsDir with no containment check — a PATH TRAVERSAL (../../
+  escapes) fixed now; lock_timeout is interpolated into SET via Sprintf
+  from unvalidated config (validate or parameterize); the dead apply
+  --timeout flag and the phantom baseline --adopt flag are deleted.
 - **Why:** All are live silent-degradation defects (the class L5/L6 exist to
   kill) or misleading API surface; none depend on the kernel; every one
   removed is one less thing later phases interact with.
@@ -832,7 +890,9 @@ item 11) is filed at phase-0 start.
 ## Phase 1 — The kernel (pure, law-tested, no Postgres, no CLI)
 
 The algebra as packages, property-tested per L9. Everything later is an
-adapter around this.
+adapter around this. LAND ORDER: 1.3 (store) and 1.6 (modelgen) first — no
+kernel dependencies — then 1.1, then {1.2, 1.5}, then 1.4 (whose property
+tests consume modelgen and whose conformance work consumes N).
 
 ### 1.1 enc: the canonical encoder — L1
 - **What:** A DEDICATED canonical encoder (explicit field ordering; per-field
@@ -856,10 +916,16 @@ adapter around this.
   firing order). Type identity from MODEL-LEVEL collections (both
   construction paths populate them; builtin-derived domains materialize
   there, so builtin changes flip identity with no special case). The
-  registry snapshot shrinks to serializing whatever has NO model
-  representation (confirmed at implementation; main role = import-surface
-  reconstruction), with an explicit field policy (semantic + all comments;
-  Source excluded) and the stale Source doc comment fixed. MECHANICAL
+  registry snapshot's scope is DECIDED: it serializes only what has no model
+  representation — expected EMPTY for identity purposes (a verification test
+  asserts it; if the test ever finds semantic registry state missing from the
+  model collections, that state is added to the model, not to identity via
+  the snapshot); its sole role is import-surface reconstruction — with an
+  explicit field policy (semantic + all comments; Source excluded) and the
+  stale Source doc comment fixed. Allowlist completed: Index.IsAutoFK
+  (excluded — enrich-derived), Table.PartmanManaged and Table.PartmanParent
+  (excluded — introspect-path facts, not desired-model semantics; they never
+  appear in TOML-built models). MECHANICAL
   TOTALITY GUARDS: reflection-based tests asserting every exported field of
   every DDL-reaching model struct AND every registry-snapshot struct is
   either encoded or on an explicit exclusion allowlist with a reason
@@ -893,9 +959,17 @@ adapter around this.
   false drift today — a live bug), replacing BOTH existing normalizers:
   diff's unsound lowercasing normalizeDefault (red test for the
   'Active'/'active' missed-drift case FIRST) and validate.normalizeExpr
-  (W018 moves onto N, or is explicitly scoped as a looser heuristic with a
-  comment). Later consumers: upgrade reconcile, predicates,
-  reconcile-verify, shadow test, import drift (7.2).
+  (W018 moves onto N — DECIDED: a looser second equivalence is exactly what
+  L1(b) prohibits). NAME-MATCHING drift joins N's scope: desired
+  content-derived constraint/index names can exceed 63 bytes while
+  introspected names are NAMEDATALEN-truncated — the differ's name matching
+  gains truncation awareness (red fixtures; expression normalization alone
+  never touches this class, and it hits 5.8's reconcile gate directly).
+  Stated boundary: internal/sqlexpr survives as a structural-EXTRACTION
+  engine (E213 column refs, CHECK-pattern extraction), not a ≈-engine — the
+  no-normalizer-outside-sqlparse grep has a principled exception. Later
+  consumers: upgrade reconcile, predicates, reconcile-verify, shadow test,
+  import drift (7.2).
 - **Why:** L1(b): every comparison engine must compute the same ≈_syn — two
   disagreeing normalizers already ship today, and the differ additionally
   disagrees with Postgres's rewriter. L1(c): the catalog-independent
@@ -940,23 +1014,37 @@ adapter around this.
   diff fast path; diff(a,a) = empty pinned; the conformance pair:
   revision-equal implies diff-empty as the initial gate; the REVERSE
   direction adopted as the end-state invariant once the differ fully adopts
-  N — its obligations include pg_version joining SchemaDiff
-  (under-reporting breaks the reverse direction, not the forward gate).
+  N — its obligations include pg_version AND Groups joining SchemaDiff
+  (both are in identity, both invisible to diff today; under-reporting
+  breaks the reverse direction, not the forward gate — whose only real
+  content is catching diff reading non-encoded state). The reverse
+  direction's PRIMARY enforcement is the DIFF-TOTALITY MUTATION GUARD:
+  perturb any single ENCODED field (driven by the encoder's own field
+  registry) and assert diff is non-empty — retiring the under-reporting
+  defect class by construction rather than field-by-field discovery. An
+  ABSTRACT OP interface lands here (kind, target, invertibility class,
+  payload-by-content-id) — 5.1's concrete families implement it, keeping
+  the kernel free of migrate imports — with a small op-list generator over
+  the abstract vocabulary for the inverse-law property tests (modelgen
+  makes models, not op-lists).
 - **Why:** L3/L4/L7 as code; squash, rollback, pure generation, and
   enforcement all become path operations and lookups over this structure.
   The free-category framing puts the trivially-true laws where they belong
   (by construction) and the real risk where it lives (squash soundness —
-  checked in 5.3, not asserted here).
+  checked in 5.3, not asserted here). The abstract op boundary keeps the
+  dependency direction kernel <- adapter.
 - **Verify:** Property tests over modelgen inputs: inverse laws on
   fully-mechanically-invertible composites; any composite NOT fully
   mechanically invertible has no manifest-diff inverse BY TYPE
   (declared-inverse-containing included); edge-identity uniqueness under
   parallel edges, endomorphisms, and simulated concurrent allocation;
   opaque-Revision cross-class comparison errors; diff(a,a) empty;
-  kind-qualified key collision tests; conformance direction in CI;
-  sensitivity tests (comment/column/type/pg_version/extension changes flip
-  revisions; no-op rebuilds don't). (No associativity or identity-edge
-  tests — trivially true in a free category; none are needed.)
+  kind-qualified key collision tests; conformance direction in CI; the
+  diff-totality mutation guard red on an unperturbable-by-diff field;
+  sensitivity tests (comment/column/type/pg_version/extension/GROUPS
+  changes flip revisions; no-op rebuilds don't). (No associativity or
+  identity-edge tests — trivially true in a free category; none are
+  needed.)
 
 ### 1.5 Whole-model form, envelope, one serializer — L1+L7
 - **What:** Whole-model form = versioned preamble + ordered concatenation of
@@ -1030,6 +1118,10 @@ adapter around this.
   verification, seed tier-1, migrate upgrade/rekey) binds from birth when
   phase 2 has landed; when a phase-5 command lands first, 2.2's sweep picks
   it up and 2.1's registration error prevents regressions thereafter.
+  internal/dbutil.ResolveURL — a dead first-non-empty URL resolver with
+  zero production callers, doing exactly this subphase's job — is absorbed
+  as the layered resolver or deleted (dead-code policy; the roadmap's
+  resolution layer supersedes it).
 - **Why:** One variable, one story; without the non-leaf edges the
   pathology regrows.
 - **Verify:** The MECHANICAL assertion "no DB-URL flag registers unbound"
@@ -1142,7 +1234,8 @@ functor with a recoverable trace. Design gate first. LAND ORDER (regrouped so
 the apply loop is rewritten ONCE, per the collapse-multi-pass rule): 5.0 ->
 5.1 -> 5.2; then TRACK A: {5.5 + 5.7 TOGETHER — the single apply-loop pass:
 precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
-5.4; 5.9 anytime after 5.1; 5.10 after 5.3. Nothing ships mid-phase
+5.4; 5.9 after 5.2 (it deserializes head manifests, which exist only once
+5.2 creates migrations/revisions/); 5.10 after 5.3. Nothing ships mid-phase
 (single-release axiom).
 
 ### 5.0 Schema and format design (design gate)
@@ -1150,18 +1243,34 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   (op identity: migration ref, phase, sequence, op kind, target; serialized
   down-op; intent/confirm status), pgdesign_applied_migrations (ALL FOUR
   columns serve reads — version, applied_at, description, checksum — with a
-  DEFINED applied_at derivation: edge-completion journal time),
+  DEFINED applied_at derivation: edge-completion journal time FOR
+  POST-UPGRADE edges; prefix rows migrated by `migrate upgrade` preserve
+  applied_at AND checksum VERBATIM from the old table, or the upgrade's own
+  ASSERT-view-reproduces-snapshot step would fail on its own columns),
   pgdesign_chain_position (current revision, in-progress edge ref,
-  per-database boundary), migration file format (display slug; from/to
-  revision; ops referencing store objects by id), chain-edge file format
-  (content-derived filename: edge-content hash prefix + slug), store roots
+  per-database boundary), and THE EDGE ARTIFACT — decided: ONE file per
+  edge (content-derived filename: edge-content hash prefix + slug) carrying
+  from/to revisions, the op list referencing store objects by id, and the
+  display slug — there is no separate "migration file" vs "chain-edge file";
+  one concept, one artifact. Store roots
   (migrations/objects/, migrations/revisions/ — manifests as kind-qualified
   sorted maps), archive layout (migrations/archive/). THE PATH-FINDER
-  specified here: apply performs reachability search from
-  chain_position's revision to a head, ARCHIVE-INCLUSIVE, with the stated
-  preference rule (a database at a consolidation's range-start takes the
-  consolidation edge; a mid-range database takes the remaining originals) —
-  a named algorithm replacing today's flat semver sort. The two divergent
+  specified here as a DETERMINISTIC TOTAL RULE: apply performs reachability
+  search from chain_position's revision (through the unified remap table)
+  to a head, ARCHIVE-INCLUSIVE, choosing the SHORTEST edge-count path with
+  consolidation-edge preference as the tie-break; OVERLAPPING consolidation
+  ranges are FORBIDDEN AT CREATION (a cheap structural invariant that
+  eliminates the ambiguous nested/overlapping cases outright) — a named
+  algorithm replacing today's flat semver sort. A COMMAND-SURFACE
+  DISPOSITION TABLE covering every existing migrate flag and subcommand:
+  generate --version (obsolete — content-derived identity; flag removed),
+  plan/generate --db (dropped for generation, per 5.9), apply --dry-run
+  (retained; previews the path-finder's chosen edges), rollback --to
+  (retargeted to a revision, resolved via journal + remap), migrate test
+  non-shadow (retained; replays edges), status (pending = chain enumeration
+  via the path-finder), apply --timeout (DEAD today — registered, never
+  read; deleted in 0.6), baseline --adopt (PHANTOM today — named in an
+  error message, never registered; deleted in 0.6). The two divergent
   tracking write paths (state.go helpers vs inline SQL; RemoveMigration is
   dead code) reconcile onto one. Labeled honestly: a human design gate with
   one mechanical check.
@@ -1250,10 +1359,17 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   object" — where the references relation spans the full dependency
   surface (RefTable/RefCols, trigger function, view/function bodies,
   depends_on; DML ops reference their tables); each rule strictly
-  decreases a stated measure (termination); the ~12 rule types' critical
-  pairs are enumerated and both resolutions tested to converge (modelgen
+  decreases a stated measure (termination); critical pairs are enumerated
+  across ALL THREE rule classes — the 12 cancellation pairs, sequential
+  type-change merging, and create_table folding (the cross-class pairs are
+  the interesting ones) — and both resolutions tested to converge (modelgen
   supplies inputs) — termination + local confluence gives UNIQUE NORMAL
-  FORMS (Newman), which is what makes consolidation well-defined.
+  FORMS (Newman), which is what makes consolidation well-defined. Named gaps
+  the rewrite fills: no cancellation pairs exist today for exclusions,
+  views, matviews, sequences, composite types, domains, or policies. The
+  references relation is only computable AFTER 5.1's content-addressed
+  closure (the fields it spans live inside today's unserialized pointer
+  defs) — the stated reason for the 5.1 -> 5.3 land-order edge.
   SQUASH-COMMUTATION (the L5/L10 functor equation) is a named test:
   apply(consolidation) and apply(sequence) land on the same introspected
   schema-state. The rollback-equivalence invariant is STRUCTURAL (revision
@@ -1315,8 +1431,12 @@ subphase numbers retained for reference; they land together.)
   sql_gen.go:554's "9.3+" for ADD VALUE IF NOT EXISTS — it is 9.6+.) The
   same protocols govern rollback of non-transactional down-ops.
   chain_position updates in the same transaction as each edge-completing
-  journal write. Re-apply resumes by skipping confirmed ops.
-  AppliedVersions/status/serve read the view.
+  journal write — DEFINED: the transaction containing the edge's FINAL
+  op's confirm row (an edge spanning expand/migrate/contract phases or a
+  non-transactional breakout completes in whichever transaction confirms
+  its last op). A batched backfill journals as ONE op with one down
+  (consistent with the single-DownOp model). Re-apply resumes by skipping
+  confirmed ops. AppliedVersions/status/serve read the view.
 - **Why:** L5's domain check and trace, landed as ONE rewrite of the loop
   (the collapse-multi-pass rule); L8 closes the crash window INSIDE the
   recovery protocol; L1's single ≈_syn via the shared normalization; the
@@ -1358,11 +1478,11 @@ subphase numbers retained for reference; they land together.)
   an orphan check (one comparison unit shared with the conformance matrix,
   not a second full-model comparison path). Reconcile does not auto-add
   imported schemas. SM-vs-enum introspection lossiness documented. The L10
-  ROUND-TRIP as a randomized DB-backed property test: modelgen pairs
-  (RESTRICTED to the injective, bridge-proven fragment per L10's soundness
-  caveat) -> diff -> apply -> verified against BOTH oracles —
-  re-introspection AND the recorded to-revision manifest compared
-  object-by-object.
+  ROUND-TRIP as a randomized DB-backed property test with SPLIT ORACLES per
+  L10: the manifest oracle (recorded to-revision manifest, object-by-object)
+  over the UNRESTRICTED modelgen generator — SM types get randomized
+  coverage; the re-introspection oracle over the injective, bridge-proven
+  fragment only.
 - **Why:** L5's codomain check; L10's caveat makes the dual oracle
   necessary (introspection alone passes vacuously where it is lossy, and
   bridge gaps would spurious-red a correct apply); the predicate-comparator
@@ -1395,17 +1515,20 @@ subphase numbers retained for reference; they land together.)
 ### 5.10 Fork resolution, re-keying, baseline + ecosystem alignment — L3+L2
 - **What:** `migrate rebase <head>`: re-parents a fork's tail, recomputes
   revisions, re-derives manifests; rebased-away edges RETIRE to
-  migrations/archive/ (never rewritten or deleted); a REMAP TABLE
-  (old-revision -> new-revision) is recorded in the chain so databases
-  stamped at rebased-away revisions are SERVED, not orphaned (apply
-  consults the remap before declaring a position unreachable). `migrate
-  rekey` (L2's epoch protocol): re-encodes the store under a new codec
-  with a recorded old-id -> new-id map — the one sanctioned re-key,
-  triggered by golden-corpus CI-red (boundary item 12). BASELINE
-  post-chain: synthesizes a revision manifest FROM INTROSPECTION (its
-  attachment specified: a genesis-parented edge carrying the introspected
-  manifest), writes chain_position, and its old semver divergence guards
-  are re-expressed against chain reachability. `migrate test --shadow`
+  migrations/archive/ (never rewritten or deleted); the UNIFIED
+  revision-remap table (per L2 — ONE mechanism for rebase and rekey) is
+  written so databases stamped at rebased-away revisions are SERVED, not
+  orphaned (apply consults the remap before declaring a position
+  unreachable). `migrate rekey` (L2's epoch protocol): TOTAL-scope
+  re-encode — store objects, manifests, AND chain-edge files under the new
+  codec, writing the same unified remap — triggered by golden-corpus
+  CI-red (boundary item 12). BASELINE post-chain: synthesizes a revision
+  manifest FROM INTROSPECTION (its attachment specified: a genesis-parented
+  edge carrying the introspected manifest), writes chain_position, and its
+  two semver guards are re-expressed EXPLICITLY: the divergence check
+  becomes "the stamped position is chain-reachable"; the out-of-order guard
+  (meaningless under content ids) becomes "the baseline target is reachable
+  from the stamped position." `migrate test --shadow`
   replays EDGES (not files). Docs updated — MECHANIZED verify: grep-assert
   zero retired vocabulary (semver filenames, file-trusting rollback) and
   every guide-named command exists in CLI registration.
@@ -1479,7 +1602,10 @@ subphase numbers retained for reference; they land together.)
   file isn't what the model produces").
 - **Why:** L6: divergence is created by partial writes and source edits,
   resolved by full ones; the taxonomy's pre-commitment only works if the
-  initial enumeration is actually total — hence four classes, not three.
+  initial enumeration is actually total — hence six named classes (the
+  four writer classes plus seed's stamped-unenforced class and the
+  checker-covered append-only stores), not a four-class list with a shadow
+  "outside" bucket.
 - **Verify:** TOML edit then build succeeds; then codegen --output of one
   output refuses naming stale siblings (group-filtered fixture); fmt
   prints the notice and the check goes stale; testdb init and introspect
@@ -1521,7 +1647,7 @@ subphase numbers retained for reference; they land together.)
 
 ### 7.3 Model integration — fail-closed union
 - **What:** ImportedTables split slice. Union wired at the COMPLETE
-  enumerated resolution sites — FIVE: buildTablesByName (E204/TableByName
+  enumerated resolution sites — SEVEN: buildTablesByName (E204/TableByName
   — without it FK validation, migrate FK qualification, and check C104
   break; C104 today silently SKIPS unresolved refs), BuildFKGraph (edges
   keyed (schema,name), Imported=true), seed FQN pools, the D2/GraphQL
@@ -1529,9 +1655,15 @@ subphase numbers retained for reference; they land together.)
   fk.RefSchema — fixed here; GraphQL gains qualification + a golden), AND
   W002 orphan detection (it builds its referenced-set from raw
   RefSchema+"."+RefTable strings, bypassing TableByName — imported-FK
-  targets would spuriously orphan). Registry collisions = hard error
-  naming both sources; imported enums usable; extension/pg_version
-  re-declaration enforced.
+  targets would spuriously orphan), the C103 orphan check (structurally
+  identical to W002 in a separate code path — ONE union-aware
+  orphan-detection helper serves both, replacing two divergent raw-string
+  scans), AND the I002 dead-column referenced-set (matches bare RefTable,
+  ignoring RefSchema entirely). Two further resolution sites are fail-safe
+  only by accident (model/topo and format's pre-Build topo — TopoSort
+  silently drops unknown deps) — pinned with comments stating why they
+  are safe. Registry collisions = hard error naming both sources; imported
+  enums usable; extension/pg_version re-declaration enforced.
 - **Why:** Fail-closed by construction — consumers iterating Tables are
   correct BY OMISSION — but only where resolution funnels through the
   union; the five bypass sites are named because each otherwise produces
@@ -1661,10 +1793,13 @@ The interactive frontend on the phase-8 contract. Unplanned by design.
   encoder), 5.1, 7.2}; 1.2 -> {1.4-conformance, 5.2, 5.5+5.7, 5.8, 7.2
   (semantic drift needs N)}; 1.3 -> {5.1, 5.2, 7.2}; 1.4 -> {5.2, 5.3,
   5.9, 6.1}; 1.5 -> {4.2-json, 8.1}; 1.6 -> {1.1, 1.2, 1.4, 5.3, 5.8};
-  0.2 -> 7.2 (surface-hash reproducibility rests on Canonicalize).
+  {1.1, 1.3} -> 5.9 (deserialization); 0.2 -> 7.2 (surface-hash
+  reproducibility rests on Canonicalize). Phase 1 internal: {1.3, 1.6} ->
+  1.1 -> {1.2, 1.5} -> 1.4.
 - 0.3 -> {7.3, 8.1-projection, 9.3}; phase 5 land order: 5.0 -> 5.1 ->
   5.2; then {5.5+5.7 as one apply-loop pass} -> 5.6 -> 5.8 (track A) and
-  5.3 -> 5.4 (track B, parallel); 5.9 after {5.1, 1.4}; 5.10 after 5.3.
+  5.3 -> 5.4 (track B, parallel); 5.9 after {5.2, 1.4} (head manifests
+  exist only once 5.2 creates migrations/revisions/); 5.10 after 5.3.
 - {5.9, 1.4, 0.5} -> 6.1; {5.2, 4.2, 0.5} -> 6.2 (the whole-phase edge is
   deliberately split — 6.x does not wait for 5.10); 5.7 -> 7.4; 7.4 ->
   9.2; 5.2-serve-edits -> 8.1 (co-edited file — phases 5 and 8 NOT
