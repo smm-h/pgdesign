@@ -1,20 +1,17 @@
 # pgdesign roadmap: the kernel and its boundary
 
-Consolidated plan from the 2026-07-19 design session, five adversarial critique
-rounds (the fifth focused on the mathematics itself), and an algebraic
-reframing (2026-07-21). This file is exempted from
-todo immutability by explicit owner authorization — a living plan; git history
-preserves all prior versions, including the pre-algebraic v6 whose content this
-version reorganizes (nothing was dropped; everything was re-derived).
+Consolidated implementation plan: determinism, schema identity, migrate
+integrity, orchestration, imports, API, visualization. This file is exempted
+from todo immutability by explicit owner authorization — it is a living plan.
+Fully self-contained.
 
-The reframing: six versions of iterative design converged, without naming it, on
-a small algebra — a content-addressed object model wrapped around a category of
-schema migrations, governed by one equivalence relation. Every defect class the
-critique rounds found is a violation of one of the laws below. This version
-states the laws first and derives the plan from them, so that the remaining
-work eliminates defect classes by construction instead of whack-a-mole, and so
-that any future proposal can be judged the same way: which law does it
-implement, check, or violate?
+The design rests on a small algebra — a content-addressed object model wrapped
+around a category of schema migrations, governed by one equivalence relation.
+Every defect class this plan guards against is a violation of one of the laws
+below. The laws come first and the plan derives from them, so the work
+eliminates defect classes by construction rather than case-by-case, and any
+future proposal is judged the same way: which law does it implement, check, or
+violate?
 
 ---
 
@@ -165,23 +162,16 @@ The system is a THREE-WAY partition, and defects are triaged accordingly:
 
 The boundary list may GROW, but only with a post-mortem answering "why was
 this not derivable from the laws?" — growth is permitted; unexplained growth
-is not. (An earlier "the list is closed" absolutism was withdrawn as
-unfalsifiable: with no law formally verified, any defect could be retro-labeled
-an implementation error.)
-
-The critique rounds support the shape empirically — findings migrated outward
-from policy (round 1) to mechanism (round 2) to specification (round 3) to
-boundary protocols (round 4) to the formalism itself (round 5) — an induction
-over five points, weighted accordingly, not proof.
+is not. (A closed-list rule would be unfalsifiable: with no law formally
+verified, any defect could be retro-labeled an implementation error.)
 
 ---
 
 # Part II — Decisions as derivations
 
 Provenance convention: `[deliberate]` = the owner's own axioms (fixed).
-`[law]` = a consequence of Part I — originally trust-adopted (%%) during the
-design sessions, now DERIVED; reversing one requires rejecting a law, not just
-changing a preference. `[%%]` = genuinely free choices (names, layouts,
+`[law]` = a consequence of Part I; reversing one requires rejecting a law, not
+just changing a preference. `[%%]` = genuinely free choices (names, layouts,
 per-language mechanics) that the laws do not determine — weakly held,
 reversible, never to be cited as deliberate intent.
 
@@ -197,10 +187,10 @@ reversible, never to be cited as deliberate intent.
 
 - Append-only STORE CONTENT (objects, manifests) — L2 structurally; append-only
   CHAIN-EDGE FILES — checked policy via the consistency checker (they are
-  location-addressed; the math round corrected an overreach here). Archived
-  originals; unconditional checksums on the apply surface — L2. (The
-  "checksums on rollback" clause died because post-journal rollback reads no
-  files; a checksum surface cannot exist there.)
+  location-addressed, so extensionality cannot cover them). Archived originals;
+  unconditional checksums on the apply surface — L2. (Checksums exist ONLY on
+  the apply surface: journal-driven rollback reads no files, so no rollback
+  checksum surface exists.)
 - Squash = a consolidation edge (composition), never a rewrite — L3.
 - Consolidation downs derived by manifest diff ONLY for fully-invertible
   ranges; DML/RawSQL-containing ranges compose recorded downs — L4.
@@ -230,11 +220,11 @@ reversible, never to be cited as deliberate intent.
 - One normalization primitive consumed by differ, predicates, upgrade
   reconcile, and shadow test; predicate IR = one structured definition with a
   Go executor (structured diagnostics; shares introspect's catalog-query
-  layer) and a SQL renderer, conformance-matrixed — L1. (A critique proposal
-  to drop the Go executor was REJECTED: the executor exists for structured
-  object/expected/found diagnostics, not DB-freedom; the matrix exists because
-  the SQL renderer is a second computation of ≈ in another language — an
-  irreducible boundary item.)
+  layer) and a SQL renderer, conformance-matrixed — L1. (The Go executor
+  exists for structured object/expected/found diagnostics, not DB-freedom —
+  dropping it in favor of SQL-only evaluation is ruled out; the matrix exists
+  because the SQL renderer is a second computation of ≈ in another language —
+  an irreducible boundary item.)
 - One canonical serializer everywhere (generate json = serve payload = import
   surface = op bodies = revision manifests); the encoder is a dedicated
   canonical encoder with a reflection-based field-coverage guard (totality is
@@ -255,9 +245,8 @@ reversible, never to be cited as deliberate intent.
   pools, D2/GraphQL edge emitters) — L6-style totality applied to name
   resolution.
 - Header/stamp grammar with one writer and one reader (pkg/genkit); one
-  wording, adopted in a single pass (the byte-preserve-then-reword staging
-  died with the one-release axiom — its justification was multi-release) —
-  L6+L9.
+  wording, adopted in a single pass (the one-release axiom makes any staged
+  transition pure double work) — L6+L9.
 - Property/fault verification style throughout: multi-iteration determinism
   tests, encoder coverage guard, conformance matrix, fault-injection matrix,
   DB-free compile checks of generated fixtures — L9.
@@ -290,40 +279,46 @@ cases). strictcli connection-env kind with registration-time unbound-flag
 error. Partition: premake required; opt-in schedule key; unacknowledged
 missing schedule = warning. pkg/diff deleted with a recorded promotion
 trigger. Web UI frontend deferred. Consumer regeneration todos filed at the
-single final release. Policies demoted from [law] by the math round (good
-engineering rationales, honestly labeled as choices): ALWAYS-large-table-safe
-generation (uniformity — a declared size hint would be equally pure);
-FULL-PROJECT stamp scope (resolves the filtered-output paradox); pure
-analyses BLOCK in revise's pure tier (the owner's hard-constraints
-philosophy applied — analysis that can block must block).
+single final release. Policies that are deliberate engineering choices, NOT
+law consequences (the laws admit alternatives; these are chosen on the
+merits): ALWAYS-large-table-safe generation (uniformity — a declared size
+hint would be equally pure); FULL-PROJECT stamp scope (resolves the
+filtered-output paradox); pure analyses BLOCK in revise's pure tier (the
+owner's hard-constraints philosophy — analysis that can block must block).
 
-## Withdrawn along the way (each a law violation in hindsight)
+## Ruled-out designs (each violates a law or an axiom — do not resurrect)
 
-Compat-named view (owner axiom violation); header staging (multi-release
-assumption); checksums-on-rollback (L2 surface that doesn't exist); plain
-Python Enum and construction-closing machinery (chased a phantom — native
-validation already exists); TS nominal brand (regressed compile-closure);
-@Enumerated(STRING) (persists names, not values); registry builtin-inclusion
-special case (redundant — builtin-derived domains materialize into model
-collections that L1 already covers); manifest.jsonl and whole-model snapshots
-and dot-dirs (superseded by per-edge chain + object store + visible names);
-snapshot-diff downs for DML ranges (L4 violation); rejecting (rather than
-validating) Go boundaries (breaks scans); row-count-conditional generation
-(L5 violation); the closed-boundary-list absolutism (unfalsifiable — replaced
-by three-way triage with growth-on-post-mortem); L4's "IFF" (claimed a false
-converse — composites can be semantically invertible when components are
-not); "squash IS composition definitionally" (empty without a morphism
-congruence — replaced by the free-category framing plus the CHECKED
-squash-commutation property); "one ≈" stated without naming ≈_syn vs ≈_pg
-(the iff was unachievable for expressions against pg_get_* forms by any pure
-string normalizer).
+Compat-named DB objects or dual recognition of old names (owner axiom).
+Staged/multi-pass header transitions (the one-release axiom makes them double
+work). Checksums on the rollback path (no such surface exists — rollback
+reads no files). Replacing StrEnum with plain Enum, or construction-closing
+machinery in Python (native Enum validation already rejects invalid values).
+A nominal TS brand (regresses the union's compile-closure and exhaustiveness
+narrowing). @Enumerated(STRING) in JPA (persists constant NAMES, not DB
+values). A registry builtin-inclusion special case in identity (redundant —
+builtin-derived domains materialize into the model collections L1 covers). A
+single append-only manifest file, whole-model snapshots, or dot-directories
+for load-bearing data (git-merge conflicts at EOF; massive duplication;
+invisibility of committed artifacts — the per-edge chain, object store, and
+visible names dominate). Manifest-diff downs for ranges containing
+data-bearing ops (L4 violation — a structural down would recreate a dropped
+column empty). Rejecting (rather than validating) Go unmarshal/scan
+boundaries (breaks every DB-scanned struct). Row-count-conditional generation
+(L5 violation — generation must not read the world). A closed boundary list
+(unfalsifiable — the triage rule with growth-on-post-mortem is the sound
+form). An iff form of L4's composite-inverse rule (false converse: composites
+can be semantically invertible when components are not). "Squash is
+composition by definition" (empty without a morphism congruence — soundness
+is the CHECKED squash-commutation property). A single undifferentiated ≈
+(unachievable: pg_get_* forms are catalog-dependent and unreachable by pure
+string normalization — hence ≈_syn/≈_pg and the rewrite-rule bridge).
 
 ---
 
 # Part III — Where the codebase violates the laws today (grounding)
 
-Source-verified across four critique rounds. Organized by law; file references
-are load-bearing for implementors.
+Source-verified. Organized by law; file references are load-bearing for
+implementors.
 
 **L1 violations (no canonical form, no single ≈):**
 - resolveTable ranges Go maps — raw model order nondeterministic; only some
@@ -533,10 +528,9 @@ closed: a future defect found OUTSIDE it means a law was implemented wrong
 # Part V — Phases
 
 Phase numbering: 0 = substrate repairs; 1 = the kernel; 2 and 4-9 = boundary
-functors and adoption, keeping their pre-reframe numbers where content is
-unchanged. Phase 3 is RETIRED: the identity work it held (whole-model form,
-revision hash, one serializer) was absorbed into kernel subphases 1.4/1.5, and
-the number is not reused. Every subphase cites its laws.
+phases and adoption. The number 3 is intentionally unassigned (the identity
+work — whole-model form, revision hash, one serializer — lives in kernel
+subphases 1.4/1.5). Every subphase cites its laws.
 
 ## Phase 0 — Substrate repairs (make the codebase law-capable)
 
@@ -604,8 +598,9 @@ DAG). The strictcli todo (boundary item 11) is filed at phase-0 start.
   (deterministic, (schema,name)-keyed; excluded from identity, included in
   the API payload) — owned here.
 - **Why:** Two identity schemes for one object is a latent bug today and a
-  guaranteed one under imports; single-pass API design prevents three
-  planned rounds of churn (the collapse-multi-pass rule).
+  guaranteed one under imports; designing the end-state API in one pass
+  prevents repeated churn over the same surface (the collapse-multi-pass
+  rule).
 - **Verify:** Red-green: same-named tables in two schemas through cascade
   checks (W013/14/15), workload, group filtering; depth-bounded walk tested;
   projection serializer deterministic and reconstructable.
@@ -704,7 +699,7 @@ adapter around this.
   indexes/policies reports false drift today — a live bug), replacing BOTH
   existing normalizers: diff's unsound lowercasing normalizeDefault (red
   test for the 'Active'/'active' missed-drift case FIRST) and
-  validate.normalizeExpr (W018 retired onto N, or explicitly scoped as a
+  validate.normalizeExpr (W018 moves onto N, or is explicitly scoped as a
   looser heuristic with a comment). Later consumers: upgrade reconcile,
   predicates, reconcile-verify, shadow test.
 - **Why:** L1(b): every comparison engine must compute the same ≈_syn — two
@@ -756,8 +751,8 @@ adapter around this.
   opaque-Revision cross-class comparison errors; diff(a,a) empty;
   conformance direction in CI; sensitivity tests (comment/column/type/
   pg_version/extension changes flip revisions; no-op rebuilds don't). (No
-  associativity/identity-edge tests — trivially true in a free category;
-  vacuous tests deleted.)
+  associativity or identity-edge tests — trivially true in a free category;
+  none are needed.)
 
 ### 1.5 Whole-model form, envelope, one serializer — L1+L7
 - **What:** Whole-model form = versioned preamble + ordered concatenation of
@@ -814,7 +809,7 @@ adapter around this.
   hermetic skips; raw os.Getenv gone from cmd/ (test harness excepted);
   precedence test.
 
-## Phase 4 — Language functors (codegen) [numbering retained from v6]
+## Phase 4 — Language functors (codegen)
 
 ### 4.0 Compile checks + CI toolchains (two deliverables) — L9 at the boundary
 - **What:** (a) NEW DB-free generated-fixture compile checks: go build, tsc
@@ -991,10 +986,10 @@ numbered; nothing ships mid-phase (single-release axiom).
   nothing about data). Tracking/journal lineage handled; no orphaned rows;
   files never rewritten.
 - **Why:** L3 makes squash a checked normalization, not a definition; L4
-  makes the round-4 data-loss hole (a DOWN recreating a dropped column
-  empty) unrepresentable; the rewriting-system spec replaces "we hope pass
-  order doesn't matter" with a finite, decidable check — the one place a
-  textbook result (Newman's lemma) changes what gets built.
+  makes the data-loss hole (a DOWN recreating a dropped column empty)
+  unrepresentable; the rewriting-system spec replaces "we hope pass order
+  doesn't matter" with a finite, decidable check — the one place a textbook
+  result (Newman's lemma) changes what gets built.
 - **Verify:** Squash of applied migrations via consolidation; mid-range DB
   resumes via archived originals; SQUASH-COMMUTATION on the comprehensive
   fixture (apply-composite vs apply-sequence, compared through reconcile);
@@ -1067,7 +1062,7 @@ numbered; nothing ships mid-phase (single-release axiom).
 - **Why:** L5's domain check, computed with L1's single ≈. The SQL
   renderer is boundary item 3 (a second computation of ≈ in another
   language); the matrix is its law-check. The Go executor exists for
-  structured diagnostics — this was challenged and REJECTED.
+  structured diagnostics; SQL-only evaluation is ruled out.
 - **Verify:** DB-backed matrix per op class; golden idempotent SQL;
   mismatch RAISEs, match no-ops; conformance green; shared catalog layer
   by import graph.
@@ -1359,7 +1354,7 @@ The interactive frontend on the phase-8 contract. Unplanned by design.
 - visualization-and-web-ui.md — its phases 1-5 = phase 9; web UI = 8/10.
 - rename-to-strictpg.md — in todo/.obsolete/ per the no-rename axiom.
 
-## Out of scope, pending their own design rounds
+## Out of scope, pending their own design work
 
 Test schema mode. N-project topology. Manifest + per-language linter
 ecosystem (evidence-gated). Recorded summit alternatives: declarative
@@ -1382,9 +1377,9 @@ rebase-only fork resolution.
 Phase 0: 2-3 sessions. Phase 1 (kernel): 2-3 sessions — pure Go,
 property-tested, no DB; front-loaded because everything else adapts it.
 Phase 2: 1-2 (externally gated). Phase 4: 3-4 (incl. 4.0's two
-deliverables). Phase 5: 4-6 (thinned — the chain/invertibility/store
-machinery moved into the kernel). Phase 6: 1-2. Phase 7: 3-4. Phase 8:
-1 (after 5.2's serve edits). Phase 9: 2-3. Parallelization per the DAG.
+deliverables). Phase 5: 4-6 (the chain/invertibility/store machinery lives
+in the kernel). Phase 6: 1-2. Phase 7: 3-4. Phase 8: 1 (after 5.2's serve
+edits). Phase 9: 2-3. Parallelization per the DAG.
 
 Release: exactly ONE rlsbl release at the very end (owner axiom);
 everything accumulates unreleased; consumer todos filed at that release.
