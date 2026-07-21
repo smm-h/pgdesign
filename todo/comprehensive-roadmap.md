@@ -1,11 +1,11 @@
 # Comprehensive roadmap: determinism, identity, migrate integrity, orchestration, imports, API, visualization
 
-Single consolidated plan from the 2026-07-19 design session, revised 2026-07-21 after an
-adversarial critique round (six investigation agents verified every grounding fact against
-source and audited each phase; ~30 accepted findings folded in). This file is exempted
-from todo immutability by explicit owner authorization — it is a living plan; git history
-preserves prior versions. Supersedes/absorbs several active todos (see "Relationship to
-existing todos" at the end).
+Single consolidated plan from the 2026-07-19 design session, revised 2026-07-21 after
+two adversarial critique rounds (each: six investigation agents verifying grounding
+facts against source and auditing every phase; accepted findings folded in). This file
+is exempted from todo immutability by explicit owner authorization — it is a living
+plan; git history preserves prior versions. Supersedes/absorbs several active todos
+(see "Relationship to existing todos" at the end).
 
 ## Decision provenance
 
@@ -15,871 +15,720 @@ intent. `[deliberate]` decisions were the owner's own.
 
 - `[deliberate]` **No rename.** The project stays `pgdesign`. rename-to-strictpg todo
   moved to todo/.obsolete/.
-- `[%%]` Compiler/live-layer seam: `build` and the core pipeline stay pure (TOML ->
-  artifacts, no DB); live-DB functionality is a distinct tier behind a designed boundary.
-- `[%%]` Ambition: summit-grade design only where outputs are permanent (schema identity,
-  migration file format); pragmatic rungs elsewhere, maximal designs recorded as
-  end-states.
-- `[%%]` Canonical ordering lives in the IR (Build() orders; emitters forbidden to sort).
-- `[%%]` Canonical serialization is semantic-only, full-model scope (object comments in).
-- `[%%]` Revision hash = SHA-256 of canonical bytes; every-command enforcement with the
+- `[deliberate]` ONE release for the whole roadmap, at the very end — never per-phase
+  releases. Global rule in ~/Projects/CLAUDE_ADDITIONS.md.
+- `[deliberate]` No backward compat anywhere (global rule): `migrate upgrade` DROPS
+  the old tracking table after migrating rows; all internal callers updated; no
+  compat-named objects, no dual recognition. An earlier "compat-named view" idea was
+  withdrawn as compat-in-disguise.
+- `[%%]` Compiler/live-layer seam: `build` and the core pipeline stay pure; live-DB
+  functionality is a distinct tier behind a designed boundary.
+- `[%%]` Ambition: summit-grade design only where outputs are permanent (schema
+  identity, migration file format); pragmatic rungs elsewhere, maximal designs
+  recorded as end-states.
+- `[%%]` Canonical ordering lives in a shared finalize routine (`Canonicalize()`)
+  invoked by ALL Schema constructors — Build, BuildMulti, AND Introspect (amended:
+  originally "Build() orders"; introspect never calls Build, and 0.5/3.3/5.8 depend
+  on introspected schemas being canonical).
+- `[%%]` Canonical serialization is semantic-only, full-model scope (object comments
+  in; Extensions and PGVersion in — amended: they affect emitted DDL and were
+  originally unenumerated).
+- `[%%]` Revision hash = SHA-256 of canonical bytes; every-command enforcement with
   full-regenerator/partial-writer refusal semantics (see 6.2).
 - `[%%]` Migration precondition drift = hard error, always. No tolerance flags.
 - `[%%]` generate --idempotent unifies with migrate verification via a predicate IR
   (one definition, Go executor + SQL renderer backends, CI conformance matrix).
-- `[%%]` Migration history is append-only: files never rewritten; squash emits a NEW
-  consolidation migration; superseded files archived; checksum verification
-  unconditional once the format lands.
-- `[%%]` Migration ops are self-contained: serializable fields ARE the rendering
-  inputs; degraded ops unrepresentable.
-- `[%%]` Migrations identified by revision pairs (from_revision -> to_revision) in a
-  parent-linked chain; filenames cosmetic (sequence + slug); no version bumps.
-- `[%%]` (critique round) Migration generation is PURE: diff(chain-head model, current
-  model), no live DB; out-of-band drift surfaces at apply (preconditions/reconcile),
-  never silently folded into generated migrations; intentional drift adoption via an
-  explicit baseline-derived flow.
-- `[%%]` (critique round) The chain's home is a small committed append-only MANIFEST
-  (sequence, filename, from/to revision, superseded-by); consolidations are ADDITIONAL
-  edges; archived originals stay reachable via the manifest, so mid-range databases are
-  never stranded.
-- `[%%]` (critique round) The per-op journal records op identity AND the serialized
-  down-op as applied; rollback is fully database-driven and never consults files.
-  Journal = one per-op table + a summary view (not two tables).
-- `[%%]` Orchestrator: `pgdesign revise` = pure tier (build + migration generation),
-  then DB tier (import verification + DB checks); seed separate; pure outputs kept on
-  partial failure; separate commits; commit failure = hard error.
-- `[%%]` Imports: split slices (fail-closed); `alias:table` syntax; vendored
-  import-surface snapshots (per-object hashes from the canonical primitive + source
-  pin); type/enum collision = hard error; app-only DDL with live verification;
-  imported extension/pg_version requirements re-declared locally.
-- `[%%]` Codegen branding, default-on breaking release: Python guarded StrEnum +
-  enum-typed surfaces incl. the DB-read path; Go complete-boundary opaque struct;
-  TS branded type + re-typed transition maps; Java/Kotlin value-based parse (+ JPA
-  @Enumerated(STRING) fix); Zig wrapper struct + re-typed transition maps. Constants
-  mode unchanged. Drizzle/sqlalchemy remain string-shaped by ORM necessity — stated
-  exceptions. Import-time registry dropped.
-- `[%%]` Seed with imported FKs: tiered real keys (live pool / count-wrapped offset
-  subqueries in INSERT mode / hard error only for offline+COPY+NOT-NULL).
-- `[%%]` strictcli: new "connection env" kind (hermetic-suppressed, lazy, no default);
-  PGDESIGN_DB declared once; all --db flags bind it; provenance via the EXISTING
-  Context.Source(); DB checks skip visibly under --hermetic.
-- `[%%]` Partition: premake required; opt-in `schedule` key wires the pg_cron helper;
-  missing schedule without acknowledgment = warning.
-- `[%%]` pkg/diff deleted; promotion trigger recorded (second flat-schema consumer).
-- `[%%]` Web UI frontend deferred; only the DB-free API contract is built.
-- `[deliberate]` (2026-07-21) ONE release for the whole roadmap, at the very end —
-  never per-phase releases. Global rule in ~/Projects/CLAUDE_ADDITIONS.md.
-- `[deliberate]` (2026-07-21) No backward compat anywhere (global rule): `migrate
-  upgrade` DROPS the old tracking table after migrating rows; all internal callers
-  (serve, AppliedVersions, status) updated; no compat-named objects, no dual
-  recognition. An earlier "compat-named view" idea is withdrawn as compat-in-disguise.
-- `[%%]` (askme round) Grandfather boundary = verify-then-stamp: `migrate upgrade`
-  requires a clean TOML<->DB reconcile, then stamps the boundary revision =
-  revision(current TOML model); refuses with the drift report otherwise.
-- `[%%]` (askme round) Journal = table `pgdesign_migration_ops` + summary view
+- `[%%]` Migration history is append-only; squash emits consolidation migrations;
+  superseded files archived; checksum verification unconditional once the format
+  lands.
+- `[%%]` Migration ops are self-contained — amended: the serializable form IS the
+  3.1 per-object canonical form (pointer-def ops embed their target object's
+  canonical bytes; no second serialization dialect, no lossy flat mirrors).
+- `[%%]` Migrations identified by revision pairs in a parent-linked chain; filenames
+  cosmetic (sequence + slug); no version bumps.
+- `[%%]` Migration generation is PURE: diff(chain-head model, current model) —
+  amended to name the mechanism: each migration's to-revision model is stored as a
+  canonical per-object SNAPSHOT (no op-replay engine); drift surfaces at apply,
+  never folded into generated migrations; intentional drift adoption via an explicit
+  baseline-derived flow.
+- `[%%]` The chain's home is `migrations/manifest.jsonl` (append-only, atomic line
+  appends); consolidations are ADDITIONAL edges; archived originals stay reachable
+  via the manifest.
+- `[%%]` Per-revision snapshots live in content-addressed
+  `migrations/.snapshots/<revision>.json`, referenced by the manifest.
+- `[%%]` The per-op journal records op identity AND the serialized down-op; rollback
+  is database-driven — amended scope: guaranteed from the upgrade boundary forward;
+  the pre-upgrade prefix and baselined migrations are ROLLBACK-FROZEN (crossing the
+  boundary = hard error; synthesized journal rows carry no executable down-ops).
+  Journal = one per-op table + summary view.
+- `[%%]` DB position anchor: `pgdesign_chain_position` table (current revision,
+  in-progress edge ref, per-database grandfather boundary); baseline and upgrade
+  write it; edge selection reads it.
+- `[%%]` Journal = table `pgdesign_migration_ops` + summary view
   `pgdesign_applied_migrations` (view exists on merit: one SQL-level definition of
   "applied migrations + status" shared by apply/rollback/status/serve).
-- `[%%]` (askme round) strictcli work handed off via a generically-worded todo filed
-  in the strictcli repo when phase 2 starts; a strictcli session implements and
-  releases; pgdesign adopts the released version.
-- `[%%]` (askme round) Migration slugs auto-derived from the diff's dominant change,
-  optional override flag. Manifest = `migrations/manifest.jsonl` (JSONL, atomic line
-  appends). Archive = `migrations/.archive/`. Commands: `import lock` /
-  `import update`, `migrate upgrade`.
-- `[%%]` (askme round) Consumer regeneration+adaptation todos filed in consumer
-  repos at the single final release.
+- `[%%]` Grandfather boundary = verify-then-stamp: `migrate upgrade` requires a
+  clean TOML<->DB reconcile, then stamps boundary = revision(current TOML model);
+  refuses with the drift report otherwise. Requires clean schema files per git
+  (when in a repo; outside a repo proceeds with a stated caveat). Runs as ONE
+  transaction with an in-transaction assertion that the view reproduces the old
+  applied set.
+- `[%%]` Orchestrator: `pgdesign revise` = pure tier (build + migration generation),
+  then DB tier (import verification + DB checks); seed separate; pure outputs kept
+  on partial failure; separate commits; commit failure = hard error.
+- `[%%]` Imports: split slices (fail-closed); `alias:table` syntax (FK references
+  only, initially); vendored import-surface snapshots = referenced tables + the
+  TRANSITIVE CLOSURE of type definitions their columns use, per-object hashes from
+  the canonical primitive + source pin; type/enum collision = hard error; app-only
+  DDL with live verification; imported extension/pg_version requirements re-declared
+  locally.
+- `[%%]` Codegen branding, default-on, in the single final release — amended per
+  critique: Go opaque struct with VALIDATING boundary (Scanner/UnmarshalJSON/Text
+  implemented via Parse, ERROR on invalid — never absent/rejecting, which would
+  break DB scans and JSON round-trips); Python guarded StrEnum + enum-typed surfaces
+  incl. the DB-read path; TS KEEPS the literal union (already compile-closed with
+  exhaustiveness narrowing — a nominal brand would regress) + parse() at boundaries
+  + re-typed transition maps; Java/Kotlin value-based parse + JPA AttributeConverter
+  (NOT @Enumerated(STRING), which persists enum NAMES like IN_PROGRESS, not DB
+  values like in_progress); Zig wrapper struct + re-typed transition maps.
+  Constants mode unchanged; constraints mode = stated data exception (embeds
+  valid-value lists, not construction); drizzle/sqlalchemy string-shaped by ORM
+  necessity — stated.
+- `[%%]` Seed with imported FKs: tiered real keys (live pool / count-wrapped offset
+  subqueries in INSERT mode / hard error only for offline+COPY+NOT-NULL).
+- `[%%]` strictcli: connection-env kind; PGDESIGN_DB declared once; all --db flags
+  bind it; provenance via existing Context.Source(); DB checks skip under
+  --hermetic. Handed off via generically-worded todo; strictcli session builds.
+- `[%%]` Partition: premake required; opt-in `schedule` key; missing schedule
+  without acknowledgment = warning.
+- `[%%]` pkg/diff deleted; promotion trigger recorded.
+- `[%%]` Web UI frontend deferred; only the DB-free API contract is built.
+- `[%%]` Migration slugs auto-derived, optional override. Archive =
+  `migrations/.archive/`. Commands: `import lock` / `import update`,
+  `migrate upgrade`.
+- `[%%]` Consumer regeneration+adaptation todos filed in consumer repos at the
+  single final release.
 
-## Grounding facts (verified in source 2026-07-19; corrected by critique 2026-07-21)
+## Grounding facts (verified in source; corrected across two critique rounds)
 
-- Raw model.Schema is NON-deterministic: resolveTable builds per-table collections by
-  ranging Go maps (build.go ~563-644). SQL/JSON/doc/d2/graphql/python-ddl emitters
-  re-sort per-table collections via model.Sorted* — but ordering has TWO semantics:
-  alphabetical (the 7 Sorted* helpers) and TOPOLOGICAL (tables via Build; views/
-  matviews/functions topo-sorted in the SQL emitter via graph.TopoSort — correctness,
-  not just determinism). Top-level collections are inconsistently ordered between JSON
-  (name-sorted) and DDL (declaration/topo). Matview indexes are unsorted on EVERY path.
-  gorm/drizzle/jpa/sqlalchemy codegen and validator policy extraction emit in raw map
-  order (stable only while tables have <=1 of each item). The existing determinism test
-  cannot catch any of this.
+- Raw model.Schema is NON-deterministic: resolveTable builds per-table collections
+  by ranging Go maps. Ordering has TWO semantics: alphabetical (the 7 Sorted*
+  helpers) and TOPOLOGICAL (tables via Build; views/matviews/functions topo-sorted
+  in TWO emitters — generate.go AND python_ddl.go, duplicated). Top-level ordering
+  inconsistent between JSON (name-sorted) and DDL (declaration/topo). Matview
+  indexes unsorted on EVERY path (and not covered by the 7 helpers). gorm/drizzle/
+  jpa/sqlalchemy codegen, validator policy extraction, AND the python query-layer
+  family (~12 sites) emit in raw map order. Auto-FK indexes are appended by
+  enrich() AFTER resolveTable — any construction-time sort must run post-enrich.
+  The existing determinism test cannot catch any of this.
+- Introspect constructs model.Schema directly and NEVER calls Build — introspected
+  schemas have nil FKGraph/TablesByName and raw query order; diff --live consumes
+  them. The finalize sequence is already copy-pasted between Build and BuildMulti.
 - Two divergent JSON serializers (generate json sorts; serve emits raw). FKGraph and
-  TablesByName are json:"-". FKEdge has NO schema field. FilterByGroups/FilterBySource
-  rebuild TablesByName but NOT FKGraph — filtered schemas carry stale graphs
-  referencing excluded tables.
-- semtype.Registry: separate from Schema, unexported/unserializable; scalar CHECKs and
-  builtin shadowing live only there; typeDefsEqual ignores BOTH Comment and Source, so
-  a snapshot needs its own explicit field policy. Enums/domains/composites/SM types
-  exist BOTH as registry TypeDefs and as Schema fields (duplication the canonical form
-  must resolve).
-- Headers: THREE wordings plus a seed variant across ~41 codegen sites + 6 validator
-  helpers + 5 CLI sites + a separate codegenHeader/hasCommentHeader CLI path; the
-  standalone single-file codegen path writes NO header at all (divergence from the
-  planner path). codegen --check is byte-exact (pkg/genkit).
-- Migrate: tracking table = version/applied_at/checksum/description; checksum is over
-  migration FILE bytes and NEVER verified; no per-op records; version row written LAST
-  (committed phases and non-transactional ops leave real DDL with no durable record;
-  re-apply restarts at op 0). Rollback re-reads files, trusting them over the DB. Ops
-  have no stable identity. ALL pointer-def op families (tables, views, matviews,
-  composite types, domains, policies, functions, triggers, sequences) are
-  non-serialized: after disk round-trip most degrade to comment no-ops, sequences lose
-  parameters, and create_function/create_trigger fall back to emitting the WRONG OBJECT
-  (deny-mutation function / append-only trigger). Only create_table has a mitigation
-  (ConsolidatedOps). No round-trip tests beyond create_table.
-- Squash deletes/rewrites originals (saferm + rename over <to>.toml); the
-  applied-version guard (M200) runs only if --db is voluntarily passed; tracking rows
-  orphaned; zero CLI-flow tests.
-- migrate generate requires --db and --version today; NO ledger/manifest exists;
-  discovery skips non-semver filenames and ~7 functions rely on semver ordering;
-  migrations-dir sentinel bug (explicit `--dir migrations` == default).
-- Introspect has NO table-level filtering at all (pgdesign_migrations reported as a
-  user table); deny-mutation function and _pgdesign_sm_ prefix ARE filtered. The
-  differ compares expressions by raw string equality while introspect returns
-  PG-rewritten forms (pg_get_constraintdef/expr/indexdef) — only types have real
-  normalization; the shadow test survives on easy fixtures only.
-- serve: hard DB-coupled at construction; --timeout registered but never enforced;
-  audit endpoint synchronous TANE; serve calls GenerateD2 with a nil registry (state
-  machine diagrams silently dropped); serve's local TOML loader discards the registry;
-  project-loading helpers live in package main.
-- strictcli: CheckContext exposes only ProjectRoot(); the check command constructs a
-  fully-populated *Context and discards it (widening = interface change + reconciling
-  two construction paths); infra roots and handshake envs are hermetic-IMMUNE, flag
-  Env() hermetic-SUPPRESSED — no primitive fits a connection URL; per-flag provenance
-  ALREADY EXISTS (Context.Source(), env>config>default precedence). 16 --db flags with
-  three different default semantics.
-- Codegen enum shapes: Go `type X string` (open), TS literal union (structural),
-  Python StrEnum (str subclass, value-construction open), Java/Kotlin real enums
-  (closed), Zig bare string consts. No parse helpers anywhere. TS AND Zig transition
-  maps use raw string keys. JPA emits no @Enumerated — Hibernate defaults to ORDINAL
-  (latent bug). Python query-layer PgBackend reconstructs rows with no enum coercion
-  (a branding read-door). drizzle pgEnum infers string-literal unions; sqlalchemy
-  keeps str columns.
-- CI: postgres:17 + pg_partman, PGDESIGN_REQUIRE_DB=1; ~11 of ~133 migrate-package
-  tests are DB-backed.
-- Partition bugs: python_ddl.go passes Retention as p_interval (sibling of the v0.24.4
-  generate fix); omitted premake -> p_premake := 0; silent skip without pg_partman;
-  manual children + maintenance emit contradictory DDL; PartmanRunMaintenanceCron() is
-  dead-but-tested code.
-- pkg/diff: zero importers; internal/diff matcher generic; result types embed ~22 PG
-  model types consumed field-by-field by migrate (~350 typed accesses).
+  TablesByName are json:"-". FKEdge has NO schema field. FilterByGroups/
+  FilterBySource rebuild TablesByName but NOT FKGraph.
+- semtype.Registry: separate from Schema, unexported/unserializable; scalar CHECKs
+  and builtin shadowing live only there; typeDefsEqual ignores top-level Comment and
+  Source but DOES compare nested state/transition comments — snapshot field policy
+  must say so. Enums/domains/composites/SM types exist BOTH as registry TypeDefs and
+  Schema fields (duplication the canonical form resolves: registry wins for type
+  definitions).
+- Headers: SIX-plus wordings (incl. a no-period CLI fallback and an SQL variant)
+  plus a seed variant, across ~41 codegen sites + 6 validator helpers + 5 CLI sites
+  + the codegenHeader/hasCommentHeader path. Codegen generators SELF-EMBED headers —
+  the planner's prepend branch is effectively dead; planner and standalone codegen
+  are already byte-identical. The genuinely headerless surfaces are the `generate`
+  command output (STDOUT-ONLY — no --output flag exists; it cannot create on-disk
+  divergence) and build's doc/d2/graphql/json paths. codegen --check is byte-exact
+  (pkg/genkit). Go headers today do NOT match the `^// Code generated .* DO NOT
+  EDIT\.$` tooling convention (lowercase variant) — 4.2's wording adoption fixes
+  that too.
+- Migrate: tracking table = version/applied_at/checksum/description; checksum over
+  FILE bytes, NEVER verified; no per-op records; version row written LAST; partial
+  phases/non-transactional ops leave committed DDL with no durable record; re-apply
+  restarts at op 0. Rollback re-reads files, trusting them over the DB. Ops have no
+  stable identity. Non-serialized op families include the nine pointer-def families
+  PLUS RawSQL (carries SM-trigger DDL and partman UPDATEs — silently dropped on
+  round-trip) and PartitionChildSpec. After round-trip, most degrade to comment
+  no-ops; sequences lose parameters; create_function/create_trigger fall back to
+  emitting the WRONG OBJECT (deny-mutation / append-only). Only create_table has a
+  mitigation. Non-transactional ops (CONCURRENTLY, enum-add) run on the raw conn
+  between transactions — a post-op journal write can be lost after the DDL commits
+  (durability gap one level down).
+- Squash deletes/rewrites originals; the M200 applied-version guard runs only if
+  --db is voluntarily passed; tracking rows orphaned; zero CLI-flow tests.
+- migrate generate requires --db and --version; NO ledger exists; discovery skips
+  non-semver filenames; ~7 functions rely on semver ordering; the migrations-dir
+  sentinel bug is replicated at EIGHT call sites (the `output` flag already shows
+  the correct Default(nil)+was-set pattern to reuse). serve's migration-version
+  endpoint opens files by `version+".toml"` — a second serve change under
+  sequence+slug names.
+- Introspect has NO table-level filtering (pgdesign_migrations reported as a user
+  table); function/trigger filters exist but use the `_pgdesign_sm_%` LEADING-
+  underscore pattern — a `pgdesign_%` table pattern does NOT cover it (two patterns
+  needed); views need relkind 'v' coverage separately. The differ compares
+  expressions by RAW STRING equality while introspect returns PG-rewritten forms
+  (pg_get_constraintdef/expr/indexdef) — a live bug: introspect->diff over schemas
+  with CHECKs/partial indexes/policies reports false drift today; only types have
+  real normalization; the shadow test survives on easy fixtures.
+- serve: hard DB-coupled; --timeout never enforced; audit synchronous; GenerateD2
+  called with nil registry (SM diagrams silently dropped); serve's TOML loader
+  discards the registry; project-loading helpers live in package main.
+- strictcli: check command builds a fully-populated *Context and discards it
+  (widening = interface change + reconciling two construction paths); infra
+  roots/handshake envs hermetic-IMMUNE, flag Env() hermetic-SUPPRESSED; per-flag
+  provenance ALREADY EXISTS (Context.Source()). 16 --db flags, three default
+  semantics.
+- Codegen enum shapes: Go `type X string` (open); TS literal union (compile-CLOSED
+  with exhaustive-switch narrowing; the open door is runtime string/any ingress);
+  Python StrEnum (str subclass, value-construction open; StrEnum members still ==
+  raw strings and format into f-strings — the closable door is construction, not
+  comparison); Java/Kotlin real enums (closed; constant names are UPPER_SNAKE while
+  getValue() returns the raw DB value — @Enumerated(STRING) would persist NAMES);
+  Zig bare string consts. No parse helpers anywhere. TS AND Zig transition maps use
+  raw string keys. Python query-layer never imports/defines the enum classes it
+  annotates rows with (annotations survive via `from __future__ import
+  annotations`); PgBackend reconstructs rows with no enum coercion. constraints
+  mode embeds raw enum-value lists in six languages. `doc` is a first-class
+  [output] format, headerless today. splitfmt (.sqlsplit) is a SEALED format whose
+  line 1 must be the statement count — it cannot carry a header stamp.
+- CI: postgres:17 + pg_partman, PGDESIGN_REQUIRE_DB=1; 11 DB-backed migrate tests
+  of ~162 in the package.
+- Partition bugs: python_ddl.go Retention-as-p_interval; premake -> 0; silent skip
+  without pg_partman; manual children + maintenance contradictory DDL;
+  PartmanRunMaintenanceCron() dead-but-tested.
+- pkg/diff: zero importers; matcher generic; result types embed ~22 PG model types
+  consumed field-by-field by migrate.
+- generate and migrate are sibling packages (neither imports the other; both import
+  internal/sql) — predicate IR structs + SQL renderer need a shared leaf home.
 
 ---
 
 ## Phase 0 — Foundational groundwork
 
-Everything later stamps, hashes, compares, or filters; phase 0 makes the substrate
-honest so later phases inherit honesty instead of re-implementing it.
-
-### 0.1 Canonical ordering in the IR
-- **What:** Two order semantics, both moved into Build(): ALPHABETICAL — the seven
-  Sorted* sorts move to construction (same comparators, so per-table output is
-  unchanged); TOPOLOGICAL — views/matviews/functions get their topo order (with
-  input-order tie-break via graph.TopoSort) computed at Build like tables already are.
-  Tables stay topo-ordered (never alphabetized — correctness); columns stay
-  source-ordered (semantic). ONE canonical top-level order adopted by both JSON and
-  DDL (= the IR order). Then delete ALL emitter-side sorting and the Sorted* helpers.
-  Fix in the same stroke: matview index ordering (nondeterministic everywhere), the
-  ORM codegen generators + validator policy extraction (luck-stable), and replace the
-  too-weak determinism test with a build-twice-compare-bytes CI test + Build
-  postcondition.
-- **Why:** The revision hash is a hash of bytes; nondeterministic bytes make identity
-  meaningless, freshness flappy, diffs dishonest. Ordering as an IR property makes
-  every current and FUTURE emitter deterministic by default — "forgot to sort" (four
-  live instances found) becomes impossible. Distinguishing alphabetical from
-  topological protects DDL correctness (a view must be created after the view it
-  references, regardless of name).
-- **Verify:** Determinism test red before / green after; goldens byte-stable; fixture
-  with 2 matview indexes + multiple FKs/policies per table stable across runs; a
-  view-references-view fixture still emits in dependency order; grep finds no
-  emitter-side sorting.
+### 0.1 Canonical ordering via a shared finalize routine
+- **What:** A `Canonicalize()` finalize routine — canonical ordering (alphabetical
+  for the per-table collections incl. matview indexes; topological with input-order
+  tie-break for tables/views/matviews/functions; columns source-ordered) plus
+  derived-structure construction (FKGraph, TablesByName) — invoked by ALL Schema
+  constructors: Build, BuildMulti, AND Introspect (which today never calls Build and
+  yields nil graphs and raw query order). Sorting runs AFTER enrich() (auto-FK
+  indexes are appended post-resolveTable). ONE canonical top-level order adopted by
+  both JSON and DDL. Delete emitter-side sorting: the 7 Sorted* helpers, the
+  DUPLICATED topo sorts in generate.go AND python_ddl.go. Fix the luck-stable
+  emitters: gorm/drizzle/jpa/sqlalchemy, validator policy extraction, and the
+  python query-layer family (~12 sites). Replace the too-weak determinism test with
+  a multi-iteration build-and-compare-bytes CI test (single runs have ~50% false-
+  negative odds on small fixtures — specify iterations and fixture size) plus a
+  Canonicalize postcondition. Note: JSON goldens change ONCE under the unified
+  top-level order (functions alphabetical -> topo); "goldens byte-stable" means
+  across-runs, not versus pre-0.1.
+- **Why:** The revision hash is a hash of bytes; nondeterministic bytes make
+  identity meaningless. Anchoring in a shared finalize (not Build alone) is what
+  makes INTROSPECTED schemas canonical too — 0.5's verify, 3.3's serve path, and
+  5.8's reconcile all consume them — and it deduplicates the finalize sequence
+  already copy-pasted between Build and BuildMulti. Topological-vs-alphabetical
+  distinction protects DDL correctness.
+- **Verify:** Multi-iteration determinism test red before / green after; a
+  view-references-view fixture emits in dependency order; INTROSPECTED schemas pass
+  the same canonical-order postcondition; fixture with 2 matview indexes + multiple
+  FKs/policies stable; grep finds no emitter-side sorting.
 
 ### 0.2 Schema-qualified identity keying
-- **What:** FKEdge gains a schema field (struct change, not just key format); rekey
-  FKGraph maps, cascade walkers, and group resolution to (schema, name). Fix the
-  stale-graph bug: FilterByGroups/FilterBySource must recompute derived structures
-  (FKGraph, TablesByName) for the filtered subset.
-- **Why:** Two identity schemes for one object is a latent bug today (same-named
-  tables in two PG schemas collide in cascade analysis) and a guaranteed bug under
-  imports (foreign schemas by definition). The filter bug hands phase 9.3 and 7.3 a
-  graph referencing excluded tables. Fix identity before building on the graph.
-- **Verify:** Red-green: same-named tables in two schemas through cascade depth
-  (W013/W014/W015), workload analysis, and group filtering; filtered schema's graph
-  contains no excluded tables; suite green.
+- **What:** FKEdge gains a schema field (struct change); rekey FKGraph, cascade
+  walkers, group resolution to (schema, name). Fix FilterByGroups/FilterBySource to
+  recompute derived structures for the filtered subset (today they carry the
+  parent's stale FKGraph referencing excluded tables).
+- **Why:** Two identity schemes for one object is a latent bug today and a
+  guaranteed bug under imports. Filters handing phase 9.3/7.3 a stale graph is a
+  live correctness hole.
+- **Verify:** Red-green: same-named tables in two schemas through cascade checks
+  (W013/W014/W015), workload analysis, group filtering; filtered schema's graph
+  contains no excluded tables.
 
 ### 0.3 Header consolidation (byte-preserving)
-- **What:** One shared parameterized header helper routed through ALL sites — the ~41
-  codegen sites, 6 validator helpers, 5 CLI sites, the codegenHeader/hasCommentHeader
-  path, the headerless standalone-codegen path (via 0.6), and seed's variant —
-  REPRODUCING each site's current wording byte-for-byte. No wording change here: the
-  unification to one wording lands in 4.2 together with the revision line, so
-  consumers regenerate once, not twice.
-- **Why:** Phase 4 stamps a revision into every header and phase 6 enforcement reads
-  the stamps; stamping through 40+ scattered literals with four wordings means that
-  many chances to miss one, and a missed stamp is invisible to divergence enforcement.
-  Byte-preservation keeps this phase consumer-invisible — the roadmap's own one-break
-  principle applied to itself.
-- **Verify:** All outputs byte-identical before/after (freshness checks stay green on
-  consumer fixtures); grep finds zero header literals outside the helper.
+- **What:** One shared parameterized header helper routed through ALL sites (~41
+  codegen + 6 validator helpers + 5 CLI + codegenHeader/hasCommentHeader + seed),
+  REPRODUCING each site's current wording byte-for-byte (six-plus wordings
+  preserved as-is for now). The stamp GRAMMAR (format + parse) is designed in
+  pkg/genkit from the start — writer and reader of the stamp in one package — with
+  the language-comment-prefix helper in internal/codegen consuming it. No wording
+  change here (that lands in 4.2 with the revision line, so consumers regenerate
+  once). Byte-preservation claim scoped: 0.6's write-path consolidation may change
+  OTHER bytes; this subphase's own changes are byte-invisible.
+- **Why:** Stamping through 50+ scattered literals with six wordings means that
+  many chances to miss one; a missed stamp is invisible to enforcement. Grammar in
+  genkit prevents the writer/reader drift disease.
+- **Verify:** Header-originating bytes identical before/after on consumer fixtures;
+  grep: zero header literals outside the helper; stamp grammar round-trip test in
+  genkit.
 
 ### 0.4 Type-registry snapshot
-- **What:** Deterministic, ordered, exported snapshot accessor on semtype.Registry +
-  reconstruct-from-snapshot. Explicit field policy of its own (it cannot mirror
-  typeDefsEqual, which ignores both Comment and Source): semantic fields + Comment
-  included, Source excluded, builtin-sourced entries excluded (shadowing flips Source
-  to "user", so shadows survive).
-- **Why:** The registry holds semantic state existing nowhere else; an identity
-  omitting it calls two different schemas "the same." The snapshot bridges the
-  registry into the canonical form and later carries type definitions across imports.
-- **Verify:** Snapshot -> reconstruct -> snapshot byte-stable; independent of
-  registration order; Source relabeling does not change the snapshot.
+- **What:** Deterministic ordered exported snapshot + reconstruct. Explicit field
+  policy (cannot mirror typeDefsEqual, which ignores top-level Comment/Source but
+  DOES compare nested state/transition comments): semantic fields + all comments
+  included, Source excluded, builtin-sourced entries excluded.
+- **Why:** Registry holds semantic state existing nowhere else; identity omitting
+  it calls different schemas "the same." Bridges the registry into the canonical
+  form and later into import surfaces.
+- **Verify:** Snapshot -> reconstruct -> snapshot byte-stable; registration-order
+  independent; Source relabeling changes nothing; nested transition comments DO
+  affect it.
 
 ### 0.5 Introspect filters managed objects
-- **What:** Managed-object exclusion by pattern/explicit list (pgdesign_% tables —
-  covering the tracking table AND the future phase-5 journal automatically), unified
-  with the existing function/trigger filters under one "managed objects" concept.
-- **Why:** Reconcile-verify and the shadow test demand "introspect reality, diff,
-  expect empty" — unusable if the tool's own bookkeeping registers as drift. Pattern-
-  based filtering means new managed objects inherit coverage instead of each one
-  reintroducing the false-drift bug.
-- **Verify:** DB-backed: introspect a migrated database (tracking table + journal
-  present), diff against desired, empty.
+- **What:** Managed-object exclusion by TWO patterns (`pgdesign_%` tables/views —
+  covering tracking, journal, chain-position, and the summary view via relkind 'v'
+  coverage in the view queries — and the legacy `_pgdesign_sm_%` function/trigger
+  prefix), unified under one concept. A user table matching the reserved pattern
+  triggers a diagnostic (it would silently vanish from introspection otherwise).
+- **Why:** Reconcile demands "introspect, diff, expect empty"; pattern-based
+  filtering means new managed objects inherit coverage. The namespace reservation
+  must be loud, not silent.
+- **Verify:** DB-backed: introspect a migrated DB (tracking + journal + view +
+  position present), diff, empty; reserved-name user table produces the diagnostic.
 
 ### 0.6 One write path; sentinel fix
 - **What:** Consolidate multi-file write + owned-dir/orphan bookkeeping onto the
-  planner implementation; standalone codegen becomes a thin caller — which also fixes
-  its single-file path writing NO header (byte-divergence from the planner path).
-  Fix the migrations-dir sentinel (explicit `--dir migrations` indistinguishable from
-  default).
-- **Why:** Phase 6 enforcement must guard EVERY write; two divergent write paths mean
-  two guards that drift. The headerless standalone path would be a stamping blind spot.
-  revise must know what the user actually asked for; a flag meaning two things poisons
-  logic built on it.
-- **Verify:** Standalone codegen and build byte-identical on a fixture (including
-  headers), identical orphan behavior; sentinel red-green test.
+  planner; standalone codegen becomes a thin caller. Corrected rationale: codegen
+  headers are self-embedded and already byte-identical across paths — the real
+  divergence risks are the write/orphan logic itself and the headerless
+  generate-command/doc/d2/graphql surfaces (addressed via 0.3's helper + 4.2's
+  stamping). Fix the migrations-dir sentinel at ALL EIGHT call sites via one shared
+  helper using the existing Default(nil)+was-set pattern (no phase-2 dependency).
+- **Why:** Phase 6 enforcement must guard every write; two divergent write paths
+  mean two guards that drift. Eight copies of a sentinel bug is eight chances to
+  fix seven.
+- **Verify:** Standalone codegen and build byte-identical on a fixture; identical
+  orphan behavior; sentinel red-green covering explicit-equals-default at all
+  sites.
+
+### 0.7 Comparison-normalization primitive
+- **What:** ONE shared normalization primitive — types, defaults, and expressions
+  (parse/deparse both sides via the existing go-pgquery wrapper) — homed in
+  internal/sqlutil (already the sqlexpr/diagnostic adapter; NOT internal/diff,
+  which would force introspect->diff coupling). The differ adopts it IMMEDIATELY
+  (red-green: introspect->diff over a schema with CHECK constraints, partial
+  indexes, and policies reports false drift today — a live bug). Later consumers:
+  5.7 preconditions, 5.2 upgrade reconcile, 5.8 reconcile-verify, shadow test.
+- **Why:** Hoisted from phase 5 because 0.5's own verify goal ("introspect, diff,
+  expect empty") cannot pass without it, and because it fixes a shipping bug now.
+  Same build-shared-machinery-first logic phase 0 applies to ordering and headers.
+- **Verify:** Red-green on the false-drift fixture; normalization unit suite
+  (PG-rewritten forms equal their sources); diff --live clean on the comprehensive
+  fixture.
 
 ## Phase 1 — Ground-clearing
 
 ### 1.1 Delete pkg/diff
-- **What:** Remove the stub; changelog records the promotion trigger (second
-  flat-schema consumer).
-- **Why:** An exported API unusable without internal imports is worse than none; it
-  costs trust and has zero importers. The trigger keeps the door honest, not closed.
-- **Verify:** Package gone; build + vet clean.
+- **What/Why/Verify:** As before — remove the stub (zero importers), record the
+  promotion trigger; build + vet clean.
 
 ### 1.2 Partition bug fixes (red-green each)
-- **What:** python_ddl.go interval/retention conflation; premake required (hard parse
-  error on omission); hard errors for non-RANGE + maintenance, maintenance without
-  pg_partman declared, maintenance + manual children; part_config query failure
-  becomes a diagnostic.
-- **Why:** All are the silent-degradation class: configs that look accepted but
-  produce broken/contradictory DDL discovered in production partitioning. Loud at
-  compile time is the entire value of a schema compiler. The sibling-path miss
-  (interval bug fixed in one emitter, not the other) is itself the argument for 0.6-
-  style consolidation.
-- **Verify:** Failing test first per bug; CI postgres+pg_partman coverage.
+- **What/Why/Verify:** As before — python_ddl interval/retention; premake required;
+  hard errors for non-RANGE+maintenance, undeclared pg_partman, maintenance+manual
+  children; part_config failure becomes a diagnostic. CI has postgres+pg_partman.
 
 ### 1.3 Partition lifecycle completion
-- **What:** Introspection reads interval/premake/retention from part_config; diff
-  distinguishes initial setup (create_parent) / retention-premake update (Safe,
-  risk-classified) / interval change (hard error + guidance); migrate guards on
-  extension presence; `schedule` key emits the pg_cron job via the dead-but-tested
-  helper (pg_cron must be declared); no schedule + no acknowledgment = warning.
-- **Why:** Partitioned tables are where the schema is alive; a tool that creates
-  partman config but cannot see, evolve, or schedule it has automated the setup and
-  abandoned the lifecycle. Dead helper wired up per dead-code policy.
-- **Verify:** Golden DDL for schedule; diff/migrate tests per transition class; live
-  introspect round-trip in CI.
+- **What/Why/Verify:** As before — introspect part_config into the model; diff
+  distinguishes setup/update/interval-change; migrate guards extension presence;
+  `schedule` key wires the dead helper; missing-schedule warning.
 
 ### 1.4 Squash safety stopgap
-- **What:** Until phase 5 replaces squash: --db and the M200 applied-version check
-  become mandatory. Stated limits: this blocks legitimate offline squash of
-  never-applied ranges (acceptable for the interim) and does NOT fix the rewrite/
-  orphaned-row mechanics — phase 5 does. Includes the FIRST test of the squash CLI
-  flow (none exist).
-- **Why:** Squash today deletes files whose checksums production tracking tables
-  record, with the DB check opt-in — a guardrail whose escape hatch is the default.
-  "Fixed later" is not protection.
-- **Verify:** Squash without --db hard-errors; overlapping applied versions refuses;
-  CLI-flow test exists and passes.
+- **What/Why/Verify:** As before — mandatory --db + M200 until phase 5 replaces
+  squash; stated limits (blocks offline squash of never-applied ranges; doesn't fix
+  rewrite mechanics); first squash-CLI test.
 
 ## Phase 2 — Connection environment
 
 ### 2.1 strictcli: connection-env kind + check context access
-- **What:** Third env primitive — hermetic-SUPPRESSED, lazily read, no implicit
-  default. Check framework gains env access: this is an interface widening of
-  CheckContext plus reconciling the two context construction paths (the check command
-  builds a fully-populated *Context and discards it) — more than "stop discarding."
-  No new provenance machinery: per-flag source labels already exist
-  (Context.Source(), env>config>default). Execution: handed off via a
-  generically-worded todo filed in the strictcli repo (no pgdesign references, per
-  todo confidentiality); a strictcli session implements and releases; pgdesign then
-  bumps and adopts (internal deps always latest).
-- **Why:** A connection URL is precisely what --hermetic should suppress, yet both
-  existing primitives survive hermetic and flag Env() is unavailable to checks. The
-  framework-level fix gives every strictcli consumer principled connection semantics.
-  Reusing Source() avoids rebuilding what exists.
-- **Verify:** strictcli tests: declaration, lazy read, hermetic suppression,
-  check-side access; schema dump includes the new kind.
+- **What/Why/Verify:** As before — third env primitive (hermetic-suppressed, lazy,
+  no default); CheckContext widening + reconciling the two construction paths;
+  provenance via existing Context.Source(). Handed off via generically-worded todo;
+  strictcli session implements and releases; pgdesign adopts.
 
 ### 2.2 pgdesign adoption
-- **What:** Declare PGDESIGN_DB once; bind all 16 --db flags (normalizing their three
-  different default semantics); provenance surfaced via Source(); checks read via the
-  framework; --hermetic makes DB checks skip visibly. The config-file [database].url
-  remains a separate, explicit resolution layer (documented precedence).
-- **Why:** One variable, one story: today checks honor the env var while commands
-  ignore it, and the raw getenv is invisible to --help/schema. Provenance replaces
-  forced retyping as the explicitness mechanism.
-- **Verify:** Env-only invocation works on every DB command with a provenance line;
-  hermetic run shows explicit skips; raw os.Getenv gone from cmd/ (test harness
-  excepted); documented precedence test (cli > env > config).
+- **What:** As before (declare once; bind all 16 --db flags, normalizing three
+  default semantics; checks via framework; hermetic skips visible; config-URL layer
+  documented precedence) — PLUS: phase 2 is NOT a leaf. Every later phase's new DB
+  entrypoint binds the connection env from birth: revise's DB tier (6.1), import
+  lock/update + live verification (7.2/7.4), seed tier-1 pools (7.4). DAG edges
+  added accordingly.
+- **Why:** Otherwise each later phase re-adds a raw --db and phase 2's pathology
+  regrows — the exact thing it exists to end.
+- **Verify:** As before, plus: no post-phase-2 command introduces an unbound DB
+  flag (checked at review; grep for raw os.Getenv stays clean).
 
 ## Phase 3 — Schema identity
 
-Summit-grade foundation (permanence test: stamped into migration files, headers,
-tracking tables, import snapshots — v1 haunts forever).
-
 ### 3.1 Canonical serialization — compositional, per-object primitive
-- **What:** The PRIMITIVE is per-object canonical serialization: each schema object
-  (table, view, function, type definition, ...) serializes independently to canonical
-  JSON with EXPLICIT key ordering (never struct reflection order) and a deliberate
-  omit-unset-optional policy. The whole-model form = versioned preamble + ordered
-  concatenation of per-object forms (order per 0.1). Content policy: SEMANTIC-ONLY —
-  registry snapshot (0.4) is the source of truth for type definitions (schema-side
-  duplicates like StateMachineTransitions excluded as derived; CycleGroups excluded as
-  derived; FKGraph/TablesByName/candidate-key caches excluded); builtin-sourced
-  registry entries excluded; object comments IN (they emit COMMENT ON), TOML
-  formatting comments OUT (parse-layer); [suppress] config and extregistry outside
-  identity (config, not model). Explicit "registry absent (introspected)" marker for
-  schemas without a registry. Format version field.
-- **Why:** One primitive, three consumers — whole-model identity (3.2), per-object
-  import-surface hashes (7.2), API payload (8.1). Subsetting whole-model bytes cannot
-  yield context-independent per-object hashes; without the compositional design,
-  imports would grow a second serialization dialect — the exact disease 3.3 kills.
-  Explicit key ordering is what makes "byte-identical across struct refactors"
-  actually achievable; the omit-unset policy is what keeps unused new features from
-  churning every hash on upgrade.
-- **Verify:** Byte-identical across repeated builds AND across a struct-field-order
-  refactor test; per-object bytes independent of neighbors/position; golden fixture;
-  comment edit changes bytes; Source relabeling does not; registry-absent marker
-  distinguishes introspected from built-empty.
+- **What:** As before (per-object canonical JSON, explicit key ordering, whole =
+  versioned preamble + ordered concatenation, semantic-only, registry wins for type
+  definitions, derived caches excluded, builtins excluded, object comments in,
+  TOML-formatting comments out, [suppress] out, registry-absent marker, format
+  version) — with amendments: `Schema.Extensions` (ordered) and `PGVersion` are IN
+  the canonical form (both change emitted DDL; extension DDL-name resolution stays
+  emitter-side, covered by byte-compare — baking resolved names into the model at
+  Build is the recorded summit alternative). The omit-unset policy is specified
+  PER FIELD in the format spec, distinguishing pointer optionals from value-typed
+  optionals (e.g. Premake collapses explicit-0 and omitted today — the spec table
+  decides each). The JSON ARTIFACT is an envelope `{format_version, revision,
+  model}` — revision = hash(model); bytes cannot contain their own hash.
+- **Why:** As before; the envelope resolves the in-band-stamp circularity; the
+  per-field policy is what keeps hash stability deliberate rather than accidental.
+- **Verify:** As before, plus: pg_version change flips the revision; extension
+  add/remove flips it; envelope revision verifies against model bytes.
 
 ### 3.2 Revision hash
-- **What:** Revision = SHA-256 of the whole canonical stream; per-object hashes =
-  SHA-256 of each object's canonical bytes (same primitive). Exposed from model;
-  surfaced in CLI output. Stated policy: a pgdesign upgrade that changes the model
-  schema flips all revisions and forces one coordinated regeneration (the existing
-  consumer-regeneration convention, now load-bearing by design). Conformance test,
-  one-directional: revision-equal implies diff-empty (the reverse is not asserted).
-  Diff fast path: equal revisions skip the diff.
-- **Why:** The revision is the coupling primitive of the roadmap — what migration
-  files, headers, tracking table, and enforcement agree on. The hash-implies-diff
-  conformance test makes the serializer and the differ police each other's semantic
-  field coverage for free.
-- **Verify:** Sensitivity tests (comment/column/registry changes flip it; no-op
-  rebuild doesn't); conformance test wired into CI; fast path exercised.
+- **What/Why:** As before (SHA-256 whole + per-object; upgrade-invalidates-all
+  policy; one-directional conformance revision-equal => diff-empty; diff fast
+  path) — plus the stated invariant: revisions are NEVER compared across the
+  registry-present/registry-absent boundary (revision(TOML) != revision(introspect
+  of the same DB) by construction; only diff crosses that boundary).
+- **Verify:** As before + a test asserting the boundary invariant is enforced
+  (comparison across it is a programming error, not a false mismatch).
 
 ### 3.3 One serializer everywhere
-- **What:** generate's json format and serve's schema responses call the SAME
-  canonical-serializer function (plus endpoint wrappers); divergent serializers die.
-  Introspect-sourced responses carry the registry-absent marker.
-- **Why:** Two serializers for one struct is how the nondeterminism bug survived
-  unnoticed. Any consumer must see THE schema, not "the schema according to this
-  endpoint."
-- **Verify:** generate json and serve bodies structurally identical for the same
-  schema; introspect-path response carries the marker; golden updated once.
+- **What/Why/Verify:** As before — generate json and serve call the SAME function;
+  introspect-sourced responses carry the marker. (DAG: 3.3 -> 4.2, since json
+  stamping lives in the unified serializer's envelope.)
 
-## Phase 4 — Codegen breaking release
+## Phase 4 — Codegen breaking release (content lands in the single final release)
 
-One coordinated consumer-facing break carrying branding, wording unification, and
-revision stamping — consumers regenerate and adapt exactly once.
-
-### 4.1 Branded types per language — full surface enumeration
-- **What:** Shared mechanism first: extend the enum_gen dispatch seam (one shared
-  value/naming model, six small per-language emitters) — not six independent efforts.
-  Per language: Go opaque struct (unexported field) with COMPLETE boundary —
-  constants as sole constructors, erroring Parse, rejecting UnmarshalJSON/Text +
-  sql.Scanner, emitting Valuer/MarshalJSON/Stringer, detectably-invalid zero value.
-  Python: StrEnum retained, implicit value-construction closed, parse() classmethod
-  as the only dynamic entry, __reduce_ex__/pickle override (Enum reconstructs via
-  cls(value)), query-layer and validator signatures enum-typed, AND the PgBackend
-  DB-read path routes through parse() — branding must close the read door, not just
-  the write door. TS: branded string type + parse; type-safe transition maps re-typed
-  off raw string keys. Java/Kotlin: value-based parse added; JPA additionally gains
-  @Enumerated(EnumType.STRING) (fixes the latent Hibernate-ORDINAL default bug) in
-  the same break. Zig: wrapper struct + parse; Zig transition maps re-typed (a
-  three-site change: resolver, value emitter, transition maps). Stated exceptions:
-  drizzle pgEnum and sqlalchemy columns remain string-shaped by ORM necessity;
-  constants mode (name strings) unchanged — constants can only name valid states.
-- **Why:** The drift class (consumer names a state the schema lacks; runtime crash at
-  the DB) dies when invalid values cannot be NAMED or SMUGGLED: compile error where
-  expressible, boundary error at every ingress (JSON/DB/string), DB CHECK backstop.
-  The read-door fix matters because a branded field holding a raw str from the DB
-  would falsify the brand's promise exactly where consumers trust it most. The
-  ORM exceptions are stated so the brand's coverage map is honest.
-- **Verify:** Per language: constructing an invalid value fails at the earliest
-  boundary; Go fixture proves all four ingresses reject; Python round-trips through
-  pickle and through PgBackend yielding enum-typed (not str) fields; TS/Zig
-  transition maps reject unknown keys at compile time where the language allows;
-  type-checkers pass on generated fixtures where toolchains exist in CI.
+### 4.1 Branded types per language — corrected mechanisms, full surface
+- **What:** Shared mechanism first (extend the enum_gen dispatch seam). Go: opaque
+  struct with a VALIDATING complete boundary — constants as the only in-code
+  constructors; Parse errors on unknowns; UnmarshalJSON/UnmarshalText/sql.Scanner
+  are all IMPLEMENTED VIA Parse and error on invalid values (never absent — go
+  structs live in db-scanned/json-round-tripped positions in go_types and gorm
+  output); Valuer/MarshalJSON/Stringer for egress; zero value detectably invalid.
+  Python: StrEnum retained; implicit value-construction closed; parse() classmethod
+  the only dynamic entry; __reduce_ex__/pickle override; query-layer + validator
+  signatures enum-typed; PgBackend read path routes through parse(); AND the
+  query-layer package gains actual imports/definitions of the enum classes it
+  annotates with (today annotations survive only via `from __future__ import
+  annotations` — parse()-routing makes the names load-bearing). Stated honestly:
+  StrEnum members still == raw strings and format into f-strings — the closed door
+  is construction. TS: KEEP the literal union (already compile-closed, exhaustive
+  switches keep working — a nominal brand would regress narrowing); add parse() at
+  boundaries; re-type the transition maps off raw string keys. Java/Kotlin:
+  value-based parse; JPA gains a generated AttributeConverter (@Convert) backed by
+  getValue()/fromValue() — NOT @Enumerated(STRING), which persists constant NAMES
+  (IN_PROGRESS) instead of DB values (in_progress). Zig: wrapper struct + parse;
+  transition maps re-typed (three-site change). Classified exceptions: constants
+  mode unchanged; constraints mode embeds valid-value DATA lists (not construction)
+  — stated exception; drizzle/sqlalchemy string-shaped by ORM necessity — stated.
+- **Why:** As before — invalid values cannot be named or smuggled — with the
+  mechanism corrections from critique: validating-not-rejecting (Go would otherwise
+  ship unrecoverable scan failures), union-not-brand (TS), converter-not-Enumerated
+  (JPA would otherwise write wrong values on every insert).
+- **Verify:** Per language, invalid values fail at the earliest boundary WITH
+  ERRORS (never absent methods); Go fixture: all four ingresses validate and
+  round-trip valid values; Java fixture: persisted value equals getValue() not
+  name(); Python: pickle round-trip + PgBackend yields enum-typed fields; TS:
+  exhaustive switches still compile, transition maps reject unknown keys; type
+  checkers pass where toolchains exist.
 
 ### 4.2 Header unification + revision stamping
-- **What:** The shared header (0.3) adopts ONE wording (Go's machine-readable "Code
-  generated ... DO NOT EDIT." convention, per-language comment prefix) and gains the
-  revision line + a stamp format-version — landing together as one header rewrite.
-  Per-artifact-class stamping: comment-stamped (sql, d2, graphql, codegen, seed);
-  in-band-stamped (json — the canonical form carries revision as a data field beside
-  format_version; a comment channel doesn't exist); .sqlsplit stamped as sql; svg
-  structurally exempt (non-deterministic rendering — documented as outside freshness
-  AND stamping). Stated cost: partial regeneration becomes impossible — one schema
-  edit re-stamps every generated file (intended; the enforcement depends on it).
-- **Why:** The stamp is how artifacts SAY which schema they came from — the raw
-  material of phase 6's divergence guarantee. Wording + stamp together honor the
-  one-break principle (0.3 kept phase 0 byte-preserving precisely so this single
-  rewrite exists). The class enumeration exists because "every artifact carries the
-  stamp" is only enforceable if the exceptions are named, bounded, and documented.
-- **Verify:** Rebuild-without-change keeps freshness green; a schema edit flips every
-  stampable output stale exactly once; json revision field present; svg documented
-  exempt; stamp format-version present.
+- **What:** As before (ONE wording — the Go-tooling-recognized convention, fixing
+  today's non-conformant lowercase Go headers; revision line + stamp
+  format-version; stamp grammar already in genkit per 0.3) — with corrected
+  artifact classes: comment-stamped = sql, d2, graphql, codegen, seed, AND doc
+  (first-class [output] format, headerless today — previously missed);
+  in-band-stamped = json (envelope field per 3.1); structurally exempt = svg
+  (non-deterministic) AND .sqlsplit (SEALED format — line 1 must be the statement
+  count; a header breaks Decode; freshness still byte-compare-covered). Stated
+  cost: partial regeneration impossible — intended.
+- **Why:** As before; the class enumeration exists precisely because a missed
+  class (doc) or an impossible class (.sqlsplit) silently undermines "every
+  artifact carries the stamp."
+- **Verify:** As before + doc output stamped; .sqlsplit byte-unchanged and
+  Decode-able; json envelope carries revision.
 
 ### 4.3 Breaking-change packaging (lands in the single final release)
-- **What:** Branding + wording + stamps carry breaking-typed changelog entries; the
-  consumer-facing material ships in THE one roadmap-end release (per the release-once
-  rule — this subphase is packaging, not a release event). At that release, file a
-  todo in each consumer repo (naming pgdesign there is fine — it is their declared
-  dependency) with regeneration + ADAPTATION notes: TS consumers with exhaustive
-  switch-on-string-literals stop compiling and must switch on branded constants;
-  Python consumers constructing enums from raw strings must move to parse(). Modes in
-  the wild: python ddl faceted; python validators+constants; zig constants; generated
-  SQL headers.
-- **Why:** Three consumer-visible changes, one break, one adaptation — and honest
-  handoff, because regeneration alone is not enough for TS/Python call sites and red
-  CI is a hostile messenger.
-- **Verify:** rlsbl changelog coverage passes with breaking entries; consumer todos
-  filed at release; consumer drift-check scripts pass after regeneration.
+- **What/Why/Verify:** As before (breaking-typed changelog entries; consumer todos
+  filed at THE release with regeneration + adaptation notes: TS switch sites keep
+  compiling now — adjusted note — but parse() call sites and Python raw-string
+  construction sites must adapt) — plus one addition: `generate --idempotent`'s
+  semantic change (silent IF-NOT-EXISTS skip -> RAISE on definition mismatch, from
+  5.7) is ALSO a consumer-visible breaking change and joins these notes.
 
 ## Phase 5 — Migrate integrity
 
-Internal sub-ordering is load-ordered and explicit (enforcement must not precede the
-format it enforces).
+Design prerequisites, per planning discipline: the journal/view/position schemas
+(5.5, `pgdesign_migration_ops` / `pgdesign_applied_migrations` /
+`pgdesign_chain_position`) are DESIGNED before 5.2 is implemented (5.2's upgrade
+migrates rows into them); the normalization primitive already exists (0.7). Code
+lands in the stated order; nothing ships mid-phase (single-release cadence).
 
-### 5.1 Self-contained ops
-- **What:** ALL pointer-def op families (tables, views, matviews, composite types,
-  domains, policies, functions, triggers, sequences) become self-contained:
-  serializable fields ARE the rendering inputs; generator builds ops from serializable
-  data only; every comment-stub no-op AND every wrong-object fallback (create_function
-  emitting deny-mutation; create_trigger emitting append-only) is DELETED; sequences
-  keep parameters. OpToSQL becomes a total function of the on-disk form for EVERY op
-  type. Table-driven round-trip test per op family (generate -> write -> re-parse ->
-  assert byte-identical SQL); write-time round-trip remains as an invariant test.
-- **Why:** A migration file that renders different SQL than intended — empty, or the
-  WRONG OBJECT — is the worst artifact the tool can produce, and today it can produce
-  it for nine op families. Total-function ops make the degraded state unrepresentable
-  instead of guarded; the per-family test makes the claim checkable rather than
-  asserted (the earlier single-fixture verify goal would have passed while views
-  silently no-op'd).
-- **Verify:** Round-trip table test covers every op family; wrong-object fallbacks
-  gone (grep + tests); write-time invariant green.
+### 5.1 Self-contained ops = per-object canonical bodies
+- **What:** The serializable form of every pointer-def op IS the 3.1 per-object
+  canonical form: ops embed their target object's canonical bytes (canonical-JSON
+  string inside the TOML op); OpToSQL renders from the reconstructed object — a
+  total function of the on-disk form. Families: the nine pointer-def families PLUS
+  RawSQL (SM-trigger DDL, partman UPDATEs — today silently dropped on round-trip)
+  and PartitionChildSpec. Every comment-stub no-op and wrong-object fallback
+  (deny-mutation / append-only) DELETED; sequences keep parameters. Table-driven
+  round-trip test per family (generate -> write -> re-parse -> byte-identical
+  SQL); write-time round-trip invariant.
+- **Why:** As before — degraded/wrong-object states unrepresentable — now WITHOUT
+  a second serialization dialect: the flat TOML mirrors that caused the lossiness
+  are replaced by the same canonical bodies used everywhere else (one primitive:
+  ops, snapshots, imports, API).
+- **Verify:** Round-trip table test covers ALL families incl. RawSQL and partition
+  children; wrong-object fallbacks gone; write-time invariant green.
 
-### 5.2 Chain format, manifest, and adoption path
-- **What:** New file format: sequence+slug filenames (cosmetic; slug auto-derived
-  from the diff's dominant change, optional override flag), from_revision/
-  to_revision pair, parent linkage. The chain's home is `migrations/manifest.jsonl`
-  — a committed APPEND-ONLY manifest (sequence, filename, from/to revision,
-  superseded-by; JSONL so appends are atomic single-line writes) — doubling as
-  lineage record and head source; chain-head/find-heads API exposed (genesis: empty
-  chain -> null parent) for 6.1. Discovery/ordering rewritten off semver (today ~7
-  functions rely on semver sorting and discovery skips non-semver names — sequence
-  files would be silently ignored without this). Adoption path for existing users:
-  a one-time explicit `migrate upgrade` — verify-then-stamp: requires a clean
-  TOML<->DB reconcile (uses 5.7's normalization primitive; the command completes
-  when both land, invisible externally under the single-release cadence), then
-  stamps the boundary revision = revision(current TOML model), refusing with the
-  drift report otherwise; recomputes stored file checksums; migrates tracking rows
-  into `pgdesign_migration_ops` and DROPS the old `pgdesign_migrations` table (no
-  compat objects — all internal callers updated); existing semver files become a
-  linear chain prefix; builds the manifest. Manifest<->files consistency check.
-- **Why:** Revision pairs give migrations real identity tied to the schemas they
-  transform; the manifest answers "where does the chain live" (scan-derivation breaks
-  once 5.3 archives files) and later "which edge applies to this DB." The adoption
-  path exists because without it, 5.4's unconditional checksums would hard-brick
-  every existing production database on first contact (stored checksums are over file
-  bytes; the format change rewrites every file).
-- **Verify:** Round-trip parse/format; grandfathered history traverses correctly;
-  upgrade command on a fixture with applied semver migrations yields a consistent
-  manifest + verified checksums; manifest-files consistency check red on tamper.
+### 5.2 Chain format, manifest, snapshots, and adoption
+- **What:** As before (sequence+slug files — auto-derived slug; from/to revision +
+  parent linkage; `migrations/manifest.jsonl`; chain-head/find-heads API; genesis;
+  discovery/ordering rewritten off semver) — plus: each migration's to-revision
+  model is written as a content-addressed snapshot
+  `migrations/.snapshots/<revision>.json` (the canonical envelope; idempotent
+  writes; referenced by the manifest; self-verifying — revision(snapshot bytes)
+  must equal the manifest's to_revision). `migrate upgrade` (one-time): requires
+  clean schema files per git when in a repo (existing gitShow plumbing; outside a
+  repo proceeds with a stated caveat); verify-then-stamp reconcile (0.7
+  normalization) or refusal with the drift report; runs as ONE TRANSACTION with an
+  in-transaction assertion that the new view reproduces the old applied set;
+  recomputes checksums; migrates tracking rows into `pgdesign_migration_ops`;
+  writes `pgdesign_chain_position` (current revision, per-database boundary);
+  DROPS the old table; semver files become the linear prefix with SYNTHETIC
+  checksum-verified (not model-derived) revisions; builds manifest + head
+  snapshot. serve's migration-version endpoint updated for sequence+slug names
+  (it opens files by `version+".toml"` today). Manifest<->files<->snapshots
+  consistency check.
+- **Why:** As before — plus the snapshots are what make 5.9's pure generation
+  implementable at all (no op-replay engine exists or is built), and
+  single-transaction upgrade means a crash leaves either the old world or the new
+  world, never half.
+- **Verify:** As before + snapshot self-verification; crash-injection test around
+  upgrade (old world or new world, nothing between); dirty-tree refusal;
+  mid-edit-TOML cannot stamp an unapplied model.
 
 ### 5.3 Append-only squash (consolidation edges)
-- **What:** Squash reimplemented: a consolidation migration is an ADDITIONAL chain
-  edge (recorded in the manifest with superseded-by lineage); superseded files retire
-  to `migrations/.archive/` INTACT and remain reachable via the manifest — a database
-  mid-way through a squashed range applies the remaining originals (edge matching its
-  current revision), everyone else takes the consolidation edge. Tracking-table
-  lineage handled: no orphaned rows. Files are never rewritten, period.
-- **Why:** Mutation of applied artifacts stops being an operation the tool offers —
-  the "file changed after apply" bug class becomes unrepresentable. The edge model
-  (vs. plain archiving) exists because the critique proved plain archiving strands
-  mid-range databases with no apply path; edges + manifest keep every reachable
-  database resumable.
-- **Verify:** Squash of applied migrations succeeds via consolidation; a DB mid-range
-  (applied only the first of three squashed migrations) resumes via archived
-  originals; fresh DB takes the consolidation edge; fully-applied DB skips it; no
-  orphaned tracking rows; archive intact.
+- **What/Why:** As before (consolidation = ADDITIONAL manifest edge; originals to
+  `migrations/.archive/` intact; edge selection by the database's
+  `pgdesign_chain_position`; no orphaned tracking rows) — plus the invariant:
+  rolling back a consolidation edge and rolling back its superseded originals
+  reach the SAME prior revision (tested).
+- **Verify:** As before + the rollback-equivalence test.
 
 ### 5.4 Unconditional checksums
-- **What:** Only now — after append-only (5.3) and adoption (5.2) — checksum
-  verification becomes unconditional on apply AND rollback: any mismatch = corruption,
-  hard error.
-- **Why:** Enforcement before the format it enforces would brick users (the original
-  A2 finding); after 5.2/5.3, a mismatch has exactly one meaning — corruption — so
-  the hard error is finally fair and absolute.
-- **Verify:** Tamper test: edited file refuses apply and rollback with a precise
-  report; upgraded-fixture applies cleanly.
+- **What/Why/Verify:** As before — only after 5.2/5.3; mismatch = corruption, hard
+  error on apply AND rollback; prefix files carry synthetic revisions whose
+  checksums ARE verified (the "one meaning" claim holds via checksum, not model
+  derivation, for the prefix).
 
 ### 5.5 Applied-op journal
-- **What:** ONE per-op journal table, `pgdesign_migration_ops`, plus the summary
-  view `pgdesign_applied_migrations` ("applied migrations + status"; AppliedVersions,
-  status, and serve read the view — the old table is gone per 5.2), recording, as
-  each op commits: op identity (migration ref, phase, sequence, op kind, target) AND
-  the serialized down-op as applied. Covers per-phase commits and non-transactional breakouts. Re-apply resumes
-  by skipping journaled ops. Covered by 0.5's managed-object filter automatically.
-- **Why:** The version row is written LAST; every committed phase or non-transactional
-  op before a failure is real DDL with no durable record, and re-apply restarts at op
-  0 and aborts forever — the original bug behind this phase. Recording the DOWN-OP
-  (not just identity) is what makes rollback fully database-driven (5.6): recorded
-  reality, never file trust. One table + view (not two tables) keeps a single
-  consistency domain, one filter, one thing for squash lineage to reference.
-- **Verify:** DB-backed fault injection (mid-phase, post-non-transactional-op):
-  re-apply resumes cleanly and completes; journal rows carry executable down-ops;
-  summary view equals today's applied-versions semantics.
+- **What:** As before (ONE table `pgdesign_migration_ops` + view
+  `pgdesign_applied_migrations`; op identity + serialized down-op; resume skips
+  journaled ops) — plus per-op-class journal TIMING: transactional ops journal
+  inside the op's transaction (atomic with the DDL); non-transactional ops use
+  INTENT-then-CONFIRM rows plus mandatory idempotent SQL forms (CREATE INDEX
+  CONCURRENTLY IF NOT EXISTS; enum-add already idempotent) so a crash between DDL
+  and journal is recoverable — the same protocol for journal-driven rollback of
+  non-transactional down-ops. `pgdesign_chain_position` updated in the same
+  transaction as each edge-completing journal write.
+- **Why:** As before — plus: a journal row written after a non-transactional
+  commit can be lost, recreating the durability gap one level down; intent/confirm
+  + idempotence closes it. The idempotent forms here are bounded and principled:
+  the precondition already ran before the intent row; the IF-NOT-EXISTS guards
+  only the intent-to-confirm window.
+- **Verify:** As before + kill-between-DDL-and-journal fault injection for
+  CONCURRENTLY and enum-add: re-apply converges with correct journal state.
 
-### 5.6 Journal-driven rollback
-- **What:** Rollback executes the journal's recorded down-ops in reverse journal
-  order — files not consulted at all (archived or not). Reversibility pre-check
-  retained (irreversible ops block, journaled as such).
-- **Why:** Rollback today re-reads files and trusts them absolutely — it will invert
-  ops that never ran (the no-op-ADD/DROP-COLUMN data-loss case) or follow an edited
-  file. Rolling back recorded reality makes both classes impossible, and journal-
-  stored down-ops sever the file dependency entirely — which also simplifies 5.3
-  (lineage is for apply-path selection and audit, not rollback).
-- **Verify:** Rollback after partial apply drops nothing it did not create; rollback
-  works with the source file archived; edited-file scenarios cannot influence
-  rollback.
+### 5.6 Journal-driven rollback (scoped)
+- **What/Why:** As before (recorded down-ops in reverse journal order; files never
+  consulted) — SCOPED: guaranteed from the upgrade boundary forward. The
+  pre-upgrade prefix and baselined migrations are ROLLBACK-FROZEN: crossing the
+  boundary is a hard error naming it (their synthesized journal rows carry no
+  executable down-ops; old tracking rows and `"baseline"` checksums cannot yield
+  them). Reversibility pre-check retained.
+- **Verify:** As before + boundary-crossing rollback refuses with the precise
+  error; post-boundary rollback works with source files archived.
 
-### 5.7 Normalization primitive, preconditions, predicate IR
-- **What:** First, ONE shared comparison/normalization primitive (types, defaults,
-  and expressions — parse/deparse both sides via the existing go-pgquery wrapper) used
-  by the differ, the preconditions, and the shadow test. Then preconditions: before
-  each op, a predicate against pg_catalog asserts expected prior state per op class
-  (absent for creates; present-and-matching for alters/drops), hard error naming
-  object/expected/found; DML ops (backfill, transform, batched loops) explicitly
-  precondition-free — arbitrary SQL has no catalog precondition. Predicates defined
-  once as structured data (catalog query + expected shape) with two backends: the Go
-  executor (apply-time) and a SQL renderer compiling the same structure into
-  DO-blocks for generate --idempotent (which thereby RAISEs on definition mismatch
-  instead of silently skipping). CI conformance matrix: both backends AND the differ
-  (as a third leg where object classes overlap) against the same live database
-  states, asserting identical verdicts.
-- **Why:** Three comparison engines exist by the end of this phase (differ,
-  precondition executor, SQL guards); without one shared normalization they disagree
-  on the same object — and the raw-string comparison the differ uses today already
-  disagrees with PG's rewritten forms (status IN (...) comes back as = ANY(ARRAY)).
-  The predicate IR dissolves the second-source-of-truth objection structurally (one
-  definition, two compilations) and the matrix makes non-drift a TESTED property.
-  DML carve-out because pretending arbitrary SQL has a catalog precondition would be
-  theater.
-- **Verify:** Normalization unit suite (PG-rewritten forms equal their sources);
-  DB-backed precondition matrix per op class (wrong-type column, missing table,
-  mismatched constraint — each precise); golden idempotent SQL; DB test: mismatched
-  pre-existing column makes the idempotent script RAISE, matching state no-ops;
-  conformance matrix green in CI.
+### 5.7 Preconditions + predicate IR
+- **What:** As before (per-op-class predicates via 0.7 normalization; hard error
+  naming object/expected/found; DML ops precondition-free; predicate IR = one
+  structured definition, Go executor + SQL renderer; conformance matrix incl. the
+  differ as a third leg where object classes overlap; generate --idempotent
+  regenerated from the IR, RAISE on mismatch) — plus placement decided UPFRONT:
+  IR structs + SQL renderer live in a shared leaf package (internal/predicate);
+  only the pgx executor lives in migrate; 7.4 reuses the executor. The
+  --idempotent semantic change is listed in 4.3's breaking notes.
+- **Verify:** As before.
 
 ### 5.8 Post-apply reconcile-verify
-- **What:** After apply: introspect (0.5 exclusions) + diff against the target model
-  — gated on 5.7's normalization; any residual mismatch = hard error listing every
-  divergent object. SM-vs-enum introspection lossiness documented.
-- **Why:** Preconditions check ops locally; reconcile checks the combined result
-  globally — out-of-band changes mid-migration, op interactions, generator bugs.
-  Reuses the real differ, so coverage is complete with zero bespoke verification
-  code. Gating on normalization is what keeps it from being flaky-by-construction on
-  real schemas (the un-normalized shadow test survives on easy fixtures only).
-- **Verify:** Clean apply over a fixture CONTAINING check constraints, partial
-  indexes, and policies reports empty (the current differ fails this); out-of-band
-  ALTER mid-migration surfaces in the report; revision-equal-implies-diff-empty
-  conformance asserted here too.
+- **What/Why/Verify:** As before (introspect with 0.5 exclusions + 0.7-normalized
+  diff; residual mismatch = hard error listing every object; SM-vs-enum lossiness
+  documented; verify on a fixture CONTAINING CHECKs, partial indexes, policies;
+  revision-equal-implies-diff-empty asserted) — introspected schemas are canonical
+  via 0.1's shared finalize.
 
-### 5.9 Pure chain-based migration generation + ecosystem alignment
-- **What:** migrate generate becomes PURE: diff(chain-head model, current model) —
-  the prior model reconstructed from the chain; no --db for generation. Drift is
-  caught at apply (5.7/5.8), never folded into generated migrations. Intentional
-  out-of-band adoption goes through an explicit baseline-derived flow (baseline
-  updated for chain format). Shadow test, serve migrations endpoints, and
-  migration-guide docs updated for format+journal+manifest.
-- **Why:** Generation from live introspection makes the same TOML edit produce
-  different migrations depending on DB state — silent drift absorption, against the
-  drift decision — and drags a DB dependency into what is conceptually a pure
-  function of intent history. Chain-based generation completes the purity seam
-  (6.1's tier story becomes true) and gives drift exactly one loud channel.
-- **Verify:** Generation without any DB produces the correct migration from a chain
-  fixture; a drifted DB does NOT alter generated output but fails apply with the
-  precondition report; baseline flow adopts intentional drift explicitly; full
-  migrate suite (unit + expanded DB-backed) green; shadow test passes on the
-  comprehensive fixture.
+### 5.9 Pure chain-based generation + ecosystem alignment
+- **What:** migrate generate = diff(deserialize(head snapshot), current model) —
+  pure, no DB; the head snapshot self-verifies against the manifest. Drift caught
+  at apply (5.7/5.8). Intentional drift adoption via the baseline-derived flow
+  (baseline writes `pgdesign_chain_position` + a snapshot). Shadow test, serve
+  endpoints, docs updated for format+journal+manifest+snapshots.
+- **Why:** As before — same TOML edit must produce the same migration regardless
+  of DB state; the snapshot mechanism (5.2) is what makes this a deserialization,
+  not an unbuilt replay engine.
+- **Verify:** As before + generation without any DB from a chain fixture; drifted
+  DB does NOT alter generated output but fails apply with the precondition report.
 
 ## Phase 6 — Orchestration and enforcement
 
 ### 6.1 pgdesign revise
-- **What:** New top-level command. PURE tier: build planner + chain-based migration
-  generation (5.9) — parent = chain head from the manifest (hard error on two heads,
-  both named; genesis handled). DB tier: live import verification (7.4) + DB checks
-  (nf, workload). Separate safegit commits: pure outputs, then migration+manifest.
-  Partial failure keeps committed pure outputs and exits loudly naming the skipped
-  tier. Commit failure = hard error (build's warn-and-continue fixed the same way).
-- **Why:** The forgotten-step failure mode is real (four commands per schema change).
-  revise is "I edited the TOML — make everything consistent and tell me what's
-  wrong," without eroding build's purity: with 5.9, even migration generation is
-  pure, so the DB tier is exactly the genuinely-live work. Chain-derived identity
-  removes invented version ceremony. Separate commits reflect the two artifact
-  lifecycles (regenerable snapshots vs append-only ledger).
-- **Verify:** End-to-end: edit TOML -> revise -> regenerated outputs + chained
-  migration + manifest entry, two commits, one revision everywhere. DB-unreachable
-  run: pure tier complete and committed, non-zero exit naming the skipped tier.
-  Two-head fixture errors.
+- **What/Why:** As before (pure tier = planner + 5.9 generation; DB tier = import
+  verification + DB checks, bound to the phase-2 connection env; chain head from
+  manifest, two-head hard error; separate commits; commit failure hard error;
+  partial failure keeps pure outputs) — plus stated: DB-tier check findings are
+  advisory for the run — they fail the command loudly but do not retroactively
+  invalidate the already-committed migration (the next revise incorporates fixes
+  as new work).
+- **Verify:** As before.
 
-### 6.2 Revision enforcement (precise semantics)
-- **What:** The invariant: all regenerable snapshot artifacts (the planner set) share
-  exactly ONE revision after any write. FULL regenerators (build, revise) are always
-  allowed — they re-stamp the entire set. PARTIAL writers (standalone codegen
-  --output, single-format generate) refuse when artifacts they would NOT rewrite
-  carry a different revision. Migration files are outside the invariant (append-only
-  chain at historical revisions — the manifest check covers them). Missing or
-  old-format stamps = stale (full regenerators proceed; partial writers refuse);
-  stamp format-version makes the first post-upgrade run land via the coordinated
-  4.3 break, not a lock-out. The revision CHECK is scoped to what the existing
-  build-freshness check cannot see: chain/manifest integrity (revision-pair
-  continuity, single head), cross-artifact stamp agreement (cheap, no re-plan), and
-  standalone artifacts. genkit gains a stamp-extractor following its reporting shape
-  — complementary to, not a replacement for, the byte-compare loop (byte-compare:
-  "this file isn't what the model produces"; stamp-compare: "a sibling I'm not
-  regenerating is at a different revision").
-- **Why:** The naive rule ("refuse on stamp != current revision") deadlocks — after
-  any TOML edit every stamp differs, and regeneration itself would be refused. The
-  full/partial split captures the real invariant: divergence is created by PARTIAL
-  writes, resolved by FULL ones. Scoping the check avoids duplicating checkBuild's
-  byte-compare — overlapping guards drifting is the disease this roadmap fights.
-- **Verify:** TOML edit then build succeeds (re-stamps all); TOML edit then
-  standalone codegen of ONE output refuses, naming the stale siblings; tampered
-  header caught by the check; chain-continuity violation caught; CI red on each.
+### 6.2 Revision enforcement (corrected taxonomy)
+- **What:** The invariant: all regenerable snapshot artifacts in the planner set
+  share ONE revision after any write. FULL regenerators (build, revise) always
+  allowed. The partial-writer set is exactly ONE command today — `codegen
+  --output` — which refuses when artifacts it would not rewrite carry a different
+  revision. `generate` is stdout-only: shell-redirected output is covered by
+  check-time verification, not write-time refusal (stated). OUTSIDE the invariant,
+  explicitly: migration files + snapshots (append-only chain at historical
+  revisions — covered by the manifest/consistency checks) and seed output
+  (stamped by 4.2 but not in the planner set — stated, so it is never an
+  unclassified stamp-disagreement source). Missing/old-format stamps = stale (full
+  regenerators proceed; the partial writer refuses); stamp format-version prevents
+  post-upgrade lock-out. The revision CHECK covers what byte-compare cannot:
+  chain/manifest/snapshot integrity, cross-artifact stamp agreement (cheap for the
+  standalone check; the write-time guard necessarily has the model in hand),
+  stdout/standalone artifacts. genkit stamp-extractor complements byte-compare.
+- **Why:** As before — with the taxonomy shrunk to reality (A6): one genuine
+  partial writer, honestly-scoped stdout coverage, and the two artifact classes
+  that must be OUTSIDE the invariant named as such.
+- **Verify:** TOML edit then build succeeds; TOML edit then codegen --output of
+  one output refuses naming stale siblings; tampered header caught; chain
+  continuity violation caught; seed/migration artifacts never flagged by the
+  planner-set invariant.
 
 ## Phase 7 — Imports
 
 ### 7.1 Declaration and reference syntax
-- **What:** [imports] config parsing (alias -> source + target PG schema);
-  `alias:table` reference form; stated precedence: alias resolution BEFORE dot-split
-  (colon is invalid in unquoted identifiers, so no grammar collision). Diagnostics:
-  unknown alias, unresolvable target, collisions.
-- **Why:** References should name the DEPENDENCY, not a physical schema string —
-  provenance visible at the reference site, renames touch one line, a typo'd alias is
-  a hard resolution error rather than a plausible-looking phantom schema.
-- **Verify:** Parse/build tests; alias typo yields resolution error; precedence test
-  (alias containing a dot-like target resolves correctly).
+- **What/Why/Verify:** As before (alias -> source + target schema; `alias:table`;
+  alias resolution before dot-split; diagnostics) — plus scope stated: alias
+  references are accepted ONLY in FK ref_table initially; appearing anywhere else
+  (depends_on, groups) is a hard error naming the supported sites.
 
 ### 7.2 Surface snapshot and pinning
-- **What:** Import-surface extraction (only referenced objects) serialized via the
-  3.1 PER-OBJECT primitive into committed vendored snapshots with per-object hashes +
-  source pin (git URL + ref) — no second serialization dialect. Subcommands:
-  `pgdesign import lock` (resolve + pin) and `pgdesign import update` (re-pin to
-  newer upstream). `check --tag imports` re-derives the
-  surface and reports semantic drift at column level, hard-failing CI. Requirement
-  granularity: extensions inferred PER REFERENCED OBJECT from the surface (the
-  extraction knows referenced types); pg_version carried as the framework's floor
-  (consumer must re-declare >=).
-- **Why:** Machine-specific committed paths are banned; unpinned imports drift
-  silently. Content-addressed vendored snapshots give reproducible offline builds;
-  SEMANTIC drift errors ("framework column X changed uuid->bigint, breaks
-  app.users.principal_id") are what make pgdesign's pinning better than a generic
-  lockfile — and they fall out of the per-object primitive for free.
-- **Verify:** Two-project fixture: drifted referenced column type -> check names the
-  exact column and breaking FK; unreferenced changes silent; offline build from
-  snapshot; per-object hashes stable across unrelated framework edits.
+- **What/Why/Verify:** As before (per-object canonical hashes + source pin;
+  `import lock` / `import update`; check --tag imports with column-level semantic
+  drift; extensions inferred per referenced object; pg_version floor) — with the
+  surface DEFINITION corrected: referenced tables PLUS the transitive closure of
+  every type definition (enum/domain/composite/SM) their columns reference, each a
+  0.4 registry-snapshot object with per-object hashes — without which 7.3's
+  "imported enums usable in columns" and collision detection have no data.
 
 ### 7.3 Model integration
-- **What:** ImportedTables split slice. Integrity machinery unions owned+imported —
-  with the two non-TableByName consumers explicitly wired: BuildFKGraph (builds edges
-  from s.Tables by bare RefTable — needs the union + 0.2 keying) and seed's FQN pool
-  maps. Registry collisions between imported and local types = hard error naming both
-  sources; imported enums usable in columns; extension/pg_version re-declaration
-  enforcement per 7.2's granularity.
-- **Why:** Fail-closed by construction: consumers iterating Tables get correct
-  behavior BY OMISSION. But fail-closed only holds where resolution funnels through
-  the union — the critique found the two bypass sites that would otherwise produce
-  phantom graph nodes and dangling seed FKs; naming them is the difference between a
-  principle and a bug.
-- **Verify:** E204 resolves imported targets; FKGraph contains imported nodes with
-  correct (schema,name) keys; seed resolves FK values against imported pools;
-  DDL/audit/codegen outputs contain zero imported-table artifacts; collision and
-  re-declaration tests.
+- **What/Why/Verify:** As before (ImportedTables split slice; explicit union
+  wiring at the two non-TableByName sites — BuildFKGraph and seed's pool maps;
+  collisions hard error; requirement re-declaration).
 
 ### 7.4 Downstream sweep
-- **What:** Generate emits app-only DDL with schema-qualified FK constraints.
-  Diff/migrate exclude imported tables from add/drop; migrate generate's live import
-  verification (referenced imports present and matching in the target DB — hard
-  error otherwise) CONSUMES the 5.7 predicate IR Go backend rather than a bespoke
-  check. Audit, design checks, orphan warnings skip imported tables. Codegen skips
-  them. Seed: tiered real keys as a branch in the FK-value resolution path — tier 1
-  (DB available): pre-populate the imported-table value pools from real keys
-  (deterministic sorted selection; Zipf and COPY work unchanged); tier 2 (offline):
-  count-wrapped ordered-offset subqueries in INSERT mode (OFFSET n %
-  GREATEST(count,1) — fixed offsets overrun small tables; Zipf not available in this
-  tier, stated); tier 3: hard error only for offline+COPY+NOT-NULL-imported-FK,
-  naming all three constraints. D2/GraphQL render imported tables as minimal
-  reference shapes so edges never dangle.
-- **Why:** Ownership discipline end-to-end: the framework's objects are facts the
-  app consumes, never regenerates, audits, or fabricates rows for. Predicate-IR reuse
-  is the D3 finding: live import verification IS a catalog-predicate check — building
-  it twice would be the duplication disease. The seed tiers follow one principle —
-  imported rows are facts; seed never invents them — with the error surface being
-  exactly the one true impossibility.
-- **Verify:** Per-package fixture assertions; live verification via IR (present
-  passes; absent and mismatched fail with specifics); seed tier tests incl.
-  determinism, small-imported-table offset wrap, and the triple-constraint error;
-  D2 golden compiles.
+- **What/Why/Verify:** As before (app-only DDL; diff/migrate exclusions; live
+  import verification VIA the 5.7 predicate executor; audit/design/orphan skips;
+  codegen skips; seed tiers with count-wrapped offsets; D2/GraphQL reference
+  shapes) — plus: introspect-side reconcile/diff --live treat configured [imports]
+  target schemas as out-of-scope (nothing excludes them today; verify goal:
+  reconcile over a DB containing the imported schema reports empty; confirm
+  whether existing schema-scoping already mitigates); and the seed tier-2
+  limitation stated: subquery-valued FKs render identical strings, so imported FKs
+  inside UNIQUE constraints can spuriously exhaust the dedup retry limit —
+  documented, with tier-1 as the answer.
 
 ## Phase 8 — Read API
 
 ### 8.1 DB-free serve mode
-- **What:** Pool optional; --db optional in project-schema mode. ONE shared
-  project-loading helper returning (schema, registry, cfg) — extracted from package
-  main, used by build/codegen/revise/serve (serve's current local loader discards the
-  registry; that dies). The schema endpoint calls the SAME canonical-serializer
-  function as generate json (3.3), returning canonical model + revision + an FKGraph
-  projection — specified as a single deterministic (schema,name)-keyed DERIVED-view
-  serializer built once in model (depends on 0.2), documented as a reconstructable
-  convenience view, not a second truth. Fix the serve nil-registry bug (state-machine
-  diagrams silently dropped on the serve path).
-- **Why:** The seam made real: today even diagram endpoints demand production
-  credentials. The endpoint is the compiler's half of the product boundary — and it
-  is literally the same function as the json output format, so it can never drift
-  from it.
-- **Verify:** serve starts with no database and answers the model endpoint
-  (byte-consistent with generate json); DB-only endpoints degrade with explicit
-  errors; SM diagrams render on the serve path.
+- **What/Why/Verify:** As before (pool optional; shared project-loading helper
+  returning schema+registry+cfg; endpoint = the same canonical-serializer function
+  as generate json, envelope incl. revision + FKGraph derived-view; nil-registry
+  SM-drop fixed; DB-only endpoints degrade explicitly).
 
 ### 8.2 API hygiene
-- **What:** --timeout becomes request-context enforcement; the synchronous TANE audit
-  endpoint becomes cancellable and non-blocking (job-start/poll); doc format gets an
-  endpoint.
-- **Why:** A timeout flag that does nothing is a lie in the CLI surface; an unbounded
-  synchronous FD-discovery endpoint is a self-DoS button. If the API is a designed
-  boundary, its operational behavior is part of the design.
-- **Verify:** Slow-audit test observes timeout/cancel; doc endpoint matches
-  generate's doc output.
+- **What/Why/Verify:** As before (--timeout enforced; audit job-start/poll; doc
+  endpoint).
 
 ## Phase 9 — Visualization
 
 ### 9.1 Options plumbing (split dependency)
-- **What:** D2 options struct threaded from config (depends only on phase 0); serve
-  query-param plumbing for the same options (depends on phase 8's DB-free mode).
-  RenderSVG parameterized: layout (dagre/elk — TALA excluded, not in the OSS
-  library), theme, direction.
-- **Why:** Every enrichment needs a config-to-generator path; the serve half is
-  honestly sequenced (its diagram endpoints are DB-coupled until phase 8).
-- **Verify:** Config round-trip; elk golden; serve query params exercised post-8.
+- **What/Why/Verify:** As before (config half after phase 0; serve half after
+  phase 8; dagre/elk, theme, direction).
 
 ### 9.2 Enrichment
-- **What:** Conditional-generation layers (D2 native layers are separate pages, not
-  toggles): index/unique markers, nullable indicator in the type column, comments as
-  tooltips, checks as notes, RLS/append-only markers, enums as rectangles with value
-  lists.
-- **Why:** Diagrams omit most of what the doc format knows; layers are opt-out
-  because show-everything is unreadable and hide-silently is wrong.
-- **Verify:** Golden per layer; independently disableable; all goldens compile
-  through the D2 library.
+- **What/Why/Verify:** As before (conditional-generation layers; markers,
+  tooltips, notes, enum rectangles).
 
 ### 9.3 Filtering
-- **What:** Include/exclude globs, include-dependencies depth — implemented on
-  FKGraph.WalkCascade with a depth limit and the EXISTING filter helpers (with 0.2's
-  derived-graph recomputation fix), summary mode (rectangles, names+edges); edges to
-  excluded tables skipped; self-referential FKs preserved.
-- **Why:** Large schemas need subset views; building on the fixed graph/filter
-  machinery instead of parallel logic is the reuse the critique demanded.
-- **Verify:** Goldens per mode; filtered output always compiles; depth-limited
-  include-dependencies matches WalkCascade semantics.
+- **What/Why/Verify:** As before (globs, include-dependencies depth, summary mode,
+  skipped edges, self-FKs preserved) — with the mechanism corrected: WalkCascade
+  has NO depth parameter and its callback cannot early-cut; 9.3 adds a depth-aware
+  walker signature to FKGraph rather than assuming the current shape supports it.
 
 ### 9.4 Cardinality
-- **What:** Edge block syntax with native crow's-foot arrowheads; 1:1 via unique/PK
-  detection, 1:N default, M:N via the strict junction heuristic (exactly two FKs
-  constituting the whole PK, no other columns).
-- **Why:** Cardinality is the most-sought ERD information and currently absent;
-  strict junction detection avoids false M:N collapses — the conservative direction
-  for diagrams people trust.
-- **Verify:** Golden per class; junction-with-extra-column NOT collapsed.
+- **What/Why/Verify:** As before (native crow's-foot; 1:1/1:N inference; strict
+  junction heuristic).
 
 ### 9.5 Heat maps and live stats
-- **What:** Fan-in/fan-out from FKGraph on a fixed colorblind-safe stroke-based
-  scale; live row-count/ratio annotations as caller-provided data (serve/CLI fetch);
-  generate stays DB-free.
-- **Why:** Hubs are where cascade risk concentrates and FKGraph already knows them;
-  caller-provided stats keep the purity boundary intact.
-- **Verify:** Heat map golden; injected-stats test; no DB import in generate.
+- **What/Why/Verify:** As before (fan-in/out stroke scale; caller-provided stats;
+  generate stays DB-free).
 
 ## Phase 10 — Deferred horizon
 
-The interactive frontend on the phase-8 contract. Unplanned by design; the seam
-guarantees phases 8-9 need no rework when it wakes.
+The interactive frontend on the phase-8 contract. Unplanned by design.
 
 ---
 
-## Dependency DAG (replaces any linear reading)
+## Dependency DAG
 
 - 0 -> {1, 2, 3, 9.1-config-half}
-- 0.3 -> 4.1 (branding); {0.3, 3.2} -> 4.2 (stamping); 4.1+4.2 -> 4.3
-- 3 -> 5; 3 -> 7; 3 -> 8; {3, 0.2} -> 7.3
-- {5, 0.6, 3} -> 6 (6.1 additionally needs 5.2's chain-head API and 5.9)
-- 5.7 -> 7.4 (predicate IR reuse); 8 -> 9.1-serve-half
-- Parallelizable after phase 3: 4.1, 5, 7 (through 7.2), 8. Phase 9 (config half)
-  parallelizable after phase 0.
-- Within 5, the sub-order 5.1 -> 5.2 -> 5.3 -> 5.4 -> 5.5 -> 5.6 -> 5.7 -> 5.8 ->
-  5.9 is load-ordered: enforcement (5.4) must not precede the format (5.2/5.3);
-  rollback (5.6) needs the journal (5.5); reconcile (5.8) needs normalization (5.7).
+- 0.3 -> 4.1; {0.3, 3.2} -> 4.2; 3.3 -> 4.2 (json envelope stamping); 4.1+4.2 ->
+  4.3; 4.2 -> 6.2 (enforcement reads the stamps 4.2 writes)
+- 0.7 -> {5.2, 5.7, 5.8} (normalization); 3 -> 5; 3 -> 7; 3 -> 8; {3, 0.2} -> 7.3
+- 2 -> 6.1 and 2 -> 7.4 (new DB entrypoints bind the connection env from birth)
+- {5, 0.6, 3, 4.2} -> 6; 5.7 -> 7.4 (predicate executor); 8 -> 9.1-serve-half
+- Design-before-implement within 5: journal/view/position schemas (5.5) and the
+  0.7 primitive precede 5.2's implementation; land order 5.1 -> 5.2 -> 5.3 -> 5.4
+  -> 5.5 -> 5.6 -> 5.7 -> 5.8 -> 5.9 stands, with 5.2's upgrade command completing
+  once 5.5's schemas exist.
+- Parallelizable after phase 3: 4.1, 5, 7 (through 7.2), 8.
 
 ## Relationship to existing todos
 
 - `infra-env-db-locator.md` — superseded by phase 2.
-- `migrate-add-column-missing-if-not-exists.md` — superseded by phase 5 (journal +
-  preconditions solve the abort-loop without the silent-mismatch hazard).
+- `migrate-add-column-missing-if-not-exists.md` — superseded by phase 5.
 - `genericize-diff-library.md` — resolved by phase 1.1.
 - `partition-lifecycle-and-diff-library.md` — Part 1 = phases 1.2/1.3; Part 2 =
   resolved by 1.1's trigger decision.
-- `cross-framework-schema-composition.md` — core = phase 7; coordination beyond live
-  verification = out of scope below.
-- `orxtra-codegen-deferred-remaining.md` — item 17 via phase 4 branding + DB CHECK
-  (manifest/linter ecosystem out of scope, evidence-gated); item 18 = phases 3/6;
-  item 20 = phase 6; item 19 dropped by decision; items 21/22 out of scope below.
+- `cross-framework-schema-composition.md` — core = phase 7.
+- `orxtra-codegen-deferred-remaining.md` — item 17 via phase 4 + DB CHECK; item 18
+  = phases 3/6; item 20 = phase 6; item 19 dropped; items 21/22 out of scope.
 - `visualization-and-web-ui.md` — its phases 1-5 = phase 9; web UI = phases 8/10.
-- `rename-to-strictpg.md` — moved to todo/.obsolete/ per the [deliberate] no-rename
-  decision.
+- `rename-to-strictpg.md` — in todo/.obsolete/ per the no-rename decision.
 
 ## Out of scope, pending their own design rounds
 
-- Test schema mode (extension stubs, relaxed constraints, fixtures).
-- N-project topology beyond the two-project import case.
-- Manifest + per-language linter ecosystem (evidence-gated).
-- Recorded summit end-states: declarative catalog reconciliation for migrate
-  (preconditions+journal+reconcile are the stepping stones); structural
-  semantics/metadata split in the model (the 3.1 format already matches its bytes);
-  registry materialization into Schema as the sole type-truth (3.1 names the interim
-  winner per object kind); DB/boot-time revision binding (tracking table + consumer
-  startup assertion).
+- Test schema mode. N-project topology. Manifest + per-language linter ecosystem
+  (evidence-gated). Recorded summit end-states: declarative catalog reconciliation
+  for migrate; structural semantics/metadata split in the model; registry
+  materialization into Schema as sole type-truth; extension-DDL-name resolution
+  baked into the model at Build; DB/boot-time revision binding.
 
 ## Effort
 
-Phases 0-2: 1-2 sessions each. Phase 3: 1-2 sessions. Phase 4: 2-3 sessions (six
-languages + consumer coordination). Phase 5: 5-7 sessions (largest; includes the
-adoption path, manifest, and DB-backed test expansion). Phase 6: 1-2. Phase 7: 3-4.
-Phase 8: 1. Phase 9: 2-3. Parallelization per the DAG can overlap 4.1, 5, 7, 8 after
-phase 3 lands.
+Phases 0-2: 1-2 sessions each (0 grew: +0.7 normalization). Phase 3: 1-2. Phase 4:
+2-3. Phase 5: 5-7 (largest). Phase 6: 1-2. Phase 7: 3-4. Phase 8: 1. Phase 9: 2-3.
+Parallelization per the DAG.
 
-Release: exactly ONE rlsbl release at the very end of the roadmap (global
-release-once rule). Everything accumulates as unreleased commits until then;
-consumer regeneration todos are filed at that release. A useful consequence: no
-intermediate state (e.g., checksums before append-only) can ever reach a consumer —
-the phase-5 sub-ordering protects repo-internal integrity, and the single release
-eliminates external exposure entirely.
+Release: exactly ONE rlsbl release at the very end (global release-once rule);
+everything accumulates unreleased; consumer todos filed at that release. No
+intermediate state can reach a consumer.
