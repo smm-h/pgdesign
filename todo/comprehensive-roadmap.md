@@ -22,8 +22,8 @@ implement, check, or violate?
 ## Objects and primitives
 
 - **Model**: the fully-resolved schema IR (tables, views, matviews, functions,
-  sequences, types, extensions, pg_version, comments — everything that
-  determines emitted DDL).
+  sequences, types, extensions, pg_version, comments, groups — everything that
+  determines generated artifacts, DDL and beyond).
 - **enc**: the canonical per-object encoder, Model-object -> canonical bytes.
 - **hash**: SHA-256; **id** = hash(enc(x)); **revision** = id of a whole-model
   manifest (ordered list of object ids).
@@ -270,7 +270,7 @@ are load-bearing for implementors.
 **L1+L2 violations (ops carry lossy mirrors):**
 - THIRTEEN unserialized op-family concerns: nine pointer-def families +
   RawSQL (SM-trigger DDL and partman UPDATEs silently dropped on round-trip)
-  + PartitionChildSpec + ParentTable + the partman-config ops that phase 1
+  + PartitionChildSpec + ParentTable + the partman-config ops that phase 0.6
   introduces (update_partman_retention/premake hit OpToSQL's default
   comment-stub TODAY). Down-ops embed def pointers too and degrade on
   rollback. create_function/create_trigger parsed from disk fall back to
@@ -392,7 +392,7 @@ closed: a future defect found OUTSIDE it means a law was implemented wrong
 4. **Normalization fidelity** — ≈ approximates PG's expression rewriter.
    Check: the pg_get_* normalization suite; the comprehensive fixture
    (CHECKs, partial indexes, policies) reused by diff --live, upgrade,
-   reconcile, shadow test (0.7/5.8).
+   reconcile, shadow test (1.2/5.8).
 5. **Six consumer languages' semantics.** Check: DB-free compile checks of
    generated fixtures — all six mandatory (4.0).
 6. **Git merge behavior** on chain files. Minimized by one-file-per-edge
@@ -414,15 +414,17 @@ closed: a future defect found OUTSIDE it means a law was implemented wrong
 
 # Part V — Phases
 
-Phase numbering: 0 = substrate repairs; 1 = the kernel; 2-9 = boundary
-functors and adoption, numbered as before where content is unchanged. Every
-subphase cites its laws.
+Phase numbering: 0 = substrate repairs; 1 = the kernel; 2 and 4-9 = boundary
+functors and adoption, keeping their pre-reframe numbers where content is
+unchanged. Phase 3 is RETIRED: the identity work it held (whole-model form,
+revision hash, one serializer) was absorbed into kernel subphases 1.4/1.5, and
+the number is not reused. Every subphase cites its laws.
 
 ## Phase 0 — Substrate repairs (make the codebase law-capable)
 
 Bug fixes and consolidations that must precede the kernel; none depend on it.
-Build order: 0.1 -> 0.2 -> 0.3; 0.4/0.5/0.6 independent after 0.2. The
-strictcli todo (boundary item 11) is filed at phase-0 start.
+Build order: 0.1 -> 0.2 -> 0.3; 0.4/0.5 after 0.2; 0.6 anytime (matching the
+DAG). The strictcli todo (boundary item 11) is filed at phase-0 start.
 
 ### 0.1 Header unification + stamp grammar — L6
 - **What:** One shared parameterized header helper homed in pkg/genkit
@@ -540,9 +542,10 @@ adapter around this.
 - **What:** A DEDICATED canonical encoder (explicit field ordering; per-field
   presence semantics distinguishing unset from zero, normalizing to pointers
   where needed; deliberate key-sorting for map-typed fields — Index
-  Opclasses/Collations/With, SMTransitionMap.Transitions, Schema.Groups,
-  NamedTransition.Requires) producing per-object canonical JSON for every
-  schema object. Type identity from MODEL-LEVEL collections (both
+  Opclasses/Collations/With, Schema.Groups, NamedTransition.Requires, and
+  state-machine transition maps in the type-definition path — the schema-side
+  StateMachineTransitions duplicate stays excluded per 1.5) producing
+  per-object canonical JSON for every schema object. Type identity from MODEL-LEVEL collections (both
   construction paths populate them; builtin-derived domains materialize
   there, so builtin changes flip identity with no special case). The
   registry snapshot shrinks to serializing whatever has NO model
