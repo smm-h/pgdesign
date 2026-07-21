@@ -1,7 +1,8 @@
 # pgdesign roadmap: the kernel and its boundary
 
-Consolidated plan from the 2026-07-19 design session, four adversarial critique
-rounds, and a final algebraic reframing (2026-07-21). This file is exempted from
+Consolidated plan from the 2026-07-19 design session, five adversarial critique
+rounds (the fifth focused on the mathematics itself), and an algebraic
+reframing (2026-07-21). This file is exempted from
 todo immutability by explicit owner authorization — a living plan; git history
 preserves all prior versions, including the pre-algebraic v6 whose content this
 version reorganizes (nothing was dropped; everything was re-derived).
@@ -9,7 +10,7 @@ version reorganizes (nothing was dropped; everything was re-derived).
 The reframing: six versions of iterative design converged, without naming it, on
 a small algebra — a content-addressed object model wrapped around a category of
 schema migrations, governed by one equivalence relation. Every defect class the
-four critique rounds found is a violation of one of nine laws. This version
+critique rounds found is a violation of one of the laws below. This version
 states the laws first and derives the plan from them, so that the remaining
 work eliminates defect classes by construction instead of whack-a-mole, and so
 that any future proposal can be judged the same way: which law does it
@@ -24,75 +25,154 @@ implement, check, or violate?
 - **Model**: the fully-resolved schema IR (tables, views, matviews, functions,
   sequences, types, extensions, pg_version, comments, groups — everything that
   determines generated artifacts, DDL and beyond).
-- **enc**: the canonical per-object encoder, Model-object -> canonical bytes.
+- **enc**: the canonical per-object encoder, Model-object -> canonical bytes;
+  **decode** is its inverse on canonicalized models (decode∘enc = id is a
+  checked property — 5.9 and 7.2 deserialize, so decodability is load-bearing).
+- **N**: the normalizer (types, defaults, expressions via parse/deparse);
+  **≈_syn** := the kernel of N (a ≈_syn b iff N(a) = N(b)) — an equivalence
+  relation BY CONSTRUCTION. **≈_pg** := Postgres's semantic equality — a
+  distinct, richer relation we do not compute (see L1).
 - **hash**: SHA-256; **id** = hash(enc(x)); **revision** = id of a whole-model
-  manifest (ordered list of object ids).
+  manifest — a NAME-SORTED MAP object-name -> object-id. Store + manifests form
+  a two-level Merkle DAG: manifest comparison is key-wise symmetric difference;
+  the shared consistency checker IS Merkle closure verification (every id in
+  every reachable manifest resolves in the store — a completeness spec, not a
+  checklist); diff gains an O(changed-objects) fast path by comparing
+  per-object ids before deep comparison (a shared skeleton for encoder and
+  differ — structural support for the single-≈ law).
 - **store**: content-addressed map id -> bytes (put/get; puts idempotent).
-- **chain**: parent-linked edges between revisions; an edge is a **migration**.
-- **≈**: THE semantic equivalence relation on model objects and SQL fragments
-  (type normalization, default normalization, expression normalization).
-- **diff**: (Model, Model) -> Delta (a morphism between revisions).
-- **apply**: the map from chain morphisms into a live database.
+- **chain**: parent-linked edges between revisions; an edge is a **migration**
+  with identity (sequence, from, to) — parallel edges and endomorphisms
+  (pure-DML migrations, R -> R) are representable, so edges are NOT determined
+  by their endpoints.
+- **diff**: (Model, Model) -> Delta. A Delta is a flat description of change,
+  NOT a morphism: Deltas do not compose or invert; all composition happens on
+  op-lists. diff's specification is L10; diff(a,a) = empty is a pinned test.
+- **apply**: the map from chain edges into the world (codomain defined in L5).
 - **journal**: the durable trace of apply's actions, with recorded inverses.
 - **stamp**: artifact -> revision-that-produced-it (provenance).
 
-## The nine laws
+## The laws (L1-L10)
 
-- **L1 (One canonical form).** enc is total on the model algebra and
-  deterministic; enc(a) = enc(b) iff a ≈ b. There is exactly ONE ≈ in the
-  system; the encoder, the differ, and the predicates all compute the same one.
-- **L2 (Content identity / extensionality).** id = hash∘enc; get(put(x)) = x;
-  puts are idempotent; identity is location-free. Mutation of stored content is
-  not an operation this structure has — "append-only" is not a policy, it is
-  what extensionality means.
-- **L3 (Migrations form a category).** Revisions are objects, migrations are
-  morphisms R_from -> R_to, composition is associative, identity morphisms
-  exist. Squash IS composition — definitionally, never a file operation.
-- **L4 (Typed partial invertibility).** Every primitive op declares whether it
-  has an inverse. The inverse of a composite is the reversed composition of
-  component inverses, DEFINED IFF every component is invertible. A "down" for a
-  composite containing non-invertible ops (data-bearing DML, raw SQL) is not
-  refused at runtime — it is unrepresentable.
-- **L5 (Apply is a functor to the world).** The live database is a separate
-  category not under our control. Preconditions are the domain check ("the
-  world is at R_from"); reconcile is the codomain check ("the world arrived at
-  R_to"); the journal is the functor's trace. Drift is a domain error — always
-  loud, never absorbed. Generation is a pure function of revisions and NEVER
-  reads the world.
+- **L1 (One canonical form — with honest status tags).** N is the normalizer;
+  ≈_syn is its kernel, an equivalence by construction. (a) enc encodes
+  N-normal forms, so enc(a) = enc(b) iff a ≈_syn b — BY CONSTRUCTION,
+  property-testable, invariant from kernel 1.1 on. (b) Single-≈: every
+  comparison engine (encoder, differ, predicates) computes ≈_syn — enforced
+  progressively via the conformance pair: revision-equal implies diff-empty
+  (initial gate); diff-empty implies revision-equal (end-state, activated once
+  the differ fully adopts N). (c) Boundary conjecture: ≈_syn ⊆ ≈_pg, KNOWN
+  INCOMPLETE — pg_get_* returns the deparse of the post-analysis tree
+  (IN -> = ANY(ARRAY[...]), materialized casts), which is catalog-dependent
+  and unreachable by any pure string normalizer. The gap is bridged on live
+  paths by an explicit, finite REWRITE-RULE SET applied to the introspected
+  side (fixture-checked, incompleteness documented; the exactness alternative
+  — live round-trip normalization through the DB, available on precisely the
+  paths that see pg_get_* text — is recorded in the alternatives list).
+  Structural sublanguage: the ORDER-SEMANTICS TABLE (which collection orders
+  are semantic — columns, enum values — and which are canonical-only —
+  checks, indexes, uniques, policies, triggers) is part of the format spec;
+  that table IS the definition of ≈_syn on structure.
+- **L2 (Content identity / extensionality).** id = hash∘enc (id equality
+  implies content equality MODULO SHA-256 collision resistance — a stated
+  assumption, since id-equality fast paths skip byte comparison);
+  get(put(x)) = x; puts idempotent; identity location-free; decode∘enc = id
+  on canonicalized models. Mutation of STORE CONTENT (objects, manifests) is
+  not an operation this structure has. Chain-edge FILES are location-addressed
+  — their append-onlyness is CHECKED POLICY (the consistency checker), not
+  structural impossibility; the derivation is honest about the difference.
+- **L3 (The chain is the free category on the edge graph).** Composition =
+  path concatenation; identities = empty paths — VIRTUAL: never files, never
+  applied (these laws hold trivially and are not what needs testing). The real
+  content: (a) edge identity is (sequence, from, to) — the hom-set question is
+  answered explicitly, parallel edges and pure-DML endomorphisms are legal;
+  (b) SQUASH SOUNDNESS — a consolidation edge is a NEW edge whose ops must be
+  apply-equivalent to the path it supersedes: a CHECKED property (the
+  commutation test in L10/5.3), never "definitional."
+- **L4 (Three-way typed invertibility).** Every primitive op is typed:
+  MECHANICALLY-INVERTIBLE / DECLARED-INVERSE (including DML ops whose declared
+  inverse is vacuous — data is not restored; today's reversibility semantics,
+  now explicit) / NON-INVERTIBLE. The inverse of a composite is the reversed
+  composition of component inverses, defined WHEN every component has one.
+  This is a deliberate conservative under-approximation: a composite can be
+  semantically invertible when components are not (chained type changes whose
+  endpoint diff yields a clean structural down) — the manifest-diff down is
+  used ONLY for fully-mechanically-invertible ranges; elsewhere recorded downs
+  compose. What remains unrepresentable: a manifest-diff down for a range
+  containing data-bearing ops.
+- **L5 (Apply is a functor on schema-states).** The codomain is named: objects
+  are ≈_syn-classes of INTROSPECTED SCHEMA STATES; morphisms are observed
+  transitions. Data is deliberately OUTSIDE the codomain — which is exactly
+  why rollback equivalence is structural and why apply does not preserve
+  inverses on data (the caveat is a codomain choice, not an inconsistency).
+  Preconditions are the domain check ("the world is at R_from"); reconcile is
+  the codomain check ("the world arrived at R_to"); the journal is the trace.
+  Drift is a domain error — always loud, never absorbed. Generation is a pure
+  function of revisions and NEVER reads the world. The substantive functor
+  equation — apply(consolidation) lands where apply(sequence) lands — is the
+  named squash-commutation test.
 - **L6 (Total provenance).** Every derived artifact carries the revision that
   produced it; regeneration is re-application of a pure function; freshness is
   extensional equality. All enforcement rules are DERIVED from provenance, not
   legislated case-by-case.
-- **L7 (Algebras don't cross).** A model with type information and an
-  introspected model without it belong to different algebras. Their revisions
-  are values of distinct types; comparing them is a type error, not a runtime
-  mismatch.
+- **L7 (Model classes don't cross).** A model with type information and an
+  introspected model without it belong to different model classes. Their
+  revisions are values of distinct types; comparing them is a type error, not
+  a runtime mismatch.
 - **L8 (The trace is recoverable in the world's terms).** Every journal write
   is atomic with its effect, or wrapped in an intent/confirm protocol whose
   resume is idempotent IN THE WORLD'S OWN STATE MODEL (e.g. Postgres's
   invalid-index semantics), not merely in ours.
-- **L9 (Verification is law-checking).** Kernel properties (round-trips,
-  totality, associativity, single-≈ agreement, functor preservation) are
-  checked by property-based tests over generated inputs. Example fixtures are
-  for the boundary, where laws end.
+- **L9 (Verification is law-checking).** Kernel properties are checked by
+  property-based tests over GENERATED inputs, not hand-picked fixtures:
+  encoder totality (the reflection coverage guard); decode∘enc = id;
+  normalizer idempotence N∘N = N over a generated expression corpus;
+  SHUFFLED-DECLARATION-ORDER convergence (≈_syn-equal inputs — permuted
+  canonical-only collections — encode to identical revisions: canonicality,
+  not mere repeatability); squash-rewriting confluence (finite critical-pair
+  enumeration + a termination measure, hence unique normal forms by Newman's
+  lemma); the L10 round-trip; and a GOLDEN CORPUS of normalized expressions
+  committed so that a go-pgquery dependency bump that shifts ≈_syn — which
+  under L1 shifts IDENTITY — turns CI red instead of silently re-keying the
+  world. Example fixtures are for the boundary, where laws end.
+- **L10 (Round-trip — the central theorem).** For models a, b: applying
+  gen(diff(a, b)) to a world at revision(a) lands it at revision(b), verified
+  by reconcile — gen is a section of apply-then-introspect up to ≈_syn. This
+  is THE specification of diff and generate; preconditions, reconcile, and
+  pure generation are scaffolding around this one equation. Checked as a
+  randomized DB-backed property test (generate model pairs, diff, apply,
+  reconcile) plus its corollaries: diff(a,a) = empty (pinned);
+  squash-commutation (apply the consolidation vs apply the sequence — same
+  schema-state); and diff MINIMALITY as a non-normative quality property
+  (mutation-tested: delete any op, reconcile must fail).
 
 ## The boundary doctrine
 
-The laws govern what we fully represent. The **boundary** is everything we do
-not control: Postgres's runtime semantics and crash timing, the filesystem,
-git's merge behavior, six consumer languages, and consumer code. At the
-boundary, defect classes cannot be made unrepresentable — only checked, by
-fault injection, conformance matrices, and compile checks. The design goal is
-therefore: a kernel where nothing can go wrong by construction, plus a THIN,
-EXPLICITLY ENUMERATED boundary (Part IV) where protocols are adversarially
-verified. Every future defect must live on that enumerated list; if one is
-found elsewhere, a law was implemented wrong, and the fix is in the kernel.
+The system is a THREE-WAY partition, and defects are triaged accordingly:
 
-The four critique rounds confirm this shape empirically: findings migrated
-monotonically outward — policy errors (round 1), mechanism errors (round 2),
-specification errors (round 3), boundary-protocol errors (round 4: an invalid
-index inside the recovery protocol; DML inside a structural inverse). A round
-five would find only boundary residue; Part IV enumerates it instead.
+1. **The kernel** — law-governed. Every law names its property tests (L9), so
+   "a law was implemented wrong" is a CHECKABLE claim against a stated
+   property, never a rhetorical escape hatch. Defects here are implementation
+   errors; the fix is in the kernel and the property suite gains the case.
+2. **The enumerated boundary** (Part IV) — everything we do not control:
+   Postgres's runtime semantics and crash timing, the filesystem, git's merge
+   behavior, six consumer languages, consumer code. Defect classes here cannot
+   be made unrepresentable — only checked, by fault injection, conformance
+   matrices, and compile checks.
+3. **Plain engineering outside the algebra** — phase 9's presentation work,
+   CLI ergonomics, doc wording, seed statistical quality. Ordinary bugs, no
+   doctrinal claim; forcing the formalism onto them would be ceremony.
+
+The boundary list may GROW, but only with a post-mortem answering "why was
+this not derivable from the laws?" — growth is permitted; unexplained growth
+is not. (An earlier "the list is closed" absolutism was withdrawn as
+unfalsifiable: with no law formally verified, any defect could be retro-labeled
+an implementation error.)
+
+The critique rounds support the shape empirically — findings migrated outward
+from policy (round 1) to mechanism (round 2) to specification (round 3) to
+boundary protocols (round 4) to the formalism itself (round 5) — an induction
+over five points, weighted accordingly, not proof.
 
 ---
 
@@ -115,15 +195,19 @@ reversible, never to be cited as deliberate intent.
 
 ## Consequences `[law]`
 
-- Append-only migration history; archived originals; unconditional checksums
-  on the apply surface — L2. (The "checksums on rollback" clause died because
-  post-journal rollback reads no files; a checksum surface cannot exist there.)
+- Append-only STORE CONTENT (objects, manifests) — L2 structurally; append-only
+  CHAIN-EDGE FILES — checked policy via the consistency checker (they are
+  location-addressed; the math round corrected an overreach here). Archived
+  originals; unconditional checksums on the apply surface — L2. (The
+  "checksums on rollback" clause died because post-journal rollback reads no
+  files; a checksum surface cannot exist there.)
 - Squash = a consolidation edge (composition), never a rewrite — L3.
 - Consolidation downs derived by manifest diff ONLY for fully-invertible
   ranges; DML/RawSQL-containing ranges compose recorded downs — L4.
-- Pure migration generation = diff(head manifest, current model); always emits
-  large-table-safe forms (a manifest carries no row counts; conditional output
-  would make generation read the world) — L5.
+- Pure migration generation = diff(head manifest, current model); its
+  specification is L10's round-trip — L5+L10. (WHICH pure emission policy to
+  use is NOT law-derived; the always-large-table-safe choice is a free choice
+  — see the [%%] section.)
 - Precondition drift = hard error, always; reconcile after apply; adoption of
   intentional drift only via explicit baseline — L5.
 - Journal records op identity AND serialized down-op; rollback is DB-driven;
@@ -132,10 +216,12 @@ reversible, never to be cited as deliberate intent.
 - Ops reference their objects and transitive type closure BY CONTENT ID into
   the store; no inline blobs, no lossy mirrors (degraded ops unrepresentable)
   — L1+L2.
-- Revision = hash of canonical bytes; stamp = FULL-PROJECT revision
-  (provenance, not content — byte-compare owns content); enforcement taxonomy
-  (full regenerators / partial writers / source editors) derived from
-  provenance totality — L6.
+- Revision = hash of canonical bytes; every artifact stamped with a producing
+  revision; enforcement taxonomy (full regenerators / partial writers / source
+  editors) derived from provenance totality — L6. (The stamp's SCOPE —
+  full-project rather than per-output — is NOT law-derived; L6 is satisfied by
+  either; the full-project choice is engineering, justified by the
+  filtered-output paradox — see the [%%] section.)
 - Opaque Revision type; registry-absent marker INSIDE the hashed bytes;
   cross-algebra comparison errors — L7.
 - Intent/confirm journaling for non-transactional ops, with resume protocols
@@ -159,9 +245,10 @@ reversible, never to be cited as deliberate intent.
   BEFORE the commit (the reverse window is harmless by L2's idempotence) —
   L5+L8+L2.
 - Compiler/live seam (build and generation pure; DB work in a distinct tier);
-  revise's pure tier includes STATIC NF audit and structural workload
-  (blocking — pure analysis that can block must block); live-only analyses
-  (TANE, pg_stat) are DB-tier and non-retroactive — L5.
+  live-only analyses (TANE, pg_stat) are DB-tier and non-retroactive — L5.
+  (That pure analyses BLOCK in revise's pure tier is NOT an L5 theorem; it is
+  a policy derived from the owner's hard-constraints philosophy — see the
+  [%%] section.)
 - Fail-closed imports: owned tables in Tables, imported in ImportedTables;
   every consumer iterating Tables is correct by omission; the union is wired
   at the ENUMERATED resolution sites (buildTablesByName, BuildFKGraph, seed
@@ -180,8 +267,10 @@ reversible, never to be cited as deliberate intent.
 Names and layouts the laws do not determine: `pgdesign_migration_ops`,
 `pgdesign_applied_migrations` (view; merit: one SQL definition of
 "applied + status" for four readers), `pgdesign_chain_position`,
-`migrations/chain/<from>-<to>.json` (one file per edge — chosen over a single
-manifest for git-merge friendliness; the DAG is the data),
+`migrations/chain/<seq>-<from>-<to>.json` (one file per edge; edge identity =
+(sequence, from, to), so parallel edges and pure-DML endomorphisms never
+collide — chosen over a single manifest for git-merge friendliness; the DAG is
+the data),
 `migrations/objects/`, `migrations/revisions/`, `migrations/archive/`,
 `imports/<alias>/`, visible (non-dot) directory names for committed
 load-bearing data, `internal/objstore`, `internal/project`,
@@ -201,7 +290,12 @@ cases). strictcli connection-env kind with registration-time unbound-flag
 error. Partition: premake required; opt-in schedule key; unacknowledged
 missing schedule = warning. pkg/diff deleted with a recorded promotion
 trigger. Web UI frontend deferred. Consumer regeneration todos filed at the
-single final release.
+single final release. Policies demoted from [law] by the math round (good
+engineering rationales, honestly labeled as choices): ALWAYS-large-table-safe
+generation (uniformity — a declared size hint would be equally pure);
+FULL-PROJECT stamp scope (resolves the filtered-output paradox); pure
+analyses BLOCK in revise's pure tier (the owner's hard-constraints
+philosophy applied — analysis that can block must block).
 
 ## Withdrawn along the way (each a law violation in hindsight)
 
@@ -215,7 +309,14 @@ collections that L1 already covers); manifest.jsonl and whole-model snapshots
 and dot-dirs (superseded by per-edge chain + object store + visible names);
 snapshot-diff downs for DML ranges (L4 violation); rejecting (rather than
 validating) Go boundaries (breaks scans); row-count-conditional generation
-(L5 violation).
+(L5 violation); the closed-boundary-list absolutism (unfalsifiable — replaced
+by three-way triage with growth-on-post-mortem); L4's "IFF" (claimed a false
+converse — composites can be semantically invertible when components are
+not); "squash IS composition definitionally" (empty without a morphism
+congruence — replaced by the free-category framing plus the CHECKED
+squash-commutation property); "one ≈" stated without naming ≈_syn vs ≈_pg
+(the iff was unachievable for expressions against pg_get_* forms by any pure
+string normalizer).
 
 ---
 
@@ -245,7 +346,15 @@ are load-bearing for implementors.
   CHECKs/partial indexes/policies; only types normalize. The differ is BLIND
   to PGVersion (in identity, not in SchemaDiff — pg_version changes alter
   emitted DDL invisibly to diff). The differ DOES compare comments and
-  extensions.
+  extensions. diff's normalizeDefault is ToLower(TrimSpace(...)) — UNSOUND,
+  not merely incomplete: it identifies the semantically distinct defaults
+  'Active' and 'active' (MISSED drift — the reverse failure mode from
+  false drift; red test required before 1.2 replaces it). A SECOND live
+  normalizer exists: validate.normalizeExpr (W018) sorts commutative AND/OR
+  operands alphabetically and strips parens — a different equivalence than
+  parse/deparse computes; 1.2's consumer list must retire it onto N (or
+  explicitly scope W018 as a looser heuristic), else the system ships two
+  ≈-computations — precisely what L1 prohibits.
 - semtype.Registry unexported/unserializable; typeDefsEqual ignores top-level
   Comment/Source but compares nested transition comments; builtin-derived
   domains (slug/email/short_text, scalar-with-CHECK) materialize into
@@ -261,6 +370,11 @@ are load-bearing for implementors.
   M200 applied-version guard runs only if --db is voluntarily passed;
   tracking rows orphaned; zero squash-CLI tests; optimizeDDLOps keeps only
   the final type-change's down (reverts one step, not to pre-range type).
+  The optimizer is a greedy, ONE-SHOT (not fixpoint), dependency-unaware
+  rewriter: pair cancellation examines only the two endpoint ops — `add
+  column x; create index on x; drop column x` cancels the add/drop pair and
+  ORPHANS the index op (a live squash bug); no associativity, confluence, or
+  order-independence tests exist.
 - Migration checksums are recorded over file bytes and NEVER verified.
 - No ledger/manifest/chain exists; discovery skips non-semver filenames; ~7
   functions rely on semver ordering; migrations-dir sentinel hardcode at 8
@@ -387,12 +501,16 @@ closed: a future defect found OUTSIDE it means a law was implemented wrong
 2. **The upgrade choreography** (DB transaction + pre-commit file writes).
    Check: crash injection on both sides of COMMIT (5.2).
 3. **The SQL predicate renderer** — a second computation of ≈ in PL/pgSQL.
-   Check: the conformance matrix (Go executor vs SQL renderer vs differ)
-   against live database states (5.7).
-4. **Normalization fidelity** — ≈ approximates PG's expression rewriter.
-   Check: the pg_get_* normalization suite; the comprehensive fixture
-   (CHECKs, partial indexes, policies) reused by diff --live, upgrade,
-   reconcile, shadow test (1.2/5.8).
+   Check: the conformance matrix (Go executor vs SQL renderer vs differ) —
+   which is SAMPLED agreement, not proof of ≈-agreement, so it is fed
+   GENERATED random expressions in addition to curated states (5.7).
+4. **The ≈_syn/≈_pg gap** — pure normalization CANNOT reach PG's
+   post-analysis forms (catalog-dependent rewrites); the explicit
+   rewrite-rule set on the introspected side is finite and documented-
+   incomplete BY DESIGN. Check: the rewrite-rule fixture suite; the golden
+   normalized-expression corpus (a dependency bump that shifts ≈_syn turns
+   CI red); the comprehensive fixture (CHECKs, partial indexes, policies)
+   reused by diff --live, upgrade, reconcile, shadow test (1.2/5.8).
 5. **Six consumer languages' semantics.** Check: DB-free compile checks of
    generated fixtures — all six mandatory (4.0).
 6. **Git merge behavior** on chain files. Minimized by one-file-per-edge
@@ -469,9 +587,12 @@ DAG). The strictcli todo (boundary item 11) is filed at phase-0 start.
   makes INTROSPECTED schemas canonical (L5's codomain checks and L7's
   algebra both need it) and collapses four topo implementations.
 - **Verify:** Determinism test red before/green after over DDL AND JSON;
-  view-references-view fixture dependency-ordered; introspected schemas pass
-  the postcondition; no emitter-side sorting by grep; filtered schemas carry
-  recomputed graphs.
+  CANONICALITY, not just repeatability: shuffled-declaration-order fixture
+  pairs (permuting canonical-only collections — checks, indexes, uniques,
+  policies — never columns or enum values, whose order is semantic) produce
+  identical output; view-references-view fixture dependency-ordered;
+  introspected schemas pass the postcondition; no emitter-side sorting by
+  grep; filtered schemas carry recomputed graphs.
 
 ### 0.3 Schema-qualified identity + final graph API — L1/L6 substrate
 - **What:** The FKGraph/walker end-state API in ONE pass: FKEdge gains
@@ -545,7 +666,13 @@ adapter around this.
   Opclasses/Collations/With, Schema.Groups, NamedTransition.Requires, and
   state-machine transition maps in the type-definition path — the schema-side
   StateMachineTransitions duplicate stays excluded per 1.5) producing
-  per-object canonical JSON for every schema object. Type identity from MODEL-LEVEL collections (both
+  per-object canonical JSON for every schema object, with a TOTAL DECODER
+  (decode∘enc = id on canonicalized models — 5.9 and 7.2 deserialize, so
+  decodability is load-bearing, not optional). The ORDER-SEMANTICS TABLE is
+  written as part of the format spec: per collection, whether order is
+  semantic (columns, enum values) or canonical-only (checks, indexes,
+  uniques, policies, triggers) — this table is the definition of ≈_syn on
+  the structural sublanguage. Type identity from MODEL-LEVEL collections (both
   construction paths populate them; builtin-derived domains materialize
   there, so builtin changes flip identity with no special case). The
   registry snapshot shrinks to serializing whatever has NO model
@@ -560,22 +687,37 @@ adapter around this.
   encoder is complete" from a review hope into a checked law (L9) — the
   highest-value single mechanism in the plan.
 - **Verify:** Property tests: per-object bytes independent of neighbors and
-  struct-field-order refactors; coverage test red when a field is added
-  unencoded; map-key ordering deterministic; builtin email-regex change
-  flips identity; Source relabeling does not; nested transition comments do.
+  struct-field-order refactors; decode∘enc = id round-trip; coverage test red
+  when a field is added unencoded; map-key ordering deterministic;
+  shuffled-declaration-order convergence (≈_syn-equal inputs, identical
+  bytes); builtin email-regex change flips identity; Source relabeling does
+  not; nested transition comments do.
 
 ### 1.2 ≈: the normalization primitive — L1
-- **What:** One shared normalization — types, defaults, expressions
-  (parse/deparse both sides) — homed in internal/sqlparse (the go-pgquery
-  leaf; ≈ MUST match pg_get_* forms, so the home is necessary). The differ
-  adopts it IMMEDIATELY (red-green: introspect->diff over CHECKs/partial
-  indexes/policies reports false drift today — a live shipping bug). Later
-  consumers: upgrade reconcile, predicates, reconcile-verify, shadow test.
-- **Why:** L1's single-≈ clause: every comparison engine must compute the
-  same relation, and the differ already disagrees with Postgres's rewriter.
-- **Verify:** Red-green on the false-drift fixture; the pg_get_* suite
-  (boundary item 4); diff --live clean on the comprehensive fixture (reused
-  verbatim by 5.8).
+- **What:** The normalizer N — types, defaults, expressions (parse/deparse) —
+  homed in internal/sqlparse (the go-pgquery leaf). ≈_syn = kernel of N.
+  The ≈_pg GAP is bridged per L1(c): an explicit, finite rewrite-rule set
+  applied to the INTROSPECTED side on live paths (IN -> = ANY(ARRAY[...]),
+  literal-cast peeling — extending introspect's existing parseSimpleDefault
+  idea), fixture-checked, incompleteness documented. The differ adopts N
+  IMMEDIATELY (red-green: introspect->diff over CHECKs/partial
+  indexes/policies reports false drift today — a live bug), replacing BOTH
+  existing normalizers: diff's unsound lowercasing normalizeDefault (red
+  test for the 'Active'/'active' missed-drift case FIRST) and
+  validate.normalizeExpr (W018 retired onto N, or explicitly scoped as a
+  looser heuristic with a comment). Later consumers: upgrade reconcile,
+  predicates, reconcile-verify, shadow test.
+- **Why:** L1(b): every comparison engine must compute the same ≈_syn — two
+  disagreeing normalizers already ship today, and the differ additionally
+  disagrees with Postgres's rewriter. L1(c): the gap is real mathematics
+  (catalog-dependent rewrites are unreachable by pure string normalization)
+  and must be bridged explicitly, not papered over with "approximates."
+- **Verify:** Red-green on the false-drift fixture AND the missed-drift
+  default fixture; N∘N = N idempotence over a generated expression corpus;
+  the GOLDEN CORPUS of normalized forms committed (a go-pgquery bump that
+  shifts ≈_syn — hence identity — turns CI red); the rewrite-rule suite;
+  diff --live clean on the comprehensive fixture (reused verbatim by 5.8);
+  grep: no normalizer outside internal/sqlparse.
 
 ### 1.3 store: internal/objstore — L2
 - **What:** The content-addressed store package: hash-keyed put/get, dedup,
@@ -586,26 +728,36 @@ adapter around this.
 - **Verify:** Property suite green; concurrent idempotent-put test.
 
 ### 1.4 chain: revisions, edges, composition, inverses — L3+L4
-- **What:** Revision manifests (ordered object->id lists); parent-linked
-  edge model with head/find-heads (genesis: null parent); composition of
-  edges; TYPED invertibility — each primitive op declares invertible or not;
-  composite inverse defined iff all components invertible (the type makes
-  DML-containing snapshot-diff downs unrepresentable); revision = hash of
-  manifest; Revision is an OPAQUE TYPE indexed by algebra
-  (registry-present / registry-absent — the marker lives INSIDE the hashed
-  bytes; cross-algebra comparison is a compile/runtime type error). Diff
-  fast path on equal revisions; the conformance pair with the differ:
-  revision-equal implies diff-empty as the initial gate (differ's PGVersion
-  blindness fixed first — pg_version joins SchemaDiff); the REVERSE
-  direction (diff-empty implies revision-equal) adopted as the end-state
-  invariant once encoder and differ share ≈.
+- **What:** Revision manifests as NAME-SORTED MAPS object-name -> id
+  (comparison = key-wise symmetric difference; the Merkle dividends of Part
+  I). Parent-linked edge model, edge identity = (sequence, from, to) —
+  parallel edges and pure-DML endomorphisms representable; head/find-heads
+  (genesis: null parent); composition = path concatenation (free category —
+  identities are VIRTUAL empty paths, never files, never applied). THREE-WAY
+  typed invertibility per L4 (mechanical / declared-inverse incl. vacuous
+  DML / non-invertible); composite inverse defined WHEN all components have
+  one; manifest-diff downs representable ONLY for fully-mechanically-
+  invertible ranges. Revision = hash of manifest; Revision is an OPAQUE TYPE
+  indexed by model class (registry-present / registry-absent — the marker
+  lives INSIDE the hashed bytes; cross-class comparison is a type error).
+  Per-object-id diff fast path; diff(a,a) = empty pinned; the conformance
+  pair: revision-equal implies diff-empty as the initial gate (differ's
+  PGVersion blindness fixed first — pg_version joins SchemaDiff); the
+  REVERSE direction adopted as the end-state invariant once the differ fully
+  adopts N.
 - **Why:** L3/L4/L7 as code; squash, rollback, pure generation, and
-  enforcement all become compositions and lookups over this structure.
-- **Verify:** Property tests: associativity; identity edges; inverse laws on
-  invertible composites; non-invertible composites have no inverse BY TYPE;
-  opaque-Revision cross-algebra comparison errors; conformance direction in
-  CI; sensitivity tests (comment/column/type/pg_version/extension changes
-  flip revisions; no-op rebuilds don't).
+  enforcement all become path operations and lookups over this structure.
+  The free-category framing puts the trivially-true laws where they belong
+  (by construction) and the real risk where it lives (squash soundness —
+  checked in 5.3, not asserted here).
+- **Verify:** Property tests: inverse laws on fully-invertible composites;
+  non-invertible-containing composites have no manifest-diff inverse BY
+  TYPE; edge-identity uniqueness under parallel edges and endomorphisms;
+  opaque-Revision cross-class comparison errors; diff(a,a) empty;
+  conformance direction in CI; sensitivity tests (comment/column/type/
+  pg_version/extension changes flip revisions; no-op rebuilds don't). (No
+  associativity/identity-edge tests — trivially true in a free category;
+  vacuous tests deleted.)
 
 ### 1.5 Whole-model form, envelope, one serializer — L1+L7
 - **What:** Whole-model form = versioned preamble + ordered concatenation of
@@ -760,8 +912,9 @@ numbered; nothing ships mid-phase (single-release axiom).
   pgdesign_chain_position (current revision, in-progress edge ref,
   per-database boundary), migration file format (sequence+slug; from/to
   revision; ops referencing store objects by id), chain-edge file format
-  (migrations/chain/<from>-<to>.json), store roots (migrations/objects/,
-  migrations/revisions/), archive layout (migrations/archive/). The two
+  (migrations/chain/<seq>-<from>-<to>.json — edge identity is the triple),
+  store roots (migrations/objects/, migrations/revisions/ — manifests as
+  name-sorted maps), archive layout (migrations/archive/). The two
   divergent tracking write paths (state.go helpers vs inline SQL) reconcile
   onto one. Labeled honestly: a human design gate with one mechanical check.
 - **Why:** 5.2 migrates rows INTO these schemas; designs precede the
@@ -821,19 +974,34 @@ numbered; nothing ships mid-phase (single-release axiom).
 - **What:** Consolidation = an ADDITIONAL chain edge; superseded files
   retire intact to migrations/archive/, reachable via their edges
   (mid-range databases apply remaining originals via chain_position edge
-  selection). Consolidation downs: by manifest diff for fully-invertible
-  ranges; ranges containing DML/RawSQL compose the originals' recorded
-  downs (L4's type decides — no runtime judgment). The
+  selection). Consolidation downs: by manifest diff for fully-mechanically-
+  invertible ranges; ranges containing declared-inverse/DML ops compose the
+  originals' recorded downs (vacuous where declared so — L4's three-way
+  type decides, no runtime judgment). The op-list optimizer is specified as
+  a TERMINATING REWRITING SYSTEM: cancellation carries the side condition
+  "no intervening op references the cancelled object" (today's greedy
+  endpoint-only matching orphans dependent ops — a live bug); each rule
+  strictly decreases a stated measure (termination); the ~12 rule types'
+  critical pairs are enumerated and both resolutions tested to converge —
+  termination + local confluence gives UNIQUE NORMAL FORMS (Newman), which
+  is what makes consolidation well-defined. SQUASH-COMMUTATION (the L5/L10
+  functor equation) is a named test: apply(consolidation) and
+  apply(sequence) land on the same introspected schema-state. The
   rollback-equivalence invariant is STRUCTURAL (revision equality says
-  nothing about data) and holds by construction exactly where L4 permits
-  the manifest-diff form. Tracking/journal lineage handled; no orphaned
-  rows; files never rewritten.
-- **Why:** L3 makes squash composition; L4 makes the round-4 data-loss
-  hole (a DOWN recreating a dropped column empty) unrepresentable.
+  nothing about data). Tracking/journal lineage handled; no orphaned rows;
+  files never rewritten.
+- **Why:** L3 makes squash a checked normalization, not a definition; L4
+  makes the round-4 data-loss hole (a DOWN recreating a dropped column
+  empty) unrepresentable; the rewriting-system spec replaces "we hope pass
+  order doesn't matter" with a finite, decidable check — the one place a
+  textbook result (Newman's lemma) changes what gets built.
 - **Verify:** Squash of applied migrations via consolidation; mid-range DB
-  resumes via archived originals; rollback-equivalence on structural AND
-  merged-type-change fixtures; a DML-containing range takes the
-  composed-downs form BY TYPE; no orphaned rows.
+  resumes via archived originals; SQUASH-COMMUTATION on the comprehensive
+  fixture (apply-composite vs apply-sequence, compared through reconcile);
+  rollback-equivalence on structural AND merged-type-change fixtures; a
+  DML-containing range takes the composed-downs form BY TYPE; critical-pair
+  convergence suite green; the orphaned-index fixture (add/index/drop)
+  refuses cancellation; no orphaned rows.
 
 ### 5.4 Unconditional checksums (apply surface) — L2
 - **What:** After 5.2/5.3: checksum verification unconditional ON APPLY —
@@ -916,7 +1084,11 @@ numbered; nothing ships mid-phase (single-release axiom).
   locally; reconcile verifies the functor landed on R_to globally,
   reusing the real differ for complete coverage.
 - **Verify:** Clean apply over the comprehensive fixture reports empty;
-  out-of-band ALTER mid-migration surfaces; managed objects invisible.
+  out-of-band ALTER mid-migration surfaces; managed objects invisible; the
+  L10 ROUND-TRIP as a randomized DB-backed property test — generate random
+  model pairs (reusing the seed package's type-aware generation machinery
+  for schema generation), diff, apply, reconcile-empty — the single
+  highest-value DB-backed property test available to the plan.
 
 ### 5.9 Pure generation — L5
 - **What:** migrate generate = diff(deserialize(head manifest via
@@ -932,19 +1104,25 @@ numbered; nothing ships mid-phase (single-release axiom).
   that possible (a manifest has no row counts).
 - **Verify:** Generation without any DB; FK add emits two-step NOT VALID
   with no DB; a drifted DB does not alter output but fails apply; stats
-  plumbing gone; the advisory still appears.
+  plumbing gone; the advisory still appears; diff MINIMALITY as a quality
+  property (mutation test: delete any generated op, reconcile must fail —
+  non-normative, L10's corollary).
 
 ### 5.10 Fork resolution + ecosystem alignment — L3
 - **What:** `migrate rebase <head>`: re-parents a fork's tail, recomputes
   revisions, re-derives manifests (per-edge files make forks semantic,
-  not textual — boundary item 6). Baseline's semver guards re-expressed
+  not textual — boundary item 6). Rebased-away edges RETIRE to
+  migrations/archive/ exactly like superseded squash originals — rebase
+  never rewrites or deletes history (L2's spirit; the consistency checker
+  treats them as reachable history). Baseline's semver guards re-expressed
   against chain reachability. Shadow test, squash CLI, docs updated;
   migration-guide rewritten.
 - **Why:** Two branches each appending an edge is normal; detection
   without resolution is a dead end; baseline references a version scheme
   that no longer exists.
 - **Verify:** Fork fixture: rebase re-parents, revisions recomputed,
-  store consistent; baseline guards fire on chain-unreachable states;
+  store consistent; rebased-away edges present in archive and reachable
+  via the checker; baseline guards fire on chain-unreachable states;
   shadow test passes; full migrate suite green.
 
 ## Phase 6 — Orchestration and provenance enforcement
@@ -1190,8 +1368,14 @@ stepping stone); structural semantics/metadata split in the model (the
 encoder's semantic-only policy already produces its bytes); registry
 materialization into Schema as sole type-truth; extension-DDL-name
 resolution baked into the model; DB/boot-time revision binding; the
-reverse conformance invariant as primary (activated once encoder and
-differ share ≈).
+reverse conformance invariant as primary (activated once the differ fully
+adopts N); LIVE ROUND-TRIP NORMALIZATION as the exactness alternative to
+the ≈_pg rewrite-rule set (round-trip desired-side expressions through the
+DB on live paths — exact where the rule set is documented-incomplete);
+THREE-WAY MODEL MERGE (pushout over a common-ancestor revision — per-object
+join with change/change conflicts detected by id inequality against base;
+the kernel makes it nearly free) as the recorded alternative to
+rebase-only fork resolution.
 
 ## Effort
 
