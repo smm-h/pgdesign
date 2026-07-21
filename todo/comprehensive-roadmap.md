@@ -192,8 +192,9 @@ reversible, never to be cited as deliberate intent.
   the apply surface: journal-driven rollback reads no files, so no rollback
   checksum surface exists.)
 - Squash = a consolidation edge (composition), never a rewrite — L3.
-- Consolidation downs derived by manifest diff ONLY for fully-invertible
-  ranges; DML/RawSQL-containing ranges compose recorded downs — L4.
+- Consolidation downs derived by manifest diff ONLY for fully-mechanically-
+  invertible ranges; ranges containing declared-inverse ops (incl. vacuous
+  DML inverses) or RawSQL compose the originals' recorded downs — L4.
 - Pure migration generation = diff(head manifest, current model); its
   specification is L10's round-trip — L5+L10. (WHICH pure emission policy to
   use is NOT law-derived; the always-large-table-safe choice is a free choice
@@ -213,7 +214,7 @@ reversible, never to be cited as deliberate intent.
   either; the full-project choice is engineering, justified by the
   filtered-output paradox — see the [%%] section.)
 - Opaque Revision type; registry-absent marker INSIDE the hashed bytes;
-  cross-algebra comparison errors — L7.
+  cross-class comparison errors — L7.
 - Intent/confirm journaling for non-transactional ops, with resume protocols
   defined against Postgres's state model (pg_index.indisvalid for interrupted
   CREATE INDEX CONCURRENTLY; IF EXISTS added to DROP INDEX CONCURRENTLY) — L8.
@@ -264,7 +265,8 @@ the data),
 `imports/<alias>/`, visible (non-dot) directory names for committed
 load-bearing data, `internal/objstore`, `internal/project`,
 `internal/predicate`, normalization homed in `internal/sqlparse` (the
-go-pgquery leaf — necessary, since ≈ must match pg_get_* forms), sequence+slug
+go-pgquery leaf — necessary: N and the ≈_pg rewrite bridge are both built on
+its parse/deparse), sequence+slug
 filenames with auto-derived slug (override flag), `import lock` /
 `import update`, `migrate upgrade`, `migrate rebase`, `pgdesign revise`.
 Per-language branding mechanics (boundary-empirical, not law-derived): Go
@@ -286,7 +288,7 @@ hint would be equally pure); FULL-PROJECT stamp scope (resolves the
 filtered-output paradox); pure analyses BLOCK in revise's pure tier (the
 owner's hard-constraints philosophy — analysis that can block must block).
 
-## Ruled-out designs (each violates a law or an axiom — do not resurrect)
+## Ruled-out designs — do not resurrect (law/axiom violations, or strictly dominated alternatives)
 
 Compat-named DB objects or dual recognition of old names (owner axiom).
 Staged/multi-pass header transitions (the one-release axiom makes them double
@@ -486,9 +488,12 @@ implementors.
 
 # Part IV — The boundary (enumerated residual risk)
 
-Everything below is irreducible — checkable, not eliminable. This list is
-closed: a future defect found OUTSIDE it means a law was implemented wrong
-(fix the kernel), not that the list grows.
+Everything below is irreducible — checkable, not eliminable. Per the boundary
+doctrine's triage rule: a defect in kernel territory is an implementation
+error against a stated law property; a defect here is checked by the named
+mechanism; a defect in plain-engineering territory is an ordinary bug. This
+list may grow only with a post-mortem answering "why was this not derivable
+from the laws?"
 
 1. **Postgres crash windows** around non-transactional DDL (CIC, drop-CIC,
    pre-PG12 enum-add). Check: fault-injection matrix incl. indisvalid
@@ -745,9 +750,10 @@ adapter around this.
   The free-category framing puts the trivially-true laws where they belong
   (by construction) and the real risk where it lives (squash soundness —
   checked in 5.3, not asserted here).
-- **Verify:** Property tests: inverse laws on fully-invertible composites;
-  non-invertible-containing composites have no manifest-diff inverse BY
-  TYPE; edge-identity uniqueness under parallel edges and endomorphisms;
+- **Verify:** Property tests: inverse laws on fully-mechanically-invertible
+  composites; any composite NOT fully mechanically invertible has no
+  manifest-diff inverse BY TYPE (declared-inverse-containing included);
+  edge-identity uniqueness under parallel edges and endomorphisms;
   opaque-Revision cross-class comparison errors; diff(a,a) empty;
   conformance direction in CI; sensitivity tests (comment/column/type/
   pg_version/extension changes flip revisions; no-op rebuilds don't). (No
@@ -1050,7 +1056,8 @@ numbered; nothing ships mid-phase (single-release axiom).
 
 ### 5.7 Preconditions + predicate IR — L5+L1
 - **What:** Per-op-class predicates against pg_catalog (absent for
-  creates; present-and-matching via ≈ for alters/drops); unexpected state
+  creates; present-and-matching via N/≈_syn — with the ≈_pg rewrite bridge
+  on introspected text — for alters/drops); unexpected state
   = hard error naming object/expected/found. DML ops precondition-free
   (arbitrary SQL has no catalog precondition). IR = structured data in
   internal/predicate; the Go executor SHARES introspect's catalog-query
@@ -1059,8 +1066,8 @@ numbered; nothing ships mid-phase (single-release axiom).
   structures into DO-blocks for generate --idempotent (RAISE on mismatch —
   4.3's breaking notes). CI conformance matrix: both backends + the differ
   where classes overlap, against live states, identical verdicts.
-- **Why:** L5's domain check, computed with L1's single ≈. The SQL
-  renderer is boundary item 3 (a second computation of ≈ in another
+- **Why:** L5's domain check, computed with L1's single ≈_syn. The SQL
+  renderer is boundary item 3 (a second computation of ≈_syn in another
   language); the matrix is its law-check. The Go executor exists for
   structured diagnostics; SQL-only evaluation is ruled out.
 - **Verify:** DB-backed matrix per op class; golden idempotent SQL;
@@ -1069,7 +1076,8 @@ numbered; nothing ships mid-phase (single-release axiom).
 
 ### 5.8 Post-apply reconcile — L5
 - **What:** After apply: introspect (0.4 exclusions; canonical via 0.2) +
-  ≈-normalized diff against the target model; residual mismatch = hard
+  N-normalized diff (with the ≈_pg rewrite bridge on the introspected
+  side) against the target model; residual mismatch = hard
   error listing every object. Reconcile does not auto-add imported
   schemas. SM-vs-enum introspection lossiness documented. Asserts
   revision-equal-implies-diff-empty on the comprehensive fixture; the
