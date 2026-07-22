@@ -119,8 +119,11 @@ violate?
   real content: (a) edge identity is content-derived — the hom-set question
   is answered explicitly, parallel edges and pure-DML endomorphisms are
   legal; (b) SQUASH SOUNDNESS — a consolidation edge is a NEW edge whose ops
-  must be apply-equivalent to the path it supersedes: a CHECKED property (the
-  commutation test in L10/5.3), never "definitional."
+  must be apply-equivalent to the path it supersedes. Under the ADOPTED
+  CONCATENATION FORM (5.3 — the op-list optimizer is descoped) the op-lists
+  coincide and equivalence holds by construction; the commutation test in
+  L10/5.3 remains as a smoke check and becomes substantive only if the
+  descoped optimizer ever lands.
 - **L4 (Three-way typed invertibility).** Every primitive op is typed:
   MECHANICALLY-INVERTIBLE / DECLARED-INVERSE (including DML ops whose declared
   inverse is vacuous — data is not restored; today's reversibility semantics,
@@ -140,9 +143,10 @@ violate?
   Preconditions are the domain check ("the world is at R_from"); reconcile is
   the codomain check ("the world arrived at R_to"); the journal is the trace.
   Drift is a domain error — always loud, never absorbed. Generation is a pure
-  function of revisions and NEVER reads the world. The substantive functor
+  function of revisions and NEVER reads the world. The functor
   equation — apply(consolidation) lands where apply(sequence) lands — is the
-  named squash-commutation test.
+  named squash-commutation test (definitional under 5.3's concatenation
+  form; substantive only if the descoped optimizer ever lands).
 - **L6 (Total provenance).** Every derived artifact carries the revision that
   produced it; regeneration is re-application of a pure function; freshness is
   extensional equality. All enforcement rules are DERIVED from provenance, not
@@ -164,9 +168,7 @@ violate?
   canonical-only collections — encode to identical revisions: canonicality,
   not mere repeatability); semantic-order collections are SLICES, never
   sorted maps (a semantic order accidentally modeled as a map would be
-  silently destroyed by key-sorting); squash-rewriting confluence (finite
-  critical-pair enumeration + a termination measure, hence unique normal
-  forms by Newman's lemma); the L10 round-trip; and a GOLDEN CORPUS of
+  silently destroyed by key-sorting); the L10 round-trip; and a GOLDEN CORPUS of
   normalized expressions committed so that a go-pgquery dependency bump that
   shifts ≈_syn — which under L1 shifts IDENTITY — turns CI red (recovery:
   `migrate rekey`, per L2). Example fixtures are for the boundary, where laws
@@ -230,6 +232,12 @@ reversible, never to be cited as deliberate intent.
 - No backward compatibility, ever, for pre-stable projects (global rule).
   (Note how this axiom and L2 reinforce each other: compat is keeping two
   identities for one content; extensionality has no such operation.)
+- Hotfix path under the one-release axiom: a first-class maintenance-release
+  mode is commissioned in rlsbl (todo filed 2026-07-22; tag-collision guard
+  included); the documented config-route procedure (see the hotfix appendix)
+  serves until it ships. Corollary rule: the FINAL roadmap release bumps
+  MINOR or MAJOR, never patch — a patch bump could mint a tag an interim
+  hotfix already used.
 
 ## Consequences `[law]`
 
@@ -248,7 +256,9 @@ reversible, never to be cited as deliberate intent.
   re-key. The rekey remap and the rebase remap are ONE mechanism: a unified
   revision-remap table in the chain, consulted by apply and the consistency
   checker alike.
-- Squash = a consolidation edge (composition), never a rewrite — L3.
+- Squash = a consolidation edge (composition), never a rewrite — L3. The
+  edge's op-list is the CONCATENATION of the superseded path's ops (the
+  op-list optimizer is descoped, evidence-gated — see out-of-scope).
 - Consolidation downs derived by manifest diff ONLY for fully-mechanically-
   invertible ranges; ranges containing declared-inverse ops (incl. vacuous
   DML inverses) or RawSQL compose the originals' recorded downs — L4. And
@@ -361,6 +371,15 @@ ALWAYS-large-table-safe generation (uniformity — a declared size hint would
 be equally pure); FULL-PROJECT stamp scope (resolves the filtered-output
 paradox); pure analyses BLOCK in revise's pure tier (the owner's
 hard-constraints philosophy — analysis that can block must block).
+2026-07-22 amendments (all [%%]): the squash op-list optimizer DESCOPED to
+the evidence-gated out-of-scope list (5.3 is concatenation-only);
+go-pgquery bumps are deliberate batched epoch events, never routine
+(unplanned corpus-red = revert the bump, not rekey); the rekey fixture is a
+PERMANENT CI job; mixed-epoch chains outside a sanctioned rekey are a
+consistency-checker HARD ERROR (naming both epochs and the offending
+edges); modelgen's validity oracle is validate itself (zero errors;
+warnings tolerated per fragment); the SM trigger behavioral test lands in
+0.6 covering both runtime branches (illegal transition + requires).
 
 ## Ruled-out designs — do not resurrect (law/axiom violations, or strictly dominated alternatives)
 
@@ -391,7 +410,9 @@ a grow-only boundary list (each unfalsifiable in one direction — the
 bidirectional rule with demotion is the sound form). An iff form of L4's
 composite-inverse rule (false converse: composites can be semantically
 invertible when components are not). "Squash is composition by definition"
-(empty without a morphism congruence — soundness is the CHECKED
+for op-list-ALTERING consolidations (empty without a morphism congruence —
+the adopted concatenation form earns it structurally because the op-lists
+coincide; any future optimizer must re-earn it via the CHECKED
 squash-commutation property). A single undifferentiated ≈ (unachievable:
 pg_get_* cast materialization is catalog-dependent and unreachable by pure
 normalization — hence ≈_syn with the foldings inside N, and the
@@ -715,7 +736,11 @@ argument, and items that become property-checkable are demoted to the kernel.
 12. **go-pgquery deparse stability** — N (and hence identity) is DEFINED by
     an externally-pinned parser's deparse output; a version bump can shift
     ≈_syn. Check: the golden normalized-expression corpus (CI-red on shift);
-    recovery: `migrate rekey` (L2's epoch protocol).
+    recovery: `migrate rekey` (L2's epoch protocol). Policy: bumps are
+    DELIBERATE BATCHED EPOCH EVENTS only — never routine dependency
+    maintenance; an unplanned corpus-red means REVERT THE BUMP, not rekey.
+    The rekey fixture runs as a PERMANENT CI job so the recovery machinery
+    cannot rot unused (5.10).
 13. **Git plumbing for import fetches** (ref resolution, auth, remote
     availability) — distinct from item 6's merge behavior. Check: import
     lock/update error-path tests; offline builds never need the remote
@@ -880,12 +905,22 @@ item 11) is filed at phase-0 start.
   migrationsDir with no containment check — a PATH TRAVERSAL (../../
   escapes) fixed now; lock_timeout is interpolated into SET via Sprintf
   from unvalidated config (validate or parameterize); the dead apply
-  --timeout flag and the phantom baseline --adopt flag are deleted.
+  --timeout flag and the phantom baseline --adopt flag are deleted. (f) SM
+  trigger BEHAVIORAL test: the transition-enforcing trigger's runtime
+  behavior has never been executed by any test — all existing coverage
+  asserts generated SQL text, and the one live installer (the DDL
+  execution-matrix test) never fires it. DB-backed test on the exec-matrix
+  fixture: apply generated DDL; INSERT initial state; legal transition
+  succeeds; illegal transition rejected with the trigger's P0001 error and
+  message; the fixture gains a requires-bearing transition so the
+  requires-non-null branch is exercised in the same test.
 - **Why:** All are live silent-degradation defects (the class L5/L6 exist to
   kill) or misleading API surface; none depend on the kernel; every one
   removed is one less thing later phases interact with.
 - **Verify:** Failing test first per bug — incl. the OpToSQL partman-op red
-  test; CI pg_partman coverage; squash without --db hard-errors.
+  test; CI pg_partman coverage; squash without --db hard-errors; the SM
+  behavioral test exercises BOTH runtime branches against live PG (legal
+  transition passes, illegal and requires-violating transitions raise).
 
 ## Phase 1 — The kernel (pure, law-tested, no Postgres, no CLI)
 
@@ -1088,9 +1123,11 @@ tests consume modelgen and whose conformance work consumes N).
   this deliverable the kernel's verification doctrine is aspirational.
   Built once, consumed by 1.1, 1.2 (expression corpus), 1.4, 5.3
   (critical-pair inputs), and 5.8 (L10).
-- **Verify:** Generated models Build+Canonicalize cleanly at all sizes;
-  fragment restrictions honored; deterministic under a seed; shrinking
-  produces minimal counterexamples.
+- **Verify:** Generated models Build+Canonicalize cleanly AND pass validate
+  with ZERO ERRORS at all sizes (validate IS the generator's validity
+  oracle — a second private notion of validity would drift narrow silently;
+  warnings tolerated per fragment config); fragment restrictions honored;
+  deterministic under a seed; shrinking produces minimal counterexamples.
 
 ## Phase 2 — Environment boundary (strictcli) [external milestone]
 
@@ -1332,7 +1369,11 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   repointed to the view; version endpoint updated for the new naming.
   Store<->chain<->files consistency check = Merkle closure PLUS
   edge-endpoint consistency (simulate each edge's ops; assert
-  from-manifest -> to-manifest); 6.2 and 7.2 invoke the same checker.
+  from-manifest -> to-manifest) PLUS epoch homogeneity (chain edges
+  carrying differing codec epochs without a covering remap entry = HARD
+  ERROR naming both epochs and the offending edges — mixed epochs outside
+  a sanctioned rekey are corruption, per the batched-events bump policy);
+  6.2 and 7.2 invoke the same checker.
 - **Why:** L3 needs the chain physically; L8 dictates the choreography
   (assert-before-DROP; lock; idempotent-files-then-atomic-commit); L5's
   verify-then-stamp makes the boundary a verified fact, not an assertion.
@@ -1340,54 +1381,48 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   dirty-tree refusal; mid-edit TOML cannot stamp; drift report on unclean
   reconcile; amnesty report on historical checksum mismatch (fold
   proceeds); consistency check red on tamper AND on an edge whose ops
-  don't map from->to; concurrent apply blocked; upgrade's reconcile does
+  don't map from->to AND on a mixed-epoch chain without covering remap;
+  concurrent apply blocked; upgrade's reconcile does
   NOT flag the just-created managed tables.
 
 ### 5.3 Squash = composition — L3+L4
 - **What:** Consolidation = an ADDITIONAL chain edge; superseded files
   retire intact to migrations/archive/, reachable via their edges
   (mid-range databases apply remaining originals via the 5.0 path-finder).
-  Consolidation downs: by manifest diff for fully-mechanically-invertible
-  ranges; ranges containing declared-inverse/DML ops compose the
-  originals' recorded downs (vacuous where declared so — L4's three-way
-  type decides, no runtime judgment). Consolidations PRESERVE every
-  DML/RawSQL op of the superseded path (no drop, no fold-across — a
-  structural side-condition on op-lists; schema-commutation cannot see the
-  data divergence folding would cause for fresh databases). The op-list
-  optimizer is specified as a TERMINATING REWRITING SYSTEM: cancellation
-  carries the side condition "no intervening op REFERENCES the cancelled
-  object" — where the references relation spans the full dependency
-  surface (RefTable/RefCols, trigger function, view/function bodies,
-  depends_on; DML ops reference their tables); each rule strictly
-  decreases a stated measure (termination); critical pairs are enumerated
-  across ALL THREE rule classes — the 12 cancellation pairs, sequential
-  type-change merging, and create_table folding (the cross-class pairs are
-  the interesting ones) — and both resolutions tested to converge (modelgen
-  supplies inputs) — termination + local confluence gives UNIQUE NORMAL
-  FORMS (Newman), which is what makes consolidation well-defined. Named gaps
-  the rewrite fills: no cancellation pairs exist today for exclusions,
-  views, matviews, sequences, composite types, domains, or policies. The
-  references relation is only computable AFTER 5.1's content-addressed
-  closure (the fields it spans live inside today's unserialized pointer
-  defs) — the stated reason for the 5.1 -> 5.3 land-order edge.
-  SQUASH-COMMUTATION (the L5/L10 functor equation) is a named test:
-  apply(consolidation) and apply(sequence) land on the same introspected
-  schema-state. The rollback-equivalence invariant is STRUCTURAL (revision
+  The consolidation op-list is the ORDERED CONCATENATION of the superseded
+  path's ops with phase tags stripped — DML/RawSQL preserved verbatim BY
+  CONSTRUCTION (concatenation never drops or folds; the data-divergence
+  hazard was a hazard of folding, which no longer exists here).
+  SQUASH-COMMUTATION (the L5/L10 functor equation) holds definitionally —
+  the op-lists coincide — and is retained as a smoke test. Consolidation
+  downs: by manifest diff for fully-mechanically-invertible ranges; ranges
+  containing declared-inverse/DML ops compose the originals' recorded
+  downs (vacuous where declared so — L4's three-way type decides, no
+  runtime judgment). THE OP-LIST OPTIMIZER IS DESCOPED (see out-of-scope):
+  cancellation/merging/folding-as-a-rewriting-system moves to the
+  evidence-gated list; today's optimizeDDLOps and its tests (inverse-pair
+  cancellation, type-merge, CREATE TABLE folding, ConsolidatedOps
+  round-trip/phase-strip) RETIRE with it as superseded dead code — the
+  orphaned-index and duplicate-add cancellation bugs die by deletion, not
+  by repair. The rollback-equivalence invariant is STRUCTURAL (revision
   equality says nothing about data). Tracking/journal lineage handled; no
-  orphaned rows; files never rewritten.
-- **Why:** L3 makes squash a checked normalization, not a definition; L4
-  makes the data-loss hole (a DOWN recreating a dropped column empty)
-  unrepresentable; the DML-preservation side-condition closes the UP
-  direction the commutation test cannot see; the rewriting-system spec
-  replaces "we hope pass order doesn't matter" with a finite, decidable
-  check.
+  orphaned rows; files never rewritten. (Land-order note: 5.1 -> 5.3 still
+  holds — not for the optimizer's references relation, but because
+  consolidation edges carry self-contained ops and the manifest-diff down
+  form needs 5.1's content-addressed manifests.)
+- **Why:** L3 makes squash a new edge, never a rewrite; concatenation
+  makes apply-equivalence and DML preservation structural properties
+  instead of checked ones; L4 makes the data-loss hole (a DOWN recreating
+  a dropped column empty) unrepresentable. Compression of consolidation
+  edges is a quality feature with no current consumer — exactly what the
+  evidence-gating posture defers.
 - **Verify:** Squash of applied migrations via consolidation; mid-range DB
-  resumes via archived originals; SQUASH-COMMUTATION on the comprehensive
-  fixture; rollback-equivalence on structural AND merged-type-change
-  fixtures; a DML-containing range takes the composed-downs form BY TYPE
-  and PRESERVES its DML ops; critical-pair convergence suite green; the
-  orphaned-index fixture (add/index/drop) refuses cancellation; an
-  FK-RefTable critical pair converges; no orphaned rows.
+  resumes via archived originals; SQUASH-COMMUTATION smoke test on the
+  comprehensive fixture; rollback-equivalence on the structural fixture; a
+  DML-containing range takes the composed-downs form BY TYPE and PRESERVES
+  its DML ops verbatim; the add/index/drop sequence replays correctly
+  through a consolidation edge (concatenation has no cancellation to get
+  wrong); no orphaned rows; optimizeDDLOps and its test suite deleted.
 
 ### 5.4 Unconditional checksums (apply surface) — L2
 - **What:** After 5.2/5.3: checksum verification unconditional ON APPLY —
@@ -1541,7 +1576,8 @@ subphase numbers retained for reference; they land together.)
   consistent, archived edges reachable via the checker, and a database
   stamped at a rebased-away revision APPLIES FORWARD via the remap; rekey
   fixture: corpus shift -> rekey -> consistency check green under the new
-  epoch, old-id map complete; baseline fixture: manifest-from-
+  epoch, old-id map complete (this fixture is a PERMANENT CI job — the
+  drill runs on every build, not on demand); baseline fixture: manifest-from-
   introspection attaches, position written, reachability guards fire;
   shadow test passes on the comprehensive fixture; the doc greps pass;
   full migrate suite green.
@@ -1840,13 +1876,54 @@ with change/change conflicts detected by id inequality against base; the
 kernel makes it nearly free) as the recorded alternative to rebase-only
 fork resolution.
 
+THE SQUASH OP-LIST OPTIMIZER (evidence-gated, descoped from 5.3):
+inverse-pair cancellation, sequential type-change merging, and CREATE
+TABLE folding specified as a terminating rewriting system —
+dependency-aware side conditions over the references relation (spanning
+RefTable/RefCols, trigger functions, view/function bodies, depends_on;
+DML ops reference their tables), per-rule decreasing measures,
+critical-pair enumeration across all three rule classes, unique normal
+forms by Newman's lemma. Trigger: a consolidation edge's size
+demonstrably hurting a consumer. Until then consolidation is
+concatenation, squash-commutation is definitional, and today's
+optimizeDDLOps plus its tests retire as superseded dead code (deleted in
+5.3).
+
+## Hotfix procedure under the one-release axiom
+
+The one-release axiom needs an escape path for a critical consumer bug in
+the CURRENTLY-RELEASED version mid-roadmap. Verified against rlsbl's
+release flow: the dev-branch path hard-fails on a branch diverged from
+main (fast-forward ancestry gate), but the ON-RELEASE-BRANCH path never
+touches main — so hotfix-from-old-tag works today via config:
+
+1. `git checkout -b hotfix/<issue> vX.Y.Z` (the last release tag).
+2. Cherry-pick/commit the fix; add JSONL changelog entries (the unreleased
+   range resolves per-branch as vX.Y.Z..HEAD — git describe sees only
+   ancestor tags).
+3. Temporarily add the hotfix branch name to `release_branches` in
+   `.rlsbl/config.json`, committed on the hotfix branch only.
+4. `rlsbl release run --no-allow-dirty --watch --yes` on the branch: it
+   releases vX.Y.(Z+1) in place; main is never fast-forwarded or touched;
+   main's later tag-range computation ignores non-ancestor tags.
+5. Forward-port the fix to main by cherry-pick (rlsbl does not do this).
+
+Hazard the config route cannot see: CROSS-BRANCH TAG COLLISION — rlsbl
+derives the next version from the branch's own files, so main's final
+release must never compute a tag an interim hotfix already minted; the
+final-release-bumps-minor-or-major rule (owner axiom section) exists for
+exactly this. A first-class maintenance-release mode (declarative branch
+authorization + a tag-collision guard) is commissioned in rlsbl; once it
+ships, step 3 collapses away.
+
 ## Effort
 
 Phase 0: 2-3 sessions. Phase 1 (kernel): 3-4 sessions (incl. modelgen) —
 pure Go, property-tested, no DB; front-loaded because everything else
 adapts it. Phase 2: 1-2 (externally gated). Phase 4: 3-4 (incl. 4.0's two
-deliverables). Phase 5: 4-6 (the chain/invertibility/store machinery lives
-in the kernel; the apply loop is rewritten once). Phase 6: 1-2. Phase 7:
+deliverables). Phase 5: 3-5 (the chain/invertibility/store machinery lives
+in the kernel; the apply loop is rewritten once; the squash optimizer is
+descoped). Phase 6: 1-2. Phase 7:
 3-4. Phase 8: 1 (after 5.2's serve edits). Phase 9: 2-3. Parallelization
 per the DAG.
 
