@@ -1895,7 +1895,13 @@ The one-release axiom needs an escape path for a critical consumer bug in
 the CURRENTLY-RELEASED version mid-roadmap. Verified against rlsbl's
 release flow: the dev-branch path hard-fails on a branch diverged from
 main (fast-forward ancestry gate), but the ON-RELEASE-BRANCH path never
-touches main — so hotfix-from-old-tag works today via config:
+touches main. Hotfix-from-old-tag works today via config PLUS ONE
+BRANCH-LOCAL CI EDIT — the config alone is NOT sufficient for this
+project, because pgdesign publishes to registries through gated CI:
+scaffolded CI triggers only on pushes to main, the publish gate polls
+check-runs for the release SHA, finds none for a hotfix-branch SHA, and
+hard-fails after its grace window — tag and GitHub Release exist, but
+THE PACKAGE NEVER REACHES npm/PyPI. Procedure:
 
 1. `git checkout -b hotfix/<issue> vX.Y.Z` (the last release tag).
 2. Cherry-pick/commit the fix; add JSONL changelog entries (the unreleased
@@ -1903,18 +1909,28 @@ touches main — so hotfix-from-old-tag works today via config:
    ancestor tags).
 3. Temporarily add the hotfix branch name to `release_branches` in
    `.rlsbl/config.json`, committed on the hotfix branch only.
-4. `rlsbl release run --no-allow-dirty --watch --yes` on the branch: it
+4. On the hotfix branch only, hand-edit `.github/workflows/ci*.yml` to add
+   the hotfix branch to the `push.branches` trigger (hand-edits to
+   scaffolded CI are proven to survive; the edit lives and dies with the
+   branch). Without this step the publish gate hard-fails (above).
+5. `rlsbl release run --no-allow-dirty --watch --yes` on the branch: it
    releases vX.Y.(Z+1) in place; main is never fast-forwarded or touched;
    main's later tag-range computation ignores non-ancestor tags.
-5. Forward-port the fix to main by cherry-pick (rlsbl does not do this).
+6. Merge back to main: cherry-pick the fix commit AND the hotfix branch's
+   CHANGELOG-FINALIZE COMMIT — without the latter, main's CHANGELOG.md
+   silently omits the hotfix version forever. rlsbl does neither.
 
-Hazard the config route cannot see: CROSS-BRANCH TAG COLLISION — rlsbl
-derives the next version from the branch's own files, so main's final
-release must never compute a tag an interim hotfix already minted; the
-final-release-bumps-minor-or-major rule (owner axiom section) exists for
-exactly this. A first-class maintenance-release mode (declarative branch
-authorization + a tag-collision guard) is commissioned in rlsbl; once it
-ships, step 3 collapses away.
+TAG-COLLISION status (corrected 2026-07-22): rlsbl's computed-tag-exists
+check DOES fire pre-mutation today (an incidental git fetch brings the
+hotfix tag down first), but it is local-only and generic, and it is
+backstopped by a SILENT SKIP of the tag-push at execute time — the real
+anti-pattern. The final-release-bumps-minor-or-major rule (owner axiom
+section) remains the belt to that unreliable suspender. Comprehensive
+hotfix support is commissioned in rlsbl (consolidated todo filed
+2026-07-22: maintenance mode with config+flag, a CI-trigger mechanism for
+the release SHA, the collision guard as a hard error on both paths with
+the silent skip removed, and a printed merge-back checklist); once it
+ships, steps 3-4 collapse away and step 6 becomes a printed checklist.
 
 ## Effort
 
