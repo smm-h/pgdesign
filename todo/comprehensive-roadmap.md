@@ -128,7 +128,7 @@ violate?
 - **L4 (Three-way typed invertibility).** Every primitive op is typed:
   MECHANICALLY-INVERTIBLE / DECLARED-INVERSE (including DML ops whose declared
   inverse is vacuous — data is not restored; today's reversibility semantics,
-  now explicit) / NON-INVERTIBLE. The inverse of a composite is the reversed
+  made explicit) / NON-INVERTIBLE. The inverse of a composite is the reversed
   composition of component inverses, defined WHEN every component has one.
   This is a deliberate conservative under-approximation: a composite can be
   semantically invertible when components are not (chained type changes whose
@@ -243,7 +243,7 @@ reversible, never to be cited as deliberate intent.
   (Note how this axiom and L2 reinforce each other: compat is keeping two
   identities for one content; extensionality has no such operation.)
 - Hotfix path under the one-release axiom: a first-class maintenance-release
-  mode is commissioned in rlsbl (todo filed 2026-07-22; tag-collision guard
+  mode is commissioned in rlsbl (todo filed in rlsbl; tag-collision guard
   included); the documented config-route procedure (see the hotfix appendix)
   serves until it ships. Corollary rule: the FINAL roadmap release bumps
   MINOR or MAJOR, never patch — a patch bump could mint a tag an interim
@@ -381,31 +381,24 @@ ALWAYS-large-table-safe generation (uniformity — a declared size hint would
 be equally pure); FULL-PROJECT stamp scope (resolves the filtered-output
 paradox); pure analyses BLOCK in revise's pure tier (the owner's
 hard-constraints philosophy — analysis that can block must block).
-2026-07-22 amendments (all [%%]): the squash op-list optimizer DESCOPED to
-the evidence-gated out-of-scope list (5.3 is concatenation-only);
-go-pgquery bumps are deliberate batched epoch events, never routine
-(unplanned corpus-red = revert the bump, not rekey); the rekey fixture is a
-PERMANENT CI job; mixed-epoch chains outside a sanctioned rekey are a
-consistency-checker HARD ERROR (naming both epochs and the offending
-edges); modelgen's validity oracle is validate itself (zero errors;
-warnings tolerated per fragment); the SM trigger behavioral test lands in
-0.6 covering both runtime branches (illegal transition + requires).
-2026-07-24 amendments (all [%%]): epoch recovery machinery (`migrate rekey`;
-the permanent rekey CI fixture) DESCOPED to event-time work recorded in
-out-of-scope — NOT pre-built. The CI PIN GUARD on go-pgquery (a recorded
-sanctioned epoch version; go.mod divergence = hard error naming the epoch
-policy — 1.2). The golden corpus REFRAMED as N-regression fixtures pinning N
-against pgdesign's OWN normalizer refactors (the frequent hazard), SUPERSEDING
-the 2026-07-22 bump-alarm framing. Mixed-epoch chains = an UNCONDITIONAL hard
-error (never "outside a sanctioned rekey" — epochs change only via the
-event-time procedure, never incrementally). Consumer rehearsals after phases
-5 and 7 (throwaway DB copies and working trees; no release, no commits to
-consumer repos). serve posture: 127.0.0.1 default bind, an explicit override
-flag whose help text states there is NO auth; auth deferred to phase 10 (a
-decided non-goal, not an omission). 5.2's pre-upgrade hard-error guard (every
-migrate subcommand against a pre-upgrade database names `migrate upgrade`).
-The validate-as-oracle triage rule (validate's correctness is kernel-adjacent
-— the boundary doctrine's one named plain-engineering exception).
+The squash op-list optimizer is descoped to the evidence-gated out-of-scope
+list (5.3 is concatenation-only). go-pgquery bumps are deliberate batched
+epoch events, never routine (an unplanned corpus-red means reverting the
+bump, not rekeying), foreclosed by the CI pin guard (1.2) that turns
+accidental movement into a hard error; N's golden corpus is regression
+fixtures pinning N against pgdesign's OWN normalizer refactors; mixed-epoch
+chains are an unconditional consistency-checker hard error (naming both
+epochs and the offending edges). modelgen's validity oracle is validate
+itself (zero errors; warnings tolerated per fragment). The SM trigger
+behavioral test lands in 0.6, covering both runtime branches (illegal
+transition and requires). Consumer rehearsals run after phases 5 and 7
+against throwaway DB copies and working trees (no release, no commits to
+consumer repos). serve binds 127.0.0.1 by default behind an explicit
+override flag whose help text states there is NO auth (auth deferred to
+phase 10, a decided non-goal, not an omission). Every migrate subcommand run
+against a pre-upgrade database hard-errors naming `migrate upgrade` (5.2).
+validate's correctness is kernel-adjacent as modelgen's validity oracle —
+the boundary doctrine's one named plain-engineering exception.
 
 ## Ruled-out designs — do not resurrect (law/axiom violations, or strictly dominated alternatives)
 
@@ -1140,7 +1133,7 @@ tests consume modelgen and whose conformance work consumes N).
   divergent serializers die. Revision printed by validate/build. Stated
   policy: a pgdesign upgrade that changes the model schema or the codec
   flips all revisions — derived artifacts regenerate once (the existing
-  consumer convention, now load-bearing); HISTORY is not a derived artifact
+  consumer convention, load-bearing here); HISTORY is not a derived artifact
   and cannot be regenerated, so an epoch change is a deliberate breaking-major
   event whose recovery tooling is written AT EVENT TIME (L2; the out-of-scope
   EPOCH RECOVERY entry).
@@ -1442,7 +1435,7 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   The consolidation op-list is the ORDERED CONCATENATION of the superseded
   path's ops with phase tags stripped — DML/RawSQL preserved verbatim BY
   CONSTRUCTION (concatenation never drops or folds; the data-divergence
-  hazard was a hazard of folding, which no longer exists here).
+  hazard was a hazard of folding, which does not exist here).
   SQUASH-COMMUTATION (the L5/L10 functor equation) holds definitionally —
   the op-lists coincide — and is retained as a smoke test. Consolidation
   downs: by manifest diff for fully-mechanically-invertible ranges; ranges
@@ -1983,14 +1976,15 @@ THE PACKAGE NEVER REACHES npm/PyPI. Procedure:
    CHANGELOG-FINALIZE COMMIT — without the latter, main's CHANGELOG.md
    silently omits the hotfix version forever. rlsbl does neither.
 
-TAG-COLLISION status (corrected 2026-07-22): rlsbl's computed-tag-exists
+TAG-COLLISION status: rlsbl's computed-tag-exists
 check DOES fire pre-mutation today (an incidental git fetch brings the
 hotfix tag down first), but it is local-only and generic, and it is
 backstopped by a SILENT SKIP of the tag-push at execute time — the real
 anti-pattern. The final-release-bumps-minor-or-major rule (owner axiom
 section) remains the belt to that unreliable suspender. Comprehensive
-hotfix support is commissioned in rlsbl (consolidated todo filed
-2026-07-22: maintenance mode with config+flag, a CI-trigger mechanism for
+hotfix support is commissioned as a first-class rlsbl feature (a
+consolidated todo is filed in rlsbl: maintenance mode with config+flag, a
+CI-trigger mechanism for
 the release SHA, the collision guard as a hard error on both paths with
 the silent skip removed, and a printed merge-back checklist); once it
 ships, steps 3-4 collapse away and step 6 becomes a printed checklist.
