@@ -101,14 +101,15 @@ violate?
   item 14); get(put(x)) = x; puts idempotent; identity location-free;
   decode∘enc = id on canonicalized models. Content ids are EPOCH-RELATIVE:
   every stored form carries its codec version, and a change to enc or N
-  re-keys the world — recovered by `migrate rekey`, the ONE sanctioned
-  rewrite, whose mutation scope is TOTAL: store objects, manifests, AND
-  chain-edge files all re-encode under the new epoch (a partial re-key would
-  break Merkle closure — edges would reference old-epoch ids). rekey and
-  rebase write into ONE unified revision-remap table in the chain, consulted
-  by both apply and the consistency checker, so a database whose
-  chain_position holds a pre-rewrite revision (rekeyed OR rebased-away) is
-  served forward, never orphaned. Outside an epoch bump, mutation of STORE
+  re-keys the world. Such epoch changes are RARE, DELIBERATE
+  BREAKING-MAJOR-RELEASE EVENTS (a go-pgquery bump, or any deliberate change
+  to enc/N semantics); the recovery tooling is written AT EVENT TIME, not
+  pre-built (see the out-of-scope EPOCH RECOVERY entry). The codec-version
+  field is what keeps the store SELF-DESCRIBING enough for that tooling to be
+  written when needed. The revision-remap table in the chain is REBASE-ONLY
+  machinery (L3/5.10) — consulted by apply and the consistency checker, so a
+  database whose chain_position holds a rebased-away revision is served
+  forward, never orphaned. Outside an epoch bump, mutation of STORE
   CONTENT (objects, manifests) is not an operation this structure has.
   Chain-edge FILES are location-addressed — their append-onlyness is CHECKED
   POLICY (the consistency checker, incl. its edge-endpoint check), not
@@ -168,11 +169,13 @@ violate?
   canonical-only collections — encode to identical revisions: canonicality,
   not mere repeatability); semantic-order collections are SLICES, never
   sorted maps (a semantic order accidentally modeled as a map would be
-  silently destroyed by key-sorting); the L10 round-trip; and a GOLDEN CORPUS of
-  normalized expressions committed so that a go-pgquery dependency bump that
-  shifts ≈_syn — which under L1 shifts IDENTITY — turns CI red (recovery:
-  `migrate rekey`, per L2). Example fixtures are for the boundary, where laws
-  end.
+  silently destroyed by key-sorting); the L10 round-trip; and a GOLDEN CORPUS
+  of normalized expressions committed as REGRESSION FIXTURES pinning N's
+  behavior against pgdesign's OWN refactors of internal/sqlparse (an own-code
+  change that shifts ≈_syn — hence identity — turns CI red and is reverted or
+  handled as a deliberate epoch event); dependency bumps are foreclosed
+  separately by the CI pin guard (see 1.2). Example fixtures are for the
+  boundary, where laws end.
 - **L10 (Round-trip — the central theorem).** For models a, b: applying
   gen(diff(a, b)) to a world at revision(a) lands it at revision(b) —
   gen is a section of apply-then-introspect up to ≈_syn. This is THE
@@ -207,6 +210,13 @@ The system is a THREE-WAY partition, and defects are triaged accordingly:
 3. **Plain engineering outside the algebra** — phase 9's presentation work,
    CLI ergonomics, doc wording, seed statistical quality. Ordinary bugs, no
    doctrinal claim; forcing the formalism onto them would be ceremony.
+
+ONE NAMED EXCEPTION to plain-engineering triage: validate is modelgen's
+validity oracle (1.6), so validate's correctness is LOAD-BEARING for kernel
+verification — a validate bug found later is KERNEL-ADJACENT, and its fix
+triggers an audit of which kernel properties were tested over a distorted
+generated-input distribution (a narrowed or skewed validity notion silently
+shrinks what the property suite ever exercised).
 
 Boundary membership is BIDIRECTIONAL: the list may grow only with a
 post-mortem containing a POSITIVE impossibility argument (why no pure
@@ -248,14 +258,14 @@ reversible, never to be cited as deliberate intent.
   surface — L2. (Checksums exist ONLY on the apply surface: post-5.6,
   journal-driven rollback reads no files, so no rollback checksum surface
   exists.)
-- Content ids are EPOCH-RELATIVE; an enc/N change re-keys the world; recovery
-  is `migrate rekey` with TOTAL mutation scope (store objects + manifests +
-  chain-edge files re-encode under the new epoch; a recorded remap) — the ONE
-  sanctioned exception to append-onlyness — L2+L9. Every stored form carries
-  its codec version so the store is self-describing enough to drive the
-  re-key. The rekey remap and the rebase remap are ONE mechanism: a unified
-  revision-remap table in the chain, consulted by apply and the consistency
-  checker alike.
+- Content ids are EPOCH-RELATIVE; an enc/N change re-keys the world — but such
+  epoch changes are RARE, DELIBERATE BREAKING-MAJOR-RELEASE EVENTS whose
+  recovery tooling is written AT EVENT TIME, not pre-built (out-of-scope EPOCH
+  RECOVERY) — L2+L9. Pre-built now: the codec-version field on every stored
+  form (so the store is self-describing enough for that tooling to be written
+  when needed) and the CI pin guard foreclosing accidental movement (1.2). The
+  revision-remap table is REBASE-ONLY (L3/5.10) — consulted by apply and the
+  consistency checker so rebased-away positions are served forward.
 - Squash = a consolidation edge (composition), never a rewrite — L3. The
   edge's op-list is the CONCATENATION of the superseded path's ops (the
   op-list optimizer is descoped, evidence-gated — see out-of-scope).
@@ -349,7 +359,7 @@ shared by introspect and the predicate executor), normalization homed in
 `internal/sqlparse` (the go-pgquery leaf — necessary: N and the ≈_pg bridge
 are both built on its parse/deparse), migration file display names carrying
 an auto-derived slug (override flag), `import lock` / `import update`,
-`migrate upgrade`, `migrate rebase`, `migrate rekey`, `pgdesign revise`.
+`migrate upgrade`, `migrate rebase`, `pgdesign revise`.
 Per-language branding mechanics (boundary-empirical, not law-derived): Go
 opaque struct with validating boundary and var members; Python parse() alias +
 enum-typed surfaces + Row __post_init__ coercion on BOTH backends; TS
@@ -380,6 +390,22 @@ consistency-checker HARD ERROR (naming both epochs and the offending
 edges); modelgen's validity oracle is validate itself (zero errors;
 warnings tolerated per fragment); the SM trigger behavioral test lands in
 0.6 covering both runtime branches (illegal transition + requires).
+2026-07-24 amendments (all [%%]): epoch recovery machinery (`migrate rekey`;
+the permanent rekey CI fixture) DESCOPED to event-time work recorded in
+out-of-scope — NOT pre-built. The CI PIN GUARD on go-pgquery (a recorded
+sanctioned epoch version; go.mod divergence = hard error naming the epoch
+policy — 1.2). The golden corpus REFRAMED as N-regression fixtures pinning N
+against pgdesign's OWN normalizer refactors (the frequent hazard), SUPERSEDING
+the 2026-07-22 bump-alarm framing. Mixed-epoch chains = an UNCONDITIONAL hard
+error (never "outside a sanctioned rekey" — epochs change only via the
+event-time procedure, never incrementally). Consumer rehearsals after phases
+5 and 7 (throwaway DB copies and working trees; no release, no commits to
+consumer repos). serve posture: 127.0.0.1 default bind, an explicit override
+flag whose help text states there is NO auth; auth deferred to phase 10 (a
+decided non-goal, not an omission). 5.2's pre-upgrade hard-error guard (every
+migrate subcommand against a pre-upgrade database names `migrate upgrade`).
+The validate-as-oracle triage rule (validate's correctness is kernel-adjacent
+— the boundary doctrine's one named plain-engineering exception).
 
 ## Ruled-out designs — do not resurrect (law/axiom violations, or strictly dominated alternatives)
 
@@ -678,7 +704,7 @@ serve's payload key changes are an API-consumer-visible change to note in
   model, workload, testdb); sqlutil is imported by validate+codegen. The
   go-pgquery dependency is pinned to a pseudo-version; its deparse output
   DEFINES N and hence identity — its cross-version stability is itself a
-  boundary item, checked by the golden corpus.
+  boundary item, foreclosed by the CI pin guard (boundary item 12).
 - serve: DB-coupled at construction; --timeout registered but never
   enforced; audit runs TANE synchronously; GenerateD2 called with a nil
   registry (SM diagrams silently dropped); serve's own parseAndBuild
@@ -735,12 +761,13 @@ argument, and items that become property-checkable are demoted to the kernel.
     have no phase-2 dependency; todo filed at phase-0 start).
 12. **go-pgquery deparse stability** — N (and hence identity) is DEFINED by
     an externally-pinned parser's deparse output; a version bump can shift
-    ≈_syn. Check: the golden normalized-expression corpus (CI-red on shift);
-    recovery: `migrate rekey` (L2's epoch protocol). Policy: bumps are
-    DELIBERATE BATCHED EPOCH EVENTS only — never routine dependency
-    maintenance; an unplanned corpus-red means REVERT THE BUMP, not rekey.
-    The rekey fixture runs as a PERMANENT CI job so the recovery machinery
-    cannot rot unused (5.10).
+    ≈_syn. Check: the CI PIN GUARD makes accidental bumps STRUCTURALLY
+    IMPOSSIBLE — the pin moves only by editing the recorded sanctioned
+    version, an unmistakably deliberate act (1.2); N's golden REGRESSION
+    fixtures cover pgdesign's own normalizer changes. Policy: essentially
+    NEVER bump — when eventually forced (new PG syntax support, toolchain
+    rot), a deliberate breaking MAJOR release carries the event-time
+    procedure (see the out-of-scope EPOCH RECOVERY entry).
 13. **Git plumbing for import fetches** (ref resolution, auth, remote
     availability) — distinct from item 6's merge behavior. Check: import
     lock/update error-path tests; offline builds never need the remote
@@ -757,6 +784,15 @@ Phase numbering: 0 = substrate repairs; 1 = the kernel; 2 and 4-9 = boundary
 phases and adoption. The number 3 is intentionally unassigned (the identity
 work — whole-model form, revision hash, one serializer — lives in kernel
 subphases 1.4/1.5). Every subphase cites its laws.
+
+CONSUMER REHEARSALS — two rehearsal checkpoints against DISPOSABLE artifacts.
+After phase 5: run the unreleased binary against a THROWAWAY copy of a real
+consumer database and repo — `migrate upgrade`, chain UX, apply/rollback end
+to end. After phase 7: imports plus branding adaptation against throwaway
+consumer working copies. Everything is discarded — disposable worktrees and
+DB copies, NO release, NO commits to consumer repos — so the one-release
+axiom is untouched; findings feed back into the plan. First real-world
+contact must NOT be the final release.
 
 ## Phase 0 — Substrate repairs (make the codebase law-capable)
 
@@ -1004,7 +1040,10 @@ tests consume modelgen and whose conformance work consumes N).
   engine (E213 column refs, CHECK-pattern extraction), not a ≈-engine — the
   no-normalizer-outside-sqlparse grep has a principled exception. Later
   consumers: upgrade reconcile, predicates, reconcile-verify, shadow test,
-  import drift (7.2).
+  import drift (7.2). THE CI PIN GUARD is a 1.2 deliverable: a CI check
+  asserting go.mod's go-pgquery version equals the RECORDED SANCTIONED epoch
+  version — divergence is a hard error naming the epoch policy, so the
+  dependency can never move by accident.
 - **Why:** L1(b): every comparison engine must compute the same ≈_syn — two
   disagreeing normalizers already ship today, and the differ additionally
   disagrees with Postgres's rewriter. L1(c): the catalog-independent
@@ -1014,8 +1053,10 @@ tests consume modelgen and whose conformance work consumes N).
   default fixture; N∘N = N idempotence over a generated expression corpus;
   folding symmetry (IN-form and =ANY-form of the same predicate normalize
   identically FROM EITHER SIDE); the GOLDEN CORPUS of normalized forms
-  committed (a go-pgquery bump that shifts ≈_syn — hence identity — turns
-  CI red; boundary item 12); the residue-rule suite; diff --live clean on
+  committed as REGRESSION FIXTURES pinning N against pgdesign's OWN refactors
+  of internal/sqlparse (an own-code shift of ≈_syn turns CI red; boundary
+  item 12); the PIN-GUARD test (a divergent go.mod go-pgquery version turns
+  CI red); the residue-rule suite; diff --live clean on
   the comprehensive fixture (reused verbatim by 5.8); grep: no normalizer
   outside internal/sqlparse.
 
@@ -1099,13 +1140,14 @@ tests consume modelgen and whose conformance work consumes N).
   divergent serializers die. Revision printed by validate/build. Stated
   policy: a pgdesign upgrade that changes the model schema or the codec
   flips all revisions — derived artifacts regenerate once (the existing
-  consumer convention, now load-bearing); HISTORY re-keys via `migrate
-  rekey` (L2's epoch protocol — history is not a derived artifact and
-  cannot be regenerated).
+  consumer convention, now load-bearing); HISTORY is not a derived artifact
+  and cannot be regenerated, so an epoch change is a deliberate breaking-major
+  event whose recovery tooling is written AT EVENT TIME (L2; the out-of-scope
+  EPOCH RECOVERY entry).
 - **Why:** L1 demands one serializer; L7 demands the in-bytes marker; the
   envelope resolves in-band-stamp circularity (bytes cannot contain their
   own hash); the epoch policy separates what regeneration can fix (derived
-  artifacts) from what needs the sanctioned re-key (history).
+  artifacts) from what needs the event-time epoch procedure (history).
 - **Verify:** generate json and serve bodies identical for the same schema;
   envelope revision verifies against embedded bytes; marker present on the
   introspect path; diagnostics preserved; goldens updated once.
@@ -1122,7 +1164,9 @@ tests consume modelgen and whose conformance work consumes N).
   codebase produces models (the seed package generates row DATA). Without
   this deliverable the kernel's verification doctrine is aspirational.
   Built once, consumed by 1.1, 1.2 (expression corpus), 1.4, 5.3
-  (critical-pair inputs), and 5.8 (L10).
+  (critical-pair inputs), and 5.8 (L10). Because validate is this generator's
+  validity oracle, validate's correctness is KERNEL-ADJACENT — the boundary
+  doctrine's one named plain-engineering exception.
 - **Verify:** Generated models Build+Canonicalize cleanly AND pass validate
   with ZERO ERRORS at all sizes (validate IS the generator's validity
   oracle — a second private notion of validity would drift narrow silently;
@@ -1152,7 +1196,7 @@ tests consume modelgen and whose conformance work consumes N).
   framework; --hermetic makes DB checks skip visibly; config [database].url
   stays a documented separate layer (cli > env > config). Not a leaf: every
   later DB entrypoint (revise's DB tier, import lock/update, live
-  verification, seed tier-1, migrate upgrade/rekey) binds from birth when
+  verification, seed tier-1, migrate upgrade) binds from birth when
   phase 2 has landed; when a phase-5 command lands first, 2.2's sweep picks
   it up and 2.1's registration error prevents regressions thereafter.
   internal/dbutil.ResolveURL — a dead first-non-empty URL resolver with
@@ -1293,7 +1337,7 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   (migrations/objects/, migrations/revisions/ — manifests as kind-qualified
   sorted maps), archive layout (migrations/archive/). THE PATH-FINDER
   specified here as a DETERMINISTIC TOTAL RULE: apply performs reachability
-  search from chain_position's revision (through the unified remap table)
+  search from chain_position's revision (through the rebase remap table)
   to a head, ARCHIVE-INCLUSIVE, choosing the SHORTEST edge-count path with
   consolidation-edge preference as the tie-break; OVERLAPPING consolidation
   ranges are FORBIDDEN AT CREATION (a cheap structural invariant that
@@ -1370,10 +1414,14 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   Store<->chain<->files consistency check = Merkle closure PLUS
   edge-endpoint consistency (simulate each edge's ops; assert
   from-manifest -> to-manifest) PLUS epoch homogeneity (chain edges
-  carrying differing codec epochs without a covering remap entry = HARD
-  ERROR naming both epochs and the offending edges — mixed epochs outside
-  a sanctioned rekey are corruption, per the batched-events bump policy);
-  6.2 and 7.2 invoke the same checker.
+  carrying differing codec epochs = UNCONDITIONAL HARD ERROR naming both
+  epochs and the offending edges — mixed epochs are corruption; epochs
+  change only via the event-time procedure, never incrementally);
+  6.2 and 7.2 invoke the same checker. PRE-UPGRADE GUARD: post-release, EVERY
+  migrate subcommand (apply, rollback, status, baseline, squash) run against a
+  PRE-UPGRADE database (old tracking table present, no chain_position)
+  HARD-ERRORS naming `migrate upgrade` — nothing may misbehave against, or
+  vacuously succeed on, the old tracking table.
 - **Why:** L3 needs the chain physically; L8 dictates the choreography
   (assert-before-DROP; lock; idempotent-files-then-atomic-commit); L5's
   verify-then-stamp makes the boundary a verified fact, not an assertion.
@@ -1381,9 +1429,11 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   dirty-tree refusal; mid-edit TOML cannot stamp; drift report on unclean
   reconcile; amnesty report on historical checksum mismatch (fold
   proceeds); consistency check red on tamper AND on an edge whose ops
-  don't map from->to AND on a mixed-epoch chain without covering remap;
+  don't map from->to AND on a mixed-epoch chain;
   concurrent apply blocked; upgrade's reconcile does
-  NOT flag the just-created managed tables.
+  NOT flag the just-created managed tables; every migrate subcommand ×
+  pre-upgrade database yields a precise hard error pointing at `migrate
+  upgrade`.
 
 ### 5.3 Squash = composition — L3+L4
 - **What:** Consolidation = an ADDITIONAL chain edge; superseded files
@@ -1547,17 +1597,13 @@ subphase numbers retained for reference; they land together.)
   (mutation test: delete any generated op, the L10 oracle must fail —
   non-normative).
 
-### 5.10 Fork resolution, re-keying, baseline + ecosystem alignment — L3+L2
+### 5.10 Fork resolution, baseline + ecosystem alignment — L3+L2
 - **What:** `migrate rebase <head>`: re-parents a fork's tail, recomputes
   revisions, re-derives manifests; rebased-away edges RETIRE to
-  migrations/archive/ (never rewritten or deleted); the UNIFIED
-  revision-remap table (per L2 — ONE mechanism for rebase and rekey) is
-  written so databases stamped at rebased-away revisions are SERVED, not
-  orphaned (apply consults the remap before declaring a position
-  unreachable). `migrate rekey` (L2's epoch protocol): TOTAL-scope
-  re-encode — store objects, manifests, AND chain-edge files under the new
-  codec, writing the same unified remap — triggered by golden-corpus
-  CI-red (boundary item 12). BASELINE post-chain: synthesizes a revision
+  migrations/archive/ (never rewritten or deleted); the REBASE revision-remap
+  table (fork resolution only) is written so databases stamped at
+  rebased-away revisions are SERVED, not orphaned (apply consults the remap
+  before declaring a position unreachable). BASELINE post-chain: synthesizes a revision
   manifest FROM INTROSPECTION (its attachment specified: a genesis-parented
   edge carrying the introspected manifest), writes chain_position, and its
   two semver guards are re-expressed EXPLICITLY: the divergence check
@@ -1569,18 +1615,14 @@ subphase numbers retained for reference; they land together.)
   every guide-named command exists in CLI registration.
 - **Why:** Two branches each appending an edge is normal; detection
   without resolution is a dead end; a rebase that orphans stamped
-  databases merely relocates the dead end; history cannot be regenerated,
-  so codec changes need the sanctioned re-key; baseline is the adoption
+  databases merely relocates the dead end; baseline is the adoption
   path for intentional drift and must produce a chain-valid position.
 - **Verify:** Fork fixture: rebase re-parents, revisions recomputed, store
   consistent, archived edges reachable via the checker, and a database
-  stamped at a rebased-away revision APPLIES FORWARD via the remap; rekey
-  fixture: corpus shift -> rekey -> consistency check green under the new
-  epoch, old-id map complete (this fixture is a PERMANENT CI job — the
-  drill runs on every build, not on demand); baseline fixture: manifest-from-
-  introspection attaches, position written, reachability guards fire;
-  shadow test passes on the comprehensive fixture; the doc greps pass;
-  full migrate suite green.
+  stamped at a rebased-away revision APPLIES FORWARD via the remap; baseline
+  fixture: manifest-from-introspection attaches, position written,
+  reachability guards fire; shadow test passes on the comprehensive fixture;
+  the doc greps pass; full migrate suite green.
 
 ## Phase 6 — Orchestration and provenance enforcement
 
@@ -1760,11 +1802,16 @@ subphase numbers retained for reference; they land together.)
 
 ### 8.2 API hygiene
 - **What:** --timeout becomes request-context enforcement; audit becomes
-  job-start/poll (cancellable); doc endpoint added.
+  job-start/poll (cancellable); doc endpoint added. Serve's security posture
+  STATED: binds 127.0.0.1 by default; changing the bind requires an explicit
+  flag whose help text states the server has NO authentication; auth itself is
+  the deferred frontend's concern (phase 10) — a decided non-goal, not an
+  omission.
 - **Why:** A dead flag is a lie in the CLI surface; an unbounded
   synchronous endpoint is a self-DoS button.
 - **Verify:** Slow-audit observes timeout/cancel; doc endpoint matches
-  generate's doc.
+  generate's doc; default-bind test (127.0.0.1); the override flag's help
+  text contains the no-auth statement.
 
 ## Phase 9 — Presentation (explicitly outside the algebra)
 
@@ -1875,6 +1922,22 @@ MODEL MERGE (pushout over a common-ancestor revision — per-object join
 with change/change conflicts detected by id inequality against base; the
 kernel makes it nearly free) as the recorded alternative to rebase-only
 fork resolution.
+
+EPOCH RECOVERY (event-time, deliberately NOT pre-built): the policy is to
+essentially NEVER bump go-pgquery; the CI pin guard (1.2) makes accidental
+movement impossible. When a bump is eventually forced (new PG syntax,
+toolchain rot — likely years out), it ships as a deliberate breaking MAJOR
+release whose notes STATE that fingerprints change. Event-time upgrade path:
+bring every database to head on the LAST OLD-EPOCH binary -> upgrade the
+binary -> baseline-reset per database (baseline synthesizes the manifest from
+introspection; the old chain retires to archive; rollback across the boundary
+is FROZEN — the same boundary semantics as 5.2's upgrade) -> regenerate
+derived artifacts (the existing convention) -> re-derive import locks. A
+REKEY TOOL (total re-encode of store objects + manifests + chain edges with an
+old-id -> new-id remap) is written AT EVENT TIME only if history continuity
+across the boundary proves to matter to a real consumer. The now-provisions
+that make this possible: the codec-version field, the pin guard, and this
+stated policy.
 
 THE SQUASH OP-LIST OPTIMIZER (evidence-gated, descoped from 5.3):
 inverse-pair cancellation, sequential type-change merging, and CREATE
