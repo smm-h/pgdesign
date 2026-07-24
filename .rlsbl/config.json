@@ -37,5 +37,37 @@
   "batch_limits": {
     "exclusions": []
   },
-  "coverage_unit": "commit"
+  "coverage_unit": "commit",
+  "services": {
+    "postgres": {
+      "targets": [
+        "go"
+      ],
+      "image": "postgres:17",
+      "env": {
+        "POSTGRES_USER": "test",
+        "POSTGRES_PASSWORD": "test",
+        "POSTGRES_DB": "postgres"
+      },
+      "ports": [
+        "5432:5432"
+      ],
+      "health": {
+        "cmd": "pg_isready -U test",
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 5
+      },
+      "setup": {
+        "commands": [
+          "apt-get update && apt-get install -y --no-install-recommends postgresql-17-partman && rm -rf /var/lib/apt/lists/*"
+        ],
+        "verify_sql": "SELECT name, default_version FROM pg_available_extensions WHERE name = 'pg_partman';"
+      }
+    }
+  },
+  "test_env": {
+    "PGDESIGN_DB": "postgres://test:test@localhost:5432/postgres?sslmode=disable",
+    "PGDESIGN_REQUIRE_DB": "1"
+  }
 }

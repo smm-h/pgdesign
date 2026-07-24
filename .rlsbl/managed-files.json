@@ -1,7 +1,7 @@
 {
   "version": 1,
   "files": {
-    ".github/workflows/ci-go.yml": "4ceaa2d6d351b64aca6b07a380d3d32b962fca5c2978b446623d72e706e1d6f9",
+    ".github/workflows/ci-go.yml": "6c119d6524df2f1c4608d6ddc1fd1ea5778e4232cfcde201b449b37c70abaefc",
     ".github/workflows/ci-pypi.yml": "e6d981bde8b61dc9c42f0acb1194834a295220eb5c44c04bab171c6e6704251b",
     "VERSION": "08e28f8503f363471bc01c1cee45ec3ed52297bb08c4544dfd79f6a77d1fa239",
     ".goreleaser.yml": "cff25efee366e2ae9b1fca8a9210296481dbfa71c52f9ee63f90873a73a6d36f",
