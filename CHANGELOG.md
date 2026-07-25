@@ -2,6 +2,16 @@
 
 # Changelog
 
+## Unreleased
+
+- No user-facing changes.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.24.4
 
 Idempotent mode now emits ADD COLUMN IF NOT EXISTS guards for every column.
@@ -16,12 +26,6 @@ Previously, idempotent mode generated CREATE TABLE IF NOT EXISTS but plain ADD C
 ### Fixes
 
 - **Fix.** Idempotent mode now emits `ADD COLUMN IF NOT EXISTS` guards for every column, preventing silent column drift on re-apply.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.24.3
 
@@ -95,7 +99,7 @@ The pypi CI job ran `uv sync --locked` at the repo root where there is no pyproj
 
 </details>
 
-### Hotfix
+### Infrastructure
 
 - Fix pypi CI to run in the pypi/ working directory
 
