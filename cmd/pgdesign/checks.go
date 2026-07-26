@@ -77,11 +77,10 @@ func checkValidation(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) str
 	// loadSchemaForCheck); with a nil override the error is always nil.
 	cfg, _ := loadProjectConfig(nil, root)
 
-	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	pgVersion, pgErr := requireSchemaPGVersion(schema)
 	if pgErr != nil {
 		return r.Skipped(pgErr.Error())
 	}
-	schema.PGVersion = pgVersion
 
 	diags := validateSchema(schema, typeReg, cfg, pgVersion)
 
@@ -336,11 +335,10 @@ func checkDesign(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcl
 	// loadSchemaForCheck); with a nil override the error is always nil.
 	cfg, _ := loadProjectConfig(nil, root)
 
-	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	pgVersion, pgErr := requireSchemaPGVersion(schema)
 	if pgErr != nil {
 		return r.Skipped(pgErr.Error())
 	}
-	schema.PGVersion = pgVersion
 
 	diags := validateSchema(schema, typeReg, cfg, pgVersion)
 
@@ -495,13 +493,12 @@ func checkBuild(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) strictcl
 		return r.Found("schema parse/build failed")
 	}
 
-	pgVersion, pgErr := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	_, pgErr := requireSchemaPGVersion(schema)
 	if pgErr != nil {
 		return r.Skipped(pgErr.Error())
 	}
-	schema.PGVersion = pgVersion
 
-	plan, planErr := Plan(schema, cfg, typeReg, pgVersion)
+	plan, planErr := Plan(schema, cfg, typeReg)
 	if planErr != nil {
 		r.Error(fmt.Sprintf("plan failed: %v", planErr))
 		return r.Found("plan generation failed")

@@ -14,6 +14,7 @@ import (
 // minimalSchema returns a schema with one table (two columns: id uuid PK, name text).
 func minimalSchema() *model.Schema {
 	return &model.Schema{
+		PGVersion: 16,
 		Tables: []model.Table{{
 			Name:    "users",
 			Schema:  "public",
@@ -42,7 +43,7 @@ func TestPlan_SQLOutput(t *testing.T) {
 	}
 	registry := semtype.NewRegistry()
 
-	result, err := Plan(schema, cfg, registry, 16)
+	result, err := Plan(schema, cfg, registry)
 	if err != nil {
 		t.Fatalf("Plan returned error: %v", err)
 	}
@@ -95,7 +96,7 @@ func TestPlan_IdempotentSQL(t *testing.T) {
 	}
 	registry := semtype.NewRegistry()
 
-	result, err := Plan(schema, cfg, registry, 16)
+	result, err := Plan(schema, cfg, registry)
 	if err != nil {
 		t.Fatalf("Plan returned error: %v", err)
 	}
@@ -123,7 +124,7 @@ func TestPlan_CodegenConstants(t *testing.T) {
 		},
 	}
 
-	result, err := Plan(schema, cfg, nil, 16)
+	result, err := Plan(schema, cfg, nil)
 	if err != nil {
 		t.Fatalf("Plan returned error: %v", err)
 	}
@@ -152,7 +153,7 @@ func TestPlan_SVGExcluded(t *testing.T) {
 	}
 	registry := semtype.NewRegistry()
 
-	result, err := Plan(schema, cfg, registry, 16)
+	result, err := Plan(schema, cfg, registry)
 	if err != nil {
 		t.Fatalf("Plan returned error: %v", err)
 	}
@@ -167,6 +168,7 @@ func TestPlan_GroupFiltering(t *testing.T) {
 		t.Skip("Plan() generates .sqlsplit via WASM parser")
 	}
 	schema := &model.Schema{
+		PGVersion: 16,
 		Tables: []model.Table{
 			{
 				Name:    "users",
@@ -204,7 +206,7 @@ func TestPlan_GroupFiltering(t *testing.T) {
 	}
 	registry := semtype.NewRegistry()
 
-	result, err := Plan(schema, cfg, registry, 16)
+	result, err := Plan(schema, cfg, registry)
 	if err != nil {
 		t.Fatalf("Plan returned error: %v", err)
 	}

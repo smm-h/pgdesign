@@ -733,8 +733,10 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 		},
 	}
 
-	// PGVersion 9: identity column should fall back to bigserial.
-	opts := Options{Format: "sql", PGVersion: 9}
+	// PGVersion 9: identity column should fall back to bigserial. The version
+	// now flows through schema.PGVersion (Options.PGVersion was removed).
+	opts := Options{Format: "sql"}
+	schema.PGVersion = 9
 	out := mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "id bigserial NOT NULL") {
@@ -745,7 +747,7 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 	}
 
 	// PGVersion 10: identity column should use GENERATED AS IDENTITY.
-	opts.PGVersion = 10
+	schema.PGVersion = 10
 	out = mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "GENERATED ALWAYS AS IDENTITY") {
@@ -755,7 +757,7 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 	// PGVersion 0 (unknown): pgcap.Has returns false, so identity falls back
 	// to bigserial (conservative behavior). PG version is mandatory in
 	// production, so this path is a safety net.
-	opts.PGVersion = 0
+	schema.PGVersion = 0
 	out = mustGenerate(t, schema, opts)
 
 	if !strings.Contains(out, "id bigserial NOT NULL") {
@@ -2765,8 +2767,10 @@ func TestIdempotentAddColumnGuards(t *testing.T) {
 		},
 	}
 
+	schema.PGVersion = 15
+
 	t.Run("idempotent emits ADD COLUMN IF NOT EXISTS", func(t *testing.T) {
-		opts := Options{Idempotent: true, Format: "sql", PGVersion: 15}
+		opts := Options{Idempotent: true, Format: "sql"}
 		out := mustGenerate(t, schema, opts)
 
 		// Each column should have an ADD COLUMN IF NOT EXISTS guard.
@@ -2793,7 +2797,7 @@ func TestIdempotentAddColumnGuards(t *testing.T) {
 	})
 
 	t.Run("non-idempotent does NOT emit ADD COLUMN", func(t *testing.T) {
-		opts := Options{Idempotent: false, Format: "sql", PGVersion: 15}
+		opts := Options{Idempotent: false, Format: "sql"}
 		out := mustGenerate(t, schema, opts)
 
 		if strings.Contains(out, "ADD COLUMN IF NOT EXISTS") {

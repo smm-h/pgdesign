@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/smm-h/pgdesign/internal/model"
+)
 
 // resolvePGVersion determines the PostgreSQL major version to use for
 // version-sensitive operations (DDL generation, risk classification, etc.).
@@ -34,4 +38,25 @@ func requirePGVersion(live, config, toml int) (int, error) {
 		return 0, fmt.Errorf("pg_version is required: set [database].pg_version in pgdesign.toml or [meta].version in your schema")
 	}
 	return v, nil
+}
+
+// applyLivePGVersion is the single post-build seam for the live PG-version tier.
+// The config and toml tiers are folded into schema.PGVersion at build time (see
+// parseAndBuild); this override is used only where a live database connection
+// yields an actual server version that must win over the declared version.
+// A zero live version leaves schema.PGVersion untouched.
+func applyLivePGVersion(schema *model.Schema, live int) {
+	if live != 0 {
+		schema.PGVersion = live
+	}
+}
+
+// requireSchemaPGVersion returns the schema's resolved PG version (already
+// folded from the config and toml tiers at build time), or an error if no
+// version is available from any tier.
+func requireSchemaPGVersion(schema *model.Schema) (int, error) {
+	if schema.PGVersion == 0 {
+		return 0, fmt.Errorf("pg_version is required: set [database].pg_version in pgdesign.toml or [meta].version in your schema")
+	}
+	return schema.PGVersion, nil
 }

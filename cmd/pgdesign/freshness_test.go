@@ -257,7 +257,7 @@ func TestPlan_OwnedDirs_SingleFileOutputsOwnNothing(t *testing.T) {
 			},
 		},
 	}
-	result, err := Plan(schema, cfg, nil, 16)
+	result, err := Plan(schema, cfg, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestPlan_OwnedDirs_SharedDirectoryUnion(t *testing.T) {
 			},
 		},
 	}
-	result, err := Plan(schema, cfg, nil, 16)
+	result, err := Plan(schema, cfg, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -352,7 +352,7 @@ func TestPlan_OwnedDirs_ConfiguredSVGInsideOwnedDirIsNotOrphan(t *testing.T) {
 			},
 		},
 	}
-	result, err := Plan(schema, cfg, nil, 16)
+	result, err := Plan(schema, cfg, nil)
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}

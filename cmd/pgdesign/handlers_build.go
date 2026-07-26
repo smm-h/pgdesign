@@ -80,12 +80,11 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 		return exitCode
 	}
 
-	pgVersion, err := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+	pgVersion, err := requireSchemaPGVersion(schema)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	schema.PGVersion = pgVersion
 
 	// Validate schema before generating outputs.
 	valDiags := validateSchema(schema, typeReg, cfg, pgVersion)
@@ -98,7 +97,7 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 	}
 
 	// Generate all outputs in memory.
-	plan, planErr := Plan(schema, cfg, typeReg, pgVersion)
+	plan, planErr := Plan(schema, cfg, typeReg)
 	if planErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", planErr)
 		return 1
@@ -233,7 +232,6 @@ func handleBuildSVG(cfg *config.ResolvedConfig, schema *model.Schema, typeReg *s
 
 		result, genDiags, err := generate.Generate(outputSchema, generate.Options{
 			Format:       "svg",
-			PGVersion:    pgVersion,
 			TypeRegistry: typeReg,
 			ExtRegistry:  extReg,
 		})

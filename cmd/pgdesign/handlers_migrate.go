@@ -94,12 +94,12 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 				statsConn.Close(ctx)
 			}
 
-			pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+			applyLivePGVersion(schema, actual.PGVersion)
+			_, pgErr := requireSchemaPGVersion(schema)
 			if pgErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
 				return strictcli.Exit(1)
 			}
-			schema.PGVersion = pgVersion
 
 			m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
 
@@ -283,12 +283,12 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				statsConn.Close(ctx)
 			}
 
-			pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+			applyLivePGVersion(schema, actual.PGVersion)
+			_, pgErr := requireSchemaPGVersion(schema)
 			if pgErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
 				return strictcli.Exit(1)
 			}
-			schema.PGVersion = pgVersion
 
 			m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
 
@@ -1110,12 +1110,12 @@ func runMigrateTestShadow(dbURL, dir string, timeout int, paths []string, config
 		return 1
 	}
 
-	pgVersion, pgErr := requirePGVersion(actual.PGVersion, cfg.Database.PGVersion, schema.PGVersion)
+	applyLivePGVersion(schema, actual.PGVersion)
+	_, pgErr := requireSchemaPGVersion(schema)
 	if pgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
 		return 1
 	}
-	schema.PGVersion = pgVersion
 
 	d := diff.Diff(schema, actual)
 	if d.IsEmpty() {

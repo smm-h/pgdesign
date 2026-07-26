@@ -41,12 +41,11 @@ func registerGenerateCmd(app *strictcli.App) {
 				}
 			}
 
-			pgVersion, err := requirePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+			pgVersion, err := requireSchemaPGVersion(schema)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			schema.PGVersion = pgVersion
 
 			valDiags := validateSchema(schema, typeReg, cfg, pgVersion)
 			if len(valDiags) > 0 {
@@ -64,7 +63,6 @@ func registerGenerateCmd(app *strictcli.App) {
 				Idempotent:      kwargs["idempotent"].(bool),
 				IncludeComments: kwargs["comments"].(bool),
 				Format:          kwargs["format"].(string),
-				PGVersion:       pgVersion,
 				TypeRegistry:    typeReg,
 				ExtRegistry:     extReg,
 			}

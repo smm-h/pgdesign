@@ -318,6 +318,13 @@ func parseAndBuild(configOverride *string, paths []string) (*model.Schema, *semt
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(warnings, true))
 	}
 
+	// Resolve the config and toml PG-version tiers into schema.PGVersion here,
+	// at the shared build entry point. Build() sets the toml tier; the config
+	// tier (pgdesign.toml [database].pg_version) wins over it. The live tier is
+	// applied later, only where a database connection is available, via
+	// applyLivePGVersion.
+	schema.PGVersion = resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
+
 	return schema, reg, 0
 }
 

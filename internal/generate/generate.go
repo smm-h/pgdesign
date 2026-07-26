@@ -19,7 +19,6 @@ type Options struct {
 	Idempotent      bool
 	IncludeComments bool
 	Format          string // "sql", "json", "d2", "svg", "doc", "graphql"
-	PGVersion       int
 	TypeRegistry    *semtype.Registry      // optional: enables state machine trigger generation and D2 state diagrams
 	ExtRegistry     *extregistry.Registry  // optional: resolves extension DDL names (e.g. pgvector -> vector)
 }
@@ -158,7 +157,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	if len(tables) > 0 {
 		var tableStmts []string
 		for i := range tables {
-			tableStmts = append(tableStmts, sql.CreateTable(&tables[i], tables[i].Schema, opts.Idempotent, opts.PGVersion, schema.Enums, schema.Domains))
+			tableStmts = append(tableStmts, sql.CreateTable(&tables[i], tables[i].Schema, opts.Idempotent, schema.PGVersion, schema.Enums, schema.Domains))
 		}
 		sections = append(sections, strings.Join(tableStmts, "\n\n"))
 	}
@@ -169,7 +168,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		for i := range tables {
 			t := &tables[i]
 			for _, col := range t.Columns {
-				colStmts = append(colStmts, sql.AlterTableAddColumnIfNotExists(t.Name, t.Schema, col, opts.PGVersion, schema.Enums, schema.Domains))
+				colStmts = append(colStmts, sql.AlterTableAddColumnIfNotExists(t.Name, t.Schema, col, schema.PGVersion, schema.Enums, schema.Domains))
 			}
 		}
 		if len(colStmts) > 0 {
@@ -307,7 +306,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			for i := range tables {
 				t := &tables[i]
 				if t.AppendOnly {
-					triggerStmts = append(triggerStmts, sql.CreateAppendOnlyTrigger(t.Schema, t.Name, opts.Idempotent, opts.PGVersion))
+					triggerStmts = append(triggerStmts, sql.CreateAppendOnlyTrigger(t.Schema, t.Name, opts.Idempotent, schema.PGVersion))
 				}
 			}
 			sections = append(sections, strings.Join(triggerStmts, "\n"))
@@ -330,7 +329,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 				smTriggerStmts = append(smTriggerStmts,
 					sql.CreateStateMachineTriggerFunction(t.Schema, t.Name, col.Name, td.Transitions))
 				smTriggerStmts = append(smTriggerStmts,
-					sql.CreateStateMachineTrigger(t.Schema, t.Name, col.Name, opts.Idempotent, opts.PGVersion))
+					sql.CreateStateMachineTrigger(t.Schema, t.Name, col.Name, opts.Idempotent, schema.PGVersion))
 			}
 		}
 		if len(smTriggerStmts) > 0 {
@@ -423,7 +422,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	for i := range tables {
 		t := &tables[i]
 		for _, p := range t.Policies {
-			policyStmts = append(policyStmts, sql.CreatePolicy(t.Schema, t.Name, p, opts.Idempotent, opts.PGVersion))
+			policyStmts = append(policyStmts, sql.CreatePolicy(t.Schema, t.Name, p, opts.Idempotent, schema.PGVersion))
 		}
 	}
 	if len(policyStmts) > 0 {
@@ -503,7 +502,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 			if strings.HasPrefix(trig.Name, "_pgdesign_sm_") {
 				continue
 			}
-			triggerStmts = append(triggerStmts, sql.CreateTrigger(t.Schema, t.Name, trig, opts.Idempotent, opts.PGVersion))
+			triggerStmts = append(triggerStmts, sql.CreateTrigger(t.Schema, t.Name, trig, opts.Idempotent, schema.PGVersion))
 		}
 	}
 	if len(triggerStmts) > 0 {

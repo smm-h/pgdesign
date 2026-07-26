@@ -248,7 +248,6 @@ func TestDDLExecutionMatrix_GenerateSQL(t *testing.T) {
 			Idempotent:      false,
 			IncludeComments: true,
 			Format:          "sql",
-			PGVersion:       schema.PGVersion,
 			TypeRegistry:    reg,
 		})
 		if err != nil {
@@ -273,7 +272,6 @@ func TestDDLExecutionMatrix_GenerateSQL(t *testing.T) {
 			Idempotent:      true,
 			IncludeComments: true,
 			Format:          "sql",
-			PGVersion:       schema.PGVersion,
 			TypeRegistry:    reg,
 		})
 		if err != nil {

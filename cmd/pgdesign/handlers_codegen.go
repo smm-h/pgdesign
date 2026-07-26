@@ -44,8 +44,7 @@ func runCodegen(configOverride *string, quiet bool, kwargs map[string]interface{
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return 1
 	}
-	pgVersion := resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
-	schema.PGVersion = pgVersion
+	pgVersion := schema.PGVersion
 
 	valDiags := validateSchema(schema, typeReg, cfg, pgVersion)
 	if len(valDiags) > 0 {
