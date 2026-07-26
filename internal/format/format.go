@@ -77,17 +77,10 @@ func orderTables(raw *parse.RawSchema, mode string) []string {
 }
 
 // topoSortTables performs a topological sort on raw tables using FK refs.
-// FK targets come before FK sources. Ties and cycle members are alphabetical.
+// FK targets come before FK sources. Ties and cycle members are alphabetical
+// (via the shared TopoSortStable tie-break helper).
 func topoSortTables(tables []parse.RawTable) []string {
-	// Pre-sort input alphabetically so TopoSort's input-order preservation
-	// becomes alphabetical tie-breaking.
-	sortedInput := make([]parse.RawTable, len(tables))
-	copy(sortedInput, tables)
-	sort.Slice(sortedInput, func(i, j int) bool {
-		return sortedInput[i].Name < sortedInput[j].Name
-	})
-
-	sorted, _ := graph.TopoSort(sortedInput,
+	sorted, _ := graph.TopoSortStable(tables,
 		func(t parse.RawTable) string { return t.Name },
 		func(t parse.RawTable) []string {
 			var deps []string
