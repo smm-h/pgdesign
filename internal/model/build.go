@@ -34,23 +34,19 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	schema.Views = resolveViews(raw)
 	schema.MaterializedViews = resolveMaterializedViews(raw)
 	schema.Functions = resolveFunctions(raw)
-
-	// Phase 2: order
-	sorted, cycles := topoSort(tables)
-	schema.Tables = sorted
-	schema.CycleGroups = cycles
+	schema.Tables = tables
 
 	// Phase 1b: resolve sequences (needs schema.Tables for owned_by validation).
 	seqs, seqDiags := resolveSequences(raw, schema)
 	diags = append(diags, seqDiags...)
 	schema.Sequences = seqs
 
-	// Phase 3: enrich
+	// Phase 3: enrich (appends auto-FK indexes; must run before canonical sort).
 	enrichDiags := enrich(schema)
 	diags = append(diags, enrichDiags...)
 
-	schema.buildTablesByName()
-	schema.BuildFKGraph()
+	// Phase 4: canonicalize — ordering + derived structures (FKGraph, TablesByName).
+	schema.Canonicalize()
 
 	// Extract state machine transition maps from the registry.
 	schema.StateMachineTransitions = resolveStateMachineTransitions(raw, reg)
@@ -107,10 +103,7 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	// Deduplicate enums (same SM or enum type declared in multiple files).
 	schema.Enums = deduplicateEnums(schema.Enums)
 
-	// Phase 2: order all tables together (topo sort sees cross-schema deps).
-	sorted, cycles := topoSort(allTables)
-	schema.Tables = sorted
-	schema.CycleGroups = cycles
+	schema.Tables = allTables
 
 	// Resolve sequences across all schemas (needs merged tables for owned_by validation).
 	for _, raw := range raws {
@@ -119,12 +112,12 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 		schema.Sequences = append(schema.Sequences, seqs...)
 	}
 
-	// Phase 3: enrich.
+	// Phase 3: enrich (appends auto-FK indexes; must run before canonical sort).
 	enrichDiags := enrich(schema)
 	diags = append(diags, enrichDiags...)
 
-	schema.buildTablesByName()
-	schema.BuildFKGraph()
+	// Phase 4: canonicalize — ordering (incl. cross-schema topo) + derived structures.
+	schema.Canonicalize()
 
 	// Extract state machine transition maps from all schemas.
 	for _, raw := range raws {

@@ -136,6 +136,13 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 		annotatePartmanChildren(ctx, conn, schema)
 	}
 
+	// Canonicalize the introspected schema: alphabetical ordering for
+	// collections, topological ordering with alphabetical tie-break for
+	// tables/views/matviews/functions, and derived structures (FKGraph,
+	// TablesByName). This makes introspected schemas byte-identical to
+	// TOML-built ones for equivalent inputs.
+	schema.Canonicalize()
+
 	return schema, diags, nil
 }
 

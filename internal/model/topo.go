@@ -15,6 +15,9 @@ func qualifiedName(schema, table string) string {
 // It uses FK references to build the dependency graph: if table A has an FK
 // referencing table B, then B must come before A.
 // Tables are identified by schema-qualified names to support multi-schema sorts.
+// Ties (tables with no dependency relation) and cycle members are broken
+// alphabetically via TopoSortStable, so ordering is independent of the input's
+// origin (TOML declaration order vs introspect ORDER BY).
 // Returns sorted tables and any cycle groups (sets of mutually-referencing tables).
 func topoSort(tables []Table) (sorted []Table, cycles [][]string) {
 	getName := func(t Table) string {
@@ -27,7 +30,7 @@ func topoSort(tables []Table) (sorted []Table, cycles [][]string) {
 		}
 		return deps
 	}
-	sorted, cycleParts := graph.TopoSort(tables, getName, getDeps)
+	sorted, cycleParts := graph.TopoSortStable(tables, getName, getDeps)
 	// Convert cycle groups from [][]Table to [][]string (just names).
 	for _, group := range cycleParts {
 		var names []string

@@ -134,8 +134,10 @@ func (s *Schema) FilterByGroups(groupNames []string) *Schema {
 		}
 	}
 
-	// Rebuild lookup map for the filtered set.
-	filtered.buildTablesByName()
+	// Rebuild derived structures (TablesByName, FKGraph) for the filtered set;
+	// without this the filtered schema would carry the parent's stale graph
+	// with edges to filtered-out tables.
+	filtered.Canonicalize()
 	return &filtered
 }
 
@@ -163,7 +165,9 @@ func (s *Schema) FilterBySource(sources []string) *Schema {
 		}
 	}
 
-	filtered.buildTablesByName()
+	// Rebuild derived structures (TablesByName, FKGraph) for the filtered set;
+	// without this the filtered schema would carry the parent's stale graph.
+	filtered.Canonicalize()
 	return &filtered
 }
 
