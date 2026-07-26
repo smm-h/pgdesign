@@ -1279,7 +1279,11 @@ consumes N); modelgen's later increments grow alongside their consumers.
   validity oracle, validate's correctness is KERNEL-ADJACENT — the boundary
   doctrine's one named plain-engineering exception.
 - **Verify:** Generated models Build+Canonicalize cleanly AND pass validate
-  with ZERO ERRORS at all sizes (validate IS the generator's validity
+  with ZERO ERRORS at all sizes — the oracle runs validate WITH ExtRegistry
+  AND TypeRegistry POPULATED (several E-codes self-disable on nil
+  registries; a registry-less oracle is silently weaker — the exact
+  distortion the boundary doctrine's validate exception warns about)
+  (validate IS the generator's validity
   oracle — a second private notion of validity would drift narrow silently;
   warnings tolerated per fragment config); fragment restrictions honored;
   deterministic under a seed; shrinking produces minimal counterexamples.
@@ -2016,7 +2020,11 @@ The interactive frontend on the phase-8 contract. Unplanned by design.
 
 ## Dependency DAG
 
-- Phase 0 internal: 0.1 ∥ 0.2 (disjoint code; goldens in one sweep);
+- Phase 0 internal: 0.1 ∥ 0.2 at the subphase level, BUT both touch
+  internal/codegen files (0.1 header sites; 0.2 luck-stable emitters) —
+  in a shared worktree, land them from one coordinating session,
+  sequentially or with explicit file ownership; goldens regenerate per
+  landing;
   0.2 -> 0.3; 0.4/0.5 after 0.2; 0.6 anytime (0.6's partman apply-time fix
   precedes 5.1's absorption of the family: 0.6 -> 5.1). strictcli todo
   filed at phase-0 start (boundary item 11; phase 2 is an EXTERNAL
