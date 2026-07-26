@@ -29,17 +29,22 @@ violate?
   epoch-relative (see L2).
 - **N**: the normalizer (types, defaults, expressions via parse/deparse, PLUS
   the catalog-independent foldings both directions — IN <-> = ANY(ARRAY[...]),
-  array-literal forms — applied to BOTH sides always); **≈_syn** := the kernel
+  array-literal forms, and cast-type-name aliases via the typeinfo alias map
+  (x::int4 ≡ x::integer — deparse verifiably does NOT normalize pg-internal
+  alias names in casts) — applied to BOTH sides always); **≈_syn** := the kernel
   of N (a ≈_syn b iff N(a) = N(b)) — an equivalence relation BY CONSTRUCTION.
   **≈_pg** := Postgres's semantic equality — a distinct, richer relation we do
   not compute (see L1).
 - **hash**: SHA-256; **id** = hash(enc(x)); **revision** = id of a whole-model
   manifest — a SORTED MAP of KIND-QUALIFIED KEYS (kind, schema, name, and for
   functions the argument signature — overloads are distinct entries; a table
-  `x` and a function `x` never collide) -> object-id. Renames are therefore
-  delete+add by construction — a DOCUMENTED limitation (diff emits DROP+CREATE;
-  for tables/columns that is data-destroying; rename-hint ops are a recorded
-  alternative). Store + manifests form a two-level Merkle DAG: manifest
+  `x` and a function `x` never collide) -> object-id. Renames are delete+add
+  at the MANIFEST level by construction, but GATED (5.9): plausible-rename
+  detection — tables: deleted+added manifest keys with EQUAL object
+  content-id; columns: within-table deep diff, content-equal-except-name —
+  plus a declarative [renames] section; detected-but-undeclared = hard
+  error, declared = a first-class mechanically-invertible rename op (the
+  best L4 class). Store + manifests form a two-level Merkle DAG: manifest
   comparison is key-wise symmetric difference; the shared consistency checker
   IS Merkle closure verification (every id in every reachable manifest
   resolves in the store) PLUS edge-endpoint consistency (an edge's ops,
@@ -84,10 +89,15 @@ violate?
   KNOWN INCOMPLETE. The catalog-independent part of PG's rewriting lives
   INSIDE N (both sides — one-sided rewriting would false-drift a user who
   writes = ANY(ARRAY[...]) directly). The residue is CATALOG-DEPENDENT cast
-  materialization, unreachable by any pure normalizer; it is bridged on live
-  paths by forward-simulation rules on introspected text (fixture-checked,
-  incompleteness documented; the exactness alternative — live round-trip
-  normalization through the DB — is recorded in the alternatives list).
+  materialization, unreachable by any pure normalizer; on live paths it is
+  resolved by LIVE ROUND-TRIP NORMALIZATION — the desired-side expression is
+  round-tripped through the target database itself (throwaway temp object +
+  pg_get_* deparse), so PG computes its own canonical form: exact by
+  construction, and it absorbs any folding N lacks. Identity NEVER consumes
+  round-trip output (no DB exists on the pure path). A minimal
+  forward-simulation rule set survives only where round-trip cannot reach
+  (fixture-checked); forward-simulation-as-primary is recorded in the
+  alternatives list.
   Structural sublanguage: the ORDER-SEMANTICS TABLE (exhaustive over the
   Model, two columns per collection: collection order and intra-object order
   — columns and enum values semantic; composite-type fields, function args,
@@ -174,7 +184,15 @@ violate?
   behavior against pgdesign's OWN refactors of internal/sqlparse (an own-code
   change that shifts ≈_syn — hence identity — turns CI red and is reverted or
   handled as a deliberate epoch event); dependency bumps are foreclosed
-  separately by the CI pin guard (see 1.2). Example fixtures are for the
+  separately by the CI pin guard (see 1.2). The corpus's negative-space
+  companion is the N-FOLDING BACKLOG: one committed XFAIL fixture per
+  KNOWN-MISSING catalog-independent folding (NOT IN <-> <> ALL,
+  single-element IN <-> =, BETWEEN, LIKE <-> ~~, boolean redundancy,
+  numeric-literal forms, COALESCE <-> CASE, commutative ordering), each
+  asserting the CURRENT non-convergence — if deparse or an N refactor starts
+  converging one, CI goes red and the entry graduates; entries fold into N
+  only at epoch events. Zero runtime code: identity-safe by construction,
+  and no second ≈ can arise from documentation. Example fixtures are for the
   boundary, where laws end.
 - **L10 (Round-trip — the central theorem).** For models a, b: applying
   gen(diff(a, b)) to a world at revision(a) lands it at revision(b) —
@@ -374,8 +392,13 @@ connection-env kind with registration-time unbound-flag error. Partition:
 premake required; opt-in schedule key; unacknowledged missing schedule =
 warning. pkg/diff deleted with a recorded promotion trigger. Web UI frontend
 deferred. Consumer regeneration todos filed at the single final release.
-Renames documented as delete+add (rename-hint ops are the recorded
-alternative). Policies that are deliberate engineering choices, NOT law
+Renames gated by [renames] declarations + diff-time detection (5.9);
+ambiguous detections (multiple content-equal candidates) hard-error listing
+all candidates, never auto-pair; a genuinely-intended content-identical
+drop+add is expressed by making the two columns differ (a comment suffices
+— stated). pgregory.net/rapid as the property-test/shrinking engine
+(test-only dependency; integrated shrinking makes shrinking structural,
+not a separable increment). Policies that are deliberate engineering choices, NOT law
 consequences (the laws admit alternatives; these are chosen on the merits):
 ALWAYS-large-table-safe generation (uniformity — a declared size hint would
 be equally pure); FULL-PROJECT stamp scope (resolves the filtered-output
@@ -391,9 +414,10 @@ chains are an unconditional consistency-checker hard error (naming both
 epochs and the offending edges). modelgen's validity oracle is validate
 itself (zero errors; warnings tolerated per fragment). The SM trigger
 behavioral test lands in 0.6, covering both runtime branches (illegal
-transition and requires). Consumer rehearsals run after phases 5 and 7
-against throwaway DB copies and working trees (no release, no commits to
-consumer repos). serve binds 127.0.0.1 by default behind an explicit
+transition and requires). Consumer rehearsals run at FOUR checkpoints
+(post-0.1, post-5.2, post-5.5+5.7, post-phase-7 — see the rehearsal
+section) against throwaway DB copies and working trees (no release, no
+commits to consumer repos). serve binds 127.0.0.1 by default behind an explicit
 override flag whose help text states there is NO auth (auth deferred to
 phase 10, a decided non-goal, not an omission). Every migrate subcommand run
 against a pre-upgrade database hard-errors naming `migrate upgrade` (5.2).
@@ -434,10 +458,17 @@ the adopted concatenation form earns it structurally because the op-lists
 coincide; any future optimizer must re-earn it via the CHECKED
 squash-commutation property). A single undifferentiated ≈ (unachievable:
 pg_get_* cast materialization is catalog-dependent and unreachable by pure
-normalization — hence ≈_syn with the foldings inside N, and the
-forward-simulation bridge for the residue). One-sided expression rewriting
+normalization — hence ≈_syn with the foldings inside N, and live round-trip
+normalization for the residue on live paths). One-sided expression rewriting
 (false drift for users who write PG's own forms directly — foldings must
-apply to both sides, inside N).
+apply to both sides, inside N). Staging catalog-independent foldings in the
+live-side residue mechanism instead of N (one-sided rewriting reborn: the
+live differ would compute ≈_syn-plus-extras while enc, the executor, and
+the renderer compute plain ≈_syn — desynchronizing the conformance matrix;
+catalog-independent equivalences go into N at epoch events or into the
+xfail backlog, never live-side; investigated and refuted 2026-07).
+Interactive rename prompts, Prisma/Django style (non-deterministic,
+CI-hostile, an escape hatch — the declarative [renames] gate dominates).
 
 ---
 
@@ -674,6 +705,26 @@ serve's payload key changes are an API-consumer-visible change to note in
   separate path) and the I002 dead-column referenced-set
   (validate.go:2264-2273 — bare RefTable, RefSchema ignored).
   C104 continues (silently skips) on unresolved refs (checks.go:218-220).
+- Consumer coupling (surface verified 2026-07): FOUR consumers — orxtra,
+  gamehome, claudetimeline, veliu-dev (~/Projects/veliu/my-repos/veliu-dev,
+  its db/ dir). NONE imports enum-typed codegen (branding's forced surface
+  is ZERO today: orxtra consumes ddl mode; gamehome validators+constants;
+  claudetimeline and veliu-dev raw SQL). NONE runs pgdesign migrate against
+  a durable tracking table. gamehome: check-codegen-drift.sh greps the
+  EXACT current header wording; deploy.yml cross-compiles the LATEST
+  pgdesign tag and ships it to prod UNPINNED (todo filed in gamehome: pin
+  before the release); partman config carries no schedule key (pg_cron
+  managed externally — 0.6's warning will fire there; expected). orxtra:
+  tests hard-code `migrate generate --version` and semver `.toml`
+  filenames (test_db_migration.py:1761-1775); wrapper cli/_db.py has NO
+  upgrade path; check_schema_codegen.sh parses --check output format;
+  frozen codegen/migration baselines (tests/migration_baselines/) are the
+  synthesis source for the post-5.2 rehearsal. veliu-dev: its PRODUCTION
+  migration mechanism is idempotent re-apply of generated.sql (ci.yml:48;
+  test_schema.py:346-395 depends on silent column-add) — 5.7's
+  RAISE-on-mismatch is a breaking semantic for it (decided: RAISE stands,
+  veliu-dev adapts; post-5.5+5.7 rehearsal). claudetimeline: fresh-DB
+  regeneration, non-idempotent output — header wording only.
 - strictcli: the check command builds a fully-populated *Context and
   discards it; infra roots + handshake envs hermetic-IMMUNE, flag Env()
   hermetic-SUPPRESSED (no primitive fits a connection URL); per-flag
@@ -698,6 +749,13 @@ serve's payload key changes are an API-consumer-visible change to note in
   go-pgquery dependency is pinned to a pseudo-version; its deparse output
   DEFINES N and hence identity — its cross-version stability is itself a
   boundary item, foreclosed by the CI pin guard (boundary item 12).
+  Empirical deparse survey (2026-07, pinned version): ident quotes and
+  case, CAST() <-> ::, SQL-standard long type spellings, parens/whitespace/
+  associativity, string-literal prefixes, IS NULL keyword forms, function
+  case, and != <-> <> all normalize FOR FREE; the divergent classes are
+  exactly the N-folding backlog's enumeration; pg-internal cast type
+  aliases (int4/bool/int8) do NOT normalize — the typeinfo alias map over
+  cast type-names is a required DAY-ONE folding (1.2).
 - serve: DB-coupled at construction; --timeout registered but never
   enforced; audit runs TANE synchronously; GenerateD2 called with a nil
   registry (SM diagrams silently dropped); serve's own parseAndBuild
@@ -729,11 +787,14 @@ argument, and items that become property-checkable are demoted to the kernel.
    differ) — which is SAMPLED agreement, not proof of ≈-agreement, so it is
    fed GENERATED random expressions in addition to curated states (5.7).
 4. **The ≈_syn/≈_pg residue** — catalog-dependent cast materialization is
-   unreachable by pure normalization; the forward-simulation rules on
-   introspected text are finite and documented-incomplete BY DESIGN. Check:
-   the rule fixture suite; the comprehensive fixture (CHECKs, partial
-   indexes, policies) reused by diff --live, upgrade, reconcile, shadow test
-   (1.2/5.8).
+   unreachable by pure normalization; on live paths it is resolved by LIVE
+   ROUND-TRIP NORMALIZATION (desired-side expressions through the target DB
+   — throwaway temp object + pg_get_* deparse; exact by construction,
+   absorbs missing foldings), with a minimal forward-simulation rule set
+   only where round-trip cannot reach. Check: the round-trip fixture suite
+   (temp-object hygiene included); the comprehensive fixture (CHECKs,
+   partial indexes, policies) reused by diff --live, upgrade, reconcile,
+   shadow test (1.2/5.8).
 5. **Six consumer languages' semantics.** Check: DB-free compile checks of
    generated fixtures — all six mandatory (4.0).
 6. **Git merge behavior** on chain files. Minimized by one-file-per-edge
@@ -746,9 +807,10 @@ argument, and items that become property-checkable are demoted to the kernel.
    preconditions run inside each op's transaction (5.7).
 9. **Filesystem atomicity** for store writes. Minimized: content-addressed
    idempotent writes; consistency checker (5.2, invoked by 6.2 and 7.2).
-10. **Consumer adaptation** to the breaking release. Check: filed todos
-    containing scripted `pgdesign codegen --check` invocations; the pass
-    itself is the consumers' half (4.3).
+10. **Consumer adaptation** to the breaking release (consumers: orxtra,
+    gamehome, claudetimeline, veliu-dev — surface verified 2026-07, Part
+    III). Check: filed todos containing scripted `pgdesign codegen --check`
+    invocations; the pass itself is the consumers' half (4.3).
 11. **External milestone**: strictcli must ship the connection-env kind
     before the DB TIERS of 6.1/7.4/seed-tier-1 finalize (the pure tiers
     have no phase-2 dependency; todo filed at phase-0 start).
@@ -778,14 +840,36 @@ phases and adoption. The number 3 is intentionally unassigned (the identity
 work — whole-model form, revision hash, one serializer — lives in kernel
 subphases 1.4/1.5). Every subphase cites its laws.
 
-CONSUMER REHEARSALS — two rehearsal checkpoints against DISPOSABLE artifacts.
-After phase 5: run the unreleased binary against a THROWAWAY copy of a real
-consumer database and repo — `migrate upgrade`, chain UX, apply/rollback end
-to end. After phase 7: imports plus branding adaptation against throwaway
-consumer working copies. Everything is discarded — disposable worktrees and
-DB copies, NO release, NO commits to consumer repos — so the one-release
-axiom is untouched; findings feed back into the plan. First real-world
-contact must NOT be the final release.
+CONSUMER REHEARSALS — FOUR checkpoints against DISPOSABLE artifacts,
+re-aimed at the verified consumer surface (Part III consumer-coupling
+facts; the original two checkpoints were mis-aimed — NO consumer imports
+enum-typed codegen, and NO consumer runs pgdesign migrate against a durable
+tracking table):
+- After 0.1 (micro, ~30 min): gamehome's check-codegen-drift.sh greps the
+  EXACT current header wording and orxtra's check_schema_codegen.sh parses
+  codegen --check's summary format — run both consumer scripts against the
+  unified header/output BEFORE 4.2 builds the stamp grammar on top.
+- After 5.2: orxtra — the only consumer with migrate machinery (a CLI
+  wrapper with no upgrade path; tests hard-coding `migrate generate
+  --version` and semver `.toml` filenames; frozen migration baselines).
+  Synthesize a pre-upgrade tracking table on a throwaway DB from its
+  baseline harness; run `migrate upgrade`, the pre-upgrade guard, chain
+  UX, apply/rollback end to end.
+- After 5.5+5.7: veliu-dev — its PRODUCTION migration mechanism is
+  re-applying `generate --idempotent` output (CI applies generated.sql via
+  psql; a test depends on silent column-add). Re-apply the RAISE-form
+  output against a deliberately DRIFTED throwaway DB copy; confirm the
+  strict semantics are workable for the re-apply-as-deploy pattern
+  (decided: RAISE stands, veliu-dev adapts — the rehearsal validates the
+  adaptation path, not the policy).
+- After phase 7 (downgraded): no branding or imports surface exists in any
+  consumer today — file the scripted `pgdesign codegen --check` todos
+  (4.3/boundary item 10); rehearse imports only if a consumer adopts them
+  first.
+Everything is discarded — disposable worktrees and DB copies, NO release,
+NO commits to consumer repos — so the one-release axiom is untouched;
+findings feed back into the plan. First real-world contact must NOT be the
+final release.
 
 ## Phase 0 — Substrate repairs (make the codebase law-capable)
 
@@ -955,9 +1039,10 @@ item 11) is filed at phase-0 start.
 ## Phase 1 — The kernel (pure, law-tested, no Postgres, no CLI)
 
 The algebra as packages, property-tested per L9. Everything later is an
-adapter around this. LAND ORDER: 1.3 (store) and 1.6 (modelgen) first — no
+adapter around this. LAND ORDER: 1.3 (store) and 1.6-INCREMENT-A first — no
 kernel dependencies — then 1.1, then {1.2, 1.5}, then 1.4 (whose property
-tests consume modelgen and whose conformance work consumes N).
+tests consume modelgen fragments as they land and whose conformance work
+consumes N); modelgen's later increments grow alongside their consumers.
 
 ### 1.1 enc: the canonical encoder — L1
 - **What:** A DEDICATED canonical encoder (explicit field ordering; per-field
@@ -1013,12 +1098,22 @@ tests consume modelgen and whose conformance work consumes N).
 ### 1.2 N: the normalization primitive — L1
 - **What:** The normalizer N — types, defaults, expressions (parse/deparse)
   PLUS the catalog-independent foldings applied to BOTH SIDES (IN <-> = ANY
-  (ARRAY[...]), array-literal forms — inside N, per L1(c); one-sided
-  rewriting is ruled out) — homed in internal/sqlparse (the go-pgquery
-  leaf). ≈_syn = kernel of N. The ≈_pg RESIDUE (catalog-dependent cast
-  materialization) is bridged by forward-simulation rules on the
-  INTROSPECTED side on live paths, fixture-checked, incompleteness
-  documented. Canonicalize's extension point begins N-normalizing expression
+  (ARRAY[...]), array-literal forms, and cast-type-name aliases via the
+  typeinfo alias map — empirically NOT free from deparse: x::int4 vs
+  x::integer diverge — inside N, per L1(c); one-sided rewriting is ruled
+  out) — homed in internal/sqlparse (the go-pgquery leaf). ≈_syn = kernel
+  of N. The ≈_pg RESIDUE (catalog-dependent cast materialization) is
+  resolved on live paths by LIVE ROUND-TRIP NORMALIZATION — the
+  desired-side expression round-tripped through the target DB (throwaway
+  temp object + pg_get_* deparse) so PG computes its own canonical form,
+  exact by construction and absorbing any folding N lacks; identity never
+  consumes round-trip output; a MINIMAL forward-simulation rule set
+  survives only where round-trip cannot reach (fixture-checked). THE
+  N-FOLDING BACKLOG is a 1.2 deliverable beside the golden corpus: one
+  XFAIL fixture per known-missing catalog-independent folding (L9's
+  enumeration), each asserting the current non-convergence — convergence
+  turns CI red and graduates the entry; entries fold into N only at epoch
+  events. Canonicalize's extension point begins N-normalizing expression
   fields into the IR (full L1(a) activates). The differ adopts N IMMEDIATELY
   (red-green: introspect->diff over CHECKs/partial indexes/policies reports
   false drift today — a live bug), replacing BOTH existing normalizers:
@@ -1042,7 +1137,9 @@ tests consume modelgen and whose conformance work consumes N).
   disagreeing normalizers already ship today, and the differ additionally
   disagrees with Postgres's rewriter. L1(c): the catalog-independent
   foldings belong inside N precisely because a user may write PG's own
-  forms directly; only the catalog-dependent residue needs a bridge.
+  forms directly; only the catalog-dependent residue needs the live
+  round-trip (and staging catalog-independent equivalences live-side is
+  ruled out — it desynchronizes the conformance matrix).
 - **Verify:** Red-green on the false-drift fixture AND the missed-drift
   default fixture; N∘N = N idempotence over a generated expression corpus;
   folding symmetry (IN-form and =ANY-form of the same predicate normalize
@@ -1050,7 +1147,10 @@ tests consume modelgen and whose conformance work consumes N).
   committed as REGRESSION FIXTURES pinning N against pgdesign's OWN refactors
   of internal/sqlparse (an own-code shift of ≈_syn turns CI red; boundary
   item 12); the PIN-GUARD test (a divergent go.mod go-pgquery version turns
-  CI red); the residue-rule suite; diff --live clean on
+  CI red); the round-trip suite (equivalently-spelled desired/introspected
+  pairs converge via the DB; temp-object cleanup verified) plus the minimal
+  residue-rule suite; the backlog XFAIL fixtures (red-on-convergence
+  semantics tested); diff --live clean on
   the comprehensive fixture (reused verbatim by 5.8); grep: no normalizer
   outside internal/sqlparse.
 
@@ -1068,8 +1168,8 @@ tests consume modelgen and whose conformance work consumes N).
 - **What:** Revision manifests as SORTED MAPS of kind-qualified keys
   (kind, schema, name[, arg-signature]) -> id (comparison = key-wise
   symmetric difference; the Merkle dividends of Part I; renames are
-  delete+add — documented, with rename-hint ops as the recorded
-  alternative). Parent-linked edge model, edge identity CONTENT-DERIVED
+  delete+add at the manifest level, gated by 5.9's detection + [renames]
+  declarations). Parent-linked edge model, edge identity CONTENT-DERIVED
   (file = edge-content hash prefix + slug; display sequence computed from
   topology at listing time) — parallel edges, pure-DML endomorphisms, and
   concurrent branch allocation can never collide; head/find-heads (genesis:
@@ -1152,7 +1252,24 @@ tests consume modelgen and whose conformance work consumes N).
   SM types), version-gated features, multi-schema layouts, canonical-only
   collection permutations. Tunable fragments: the INJECTIVE fragment (no SM
   types — introspection lossiness excluded) and the BRIDGE-PROVEN expression
-  fragment, for L10's restricted generator. No DB, no CLI.
+  fragment, for L10's restricted generator. No DB, no CLI. Built on
+  pgregory.net/rapid (test-only dependency) — integrated shrinking comes
+  with the generator combinators, so shrinking is STRUCTURAL and cannot be
+  descoped. STAGED: increment A (flat tables + columns + comments + PKs,
+  ~0.5 session) lands FIRST and unblocks 1.1's property tests; the
+  FK/type-closure/SM/view fragments grow as consumers 1.4/5.3/5.8 need
+  them. KEY SCOPE FACT (source-verified): view queries, function bodies,
+  and CHECK expressions are OPAQUE to the validate+Build oracle (view SQL
+  never parsed; function-body parse errors ignored; CHECKs feed only
+  warnings) — the core generator needs NO SQL generator; a small template
+  grammar serves only the 1.2 expression corpus and the bridge-proven
+  fragment. ORACLE DOCTRINE: construct-by-design only the well-formedness
+  invariants (name shapes, comments, resolvable types, FK existence +
+  covering indexes, valid type defaults); generate-then-validate-REJECT for
+  policy invariants (append-only cascade legality, policy placement,
+  version gates) so their distributions stay wide — reject sampling against
+  the real oracle is what keeps the distribution honest, and shrinking is
+  what makes its failures debuggable.
 - **Why:** L9 demands property tests over GENERATED inputs and L10's
   round-trip test consumes generated model pairs — but nothing in the
   codebase produces models (the seed package generates row DATA). Without
@@ -1295,7 +1412,9 @@ tests consume modelgen and whose conformance work consumes N).
   string-literal comparisons -> branded type; TS parse() at boundaries; JPA
   converters; Java layout) — each todo contains a SCRIPTED
   `pgdesign codegen --check` invocation (the mechanical half of boundary
-  item 10).
+  item 10). Consumers: orxtra, gamehome, claudetimeline, veliu-dev (their
+  verified coupling surface is in Part III — note the branding break's
+  FORCED surface is zero today; the todos are forward-looking contracts).
 - **Why:** All consumer-visible changes, one break, one adaptation, honest
   handoff.
 - **Verify:** rlsbl changelog coverage passes with breaking entries;
@@ -1415,7 +1534,12 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   migrate subcommand (apply, rollback, status, baseline, squash) run against a
   PRE-UPGRADE database (old tracking table present, no chain_position)
   HARD-ERRORS naming `migrate upgrade` — nothing may misbehave against, or
-  vacuously succeed on, the old tracking table.
+  vacuously succeed on, the old tracking table. TEST-SUPPORT (owned here):
+  the upgrade implementation is split writeChainFiles()/runUpgradeTxn()
+  with before/after-commit test hooks, and the concurrent-apply case uses
+  an advisory-lock Barrier helper — all IN-PROCESS (crash-before-commit =
+  write files, don't commit, close the conn: PG rolls back on disconnect);
+  no subprocess kills, no backend-kill machinery.
 - **Why:** L3 needs the chain physically; L8 dictates the choreography
   (assert-before-DROP; lock; idempotent-files-then-atomic-commit); L5's
   verify-then-stamp makes the boundary a verified fact, not an assertion.
@@ -1515,7 +1639,16 @@ subphase numbers retained for reference; they land together.)
   non-transactional breakout completes in whichever transaction confirms
   its last op). A batched backfill journals as ONE op with one down
   (consistent with the single-DownOp model). Re-apply resumes by skipping
-  confirmed ops. AppliedVersions/status/serve read the view.
+  confirmed ops. AppliedVersions/status/serve read the view. TEST-SUPPORT
+  (owned here): internal/testdb gains CreateInvalidIndex (unique-CIC-over-
+  duplicate-data — deterministically leaves pg_index.indisvalid=false, NO
+  backend kill needed) and a sync Barrier helper; the rewritten loop
+  carries ONE nil-default per-op afterOpHook seam (an injected error rolls
+  the phase's transaction back — faithfully modeling a crash, since PG
+  also rolls back on disconnect). No faulttest framework, no subprocess
+  SIGKILL, no backend-kill machinery: every fault-matrix case is
+  deterministic-state-setup or in-process seam (classification verified
+  2026-07).
 - **Why:** L5's domain check and trace, landed as ONE rewrite of the loop
   (the collapse-multi-pass rule); L8 closes the crash window INSIDE the
   recovery protocol; L1's single ≈_syn via the shared normalization; the
@@ -1526,7 +1659,10 @@ subphase numbers retained for reference; they land together.)
   idempotent SQL; mismatch RAISEs, match no-ops; conformance matrix green;
   shared catalog layer by import graph; fault-injection matrix (boundary
   item 1): mid-phase; after CIC (resumed index is VALID); after drop-CIC;
-  around enum-add on both PG classes; view semantics equal the old
+  around enum-add (transactional class live on CI PG17; the pre-12
+  non-transactional class via the IsNonTransactional/pgcap path-selection
+  UNIT test — the postgres:11 CI leg is out-of-scope, benchmark-gated);
+  view semantics equal the old
   applied-set; single write path by grep.
 
 ### 5.6 Journal-driven rollback (scoped) — L5+L4
@@ -1580,14 +1716,38 @@ subphase numbers retained for reference; they land together.)
   is dropped (diff has no row counts) — it becomes narrowing-always, chosen
   deliberately. `migrate plan` is ASSIGNED here: it becomes the pure
   preview of pending chain edges (drift preview is diff --live's job).
-  Drift caught at apply; adoption via baseline (5.10).
+  Drift caught at apply; adoption via baseline (5.10). THE RENAME GATE
+  lands here (ADOPTED — formerly the out-of-scope rename-hint alternative;
+  the drop+add data-loss path today ships with a Dangerous diagnostic that
+  NOTHING consumes: generate writes the file regardless, apply has no
+  gate, and pure generation removes even the row-count signal):
+  diff-time plausible-rename detection — columns: for each (removed,
+  added) pair within a table, the existing per-column comparator with the
+  name masked (content-equal-except-name); tables: deleted+added manifest
+  keys with EQUAL table-object content-id — plus a declarative [renames]
+  section in the schema TOML (old -> new, consumed at diff time; pure,
+  deterministic, committed, CI-safe). Detected-but-undeclared plausible
+  rename = HARD ERROR naming the pair and pointing at [renames]; declared
+  renames emit the EXISTING rename_column/rename_table op kinds (dead code
+  today — SQL emitters, Caution/Reversible risk entries, phase membership
+  all ship with no producer; wired up here per the dead-code policy) with
+  proper inverse downs (rename b -> a: mechanically invertible, the best
+  L4 class). Ambiguous detections (multiple content-equal candidates)
+  hard-error listing all candidates, never auto-pair; stale [renames]
+  entries (old name no longer present/plausible) are a validation error.
 - **Why:** L5: generation never reads the world — same TOML edit, same
   migration, regardless of DB state; the always-safe form is what makes
-  that possible (a manifest has no row counts).
+  that possible (a manifest has no row counts). The rename gate belongs to
+  the same doctrine: a pure analysis that can block must block — and it is
+  the ONLY place the rename data-loss hazard can be caught before apply.
 - **Verify:** Generation without any DB; FK add emits two-step NOT VALID
   with no DB; a drifted DB does not alter output but fails apply; stats
   plumbing gone; the advisory fires on narrowing (gate change asserted);
-  plan output is pure and DB-free; diff MINIMALITY as a quality property
+  plan output is pure and DB-free; rename fixtures: an undeclared rename
+  edit BLOCKS generation naming the pair; declared emits ALTER ... RENAME
+  with a reversible down that round-trips; the ambiguous two-candidate
+  fixture errors listing both; table rename via content-id equality;
+  stale-[renames] validation error; diff MINIMALITY as a quality property
   (mutation test: delete any generated op, the L10 oracle must fail —
   non-normative).
 
@@ -1871,8 +2031,9 @@ The interactive frontend on the phase-8 contract. Unplanned by design.
   (semantic drift needs N)}; 1.3 -> {5.1, 5.2, 7.2}; 1.4 -> {5.2, 5.3,
   5.9, 6.1}; 1.5 -> {4.2-json, 8.1}; 1.6 -> {1.1, 1.2, 1.4, 5.3, 5.8};
   {1.1, 1.3} -> 5.9 (deserialization); 0.2 -> 7.2 (surface-hash
-  reproducibility rests on Canonicalize). Phase 1 internal: {1.3, 1.6} ->
-  1.1 -> {1.2, 1.5} -> 1.4.
+  reproducibility rests on Canonicalize). Phase 1 internal: {1.3, 1.6-A} ->
+  1.1 -> {1.2, 1.5} -> 1.4; modelgen increments B+ land alongside their
+  consumers (1.4, 5.3, 5.8).
 - 0.3 -> {7.3, 8.1-projection, 9.3}; phase 5 land order: 5.0 -> 5.1 ->
   5.2; then {5.5+5.7 as one apply-loop pass} -> 5.6 -> 5.8 (track A) and
   5.3 -> 5.4 (track B, parallel); 5.9 after {5.2, 1.4} (head manifests
@@ -1908,10 +2069,13 @@ encoder's semantic-only policy already produces its bytes); registry
 materialization into Schema as sole type-truth; extension-DDL-name
 resolution baked into the model; DB/boot-time revision binding; the
 reverse conformance invariant as primary (activated once the differ fully
-adopts N); RENAME-HINT OPS (renames are delete+add today — documented);
-LIVE ROUND-TRIP NORMALIZATION as the exactness alternative to the ≈_pg
-residue rules (round-trip desired-side expressions through the DB on live
-paths — exact where the rule set is documented-incomplete); THREE-WAY
+adopts N); FORWARD-SIMULATION RULES AS PRIMARY live-residue mechanism
+(superseded 2026-07: live round-trip normalization is ADOPTED on live
+paths — 1.2; a minimal rule set survives only where round-trip cannot
+reach); THE POSTGRES:11 CI LEG for the pre-12 non-transactional enum-add
+class (adopt only after a pipeline-performance benchmark shows acceptable
+cost — EOL image; until then the pre-12 class is covered by the
+IsNonTransactional path-selection unit test, 5.5+5.7); THREE-WAY
 MODEL MERGE (pushout over a common-ancestor revision — per-object join
 with change/change conflicts detected by id inequality against base; the
 kernel makes it nearly free) as the recorded alternative to rebase-only
@@ -1992,9 +2156,10 @@ printed checklist.
 
 ## Effort
 
-Phase 0: 2-3 sessions. Phase 1 (kernel): 3-4 sessions (incl. modelgen) —
-pure Go, property-tested, no DB; front-loaded because everything else
-adapts it. Phase 2: 1-2 (externally gated). Phase 4: 3-4 (incl. 4.0's two
+Phase 0: 2-3 sessions. Phase 1 (kernel): 6-7 sessions — modelgen is the
+dominant line item (~4 staged, rapid-based; increment A at ~0.5 unblocks
+1.1 immediately); pure Go, property-tested, no DB; front-loaded because
+everything else adapts it. Phase 2: 1-2 (externally gated). Phase 4: 3-4 (incl. 4.0's two
 deliverables). Phase 5: 3-5 (the chain/invertibility/store machinery lives
 in the kernel; the apply loop is rewritten once; the squash optimizer is
 descoped). Phase 6: 1-2. Phase 7: 3-4. Phase 8: 1 (after 5.2's serve edits).
