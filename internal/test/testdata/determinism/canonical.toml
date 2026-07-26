@@ -1,0 +1,166 @@
+# Determinism fixture: exercises every map-sourced collection with >= 2 entries
+# so that Canonicalize's alphabetical ordering is actually observable. Includes a
+# materialized view with 2 indexes, tables with 2+ FKs / indexes / checks /
+# uniques / policies, 2 enums, and a view that references another view.
+
+[meta]
+version = 16
+schema = "shop"
+extensions = ["pgcrypto"]
+
+[types.user_role]
+kind = "enum"
+values = ["admin", "customer", "guest"]
+
+[types.order_status]
+kind = "enum"
+values = ["pending", "shipped", "delivered"]
+
+# -- Users --
+
+[tables.users]
+comment = "Registered users."
+enable_rls = true
+
+[tables.users.columns.id]
+type = "id"
+
+[tables.users.columns.email]
+type = "short_text"
+
+[tables.users.columns.username]
+type = "short_text"
+
+[tables.users.columns.role]
+type = "user_role"
+
+[tables.users.unique.uq_users_email]
+columns = ["email"]
+
+[tables.users.unique.uq_users_username]
+columns = ["username"]
+
+[tables.users.checks.ck_users_email_nonempty]
+expr = "email <> ''"
+
+[tables.users.checks.ck_users_username_nonempty]
+expr = "username <> ''"
+
+[tables.users.indexes.idx_users_role]
+columns = ["role"]
+
+[tables.users.indexes.idx_users_email]
+columns = ["email"]
+
+[tables.users.policies.users_select]
+for = "SELECT"
+to = "app_user"
+using = "id = current_setting('app.user_id')::uuid"
+
+[tables.users.policies.users_update]
+for = "UPDATE"
+to = "app_user"
+using = "id = current_setting('app.user_id')::uuid"
+
+# -- Products --
+
+[tables.products]
+comment = "Catalog products."
+
+[tables.products.columns.id]
+type = "id"
+
+[tables.products.columns.name]
+type = "short_text"
+
+[tables.products.columns.price]
+type = "money"
+
+# -- Orders --
+
+[tables.orders]
+comment = "Customer orders."
+enable_rls = true
+
+[tables.orders.columns.id]
+type = "id"
+
+[tables.orders.columns.user_id]
+type = "ref"
+
+[tables.orders.columns.product_id]
+type = "ref"
+
+[tables.orders.columns.status]
+type = "order_status"
+
+[tables.orders.columns.total]
+type = "money"
+
+[tables.orders.columns.created_at]
+type = "timestamp"
+
+[tables.orders.fks.fk_orders_user]
+columns = ["user_id"]
+ref_table = "users"
+ref_columns = ["id"]
+on_delete = "CASCADE"
+
+[tables.orders.fks.fk_orders_product]
+columns = ["product_id"]
+ref_table = "products"
+ref_columns = ["id"]
+on_delete = "RESTRICT"
+
+[tables.orders.checks.ck_orders_total_positive]
+expr = "total >= 0"
+
+[tables.orders.checks.ck_orders_user_product_distinct]
+expr = "user_id <> product_id"
+
+[tables.orders.unique.uq_orders_user_product]
+columns = ["user_id", "product_id"]
+
+[tables.orders.unique.uq_orders_user_created]
+columns = ["user_id", "created_at"]
+
+[tables.orders.indexes.idx_orders_status]
+columns = ["status"]
+
+[tables.orders.indexes.idx_orders_created]
+columns = ["created_at"]
+
+[tables.orders.policies.orders_select]
+for = "SELECT"
+to = "app_user"
+using = "user_id = current_setting('app.user_id')::uuid"
+
+[tables.orders.policies.orders_insert]
+for = "INSERT"
+to = "app_user"
+with_check = "user_id = current_setting('app.user_id')::uuid"
+
+# -- Materialized view with two indexes --
+
+[materialized_views.order_totals]
+query = "SELECT user_id, count(*) AS order_count, sum(total) AS total_spent FROM shop.orders GROUP BY user_id"
+comment = "Per-user order rollup."
+
+[materialized_views.order_totals.indexes.idx_order_totals_user]
+columns = ["user_id"]
+unique = true
+
+[materialized_views.order_totals.indexes.idx_order_totals_spent]
+columns = ["total_spent"]
+
+# -- Views: one references the other --
+
+[views.active_orders]
+query = "SELECT id, user_id, total FROM shop.orders WHERE status <> 'delivered'"
+comment = "Orders not yet delivered."
+depends_on = ["orders"]
+
+[views.active_orders_by_user]
+query = "SELECT user_id, count(*) AS n FROM shop.active_orders GROUP BY user_id"
+comment = "Active order counts per user."
+depends_on = ["active_orders"]

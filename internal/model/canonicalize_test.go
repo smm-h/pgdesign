@@ -1,10 +1,86 @@
 package model
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/parse"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
+
+// TestCanonicalize_SortsUnsortedSchema mimics the introspect path: a schema
+// assembled from structs (not from Build) with collections in arbitrary order.
+// Canonicalize must alphabetize every map-sourced collection, topologically
+// order the tables, and rebuild the derived structures — the exact postcondition
+// introspected schemas rely on (Introspect calls Canonicalize before returning).
+func TestCanonicalize_SortsUnsortedSchema(t *testing.T) {
+	schema := &Schema{
+		Name:       "shop",
+		Extensions: []string{"pgcrypto", "btree_gist"},
+		Enums: []Enum{
+			{Name: "user_role", Values: []string{"admin", "customer"}},
+			{Name: "order_status", Values: []string{"pending", "shipped"}},
+		},
+		Tables: []Table{
+			{
+				Name: "orders", Schema: "shop", Comment: "Orders.",
+				Columns: []Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+				FKs: []FK{
+					{Name: "fk_orders_user", Columns: []string{"user_id"}, RefSchema: "shop", RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+				},
+				Checks: []CheckConstraint{
+					{Name: "ck_orders_z", Expr: "user_id IS NOT NULL"},
+					{Name: "ck_orders_a", Expr: "id IS NOT NULL"},
+				},
+				Indexes: []Index{
+					{Name: "idx_orders_z", Columns: []string{"user_id"}},
+					{Name: "idx_orders_a", Columns: []string{"id"}},
+				},
+			},
+			{
+				Name: "users", Schema: "shop", Comment: "Users.",
+				Columns: []Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+
+	schema.Canonicalize()
+
+	// Tables topo-ordered: users (referenced) before orders.
+	if schema.Tables[0].Name != "users" || schema.Tables[1].Name != "orders" {
+		t.Errorf("tables not dependency-ordered: %s, %s", schema.Tables[0].Name, schema.Tables[1].Name)
+	}
+	// Extensions and enums alphabetized.
+	if !sort.StringsAreSorted(schema.Extensions) {
+		t.Errorf("Extensions not sorted: %v", schema.Extensions)
+	}
+	if schema.Enums[0].Name != "order_status" || schema.Enums[1].Name != "user_role" {
+		t.Errorf("Enums not sorted: %v", schema.Enums)
+	}
+	// enum VALUES must be left untouched (semantic order).
+	if got := schema.Enums[1].Values; got[0] != "admin" || got[1] != "customer" {
+		t.Errorf("enum values must not be reordered, got %v", got)
+	}
+	// orders collections alphabetized.
+	orders := schema.TableByName("shop", "orders")
+	if orders == nil {
+		t.Fatal("orders not found via TablesByName (derived structure not rebuilt)")
+	}
+	if orders.Checks[0].Name != "ck_orders_a" || orders.Indexes[0].Name != "idx_orders_a" {
+		t.Errorf("orders collections not alphabetized: checks=%v indexes=%v", orders.Checks, orders.Indexes)
+	}
+	// Derived FK graph rebuilt.
+	if schema.FKGraph == nil || schema.FKGraph.FanIn["users"] != 1 {
+		t.Errorf("FKGraph not rebuilt: %+v", schema.FKGraph)
+	}
+}
 
 // twoTableRawWithGroups builds a raw schema with a "users" table and a "posts"
 // table whose FK references "users", plus groups isolating each table.
