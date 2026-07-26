@@ -5,3 +5,4 @@
 {"id":"18c5f33be0e36bf9928e304b1cea4fbabf13b7eb54180993","commits":["7405fe4a0e7571cff2b47c8719d642f8caa9f943"],"user_facing":false}
 {"id":"18c5f6195eb8c35d9dd3605f9821435ea710795d16c72d46","commits":["d73c1ee2a6a99914af5d4a90f0d8ef8253d7a510"],"user_facing":false}
 {"id":"18c5f638860a4f936d2511334d204d308a57a8bca7a82250","commits":["f1323538e5d16dee16aadf099efadf93d3d9393f"],"user_facing":true,"description":"**Removed pkg/diff.** The exported diff package was an unusable interface-only stub (zero importers). A public differ will be reconsidered only when a second flat-schema consumer actually exists.","type":"breaking"}
+{"id":"18c5f68455ae65c90fb1f4aa6ce04accb898cb7d29fbfc2e","commits":["a5d1c5dbad27088ae140d4989b093664299f3395"],"user_facing":false}
