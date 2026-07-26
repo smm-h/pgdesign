@@ -14,18 +14,11 @@ import (
 	"github.com/smm-h/pgdesign/internal/sqlutil"
 )
 
-// Generator generates application code from a resolved schema.
-type Generator interface {
-	// Generate produces source code for all eligible policies in the schema.
-	Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic)
-}
-
-// MultiFileGenerator generates multiple output files from a resolved schema.
-// Generators that implement this interface produce a map of relative file paths
-// to file contents, where each file manages its own header.
-type MultiFileGenerator interface {
-	GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic)
-}
+// The Generator and MultiFileGenerator interfaces this package's generators
+// implement live in pkg/genkit (the single provenance/generator contract).
+// Go interface satisfaction is structural, so the generators here need no
+// import of genkit for the interfaces; they do import genkit for the shared
+// provenance-header helper (see Stamp/Header).
 
 // PolicyContext holds the data needed to generate a validator for one policy.
 type PolicyContext struct {

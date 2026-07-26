@@ -8,6 +8,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
+	"github.com/smm-h/pgdesign/pkg/genkit"
 )
 
 // determinismSchema returns a schema with enough enum columns and CHECK
@@ -52,7 +53,7 @@ func determinismSchema() *model.Schema {
 // schema. Map iteration order in Go is randomized, so any generator that
 // ranges over ConstraintSet maps directly will flake here.
 func TestConstraintsGenerators_Deterministic(t *testing.T) {
-	generators := map[string]Generator{
+	generators := map[string]genkit.Generator{
 		"go":     &GoConstraintsGenerator{},
 		"python": &PythonConstraintsGenerator{},
 		"java":   &JavaConstraintsGenerator{},

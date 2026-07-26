@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/smm-h/pgdesign/internal/codegen"
+	"github.com/smm-h/pgdesign/pkg/genkit"
 )
 
 // SupportedModes returns a map of codegen mode to the languages it supports.
@@ -35,9 +36,9 @@ func SupportedModeNames() []string {
 	return names
 }
 
-// SelectGenerator returns the codegen.Generator for the given language and mode.
+// SelectGenerator returns the genkit.Generator for the given language and mode.
 // It returns a descriptive error if the combination is unsupported.
-func SelectGenerator(lang, mode string) (codegen.Generator, error) {
+func SelectGenerator(lang, mode string) (genkit.Generator, error) {
 	switch mode {
 	case "validators":
 		switch lang {

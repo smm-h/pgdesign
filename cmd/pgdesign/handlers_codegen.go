@@ -7,6 +7,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/codegen"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/pkg/genkit"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
@@ -88,7 +89,7 @@ func runCodegen(configOverride *string, quiet bool, kwargs map[string]interface{
 	}
 
 	// MultiFileGenerator: write files into output directory.
-	if mfg, ok := gen.(codegen.MultiFileGenerator); ok {
+	if mfg, ok := gen.(genkit.MultiFileGenerator); ok {
 		files, diags := mfg.GenerateFiles(schema)
 		for _, d := range diags {
 			fmt.Fprintf(os.Stderr, "%s: %s\n", d.Severity, d.Message)

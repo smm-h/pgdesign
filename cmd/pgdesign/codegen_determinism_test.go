@@ -12,6 +12,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
+	"github.com/smm-h/pgdesign/pkg/genkit"
 )
 
 // loadDeterminismSchema parses and builds the representative determinism
@@ -107,7 +108,7 @@ func TestCodegenDeterminismContract(t *testing.T) {
 				if err != nil {
 					t.Fatalf("SelectGenerator(%s, %s): %v", lang, mode, err)
 				}
-				if _, ok := probe.(codegen.MultiFileGenerator); !ok {
+				if _, ok := probe.(genkit.MultiFileGenerator); !ok {
 					return
 				}
 				var firstFiles map[string][]byte
@@ -116,7 +117,7 @@ func TestCodegenDeterminismContract(t *testing.T) {
 					if err != nil {
 						t.Fatalf("SelectGenerator(%s, %s): %v", lang, mode, err)
 					}
-					files, diags := gen.(codegen.MultiFileGenerator).GenerateFiles(schema)
+					files, diags := gen.(genkit.MultiFileGenerator).GenerateFiles(schema)
 					failOnErrorDiags(t, i, diags)
 					if i == 0 {
 						firstFiles = files

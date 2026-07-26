@@ -45,20 +45,23 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/pkg/diagnostic"
 )
 
-// Generator produces a single output from a schema. Implementations must be
-// deterministic: the same input must always produce byte-identical output.
+// Generator produces a single output from a resolved schema. Implementations
+// must be deterministic: the same input must always produce byte-identical
+// output. This is the unified generator contract -- internal/codegen's
+// generators implement it directly.
 type Generator interface {
-	Generate(schema interface{}) ([]byte, []diagnostic.Diagnostic)
+	Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic)
 }
 
-// MultiFileGenerator produces multiple output files from a schema.
+// MultiFileGenerator produces multiple output files from a resolved schema.
 // The returned map keys are slash-separated relative paths within the output
 // directory. Implementations must be deterministic.
 type MultiFileGenerator interface {
-	GenerateFiles(schema interface{}) (map[string][]byte, []diagnostic.Diagnostic)
+	GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic)
 }
 
 // FreshnessResult classifies planned files against their on-disk state.
