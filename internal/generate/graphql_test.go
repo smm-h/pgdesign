@@ -370,6 +370,12 @@ func TestGraphQLGoldenFile(t *testing.T) {
 	got := mustGenerate(t, schema, Options{Format: "graphql"})
 
 	expectedPath := filepath.Join("testdata", "graphql_expected.graphql")
+	if *updateGolden {
+		if err := os.WriteFile(expectedPath, []byte(got), 0644); err != nil {
+			t.Fatalf("cannot update golden file: %v", err)
+		}
+		t.Logf("updated %s", expectedPath)
+	}
 	expectedBytes, err := os.ReadFile(expectedPath)
 	if err != nil {
 		t.Fatalf("cannot read expected file: %v", err)

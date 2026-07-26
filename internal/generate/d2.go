@@ -34,8 +34,7 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry) string {
 
 	// Render FK edges after all tables.
 	for _, t := range tables {
-		fks := model.SortedFKs(t.FKs)
-		for _, fk := range fks {
+		for _, fk := range t.FKs {
 			sections = append(sections, renderD2Edge(&t, &fk))
 		}
 	}

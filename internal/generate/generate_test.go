@@ -24,6 +24,11 @@ func boolPtr(b bool) *bool { return &b }
 // mustGenerate calls Generate and fails the test on error.
 func mustGenerate(t *testing.T, schema *model.Schema, opts Options) string {
 	t.Helper()
+	// Generate consumes canonical schemas in production (Build/Introspect run
+	// Canonicalize). Hand-built test schemas must be canonicalized too so that
+	// ordering (topo view/matview/function order, alphabetical collections) and
+	// derived structures (FKGraph) match production behavior.
+	schema.Canonicalize()
 	out, _, err := Generate(schema, opts)
 	if err != nil {
 		t.Fatalf("Generate error: %v", err)
@@ -489,8 +494,11 @@ func TestJSONFormat(t *testing.T) {
 	if tbl.Owner != "app_role" {
 		t.Errorf("expected owner 'app_role', got %q", tbl.Owner)
 	}
-	if len(roundTripped.CycleGroups) != 1 || roundTripped.CycleGroups[0][0] != "users" {
-		t.Errorf("expected cycle_groups [[users]], got %v", roundTripped.CycleGroups)
+	// Canonicalize recomputes CycleGroups from the FK graph; a self-referencing
+	// FK is not a topological cycle (self-deps are skipped), so a single table
+	// with only a self-FK yields no cycle groups.
+	if len(roundTripped.CycleGroups) != 0 {
+		t.Errorf("expected no cycle_groups (self-FK is not a cycle), got %v", roundTripped.CycleGroups)
 	}
 }
 

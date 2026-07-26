@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
-	"github.com/smm-h/pgdesign/internal/graph"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/sql"
 )
@@ -257,8 +256,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 6. ALTER TABLE ADD CONSTRAINT FK (phase 6)
 	for i := range tables {
 		t := &tables[i]
-		fks := model.SortedFKs(t.FKs)
-		for _, fk := range fks {
+		for _, fk := range t.FKs {
 			fkCopy := fk
 			constraintName := fk.Name
 			if constraintName == "" {
@@ -280,8 +278,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 7. ALTER TABLE ADD CONSTRAINT UNIQUE (phase 7)
 	for i := range tables {
 		t := &tables[i]
-		uqs := model.SortedUniques(t.Uniques)
-		for _, uq := range uqs {
+		for _, uq := range t.Uniques {
 			uqCopy := uq
 			constraintName := uq.Name
 			if constraintName == "" {
@@ -303,8 +300,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 8. ALTER TABLE ADD CONSTRAINT CHECK (phase 8)
 	for i := range tables {
 		t := &tables[i]
-		cks := model.SortedChecks(t.Checks)
-		for _, ck := range cks {
+		for _, ck := range t.Checks {
 			ckCopy := ck
 			constraintName := ck.Name
 			if constraintName == "" {
@@ -326,8 +322,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 8b. ALTER TABLE ADD CONSTRAINT EXCLUDE (phase 8)
 	for i := range tables {
 		t := &tables[i]
-		excls := model.SortedExclusions(t.Exclusions)
-		for _, exc := range excls {
+		for _, exc := range t.Exclusions {
 			excCopy := exc
 			constraintName := exc.Name
 			if constraintName == "" {
@@ -349,8 +344,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 9. CREATE INDEX (phase 9)
 	for i := range tables {
 		t := &tables[i]
-		idxs := model.SortedIndexes(t.Indexes)
-		for _, idx := range idxs {
+		for _, idx := range t.Indexes {
 			idxCopy := idx
 			idxName := idx.Name
 			if idxName == "" {
@@ -528,8 +522,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 13. CREATE POLICY (phase 13)
 	for i := range tables {
 		t := &tables[i]
-		policies := model.SortedPolicies(t.Policies)
-		for _, p := range policies {
+		for _, p := range t.Policies {
 			tuples = append(tuples, ddlTuple{
 				SQL:           sql.CreatePolicy(t.Schema, t.Name, p, false, schema.PGVersion),
 				IdempotentSQL: sql.CreatePolicy(t.Schema, t.Name, p, true, schema.PGVersion),
@@ -543,23 +536,11 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 		}
 	}
 
-	// 14. CREATE VIEW (phase 14)
+	// 14. CREATE VIEW (phase 14; canonical order from build-time topo sort)
 	if len(schema.Views) > 0 {
-		sorted, err := topoSortViews(schema.Views)
-		if err != nil {
-			sorted = schema.Views
-			var cycleMembers []string
-			for _, v := range sorted {
-				cycleMembers = append(cycleMembers, v.Name)
-			}
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Warning,
-				Message:  fmt.Sprintf("dependency cycle detected among views: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
-			})
-		}
 		schemaName := schema.Name
-		for i := range sorted {
-			v := &sorted[i]
+		for i := range schema.Views {
+			v := &schema.Views[i]
 			if v.Schema != "" {
 				schemaName = v.Schema
 			}
@@ -585,23 +566,11 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 		}
 	}
 
-	// 15. CREATE MATERIALIZED VIEW (phase 15)
+	// 15. CREATE MATERIALIZED VIEW (phase 15; canonical order from build-time topo sort)
 	if len(schema.MaterializedViews) > 0 {
-		sorted, err := topoSortMaterializedViews(schema.MaterializedViews)
-		if err != nil {
-			sorted = schema.MaterializedViews
-			var cycleMembers []string
-			for _, mv := range sorted {
-				cycleMembers = append(cycleMembers, mv.Name)
-			}
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Warning,
-				Message:  fmt.Sprintf("dependency cycle detected among materialized views: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
-			})
-		}
 		schemaName := schema.Name
-		for i := range sorted {
-			mv := &sorted[i]
+		for i := range schema.MaterializedViews {
+			mv := &schema.MaterializedViews[i]
 			if mv.Schema != "" {
 				schemaName = mv.Schema
 			}
@@ -643,23 +612,11 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 		}
 	}
 
-	// 16. CREATE FUNCTION (phase 16)
+	// 16. CREATE FUNCTION (phase 16; canonical order from build-time topo sort)
 	if len(schema.Functions) > 0 {
-		sorted, err := topoSortFunctions(schema.Functions)
-		if err != nil {
-			sorted = schema.Functions
-			var cycleMembers []string
-			for _, f := range sorted {
-				cycleMembers = append(cycleMembers, f.Name)
-			}
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Warning,
-				Message:  fmt.Sprintf("dependency cycle detected among functions: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
-			})
-		}
 		schemaName := schema.Name
-		for i := range sorted {
-			f := &sorted[i]
+		for i := range schema.Functions {
+			f := &schema.Functions[i]
 			if f.Schema != "" {
 				schemaName = f.Schema
 			}
@@ -697,8 +654,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 	// 17. CREATE TRIGGER (phase 17)
 	for i := range tables {
 		t := &tables[i]
-		triggers := model.SortedTriggers(t.Triggers)
-		for _, trig := range triggers {
+		for _, trig := range t.Triggers {
 			tuples = append(tuples, ddlTuple{
 				SQL:           sql.CreateTrigger(t.Schema, t.Name, trig, false, schema.PGVersion),
 				IdempotentSQL: sql.CreateTrigger(t.Schema, t.Name, trig, true, schema.PGVersion),
@@ -1506,40 +1462,4 @@ func hasExtension(schema *model.Schema, name string) bool {
 		}
 	}
 	return false
-}
-
-// topoSortViews sorts views by DependsOn.
-func topoSortViews(views []model.View) ([]model.View, error) {
-	sorted, cycles := graph.TopoSort(views,
-		func(v model.View) string { return v.Name },
-		func(v model.View) []string { return v.DependsOn },
-	)
-	if len(cycles) > 0 {
-		return nil, fmt.Errorf("cycle detected in view dependencies")
-	}
-	return sorted, nil
-}
-
-// topoSortMaterializedViews sorts materialized views by DependsOn.
-func topoSortMaterializedViews(mvs []model.MaterializedView) ([]model.MaterializedView, error) {
-	sorted, cycles := graph.TopoSort(mvs,
-		func(mv model.MaterializedView) string { return mv.Name },
-		func(mv model.MaterializedView) []string { return mv.DependsOn },
-	)
-	if len(cycles) > 0 {
-		return nil, fmt.Errorf("cycle detected in materialized view dependencies")
-	}
-	return sorted, nil
-}
-
-// topoSortFunctions sorts functions by DependsOn.
-func topoSortFunctions(funcs []model.Function) ([]model.Function, error) {
-	sorted, cycles := graph.TopoSort(funcs,
-		func(f model.Function) string { return f.Name },
-		func(f model.Function) []string { return f.DependsOn },
-	)
-	if len(cycles) > 0 {
-		return nil, fmt.Errorf("cycle detected in function dependencies")
-	}
-	return sorted, nil
 }

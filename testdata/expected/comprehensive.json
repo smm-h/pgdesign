@@ -1,8 +1,8 @@
 {
   "name": "app",
   "extensions": [
-    "pgcrypto",
-    "pg_partman"
+    "pg_partman",
+    "pgcrypto"
   ],
   "enums": [
     {
@@ -95,11 +95,11 @@
       "pk": [
         "id"
       ],
-      "fks": [],
-      "indexes": [],
-      "uniques": [],
-      "checks": [],
-      "exclusions": [],
+      "fks": null,
+      "indexes": null,
+      "uniques": null,
+      "checks": null,
+      "exclusions": null,
       "policies": [
         {
           "name": "owner_delete",
@@ -132,6 +132,250 @@
         }
       ],
       "enable_rls": true
+    },
+    {
+      "name": "audit_log",
+      "schema": "app",
+      "source_file": "comprehensive.toml",
+      "comment": "Immutable audit trail of project actions.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "project_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "actor_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "action",
+          "pg_type": {
+            "base": "text",
+            "domain_name": "short_text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "short_text",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "metadata",
+          "pg_type": {
+            "base": "jsonb",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "'{}'::jsonb",
+          "semantic_type_name": "json",
+          "json_schema": "comprehensive_shape.json",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "created_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_audit_log_project",
+          "columns": [
+            "project_id"
+          ],
+          "ref_schema": "app",
+          "ref_table": "projects",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_audit_log_project",
+          "columns": [
+            "project_id",
+            "created_at"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": [
+        {
+          "name": "ck_metadata_title_type",
+          "expr": "metadata ? 'title' AND jsonb_typeof(metadata-\u003e'title') = 'string'"
+        },
+        {
+          "name": "ck_metadata_value_type",
+          "expr": "metadata ? 'value' AND jsonb_typeof(metadata-\u003e'value') = 'number'"
+        }
+      ],
+      "exclusions": null,
+      "append_only": true
+    },
+    {
+      "name": "events",
+      "schema": "app",
+      "source_file": "comprehensive.toml",
+      "comment": "Time-series project events, partitioned by quarter.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "project_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "event_type",
+          "pg_type": {
+            "base": "text",
+            "domain_name": "short_text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "short_text",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "payload",
+          "pg_type": {
+            "base": "jsonb",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "'{}'::jsonb",
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "occurred_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "id",
+        "occurred_at"
+      ],
+      "fks": [
+        {
+          "name": "fk_events_project",
+          "columns": [
+            "project_id"
+          ],
+          "ref_schema": "app",
+          "ref_table": "projects",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_events_project_time",
+          "columns": [
+            "project_id",
+            "occurred_at"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null,
+      "partitioning": {
+        "strategy": "range",
+        "columns": [
+          "occurred_at"
+        ],
+        "children": [
+          {
+            "strategy": "",
+            "columns": null,
+            "name": "events_2024_q1",
+            "bound": "FROM ('2024-01-01') TO ('2024-04-01')",
+            "children": null
+          },
+          {
+            "strategy": "",
+            "columns": null,
+            "name": "events_2024_q2",
+            "bound": "FROM ('2024-04-01') TO ('2024-07-01')",
+            "children": null
+          }
+        ]
+      },
+      "maintenance": {
+        "interval": "1 month",
+        "premake": 3,
+        "retention": "90 days",
+        "retention_keep_table": false
+      }
     },
     {
       "name": "tasks",
@@ -282,251 +526,7 @@
           "expr": "estimated_hours \u003e= 0"
         }
       ],
-      "exclusions": []
-    },
-    {
-      "name": "audit_log",
-      "schema": "app",
-      "source_file": "comprehensive.toml",
-      "comment": "Immutable audit trail of project actions.",
-      "columns": [
-        {
-          "name": "id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "project_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "actor_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "action",
-          "pg_type": {
-            "base": "text",
-            "domain_name": "short_text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "short_text",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "metadata",
-          "pg_type": {
-            "base": "jsonb",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "'{}'::jsonb",
-          "semantic_type_name": "json",
-          "json_schema": "comprehensive_shape.json",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "created_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "id"
-      ],
-      "fks": [
-        {
-          "name": "fk_audit_log_project",
-          "columns": [
-            "project_id"
-          ],
-          "ref_schema": "app",
-          "ref_table": "projects",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_audit_log_project",
-          "columns": [
-            "project_id",
-            "created_at"
-          ],
-          "desc": [
-            false,
-            true
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [
-        {
-          "name": "ck_metadata_title_type",
-          "expr": "metadata ? 'title' AND jsonb_typeof(metadata-\u003e'title') = 'string'"
-        },
-        {
-          "name": "ck_metadata_value_type",
-          "expr": "metadata ? 'value' AND jsonb_typeof(metadata-\u003e'value') = 'number'"
-        }
-      ],
-      "exclusions": [],
-      "append_only": true
-    },
-    {
-      "name": "events",
-      "schema": "app",
-      "source_file": "comprehensive.toml",
-      "comment": "Time-series project events, partitioned by quarter.",
-      "columns": [
-        {
-          "name": "id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "project_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "event_type",
-          "pg_type": {
-            "base": "text",
-            "domain_name": "short_text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "short_text",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "payload",
-          "pg_type": {
-            "base": "jsonb",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "'{}'::jsonb",
-          "semantic_type_name": "json",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "occurred_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "id",
-        "occurred_at"
-      ],
-      "fks": [
-        {
-          "name": "fk_events_project",
-          "columns": [
-            "project_id"
-          ],
-          "ref_schema": "app",
-          "ref_table": "projects",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_events_project_time",
-          "columns": [
-            "project_id",
-            "occurred_at"
-          ],
-          "desc": [
-            false,
-            true
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": [],
-      "partitioning": {
-        "strategy": "range",
-        "columns": [
-          "occurred_at"
-        ],
-        "children": [
-          {
-            "strategy": "",
-            "columns": null,
-            "name": "events_2024_q1",
-            "bound": "FROM ('2024-01-01') TO ('2024-04-01')",
-            "children": null
-          },
-          {
-            "strategy": "",
-            "columns": null,
-            "name": "events_2024_q2",
-            "bound": "FROM ('2024-04-01') TO ('2024-07-01')",
-            "children": null
-          }
-        ]
-      },
-      "maintenance": {
-        "interval": "1 month",
-        "premake": 3,
-        "retention": "90 days",
-        "retention_keep_table": false
-      }
+      "exclusions": null
     },
     {
       "name": "comments",
@@ -632,9 +632,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     }
   ],
   "pg_version": 16

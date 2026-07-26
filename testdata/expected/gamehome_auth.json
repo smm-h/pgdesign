@@ -3,8 +3,74 @@
   "extensions": [
     "pgcrypto"
   ],
-  "enums": [],
+  "enums": null,
   "tables": [
+    {
+      "name": "magic_links",
+      "schema": "auth",
+      "source_file": "gamehome_auth.toml",
+      "comment": "Passwordless login tokens sent via email.",
+      "columns": [
+        {
+          "name": "token",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "email",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "expires_at",
+          "pg_type": {
+            "base": "float8",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "used",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "token"
+      ],
+      "fks": null,
+      "indexes": [
+        {
+          "name": "idx_magic_links_email",
+          "columns": [
+            "email"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
     {
       "name": "users",
       "schema": "auth",
@@ -88,7 +154,7 @@
       "pk": [
         "id"
       ],
-      "fks": [],
+      "fks": null,
       "indexes": [
         {
           "name": "idx_users_email",
@@ -109,75 +175,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "magic_links",
-      "schema": "auth",
-      "source_file": "gamehome_auth.toml",
-      "comment": "Passwordless login tokens sent via email.",
-      "columns": [
-        {
-          "name": "token",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "email",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "expires_at",
-          "pg_type": {
-            "base": "float8",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "epoch",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "used",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "false",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "token"
-      ],
-      "fks": [],
-      "indexes": [
-        {
-          "name": "idx_magic_links_email",
-          "columns": [
-            "email"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "credentials",
@@ -254,9 +254,345 @@
           "is_auto_fk": true
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "email_verifications",
+      "schema": "auth",
+      "source_file": "gamehome_auth.toml",
+      "comment": "Pending email verification tokens with expiry.",
+      "columns": [
+        {
+          "name": "token",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "user_id",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "email",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "expires_at",
+          "pg_type": {
+            "base": "float8",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "used",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "token"
+      ],
+      "fks": [
+        {
+          "name": "fk_email_verifications_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_email_verifications_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "password_resets",
+      "schema": "auth",
+      "source_file": "gamehome_auth.toml",
+      "comment": "Password reset tokens with expiry.",
+      "columns": [
+        {
+          "name": "token",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "user_id",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "expires_at",
+          "pg_type": {
+            "base": "float8",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "used",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "token"
+      ],
+      "fks": [
+        {
+          "name": "fk_password_resets_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_password_resets_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "provider_links",
+      "schema": "auth",
+      "source_file": "gamehome_auth.toml",
+      "comment": "OAuth/OIDC provider links. Composite PK on (provider, provider_sub) to prevent duplicates.",
+      "columns": [
+        {
+          "name": "user_id",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "provider",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "provider_sub",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "provider_email",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": false,
+          "semantic_type_name": "text_nullable",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "linked_at",
+          "pg_type": {
+            "base": "float8",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "epoch",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "provider",
+        "provider_sub"
+      ],
+      "fks": [
+        {
+          "name": "fk_provider_links_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_provider_links_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "recovery_codes",
+      "schema": "auth",
+      "source_file": "gamehome_auth.toml",
+      "comment": "One-time-use backup codes for MFA recovery.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": {
+            "base": "int8",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "bigint_id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "user_id",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "code_hash",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "used",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_recovery_codes_user",
+          "columns": [
+            "user_id"
+          ],
+          "ref_schema": "auth",
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_recovery_codes_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "sessions",
@@ -371,266 +707,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "provider_links",
-      "schema": "auth",
-      "source_file": "gamehome_auth.toml",
-      "comment": "OAuth/OIDC provider links. Composite PK on (provider, provider_sub) to prevent duplicates.",
-      "columns": [
-        {
-          "name": "user_id",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "provider",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "provider_sub",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "provider_email",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": false,
-          "semantic_type_name": "text_nullable",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "linked_at",
-          "pg_type": {
-            "base": "float8",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "epoch",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "provider",
-        "provider_sub"
-      ],
-      "fks": [
-        {
-          "name": "fk_provider_links_user",
-          "columns": [
-            "user_id"
-          ],
-          "ref_schema": "auth",
-          "ref_table": "users",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_provider_links_user_id",
-          "columns": [
-            "user_id"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "email_verifications",
-      "schema": "auth",
-      "source_file": "gamehome_auth.toml",
-      "comment": "Pending email verification tokens with expiry.",
-      "columns": [
-        {
-          "name": "token",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "user_id",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "email",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "expires_at",
-          "pg_type": {
-            "base": "float8",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "epoch",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "used",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "false",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "token"
-      ],
-      "fks": [
-        {
-          "name": "fk_email_verifications_user",
-          "columns": [
-            "user_id"
-          ],
-          "ref_schema": "auth",
-          "ref_table": "users",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_email_verifications_user_id",
-          "columns": [
-            "user_id"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "password_resets",
-      "schema": "auth",
-      "source_file": "gamehome_auth.toml",
-      "comment": "Password reset tokens with expiry.",
-      "columns": [
-        {
-          "name": "token",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "user_id",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "expires_at",
-          "pg_type": {
-            "base": "float8",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "epoch",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "used",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "false",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "token"
-      ],
-      "fks": [
-        {
-          "name": "fk_password_resets_user",
-          "columns": [
-            "user_id"
-          ],
-          "ref_schema": "auth",
-          "ref_table": "users",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_password_resets_user_id",
-          "columns": [
-            "user_id"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "totp_secrets",
@@ -708,88 +787,9 @@
           "is_auto_fk": true
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "recovery_codes",
-      "schema": "auth",
-      "source_file": "gamehome_auth.toml",
-      "comment": "One-time-use backup codes for MFA recovery.",
-      "columns": [
-        {
-          "name": "id",
-          "pg_type": {
-            "base": "int8",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "bigint_id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "user_id",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "code_hash",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "used",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "false",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "id"
-      ],
-      "fks": [
-        {
-          "name": "fk_recovery_codes_user",
-          "columns": [
-            "user_id"
-          ],
-          "ref_schema": "auth",
-          "ref_table": "users",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_recovery_codes_user_id",
-          "columns": [
-            "user_id"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "webauthn_credentials",
@@ -907,9 +907,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     }
   ],
   "pg_version": 1

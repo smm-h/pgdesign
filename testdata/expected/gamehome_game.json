@@ -149,6 +149,192 @@
   ],
   "tables": [
     {
+      "name": "achievement_def",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Achievement templates with criteria. Defines what achievements exist.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "name",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "description",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "icon",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": false,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "criteria",
+          "pg_type": {
+            "base": "jsonb",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "'{}'::jsonb",
+          "comment": "JSON object describing the unlock criteria",
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "created_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": null,
+      "indexes": null,
+      "uniques": [
+        {
+          "name": "uq_achievement_def_name",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "experiment",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "A/B experiments with variant definitions and allocation percentage.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "name",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "description",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": false,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "variants",
+          "pg_type": {
+            "base": "jsonb",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "'{}'::jsonb",
+          "comment": "JSON array of variant definitions",
+          "semantic_type_name": "json",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "status",
+          "pg_type": {
+            "base": "experiment_status",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "experiment_status",
+          "type_kind": "enum"
+        },
+        {
+          "name": "allocation_pct",
+          "pg_type": {
+            "base": "int4",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "100",
+          "comment": "Percentage of eligible players to enroll (0-100)",
+          "semantic_type_name": "int",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "created_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": null,
+      "indexes": null,
+      "uniques": [
+        {
+          "name": "uq_experiment_name",
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "checks": null,
+      "exclusions": null
+    },
+    {
       "name": "players",
       "schema": "game",
       "source_file": "gamehome_game.toml",
@@ -300,7 +486,7 @@
           "expr": "(is_ai = true AND ai_model IS NOT NULL) OR (is_ai = false AND ai_model IS NULL)"
         }
       ],
-      "exclusions": []
+      "exclusions": null
     },
     {
       "name": "server_registry",
@@ -417,7 +603,7 @@
       "pk": [
         "id"
       ],
-      "fks": [],
+      "fks": null,
       "indexes": [
         {
           "name": "idx_server_registry_server_type",
@@ -436,15 +622,15 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
-      "name": "experiment",
+      "name": "api_keys",
       "schema": "game",
       "source_file": "gamehome_game.toml",
-      "comment": "A/B experiments with variant definitions and allocation percentage.",
+      "comment": "API keys for AI agent and service authentication. Keys are hashed; the plaintext is shown only once at creation.",
       "columns": [
         {
           "name": "id",
@@ -458,6 +644,26 @@
           "type_kind": "scalar"
         },
         {
+          "name": "player_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "key_hash",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
           "name": "name",
           "pg_type": {
             "base": "text",
@@ -468,96 +674,341 @@
           "type_kind": "scalar"
         },
         {
-          "name": "description",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": false,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "variants",
+          "name": "scopes",
           "pg_type": {
             "base": "jsonb",
             "params": {}
           },
           "not_null": true,
           "default_expr": "'{}'::jsonb",
-          "comment": "JSON array of variant definitions",
           "semantic_type_name": "json",
           "type_kind": "scalar"
         },
         {
-          "name": "status",
+          "name": "created_at",
           "pg_type": {
-            "base": "experiment_status",
+            "base": "timestamptz",
             "params": {}
           },
           "not_null": true,
-          "semantic_type_name": "experiment_status",
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "last_used_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": false,
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "revoked_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": false,
+          "semantic_type_name": "timestamp_optional",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_api_keys_player",
+          "columns": [
+            "player_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_api_keys_hash",
+          "columns": [
+            "key_hash"
+          ],
+          "unique": true,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_api_keys_player",
+          "columns": [
+            "player_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "chat_messages",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Player chat messages, partitioned by month. Retention: 90 days (drop old partitions via cron).",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "sender_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "channel",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "body",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "metadata",
+          "pg_type": {
+            "base": "jsonb",
+            "params": {}
+          },
+          "not_null": false,
+          "semantic_type_name": "jsonb_nullable",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "sent_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "id",
+        "sent_at"
+      ],
+      "fks": [
+        {
+          "name": "fk_chat_messages_sender",
+          "columns": [
+            "sender_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_chat_messages_channel_sent",
+          "columns": [
+            "channel",
+            "sent_at"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_chat_messages_sender",
+          "columns": [
+            "sender_id",
+            "sent_at"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null,
+      "partitioning": {
+        "strategy": "range",
+        "columns": [
+          "sent_at"
+        ],
+        "children": null
+      },
+      "maintenance": {
+        "interval": "1 month",
+        "premake": 3,
+        "retention": "90 days",
+        "retention_keep_table": false
+      }
+    },
+    {
+      "name": "currency_balance",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Current virtual currency balance per player. Single row per player.",
+      "columns": [
+        {
+          "name": "player_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "balance",
+          "pg_type": {
+            "base": "int8",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "0",
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "updated_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "player_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_currency_balance_player",
+          "columns": [
+            "player_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_currency_balance_player_id",
+          "columns": [
+            "player_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "currency_transaction",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Immutable ledger of virtual currency transactions.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "player_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "amount",
+          "pg_type": {
+            "base": "int8",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "0",
+          "comment": "Signed amount (positive = credit, negative = debit)",
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "type",
+          "pg_type": {
+            "base": "currency_transaction_type",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "currency_transaction_type",
           "type_kind": "enum"
         },
         {
-          "name": "allocation_pct",
-          "pg_type": {
-            "base": "int4",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "100",
-          "comment": "Percentage of eligible players to enroll (0-100)",
-          "semantic_type_name": "int",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "created_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "id"
-      ],
-      "fks": [],
-      "indexes": [],
-      "uniques": [
-        {
-          "name": "uq_experiment_name",
-          "columns": [
-            "name"
-          ]
-        }
-      ],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "achievement_def",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Achievement templates with criteria. Defines what achievements exist.",
-      "columns": [
-        {
-          "name": "id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "name",
+          "name": "reason",
           "pg_type": {
             "base": "text",
             "params": {}
@@ -567,35 +1018,25 @@
           "type_kind": "scalar"
         },
         {
-          "name": "description",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "icon",
+          "name": "reference_type",
           "pg_type": {
             "base": "text",
             "params": {}
           },
           "not_null": false,
+          "comment": "Entity type that triggered the transaction (e.g. game_play, achievement)",
           "semantic_type_name": "text_field",
           "type_kind": "scalar"
         },
         {
-          "name": "criteria",
+          "name": "reference_id",
           "pg_type": {
-            "base": "jsonb",
+            "base": "uuid",
             "params": {}
           },
-          "not_null": true,
-          "default_expr": "'{}'::jsonb",
-          "comment": "JSON object describing the unlock criteria",
-          "semantic_type_name": "json",
+          "not_null": false,
+          "comment": "UUID of the triggering entity",
+          "semantic_type_name": "ref",
           "type_kind": "scalar"
         },
         {
@@ -613,18 +1054,240 @@
       "pk": [
         "id"
       ],
-      "fks": [],
-      "indexes": [],
-      "uniques": [
+      "fks": [
         {
-          "name": "uq_achievement_def_name",
+          "name": "fk_currency_transaction_player",
           "columns": [
-            "name"
-          ]
+            "player_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
         }
       ],
-      "checks": [],
-      "exclusions": []
+      "indexes": [
+        {
+          "name": "idx_currency_transaction_player",
+          "columns": [
+            "player_id",
+            "created_at"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_currency_transaction_type",
+          "columns": [
+            "type"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "experiment_assignment",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Tracks which variant a player is assigned to in an experiment.",
+      "columns": [
+        {
+          "name": "experiment_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "player_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "variant",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "assigned_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "experiment_id",
+        "player_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_experiment_assignment_experiment",
+          "columns": [
+            "experiment_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "experiment",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_experiment_assignment_player",
+          "columns": [
+            "player_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_experiment_assignment_experiment_id",
+          "columns": [
+            "experiment_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        },
+        {
+          "name": "idx_experiment_assignment_player_id",
+          "columns": [
+            "player_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "follow",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Player-to-player follows. Composite PK prevents duplicate follows.",
+      "columns": [
+        {
+          "name": "follower_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "followed_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "created_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "follower_id",
+        "followed_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_follow_followed",
+          "columns": [
+            "followed_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_follow_follower",
+          "columns": [
+            "follower_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_follow_followed",
+          "columns": [
+            "followed_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_follow_follower_id",
+          "columns": [
+            "follower_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        }
+      ],
+      "uniques": null,
+      "checks": [
+        {
+          "name": "ck_follow_no_self",
+          "expr": "follower_id \u003c\u003e followed_id"
+        }
+      ],
+      "exclusions": null
     },
     {
       "name": "friendships",
@@ -775,7 +1438,7 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
+      "uniques": null,
       "checks": [
         {
           "name": "ck_friendships_no_self",
@@ -786,7 +1449,7 @@
           "expr": "player_a \u003c player_b"
         }
       ],
-      "exclusions": []
+      "exclusions": null
     },
     {
       "name": "game_catalog",
@@ -939,20 +1602,20 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
+      "uniques": null,
       "checks": [
         {
           "name": "ck_game_catalog_generation_consistency",
           "expr": "(ai_generated = true AND generation_model IS NOT NULL) OR (ai_generated = false AND generation_model IS NULL AND generation_prompt IS NULL)"
         }
       ],
-      "exclusions": []
+      "exclusions": null
     },
     {
-      "name": "chat_messages",
+      "name": "notification",
       "schema": "game",
       "source_file": "gamehome_game.toml",
-      "comment": "Player chat messages, partitioned by month. Retention: 90 days (drop old partitions via cron).",
+      "comment": "Player notifications for friend requests, likes, achievements, moderation, and system events.",
       "columns": [
         {
           "name": "id",
@@ -966,7 +1629,7 @@
           "type_kind": "scalar"
         },
         {
-          "name": "sender_id",
+          "name": "player_id",
           "pg_type": {
             "base": "uuid",
             "params": {}
@@ -976,7 +1639,17 @@
           "type_kind": "scalar"
         },
         {
-          "name": "channel",
+          "name": "type",
+          "pg_type": {
+            "base": "notification_type",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "notification_type",
+          "type_kind": "enum"
+        },
+        {
+          "name": "title",
           "pg_type": {
             "base": "text",
             "params": {}
@@ -996,17 +1669,29 @@
           "type_kind": "scalar"
         },
         {
-          "name": "metadata",
+          "name": "data",
           "pg_type": {
             "base": "jsonb",
             "params": {}
           },
           "not_null": false,
+          "comment": "Arbitrary payload (e.g. friend request ID, game ID)",
           "semantic_type_name": "jsonb_nullable",
           "type_kind": "scalar"
         },
         {
-          "name": "sent_at",
+          "name": "read",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "created_at",
           "pg_type": {
             "base": "timestamptz",
             "params": {}
@@ -1018,146 +1703,11 @@
         }
       ],
       "pk": [
-        "id",
-        "sent_at"
+        "id"
       ],
       "fks": [
         {
-          "name": "fk_chat_messages_sender",
-          "columns": [
-            "sender_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_chat_messages_channel_sent",
-          "columns": [
-            "channel",
-            "sent_at"
-          ],
-          "desc": [
-            false,
-            true
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        },
-        {
-          "name": "idx_chat_messages_sender",
-          "columns": [
-            "sender_id",
-            "sent_at"
-          ],
-          "desc": [
-            false,
-            true
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": [],
-      "partitioning": {
-        "strategy": "range",
-        "columns": [
-          "sent_at"
-        ],
-        "children": null
-      },
-      "maintenance": {
-        "interval": "1 month",
-        "premake": 3,
-        "retention": "90 days",
-        "retention_keep_table": false
-      }
-    },
-    {
-      "name": "player_privacy_settings",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Per-player privacy controls. Created at registration with all social features disabled (privacy-by-default).",
-      "columns": [
-        {
-          "name": "player_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "public_profile",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "false",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "chat_enabled",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "false",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "friends_enabled",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "false",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "leaderboard_visible",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "true",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "updated_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "player_id"
-      ],
-      "fks": [
-        {
-          "name": "fk_privacy_settings_player",
+          "name": "fk_notification_player",
           "columns": [
             "player_id"
           ],
@@ -1171,18 +1721,28 @@
       ],
       "indexes": [
         {
-          "name": "idx_player_privacy_settings_player_id",
+          "name": "idx_notification_player",
           "columns": [
-            "player_id"
+            "player_id",
+            "created_at"
           ],
-          "method": "btree",
           "unique": false,
-          "is_auto_fk": true
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_notification_player_unread",
+          "columns": [
+            "player_id",
+            "created_at"
+          ],
+          "where": "read = false",
+          "unique": false,
+          "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "player_age_verification",
@@ -1333,9 +1893,113 @@
           "is_auto_fk": true
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "player_privacy_settings",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Per-player privacy controls. Created at registration with all social features disabled (privacy-by-default).",
+      "columns": [
+        {
+          "name": "player_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "public_profile",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "chat_enabled",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "friends_enabled",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "false",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "leaderboard_visible",
+          "pg_type": {
+            "base": "bool",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "true",
+          "semantic_type_name": "flag",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "updated_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "player_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_privacy_settings_player",
+          "columns": [
+            "player_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_player_privacy_settings_player_id",
+          "columns": [
+            "player_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "player_profile",
@@ -1434,9 +2098,9 @@
           "is_auto_fk": true
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "player_setting",
@@ -1504,105 +2168,9 @@
           "is_auto_fk": true
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "follow",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Player-to-player follows. Composite PK prevents duplicate follows.",
-      "columns": [
-        {
-          "name": "follower_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "followed_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "created_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "follower_id",
-        "followed_id"
-      ],
-      "fks": [
-        {
-          "name": "fk_follow_followed",
-          "columns": [
-            "followed_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        },
-        {
-          "name": "fk_follow_follower",
-          "columns": [
-            "follower_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_follow_followed",
-          "columns": [
-            "followed_id"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        },
-        {
-          "name": "idx_follow_follower_id",
-          "columns": [
-            "follower_id"
-          ],
-          "method": "btree",
-          "unique": false,
-          "is_auto_fk": true
-        }
-      ],
-      "uniques": [],
-      "checks": [
-        {
-          "name": "ck_follow_no_self",
-          "expr": "follower_id \u003c\u003e followed_id"
-        }
-      ],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "report",
@@ -1728,15 +2296,15 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
-      "name": "currency_balance",
+      "name": "achievement",
       "schema": "game",
       "source_file": "gamehome_game.toml",
-      "comment": "Current virtual currency balance per player. Single row per player.",
+      "comment": "Earned achievements per player. Composite PK prevents duplicate awards.",
       "columns": [
         {
           "name": "player_id",
@@ -1749,18 +2317,28 @@
           "type_kind": "scalar"
         },
         {
-          "name": "balance",
+          "name": "achievement_def_id",
           "pg_type": {
-            "base": "int8",
+            "base": "uuid",
             "params": {}
           },
           "not_null": true,
-          "default": "0",
-          "semantic_type_name": "counter",
+          "semantic_type_name": "ref",
           "type_kind": "scalar"
         },
         {
-          "name": "updated_at",
+          "name": "game_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": false,
+          "comment": "Game that triggered the unlock, if applicable",
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "earned_at",
           "pg_type": {
             "base": "timestamptz",
             "params": {}
@@ -1772,11 +2350,36 @@
         }
       ],
       "pk": [
-        "player_id"
+        "player_id",
+        "achievement_def_id"
       ],
       "fks": [
         {
-          "name": "fk_currency_balance_player",
+          "name": "fk_achievement_def",
+          "columns": [
+            "achievement_def_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "achievement_def",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_achievement_game",
+          "columns": [
+            "game_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "game_catalog",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "SET NULL"
+        },
+        {
+          "name": "fk_achievement_player",
           "columns": [
             "player_id"
           ],
@@ -1790,7 +2393,25 @@
       ],
       "indexes": [
         {
-          "name": "idx_currency_balance_player_id",
+          "name": "idx_achievement_achievement_def_id",
+          "columns": [
+            "achievement_def_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        },
+        {
+          "name": "idx_achievement_game",
+          "columns": [
+            "game_id"
+          ],
+          "where": "game_id IS NOT NULL",
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_achievement_player_id",
           "columns": [
             "player_id"
           ],
@@ -1799,15 +2420,15 @@
           "is_auto_fk": true
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
-      "name": "currency_transaction",
+      "name": "game_comment",
       "schema": "game",
       "source_file": "gamehome_game.toml",
-      "comment": "Immutable ledger of virtual currency transactions.",
+      "comment": "Player comments on games.",
       "columns": [
         {
           "name": "id",
@@ -1821,136 +2442,13 @@
           "type_kind": "scalar"
         },
         {
-          "name": "player_id",
+          "name": "game_id",
           "pg_type": {
             "base": "uuid",
             "params": {}
           },
           "not_null": true,
           "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "amount",
-          "pg_type": {
-            "base": "int8",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "0",
-          "comment": "Signed amount (positive = credit, negative = debit)",
-          "semantic_type_name": "counter",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "type",
-          "pg_type": {
-            "base": "currency_transaction_type",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "currency_transaction_type",
-          "type_kind": "enum"
-        },
-        {
-          "name": "reason",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "reference_type",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": false,
-          "comment": "Entity type that triggered the transaction (e.g. game_play, achievement)",
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "reference_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": false,
-          "comment": "UUID of the triggering entity",
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "created_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "id"
-      ],
-      "fks": [
-        {
-          "name": "fk_currency_transaction_player",
-          "columns": [
-            "player_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_currency_transaction_player",
-          "columns": [
-            "player_id",
-            "created_at"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        },
-        {
-          "name": "idx_currency_transaction_type",
-          "columns": [
-            "type"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "notification",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Player notifications for friend requests, likes, achievements, moderation, and system events.",
-      "columns": [
-        {
-          "name": "id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id",
           "type_kind": "scalar"
         },
         {
@@ -1961,26 +2459,6 @@
           },
           "not_null": true,
           "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "type",
-          "pg_type": {
-            "base": "notification_type",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "notification_type",
-          "type_kind": "enum"
-        },
-        {
-          "name": "title",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
           "type_kind": "scalar"
         },
         {
@@ -1994,28 +2472,6 @@
           "type_kind": "scalar"
         },
         {
-          "name": "data",
-          "pg_type": {
-            "base": "jsonb",
-            "params": {}
-          },
-          "not_null": false,
-          "comment": "Arbitrary payload (e.g. friend request ID, game ID)",
-          "semantic_type_name": "jsonb_nullable",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "read",
-          "pg_type": {
-            "base": "bool",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "false",
-          "semantic_type_name": "flag",
-          "type_kind": "scalar"
-        },
-        {
           "name": "created_at",
           "pg_type": {
             "base": "timestamptz",
@@ -2032,350 +2488,7 @@
       ],
       "fks": [
         {
-          "name": "fk_notification_player",
-          "columns": [
-            "player_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_notification_player",
-          "columns": [
-            "player_id",
-            "created_at"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        },
-        {
-          "name": "idx_notification_player_unread",
-          "columns": [
-            "player_id",
-            "created_at"
-          ],
-          "where": "read = false",
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "api_keys",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "API keys for AI agent and service authentication. Keys are hashed; the plaintext is shown only once at creation.",
-      "columns": [
-        {
-          "name": "id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "player_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "key_hash",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "name",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "scopes",
-          "pg_type": {
-            "base": "jsonb",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "'{}'::jsonb",
-          "semantic_type_name": "json",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "created_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "last_used_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": false,
-          "semantic_type_name": "timestamp_optional",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "revoked_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": false,
-          "semantic_type_name": "timestamp_optional",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "id"
-      ],
-      "fks": [
-        {
-          "name": "fk_api_keys_player",
-          "columns": [
-            "player_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_api_keys_hash",
-          "columns": [
-            "key_hash"
-          ],
-          "unique": true,
-          "is_auto_fk": false
-        },
-        {
-          "name": "idx_api_keys_player",
-          "columns": [
-            "player_id"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "experiment_assignment",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Tracks which variant a player is assigned to in an experiment.",
-      "columns": [
-        {
-          "name": "experiment_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "player_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "variant",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "assigned_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "experiment_id",
-        "player_id"
-      ],
-      "fks": [
-        {
-          "name": "fk_experiment_assignment_experiment",
-          "columns": [
-            "experiment_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "experiment",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        },
-        {
-          "name": "fk_experiment_assignment_player",
-          "columns": [
-            "player_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_experiment_assignment_experiment_id",
-          "columns": [
-            "experiment_id"
-          ],
-          "method": "btree",
-          "unique": false,
-          "is_auto_fk": true
-        },
-        {
-          "name": "idx_experiment_assignment_player_id",
-          "columns": [
-            "player_id"
-          ],
-          "method": "btree",
-          "unique": false,
-          "is_auto_fk": true
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "platform_leaderboards",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Cross-game leaderboard entries. Each row is a score submission for a specific game.",
-      "columns": [
-        {
-          "name": "id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "game_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "player_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "score",
-          "pg_type": {
-            "base": "int8",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "0",
-          "semantic_type_name": "counter",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "metadata",
-          "pg_type": {
-            "base": "jsonb",
-            "params": {}
-          },
-          "not_null": false,
-          "semantic_type_name": "jsonb_nullable",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "achieved_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "id"
-      ],
-      "fks": [
-        {
-          "name": "fk_leaderboards_game",
+          "name": "fk_game_comment_game",
           "columns": [
             "game_id"
           ],
@@ -2387,7 +2500,7 @@
           "on_delete": "CASCADE"
         },
         {
-          "name": "fk_leaderboards_player",
+          "name": "fk_game_comment_player",
           "columns": [
             "player_id"
           ],
@@ -2401,31 +2514,16 @@
       ],
       "indexes": [
         {
-          "name": "idx_leaderboards_achieved_at",
-          "columns": [
-            "achieved_at"
-          ],
-          "desc": [
-            true
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        },
-        {
-          "name": "idx_leaderboards_game_score",
+          "name": "idx_game_comment_game",
           "columns": [
             "game_id",
-            "score"
-          ],
-          "desc": [
-            false,
-            true
+            "created_at"
           ],
           "unique": false,
           "is_auto_fk": false
         },
         {
-          "name": "idx_leaderboards_player",
+          "name": "idx_game_comment_player",
           "columns": [
             "player_id"
           ],
@@ -2433,122 +2531,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "game_version",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Versioned game bundles. Each game can have multiple published versions.",
-      "columns": [
-        {
-          "name": "id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "gen_random_uuid()",
-          "semantic_type_name": "id",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "game_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "version_number",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "bundle_path",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "bundle_size",
-          "pg_type": {
-            "base": "int8",
-            "params": {}
-          },
-          "not_null": true,
-          "default": "0",
-          "comment": "Bundle size in bytes",
-          "semantic_type_name": "counter",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "changelog",
-          "pg_type": {
-            "base": "text",
-            "params": {}
-          },
-          "not_null": false,
-          "semantic_type_name": "text_field",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "created_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "id"
-      ],
-      "fks": [
-        {
-          "name": "fk_game_version_game",
-          "columns": [
-            "game_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "game_catalog",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_game_version_game_id",
-          "columns": [
-            "game_id",
-            "created_at"
-          ],
-          "unique": false,
-          "is_auto_fk": false
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "game_fork",
@@ -2677,9 +2662,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "game_like",
@@ -2768,15 +2753,15 @@
           "is_auto_fk": true
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
-      "name": "game_comment",
+      "name": "game_version",
       "schema": "game",
       "source_file": "gamehome_game.toml",
-      "comment": "Player comments on games.",
+      "comment": "Versioned game bundles. Each game can have multiple published versions.",
       "columns": [
         {
           "name": "id",
@@ -2800,22 +2785,44 @@
           "type_kind": "scalar"
         },
         {
-          "name": "player_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "body",
+          "name": "version_number",
           "pg_type": {
             "base": "text",
             "params": {}
           },
           "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "bundle_path",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "text_field",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "bundle_size",
+          "pg_type": {
+            "base": "int8",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "0",
+          "comment": "Bundle size in bytes",
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "changelog",
+          "pg_type": {
+            "base": "text",
+            "params": {}
+          },
+          "not_null": false,
           "semantic_type_name": "text_field",
           "type_kind": "scalar"
         },
@@ -2836,7 +2843,7 @@
       ],
       "fks": [
         {
-          "name": "fk_game_comment_game",
+          "name": "fk_game_version_game",
           "columns": [
             "game_id"
           ],
@@ -2846,42 +2853,22 @@
             "id"
           ],
           "on_delete": "CASCADE"
-        },
-        {
-          "name": "fk_game_comment_player",
-          "columns": [
-            "player_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
         }
       ],
       "indexes": [
         {
-          "name": "idx_game_comment_game",
+          "name": "idx_game_version_game_id",
           "columns": [
             "game_id",
             "created_at"
           ],
           "unique": false,
           "is_auto_fk": false
-        },
-        {
-          "name": "idx_game_comment_player",
-          "columns": [
-            "player_id"
-          ],
-          "unique": false,
-          "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "generation_job",
@@ -3063,9 +3050,146 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "platform_leaderboards",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Cross-game leaderboard entries. Each row is a score submission for a specific game.",
+      "columns": [
+        {
+          "name": "id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "gen_random_uuid()",
+          "semantic_type_name": "id",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "game_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "player_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "score",
+          "pg_type": {
+            "base": "int8",
+            "params": {}
+          },
+          "not_null": true,
+          "default": "0",
+          "semantic_type_name": "counter",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "metadata",
+          "pg_type": {
+            "base": "jsonb",
+            "params": {}
+          },
+          "not_null": false,
+          "semantic_type_name": "jsonb_nullable",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "achieved_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "fks": [
+        {
+          "name": "fk_leaderboards_game",
+          "columns": [
+            "game_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "game_catalog",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_leaderboards_player",
+          "columns": [
+            "player_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_leaderboards_achieved_at",
+          "columns": [
+            "achieved_at"
+          ],
+          "desc": [
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_leaderboards_game_score",
+          "columns": [
+            "game_id",
+            "score"
+          ],
+          "desc": [
+            false,
+            true
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        },
+        {
+          "name": "idx_leaderboards_player",
+          "columns": [
+            "player_id"
+          ],
+          "unique": false,
+          "is_auto_fk": false
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "session",
@@ -3253,133 +3377,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "achievement",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Earned achievements per player. Composite PK prevents duplicate awards.",
-      "columns": [
-        {
-          "name": "player_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "achievement_def_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "game_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": false,
-          "comment": "Game that triggered the unlock, if applicable",
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "earned_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "player_id",
-        "achievement_def_id"
-      ],
-      "fks": [
-        {
-          "name": "fk_achievement_def",
-          "columns": [
-            "achievement_def_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "achievement_def",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        },
-        {
-          "name": "fk_achievement_game",
-          "columns": [
-            "game_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "game_catalog",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "SET NULL"
-        },
-        {
-          "name": "fk_achievement_player",
-          "columns": [
-            "player_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_achievement_achievement_def_id",
-          "columns": [
-            "achievement_def_id"
-          ],
-          "method": "btree",
-          "unique": false,
-          "is_auto_fk": true
-        },
-        {
-          "name": "idx_achievement_game",
-          "columns": [
-            "game_id"
-          ],
-          "where": "game_id IS NOT NULL",
-          "unique": false,
-          "is_auto_fk": false
-        },
-        {
-          "name": "idx_achievement_player_id",
-          "columns": [
-            "player_id"
-          ],
-          "method": "btree",
-          "unique": false,
-          "is_auto_fk": true
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "moderation_action",
@@ -3467,9 +3467,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "game_play",
@@ -3632,111 +3632,9 @@
           "is_auto_fk": true
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
-    },
-    {
-      "name": "session_participant",
-      "schema": "game",
-      "source_file": "gamehome_game.toml",
-      "comment": "Players in a game session with their role.",
-      "columns": [
-        {
-          "name": "session_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "player_id",
-          "pg_type": {
-            "base": "uuid",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "ref",
-          "type_kind": "scalar"
-        },
-        {
-          "name": "role",
-          "pg_type": {
-            "base": "session_role",
-            "params": {}
-          },
-          "not_null": true,
-          "semantic_type_name": "session_role",
-          "type_kind": "enum"
-        },
-        {
-          "name": "joined_at",
-          "pg_type": {
-            "base": "timestamptz",
-            "params": {}
-          },
-          "not_null": true,
-          "default_expr": "now()",
-          "semantic_type_name": "timestamp",
-          "type_kind": "scalar"
-        }
-      ],
-      "pk": [
-        "session_id",
-        "player_id"
-      ],
-      "fks": [
-        {
-          "name": "fk_session_participant_player",
-          "columns": [
-            "player_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "players",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        },
-        {
-          "name": "fk_session_participant_session",
-          "columns": [
-            "session_id"
-          ],
-          "ref_schema": "game",
-          "ref_table": "session",
-          "ref_columns": [
-            "id"
-          ],
-          "on_delete": "CASCADE"
-        }
-      ],
-      "indexes": [
-        {
-          "name": "idx_session_participant_player_id",
-          "columns": [
-            "player_id"
-          ],
-          "method": "btree",
-          "unique": false,
-          "is_auto_fk": true
-        },
-        {
-          "name": "idx_session_participant_session_id",
-          "columns": [
-            "session_id"
-          ],
-          "method": "btree",
-          "unique": false,
-          "is_auto_fk": true
-        }
-      ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "action_log",
@@ -3857,9 +3755,111 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
+    },
+    {
+      "name": "session_participant",
+      "schema": "game",
+      "source_file": "gamehome_game.toml",
+      "comment": "Players in a game session with their role.",
+      "columns": [
+        {
+          "name": "session_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "player_id",
+          "pg_type": {
+            "base": "uuid",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "ref",
+          "type_kind": "scalar"
+        },
+        {
+          "name": "role",
+          "pg_type": {
+            "base": "session_role",
+            "params": {}
+          },
+          "not_null": true,
+          "semantic_type_name": "session_role",
+          "type_kind": "enum"
+        },
+        {
+          "name": "joined_at",
+          "pg_type": {
+            "base": "timestamptz",
+            "params": {}
+          },
+          "not_null": true,
+          "default_expr": "now()",
+          "semantic_type_name": "timestamp",
+          "type_kind": "scalar"
+        }
+      ],
+      "pk": [
+        "session_id",
+        "player_id"
+      ],
+      "fks": [
+        {
+          "name": "fk_session_participant_player",
+          "columns": [
+            "player_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "players",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_session_participant_session",
+          "columns": [
+            "session_id"
+          ],
+          "ref_schema": "game",
+          "ref_table": "session",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_session_participant_player_id",
+          "columns": [
+            "player_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        },
+        {
+          "name": "idx_session_participant_session_id",
+          "columns": [
+            "session_id"
+          ],
+          "method": "btree",
+          "unique": false,
+          "is_auto_fk": true
+        }
+      ],
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     },
     {
       "name": "state_snapshot",
@@ -3950,9 +3950,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     }
   ],
   "pg_version": 1

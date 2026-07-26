@@ -3,7 +3,7 @@
   "extensions": [
     "pgcrypto"
   ],
-  "enums": [],
+  "enums": null,
   "domains": [
     {
       "name": "short_text",
@@ -69,11 +69,11 @@
       "pk": [
         "id"
       ],
-      "fks": [],
-      "indexes": [],
-      "uniques": [],
-      "checks": [],
-      "exclusions": [],
+      "fks": null,
+      "indexes": null,
+      "uniques": null,
+      "checks": null,
+      "exclusions": null,
       "policies": [
         {
           "name": "owners_delete",

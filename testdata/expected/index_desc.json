@@ -1,7 +1,7 @@
 {
   "name": "chat",
   "extensions": null,
-  "enums": [],
+  "enums": null,
   "domains": [
     {
       "name": "short_text",
@@ -68,7 +68,7 @@
       "pk": [
         "id"
       ],
-      "fks": [],
+      "fks": null,
       "indexes": [
         {
           "name": "idx_messages_channel_sent",
@@ -103,9 +103,9 @@
           "is_auto_fk": false
         }
       ],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     }
   ],
   "pg_version": 16

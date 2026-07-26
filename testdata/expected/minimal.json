@@ -1,7 +1,7 @@
 {
   "name": "public",
   "extensions": null,
-  "enums": [],
+  "enums": null,
   "domains": [
     {
       "name": "email",
@@ -57,11 +57,11 @@
       "pk": [
         "id"
       ],
-      "fks": [],
-      "indexes": [],
-      "uniques": [],
-      "checks": [],
-      "exclusions": []
+      "fks": null,
+      "indexes": null,
+      "uniques": null,
+      "checks": null,
+      "exclusions": null
     }
   ],
   "pg_version": 16

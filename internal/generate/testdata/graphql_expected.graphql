@@ -1,16 +1,16 @@
 scalar DateTime
 scalar JSON
 
-enum UserRole {
-  ADMIN
-  EDITOR
-  VIEWER
-}
-
 enum OrderStatus {
   PENDING
   SHIPPED
   DELIVERED
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
 }
 
 type Users {

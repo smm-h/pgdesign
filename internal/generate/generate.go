@@ -9,7 +9,6 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
-	"github.com/smm-h/pgdesign/internal/graph"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sql"
@@ -52,47 +51,11 @@ func Generate(schema *model.Schema, opts Options) (string, []diagnostic.Diagnost
 	}
 }
 
-// generateJSON produces pretty-printed JSON output of the full schema.
+// generateJSON produces pretty-printed JSON output of the full schema. The
+// schema is already in canonical order (model.Canonicalize runs at build time),
+// so it is marshalled directly.
 func generateJSON(schema *model.Schema) (string, error) {
-	// Deep-enough copy so sorting doesn't mutate the original.
-	s := *schema
-	s.Enums = make([]model.Enum, len(schema.Enums))
-	copy(s.Enums, schema.Enums)
-	sort.Slice(s.Enums, func(i, j int) bool {
-		return s.Enums[i].Name < s.Enums[j].Name
-	})
-	s.Domains = make([]model.Domain, len(schema.Domains))
-	copy(s.Domains, schema.Domains)
-	sort.Slice(s.Domains, func(i, j int) bool {
-		return s.Domains[i].Name < s.Domains[j].Name
-	})
-	s.CompositeTypes = make([]model.CompositeType, len(schema.CompositeTypes))
-	copy(s.CompositeTypes, schema.CompositeTypes)
-	sort.Slice(s.CompositeTypes, func(i, j int) bool {
-		return s.CompositeTypes[i].Name < s.CompositeTypes[j].Name
-	})
-	s.Sequences = make([]model.Sequence, len(schema.Sequences))
-	copy(s.Sequences, schema.Sequences)
-	sort.Slice(s.Sequences, func(i, j int) bool {
-		return s.Sequences[i].Name < s.Sequences[j].Name
-	})
-	s.Tables = make([]model.Table, len(schema.Tables))
-	copy(s.Tables, schema.Tables)
-	for i := range s.Tables {
-		s.Tables[i].FKs = model.SortedFKs(s.Tables[i].FKs)
-		s.Tables[i].Indexes = model.SortedIndexes(s.Tables[i].Indexes)
-		s.Tables[i].Uniques = model.SortedUniques(s.Tables[i].Uniques)
-		s.Tables[i].Checks = model.SortedChecks(s.Tables[i].Checks)
-		s.Tables[i].Exclusions = model.SortedExclusions(s.Tables[i].Exclusions)
-		s.Tables[i].Policies = model.SortedPolicies(s.Tables[i].Policies)
-		s.Tables[i].Triggers = model.SortedTriggers(s.Tables[i].Triggers)
-	}
-	s.Functions = make([]model.Function, len(schema.Functions))
-	copy(s.Functions, schema.Functions)
-	sort.Slice(s.Functions, func(i, j int) bool {
-		return s.Functions[i].Name < s.Functions[j].Name
-	})
-	data, err := json.MarshalIndent(&s, "", "  ")
+	data, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("json marshal: %w", err)
 	}
@@ -258,8 +221,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var fkStmts []string
 	for i := range tables {
 		t := &tables[i]
-		fks := model.SortedFKs(t.FKs)
-		for _, fk := range fks {
+		for _, fk := range t.FKs {
 			fkCopy := fk
 			fkStmts = append(fkStmts, sql.AlterTableAddFK(t.Schema, t, &fkCopy, opts.Idempotent))
 		}
@@ -272,8 +234,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var uqStmts []string
 	for i := range tables {
 		t := &tables[i]
-		uqs := model.SortedUniques(t.Uniques)
-		for _, uq := range uqs {
+		for _, uq := range t.Uniques {
 			uqCopy := uq
 			uqStmts = append(uqStmts, sql.AlterTableAddUnique(t.Schema, t.Name, &uqCopy, opts.Idempotent))
 		}
@@ -286,8 +247,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var ckStmts []string
 	for i := range tables {
 		t := &tables[i]
-		cks := model.SortedChecks(t.Checks)
-		for _, ck := range cks {
+		for _, ck := range t.Checks {
 			ckCopy := ck
 			ckStmts = append(ckStmts, sql.AlterTableAddCheck(t.Schema, t.Name, &ckCopy, opts.Idempotent))
 		}
@@ -300,8 +260,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var exclStmts []string
 	for i := range tables {
 		t := &tables[i]
-		excls := model.SortedExclusions(t.Exclusions)
-		for _, exc := range excls {
+		for _, exc := range t.Exclusions {
 			excCopy := exc
 			exclStmts = append(exclStmts, sql.AlterTableAddExclusion(t.Schema, t.Name, &excCopy, opts.Idempotent))
 		}
@@ -314,8 +273,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var idxStmts []string
 	for i := range tables {
 		t := &tables[i]
-		idxs := model.SortedIndexes(t.Indexes)
-		for _, idx := range idxs {
+		for _, idx := range t.Indexes {
 			idxCopy := idx
 			idxStmts = append(idxStmts, sql.CreateIndex(t.Schema, &idxCopy, t.Name, opts.Idempotent, false))
 		}
@@ -464,8 +422,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var policyStmts []string
 	for i := range tables {
 		t := &tables[i]
-		policies := model.SortedPolicies(t.Policies)
-		for _, p := range policies {
+		for _, p := range t.Policies {
 			policyStmts = append(policyStmts, sql.CreatePolicy(t.Schema, t.Name, p, opts.Idempotent, opts.PGVersion))
 		}
 	}
@@ -473,28 +430,12 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		sections = append(sections, strings.Join(policyStmts, "\n"))
 	}
 
-	// 14. CREATE VIEW (topologically sorted by DependsOn)
+	// 14. CREATE VIEW (canonical order: topologically sorted by DependsOn at build time)
 	if len(schema.Views) > 0 {
-		sorted, err := topoSortViews(schema.Views)
-		if err != nil {
-			// Cycle in view dependencies -- emit in original order with a warning.
-			sorted = schema.Views
-			var cycleMembers []string
-			for _, v := range sorted {
-				cycleMembers = append(cycleMembers, v.Name)
-			}
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Warning,
-				Message:  fmt.Sprintf("dependency cycle detected among views: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
-			})
-		}
 		var viewStmts []string
-		if err != nil {
-			viewStmts = append(viewStmts, "-- WARNING: dependency cycle detected; emitted in declaration order")
-		}
 		schemaName := schema.Name
-		for i := range sorted {
-			v := &sorted[i]
+		for i := range schema.Views {
+			v := &schema.Views[i]
 			if v.Schema != "" {
 				schemaName = v.Schema
 			}
@@ -508,28 +449,12 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		}
 	}
 
-	// 15. CREATE MATERIALIZED VIEW (topologically sorted by DependsOn)
+	// 15. CREATE MATERIALIZED VIEW (canonical order: topologically sorted by DependsOn at build time)
 	if len(schema.MaterializedViews) > 0 {
-		sorted, err := topoSortMaterializedViews(schema.MaterializedViews)
-		if err != nil {
-			// Cycle in materialized view dependencies -- emit in original order with a warning.
-			sorted = schema.MaterializedViews
-			var cycleMembers []string
-			for _, mv := range sorted {
-				cycleMembers = append(cycleMembers, mv.Name)
-			}
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Warning,
-				Message:  fmt.Sprintf("dependency cycle detected among materialized views: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
-			})
-		}
 		var mvStmts []string
-		if err != nil {
-			mvStmts = append(mvStmts, "-- WARNING: dependency cycle detected; emitted in declaration order")
-		}
 		schemaName := schema.Name
-		for i := range sorted {
-			mv := &sorted[i]
+		for i := range schema.MaterializedViews {
+			mv := &schema.MaterializedViews[i]
 			if mv.Schema != "" {
 				schemaName = mv.Schema
 			}
@@ -547,27 +472,12 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 		}
 	}
 
-	// 16. CREATE FUNCTION / CREATE PROCEDURE (topologically sorted by DependsOn)
+	// 16. CREATE FUNCTION / CREATE PROCEDURE (canonical order: topologically sorted by DependsOn at build time)
 	if len(schema.Functions) > 0 {
-		sorted, err := topoSortFunctions(schema.Functions)
-		if err != nil {
-			sorted = schema.Functions
-			var cycleMembers []string
-			for _, f := range sorted {
-				cycleMembers = append(cycleMembers, f.Name)
-			}
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Warning,
-				Message:  fmt.Sprintf("dependency cycle detected among functions: %s; emitted in declaration order", strings.Join(cycleMembers, ", ")),
-			})
-		}
 		var funcStmts []string
-		if err != nil {
-			funcStmts = append(funcStmts, "-- WARNING: dependency cycle detected; emitted in declaration order")
-		}
 		schemaName := schema.Name
-		for i := range sorted {
-			f := &sorted[i]
+		for i := range schema.Functions {
+			f := &schema.Functions[i]
 			if f.Schema != "" {
 				schemaName = f.Schema
 			}
@@ -589,8 +499,7 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	var triggerStmts []string
 	for i := range tables {
 		t := &tables[i]
-		triggers := model.SortedTriggers(t.Triggers)
-		for _, trig := range triggers {
+		for _, trig := range t.Triggers {
 			if strings.HasPrefix(trig.Name, "_pgdesign_sm_") {
 				continue
 			}
@@ -636,44 +545,4 @@ func hasExtension(schema *model.Schema, name string) bool {
 		}
 	}
 	return false
-}
-
-// topoSortViews sorts views by DependsOn using Kahn's algorithm.
-// Views that depend on other views come after their dependencies.
-// Returns an error if a cycle is detected.
-func topoSortViews(views []model.View) ([]model.View, error) {
-	sorted, cycles := graph.TopoSort(views,
-		func(v model.View) string { return v.Name },
-		func(v model.View) []string { return v.DependsOn },
-	)
-	if len(cycles) > 0 {
-		return nil, fmt.Errorf("cycle detected in view dependencies")
-	}
-	return sorted, nil
-}
-
-// topoSortMaterializedViews sorts materialized views by DependsOn using Kahn's algorithm.
-// Materialized views that depend on other materialized views come after their dependencies.
-// Returns an error if a cycle is detected.
-func topoSortMaterializedViews(mvs []model.MaterializedView) ([]model.MaterializedView, error) {
-	sorted, cycles := graph.TopoSort(mvs,
-		func(mv model.MaterializedView) string { return mv.Name },
-		func(mv model.MaterializedView) []string { return mv.DependsOn },
-	)
-	if len(cycles) > 0 {
-		return nil, fmt.Errorf("cycle detected in materialized view dependencies")
-	}
-	return sorted, nil
-}
-
-// topoSortFunctions sorts functions by DependsOn using Kahn's algorithm.
-func topoSortFunctions(funcs []model.Function) ([]model.Function, error) {
-	sorted, cycles := graph.TopoSort(funcs,
-		func(f model.Function) string { return f.Name },
-		func(f model.Function) []string { return f.DependsOn },
-	)
-	if len(cycles) > 0 {
-		return nil, fmt.Errorf("cycle detected in function dependencies")
-	}
-	return sorted, nil
 }

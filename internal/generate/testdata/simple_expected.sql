@@ -2,8 +2,8 @@ CREATE SCHEMA shop;
 
 CREATE EXTENSION pgcrypto;
 
-CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);
 CREATE DOMAIN shop.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\.[^@]+$');
+CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);
 
 CREATE TABLE shop.customers (
     id uuid NOT NULL DEFAULT gen_random_uuid(),

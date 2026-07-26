@@ -6,17 +6,6 @@ projects: {
   description: short_text
   created_at: timestamptz
 }
-tasks: {
-  shape: sql_table
-  id: uuid {constraint: primary_key}
-  project_id: uuid {constraint: foreign_key}
-  title: short_text
-  priority: priority
-  estimated_hours: int8
-  hourly_rate: int8
-  estimated_cost: int8
-  created_at: timestamptz
-}
 audit_log: {
   shape: sql_table
   id: uuid {constraint: primary_key}
@@ -34,6 +23,17 @@ events: {
   payload: jsonb
   occurred_at: timestamptz {constraint: primary_key}
 }
+tasks: {
+  shape: sql_table
+  id: uuid {constraint: primary_key}
+  project_id: uuid {constraint: foreign_key}
+  title: short_text
+  priority: priority
+  estimated_hours: int8
+  hourly_rate: int8
+  estimated_cost: int8
+  created_at: timestamptz
+}
 comments: {
   shape: sql_table
   id: uuid {constraint: primary_key}
@@ -43,7 +43,7 @@ comments: {
   tags: short_text
   created_at: timestamptz
 }
-tasks.project_id -> projects.id: CASCADE
 audit_log.project_id -> projects.id: CASCADE
 events.project_id -> projects.id: CASCADE
+tasks.project_id -> projects.id: CASCADE
 comments.task_id -> tasks.id: CASCADE

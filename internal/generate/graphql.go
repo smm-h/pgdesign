@@ -1,7 +1,6 @@
 package generate
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -145,7 +144,7 @@ func generateGraphQL(schema *model.Schema) string {
 			b.WriteString("\n")
 		}
 
-		// FK relation fields, sorted by field name.
+		// FK relation fields, emitted in the table's canonical FK order.
 		type fkField struct {
 			fieldName string
 			typeName  string
@@ -166,9 +165,6 @@ func generateGraphQL(schema *model.Schema) string {
 				notNull:   allNotNull,
 			})
 		}
-		sort.Slice(fkFields, func(i, j int) bool {
-			return fkFields[i].fieldName < fkFields[j].fieldName
-		})
 		for _, f := range fkFields {
 			b.WriteString("  ")
 			b.WriteString(f.fieldName)
@@ -180,7 +176,7 @@ func generateGraphQL(schema *model.Schema) string {
 			b.WriteString("\n")
 		}
 
-		// Reverse relation fields, sorted by field name.
+		// Reverse relation fields, emitted in canonical FKGraph edge order.
 		type revField struct {
 			fieldName string
 			typeName  string
@@ -197,9 +193,6 @@ func generateGraphQL(schema *model.Schema) string {
 				typeName:  toPascalCase(edge.FromTable),
 			})
 		}
-		sort.Slice(revFields, func(i, j int) bool {
-			return revFields[i].fieldName < revFields[j].fieldName
-		})
 		for _, f := range revFields {
 			b.WriteString("  ")
 			b.WriteString(f.fieldName)

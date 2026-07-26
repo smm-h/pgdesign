@@ -9,18 +9,18 @@ DDLStmt = namedtuple("DDLStmt", ["sql", "idempotent_sql", "kind", "name", "table
 STATEMENTS: Final[list[DDLStmt]] = [
     DDLStmt("CREATE SCHEMA shop;", "CREATE SCHEMA IF NOT EXISTS shop;", "schema", "shop", None, 1, True),
     DDLStmt("CREATE EXTENSION pgcrypto;", "CREATE EXTENSION IF NOT EXISTS pgcrypto;", "extension", "pgcrypto", None, 2, True),
-    DDLStmt("CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);", """DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = 'short_text' AND n.nspname = 'shop' AND t.typtype = 'd') THEN
-    EXECUTE 'CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);';
-  END IF;
-END $$;""", "domain", "short_text", None, 3, True),
     DDLStmt("CREATE DOMAIN shop.email AS text CHECK (VALUE ~ '^[^@]+@[^@]+\\.[^@]+$');", """DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = 'email' AND n.nspname = 'shop' AND t.typtype = 'd') THEN
     EXECUTE 'CREATE DOMAIN shop.email AS text CHECK (VALUE ~ ''^[^@]+@[^@]+\\.[^@]+$'');';
   END IF;
 END $$;""", "domain", "email", None, 3, True),
+    DDLStmt("CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);", """DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.typname = 'short_text' AND n.nspname = 'shop' AND t.typtype = 'd') THEN
+    EXECUTE 'CREATE DOMAIN shop.short_text AS text CHECK (LENGTH(VALUE) <= 255);';
+  END IF;
+END $$;""", "domain", "short_text", None, 3, True),
     DDLStmt("""CREATE TABLE shop.customers (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     name shop.short_text NOT NULL,
