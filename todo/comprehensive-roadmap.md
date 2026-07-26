@@ -725,6 +725,15 @@ serve's payload key changes are an API-consumer-visible change to note in
   RAISE-on-mismatch is a breaking semantic for it (decided: RAISE stands,
   veliu-dev adapts; post-5.5+5.7 rehearsal). claudetimeline: fresh-DB
   regeneration, non-idempotent output — header wording only.
+  POST-0.1 MICRO-REHEARSAL RESULTS (2026-07, feeds 4.3 todos): orxtra's
+  check_schema_codegen.sh needs NO script change (summary-line parser is
+  format-stable; its __init__.py orphan branch is dead-but-harmless — the
+  file is generated, reported stale not orphan); gamehome needs the
+  header_check substring + echo updated (check-codegen-drift.sh:37,39) plus
+  regeneration. CRITICAL for both todos: regeneration diffs are DOMINATED
+  by 0.2's canonical reordering (~484 lines/file gamehome constants, ~1002
+  lines orxtra schema_executor.py), not the header — the todos must say
+  "full regenerate + review", never "header-only change".
 - strictcli: the check command builds a fully-populated *Context and
   discards it; infra roots + handshake envs hermetic-IMMUNE, flag Env()
   hermetic-SUPPRESSED (no primitive fits a connection URL); per-flag
