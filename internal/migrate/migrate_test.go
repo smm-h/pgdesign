@@ -595,6 +595,43 @@ func TestOpToSQL_CreatePartition(t *testing.T) {
 	}
 }
 
+// TestOpToSQL_PartmanConfigOps verifies the partman-config op family renders
+// its pre-rendered RawSQL rather than falling to the "-- unknown op" default.
+// These ops are emitted by migrate generate but OpToSQL had no case for them,
+// so they silently rendered as comment stubs at apply time -- a live no-op.
+func TestOpToSQL_PartmanConfigOps(t *testing.T) {
+	cases := []struct {
+		op   string
+		want string
+	}{
+		{
+			op:   "update_partman_retention",
+			want: "UPDATE partman.part_config",
+		},
+		{
+			op:   "update_partman_premake",
+			want: "UPDATE partman.part_config",
+		},
+		{
+			op:   "create_partman_parent",
+			want: "partman.create_parent",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.op, func(t *testing.T) {
+			raw := "-- pre-rendered: " + c.want + " ..."
+			op := DDLOp{Op: c.op, Table: "public.events", RawSQL: raw}
+			got := OpToSQL(op)
+			if strings.Contains(got, "unknown op") {
+				t.Fatalf("op %q rendered as unknown-op stub: %s", c.op, got)
+			}
+			if got != raw {
+				t.Errorf("op %q: OpToSQL should return the pre-rendered RawSQL\n got: %s\nwant: %s", c.op, got, raw)
+			}
+		})
+	}
+}
+
 // opsDebug returns a string summary of ops for test failure messages.
 func opsDebug(ops []DDLOp) string {
 	var parts []string

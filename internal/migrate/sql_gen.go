@@ -144,6 +144,13 @@ func OpToSQL(op DDLOp) string {
 			return op.RawSQL
 		}
 		return fmt.Sprintf("-- %s: missing pre-rendered SQL for %s", op.Op, op.Name)
+	case "create_partman_parent", "update_partman_retention", "update_partman_premake":
+		// Partman-config ops carry pre-rendered RawSQL (the SELECT
+		// partman.create_parent() / UPDATE partman.part_config statement).
+		if op.RawSQL != "" {
+			return op.RawSQL
+		}
+		return fmt.Sprintf("-- %s: missing pre-rendered SQL for %s", op.Op, opTarget(op))
 	default:
 		return fmt.Sprintf("-- unknown op: %s", op.Op)
 	}
