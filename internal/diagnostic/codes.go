@@ -148,3 +148,7 @@ package diagnostic
 // I200  Live introspection could not read expected catalog state
 //       (e.g. pg_partman is declared but partman.part_config is unreadable);
 //       the corresponding model detail was left unpopulated.
+// I201  Live introspection filtered a database object whose name matches a
+//       pgdesign-managed reserved pattern (e.g. a user table/view named
+//       "pgdesign_..."). The object was excluded from the introspected model;
+//       the diagnostic makes the filtering visible rather than silent.

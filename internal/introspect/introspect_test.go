@@ -87,12 +87,15 @@ func TestIntrospectTables(t *testing.T) {
 		t.Fatalf("len(Tables) = %d, want 9; got: %v", len(schema.Tables), names)
 	}
 
-	// Tables are ordered alphabetically.
+	// Tables are ordered topologically with an alphabetical tie-break
+	// (Canonicalize): "events" has no dependencies and sorts first among the
+	// roots; "posts" depends on "users" via its FK, so "users" precedes it and
+	// "posts" lands last.
 	if schema.Tables[0].Name != "events" {
 		t.Errorf("Tables[0].Name = %q, want %q", schema.Tables[0].Name, "events")
 	}
-	if schema.Tables[len(schema.Tables)-1].Name != "users" {
-		t.Errorf("Tables[last].Name = %q, want %q", schema.Tables[len(schema.Tables)-1].Name, "users")
+	if schema.Tables[len(schema.Tables)-1].Name != "posts" {
+		t.Errorf("Tables[last].Name = %q, want %q", schema.Tables[len(schema.Tables)-1].Name, "posts")
 	}
 }
 
@@ -1520,6 +1523,60 @@ func TestIntrospectTriggerFilter_StateMachine(t *testing.T) {
 	for _, trig := range posts.Triggers {
 		if trig.Function == "pgdesign_deny_mutation" {
 			t.Errorf("introspect should filter pgdesign_deny_mutation triggers on posts, found: %s", trig.Name)
+		}
+	}
+}
+
+// TestIntrospectFiltersReservedNames pins the 0.4 behavior: relations whose
+// names collide with the pgdesign-managed "pgdesign_" pattern are filtered out
+// of the introspected model AND surface an I201 diagnostic so the filtering is
+// never silent. The synthetic reserved-name table/view/matview stand in for the
+// real managed objects that arrive in phase 5.
+func TestIntrospectFiltersReservedNames(t *testing.T) {
+	schema, diags, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+
+	// None of the reserved-name relations may appear in the model.
+	for _, tbl := range schema.Tables {
+		if isManagedObjectName(tbl.Name) {
+			t.Errorf("reserved-name table %q must be filtered from introspection", tbl.Name)
+		}
+	}
+	for _, v := range schema.Views {
+		if isManagedObjectName(v.Name) {
+			t.Errorf("reserved-name view %q must be filtered from introspection", v.Name)
+		}
+	}
+	for _, mv := range schema.MaterializedViews {
+		if isManagedObjectName(mv.Name) {
+			t.Errorf("reserved-name materialized view %q must be filtered from introspection", mv.Name)
+		}
+	}
+
+	// The filtering must be visible: an I201 diagnostic per filtered relation.
+	got := map[string]bool{}
+	for _, d := range diags {
+		if d.Code == "I201" {
+			for _, name := range []string{
+				"pgdesign_reserved_table",
+				"pgdesign_reserved_view",
+				"pgdesign_reserved_matview",
+			} {
+				if strings.Contains(d.Message, name) {
+					got[name] = true
+				}
+			}
+		}
+	}
+	for _, name := range []string{
+		"pgdesign_reserved_table",
+		"pgdesign_reserved_view",
+		"pgdesign_reserved_matview",
+	} {
+		if !got[name] {
+			t.Errorf("expected an I201 diagnostic mentioning %q, diags: %v", name, diags)
 		}
 	}
 }

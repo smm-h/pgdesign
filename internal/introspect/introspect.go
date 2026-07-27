@@ -92,10 +92,11 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 
 	// Extract views from all requested schemas.
 	for _, sn := range schemaNames {
-		views, err := queryViews(ctx, conn, sn)
+		views, viewDiags, err := queryViews(ctx, conn, sn)
 		if err != nil {
 			return nil, nil, fmt.Errorf("views for schema %q: %w", sn, err)
 		}
+		diags = append(diags, viewDiags...)
 		schema.Views = append(schema.Views, views...)
 	}
 
@@ -146,6 +147,36 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 	schema.Canonicalize()
 
 	return schema, diags, nil
+}
+
+// isManagedObjectName reports whether name matches a pgdesign-managed object
+// naming pattern. It is the single predicate that unifies every introspection
+// filter for pgdesign's own objects:
+//
+//   - "pgdesign_" prefix: managed tables and views (e.g. the migration
+//     tracking table and applied-migrations view) and the pgdesign_deny_mutation
+//     append-only trigger function.
+//   - "_pgdesign_sm_" prefix (legacy): state-machine trigger functions and the
+//     triggers that reference them.
+//
+// Objects whose names match are pgdesign's own trace in the database and must
+// not surface as user schema during introspection.
+func isManagedObjectName(name string) bool {
+	return strings.HasPrefix(name, "pgdesign_") || strings.HasPrefix(name, "_pgdesign_sm_")
+}
+
+// reservedNameDiag builds the I201 diagnostic emitted when a user-named
+// relation collides with the pgdesign-managed reserved pattern and is therefore
+// filtered out of the introspected model. Making the filtering visible keeps it
+// from being silent.
+func reservedNameDiag(kind, schemaName, name string) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Warning,
+		Code:     "I201",
+		Message: fmt.Sprintf(
+			"%s %q.%q uses the reserved pgdesign-managed name pattern and was excluded from introspection; rename it to avoid collisions with pgdesign-managed objects",
+			kind, schemaName, name),
+	}
 }
 
 // hasExtension returns true if the given extension name is in the list.
@@ -553,6 +584,14 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersi
 	var diags []diagnostic.Diagnostic
 
 	for _, ti := range infos {
+		// Skip pgdesign-managed / reserved-name relations. A user table that
+		// collides with the reserved pattern is filtered out with a visible
+		// diagnostic so the exclusion is never silent.
+		if isManagedObjectName(ti.name) {
+			diags = append(diags, reservedNameDiag("table", schemaName, ti.name))
+			continue
+		}
+
 		t := model.Table{
 			Name:      ti.name,
 			Schema:    schemaName,
@@ -1344,8 +1383,10 @@ func splitExclusionElements(s string) []string {
 }
 
 // queryTriggers returns user-defined triggers for a table OID.
-// Filters out internal triggers, foreign-key constraint triggers, and
-// pgdesign_deny_mutation triggers (managed by append_only).
+// Filters out internal triggers and foreign-key constraint triggers via SQL,
+// and pgdesign-managed triggers (whose backing function matches
+// isManagedObjectName: pgdesign_deny_mutation and _pgdesign_sm_* state-machine
+// functions) via the single Go predicate.
 func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]model.Trigger, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT
@@ -1363,8 +1404,6 @@ func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]mode
 		WHERE t.tgrelid = $1
 		  AND NOT t.tgisinternal
 		  AND t.tgconstrrelid = 0
-		  AND p.proname != 'pgdesign_deny_mutation'
-		  AND p.proname NOT LIKE '_pgdesign_sm_%'
 		ORDER BY t.tgname
 	`, tableOID)
 	if err != nil {
@@ -1387,6 +1426,12 @@ func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32) ([]mode
 		)
 		if err := rows.Scan(&name, &funcName, &tgtype, &isConstraint, &deferrable, &initDeferred, &oldTable, &newTable, &triggerdef); err != nil {
 			return nil, err
+		}
+
+		// Skip pgdesign-managed triggers, identified by their backing function
+		// name via the single managed-object predicate.
+		if isManagedObjectName(funcName) {
+			continue
 		}
 
 		trig := model.Trigger{
@@ -1657,8 +1702,8 @@ func queryViewDependsOn(ctx context.Context, conn *pgx.Conn, viewName, schemaNam
 }
 
 // queryViews returns views defined in the given schema. DependsOn is resolved
-// via pg_depend.
-func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.View, error) {
+// via pg_depend. Reserved-name views are filtered out with a diagnostic.
+func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.View, []diagnostic.Diagnostic, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT v.viewname, pg_get_viewdef(c.oid, true), d.description
 		FROM pg_views v
@@ -1669,16 +1714,24 @@ func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model
 		ORDER BY v.viewname
 	`, schemaName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
 
 	var views []model.View
+	var diags []diagnostic.Diagnostic
 	for rows.Next() {
 		var name, definition string
 		var comment *string
 		if err := rows.Scan(&name, &definition, &comment); err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+
+		// Skip pgdesign-managed / reserved-name views (e.g. the applied-
+		// migrations view), with a visible diagnostic for user collisions.
+		if isManagedObjectName(name) {
+			diags = append(diags, reservedNameDiag("view", schemaName, name))
+			continue
 		}
 
 		v := model.View{
@@ -1693,7 +1746,7 @@ func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model
 		views = append(views, v)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Resolve DependsOn via pg_depend in a second pass (the connection
@@ -1701,12 +1754,12 @@ func queryViews(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model
 	for i := range views {
 		deps, err := queryViewDependsOn(ctx, conn, views[i].Name, schemaName)
 		if err != nil {
-			return nil, fmt.Errorf("depends_on for view %s: %w", views[i].Name, err)
+			return nil, nil, fmt.Errorf("depends_on for view %s: %w", views[i].Name, err)
 		}
 		views[i].DependsOn = deps
 	}
 
-	return views, nil
+	return views, diags, nil
 }
 
 // queryMaterializedViewIndexes returns indexes defined on a materialized view.
@@ -1751,6 +1804,13 @@ func queryMaterializedViews(ctx context.Context, conn *pgx.Conn, schemaName stri
 		var ispopulated bool
 		if err := rows.Scan(&name, &definition, &comment, &ispopulated); err != nil {
 			return nil, nil, err
+		}
+
+		// Skip pgdesign-managed / reserved-name materialized views, with a
+		// visible diagnostic for user collisions.
+		if isManagedObjectName(name) {
+			diags = append(diags, reservedNameDiag("materialized view", schemaName, name))
+			continue
 		}
 
 		mv := model.MaterializedView{
@@ -1882,8 +1942,9 @@ func querySequences(ctx context.Context, conn *pgx.Conn, schemaName string) ([]m
 }
 
 // queryFunctions returns user-defined functions and procedures in the given schema.
-// Filters out: aggregate functions, window functions, internal functions,
-// and pgdesign-generated trigger functions (pgdesign_deny_mutation).
+// Filters out (via SQL): aggregate functions, window functions, internal
+// functions, and trigger-returning functions; and (via the single Go
+// predicate) pgdesign-managed functions matching isManagedObjectName.
 func queryFunctions(ctx context.Context, conn *pgx.Conn, schemaName string) ([]model.Function, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT
@@ -1906,7 +1967,6 @@ func queryFunctions(ctx context.Context, conn *pgx.Conn, schemaName string) ([]m
 		WHERE n.nspname = $1
 			AND p.prokind IN ('f', 'p')
 			AND NOT p.prorettype = 'trigger'::regtype
-			AND p.proname != 'pgdesign_deny_mutation'
 		ORDER BY p.proname
 	`, schemaName)
 	if err != nil {
@@ -1932,6 +1992,13 @@ func queryFunctions(ctx context.Context, conn *pgx.Conn, schemaName string) ([]m
 		)
 		if err := rows.Scan(&name, &language, &returnType, &argsStr, &funcdef, &volatile, &parallel, &secdef, &isProc, &cost, &prorows, &comment); err != nil {
 			return nil, err
+		}
+
+		// Skip pgdesign-managed functions via the single managed-object
+		// predicate (e.g. pgdesign_deny_mutation, should it ever be a
+		// non-trigger-returning function).
+		if isManagedObjectName(name) {
+			continue
 		}
 
 		f := model.Function{

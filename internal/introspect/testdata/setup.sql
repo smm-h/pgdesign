@@ -163,3 +163,17 @@ CREATE TRIGGER user_audit AFTER UPDATE ON users
 -- Function with explicit volatility and parallel safety (regression test for
 -- provolatile/proparallel "char" column scanning).
 CREATE FUNCTION test_volatile_func() RETURNS int LANGUAGE sql IMMUTABLE PARALLEL SAFE AS 'SELECT 1';
+
+-- Synthetic reserved-name objects: user-created relations that collide with the
+-- pgdesign-managed "pgdesign_" naming pattern. Introspection must FILTER these
+-- out of the model AND emit an I201 diagnostic so the exclusion is never silent
+-- (0.4). The real managed objects arrive in phase 5; these stand in for them.
+CREATE TABLE pgdesign_reserved_table (
+    id bigint PRIMARY KEY,
+    label text NOT NULL
+);
+COMMENT ON TABLE pgdesign_reserved_table IS 'Reserved-name table (should be filtered)';
+
+CREATE VIEW pgdesign_reserved_view AS SELECT id, name FROM users;
+
+CREATE MATERIALIZED VIEW pgdesign_reserved_matview AS SELECT id FROM users;
