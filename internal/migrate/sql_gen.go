@@ -453,11 +453,14 @@ func opCreateIndexConcurrently(op DDLOp) string {
 }
 
 func opDropIndexConcurrently(op DDLOp) string {
+	// IF EXISTS makes the drop idempotent (roadmap L8): a resume after an
+	// interrupted DROP INDEX CONCURRENTLY must not fail on the already-absent
+	// index, and the create-index resume protocol DROP-rebuilds through this path.
 	schema, _ := splitQualifiedName(op.Table)
 	if schema != "" {
-		return fmt.Sprintf("DROP INDEX CONCURRENTLY %s.%s;", sql.QuoteIdent(schema), sql.QuoteIdent(op.Name))
+		return fmt.Sprintf("DROP INDEX CONCURRENTLY IF EXISTS %s.%s;", sql.QuoteIdent(schema), sql.QuoteIdent(op.Name))
 	}
-	return fmt.Sprintf("DROP INDEX CONCURRENTLY %s;", sql.QuoteIdent(op.Name))
+	return fmt.Sprintf("DROP INDEX CONCURRENTLY IF EXISTS %s;", sql.QuoteIdent(op.Name))
 }
 
 func opAlterIndexSet(op DDLOp) string {
@@ -561,7 +564,7 @@ func opAlterEnumAddValue(op DDLOp) string {
 	var stmts []string
 	for _, v := range op.Values {
 		escaped := strings.ReplaceAll(v, "'", "''")
-		// IF NOT EXISTS (PG 9.3+) makes failed-then-retried migrations safe.
+		// IF NOT EXISTS (PG 9.6+) makes failed-then-retried migrations safe.
 		stmts = append(stmts, fmt.Sprintf("ALTER TYPE %s ADD VALUE IF NOT EXISTS '%s';", qualified, escaped))
 	}
 	return strings.Join(stmts, "\n")

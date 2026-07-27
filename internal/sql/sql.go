@@ -590,11 +590,15 @@ END $$;`, catalogCheckSQL, escapedStmt)
 
 // CreateIndex generates a CREATE INDEX statement.
 // Handles Method (default btree), per-column Opclasses, WHERE, INCLUDE, and
-// CONCURRENTLY. When concurrently is true, IF NOT EXISTS is omitted because
-// PostgreSQL does not support combining them reliably.
+// CONCURRENTLY. When concurrently is true, IF NOT EXISTS is DELIBERATELY omitted
+// (not for version reasons — CREATE INDEX CONCURRENTLY IF NOT EXISTS is valid
+// since PG 9.5): an interrupted CREATE INDEX CONCURRENTLY leaves an INVALID index
+// of the target name, and IF NOT EXISTS would skip it forever. The resume
+// protocol instead checks pg_index.indisvalid and DROP-rebuilds (roadmap L8), so
+// the bare form is correct here.
 func CreateIndex(schemaName string, index *model.Index, tableName string, idempotent bool, concurrently bool) string {
-	// CONCURRENTLY is incompatible with IF NOT EXISTS in some PG versions,
-	// so when both are requested, prefer CONCURRENTLY without IF NOT EXISTS.
+	// See the doc comment: IF NOT EXISTS is omitted for CONCURRENTLY so a leftover
+	// INVALID index from an interrupted build is not silently skipped.
 	ifne := ""
 	if idempotent && !concurrently {
 		ifne = " IF NOT EXISTS"
