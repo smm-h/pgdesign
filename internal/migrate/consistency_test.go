@@ -11,10 +11,11 @@ import (
 	"github.com/smm-h/pgdesign/internal/rev"
 )
 
-// singleObjectManifest builds a controlled to-manifest containing exactly the
+// writeControlledGenesis builds a controlled to-manifest containing exactly the
 // create_table op's target -> def id, so the OpSimulator (empty -> [create_table])
 // reproduces it exactly. This unit-tests the checker wiring at object granularity
-// without needing a schema-meta op (see the SCOPE note in consistency.go).
+// with a single-object manifest (no schema-meta op needed because the manifest is
+// deliberately restricted to the one key the op produces).
 func writeControlledGenesis(t *testing.T, p *ChainProject, e Edge) chain.Manifest {
 	t.Helper()
 	tableKey := e.Ops[0].target

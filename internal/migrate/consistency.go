@@ -125,9 +125,13 @@ func verifyEdgeConsistency(p *ChainProject, e Edge, sim opSimulator) error {
 // opSimulator implements chain.OpSimulator over the self-contained op families.
 type opSimulator struct{ store *objstore.Store }
 
-// Simulate maps a from-manifest to a to-manifest by applying each op. Object
-// creates/replaces set the target key to the op's def-id; drops remove it; DML/raw
-// are no-ops; nested-modifier ops are a hard error (see the SCOPE note).
+// Simulate maps a from-manifest to a to-manifest by applying each op. It is
+// TOTAL over the self-contained inventory (roadmap 5.1b): whole-object
+// creates/replaces set the target key to the op's def-id; whole-object drops
+// remove it; nested-modifier ops map the owning key to the payload's post-state
+// id; rename_table swaps keys; schema-meta maps the schema key; DML/raw
+// pseudo-targets and refresh are no-ops. An op kind outside the inventory is a
+// hard error, never a silent fake.
 func (s opSimulator) Simulate(from chain.Manifest, ops []chain.Op) (chain.Manifest, error) {
 	out := make(chain.Manifest, len(from))
 	for k, id := range from {
