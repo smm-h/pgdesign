@@ -24,3 +24,4 @@
 {"id":"18c5ff627b7b49f58c335d07b0c141f8a7143e1a43be0fc2","commits":["01fa69780e8d16f4c4f2eee78b8d9d2784ec53a5"],"user_facing":true,"description":"New `[tables.*.maintenance].schedule` key schedules automatic partition maintenance via pg_cron; a partman-managed table with no schedule now warns (W029)","type":"feature"}
 {"id":"18c5ff9451a1797f84007afb9d9648a5bd20618214c02407","commits":["d7c97caab2b0663b6d91802c9fe7afed79470dc7"],"user_facing":true,"description":"`migrate squash` now requires `--db`: the M200 applied-version safety check is mandatory, so an applied (or offline) range can no longer be squashed into a tracking-table desync","type":"fix"}
 {"id":"18c5ffb05effdfd98ff95d4533f0426385bba103dd07d0b2","commits":["658a32d15e3180eed5f63d4ee02174fc670387b6"],"user_facing":false}
+{"id":"18c5ffc4988c261e6c599cc98c11496d828bebfd7c814597","commits":["04ab50ac80d68b4a50d4615fbd9f1d98e14a5ab3"],"user_facing":false}
