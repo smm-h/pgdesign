@@ -945,7 +945,14 @@ func keyColumnEqual(a, b string) bool {
 	if isExpressionColumn(a) || isExpressionColumn(b) {
 		return sqlparse.ExprEqual(a, b)
 	}
-	return a == b
+	// Both are bare (unquoted) identifiers. PostgreSQL folds unquoted
+	// identifiers to lowercase, so `Email` and `email` name the SAME column;
+	// a raw exact compare would false-drift a desired mixed-case unquoted name
+	// against the introspected lowercased form. QUOTED identifiers never reach
+	// here — a quote makes isExpressionColumn true, routing them through the
+	// expression path above, which preserves case (a quoted "Email" is a
+	// genuinely distinct, case-sensitive column).
+	return strings.ToLower(a) == strings.ToLower(b)
 }
 
 // keyColumnsEqual compares two ordered lists of index/exclusion key columns

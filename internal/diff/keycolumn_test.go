@@ -42,6 +42,33 @@ func TestIndexEqualPlainKeyColumnExact(t *testing.T) {
 	}
 }
 
+// TestIndexEqualUnquotedIdentifierCaseFolded is the mixed-case unquoted-identifier
+// rider (1.5 audit): PostgreSQL folds unquoted identifiers to lowercase, so a
+// desired key column `Email` and the introspected `email` name the SAME column
+// and must NOT false-drift. A raw exact compare (the pre-fix behavior) reported
+// a spurious change.
+func TestIndexEqualUnquotedIdentifierCaseFolded(t *testing.T) {
+	desired := &model.Index{Name: "idx", Columns: []string{"Email"}}
+	actual := &model.Index{Name: "idx", Columns: []string{"email"}}
+	if !indexEqual(desired, actual) {
+		t.Errorf("unquoted key columns %q and %q fold to the same identifier but indexEqual reported a change",
+			desired.Columns[0], actual.Columns[0])
+	}
+}
+
+// TestIndexEqualQuotedIdentifierCaseSensitive confirms QUOTED identifiers stay
+// case-sensitive: a quoted "Email" is a genuinely distinct column from email
+// and must NOT be folded together. Quoting routes the comparison through the
+// expression path, which preserves case.
+func TestIndexEqualQuotedIdentifierCaseSensitive(t *testing.T) {
+	desired := &model.Index{Name: "idx", Columns: []string{`"Email"`}}
+	actual := &model.Index{Name: "idx", Columns: []string{`"email"`}}
+	if indexEqual(desired, actual) {
+		t.Errorf("quoted key columns %q and %q are case-sensitively distinct but indexEqual folded them together",
+			desired.Columns[0], actual.Columns[0])
+	}
+}
+
 // TestExclusionEqualExpressionColumn is the same hole for exclusion-constraint
 // element columns, which are also index key columns and can be expressions.
 func TestExclusionEqualExpressionColumn(t *testing.T) {
