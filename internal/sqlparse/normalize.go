@@ -163,38 +163,50 @@ func foldInAny(ae *pg.A_Expr) {
 	ae.Rexpr = &pg.Node{Node: &pg.Node_List{List: &pg.List{Items: arr.Elements}}}
 }
 
-// foldCastName canonicalizes a cast's type name through the typeinfo alias map
-// so pg-internal aliases converge. go-pgquery parses `integer` to
-// `pg_catalog.int4` (deparsing to `int`) while `int4` stays bare (deparsing to
-// `int4`) — divergent forms this fold collapses to the canonical short name.
+// castInternalAliases is the set of bare pg-internal short type names whose
+// go-pgquery deparse DIVERGES from the SQL-standard spelling. When a user writes
+// the SQL-standard name (integer, bigint, boolean, real, double precision,
+// smallint), go-pgquery's parser already rewrites it to pg_catalog.<internal>,
+// which deparses to the friendly form (int, bigint, boolean, real, double
+// precision, smallint). But a user who writes the BARE internal name (int4,
+// int8, bool, ...) gets it back verbatim (int4, int8, bool) — a divergence.
+// Qualifying the bare internal name with pg_catalog makes deparse render the
+// same friendly form, converging the two spellings (L1(c): both sides fold).
 //
-// Only bare names and pg_catalog-qualified names are rewritten. Schema-qualified
-// user types (e.g. myschema.mytype) are left untouched. Type modifiers and
-// array bounds live in separate fields and are preserved.
+// Only these divergent-rendering internal names are qualified. Types whose bare
+// and friendly spellings already coincide (numeric, text, uuid, jsonb, ...) are
+// left untouched — qualifying them would either be a no-op or, worse, make
+// deparse emit an uglier form (e.g. bare numeric with a typmod deparses to the
+// quoted "numeric"; pg_catalog.text deparses to pg_catalog.text). The set is
+// keyed by the canonical Base that the typeinfo alias map produces.
+var castInternalAliases = map[string]bool{
+	"int2":   true,
+	"int4":   true,
+	"int8":   true,
+	"float4": true,
+	"float8": true,
+	"bool":   true,
+}
+
+// foldCastName canonicalizes a cast's type name so pg-internal aliases converge
+// with their SQL-standard spellings. It rewrites ONLY bare divergent-rendering
+// internal names (per castInternalAliases, keyed via the typeinfo alias map),
+// leaving schema-qualified user types, pg_catalog-qualified forms (already
+// canonical), and all other builtins untouched. Type modifiers and array bounds
+// live in separate fields and are preserved.
 func foldCastName(tn *pg.TypeName) {
-	if tn == nil {
+	if tn == nil || len(tn.Names) != 1 {
 		return
 	}
-	var base string
-	switch len(tn.Names) {
-	case 1:
-		base = tn.Names[0].GetString_().GetSval()
-	case 2:
-		if tn.Names[0].GetString_().GetSval() != "pg_catalog" {
-			return
-		}
-		base = tn.Names[1].GetString_().GetSval()
-	default:
+	name := tn.Names[0].GetString_().GetSval()
+	if name == "" {
 		return
 	}
-	if base == "" {
+	canon := typeinfo.Parse(name).Base
+	if !castInternalAliases[canon] {
 		return
 	}
-	canonical := typeinfo.Parse(base).Base
-	if canonical == "" {
-		return
-	}
-	tn.Names = []*pg.Node{strNode(canonical)}
+	tn.Names = []*pg.Node{strNode("pg_catalog"), strNode(canon)}
 }
 
 // strNode wraps a string as a pg String node.
