@@ -49,29 +49,20 @@ func DDLOpToSelfContained(store *objstore.Store, op DDLOp, desired *model.Schema
 // mechanically-invertible op needs no embedded down (deriveDown derives it
 // structurally). Renames are mechanically-invertible (structural swap).
 func shimInvAndDown(store *objstore.Store, op DDLOp, kind string, seq int) (chain.InvertibilityClass, *opBody, error) {
+	// Renames are the pure structural inverse (5.9 rename gate); deriveDown swaps
+	// the delta, no embedded down needed.
 	if kind == "rename_column" || kind == "rename_table" {
 		return chain.MechanicallyInvertible, nil, nil
 	}
-	cat, _ := categoryForKind(kind)
-	// Whole-object creates: mechanically-invertible unless the family is a
-	// declared "or_replace"/"alter" whose down restores prior state.
-	if cat == catWholeCreate {
-		switch invClassForKind(kind) {
-		case chain.MechanicallyInvertible:
-			return chain.MechanicallyInvertible, nil, nil
-		default: // declared: create_or_replace_*, alter_sequence
-			if op.Down == nil || op.Down.Irreversible || len(op.Down.Ops) == 0 {
-				return chain.NonInvertible, nil, nil
-			}
-			down, err := shimDownBody(store, op.Down.Ops[0], seq)
-			if err != nil {
-				return 0, nil, err
-			}
-			return chain.DeclaredInverse, down, nil
-		}
+	// Mechanically-invertible creates (table/view/matview/sequence/composite/
+	// domain/function/enum/trigger/policy/partition) derive their drop
+	// structurally — no embedded down.
+	if invClassForKind(kind) == chain.MechanicallyInvertible {
+		return chain.MechanicallyInvertible, nil, nil
 	}
-	// Everything else (drops, nested modifiers, rls, raw machinery): the recorded
-	// down decides. Irreversible / absent -> non-invertible.
+	// Everything else (drops, nested modifiers, rls, or_replace, alter_sequence,
+	// raw machinery): the recorded legacy down decides. Irreversible / absent ->
+	// non-invertible; a real down -> declared-inverse with the embedded down.
 	if op.Down == nil || op.Down.Irreversible || len(op.Down.Ops) == 0 {
 		return chain.NonInvertible, nil, nil
 	}
@@ -126,6 +117,22 @@ func ddlOpToBody(store *objstore.Store, op DDLOp, desired *model.Schema, seq int
 
 	case catWholeDrop:
 		key := wholeObjectKey(op)
+		// drop_function renders from the function def (its argument signature), so
+		// it carries the def by content id rather than a scalar delta.
+		if op.Op == "drop_function" {
+			if op.FunctionDef == nil {
+				return "", enc.Key{}, opBody{}, fmt.Errorf("migrate: shim: drop_function without a function def")
+			}
+			data, err := enc.EncodeFunction(*op.FunctionDef)
+			if err != nil {
+				return "", enc.Key{}, opBody{}, err
+			}
+			defID, err := store.Put(data)
+			if err != nil {
+				return "", enc.Key{}, opBody{}, err
+			}
+			return op.Op, key, opBody{Schema: schemaOrPublic(op.Schema), Name: op.Name, DefID: defID}, nil
+		}
 		return op.Op, key, opBody{Delta: deltaOf(op)}, nil
 
 	case catManifestNoop: // refresh_materialized_view
