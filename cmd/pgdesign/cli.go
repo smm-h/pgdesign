@@ -20,6 +20,14 @@ import (
 var checksToml []byte
 
 func main() {
+	buildApp().Run()
+}
+
+// buildApp constructs and fully registers the pgdesign CLI app. It is extracted
+// from main so tests can construct the app (which exercises strictcli's
+// registration-time enforcement, e.g. the connection-URL binding check) and
+// invoke commands via App.Test without a process boundary.
+func buildApp() *strictcli.App {
 	// Initialize codegen mode registry for config validation.
 	config.CodegenModes = SupportedModes()
 
@@ -78,7 +86,7 @@ func main() {
 	registerTestdbGCCmd(tdb)
 	registerTestdbInitCmd(tdb)
 
-	app.Run()
+	return app
 }
 
 // resolveConfigPath returns the pgdesign.toml path to use for config discovery.
