@@ -179,10 +179,16 @@ func TestGenerateKotlinEnum(t *testing.T) {
 
 func TestGenerateZigEnum(t *testing.T) {
 	out := GenerateEnums([]model.Enum{testEnum()}, LangZig)
+	// Branded wrapper struct with member constants and a validating parse.
 	for _, want := range []string{
-		`pub const status_active = "active";`,
-		`pub const status_in_progress = "in-progress";`,
-		`pub const status_banned = "banned";`,
+		"pub const Status = struct {",
+		"value: []const u8,",
+		`pub const active = Status{ .value = "active" };`,
+		`pub const in_progress = Status{ .value = "in-progress" };`,
+		`pub const banned = Status{ .value = "banned" };`,
+		"pub fn parse(s: []const u8) !Status {",
+		`if (std.mem.eql(u8, s, "active")) return active;`,
+		"return error.InvalidStatus;",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Zig enum output missing %q\ngot:\n%s", want, out)

@@ -334,18 +334,21 @@ func generateZigConstTransitionMap(smt model.SMTransitionMap) string {
 func generateZigTransitionMap(smt model.SMTransitionMap) string {
 	var buf bytes.Buffer
 	prefix := strings.ToLower(strings.ReplaceAll(smt.TypeName, "-", "_"))
+	typeName := toPascalCase(smt.TypeName)
 
 	fmt.Fprintf(&buf, "/// Maps each %s state to its allowed target states.\n", smt.TypeName)
 	fmt.Fprintf(&buf, "pub const %s_transitions = struct {\n", prefix)
 
+	// Targets are re-keyed to the branded wrapper's member constants (typed
+	// against the wrapper struct), not bare string literals.
 	for _, from := range sortedFromStates(smt) {
 		tos := smt.Transitions[from]
 		fromName := sanitizeEnumValue(from, LangZig)
-		quotedTos := make([]string, len(tos))
+		members := make([]string, len(tos))
 		for i, to := range tos {
-			quotedTos[i] = fmt.Sprintf("%q", to)
+			members[i] = typeName + "." + sanitizeEnumValue(to, LangZig)
 		}
-		fmt.Fprintf(&buf, "    pub const %s = [_][]const u8{ %s };\n", fromName, strings.Join(quotedTos, ", "))
+		fmt.Fprintf(&buf, "    pub const %s = [_]%s{ %s };\n", fromName, typeName, strings.Join(members, ", "))
 	}
 	buf.WriteString("};\n")
 

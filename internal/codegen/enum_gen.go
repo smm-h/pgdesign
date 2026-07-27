@@ -294,19 +294,31 @@ func generateKotlinEnum(e model.Enum) string {
 	return buf.String()
 }
 
-// generateZigEnum produces Zig pub const declarations for enum values.
-// Zig lacks string-backed enums, so each value becomes a string constant.
+// generateZigEnum produces a BRANDED Zig wrapper struct: a struct with a
+// []const u8 value, named member constants, and a validating parse() that
+// rejects undefined values. The wrapper is the validating boundary (Zig lacks
+// string-backed enums). Callers must import std for parse's std.mem.eql.
 func generateZigEnum(e model.Enum) string {
 	var buf bytes.Buffer
-	prefix := strings.ToLower(strings.ReplaceAll(e.Name, "-", "_"))
+	typeName := toPascalCase(e.Name)
 
 	if e.Comment != "" {
 		fmt.Fprintf(&buf, "/// %s\n", e.Comment)
 	}
+	fmt.Fprintf(&buf, "pub const %s = struct {\n", typeName)
+	buf.WriteString("    value: []const u8,\n\n")
 	for _, v := range e.Values {
 		name := sanitizeEnumValue(v, LangZig)
-		fmt.Fprintf(&buf, "pub const %s_%s = %q;\n", prefix, name, v)
+		fmt.Fprintf(&buf, "    pub const %s = %s{ .value = %q };\n", name, typeName, v)
 	}
+	fmt.Fprintf(&buf, "\n    pub fn parse(s: []const u8) !%s {\n", typeName)
+	for _, v := range e.Values {
+		name := sanitizeEnumValue(v, LangZig)
+		fmt.Fprintf(&buf, "        if (std.mem.eql(u8, s, %q)) return %s;\n", v, name)
+	}
+	fmt.Fprintf(&buf, "        return error.Invalid%s;\n", typeName)
+	buf.WriteString("    }\n")
+	buf.WriteString("};\n")
 
 	return buf.String()
 }

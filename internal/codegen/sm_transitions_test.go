@@ -196,9 +196,12 @@ func TestZigTypesGenerator_TransitionMap(t *testing.T) {
 
 	result := string(out)
 
-	// Enum constants should be present.
-	if !strings.Contains(result, `pub const order_status_pending = "pending";`) {
-		t.Error("missing order_status_pending constant")
+	// Branded wrapper struct with member constants should be present.
+	if !strings.Contains(result, "pub const OrderStatus = struct {") {
+		t.Error("missing OrderStatus wrapper struct")
+	}
+	if !strings.Contains(result, `pub const pending = OrderStatus{ .value = "pending" };`) {
+		t.Error("missing OrderStatus.pending member")
 	}
 
 	// Transition map should be present.
@@ -206,8 +209,8 @@ func TestZigTypesGenerator_TransitionMap(t *testing.T) {
 		t.Errorf("missing order_status_transitions declaration, got:\n%s", result)
 	}
 
-	// Check specific entries.
-	if !strings.Contains(result, `pub const pending = [_][]const u8{ "active", "cancelled" };`) {
+	// Targets are re-keyed to branded wrapper members.
+	if !strings.Contains(result, `pub const pending = [_]OrderStatus{ OrderStatus.active, OrderStatus.cancelled };`) {
 		t.Errorf("missing or incorrect pending transitions, got:\n%s", result)
 	}
 }

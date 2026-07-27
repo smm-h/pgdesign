@@ -24,7 +24,12 @@ func (g *ZigTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic
 
 	buf.WriteString(header)
 
-	// Write enum constants.
+	// The branded enum wrapper's parse() uses std.mem.eql.
+	if len(schema.Enums) > 0 {
+		buf.WriteString("\nconst std = @import(\"std\");\n")
+	}
+
+	// Write branded enum wrapper structs.
 	enumBlock := GenerateEnums(schema.Enums, LangZig)
 	if enumBlock != "" {
 		buf.WriteString("\n")
