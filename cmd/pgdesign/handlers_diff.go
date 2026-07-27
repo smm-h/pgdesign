@@ -97,6 +97,10 @@ func registerDiffCmd(app *strictcli.App) {
 				}
 			}
 
+			if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
+				return strictcli.Exit(1)
+			}
 			d := diff.DiffLive(schema, actual, ln)
 
 			if kwargs["json"].(bool) {

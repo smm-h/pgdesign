@@ -64,6 +64,10 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
+			if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
+				return strictcli.Exit(1)
+			}
 			d := diff.Diff(schema, actual)
 			if d.IsEmpty() {
 				if !quiet {
@@ -252,6 +256,10 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
+			if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
+				return strictcli.Exit(1)
+			}
 			d := diff.Diff(schema, actual)
 			if d.IsEmpty() {
 				fmt.Println("No changes detected. Nothing to generate.")
@@ -1074,6 +1082,10 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 		return 1
 	}
 
+	if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
+		return 1
+	}
 	d := diff.Diff(schema, actual)
 	if d.IsEmpty() {
 		if !quiet {

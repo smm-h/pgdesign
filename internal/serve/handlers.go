@@ -442,6 +442,10 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if collErr := diff.CheckTruncationCollisions(desired); collErr != nil {
+		writeError(w, http.StatusBadRequest, collErr.Error())
+		return
+	}
 	d := diff.Diff(desired, actual)
 	writeJSON(w, http.StatusOK, d)
 }
