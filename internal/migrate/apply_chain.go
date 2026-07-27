@@ -29,6 +29,7 @@ package migrate
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 
@@ -111,20 +112,30 @@ func ApplyChain(ctx context.Context, conn *pgx.Conn, p *ChainProject, lockTimeou
 }
 
 // parentModelForEdge reconstructs the edge's PARENT-revision model, the source of
-// attribute-level precondition expectations (roadmap 5.5+5.7, from-manifest). A
-// genesis edge has no parent (nil, existence-only). A reconstruction failure (e.g.
-// a parent manifest not present on disk) also yields nil: with no recorded
-// pre-state the op falls to an existence-only check rather than false-erroring —
-// availability of the recorded pre-state selects the mode, not a runtime retry.
-func parentModelForEdge(p *ChainProject, e Edge) *model.Schema {
+// attribute-level precondition expectations (roadmap 5.5+5.7, from-manifest).
+//
+// Two "no pre-state" cases fall to an existence-only check (nil, nil), and they are
+// distinguished from a THIRD that must never be silenced:
+//
+//   - GENESIS edge — no parent by construction; existence-only is correct.
+//   - Parent manifest ABSENT on disk — no recorded pre-state was ever written;
+//     availability of the pre-state selects the mode, so existence-only is correct.
+//   - Parent manifest PRESENT BUT BROKEN — an unresolved object id or a decode
+//     failure is STORE CORRUPTION. Degrading it to existence-only would silently
+//     trust a corrupt store (masking real drift), so it is a HARD ERROR. This is
+//     the distinction rider 4 enforces: absence is a mode; corruption is a fault.
+func parentModelForEdge(p *ChainProject, e Edge) (*model.Schema, error) {
 	if e.IsGenesis() {
-		return nil
+		return nil, nil
 	}
 	from, err := ReconstructModel(p, e.Parent)
 	if err != nil {
-		return nil
+		if errors.Is(err, ErrRevisionManifestNotFound) {
+			return nil, nil // no recorded pre-state: existence-only check
+		}
+		return nil, fmt.Errorf("migrate: edge %s: parent model reconstruction failed (store corruption?): %w", e.ID()[:12], err)
 	}
-	return from
+	return from, nil
 }
 
 // findApplyPath loads the live + archive edges and asks the path-finder for the
@@ -195,7 +206,10 @@ func ensureChainStructures(ctx context.Context, conn *pgx.Conn) error {
 // transaction that confirms the edge's FINAL op.
 func applyEdge(ctx context.Context, conn *pgx.Conn, p *ChainProject, e Edge, hooks *ApplyHooks) error {
 	store := p.Store()
-	from := parentModelForEdge(p, e)
+	from, err := parentModelForEdge(p, e)
+	if err != nil {
+		return err
+	}
 	edgeID := e.ID()
 	checksum, err := edgeFileChecksum(e)
 	if err != nil {

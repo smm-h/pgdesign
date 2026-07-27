@@ -11,6 +11,7 @@ package migrate
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +20,12 @@ import (
 	"github.com/smm-h/pgdesign/internal/enc"
 	"github.com/smm-h/pgdesign/internal/rev"
 )
+
+// ErrRevisionManifestNotFound marks the ABSENCE of a revision manifest file (as
+// distinct from a present-but-corrupt one). Callers that must tell "no recorded
+// pre-state" from "store corruption" match with errors.Is — reconstruction failures
+// on a PRESENT manifest (unresolved object id, decode error) never carry it.
+var ErrRevisionManifestNotFound = errors.New("revision manifest not found")
 
 // revisionFileJSON is the on-disk revision-manifest body (store_layout.md).
 type revisionFileJSON struct {
@@ -71,7 +78,7 @@ func (p *ChainProject) ReadRevisionManifest(r rev.Revision) (chain.Manifest, err
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("migrate: revision manifest for %s not found", r)
+			return nil, fmt.Errorf("migrate: revision manifest for %s: %w", r, ErrRevisionManifestNotFound)
 		}
 		return nil, fmt.Errorf("migrate: reading revision manifest %q: %w", path, err)
 	}
