@@ -69,7 +69,7 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			},
 		}
 		m.DDLOps = append(m.DDLOps, op)
-		diags = append(diags, classifyOp(op, risk.OpType("create_enum"), risk.OpContext{PGVersion: desired.PGVersion})...)
+		diags = append(diags, classifyOp(op, risk.OpCreateEnum, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
 	for _, enumDiff := range d.EnumsChanged {

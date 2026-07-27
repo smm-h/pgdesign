@@ -246,3 +246,19 @@ func TestRefreshMaterializedView(t *testing.T) {
 		t.Errorf("expected Caution, got %s", c.RiskLevel)
 	}
 }
+
+func TestCreateEnum(t *testing.T) {
+	// Creating a new enum type takes no lock on user data and is reversible; it
+	// must classify Safe (not fall through to the Dangerous "unknown op" default
+	// and emit error-severity MIGRATE_RISK noise).
+	c := Classify(OpCreateEnum, OpContext{})
+	if c.RiskLevel != Safe {
+		t.Errorf("expected Safe, got %s", c.RiskLevel)
+	}
+	if c.LockType != LockNone {
+		t.Errorf("expected LockNone, got %s", c.LockType)
+	}
+	if !c.Reversible {
+		t.Error("expected Reversible")
+	}
+}

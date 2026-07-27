@@ -90,6 +90,7 @@ const (
 	OpCreateSequence          OpType = "create_sequence"
 	OpDropSequence            OpType = "drop_sequence"
 	OpAlterSequence           OpType = "alter_sequence"
+	OpCreateEnum              OpType = "create_enum"
 	OpCreateCompositeType     OpType = "create_composite_type"
 	OpDropCompositeType       OpType = "drop_composite_type"
 	OpCreateDomain            OpType = "create_domain"
@@ -527,6 +528,15 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 		// Partman registration and part_config updates touch only pg_partman's
 		// own bookkeeping; they take no lock on user data and are reversible by
 		// re-running with the previous values.
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
+		}
+
+	case OpCreateEnum:
+		// Creating a new enum type takes no lock on existing user data and is
+		// reversible (down: drop_enum). Safe.
 		return Classification{
 			RiskLevel:  Safe,
 			LockType:   LockNone,
