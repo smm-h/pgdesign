@@ -89,10 +89,11 @@ func TestPrecedenceCLIOverEnv(t *testing.T) {
 }
 
 // fakeConnReader is a CheckContext that also implements ConnectionEnvReader,
-// returning a fixed (value, present) for PGDESIGN_DB.
+// returning a fixed (value, present) for PGDESIGN_DB and a fixed hermetic flag.
 type fakeConnReader struct {
-	value   string
-	present bool
+	value    string
+	present  bool
+	hermetic bool
 }
 
 func (f fakeConnReader) ProjectRoot() string { return "." }
@@ -102,6 +103,7 @@ func (f fakeConnReader) ConnectionEnvValue(envVar string) (string, bool) {
 	}
 	return f.value, f.present
 }
+func (f fakeConnReader) IsHermetic() bool { return f.hermetic }
 
 // TestResolveCheckDBURL pins the check-side resolution layering (env > config)
 // and the hermetic detection.
@@ -120,7 +122,23 @@ func TestResolveCheckDBURL(t *testing.T) {
 
 	t.Run("hermetic: env set but suppressed => skip, config ignored", func(t *testing.T) {
 		t.Setenv("PGDESIGN_DB", "postgres://suppressed/url")
-		ctx := fakeConnReader{present: false} // framework hid it under --hermetic
+		ctx := fakeConnReader{present: false, hermetic: true} // framework hid it under --hermetic
+		url, herm := resolveCheckDBURL(ctx, withCfg)
+		if !herm {
+			t.Fatalf("expected hermetic=true, got (%q, %v)", url, herm)
+		}
+		if url != "" {
+			t.Fatalf("hermetic must not fall back to config, got url %q", url)
+		}
+	})
+
+	// The hole closed by IsHermetic(): env genuinely UNSET, config URL present,
+	// AND --hermetic. Present=false conflates unset with suppressed, so the old
+	// os.LookupEnv workaround saw "unset" and fell through to the config URL --
+	// connecting despite --hermetic. IsHermetic() distinguishes the cases.
+	t.Run("hermetic: env unset + config present => skip, config ignored", func(t *testing.T) {
+		os.Unsetenv("PGDESIGN_DB")
+		ctx := fakeConnReader{present: false, hermetic: true}
 		url, herm := resolveCheckDBURL(ctx, withCfg)
 		if !herm {
 			t.Fatalf("expected hermetic=true, got (%q, %v)", url, herm)

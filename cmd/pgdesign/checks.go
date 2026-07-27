@@ -123,19 +123,19 @@ func checkValidation(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) str
 // checks skip VISIBLY. Returns (url, hermetic): hermetic is true when
 // --hermetic suppressed the connection env, so the caller can name the skip.
 //
-// NOTE (flagged): the framework's ConnectionEnvReader returns (value, present)
-// where present==false covers BOTH --hermetic suppression and a genuinely-unset
-// env; it exposes no dedicated hermetic accessor. To honor hermetic even when a
-// config URL is present (hermetic must not connect), a single os.LookupEnv is
-// used PURELY to detect suppression (env set in the process yet hidden by the
-// framework). The URL value itself never comes from a raw env read.
+// The framework's ConnectionEnvReader returns (value, present) where
+// present==false covers BOTH --hermetic suppression and a genuinely-unset env;
+// IsHermetic() (strictcli >= 0.27.0) distinguishes the two. Under --hermetic the
+// config layer is skipped entirely so DB-backed checks skip VISIBLY instead of
+// connecting to a config URL.
 func resolveCheckDBURL[P config.PathKind](ctx strictcli.CheckContext, cfg *config.Config[P]) (url string, hermetic bool) {
 	if reader, ok := ctx.(strictcli.ConnectionEnvReader); ok {
 		if v, present := reader.ConnectionEnvValue("PGDESIGN_DB"); present {
 			return v, false
 		}
-		if _, set := os.LookupEnv("PGDESIGN_DB"); set {
-			// Env is set in the process but the framework hid it: --hermetic.
+		if reader.IsHermetic() {
+			// Connection env suppressed by --hermetic: never fall through to the
+			// config URL, which would connect and break the hermetic guarantee.
 			return "", true
 		}
 	}
