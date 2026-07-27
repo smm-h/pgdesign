@@ -44,6 +44,7 @@ last = "text"
 [types.order_status]
 kind = "state_machine"
 initial = "pending"
+enforce = true
 comment = "Order lifecycle"
 
 [types.order_status.states.pending]
@@ -63,6 +64,7 @@ to = "processing"
 name = "ship"
 from = ["processing"]
 to = "shipped"
+requires = { tracking_number = "short_text" }
 
 [[types.order_status.transitions]]
 name = "deliver"
@@ -138,6 +140,11 @@ type = "cents"
 
 [tables.orders.columns.busy]
 type = "busy_period"
+
+[tables.orders.columns.tracking_number]
+type = "short_text"
+nullable = true
+comment = "Carrier tracking number, required to ship"
 
 [tables.orders.fks.fk_orders_accounts]
 columns = ["account_id"]
