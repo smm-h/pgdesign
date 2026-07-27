@@ -460,7 +460,7 @@ func writeReaderProtocol(buf *bytes.Buffer, tbl *model.Table, fkGraph *model.FKG
 		seen := make(map[string]bool)
 		var fkMethods []fkByMethod
 
-		for _, edge := range fkGraph.Reverse[tbl.Name] {
+		for _, edge := range fkGraph.Reverse[model.TableKey(tbl.Schema, tbl.Name)] {
 			// Only single-column FKs.
 			methodName := edge.FromColumn
 			if seen[methodName] {
@@ -670,7 +670,7 @@ func writeReaderMethodsForBackend(buf *bytes.Buffer, tbl *model.Table, fkGraph *
 		seen := make(map[string]bool)
 		var fkMethods []fkByMethod
 
-		for _, edge := range fkGraph.Reverse[tbl.Name] {
+		for _, edge := range fkGraph.Reverse[model.TableKey(tbl.Schema, tbl.Name)] {
 			methodName := edge.FromColumn
 			if seen[methodName] {
 				continue

@@ -2,15 +2,6 @@ package model
 
 import "github.com/smm-h/pgdesign/internal/graph"
 
-// qualifiedName returns "schema.table" for use as a unique key in topo sort.
-// Falls back to just the table name if schema is empty.
-func qualifiedName(schema, table string) string {
-	if schema == "" {
-		return table
-	}
-	return schema + "." + table
-}
-
 // topoSort performs topological sort on tables using Kahn's algorithm.
 // It uses FK references to build the dependency graph: if table A has an FK
 // referencing table B, then B must come before A.
@@ -21,12 +12,12 @@ func qualifiedName(schema, table string) string {
 // Returns sorted tables and any cycle groups (sets of mutually-referencing tables).
 func topoSort(tables []Table) (sorted []Table, cycles [][]string) {
 	getName := func(t Table) string {
-		return qualifiedName(t.Schema, t.Name)
+		return TableKey(t.Schema, t.Name)
 	}
 	getDeps := func(t Table) []string {
 		var deps []string
 		for _, fk := range t.FKs {
-			deps = append(deps, qualifiedName(fk.RefSchema, fk.RefTable))
+			deps = append(deps, TableKey(fk.RefSchema, fk.RefTable))
 		}
 		return deps
 	}

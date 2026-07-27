@@ -141,7 +141,7 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		}
 
 		// @OneToMany fields from reverse FK map.
-		if edges := schema.FKGraph.Reverse[tbl.Name]; len(edges) > 0 {
+		if edges := schema.FKGraph.Reverse[model.TableKey(tbl.Schema, tbl.Name)]; len(edges) > 0 {
 			fkColCount := make(map[string]int)
 			for _, e := range edges {
 				fkColCount[e.FKName]++

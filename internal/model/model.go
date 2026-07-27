@@ -99,7 +99,7 @@ func (s *Schema) TableOrder() []Table {
 // TableByName looks up a table by schema and name.
 func (s *Schema) TableByName(schema, name string) *Table {
 	if s.TablesByName != nil {
-		return s.TablesByName[schema+"."+name]
+		return s.TablesByName[TableKey(schema, name)]
 	}
 	for i := range s.Tables {
 		if s.Tables[i].Schema == schema && s.Tables[i].Name == name {
@@ -118,18 +118,29 @@ func (s *Schema) FilterByGroups(groupNames []string) *Schema {
 		return s
 	}
 
-	// Collect all table names from the requested groups.
-	include := make(map[string]bool)
+	// Group membership is declared by bare table name in TOML. The
+	// bare-to-qualified rule: a bare group entry selects every table whose
+	// bare Name matches it — exactly one table in a single-schema schema, and
+	// the same-named table in each schema for a multi-schema build. The
+	// include set is keyed by TableKey so selection is unambiguous even when
+	// two schemas share a table name.
+	includeBare := make(map[string]bool)
 	for _, g := range groupNames {
 		for _, tbl := range s.Groups[g] {
-			include[tbl] = true
+			includeBare[tbl] = true
+		}
+	}
+	include := make(map[string]bool)
+	for _, t := range s.Tables {
+		if includeBare[t.Name] {
+			include[TableKey(t.Schema, t.Name)] = true
 		}
 	}
 
 	filtered := *s
 	filtered.Tables = nil
 	for _, t := range s.Tables {
-		if include[t.Name] {
+		if include[TableKey(t.Schema, t.Name)] {
 			filtered.Tables = append(filtered.Tables, t)
 		}
 	}

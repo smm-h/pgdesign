@@ -293,7 +293,7 @@ func writePgGetByFKMethods(buf *bytes.Buffer, tbl *model.Table, fkGraph *model.F
 	seen := make(map[string]bool)
 	var methods []fkByMethod
 
-	for _, edge := range fkGraph.Reverse[tbl.Name] {
+	for _, edge := range fkGraph.Reverse[model.TableKey(tbl.Schema, tbl.Name)] {
 		methodName := edge.FromColumn
 		if seen[methodName] {
 			continue
@@ -691,7 +691,7 @@ func writePgBackendForwardingMethods(buf *bytes.Buffer, tbl *model.Table, schema
 		seen := make(map[string]bool)
 		var fkMethods []fkByMethod
 
-		for _, edge := range schema.FKGraph.Reverse[tbl.Name] {
+		for _, edge := range schema.FKGraph.Reverse[model.TableKey(tbl.Schema, tbl.Name)] {
 			methodName := edge.FromColumn
 			if seen[methodName] {
 				continue

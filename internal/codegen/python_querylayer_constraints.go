@@ -175,7 +175,7 @@ func writeTableConstraints(buf *bytes.Buffer, tbl *model.Table, schema *model.Sc
 		}
 		seen := make(map[string]bool)
 		var incoming []incomingFK
-		for _, edge := range schema.FKGraph.Reverse[tbl.Name] {
+		for _, edge := range schema.FKGraph.Reverse[model.TableKey(tbl.Schema, tbl.Name)] {
 			key := edge.FromTable + "." + edge.FromColumn
 			if seen[key] {
 				continue

@@ -45,46 +45,47 @@ func TestFKGraph_Construction(t *testing.T) {
 	}
 	g := schema.FKGraph
 
-	// Forward edges: posts -> users, comments -> posts.
-	if len(g.Forward["posts"]) != 1 {
-		t.Fatalf("expected 1 forward edge from posts, got %d", len(g.Forward["posts"]))
+	// Forward edges: posts -> users, comments -> posts. Maps are keyed by
+	// TableKey(schema, name); the edge's ToTable stays the bare name.
+	if len(g.Forward["public.posts"]) != 1 {
+		t.Fatalf("expected 1 forward edge from posts, got %d", len(g.Forward["public.posts"]))
 	}
-	if g.Forward["posts"][0].ToTable != "users" {
-		t.Errorf("expected posts forward edge to users, got %q", g.Forward["posts"][0].ToTable)
+	if g.Forward["public.posts"][0].ToTable != "users" {
+		t.Errorf("expected posts forward edge to users, got %q", g.Forward["public.posts"][0].ToTable)
 	}
-	if len(g.Forward["comments"]) != 1 {
-		t.Fatalf("expected 1 forward edge from comments, got %d", len(g.Forward["comments"]))
+	if len(g.Forward["public.comments"]) != 1 {
+		t.Fatalf("expected 1 forward edge from comments, got %d", len(g.Forward["public.comments"]))
 	}
-	if g.Forward["comments"][0].ToTable != "posts" {
-		t.Errorf("expected comments forward edge to posts, got %q", g.Forward["comments"][0].ToTable)
+	if g.Forward["public.comments"][0].ToTable != "posts" {
+		t.Errorf("expected comments forward edge to posts, got %q", g.Forward["public.comments"][0].ToTable)
 	}
 
 	// Reverse edges: users <- posts, posts <- comments.
-	if len(g.Reverse["users"]) != 1 {
-		t.Fatalf("expected 1 reverse edge to users, got %d", len(g.Reverse["users"]))
+	if len(g.Reverse["public.users"]) != 1 {
+		t.Fatalf("expected 1 reverse edge to users, got %d", len(g.Reverse["public.users"]))
 	}
-	if g.Reverse["users"][0].FromTable != "posts" {
-		t.Errorf("expected users reverse edge from posts, got %q", g.Reverse["users"][0].FromTable)
+	if g.Reverse["public.users"][0].FromTable != "posts" {
+		t.Errorf("expected users reverse edge from posts, got %q", g.Reverse["public.users"][0].FromTable)
 	}
-	if len(g.Reverse["posts"]) != 1 {
-		t.Fatalf("expected 1 reverse edge to posts, got %d", len(g.Reverse["posts"]))
+	if len(g.Reverse["public.posts"]) != 1 {
+		t.Fatalf("expected 1 reverse edge to posts, got %d", len(g.Reverse["public.posts"]))
 	}
-	if g.Reverse["posts"][0].FromTable != "comments" {
-		t.Errorf("expected posts reverse edge from comments, got %q", g.Reverse["posts"][0].FromTable)
+	if g.Reverse["public.posts"][0].FromTable != "comments" {
+		t.Errorf("expected posts reverse edge from comments, got %q", g.Reverse["public.posts"][0].FromTable)
 	}
 
 	// FanIn/FanOut.
-	if g.FanIn["users"] != 1 {
-		t.Errorf("expected users FanIn=1, got %d", g.FanIn["users"])
+	if g.FanIn["public.users"] != 1 {
+		t.Errorf("expected users FanIn=1, got %d", g.FanIn["public.users"])
 	}
-	if g.FanIn["posts"] != 1 {
-		t.Errorf("expected posts FanIn=1, got %d", g.FanIn["posts"])
+	if g.FanIn["public.posts"] != 1 {
+		t.Errorf("expected posts FanIn=1, got %d", g.FanIn["public.posts"])
 	}
-	if g.FanOut["posts"] != 1 {
-		t.Errorf("expected posts FanOut=1, got %d", g.FanOut["posts"])
+	if g.FanOut["public.posts"] != 1 {
+		t.Errorf("expected posts FanOut=1, got %d", g.FanOut["public.posts"])
 	}
-	if g.FanOut["comments"] != 1 {
-		t.Errorf("expected comments FanOut=1, got %d", g.FanOut["comments"])
+	if g.FanOut["public.comments"] != 1 {
+		t.Errorf("expected comments FanOut=1, got %d", g.FanOut["public.comments"])
 	}
 }
 
@@ -130,20 +131,20 @@ func TestFKGraph_MultiColumnFK(t *testing.T) {
 	g := schema.FKGraph
 
 	// Two edges (one per column) in forward direction.
-	if len(g.Forward["child"]) != 2 {
-		t.Fatalf("expected 2 forward edges from child, got %d", len(g.Forward["child"]))
+	if len(g.Forward["public.child"]) != 2 {
+		t.Fatalf("expected 2 forward edges from child, got %d", len(g.Forward["public.child"]))
 	}
 	// Two edges in reverse direction.
-	if len(g.Reverse["parent"]) != 2 {
-		t.Fatalf("expected 2 reverse edges to parent, got %d", len(g.Reverse["parent"]))
+	if len(g.Reverse["public.parent"]) != 2 {
+		t.Fatalf("expected 2 reverse edges to parent, got %d", len(g.Reverse["public.parent"]))
 	}
 
 	// FanIn/FanOut count constraints, not columns: should be 1 each.
-	if g.FanOut["child"] != 1 {
-		t.Errorf("expected child FanOut=1, got %d", g.FanOut["child"])
+	if g.FanOut["public.child"] != 1 {
+		t.Errorf("expected child FanOut=1, got %d", g.FanOut["public.child"])
 	}
-	if g.FanIn["parent"] != 1 {
-		t.Errorf("expected parent FanIn=1, got %d", g.FanIn["parent"])
+	if g.FanIn["public.parent"] != 1 {
+		t.Errorf("expected parent FanIn=1, got %d", g.FanIn["public.parent"])
 	}
 }
 
@@ -176,11 +177,11 @@ func TestFKGraph_CascadeDepth(t *testing.T) {
 	}{
 		// Deleting from d cascades d -> c -> b -> a (depth 3). Deleting from
 		// a affects nothing: e references a with SET NULL, not CASCADE.
-		{"a", 0},
-		{"b", 1},
-		{"c", 2},
-		{"d", 3},
-		{"e", 0},
+		{"public.a", 0},
+		{"public.b", 1},
+		{"public.c", 2},
+		{"public.d", 3},
+		{"public.e", 0},
 	}
 	for _, tt := range tests {
 		got := g.CascadeDepth(tt.table)
@@ -198,11 +199,11 @@ func TestFKGraph_CascadeBreadth(t *testing.T) {
 		table string
 		want  int
 	}{
-		{"a", 0},
-		{"b", 1},
-		{"c", 2},
-		{"d", 3},
-		{"e", 0},
+		{"public.a", 0},
+		{"public.b", 1},
+		{"public.c", 2},
+		{"public.d", 3},
+		{"public.e", 0},
 	}
 	for _, tt := range tests {
 		got := g.CascadeBreadth(tt.table)
@@ -217,12 +218,13 @@ func TestFKGraph_CascadeChain(t *testing.T) {
 	g := s.FKGraph
 
 	// Deleting from "d" cascades into the tables that (transitively)
-	// reference it with CASCADE: c, then b, then a.
-	chain := g.CascadeChain("d")
+	// reference it with CASCADE: c, then b, then a. CascadeChain returns
+	// qualified TableKey strings.
+	chain := g.CascadeChain("public.d")
 	if len(chain) != 3 {
 		t.Fatalf("CascadeChain(d): expected 3 elements, got %d: %v", len(chain), chain)
 	}
-	expected := []string{"c", "b", "a"}
+	expected := []string{"public.c", "public.b", "public.a"}
 	for i, want := range expected {
 		if chain[i] != want {
 			t.Errorf("CascadeChain(d)[%d] = %q, want %q", i, chain[i], want)
@@ -232,7 +234,7 @@ func TestFKGraph_CascadeChain(t *testing.T) {
 	// Deleting from "a" cascades nowhere: the only FK referencing a (from e)
 	// is SET NULL, and a's own FK to b is irrelevant (deleting a child never
 	// touches its parent).
-	chain = g.CascadeChain("a")
+	chain = g.CascadeChain("public.a")
 	if chain != nil {
 		t.Errorf("CascadeChain(a): expected nil, got %v", chain)
 	}
@@ -254,16 +256,16 @@ func TestFKGraph_CascadeDirection(t *testing.T) {
 	s.BuildFKGraph()
 	g := s.FKGraph
 
-	if got := g.CascadeDepth("parent"); got != 1 {
+	if got := g.CascadeDepth("public.parent"); got != 1 {
 		t.Errorf("CascadeDepth(parent) = %d, want 1 (deleting parent deletes child rows)", got)
 	}
-	if got := g.CascadeDepth("child"); got != 0 {
+	if got := g.CascadeDepth("public.child"); got != 0 {
 		t.Errorf("CascadeDepth(child) = %d, want 0 (deleting child never touches parent)", got)
 	}
-	if chain := g.CascadeChain("parent"); len(chain) != 1 || chain[0] != "child" {
-		t.Errorf("CascadeChain(parent) = %v, want [child]", chain)
+	if chain := g.CascadeChain("public.parent"); len(chain) != 1 || chain[0] != "public.child" {
+		t.Errorf("CascadeChain(parent) = %v, want [public.child]", chain)
 	}
-	if chain := g.CascadeChain("child"); chain != nil {
+	if chain := g.CascadeChain("public.child"); chain != nil {
 		t.Errorf("CascadeChain(child) = %v, want nil", chain)
 	}
 }
@@ -285,7 +287,7 @@ func TestFKGraph_WalkCascade(t *testing.T) {
 	// TowardReferenced from x, first hop accepts SET NULL, later hops only
 	// CASCADE: paths [x->y] and [x->y, y->z].
 	var paths [][]string
-	g.WalkCascade("x", TowardReferenced, func(edge FKEdge, firstHop bool) bool {
+	g.WalkCascade("public.x", TowardReferenced, 0, func(edge FKEdge, firstHop bool) bool {
 		if firstHop {
 			return edge.OnDelete == "SET NULL" || edge.OnDelete == "CASCADE"
 		}
@@ -310,7 +312,7 @@ func TestFKGraph_WalkCascade(t *testing.T) {
 	// TowardReferencing from z with CASCADE-only: reaches y (CASCADE) but not
 	// x (the y<-x edge is SET NULL).
 	var reached []string
-	g.WalkCascade("z", TowardReferencing, followCascadeOnly, func(path []FKEdge) {
+	g.WalkCascade("public.z", TowardReferencing, 0, followCascadeOnly, func(path []FKEdge) {
 		reached = append(reached, path[len(path)-1].FromTable)
 	})
 	if len(reached) != 1 || reached[0] != "y" {
@@ -330,18 +332,18 @@ func TestFKGraph_CascadeHandlesCycles(t *testing.T) {
 
 	// Must not hang. Depth should be finite (1: x -> y, then y -> x is
 	// blocked by visited set).
-	depth := g.CascadeDepth("x")
+	depth := g.CascadeDepth("public.x")
 	if depth < 0 {
 		t.Errorf("CascadeDepth(x) returned negative: %d", depth)
 	}
 
-	chain := g.CascadeChain("x")
+	chain := g.CascadeChain("public.x")
 	if chain == nil {
 		t.Fatal("CascadeChain(x): expected non-nil (y is reachable)")
 	}
 	found := false
 	for _, v := range chain {
-		if v == "y" {
+		if v == "public.y" {
 			found = true
 			break
 		}
@@ -437,26 +439,26 @@ func TestBuildFKGraph_CalledExplicitly(t *testing.T) {
 	g := s.FKGraph
 
 	// Forward: beta -> alpha.
-	if len(g.Forward["beta"]) != 1 {
-		t.Fatalf("expected 1 forward edge from beta, got %d", len(g.Forward["beta"]))
+	if len(g.Forward["public.beta"]) != 1 {
+		t.Fatalf("expected 1 forward edge from beta, got %d", len(g.Forward["public.beta"]))
 	}
-	if g.Forward["beta"][0].ToTable != "alpha" {
-		t.Errorf("expected beta forward edge to alpha, got %q", g.Forward["beta"][0].ToTable)
+	if g.Forward["public.beta"][0].ToTable != "alpha" {
+		t.Errorf("expected beta forward edge to alpha, got %q", g.Forward["public.beta"][0].ToTable)
 	}
 
 	// Reverse: alpha <- beta.
-	if len(g.Reverse["alpha"]) != 1 {
-		t.Fatalf("expected 1 reverse edge to alpha, got %d", len(g.Reverse["alpha"]))
+	if len(g.Reverse["public.alpha"]) != 1 {
+		t.Fatalf("expected 1 reverse edge to alpha, got %d", len(g.Reverse["public.alpha"]))
 	}
-	if g.Reverse["alpha"][0].FromTable != "beta" {
-		t.Errorf("expected alpha reverse edge from beta, got %q", g.Reverse["alpha"][0].FromTable)
+	if g.Reverse["public.alpha"][0].FromTable != "beta" {
+		t.Errorf("expected alpha reverse edge from beta, got %q", g.Reverse["public.alpha"][0].FromTable)
 	}
 
 	// Fan counts.
-	if g.FanOut["beta"] != 1 {
-		t.Errorf("expected beta FanOut=1, got %d", g.FanOut["beta"])
+	if g.FanOut["public.beta"] != 1 {
+		t.Errorf("expected beta FanOut=1, got %d", g.FanOut["public.beta"])
 	}
-	if g.FanIn["alpha"] != 1 {
-		t.Errorf("expected alpha FanIn=1, got %d", g.FanIn["alpha"])
+	if g.FanIn["public.alpha"] != 1 {
+		t.Errorf("expected alpha FanIn=1, got %d", g.FanIn["public.alpha"])
 	}
 }

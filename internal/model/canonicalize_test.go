@@ -77,7 +77,7 @@ func TestCanonicalize_SortsUnsortedSchema(t *testing.T) {
 		t.Errorf("orders collections not alphabetized: checks=%v indexes=%v", orders.Checks, orders.Indexes)
 	}
 	// Derived FK graph rebuilt.
-	if schema.FKGraph == nil || schema.FKGraph.FanIn["users"] != 1 {
+	if schema.FKGraph == nil || schema.FKGraph.FanIn["shop.users"] != 1 {
 		t.Errorf("FKGraph not rebuilt: %+v", schema.FKGraph)
 	}
 }
@@ -120,8 +120,8 @@ func TestFilterByGroups_RebuildsFKGraph(t *testing.T) {
 	}
 
 	// Parent graph carries the posts->users edge.
-	if schema.FKGraph.FanIn["users"] != 1 {
-		t.Fatalf("precondition: parent FanIn[users] = %d, want 1", schema.FKGraph.FanIn["users"])
+	if schema.FKGraph.FanIn["public.users"] != 1 {
+		t.Fatalf("precondition: parent FanIn[users] = %d, want 1", schema.FKGraph.FanIn["public.users"])
 	}
 
 	filtered := schema.FilterByGroups([]string{"onlyusers"})
@@ -129,10 +129,10 @@ func TestFilterByGroups_RebuildsFKGraph(t *testing.T) {
 	if filtered.FKGraph == schema.FKGraph {
 		t.Fatalf("filtered schema shares the parent FKGraph pointer (stale graph)")
 	}
-	if got := filtered.FKGraph.FanIn["users"]; got != 0 {
+	if got := filtered.FKGraph.FanIn["public.users"]; got != 0 {
 		t.Errorf("filtered FanIn[users] = %d, want 0 (posts was filtered out)", got)
 	}
-	if got := len(filtered.FKGraph.Reverse["users"]); got != 0 {
+	if got := len(filtered.FKGraph.Reverse["public.users"]); got != 0 {
 		t.Errorf("filtered Reverse[users] has %d stale edges, want 0", got)
 	}
 }
@@ -173,7 +173,7 @@ func TestFilterBySource_RebuildsFKGraph(t *testing.T) {
 	if filtered.FKGraph == schema.FKGraph {
 		t.Fatalf("filtered schema shares the parent FKGraph pointer (stale graph)")
 	}
-	if got := filtered.FKGraph.FanIn["users"]; got != 0 {
+	if got := filtered.FKGraph.FanIn["public.users"]; got != 0 {
 		t.Errorf("filtered FanIn[users] = %d, want 0 (posts was filtered out)", got)
 	}
 }

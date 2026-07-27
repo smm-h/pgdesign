@@ -183,7 +183,7 @@ func generateGraphQL(schema *model.Schema) string {
 		}
 		var revFields []revField
 		seen := make(map[string]bool)
-		for _, edge := range schema.FKGraph.Reverse[t.Name] {
+		for _, edge := range schema.FKGraph.Reverse[model.TableKey(t.Schema, t.Name)] {
 			if seen[edge.FKName] {
 				continue
 			}

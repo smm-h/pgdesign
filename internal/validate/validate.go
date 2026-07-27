@@ -1447,14 +1447,15 @@ func checkCascadeDepth(schema *model.Schema, config *Config) []diagnostic.Diagno
 	}
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
-		depth := schema.FKGraph.CascadeDepth(t.Name)
+		key := model.TableKey(t.Schema, t.Name)
+		depth := schema.FKGraph.CascadeDepth(key)
 		if depth > config.CascadeMaxDepth {
-			chain := schema.FKGraph.CascadeChain(t.Name)
+			chain := schema.FKGraph.CascadeChain(key)
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity:   diagnostic.Warning,
 				Code:       "W013",
 				Table:      t.Name,
-				Message:    fmt.Sprintf("CASCADE depth %d exceeds threshold %d: %s -> %s", depth, config.CascadeMaxDepth, t.Name, strings.Join(chain, " -> ")),
+				Message:    fmt.Sprintf("CASCADE depth %d exceeds threshold %d: %s -> %s", depth, config.CascadeMaxDepth, key, strings.Join(chain, " -> ")),
 				Suggestion: "Consider using RESTRICT or SET NULL to break the cascade chain",
 			})
 		}
@@ -1469,14 +1470,15 @@ func checkCascadeBreadth(schema *model.Schema, config *Config) []diagnostic.Diag
 	}
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
-		breadth := schema.FKGraph.CascadeBreadth(t.Name)
+		key := model.TableKey(t.Schema, t.Name)
+		breadth := schema.FKGraph.CascadeBreadth(key)
 		if breadth >= config.CascadeMaxBreadth {
-			chain := schema.FKGraph.CascadeChain(t.Name)
+			chain := schema.FKGraph.CascadeChain(key)
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity:   diagnostic.Warning,
 				Code:       "W014",
 				Table:      t.Name,
-				Message:    fmt.Sprintf("deleting from %q cascades to %d tables: %s", t.Name, breadth, strings.Join(chain, ", ")),
+				Message:    fmt.Sprintf("deleting from %q cascades to %d tables: %s", key, breadth, strings.Join(chain, ", ")),
 				Suggestion: "Consider using RESTRICT or SET NULL to limit cascade blast radius",
 			})
 		}
@@ -1491,7 +1493,8 @@ func checkMixedOnDelete(schema *model.Schema, _ *Config) []diagnostic.Diagnostic
 	}
 	var diags []diagnostic.Diagnostic
 	for _, t := range schema.Tables {
-		edges := schema.FKGraph.Reverse[t.Name]
+		key := model.TableKey(t.Schema, t.Name)
+		edges := schema.FKGraph.Reverse[key]
 		if len(edges) == 0 {
 			continue
 		}
@@ -1522,7 +1525,7 @@ func checkMixedOnDelete(schema *model.Schema, _ *Config) []diagnostic.Diagnostic
 			Severity:   diagnostic.Warning,
 			Code:       "W015",
 			Table:      t.Name,
-			Message:    fmt.Sprintf("mixed ON DELETE actions on incoming FKs to %q: %s", t.Name, strings.Join(parts, "; ")),
+			Message:    fmt.Sprintf("mixed ON DELETE actions on incoming FKs to %q: %s", key, strings.Join(parts, "; ")),
 			Suggestion: "Consider using a consistent ON DELETE action for all FKs referencing this table",
 		})
 	}
@@ -2855,7 +2858,7 @@ func checkCascadeIntoAppendOnly(schema *model.Schema, _ *Config) []diagnostic.Di
 			continue
 		}
 		seen := make(map[string]bool) // dedupe: one diagnostic per (first-hop FK, delete origin)
-		schema.FKGraph.WalkCascade(t.Name, model.TowardReferenced, func(edge model.FKEdge, firstHop bool) bool {
+		schema.FKGraph.WalkCascade(model.TableKey(t.Schema, t.Name), model.TowardReferenced, 0, func(edge model.FKEdge, firstHop bool) bool {
 			action := strings.ToUpper(strings.TrimSpace(edge.OnDelete))
 			if action == "" {
 				return false // E201 handles missing on_delete

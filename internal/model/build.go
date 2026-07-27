@@ -201,7 +201,7 @@ func mergeGroups(raws []*parse.RawSchema) map[string][]string {
 func (s *Schema) buildTablesByName() {
 	s.TablesByName = make(map[string]*Table, len(s.Tables))
 	for i := range s.Tables {
-		key := s.Tables[i].Schema + "." + s.Tables[i].Name
+		key := TableKey(s.Tables[i].Schema, s.Tables[i].Name)
 		s.TablesByName[key] = &s.Tables[i]
 	}
 }
