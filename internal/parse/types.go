@@ -1,4 +1,12 @@
-// Package parse provides a lenient TOML parser for pgdesign schema files, extracting structure without enforcing semantic rules into a RawSchema.
+// Package parse turns pgdesign schema TOML into a RawSchema. Entry points
+// (File/Bytes/Files/Dir) first run a strictspec-generated document-shape gate
+// (see gate.go and pgschema/): strictspec is the single authority for shape —
+// well-formedness, closed records (unknown keys), base-type conformance,
+// required fields, and the identifier/pgtype/sql-expression custom-scalar
+// lexemes. Only shape-valid documents are walked into a RawSchema; semantic
+// rules (type existence, reference/enum-value resolution, SQL grammaticality,
+// normal form) remain native in model/validate. Every schema document must
+// carry a top-level format_version.
 //
 // Column order is preserved via AST walking (not map iteration).
 package parse

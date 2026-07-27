@@ -25,6 +25,13 @@ func File(path string) (*RawSchema, []diagnostic.Diagnostic) {
 		}}
 	}
 
+	// Document-shape gate: strictspec validates well-formedness, closed records
+	// (unknown keys), base types, required fields, and the custom-scalar lexemes
+	// BEFORE the native walk. On failure, return diagnostics without walking.
+	if gateDiags := gateDocument(data, path); len(gateDiags) > 0 {
+		return nil, gateDiags
+	}
+
 	doc, err := tomledit.Parse(data)
 	if err != nil {
 		return nil, []diagnostic.Diagnostic{{
@@ -47,6 +54,11 @@ func File(path string) (*RawSchema, []diagnostic.Diagnostic) {
 // Bytes parses TOML bytes and returns a RawSchema with diagnostics.
 // Like File but operates on in-memory bytes instead of reading from disk.
 func Bytes(data []byte) (*RawSchema, []diagnostic.Diagnostic) {
+	// Document-shape gate first (see gateDocument / File).
+	if gateDiags := gateDocument(data, "<bytes>"); len(gateDiags) > 0 {
+		return nil, gateDiags
+	}
+
 	doc, err := tomledit.Parse(data)
 	if err != nil {
 		return nil, []diagnostic.Diagnostic{{
@@ -178,36 +190,24 @@ func (p *parser) parseMeta() RawMeta {
 		return meta
 	}
 
-	knownKeys := map[string]bool{"version": true, "schema": true, "extensions": true}
-
 	for _, child := range metaTable.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", "", "", "unknown key in [meta]: %q", key)
-			continue
-		}
 		switch key {
 		case "version":
 			if v, ok := nodeInt(kv.Val); ok {
 				meta.Version = int(v)
-			} else {
-				p.errorf("E010", "", "", "[meta].version must be an integer")
 			}
 		case "schema":
 			if v, ok := nodeString(kv.Val); ok {
 				meta.Schema = v
-			} else {
-				p.errorf("E010", "", "", "[meta].schema must be a string")
 			}
 		case "extensions":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				meta.Extensions = v
-			} else {
-				p.errorf("E010", "", "", "[meta].extensions must be an array of strings")
 			}
 		}
 	}
@@ -260,8 +260,6 @@ func (p *parser) parseTypes() []RawType {
 				fieldName := kv.Key.Parts[0]
 				if v, ok := nodeString(kv.Val); ok {
 					fields = append(fields, RawCompositeField{Name: fieldName, Type: v})
-				} else {
-					p.errorf("E010", "", "", "[types.%s.fields].%s must be a string", typeName, fieldName)
 				}
 			}
 			types[idx].Fields = fields
@@ -286,17 +284,11 @@ func (p *parser) parseTypes() []RawType {
 				case "terminal":
 					if v, ok := nodeBool(kv.Val); ok {
 						state.Terminal = &v
-					} else {
-						p.errorf("E010", "", "", "[types.%s.states.%s].terminal must be a boolean", typeName, stateName)
 					}
 				case "comment":
 					if v, ok := nodeString(kv.Val); ok {
 						state.Comment = &v
-					} else {
-						p.errorf("E010", "", "", "[types.%s.states.%s].comment must be a string", typeName, stateName)
 					}
-				default:
-					p.warnf("W001", "", "", "unknown key in [types.%s.states.%s]: %q", typeName, stateName, key)
 				}
 			}
 			// Append in document order: state order is semantic (it becomes
@@ -331,64 +323,37 @@ func (p *parser) parseTypes() []RawType {
 func (p *parser) parseTypeTransition(typeName string, at *tomledit.ArrayTableNode) RawSMTransition {
 	tr := RawSMTransition{}
 
-	knownKeys := map[string]bool{
-		"name": true, "from": true, "to": true, "requires": true, "comment": true,
-	}
-
 	for _, child := range at.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", "", "", "unknown key in [[types.%s.transitions]]: %q", typeName, key)
-			continue
-		}
 		switch key {
 		case "name":
 			if v, ok := nodeString(kv.Val); ok {
 				tr.Name = v
-			} else {
-				p.errorf("E010", "", "", "[[types.%s.transitions]].name must be a string", typeName)
 			}
 		case "from":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				tr.From = v
-			} else {
-				p.errorf("E010", "", "", "[[types.%s.transitions]].from must be an array of strings", typeName)
 			}
 		case "to":
 			if v, ok := nodeString(kv.Val); ok {
 				tr.To = v
-			} else {
-				p.errorf("E010", "", "", "[[types.%s.transitions]].to must be a string", typeName)
 			}
 		case "requires":
 			if m, ok := nodeStringMap(kv.Val); ok {
 				tr.Requires = m
-			} else {
-				p.errorf("E010", "", "", "[[types.%s.transitions]].requires must be an inline table of strings", typeName)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
 				tr.Comment = &v
-			} else {
-				p.errorf("E010", "", "", "[[types.%s.transitions]].comment must be a string", typeName)
 			}
 		}
 	}
 
-	// Validate required fields.
-	if tr.Name == "" {
-		p.errorf("E011", "", "", "[[types.%s.transitions]] is missing required field \"name\"", typeName)
-	}
-	if len(tr.From) == 0 {
-		p.errorf("E011", "", "", "[[types.%s.transitions]] is missing required field \"from\"", typeName)
-	}
-	if tr.To == "" {
-		p.errorf("E011", "", "", "[[types.%s.transitions]] is missing required field \"to\"", typeName)
-	}
+	// name/from/to required — enforced by the strictspec shape gate.
 
 	return tr
 }
@@ -396,101 +361,64 @@ func (p *parser) parseTypeTransition(typeName string, at *tomledit.ArrayTableNod
 func (p *parser) parseType(name string, tbl *tomledit.TableNode) RawType {
 	rt := RawType{Name: name}
 
-	knownKeys := map[string]bool{
-		"kind": true, "extends": true, "base_type": true, "values": true,
-		"not_null": true, "default": true, "default_expr": true,
-		"check": true, "unique": true, "array": true, "comment": true,
-		"initial": true, "enforce": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", "", "", "unknown key in [types.%s]: %q", name, key)
-			continue
-		}
 		switch key {
 		case "kind":
 			if v, ok := nodeString(kv.Val); ok {
 				rt.Kind = v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].kind must be a string", name)
 			}
 		case "extends":
 			if v, ok := nodeString(kv.Val); ok {
 				rt.Extends = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].extends must be a string", name)
 			}
 		case "base_type":
 			if v, ok := nodeString(kv.Val); ok {
 				rt.BaseType = v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].base_type must be a string", name)
 			}
 		case "values":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				rt.Values = v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].values must be an array of strings", name)
 			}
 		case "not_null":
 			if v, ok := nodeBool(kv.Val); ok {
 				rt.NotNull = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].not_null must be a boolean", name)
 			}
 		case "default":
 			if v, ok := nodeString(kv.Val); ok {
 				rt.Default = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].default must be a string", name)
 			}
 		case "default_expr":
 			if v, ok := nodeString(kv.Val); ok {
 				rt.DefaultExpr = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].default_expr must be a string", name)
 			}
 		case "check":
 			if v, ok := nodeString(kv.Val); ok {
 				rt.Check = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].check must be a string", name)
 			}
 		case "unique":
 			if v, ok := nodeBool(kv.Val); ok {
 				rt.Unique = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].unique must be a boolean", name)
 			}
 		case "array":
 			if v, ok := nodeBool(kv.Val); ok {
 				rt.Array = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].array must be a boolean", name)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
 				rt.Comment = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].comment must be a string", name)
 			}
 		case "initial":
 			if v, ok := nodeString(kv.Val); ok {
 				rt.InitialState = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].initial must be a string", name)
 			}
 		case "enforce":
 			if v, ok := nodeBool(kv.Val); ok {
 				rt.EnforceTrigger = &v
-			} else {
-				p.errorf("E010", "", "", "[types.%s].enforce must be a boolean", name)
 			}
 		}
 	}
@@ -550,46 +478,29 @@ func (p *parser) parseViews() []RawView {
 func (p *parser) parseView(name string, tbl *tomledit.TableNode) RawView {
 	rv := RawView{Name: name}
 
-	knownKeys := map[string]bool{
-		"query": true, "comment": true, "depends_on": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", "", "", "unknown key in [views.%s]: %q", name, key)
-			continue
-		}
 		switch key {
 		case "query":
 			if v, ok := nodeString(kv.Val); ok {
 				rv.Query = v
-			} else {
-				p.errorf("E010", "", "", "[views.%s].query must be a string", name)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
 				rv.Comment = &v
-			} else {
-				p.errorf("E010", "", "", "[views.%s].comment must be a string", name)
 			}
 		case "depends_on":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				rv.DependsOn = v
-			} else {
-				p.errorf("E010", "", "", "[views.%s].depends_on must be an array of strings", name)
 			}
 		}
 	}
 
-	// query is required
-	if rv.Query == "" {
-		p.errorf("E011", "", "", "view %q is missing required field \"query\"", name)
-	}
+	// query required — enforced by the strictspec shape gate.
 
 	return rv
 }
@@ -616,52 +527,33 @@ func (p *parser) parseMaterializedViews() []RawMaterializedView {
 func (p *parser) parseMaterializedView(name string, tbl *tomledit.TableNode) RawMaterializedView {
 	rmv := RawMaterializedView{Name: name}
 
-	knownKeys := map[string]bool{
-		"query": true, "comment": true, "depends_on": true, "with_data": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", "", "", "unknown key in [materialized_views.%s]: %q", name, key)
-			continue
-		}
 		switch key {
 		case "query":
 			if v, ok := nodeString(kv.Val); ok {
 				rmv.Query = v
-			} else {
-				p.errorf("E010", "", "", "[materialized_views.%s].query must be a string", name)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
 				rmv.Comment = &v
-			} else {
-				p.errorf("E010", "", "", "[materialized_views.%s].comment must be a string", name)
 			}
 		case "depends_on":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				rmv.DependsOn = v
-			} else {
-				p.errorf("E010", "", "", "[materialized_views.%s].depends_on must be an array of strings", name)
 			}
 		case "with_data":
 			if v, ok := nodeBool(kv.Val); ok {
 				rmv.WithData = &v
-			} else {
-				p.errorf("E010", "", "", "[materialized_views.%s].with_data must be a boolean", name)
 			}
 		}
 	}
 
-	// query is required
-	if rmv.Query == "" {
-		p.errorf("E011", "", "", "materialized view %q is missing required field \"query\"", name)
-	}
+	// query required — enforced by the strictspec shape gate.
 
 	// Parse indexes
 	rmv.Indexes = make(map[string]RawIndex)
@@ -702,69 +594,44 @@ func (p *parser) parseSequences() []RawSequence {
 func (p *parser) parseSequence(name string, tbl *tomledit.TableNode) RawSequence {
 	rs := RawSequence{Name: name}
 
-	knownKeys := map[string]bool{
-		"start": true, "increment": true, "min_value": true, "max_value": true,
-		"cache": true, "cycle": true, "owned_by": true, "comment": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", "", "", "unknown key in [sequences.%s]: %q", name, key)
-			continue
-		}
 		switch key {
 		case "start":
 			if v, ok := nodeInt(kv.Val); ok {
 				rs.Start = &v
-			} else {
-				p.errorf("E010", "", "", "[sequences.%s].start must be an integer", name)
 			}
 		case "increment":
 			if v, ok := nodeInt(kv.Val); ok {
 				rs.Increment = &v
-			} else {
-				p.errorf("E010", "", "", "[sequences.%s].increment must be an integer", name)
 			}
 		case "min_value":
 			if v, ok := nodeInt(kv.Val); ok {
 				rs.MinValue = &v
-			} else {
-				p.errorf("E010", "", "", "[sequences.%s].min_value must be an integer", name)
 			}
 		case "max_value":
 			if v, ok := nodeInt(kv.Val); ok {
 				rs.MaxValue = &v
-			} else {
-				p.errorf("E010", "", "", "[sequences.%s].max_value must be an integer", name)
 			}
 		case "cache":
 			if v, ok := nodeInt(kv.Val); ok {
 				rs.Cache = &v
-			} else {
-				p.errorf("E010", "", "", "[sequences.%s].cache must be an integer", name)
 			}
 		case "cycle":
 			if v, ok := nodeBool(kv.Val); ok {
 				rs.Cycle = &v
-			} else {
-				p.errorf("E010", "", "", "[sequences.%s].cycle must be a boolean", name)
 			}
 		case "owned_by":
 			if v, ok := nodeString(kv.Val); ok {
 				rs.OwnedBy = &v
-			} else {
-				p.errorf("E010", "", "", "[sequences.%s].owned_by must be a string", name)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
 				rs.Comment = &v
-			} else {
-				p.errorf("E010", "", "", "[sequences.%s].comment must be a string", name)
 			}
 		}
 	}
@@ -794,105 +661,68 @@ func (p *parser) parseFunctions() []RawFunction {
 func (p *parser) parseFunction(name string, tbl *tomledit.TableNode) RawFunction {
 	rf := RawFunction{Name: name}
 
-	knownKeys := map[string]bool{
-		"language": true, "returns": true, "body": true, "file": true,
-		"comment": true, "volatility": true, "parallel": true,
-		"security_definer": true, "procedure": true, "cost": true,
-		"rows": true, "depends_on": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", "", "", "unknown key in [functions.%s]: %q", name, key)
-			continue
-		}
 		switch key {
 		case "language":
 			if v, ok := nodeString(kv.Val); ok {
 				rf.Language = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].language must be a string", name)
 			}
 		case "returns":
 			if v, ok := nodeString(kv.Val); ok {
 				rf.Returns = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].returns must be a string", name)
 			}
 		case "body":
 			if v, ok := nodeString(kv.Val); ok {
 				rf.Body = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].body must be a string", name)
 			}
 		case "file":
 			if v, ok := nodeString(kv.Val); ok {
 				rf.File = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].file must be a string", name)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
 				rf.Comment = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].comment must be a string", name)
 			}
 		case "volatility":
 			if v, ok := nodeString(kv.Val); ok {
 				rf.Volatility = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].volatility must be a string", name)
 			}
 		case "parallel":
 			if v, ok := nodeString(kv.Val); ok {
 				rf.Parallel = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].parallel must be a string", name)
 			}
 		case "security_definer":
 			if v, ok := nodeBool(kv.Val); ok {
 				rf.SecurityDefiner = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].security_definer must be a boolean", name)
 			}
 		case "procedure":
 			if v, ok := nodeBool(kv.Val); ok {
 				rf.Procedure = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].procedure must be a boolean", name)
 			}
 		case "cost":
 			if v, ok := nodeFloat(kv.Val); ok {
 				rf.Cost = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].cost must be a number", name)
 			}
 		case "rows":
 			if v, ok := nodeFloat(kv.Val); ok {
 				rf.Rows = &v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].rows must be a number", name)
 			}
 		case "depends_on":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				rf.DependsOn = v
-			} else {
-				p.errorf("E010", "", "", "[functions.%s].depends_on must be an array of strings", name)
 			}
 		}
 	}
 
-	// Validate required fields.
+	// Validate required fields. language is gate-owned; body-or-file (either),
+	// both-body-and-file (exclusion), and returns (conditional on procedure)
+	// remain native — the shape gate cannot express these cross-field rules.
 	isProcedure := rf.Procedure != nil && *rf.Procedure
-
-	if rf.Language == nil {
-		p.errorf("E011", "", "", "function %q is missing required field \"language\"", name)
-	}
 
 	if rf.Body == nil && rf.File == nil {
 		p.errorf("E011", "", "", "function %q is missing required field \"body\" or \"file\"", name)
@@ -912,8 +742,6 @@ func (p *parser) parseFunction(name string, tbl *tomledit.TableNode) RawFunction
 		if err != nil {
 			if os.IsNotExist(err) {
 				p.errorf("E012", "", "", "function %q file not found: %s", name, filePath)
-			} else {
-				p.errorf("E010", "", "", "function %q cannot read file %s: %v", name, filePath, err)
 			}
 		} else {
 			body := string(data)
@@ -940,48 +768,29 @@ func (p *parser) parseFunctionArgs(funcName string) []RawFunctionArg {
 		if pathsEqual(at.KeyPath, target) {
 			arg := RawFunctionArg{}
 
-			knownKeys := map[string]bool{
-				"name": true, "type": true, "default": true,
-			}
-
 			for _, child := range at.Children {
 				kv, ok := child.(*tomledit.KeyValueNode)
 				if !ok {
 					continue
 				}
 				key := kv.Key.Parts[0]
-				if !knownKeys[key] {
-					p.warnf("W001", "", "", "unknown key in [[functions.%s.args]]: %q", funcName, key)
-					continue
-				}
 				switch key {
 				case "name":
 					if v, ok := nodeString(kv.Val); ok {
 						arg.Name = v
-					} else {
-						p.errorf("E010", "", "", "[[functions.%s.args]].name must be a string", funcName)
 					}
 				case "type":
 					if v, ok := nodeString(kv.Val); ok {
 						arg.Type = v
-					} else {
-						p.errorf("E010", "", "", "[[functions.%s.args]].type must be a string", funcName)
 					}
 				case "default":
 					if v, ok := nodeString(kv.Val); ok {
 						arg.Default = &v
-					} else {
-						p.errorf("E010", "", "", "[[functions.%s.args]].default must be a string", funcName)
 					}
 				}
 			}
 
-			if arg.Name == "" {
-				p.errorf("E011", "", "", "[[functions.%s.args]] is missing required field \"name\"", funcName)
-			}
-			if arg.Type == "" {
-				p.errorf("E011", "", "", "[[functions.%s.args]] is missing required field \"type\"", funcName)
-			}
+			// name/type required — enforced by the strictspec shape gate.
 
 			args = append(args, arg)
 		}
@@ -1007,8 +816,6 @@ func (p *parser) parseGroups() map[string][]string {
 		name := kv.Key.Parts[0]
 		if tables, ok := nodeStringSlice(kv.Val); ok {
 			groups[name] = tables
-		} else {
-			p.errorf("E010", "", "", "[groups].%s must be an array of strings", name)
 		}
 	}
 
@@ -1033,55 +840,32 @@ func (p *parser) parseTable(name string) RawTable {
 	// Find the [tables.<name>] table node for top-level keys
 	tableTbl := p.findTableByPath([]string{"tables", name})
 	if tableTbl != nil {
-		knownKeys := map[string]bool{
-			"comment": true, "pk": true, "enable_rls": true, "force_rls": true, "append_only": true,
-		}
 		for _, child := range tableTbl.Children {
 			kv, ok := child.(*tomledit.KeyValueNode)
 			if !ok {
 				continue
 			}
 			key := kv.Key.Parts[0]
-			if !knownKeys[key] {
-				// Could be a dotted key for sub-sections; skip known sub-section prefixes
-				if key == "columns" || key == "fks" || key == "indexes" ||
-					key == "unique" || key == "checks" || key == "exclusions" || key == "policies" || key == "triggers" ||
-					key == "partitioning" || key == "dependencies" || key == "maintenance" {
-					continue
-				}
-				p.warnf("W001", name, "", "unknown key in [tables.%s]: %q", name, key)
-				continue
-			}
 			switch key {
 			case "comment":
 				if v, ok := nodeString(kv.Val); ok {
 					rt.Comment = &v
-				} else {
-					p.errorf("E010", name, "", "[tables.%s].comment must be a string", name)
 				}
 			case "pk":
 				if v, ok := nodeStringSlice(kv.Val); ok {
 					rt.PK = v
-				} else {
-					p.errorf("E010", name, "", "[tables.%s].pk must be an array of strings", name)
 				}
 			case "enable_rls":
 				if v, ok := nodeBool(kv.Val); ok {
 					rt.EnableRLS = v
-				} else {
-					p.errorf("E010", name, "", "[tables.%s].enable_rls must be a boolean", name)
 				}
 			case "force_rls":
 				if v, ok := nodeBool(kv.Val); ok {
 					rt.ForceRLS = v
-				} else {
-					p.errorf("E010", name, "", "[tables.%s].force_rls must be a boolean", name)
 				}
 			case "append_only":
 				if v, ok := nodeBool(kv.Val); ok {
 					rt.AppendOnly = &v
-				} else {
-					p.errorf("E010", name, "", "[tables.%s].append_only must be a boolean", name)
 				}
 			}
 		}
@@ -1148,90 +932,57 @@ func (p *parser) parseColumns(tableName string) []RawColumn {
 func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode) RawColumn {
 	col := RawColumn{Name: colName}
 
-	knownKeys := map[string]bool{
-		"type": true, "nullable": true, "default": true,
-		"default_expr": true, "generated": true, "stored": true,
-		"array": true, "comment": true, "json_schema": true,
-		"collation": true, "statistics": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", tableName, colName, "unknown key in [tables.%s.columns.%s]: %q", tableName, colName, key)
-			continue
-		}
 		switch key {
 		case "type":
 			if v, ok := nodeString(kv.Val); ok {
 				col.Type = v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].type must be a string", tableName, colName)
 			}
 		case "nullable":
 			if v, ok := nodeBool(kv.Val); ok {
 				col.Nullable = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].nullable must be a boolean", tableName, colName)
 			}
 		case "default":
 			if v, ok := nodeString(kv.Val); ok {
 				col.Default = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].default must be a string", tableName, colName)
 			}
 		case "default_expr":
 			if v, ok := nodeString(kv.Val); ok {
 				col.DefaultExpr = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].default_expr must be a string", tableName, colName)
 			}
 		case "generated":
 			if v, ok := nodeString(kv.Val); ok {
 				col.Generated = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].generated must be a string", tableName, colName)
 			}
 		case "stored":
 			if v, ok := nodeBool(kv.Val); ok {
 				col.Stored = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].stored must be a boolean", tableName, colName)
 			}
 		case "array":
 			if v, ok := nodeBool(kv.Val); ok {
 				col.Array = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].array must be a boolean", tableName, colName)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
 				col.Comment = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].comment must be a string", tableName, colName)
 			}
 		case "json_schema":
 			if v, ok := nodeString(kv.Val); ok {
 				col.JSONSchema = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].json_schema must be a string", tableName, colName)
 			}
 		case "collation":
 			if v, ok := nodeString(kv.Val); ok {
 				col.Collation = &v
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].collation must be a string", tableName, colName)
 			}
 		case "statistics":
 			if v, ok := nodeInt(kv.Val); ok {
 				iv := int(v)
 				col.Statistics = &iv
-			} else {
-				p.errorf("E010", tableName, colName, "[tables.%s.columns.%s].statistics must be an integer", tableName, colName)
 			}
 		}
 	}
@@ -1253,10 +1004,7 @@ func (p *parser) parseColumn(tableName, colName string, tbl *tomledit.TableNode)
 		}
 	}
 
-	// Missing type is an error but we continue with partial data
-	if col.Type == "" {
-		p.errorf("E011", tableName, colName, "column %q in table %q is missing required field \"type\"", colName, tableName)
-	}
+	// type required — enforced by the strictspec shape gate.
 
 	return col
 }
@@ -1281,44 +1029,28 @@ func (p *parser) parseFKs(tableName string, rt *RawTable) {
 func (p *parser) parseFK(tableName, fkName string, tbl *tomledit.TableNode) RawFK {
 	fk := RawFK{Name: fkName}
 
-	knownKeys := map[string]bool{
-		"columns": true, "ref_table": true, "ref_columns": true, "on_delete": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", tableName, "", "unknown key in [tables.%s.fks.%s]: %q", tableName, fkName, key)
-			continue
-		}
 		switch key {
 		case "columns":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				fk.Columns = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.fks.%s].columns must be an array of strings", tableName, fkName)
 			}
 		case "ref_table":
 			if v, ok := nodeString(kv.Val); ok {
 				fk.RefTable = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.fks.%s].ref_table must be a string", tableName, fkName)
 			}
 		case "ref_columns":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				fk.RefColumns = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.fks.%s].ref_columns must be an array of strings", tableName, fkName)
 			}
 		case "on_delete":
 			if v, ok := nodeString(kv.Val); ok {
 				fk.OnDelete = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.fks.%s].on_delete must be a string", tableName, fkName)
 			}
 		}
 	}
@@ -1346,73 +1078,48 @@ func (p *parser) parseIndexes(tableName string, rt *RawTable) {
 func (p *parser) parseIndex(tableName, idxName string, tbl *tomledit.TableNode) RawIndex {
 	idx := RawIndex{Name: idxName}
 
-	knownKeys := map[string]bool{
-		"columns": true, "method": true, "opclass": true, "collation": true,
-		"where": true, "include": true, "unique": true, "with": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", tableName, "", "unknown key in [tables.%s.indexes.%s]: %q", tableName, idxName, key)
-			continue
-		}
 		switch key {
 		case "columns":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				idx.Columns = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].columns must be an array of strings", tableName, idxName)
 			}
 		case "method":
 			if v, ok := nodeString(kv.Val); ok {
 				idx.Method = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].method must be a string", tableName, idxName)
 			}
 		case "opclass":
 			if v, ok := nodeString(kv.Val); ok {
 				idx.Opclass = &v
 			} else if m, ok := nodeStringMap(kv.Val); ok {
 				idx.OpclassMap = m
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].opclass must be a string or inline table of strings", tableName, idxName)
 			}
 		case "collation":
 			if v, ok := nodeString(kv.Val); ok {
 				idx.Collation = &v
 			} else if m, ok := nodeStringMap(kv.Val); ok {
 				idx.CollationMap = m
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].collation must be a string or inline table of strings", tableName, idxName)
 			}
 		case "where":
 			if v, ok := nodeString(kv.Val); ok {
 				idx.Where = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].where must be a string", tableName, idxName)
 			}
 		case "include":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				idx.Include = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].include must be an array of strings", tableName, idxName)
 			}
 		case "unique":
 			if v, ok := nodeBool(kv.Val); ok {
 				idx.Unique = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].unique must be a boolean", tableName, idxName)
 			}
 		case "with":
 			if m, ok := nodeStringMap(kv.Val); ok {
 				idx.With = m
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.indexes.%s].with must be an inline table of strings", tableName, idxName)
 			}
 		}
 	}
@@ -1450,23 +1157,15 @@ func (p *parser) parseUnique(tableName, uqName string, tbl *tomledit.TableNode) 
 		case "columns":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				uq.Columns = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.unique.%s].columns must be an array of strings", tableName, uqName)
 			}
 		case "deferrable":
 			if v, ok := nodeBool(kv.Val); ok {
 				uq.Deferrable = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.unique.%s].deferrable must be a boolean", tableName, uqName)
 			}
 		case "initially_deferred":
 			if v, ok := nodeBool(kv.Val); ok {
 				uq.InitiallyDeferred = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.unique.%s].initially_deferred must be a boolean", tableName, uqName)
 			}
-		default:
-			p.warnf("W001", tableName, "", "unknown key in [tables.%s.unique.%s]: %q", tableName, uqName, key)
 		}
 	}
 
@@ -1503,11 +1202,7 @@ func (p *parser) parseCheck(tableName, chkName string, tbl *tomledit.TableNode) 
 		case "expr":
 			if v, ok := nodeString(kv.Val); ok {
 				chk.Expr = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.checks.%s].expr must be a string", tableName, chkName)
 			}
-		default:
-			p.warnf("W001", tableName, "", "unknown key in [tables.%s.checks.%s]: %q", tableName, chkName, key)
 		}
 	}
 
@@ -1544,41 +1239,27 @@ func (p *parser) parseExclusion(tableName, excName string, tbl *tomledit.TableNo
 		case "columns":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				exc.Columns = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].columns must be an array of strings", tableName, excName)
 			}
 		case "operators":
 			if v, ok := nodeStringSlice(kv.Val); ok {
 				exc.Operators = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].operators must be an array of strings", tableName, excName)
 			}
 		case "method":
 			if v, ok := nodeString(kv.Val); ok {
 				exc.Method = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].method must be a string", tableName, excName)
 			}
 		case "where":
 			if v, ok := nodeString(kv.Val); ok {
 				exc.Where = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].where must be a string", tableName, excName)
 			}
 		case "deferrable":
 			if v, ok := nodeBool(kv.Val); ok {
 				exc.Deferrable = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].deferrable must be a boolean", tableName, excName)
 			}
 		case "initially_deferred":
 			if v, ok := nodeBool(kv.Val); ok {
 				exc.InitiallyDeferred = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.exclusions.%s].initially_deferred must be a boolean", tableName, excName)
 			}
-		default:
-			p.warnf("W001", tableName, "", "unknown key in [tables.%s.exclusions.%s]: %q", tableName, excName, key)
 		}
 	}
 
@@ -1610,63 +1291,40 @@ func (p *parser) parsePolicies(tableName string, rt *RawTable) {
 func (p *parser) parsePolicy(tableName, polName string, tbl *tomledit.TableNode) RawPolicy {
 	pol := RawPolicy{Name: polName}
 
-	knownKeys := map[string]bool{
-		"type": true, "for": true, "to": true, "using": true,
-		"with_check": true, "error_code": true, "error_message": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", tableName, "", "unknown key in [tables.%s.policies.%s]: %q", tableName, polName, key)
-			continue
-		}
 		switch key {
 		case "type":
 			if v, ok := nodeString(kv.Val); ok {
 				pol.Type = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].type must be a string", tableName, polName)
 			}
 		case "for":
 			if v, ok := nodeString(kv.Val); ok {
 				pol.For = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].for must be a string", tableName, polName)
 			}
 		case "to":
 			if v, ok := nodeString(kv.Val); ok {
 				pol.To = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].to must be a string", tableName, polName)
 			}
 		case "using":
 			if v, ok := nodeString(kv.Val); ok {
 				pol.Using = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].using must be a string", tableName, polName)
 			}
 		case "with_check":
 			if v, ok := nodeString(kv.Val); ok {
 				pol.WithCheck = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].with_check must be a string", tableName, polName)
 			}
 		case "error_code":
 			if v, ok := nodeString(kv.Val); ok {
 				pol.ErrorCode = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].error_code must be a string", tableName, polName)
 			}
 		case "error_message":
 			if v, ok := nodeString(kv.Val); ok {
 				pol.ErrorMessage = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.policies.%s].error_message must be a string", tableName, polName)
 			}
 		}
 	}
@@ -1694,102 +1352,61 @@ func (p *parser) parseTriggers(tableName string, rt *RawTable) {
 func (p *parser) parseTrigger(tableName, trigName string, tbl *tomledit.TableNode) RawTrigger {
 	trig := RawTrigger{Name: trigName}
 
-	knownKeys := map[string]bool{
-		"function": true, "events": true, "timing": true, "for_each": true,
-		"when": true, "constraint": true, "deferrable": true, "initially_deferred": true,
-		"referencing_old": true, "referencing_new": true, "comment": true,
-	}
-
 	for _, child := range tbl.Children {
 		kv, ok := child.(*tomledit.KeyValueNode)
 		if !ok {
 			continue
 		}
 		key := kv.Key.Parts[0]
-		if !knownKeys[key] {
-			p.warnf("W001", tableName, "", "unknown key in [tables.%s.triggers.%s]: %q", tableName, trigName, key)
-			continue
-		}
 		switch key {
 		case "function":
 			if v, ok := nodeString(kv.Val); ok {
 				trig.Function = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].function must be a string", tableName, trigName)
 			}
 		case "events":
 			if arr, ok := nodeStringSlice(kv.Val); ok {
 				trig.Events = arr
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].events must be an array of strings", tableName, trigName)
 			}
 		case "timing":
 			if v, ok := nodeString(kv.Val); ok {
 				trig.Timing = v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].timing must be a string", tableName, trigName)
 			}
 		case "for_each":
 			if v, ok := nodeString(kv.Val); ok {
 				trig.ForEach = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].for_each must be a string", tableName, trigName)
 			}
 		case "when":
 			if v, ok := nodeString(kv.Val); ok {
 				trig.When = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].when must be a string", tableName, trigName)
 			}
 		case "constraint":
 			if v, ok := nodeBool(kv.Val); ok {
 				trig.Constraint = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].constraint must be a boolean", tableName, trigName)
 			}
 		case "deferrable":
 			if v, ok := nodeBool(kv.Val); ok {
 				trig.Deferrable = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].deferrable must be a boolean", tableName, trigName)
 			}
 		case "initially_deferred":
 			if v, ok := nodeBool(kv.Val); ok {
 				trig.InitiallyDeferred = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].initially_deferred must be a boolean", tableName, trigName)
 			}
 		case "referencing_old":
 			if v, ok := nodeString(kv.Val); ok {
 				trig.ReferencingOld = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].referencing_old must be a string", tableName, trigName)
 			}
 		case "referencing_new":
 			if v, ok := nodeString(kv.Val); ok {
 				trig.ReferencingNew = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].referencing_new must be a string", tableName, trigName)
 			}
 		case "comment":
 			if v, ok := nodeString(kv.Val); ok {
 				trig.Comment = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.triggers.%s].comment must be a string", tableName, trigName)
 			}
 		}
 	}
 
-	// Validate required fields.
-	if trig.Function == "" {
-		p.errorf("E010", tableName, "", "[tables.%s.triggers.%s] missing required field \"function\"", tableName, trigName)
-	}
-	if len(trig.Events) == 0 {
-		p.errorf("E010", tableName, "", "[tables.%s.triggers.%s] missing required field \"events\"", tableName, trigName)
-	}
-	if trig.Timing == "" {
-		p.errorf("E010", tableName, "", "[tables.%s.triggers.%s] missing required field \"timing\"", tableName, trigName)
-	}
+	// function/events/timing required — enforced by the strictspec shape gate.
 
 	return trig
 }
@@ -1950,36 +1567,24 @@ func (p *parser) parseMaintenance(tableName string, rt *RawTable) {
 		case "interval":
 			if v, ok := nodeString(kv.Val); ok {
 				maint.Interval = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.maintenance].interval must be a string", tableName)
 			}
 		case "premake":
 			if v, ok := nodeInt(kv.Val); ok {
 				iv := int(v)
 				maint.Premake = &iv
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.maintenance].premake must be an integer", tableName)
 			}
 		case "retention":
 			if v, ok := nodeString(kv.Val); ok {
 				maint.Retention = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.maintenance].retention must be a string", tableName)
 			}
 		case "retention_keep_table":
 			if v, ok := nodeBool(kv.Val); ok {
 				maint.RetentionKeepTable = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.maintenance].retention_keep_table must be a boolean", tableName)
 			}
 		case "schedule":
 			if v, ok := nodeString(kv.Val); ok {
 				maint.Schedule = &v
-			} else {
-				p.errorf("E010", tableName, "", "[tables.%s.maintenance].schedule must be a string (a pg_cron schedule expression)", tableName)
 			}
-		default:
-			p.warnf("W001", tableName, "", "unknown key in [tables.%s.maintenance]: %q", tableName, key)
 		}
 	}
 
