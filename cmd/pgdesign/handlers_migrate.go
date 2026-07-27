@@ -712,6 +712,13 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 			}
 
 			toVersion := kwargs["to"].(string)
+
+			// Chain-mode project: journal-driven rollback (roadmap 5.6). Reverses
+			// recorded down-ops in reverse journal order; --to is a target REVISION.
+			if migrate.IsChainMode(dir) {
+				return strictcli.Exit(handleMigrateRollbackChain(ctx, conn, dir, toVersion, lockTimeout, quiet))
+			}
+
 			if toVersion != "" {
 				rolledBack, err := migrate.RollbackTo(ctx, conn, dir, toVersion, lockTimeout)
 				if err != nil {
@@ -747,6 +754,38 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 			strictcli.StringFlag("to", "Target version to rollback to (exclusive -- this version stays applied)", strictcli.Default("")),
 		),
 	)
+}
+
+// handleMigrateRollbackChain reverses applied chain edges via the journal-driven
+// path (roadmap 5.6). toRevision is empty for a single-step rollback or a target
+// revision string for `rollback --to`.
+func handleMigrateRollbackChain(ctx context.Context, conn *pgx.Conn, dir, toRevision, lockTimeout string, quiet bool) int {
+	p, err := migrate.OpenChainProject(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	rolled, err := migrate.RollbackChain(ctx, conn, p, toRevision, lockTimeout)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		if len(rolled) > 0 {
+			fmt.Fprintf(os.Stderr, "Rolled back before failure: %v\n", rolled)
+		}
+		return 1
+	}
+	if len(rolled) == 0 {
+		if !quiet {
+			fmt.Println("No applied edges to roll back.")
+		}
+		return 0
+	}
+	if !quiet {
+		fmt.Printf("Rolled back %d edge(s):\n", len(rolled))
+		for _, v := range rolled {
+			fmt.Printf("  - %s\n", v)
+		}
+	}
+	return 0
 }
 
 func registerMigrateStatusCmd(g *strictcli.Group) {

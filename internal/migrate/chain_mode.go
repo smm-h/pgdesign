@@ -4,12 +4,13 @@ package migrate
 //
 // A migrations/ directory is in CHAIN MODE once it holds a migrations/chain/
 // directory (the on-disk chain edges; store_layout.md). Legacy (semver-TOML)
-// projects never have it. The squash/rollback/baseline subcommands are NOT yet
-// reworked for the chain format — they land in later subphases (5.3/5.6/5.10) —
-// so against a chain-mode project each HARD-ERRORS cleanly naming its subphase,
-// rather than misbehaving on files it does not understand. They keep working
-// unchanged for legacy-mode projects (a pre-upgrade database, which has no chain/
-// dir, is mediated here too since all three take --db against such a project).
+// projects never have it. squash (5.3) and rollback (5.6) are now reworked for
+// the chain format — the CLI dispatches a chain-mode project to their chain
+// implementations (SquashChain / RollbackChain). The remaining bridge guard is
+// baseline (5.10): against a chain-mode project it HARD-ERRORS cleanly naming its
+// subphase rather than misbehaving on files it does not understand. The guarded
+// subcommands keep working unchanged for legacy-mode projects (a pre-upgrade
+// database, which has no chain/ dir, is mediated here too since they take --db).
 
 import (
 	"fmt"

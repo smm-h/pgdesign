@@ -265,6 +265,23 @@ func confirmIntentOp(ctx context.Context, exec sqlExecer, edgeID string, seq int
 	return nil
 }
 
+// deleteRolledBackOps removes every journal row for a rolled-back edge (roadmap
+// 5.6). It is the tracking-structure write of journal-driven rollback: the
+// pgdesign_migration_ops CHECK constraints admit only status IN
+// ('intended','confirmed') — there is no 'reverted' state to transition to — so
+// DELETE is the sole disposition the schema permits while keeping the applied
+// view coherent (a fully rolled-back edge disappears from the view once its rows
+// are gone). Paired with advanceChainPosition in the edge's final rollback
+// transaction, this is the SOLE rollback tracking write (single-write-path
+// invariant, tracking_write_path.md).
+func deleteRolledBackOps(ctx context.Context, exec sqlExecer, edgeID string) error {
+	if _, err := exec.Exec(ctx,
+		"DELETE FROM pgdesign_migration_ops WHERE edge_id = $1", edgeID); err != nil {
+		return fmt.Errorf("migrate rollback: delete journal rows for %s: %w", edgeID[:12], err)
+	}
+	return nil
+}
+
 // loadEdgeOpStatus returns, for an edge, the set of confirmed seqs and the set of
 // seqs with a lingering (unconfirmed) INTENT row. Confirmed seqs are SKIPPED on
 // resume (mid-edge resume); intent seqs drive the non-transactional resume
