@@ -117,12 +117,21 @@ func TestCodegenBuildParity_GroupFilter(t *testing.T) {
 	}
 }
 
-// TestCoGenerationEnumDedup verifies the co-generation-aware enum dedup: when
-// Go `types` and `gorm` outputs share one package directory, the branded enum
-// block is emitted EXACTLY ONCE across the two files (a second declaration would
-// not compile). gorm-only consumers keep their block; the dedup only fires when
-// a sibling already claimed the directory.
-func TestCoGenerationEnumDedup(t *testing.T) {
+// TestCoLocatedGoEnumDeclaredOnce verifies that in a VALID Go co-location — a
+// struct provider (`types`) plus a `constraints` output in one package directory
+// — the branded enum block is declared EXACTLY ONCE across the two files. This is
+// now structural, not a runtime dedup: only the struct provider emits the enum
+// block; `constraints` emits `package schema` but no row structs or enums, it
+// only references them (Role.String()/.IsValid()). The two struct providers
+// (`types` and `gorm`) can never share a directory (that is a hard error — they
+// define the same row structs), so there is no configuration in which two
+// generators both emit the enum block into one package.
+//
+// (This test was reworked from a former types+gorm "enum dedup" test; that pair
+// is now a hard error because it produces duplicate row structs, so the dedup
+// mechanism it exercised was removed. The surviving invariant — one enum
+// declaration per valid co-located package — is what this test now pins.)
+func TestCoLocatedGoEnumDeclaredOnce(t *testing.T) {
 	config.CodegenModes = SupportedModes()
 	dir := t.TempDir()
 	schema := `[meta]
@@ -147,7 +156,7 @@ type = "role"
 	}
 	pkgDir := filepath.Join(dir, "schemapkg")
 	typesOut := filepath.Join(pkgDir, "types.go")
-	gormOut := filepath.Join(pkgDir, "gorm.go")
+	constraintsOut := filepath.Join(pkgDir, "constraints.go")
 	cfg := fmt.Sprintf(`[project]
 schemas = ["schema.toml"]
 
@@ -160,12 +169,12 @@ path = %q
 lang = "go"
 mode = "types"
 
-[output.gogorm]
+[output.goconstraints]
 format = "codegen"
 path = %q
 lang = "go"
-mode = "gorm"
-`, typesOut, gormOut)
+mode = "constraints"
+`, typesOut, constraintsOut)
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
 	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
 		t.Fatalf("write pgdesign.toml: %v", err)
@@ -177,13 +186,19 @@ mode = "gorm"
 	if err != nil {
 		t.Fatalf("read types output: %v", err)
 	}
-	gormContent, err := os.ReadFile(gormOut)
+	constraintsContent, err := os.ReadFile(constraintsOut)
 	if err != nil {
-		t.Fatalf("read gorm output: %v", err)
+		t.Fatalf("read constraints output: %v", err)
 	}
-	combined := string(typesContent) + string(gormContent)
+	combined := string(typesContent) + string(constraintsContent)
 	if n := countSubstr(combined, "type Role struct"); n != 1 {
-		t.Fatalf("branded enum Role must be declared exactly once across co-generated files, got %d\ntypes:\n%s\ngorm:\n%s", n, typesContent, gormContent)
+		t.Fatalf("branded enum Role must be declared exactly once across the co-located package, got %d\ntypes:\n%s\nconstraints:\n%s", n, typesContent, constraintsContent)
+	}
+	// Prove the co-location is genuine: the constraints file references the
+	// branded enum the types file defines (so the single declaration is actually
+	// consumed in-package, not merely present-once by accident).
+	if !contains(string(constraintsContent), "row.Role.String()") {
+		t.Fatalf("constraints file should reference the branded enum Role by bare name, got:\n%s", constraintsContent)
 	}
 }
 

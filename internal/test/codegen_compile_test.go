@@ -187,6 +187,28 @@ func TestCompileGoConstraints(t *testing.T) {
 	runCompile(t, dir, nil, "go", "vet", "./...")
 }
 
+// TestCompileGoGormConstraints compiles the branded `constraints` mode alongside
+// the `gorm` mode in one package. gorm is the OTHER Go struct provider (besides
+// types): it also emits the branded row structs and enum types into package
+// schema that constraints references by bare name (row.Role.String()/.IsValid()).
+// This pins that gorm+constraints co-location compiles, which is what the build
+// guard now permits (and requires, when both are configured, in one directory).
+func TestCompileGoGormConstraints(t *testing.T) {
+	requireTool(t, "go")
+	dir := t.TempDir()
+	schema := loadCompileSchema(t)
+	gormOut, gdiags := (&codegen.GoGormGenerator{}).Generate(schema)
+	failOnCompileErrDiags(t, gdiags)
+	writeFiles(t, dir, map[string][]byte{"gorm.go": gormOut})
+	conOut, cdiags := (&codegen.GoConstraintsGenerator{}).Generate(schema)
+	failOnCompileErrDiags(t, cdiags)
+	writeFiles(t, dir, map[string][]byte{"constraints.go": conOut})
+	goModWithUUID(t, dir)
+	runCompile(t, dir, nil, "go", "mod", "tidy")
+	runCompile(t, dir, nil, "go", "build", "./...")
+	runCompile(t, dir, nil, "go", "vet", "./...")
+}
+
 // TestCompileGoEnumAllIngress compiles AND runs an all-ingress round-trip over
 // the branded Go enum: literal member, Parse (accept + reject), zero-value
 // invalidity, JSON marshal/unmarshal (validating), sql.Scan (string/bytes/nil/
