@@ -29,7 +29,7 @@ func TestChainApplyPreconditionDrift(t *testing.T) {
 	}
 
 	p := genesisChainProject(t)
-	_, err = ApplyChain(ctx, conn, p, "5s", nil)
+	_, err = ApplyChain(ctx, conn, p, "", "5s", nil)
 	if err == nil {
 		t.Fatal("expected a precondition drift error")
 	}

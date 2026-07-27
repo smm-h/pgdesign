@@ -32,7 +32,7 @@ func TestSquashChainAppliedRangeResumeDB(t *testing.T) {
 	r2 := appendEdge(t, p, m2, m1, r1, "create-b", "")
 
 	// Apply e1;e2 -> the DB lands MID-RANGE at R2, with e2 applied.
-	if _, err := ApplyChain(ctx, conn, p, "5s", nil); err != nil {
+	if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err != nil {
 		t.Fatalf("ApplyChain (e1;e2): %v", err)
 	}
 	pos, _, err := readChainPosition(ctx, conn)
@@ -72,7 +72,7 @@ func TestSquashChainAppliedRangeResumeDB(t *testing.T) {
 	// The DB is still stamped mid-range at R2. Apply resumes via the ARCHIVED
 	// original e3 (the live consolidation's parent R1 is upstream of R2, so it is
 	// not applicable — the path-finder walks the archive).
-	applied, err := ApplyChain(ctx, conn, p, "5s", nil)
+	applied, err := ApplyChain(ctx, conn, p, "", "5s", nil)
 	if err != nil {
 		t.Fatalf("ApplyChain (resume from mid-range): %v", err)
 	}
@@ -132,7 +132,7 @@ func TestSquashChainApplyFromGenesisViaConsolidationDB(t *testing.T) {
 		t.Fatalf("SquashChain: %v", err)
 	}
 
-	applied, err := ApplyChain(ctx, conn, p, "5s", nil)
+	applied, err := ApplyChain(ctx, conn, p, "", "5s", nil)
 	if err != nil {
 		t.Fatalf("ApplyChain: %v", err)
 	}

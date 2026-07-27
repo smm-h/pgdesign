@@ -80,7 +80,7 @@ func TestChainApplyRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	applied, err := ApplyChain(ctx, conn, p, "5s", nil)
+	applied, err := ApplyChain(ctx, conn, p, "", "5s", nil)
 	if err != nil {
 		t.Fatalf("ApplyChain: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestChainApplyRoundTrip(t *testing.T) {
 	}
 
 	// Re-apply is a no-op (already at the head).
-	applied2, err := ApplyChain(ctx, conn, p, "5s", nil)
+	applied2, err := ApplyChain(ctx, conn, p, "", "5s", nil)
 	if err != nil {
 		t.Fatalf("ApplyChain (re-apply): %v", err)
 	}
@@ -156,7 +156,7 @@ func TestChainApplyCrashMidEdge(t *testing.T) {
 		}
 		return nil
 	}}
-	_, err = ApplyChain(ctx, conn, p, "5s", hooks)
+	_, err = ApplyChain(ctx, conn, p, "", "5s", hooks)
 	if err == nil {
 		t.Fatal("expected ApplyChain to fail from the injected crash")
 	}
@@ -183,7 +183,7 @@ func TestChainApplyCrashMidEdge(t *testing.T) {
 	}
 
 	// A clean re-apply now succeeds and completes the edge.
-	applied, err := ApplyChain(ctx, conn, p, "5s", nil)
+	applied, err := ApplyChain(ctx, conn, p, "", "5s", nil)
 	if err != nil {
 		t.Fatalf("clean re-apply: %v", err)
 	}

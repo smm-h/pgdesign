@@ -367,7 +367,7 @@ func TestUpgradeConcurrentApplyBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn2.Close(ctx)
-	if _, aerr := ApplyChain(ctx, conn2, p, "5s", nil); aerr == nil {
+	if _, aerr := ApplyChain(ctx, conn2, p, "", "5s", nil); aerr == nil {
 		t.Error("concurrent apply during an in-flight upgrade must be blocked")
 	}
 	barrier.Release()
@@ -549,7 +549,7 @@ func TestUpgradePostUpgradeApplyContinues(t *testing.T) {
 	}
 
 	// Apply continues from the boundary and creates the new table.
-	applied, err := ApplyChain(ctx, conn, p, "5s", nil)
+	applied, err := ApplyChain(ctx, conn, p, "", "5s", nil)
 	if err != nil {
 		t.Fatalf("ApplyChain post-upgrade: %v", err)
 	}

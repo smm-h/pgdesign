@@ -110,7 +110,7 @@ func TestApplyRefusesTamperedActiveEdgeDB(t *testing.T) {
 	p, _, _, _, _, _, _ := threeEdgeChain(t)
 	name := tamperEdgeSlug(t, p.edgesPath(), "create-a", "create-Z")
 
-	_, err = ApplyChain(ctx, conn, p, "5s", nil)
+	_, err = ApplyChain(ctx, conn, p, "", "5s", nil)
 	if err == nil {
 		t.Fatal("apply must refuse a tampered active edge")
 	}

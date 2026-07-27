@@ -60,7 +60,7 @@ func TestNonTxFreshDriftLeavesNoIntentRow(t *testing.T) {
 	}
 
 	// Apply must fail on the precondition (index already present).
-	if _, err := ApplyChain(ctx, conn, p, "5s", nil); err == nil {
+	if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err == nil {
 		t.Fatal("expected a precondition drift error on the concurrent-index create")
 	}
 

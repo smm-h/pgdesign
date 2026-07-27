@@ -114,7 +114,7 @@ func TestChainRollbackSingleStep(t *testing.T) {
 	}
 
 	p, r1, r2 := twoEdgeChainProject(t)
-	if _, err := ApplyChain(ctx, conn, p, "5s", nil); err != nil {
+	if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err != nil {
 		t.Fatalf("ApplyChain: %v", err)
 	}
 	if got := currentRevision(t, ctx, conn); got != r2.String() {
@@ -177,7 +177,7 @@ func TestChainRollbackToRevision(t *testing.T) {
 	defer conn.Close(ctx)
 
 	p, r1, _ := twoEdgeChainProject(t)
-	if _, err := ApplyChain(ctx, conn, p, "5s", nil); err != nil {
+	if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err != nil {
 		t.Fatalf("ApplyChain: %v", err)
 	}
 
@@ -220,7 +220,7 @@ func TestChainRollbackFileIndependent(t *testing.T) {
 	defer conn.Close(ctx)
 
 	p, r1, _ := twoEdgeChainProject(t)
-	if _, err := ApplyChain(ctx, conn, p, "5s", nil); err != nil {
+	if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err != nil {
 		t.Fatalf("ApplyChain: %v", err)
 	}
 
@@ -275,7 +275,7 @@ func TestChainRollbackBoundaryRefuses(t *testing.T) {
 	defer conn.Close(ctx)
 
 	p, r1, _ := twoEdgeChainProject(t)
-	if _, err := ApplyChain(ctx, conn, p, "5s", nil); err != nil {
+	if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err != nil {
 		t.Fatalf("ApplyChain: %v", err)
 	}
 
@@ -342,7 +342,7 @@ func TestChainRollbackNonInvertibleRefuses(t *testing.T) {
 		t.Fatalf("GenerateEdge drop-products: %v", err)
 	}
 
-	if _, err := ApplyChain(ctx, conn, p, "5s", nil); err != nil {
+	if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err != nil {
 		t.Fatalf("ApplyChain: %v", err)
 	}
 	if relExists(t, ctx, conn, "public.products") {

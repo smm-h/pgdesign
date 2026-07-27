@@ -495,7 +495,7 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 			// Chain-mode project: route through the on-disk chain (path-finder +
 			// self-contained renderer). Legacy-mode projects keep the semver path.
 			if migrate.IsChainMode(dir) {
-				return strictcli.Exit(handleMigrateApplyChain(ctx, conn, dir, lockTimeout, dryRun, quiet))
+				return strictcli.Exit(handleMigrateApplyChain(ctx, conn, dbURL, dir, lockTimeout, dryRun, quiet))
 			}
 
 			if dryRun {
@@ -538,7 +538,7 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 // project: the path-finder chooses the edges from the database's chain position,
 // and each edge's ops render through the self-contained renderer. dry-run prints
 // the chosen edges and their SQL without executing.
-func handleMigrateApplyChain(ctx context.Context, conn *pgx.Conn, dir, lockTimeout string, dryRun, quiet bool) int {
+func handleMigrateApplyChain(ctx context.Context, conn *pgx.Conn, dbURL, dir, lockTimeout string, dryRun, quiet bool) int {
 	p, err := migrate.OpenChainProject(dir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -571,7 +571,7 @@ func handleMigrateApplyChain(ctx context.Context, conn *pgx.Conn, dir, lockTimeo
 		return 0
 	}
 
-	applied, err := migrate.ApplyChain(ctx, conn, p, lockTimeout, nil)
+	applied, err := migrate.ApplyChain(ctx, conn, p, dbURL, lockTimeout, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		if len(applied) > 0 {

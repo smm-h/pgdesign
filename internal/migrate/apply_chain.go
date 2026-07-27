@@ -64,7 +64,15 @@ type ApplyHooks struct {
 // display ids (edge-id prefix + slug). A fresh database (no chain structures) is
 // seeded here: the three managed structures are created and chain_position is set
 // to genesis before path-finding. lockTimeout sets the session lock_timeout.
-func ApplyChain(ctx context.Context, conn *pgx.Conn, p *ChainProject, lockTimeout string, hooks *ApplyHooks) ([]string, error) {
+//
+// After the path lands, ReconcileAfterApply runs UNCONDITIONALLY (roadmap 5.8,
+// L5's codomain check): the applied database is introspected and N-normalized
+// DiffLive'd against the reconstructed target model; a residual mismatch is a hard
+// error. dbURL is the connection string reconcile uses for its own introspection
+// and live-normalizer sessions (conn is the apply session, still holding the
+// advisory lock). An empty dbURL SKIPS reconcile — reserved for in-process callers
+// that have no URL and drive their own verification (production always passes it).
+func ApplyChain(ctx context.Context, conn *pgx.Conn, p *ChainProject, dbURL, lockTimeout string, hooks *ApplyHooks) ([]string, error) {
 	if hooks == nil {
 		hooks = &ApplyHooks{}
 	}
@@ -107,6 +115,16 @@ func ApplyChain(ctx context.Context, conn *pgx.Conn, p *ChainProject, lockTimeou
 			return applied, fmt.Errorf("edge %s: %w", e.ID()[:12], err)
 		}
 		applied = append(applied, e.ID()[:12]+" "+e.Slug)
+	}
+
+	// L5 codomain check, unconditional (roadmap 5.8): the applied database must
+	// match the target model. Runs while the advisory lock is still held. Skipped
+	// only when dbURL is empty (an in-process caller with no URL — a test seam;
+	// production always supplies it).
+	if dbURL != "" {
+		if err := ReconcileAfterApply(ctx, dbURL, p); err != nil {
+			return applied, err
+		}
 	}
 	return applied, nil
 }
