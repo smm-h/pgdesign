@@ -437,7 +437,8 @@ func TestGenerateMigration_PartitionStrategyChanged(t *testing.T) {
 
 func TestGenerateMigration_MaintenanceRetentionChange(t *testing.T) {
 	desired := &model.Schema{
-		Name: "public",
+		Name:       "public",
+		Extensions: []string{"pg_partman"},
 		Tables: []model.Table{
 			{
 				Name:   "events",
@@ -482,7 +483,8 @@ func TestGenerateMigration_MaintenanceRetentionChange(t *testing.T) {
 
 func TestGenerateMigration_MaintenancePremakeChange(t *testing.T) {
 	desired := &model.Schema{
-		Name: "public",
+		Name:       "public",
+		Extensions: []string{"pg_partman"},
 		Tables: []model.Table{
 			{
 				Name:   "events",
@@ -526,7 +528,8 @@ func TestGenerateMigration_MaintenancePremakeChange(t *testing.T) {
 
 func TestGenerateMigration_MaintenanceIntervalChangeError(t *testing.T) {
 	desired := &model.Schema{
-		Name: "public",
+		Name:       "public",
+		Extensions: []string{"pg_partman"},
 		Tables: []model.Table{
 			{
 				Name:   "events",
@@ -565,6 +568,46 @@ func TestGenerateMigration_MaintenanceIntervalChangeError(t *testing.T) {
 	}
 	if !hasError {
 		t.Error("expected MAINTENANCE_INTERVAL_CHANGE error diagnostic")
+	}
+}
+
+func TestGenerateMigration_MaintenanceRequiresPartmanExtension(t *testing.T) {
+	// A maintenance change whose desired schema does not declare pg_partman is
+	// a hard error: the emitted partman ops would fail at apply time.
+	desired := &model.Schema{
+		Name: "public",
+		// no Extensions
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "public",
+				Maintenance: &model.MaintenanceConfig{
+					Interval: "1 month", Premake: 4, Retention: "12 months",
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "events",
+				MaintenanceChanged: &diff.MaintenanceDiff{
+					RetentionChanged: &[2]string{"6 months", "12 months"},
+				},
+			},
+		},
+	}
+
+	_, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	found := false
+	for _, dg := range diags {
+		if dg.Code == "MAINTENANCE_NO_PARTMAN" && dg.Severity == diagnostic.Error {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected MAINTENANCE_NO_PARTMAN error when pg_partman is not declared, got: %v", diags)
 	}
 }
 

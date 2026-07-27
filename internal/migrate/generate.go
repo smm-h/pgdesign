@@ -974,7 +974,16 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		if td.MaintenanceChanged != nil {
 			md := td.MaintenanceChanged
 
-			if md.InitialSetup {
+			// Guard: partman ops require pg_partman. Without it the emitted
+			// create_parent / part_config statements fail at apply time.
+			if !schemaHasExtension(desired, "pg_partman") {
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error,
+					Code:     "MAINTENANCE_NO_PARTMAN",
+					Table:    td.Name,
+					Message:  fmt.Sprintf("maintenance change on %s requires the pg_partman extension to be declared", td.Name),
+				})
+			} else if md.InitialSetup {
 				// Initial partman registration: emit create_parent, then any
 				// non-default retention config. This is NOT an interval change.
 				parentTable := findTable(desired, td.Name)
@@ -1788,6 +1797,19 @@ func classifyOp(op DDLOp, opType risk.OpType, ctx risk.OpContext) []diagnostic.D
 		d.Suggestion = c.Suggestion
 	}
 	return []diagnostic.Diagnostic{d}
+}
+
+// schemaHasExtension reports whether the schema declares the named extension.
+func schemaHasExtension(schema *model.Schema, name string) bool {
+	if schema == nil {
+		return false
+	}
+	for _, ext := range schema.Extensions {
+		if ext == name {
+			return true
+		}
+	}
+	return false
 }
 
 func opTarget(op DDLOp) string {
