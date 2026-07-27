@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/model"
 )
 
@@ -49,6 +50,18 @@ func applyLivePGVersion(schema *model.Schema, live int) {
 	if live != 0 {
 		schema.PGVersion = live
 	}
+}
+
+// migrationDiff is the migrate plan/generate/test diff seam: it resolves the
+// live PG version onto the desired schema (so an unpinned pg_version does not
+// register as a spurious PGVersionChanged) and THEN diffs against the
+// introspected actual. actual is always introspected (registry-absent) on these
+// paths, so DiffLive is used — class-aware fields (semantic type names) do not
+// false-drift. Extracted as a helper so the ordering (apply-then-diff) is
+// unit-testable without a live database.
+func migrationDiff(desired, actual *model.Schema) *diff.SchemaDiff {
+	applyLivePGVersion(desired, actual.PGVersion)
+	return diff.DiffLive(desired, actual, nil)
 }
 
 // requireSchemaPGVersion returns the schema's resolved PG version (already

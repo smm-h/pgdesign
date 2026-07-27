@@ -68,12 +68,21 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 				fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
 				return strictcli.Exit(1)
 			}
-			d := diff.Diff(schema, actual)
+			// migrationDiff resolves the live PG version onto the desired schema
+			// BEFORE diffing. Otherwise an in-sync project with an UNPINNED
+			// pg_version (schema version 0) diffs against the live server version and
+			// reports a spurious PGVersionChanged, losing "No changes detected".
+			d := migrationDiff(schema, actual)
 			if d.IsEmpty() {
 				if !quiet {
 					fmt.Println("No changes detected. Schema is up to date.")
 				}
 				return strictcli.Exit(0)
+			}
+
+			if _, pgErr := requireSchemaPGVersion(schema); pgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+				return strictcli.Exit(1)
 			}
 
 			var tableStats migrate.TableStats
@@ -96,13 +105,6 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 					}
 				}
 				statsConn.Close(ctx)
-			}
-
-			applyLivePGVersion(schema, actual.PGVersion)
-			_, pgErr := requireSchemaPGVersion(schema)
-			if pgErr != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
-				return strictcli.Exit(1)
 			}
 
 			m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
@@ -260,10 +262,18 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
 				return strictcli.Exit(1)
 			}
-			d := diff.Diff(schema, actual)
+			// migrationDiff resolves the live PG version BEFORE diffing (see plan):
+			// an unpinned pg_version must not register as a spurious
+			// PGVersionChanged and cause a zero-op migration file to be written.
+			d := migrationDiff(schema, actual)
 			if d.IsEmpty() {
 				fmt.Println("No changes detected. Nothing to generate.")
 				return strictcli.Exit(0)
+			}
+
+			if _, pgErr := requireSchemaPGVersion(schema); pgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+				return strictcli.Exit(1)
 			}
 
 			var tableStats migrate.TableStats
@@ -288,17 +298,19 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				statsConn.Close(ctx)
 			}
 
-			applyLivePGVersion(schema, actual.PGVersion)
-			_, pgErr := requireSchemaPGVersion(schema)
-			if pgErr != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
-				return strictcli.Exit(1)
-			}
-
 			m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
 
 			if len(migDiags) > 0 {
 				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
+			}
+
+			// Never write a migration file with an empty op-list. A non-empty diff
+			// can still lower to zero ops (e.g. an identity-only difference the op
+			// generator does not translate); writing a zero-op file would mint a
+			// spurious, un-applyable migration. Match plan's no-op behavior.
+			if len(m.DDLOps) == 0 && len(m.DMLOps) == 0 {
+				fmt.Println("No operations generated. Nothing to write.")
+				return strictcli.Exit(0)
 			}
 
 			if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -1075,18 +1087,13 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 		return 1
 	}
 
-	applyLivePGVersion(schema, actual.PGVersion)
-	_, pgErr := requireSchemaPGVersion(schema)
-	if pgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
-		return 1
-	}
-
 	if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
 		return 1
 	}
-	d := diff.Diff(schema, actual)
+	// actual is the introspected shadow DB (registry-absent); migrationDiff
+	// applies the live PG version before diffing via DiffLive.
+	d := migrationDiff(schema, actual)
 	if d.IsEmpty() {
 		if !quiet {
 			fmt.Println("\nResult: PASS")
