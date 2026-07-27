@@ -81,3 +81,4 @@
 {"id":"18c6250657105432cf692500da0743d2b680343fadc3bc1a","commits":["7126dcbeccbe05dc72f5abc6c8e9133276314048"],"user_facing":false}
 {"id":"18c6250cd5d667e5bf84a831f57e4a228154e3cde3f2fec7","commits":["d76725caace6093548a02e1d1fe1990a4fe87c27"],"user_facing":false}
 {"id":"18c6252a1387c5cd6e1ea852a656492a93fbe5fd45d16652","commits":["1333ce51068c00f6a6cb7a91437ea72086f17904"],"user_facing":true,"description":"**Every `--db` and `--live` flag now falls back to the `PGDESIGN_DB` environment variable.** Set `PGDESIGN_DB` once and omit the flag on any database-backed command; an explicit flag still wins. Commands that require a database still fail loudly when neither the flag nor the env supplies a URL, and `--hermetic` suppresses the connection so database work skips instead of connecting.","type":"feature"}
+{"id":"18c6253e576855f8fad997b6b8d946eb9b19b79e07a990e9","commits":["02a7095a9425c5802342835c328192896cccba77"],"user_facing":false}
