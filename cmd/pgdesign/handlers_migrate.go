@@ -776,8 +776,37 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 			}
 			defer conn.Close(ctx)
 
+			// Mode check FIRST. A chain-mode project uses chain-aware status, a
+			// pure READ that NEVER creates any managed structure (the legacy
+			// handler resurrected the dropped pgdesign_migrations table on an
+			// upgraded database by calling EnsureMigrationsTable).
+			if migrate.IsChainMode(dir) {
+				p, err := migrate.OpenChainProject(dir)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				st, err := migrate.ComputeChainStatus(ctx, conn, p)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				printChainStatus(st)
+				return strictcli.Exit(0)
+			}
+
+			// Legacy-mode status. Refuse to create a legacy tracking table on a
+			// database that is already on the chain (an upgraded DB paired with a
+			// legacy-format migrations directory) — that would resurrect the table.
 			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			if chainExists, err := migrate.ChainStructuresExist(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			} else if chainExists {
+				fmt.Fprintf(os.Stderr, "error: this database is on the migration chain but %s is a legacy-format directory (no chain/ subdir) — refusing to create a legacy tracking table; regenerate the chain or point --dir at the chain project\n", dir)
 				return strictcli.Exit(1)
 			}
 
@@ -851,6 +880,24 @@ func opSummary(op migrate.DDLOp) string {
 		target = op.Name
 	}
 	return target
+}
+
+// printChainStatus renders chain-aware status: the chain position, the confirmed
+// edges (from the applied-migrations view), and the pending edges (path-finder).
+func printChainStatus(st *migrate.ChainStatus) {
+	fmt.Printf("Chain position: %s\n", displayRevString(st.Position))
+	fmt.Printf("Applied migrations: %d\n", len(st.Applied))
+	for _, a := range st.Applied {
+		fmt.Printf("  [applied] %s\n", a.Version)
+	}
+	if len(st.Pending) == 0 {
+		fmt.Println("Up to date (no pending edges).")
+		return
+	}
+	for _, e := range st.Pending {
+		fmt.Printf("  [pending] %s %s\n", e.ID()[:12], e.Slug)
+	}
+	fmt.Printf("\n%d pending edge(s).\n", len(st.Pending))
 }
 
 // displayRevString renders a possibly-empty (genesis) revision for CLI output.
