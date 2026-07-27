@@ -253,6 +253,16 @@ func generateJavaEnum(e model.Enum) string {
 	buf.WriteString("    }\n\n")
 	buf.WriteString("    public String getValue() {\n")
 	buf.WriteString("        return this.value;\n")
+	buf.WriteString("    }\n\n")
+	// fromValue is the net-new value-based parse: it maps a raw DB/JSON value
+	// back to the member, rejecting undefined values (the JPA converter uses it).
+	fmt.Fprintf(&buf, "    public static %s fromValue(String value) {\n", typeName)
+	fmt.Fprintf(&buf, "        for (%s e : values()) {\n", typeName)
+	buf.WriteString("            if (e.value.equals(value)) {\n")
+	buf.WriteString("                return e;\n")
+	buf.WriteString("            }\n")
+	buf.WriteString("        }\n")
+	fmt.Fprintf(&buf, "        throw new IllegalArgumentException(\"invalid %s: \" + value);\n", typeName)
 	buf.WriteString("    }\n")
 	buf.WriteString("}\n")
 
@@ -273,6 +283,12 @@ func generateKotlinEnum(e model.Enum) string {
 			fmt.Fprintf(&buf, "    %s(%q);\n", name, v)
 		}
 	}
+	// fromValue is the net-new value-based parse, symmetric with Java's.
+	buf.WriteString("\n    companion object {\n")
+	fmt.Fprintf(&buf, "        fun fromValue(value: String): %s =\n", typeName)
+	buf.WriteString("            values().firstOrNull { it.value == value }\n")
+	fmt.Fprintf(&buf, "                ?: throw IllegalArgumentException(\"invalid %s: $value\")\n", typeName)
+	buf.WriteString("    }\n")
 	buf.WriteString("}\n")
 
 	return buf.String()

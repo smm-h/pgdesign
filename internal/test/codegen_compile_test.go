@@ -395,6 +395,92 @@ func TestCompileJavaTypes(t *testing.T) {
 	runCompile(t, dir, nil, "javac", names...)
 }
 
+// javaxPersistenceStubs are minimal source stubs for the javax.persistence
+// annotations/types the JPA output uses. The real JPA jar is the only blocker
+// to compiling generated JPA code (roadmap 4.1's stub-javax strategy); these
+// stubs let javac verify the generated entities, converters, and enum classes
+// type-check without pulling a dependency.
+var javaxPersistenceStubs = map[string]string{
+	"javax/persistence/Entity.java":     "package javax.persistence;\npublic @interface Entity {}\n",
+	"javax/persistence/Table.java":      "package javax.persistence;\npublic @interface Table { String name() default \"\"; }\n",
+	"javax/persistence/Id.java":         "package javax.persistence;\npublic @interface Id {}\n",
+	"javax/persistence/Column.java":     "package javax.persistence;\npublic @interface Column { String name() default \"\"; boolean nullable() default true; String columnDefinition() default \"\"; }\n",
+	"javax/persistence/JoinColumn.java": "package javax.persistence;\npublic @interface JoinColumn { String name() default \"\"; boolean nullable() default true; }\n",
+	"javax/persistence/ManyToOne.java":  "package javax.persistence;\npublic @interface ManyToOne { FetchType fetch() default FetchType.EAGER; }\n",
+	"javax/persistence/OneToMany.java":  "package javax.persistence;\npublic @interface OneToMany { String mappedBy() default \"\"; }\n",
+	"javax/persistence/FetchType.java":  "package javax.persistence;\npublic enum FetchType { LAZY, EAGER }\n",
+	"javax/persistence/Convert.java":    "package javax.persistence;\npublic @interface Convert { Class<?> converter() default void.class; }\n",
+	"javax/persistence/Converter.java":  "package javax.persistence;\npublic @interface Converter { boolean autoApply() default false; }\n",
+	"javax/persistence/AttributeConverter.java": "package javax.persistence;\npublic interface AttributeConverter<X, Y> { Y convertToDatabaseColumn(X attribute); X convertToEntityAttribute(Y dbData); }\n",
+}
+
+// TestCompileJavaJPA compiles the branded JPA output: entities using
+// @Convert(converter = XxxConverter.class) on enum columns, generated enum
+// classes with fromValue()/getValue(), and AttributeConverters backed by them
+// (never @Enumerated(STRING)). Compiled against stub javax.persistence sources
+// (roadmap 4.1).
+func TestCompileJavaJPA(t *testing.T) {
+	requireTool(t, "javac")
+	dir := t.TempDir()
+	files, diags := (&codegen.JavaJPAGenerator{}).GenerateFiles(loadCompileSchema(t))
+	failOnCompileErrDiags(t, diags)
+	names := writeFiles(t, dir, files)
+	stubBytes := make(map[string][]byte, len(javaxPersistenceStubs))
+	for rel, src := range javaxPersistenceStubs {
+		stubBytes[rel] = []byte(src)
+	}
+	names = append(names, writeFiles(t, dir, stubBytes)...)
+
+	// Runtime witness (roadmap 4.1 "Java persisted value == getValue()"): the
+	// converter persists getValue() and reconstructs via fromValue(), and
+	// fromValue rejects undefined values.
+	main := `public class JpaCheck {
+    public static void main(String[] args) {
+        RoleConverter c = new RoleConverter();
+        String persisted = c.convertToDatabaseColumn(Role.ADMIN);
+        if (!persisted.equals(Role.ADMIN.getValue())) {
+            throw new AssertionError("persisted != getValue: " + persisted);
+        }
+        if (c.convertToEntityAttribute("admin") != Role.ADMIN) {
+            throw new AssertionError("fromValue round-trip failed");
+        }
+        boolean rejected = false;
+        try {
+            Role.fromValue("bogus");
+        } catch (IllegalArgumentException e) {
+            rejected = true;
+        }
+        if (!rejected) {
+            throw new AssertionError("fromValue must reject undefined values");
+        }
+        System.out.println("OK");
+    }
+}
+`
+	names = append(names, writeFiles(t, dir, map[string][]byte{"JpaCheck.java": []byte(main)})...)
+	runCompile(t, dir, nil, "javac", names...)
+	if _, err := exec.LookPath("java"); err == nil {
+		runCompile(t, dir, nil, "java", "JpaCheck")
+	}
+}
+
+// TestCompileJavaConstraints compiles the branded Java constraints validators
+// alongside the Java types they validate. Enum checks compare against the
+// branded enum's getValue() (roadmap 4.1 "Java contains(getValue())"), so the
+// validators only compile against the branded record types + enum classes.
+func TestCompileJavaConstraints(t *testing.T) {
+	requireTool(t, "javac")
+	dir := t.TempDir()
+	schema := loadCompileSchema(t)
+	typeFiles, tdiags := (&codegen.JavaTypesGenerator{}).GenerateFiles(schema)
+	failOnCompileErrDiags(t, tdiags)
+	conFiles, cdiags := (&codegen.JavaConstraintsGenerator{}).GenerateFiles(schema)
+	failOnCompileErrDiags(t, cdiags)
+	names := writeFiles(t, dir, typeFiles)
+	names = append(names, writeFiles(t, dir, conFiles)...)
+	runCompile(t, dir, nil, "javac", names...)
+}
+
 func TestCompileKotlinTypes(t *testing.T) {
 	requireTool(t, "kotlinc")
 	dir := t.TempDir()

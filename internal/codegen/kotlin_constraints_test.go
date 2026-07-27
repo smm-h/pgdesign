@@ -75,8 +75,8 @@ func TestKotlinConstraintsGenerator_Generate(t *testing.T) {
 	}
 
 	// Enum check with when expression.
-	if !strings.Contains(result, "when (role)") {
-		t.Error("missing when expression for enum check")
+	if !strings.Contains(result, "when (role?.value)") {
+		t.Error("missing branded when expression for enum check")
 	}
 	if !strings.Contains(result, `"admin"`) {
 		t.Error("missing enum value 'admin'")

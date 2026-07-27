@@ -80,6 +80,12 @@ func collectJPAEntities(schema *model.Schema) []jpaEntity {
 			if pkSet[col.Name] {
 				annotations = append(annotations, "@Id")
 			}
+			// Enum columns persist via a generated AttributeConverter (backed by
+			// getValue()/fromValue()), never @Enumerated(STRING) which would store
+			// the constant NAME rather than the DB value.
+			if (col.TypeKind == "enum" || col.TypeKind == "state_machine") && !col.Array {
+				annotations = append(annotations, fmt.Sprintf("@Convert(converter = %sConverter.class)", EnumTypeName(col.PGType.Base)))
+			}
 			nullable := "false"
 			if !col.NotNull {
 				nullable = "true"
@@ -256,6 +262,18 @@ func (g *JavaJPAGenerator) GenerateFiles(schema *model.Schema) (map[string][]byt
 	header := genkit.Header(genkit.CommentSlash)
 	files := make(map[string][]byte)
 
+	// Enum class files and their AttributeConverters (one public type per file).
+	for _, e := range usedJPAEnums(schema) {
+		typeName := toPascalCase(e.Name)
+		var enumBuf bytes.Buffer
+		enumBuf.WriteString(header)
+		enumBuf.WriteString("\n")
+		enumBuf.WriteString(generateJavaEnum(e))
+		files[typeName+".java"] = enumBuf.Bytes()
+
+		files[typeName+"Converter.java"] = generateJPAConverter(header, typeName)
+	}
+
 	for _, ei := range collectJPAEntities(schema) {
 		fileImports := make(map[string]bool)
 		for _, f := range ei.Fields {
@@ -273,6 +291,48 @@ func (g *JavaJPAGenerator) GenerateFiles(schema *model.Schema) (map[string][]byt
 	}
 
 	return files, nil
+}
+
+// usedJPAEnums returns the enums referenced by non-array enum/state-machine
+// columns across the schema, in schema.Enums order (canonical). Each needs a
+// class file and an AttributeConverter file.
+func usedJPAEnums(schema *model.Schema) []model.Enum {
+	used := make(map[string]bool)
+	for _, tbl := range schema.Tables {
+		for _, col := range tbl.Columns {
+			if (col.TypeKind == "enum" || col.TypeKind == "state_machine") && !col.Array {
+				used[col.PGType.Base] = true
+			}
+		}
+	}
+	var out []model.Enum
+	for _, e := range schema.Enums {
+		if used[e.Name] {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// generateJPAConverter emits a JPA AttributeConverter that persists an enum by
+// its DB value (getValue) and reconstructs it (fromValue) -- never by NAME.
+func generateJPAConverter(header, typeName string) []byte {
+	var buf bytes.Buffer
+	buf.WriteString(header)
+	buf.WriteString("\nimport javax.persistence.AttributeConverter;\n")
+	buf.WriteString("import javax.persistence.Converter;\n\n")
+	buf.WriteString("@Converter(autoApply = false)\n")
+	fmt.Fprintf(&buf, "public class %sConverter implements AttributeConverter<%s, String> {\n", typeName, typeName)
+	buf.WriteString("    @Override\n")
+	fmt.Fprintf(&buf, "    public String convertToDatabaseColumn(%s attribute) {\n", typeName)
+	buf.WriteString("        return attribute == null ? null : attribute.getValue();\n")
+	buf.WriteString("    }\n\n")
+	buf.WriteString("    @Override\n")
+	fmt.Fprintf(&buf, "    public %s convertToEntityAttribute(String dbData) {\n", typeName)
+	fmt.Fprintf(&buf, "        return dbData == null ? null : %s.fromValue(dbData);\n", typeName)
+	buf.WriteString("    }\n")
+	buf.WriteString("}\n")
+	return buf.Bytes()
 }
 
 // jpaRelFieldName derives the Java field name for a @ManyToOne relationship.

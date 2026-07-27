@@ -140,6 +140,20 @@ public final class Constraints {
 	return files, nil
 }
 
+// isJavaPrimitiveColumn reports whether a NOT NULL, non-array column maps to a
+// Java primitive type (which is never null).
+func isJavaPrimitiveColumn(col model.Column) bool {
+	if col.Array || !col.NotNull {
+		return false
+	}
+	jt, _ := pgBaseTypeToJava(col)
+	switch jt {
+	case "int", "long", "short", "float", "double", "boolean":
+		return true
+	}
+	return false
+}
+
 func writeJavaValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 	funcName := "validate" + toPascalCase(table.Name)
 	typeName := toPascalCase(table.Name)
@@ -148,8 +162,13 @@ func writeJavaValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) 
 	fmt.Fprintf(buf, "    public static List<ValidationError> %s(%s row) {\n", funcName, typeName)
 	buf.WriteString("        List<ValidationError> errors = new ArrayList<>();\n")
 
-	// NOT NULL checks.
+	// NOT NULL checks. Skip columns that map to a Java primitive (int, long,
+	// boolean, ...): primitives are never null, and `primitive == null` is not
+	// legal Java.
 	for _, col := range cs.NotNullFields {
+		if c := findColumn(table, col); c != nil && isJavaPrimitiveColumn(*c) {
+			continue
+		}
 		javaField := toCamelCase(col)
 		pgType := columnPGType(table, col)
 		if isStringPGType(pgType) {
@@ -168,9 +187,11 @@ func writeJavaValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) 
 		for i, v := range ef.Values {
 			quoted[i] = fmt.Sprintf("%q", v)
 		}
-		fmt.Fprintf(buf, "        if (row.%s() != null && !Set.of(%s).contains(row.%s())) {\n",
+		// Compare against the branded enum's DB value (getValue()), not the enum
+		// reference, so the string value set matches.
+		fmt.Fprintf(buf, "        if (row.%s() != null && !Set.of(%s).contains(row.%s().getValue())) {\n",
 			javaField, strings.Join(quoted, ", "), javaField)
-		fmt.Fprintf(buf, "            errors.add(new ValidationError(%q, \"invalid value \\\"\" + row.%s() + \"\\\"\"));\n", ef.Column, javaField)
+		fmt.Fprintf(buf, "            errors.add(new ValidationError(%q, \"invalid value \\\"\" + row.%s().getValue() + \"\\\"\"));\n", ef.Column, javaField)
 		buf.WriteString("        }\n")
 	}
 
@@ -182,14 +203,25 @@ func writeJavaValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) 
 			fmt.Fprintf(buf, "        // CHECK on %s: %s (unrecognized pattern, skipped)\n", ce.Column, ce.Expr)
 			continue
 		}
-		writeJavaCheckPattern(buf, ce.Column, javaField, pat)
+		guardNull := true
+		if c := findColumn(table, ce.Column); c != nil && isJavaPrimitiveColumn(*c) {
+			guardNull = false
+		}
+		writeJavaCheckPattern(buf, ce.Column, javaField, pat, guardNull)
 	}
 
 	buf.WriteString("        return errors;\n")
 	buf.WriteString("    }\n")
 }
 
-func writeJavaCheckPattern(buf *bytes.Buffer, col, javaField string, pat checkPattern) {
+// writeJavaCheckPattern emits a CHECK validation branch. guardNull controls
+// whether a `row.field() != null &&` guard prefixes the condition; it must be
+// false for Java-primitive fields (comparing a primitive to null is illegal).
+func writeJavaCheckPattern(buf *bytes.Buffer, col, javaField string, pat checkPattern, guardNull bool) {
+	nullGuard := ""
+	if guardNull {
+		nullGuard = fmt.Sprintf("row.%s() != null && ", javaField)
+	}
 	switch p := pat.(type) {
 	case *rangePattern:
 		var lowOp, highOp string
@@ -203,20 +235,20 @@ func writeJavaCheckPattern(buf *bytes.Buffer, col, javaField string, pat checkPa
 		} else {
 			highOp = ">="
 		}
-		fmt.Fprintf(buf, "        if (row.%s() != null && (row.%s() %s %s || row.%s() %s %s)) {\n",
-			javaField, javaField, lowOp, p.Low, javaField, highOp, p.High)
+		fmt.Fprintf(buf, "        if (%s(row.%s() %s %s || row.%s() %s %s)) {\n",
+			nullGuard, javaField, lowOp, p.Low, javaField, highOp, p.High)
 		fmt.Fprintf(buf, "            errors.add(new ValidationError(%q, \"value out of range\"));\n", col)
 		buf.WriteString("        }\n")
 
 	case *comparisonPattern:
 		failOp := invertComparisonOp(p.Op)
-		fmt.Fprintf(buf, "        if (row.%s() != null && row.%s() %s %s) {\n", javaField, javaField, failOp, p.Value)
+		fmt.Fprintf(buf, "        if (%srow.%s() %s %s) {\n", nullGuard, javaField, failOp, p.Value)
 		fmt.Fprintf(buf, "            errors.add(new ValidationError(%q, \"failed check: %s %s\"));\n", col, p.Op, p.Value)
 		buf.WriteString("        }\n")
 
 	case *lengthPattern:
 		failOp := invertComparisonOp(p.Op)
-		fmt.Fprintf(buf, "        if (row.%s() != null && row.%s().length() %s %d) {\n", javaField, javaField, failOp, p.Value)
+		fmt.Fprintf(buf, "        if (%srow.%s().length() %s %d) {\n", nullGuard, javaField, failOp, p.Value)
 		fmt.Fprintf(buf, "            errors.add(new ValidationError(%q, String.format(\"length must be %s %d, got %%d\", row.%s().length())));\n", col, p.Op, p.Value, javaField)
 		buf.WriteString("        }\n")
 
@@ -226,9 +258,9 @@ func writeJavaCheckPattern(buf *bytes.Buffer, col, javaField string, pat checkPa
 			regex = "(?i)" + regex
 		}
 		if p.IsNegated() {
-			fmt.Fprintf(buf, "        if (row.%s() != null && Pattern.matches(%q, row.%s())) {\n", javaField, regex, javaField)
+			fmt.Fprintf(buf, "        if (%sPattern.matches(%q, row.%s())) {\n", nullGuard, regex, javaField)
 		} else {
-			fmt.Fprintf(buf, "        if (row.%s() != null && !Pattern.matches(%q, row.%s())) {\n", javaField, regex, javaField)
+			fmt.Fprintf(buf, "        if (%s!Pattern.matches(%q, row.%s())) {\n", nullGuard, regex, javaField)
 		}
 		fmt.Fprintf(buf, "            errors.add(new ValidationError(%q, \"does not match required pattern\"));\n", col)
 		buf.WriteString("        }\n")

@@ -105,15 +105,16 @@ func writeKotlinValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet
 		buf.WriteString("    }\n")
 	}
 
-	// Enum checks.
+	// Enum checks: match against the branded enum's DB value (?.value), not the
+	// enum reference, so the string cases match.
 	for _, ef := range cs.SortedEnumFields() {
 		kotlinField := toCamelCase(ef.Column)
-		fmt.Fprintf(buf, "    when (%s) {\n", kotlinField)
+		fmt.Fprintf(buf, "    when (%s?.value) {\n", kotlinField)
 		for _, v := range ef.Values {
 			fmt.Fprintf(buf, "        %q -> {}\n", v)
 		}
 		buf.WriteString("        null -> {}\n")
-		fmt.Fprintf(buf, "        else -> errors.add(ValidationError(field = %q, message = \"invalid value \\\"$%s\\\"\"))\n", ef.Column, kotlinField)
+		fmt.Fprintf(buf, "        else -> errors.add(ValidationError(field = %q, message = \"invalid value \\\"${%s?.value}\\\"\"))\n", ef.Column, kotlinField)
 		buf.WriteString("    }\n")
 	}
 
