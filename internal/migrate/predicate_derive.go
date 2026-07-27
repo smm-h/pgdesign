@@ -8,19 +8,34 @@ package migrate
 // (arbitrary SQL has no catalog precondition). The IR lives in internal/predicate;
 // this derivation lives in migrate to avoid an import cycle (predicate is a leaf).
 //
-// Existence-only preconditions are derived here; present-AND-matching refinements
-// (column type, constraint def) are a future tightening — the existence checks
-// already close the "missing table / already-present object" drift class.
+// Present-AND-matching refinements (attribute-level preconditions) are derived
+// from the FROM-MANIFEST: for alters/drops of a nested object, the expected
+// pre-state is the object as it stood in the edge's PARENT revision (the model
+// reconstructed from that revision's manifest). The per-class strategy is the
+// matching-strategy resolution's: column TYPE by OID (typeinfo.Reconstruct text
+// probed via to_regtype), column NOT NULL / DEFAULT / CHECK def compared by the
+// predicate backends' round-trip. Creates stay absence-checks; genesis edges (and
+// any op whose owning object is absent from the from-model) fall to existence-only.
+//
+// The definitional-body classes limited to CHECK constraints here: FK / UNIQUE /
+// EXCLUSION defs and index defs stay existence-only (documented) — their clause
+// rendering / index-name embedding is out of scope for this pass.
 
 import (
+	"strings"
+
 	"github.com/smm-h/pgdesign/internal/enc"
+	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/objstore"
 	"github.com/smm-h/pgdesign/internal/predicate"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // preconditions returns the domain-check preconditions for an op (usually zero or
-// one). An unrecognized op is precondition-free (nil), which never false-errors.
-func (o SelfContainedOp) preconditions(store *objstore.Store) ([]predicate.Precondition, error) {
+// one). from is the reconstructed PARENT-revision model (nil for a genesis edge or
+// when unavailable); it supplies the expected pre-state for attribute-level
+// matches. An unrecognized op is precondition-free (nil), which never false-errors.
+func (o SelfContainedOp) preconditions(store *objstore.Store, from *model.Schema) ([]predicate.Precondition, error) {
 	cat, ok := categoryForKind(o.kind)
 	if !ok {
 		return nil, nil
@@ -78,7 +93,7 @@ func (o SelfContainedOp) preconditions(store *objstore.Store) ([]predicate.Preco
 			return nil, err
 		}
 		if body.Delta != nil {
-			return deltaPreconditions(*body.Delta), nil
+			return deltaPreconditions(*body.Delta, from), nil
 		}
 		// create_trigger / create_policy carry Name/Table (no Delta): object absent.
 		switch o.kind {
@@ -103,11 +118,17 @@ func (o SelfContainedOp) preconditions(store *objstore.Store) ([]predicate.Preco
 }
 
 // deltaPreconditions derives the precondition(s) for a nested-modifier op from its
-// scalar DDLOp delta.
-func deltaPreconditions(d DDLOp) []predicate.Precondition {
+// scalar DDLOp delta, refining present-checks with attribute-level matches drawn
+// from the parent-revision model (from).
+func deltaPreconditions(d DDLOp, from *model.Schema) []predicate.Precondition {
 	schema, table := splitQualifiedName(d.Table)
 	col := func(name string, ex predicate.Existence) []predicate.Precondition {
 		return []predicate.Precondition{{Existence: ex, Class: predicate.ClassColumn, Schema: schema, Table: table, Name: name, PGVersion: d.PGVersion}}
+	}
+	// colMatch builds a MustBePresent column precondition carrying the given Match
+	// (nil-safe: a nil match yields existence-only).
+	colMatch := func(name string, m *predicate.Match) []predicate.Precondition {
+		return []predicate.Precondition{{Existence: predicate.MustBePresent, Class: predicate.ClassColumn, Schema: schema, Table: table, Name: name, PGVersion: d.PGVersion, Match: m}}
 	}
 	constraint := func(ex predicate.Existence) []predicate.Precondition {
 		return []predicate.Precondition{{Existence: ex, Class: predicate.ClassConstraint, Schema: schema, Table: table, Name: d.Name}}
@@ -118,24 +139,43 @@ func deltaPreconditions(d DDLOp) []predicate.Precondition {
 	present := func(cls predicate.Class, name string) []predicate.Precondition {
 		return []predicate.Precondition{{Existence: predicate.MustBePresent, Class: cls, Schema: schema, Table: table, Name: name}}
 	}
+	pc := parentColumn(from, schema, table, d.Column)
 
 	switch d.Op {
 	// Column adds: column must be absent.
 	case "add_column":
 		return col(d.Column, predicate.MustBeAbsent)
-	// Column present (alter/drop/statistics/owner-on-column).
-	case "drop_column", "alter_column_type", "set_not_null", "drop_not_null",
-		"alter_column_default", "drop_column_default", "set_statistics":
-		return col(d.Column, predicate.MustBePresent)
-	case "rename_column":
-		// The pre-rename column (d.Column) must be present.
+
+	// Column type alter / drop / rename: pre-state is the parent column's TYPE
+	// (OID-probed). For alter_column_type the delta carries the NEW type — only the
+	// parent model records the OLD type the live column must currently have.
+	case "alter_column_type", "drop_column", "rename_column":
+		return colMatch(d.Column, columnTypeMatch(pc))
+
+	// NOT NULL toggles: pre-state is the parent column's nullability.
+	case "set_not_null", "drop_not_null":
+		return colMatch(d.Column, columnNotNullMatch(pc))
+
+	// Default set/drop: pre-state is the parent column's DEFAULT (round-tripped).
+	case "alter_column_default", "drop_column_default":
+		return colMatch(d.Column, columnDefaultMatch(pc))
+
+	// Statistics: presence only (no attribute body).
+	case "set_statistics":
 		return col(d.Column, predicate.MustBePresent)
 
 	// Constraint adds: absent.
 	case "add_fk", "add_fk_not_valid", "add_unique", "add_check", "add_exclusion":
 		return constraint(predicate.MustBeAbsent)
-	// Constraint present.
-	case "drop_fk", "drop_unique", "drop_check", "drop_exclusion", "validate_constraint":
+	// CHECK drop: pre-state is the parent CHECK's definition (round-tripped).
+	case "drop_check":
+		if m := checkDefMatch(from, schema, table, d.Name); m != nil {
+			return []predicate.Precondition{{Existence: predicate.MustBePresent, Class: predicate.ClassConstraint, Schema: schema, Table: table, Name: d.Name, Match: m}}
+		}
+		return constraint(predicate.MustBePresent)
+	// Other constraint present (def not matched — FK/UNIQUE/EXCLUSION clause
+	// rendering and validate_constraint pre-state are existence-only for now).
+	case "drop_fk", "drop_unique", "drop_exclusion", "validate_constraint":
 		return constraint(predicate.MustBePresent)
 
 	// Index adds: absent.
@@ -167,6 +207,89 @@ func deltaPreconditions(d DDLOp) []predicate.Precondition {
 	default:
 		return nil
 	}
+}
+
+// parentColumn looks up a column in the parent-revision model, returning nil when
+// the model is absent (genesis / unavailable) or the table/column is not found —
+// the caller then falls to an existence-only precondition.
+func parentColumn(from *model.Schema, schema, table, column string) *model.Column {
+	if from == nil || column == "" {
+		return nil
+	}
+	t := from.TableByName(schema, table)
+	if t == nil {
+		return nil
+	}
+	for i := range t.Columns {
+		if t.Columns[i].Name == column {
+			return &t.Columns[i]
+		}
+	}
+	return nil
+}
+
+// columnTypeReconstruct renders the parent column's type as SQL text for the OID
+// probe (array suffix appended when Reconstruct omits it).
+func columnTypeReconstruct(c *model.Column) string {
+	txt := typeinfo.Reconstruct(c.PGType)
+	if c.Array && txt != "" && !strings.HasSuffix(txt, "[]") {
+		txt += "[]"
+	}
+	return txt
+}
+
+// columnTypeMatch builds a TYPE match from the parent column (nil when unavailable
+// or the type does not reconstruct — existence-only fallback).
+func columnTypeMatch(c *model.Column) *predicate.Match {
+	if c == nil {
+		return nil
+	}
+	txt := columnTypeReconstruct(c)
+	if txt == "" {
+		return nil
+	}
+	return &predicate.Match{ColumnType: txt}
+}
+
+// columnNotNullMatch builds a NOT NULL match from the parent column.
+func columnNotNullMatch(c *model.Column) *predicate.Match {
+	if c == nil {
+		return nil
+	}
+	nn := c.NotNull
+	return &predicate.Match{ColumnNotNull: &nn}
+}
+
+// columnDefaultMatch builds a DEFAULT match from the parent column: the recorded
+// default text, or "" (assert no default) when the parent had none.
+func columnDefaultMatch(c *model.Column) *predicate.Match {
+	if c == nil {
+		return nil
+	}
+	def := ""
+	if c.Default != nil {
+		def = *c.Default
+	}
+	return &predicate.Match{ColumnDefault: &def}
+}
+
+// checkDefMatch builds a CHECK-constraint definition match from the parent table's
+// recorded CHECK by name (nil when unavailable — existence-only fallback). The
+// clause "CHECK (<expr>)" is round-tripped by the predicate backends.
+func checkDefMatch(from *model.Schema, schema, table, name string) *predicate.Match {
+	if from == nil || name == "" {
+		return nil
+	}
+	t := from.TableByName(schema, table)
+	if t == nil {
+		return nil
+	}
+	for i := range t.Checks {
+		if t.Checks[i].Name == name && strings.TrimSpace(t.Checks[i].Expr) != "" {
+			return &predicate.Match{ConstraintDef: "CHECK (" + t.Checks[i].Expr + ")"}
+		}
+	}
+	return nil
 }
 
 // classForKind maps an enc.Kind (whole-object target) to a predicate class.

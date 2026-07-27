@@ -36,6 +36,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/catalog"
 	"github.com/smm-h/pgdesign/internal/chain"
 	"github.com/smm-h/pgdesign/internal/enc"
+	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/objstore"
 	"github.com/smm-h/pgdesign/internal/predicate"
 	"github.com/smm-h/pgdesign/internal/sql"
@@ -101,12 +102,29 @@ func ApplyChain(ctx context.Context, conn *pgx.Conn, p *ChainProject, lockTimeou
 
 	var applied []string
 	for _, e := range path {
-		if err := applyEdge(ctx, conn, p.Store(), e, hooks); err != nil {
+		if err := applyEdge(ctx, conn, p, e, hooks); err != nil {
 			return applied, fmt.Errorf("edge %s: %w", e.ID()[:12], err)
 		}
 		applied = append(applied, e.ID()[:12]+" "+e.Slug)
 	}
 	return applied, nil
+}
+
+// parentModelForEdge reconstructs the edge's PARENT-revision model, the source of
+// attribute-level precondition expectations (roadmap 5.5+5.7, from-manifest). A
+// genesis edge has no parent (nil, existence-only). A reconstruction failure (e.g.
+// a parent manifest not present on disk) also yields nil: with no recorded
+// pre-state the op falls to an existence-only check rather than false-erroring —
+// availability of the recorded pre-state selects the mode, not a runtime retry.
+func parentModelForEdge(p *ChainProject, e Edge) *model.Schema {
+	if e.IsGenesis() {
+		return nil
+	}
+	from, err := ReconstructModel(p, e.Parent)
+	if err != nil {
+		return nil
+	}
+	return from
 }
 
 // findApplyPath loads the live + archive edges and asks the path-finder for the
@@ -175,7 +193,9 @@ func ensureChainStructures(ctx context.Context, conn *pgx.Conn) error {
 // RESUME (mid-edge): already-confirmed ops are SKIPPED; a lingering intent row
 // drives the non-transactional resume protocol. chain_position advances in the
 // transaction that confirms the edge's FINAL op.
-func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edge, hooks *ApplyHooks) error {
+func applyEdge(ctx context.Context, conn *pgx.Conn, p *ChainProject, e Edge, hooks *ApplyHooks) error {
+	store := p.Store()
+	from := parentModelForEdge(p, e)
 	edgeID := e.ID()
 	checksum, err := edgeFileChecksum(e)
 	if err != nil {
@@ -248,7 +268,7 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edg
 			if err := commitSeg(); err != nil {
 				return fmt.Errorf("commit before non-transactional op %d (%s): %w", seq, op.kind, err)
 			}
-			if err := executeNonTransactionalOp(ctx, conn, store, op, resume); err != nil {
+			if err := executeNonTransactionalOp(ctx, conn, store, from, op, resume); err != nil {
 				return fmt.Errorf("op %d (%s): %w", seq, op.kind, err)
 			}
 			// Confirm (+ advance if final) atomically in a small transaction.
@@ -281,7 +301,7 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edg
 		if err := beginSeg(); err != nil {
 			return err
 		}
-		if err := checkPreconditions(ctx, tx, store, op); err != nil {
+		if err := checkPreconditions(ctx, tx, store, from, op); err != nil {
 			return fmt.Errorf("op %d (%s): %w", seq, op.kind, err)
 		}
 		sqlStmt, err := op.RenderSQL(store)
@@ -323,8 +343,8 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edg
 // current DB state (q is the segment tx for transactional ops, the conn for
 // non-transactional ops). A violated precondition is a hard error naming
 // object/expected/found.
-func checkPreconditions(ctx context.Context, q predicate.Execer, store *objstore.Store, op SelfContainedOp) error {
-	pres, err := op.preconditions(store)
+func checkPreconditions(ctx context.Context, q predicate.Execer, store *objstore.Store, from *model.Schema, op SelfContainedOp) error {
+	pres, err := op.preconditions(store, from)
 	if err != nil {
 		return err
 	}
@@ -343,16 +363,16 @@ func checkPreconditions(ctx context.Context, q predicate.Execer, store *objstore
 // executeNonTransactionalOp runs a non-transactional op idempotently. On a fresh
 // run it checks the op's precondition then executes; on resume it applies the
 // class-specific protocol in Postgres's own state model (L8).
-func executeNonTransactionalOp(ctx context.Context, conn *pgx.Conn, store *objstore.Store, op SelfContainedOp, resume bool) error {
+func executeNonTransactionalOp(ctx context.Context, conn *pgx.Conn, store *objstore.Store, from *model.Schema, op SelfContainedOp, resume bool) error {
 	switch op.kind {
 	case "create_index_concurrently":
-		return resumeCreateIndexConcurrently(ctx, conn, store, op, resume)
+		return resumeCreateIndexConcurrently(ctx, conn, store, from, op, resume)
 	case "drop_index_concurrently":
 		// DROP INDEX CONCURRENTLY IF EXISTS is idempotent; its precondition (index
 		// present) is checked only on a fresh run — on resume the index may already
 		// be gone, which IF EXISTS handles.
 		if !resume {
-			if err := checkPreconditions(ctx, conn, store, op); err != nil {
+			if err := checkPreconditions(ctx, conn, store, from, op); err != nil {
 				return err
 			}
 		}
@@ -361,7 +381,7 @@ func executeNonTransactionalOp(ctx context.Context, conn *pgx.Conn, store *objst
 		// Version-conditional enum-add (pre-12) and any other non-transactional op:
 		// ADD VALUE IF NOT EXISTS is idempotent, so resume simply re-runs.
 		if !resume {
-			if err := checkPreconditions(ctx, conn, store, op); err != nil {
+			if err := checkPreconditions(ctx, conn, store, from, op); err != nil {
 				return err
 			}
 		}
@@ -374,9 +394,9 @@ func executeNonTransactionalOp(ctx context.Context, conn *pgx.Conn, store *objst
 // of the target name that IF NOT EXISTS would skip forever. On resume, if the
 // index is present AND valid it was built before the crash (nothing to do); if it
 // is absent or INVALID, DROP INDEX CONCURRENTLY IF EXISTS then rebuild.
-func resumeCreateIndexConcurrently(ctx context.Context, conn *pgx.Conn, store *objstore.Store, op SelfContainedOp, resume bool) error {
+func resumeCreateIndexConcurrently(ctx context.Context, conn *pgx.Conn, store *objstore.Store, from *model.Schema, op SelfContainedOp, resume bool) error {
 	if !resume {
-		if err := checkPreconditions(ctx, conn, store, op); err != nil {
+		if err := checkPreconditions(ctx, conn, store, from, op); err != nil {
 			return err
 		}
 		return execNonTxStatements(ctx, conn, store, op)
@@ -434,7 +454,7 @@ func indexTargetName(store *objstore.Store, op SelfContainedOp) (string, string,
 
 // journalRowFor builds the confirmed journal row for one op. The down-op is the
 // serialized inverse (nil exactly for non-invertible ops, matching the
-// down_presence CHECK). Phase is '' — chain edges strip phase tags (roadmap 5.3).
+// down_presence CHECK). Phase is ” — chain edges strip phase tags (roadmap 5.3).
 func journalRowFor(op SelfContainedOp, seq int, slug, edgeID, checksum string) (journalRow, error) {
 	var downJSON *string
 	if op.inv != chain.NonInvertible && op.down != nil {
