@@ -1701,6 +1701,21 @@ subphase numbers retained for reference; they land together.)
   SIGKILL, no backend-kill machinery: every fault-matrix case is
   deterministic-state-setup or in-process seam (classification verified
   2026-07).
+- MATCHING-STRATEGY RESOLUTION (2026-07, law-derived from L1(c) as
+  amended): present-AND-matching comparisons in preconditions AND
+  idempotent guards are LIVE-PATH comparisons (both run against the
+  target DB), so the live round-trip mechanism applies — NOT pure
+  model-to-catalog text rendering (which the ≈_pg residue forbids).
+  Concretely: column TYPES compare by OID (+typmod) via to_regtype
+  (alias-robust, pure-computable probe); definitional bodies
+  (constraints, index defs, defaults) compare via in-DB round-trip —
+  the Go executor uses livenorm, the SQL renderer's DO-block creates a
+  temp object from the model text and compares pg_get_* canonical
+  forms (the round-trip implemented natively in PL/pgSQL — both
+  backends compute the same verdict, keeping the conformance matrix
+  honest). Schema/extension keep native IF NOT EXISTS (no definitional
+  body). Where round-trip cannot reach a class, that class stays
+  existence-only WITH a documented per-class list — never silent.
 - **Why:** L5's domain check and trace, landed as ONE rewrite of the loop
   (the collapse-multi-pass rule); L8 closes the crash window INSIDE the
   recovery protocol; L1's single ≈_syn via the shared normalization; the
