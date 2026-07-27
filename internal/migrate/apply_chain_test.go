@@ -15,25 +15,25 @@ import (
 // separate emission is the "double-render" concern).
 func twoTableDesired() *model.Schema {
 	s := &model.Schema{
-		Name:      "shop",
+		Name:      "public",
 		PGVersion: 16,
 		Tables: []model.Table{
 			{
-				Name: "users", Schema: "shop", PK: []string{"id"}, Comment: "users",
+				Name: "users", Schema: "public", PK: []string{"id"}, Comment: "users",
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "email", PGType: typeinfo.T("text"), NotNull: true},
 				},
 			},
 			{
-				Name: "orders", Schema: "shop", PK: []string{"id"}, Comment: "orders",
+				Name: "orders", Schema: "public", PK: []string{"id"}, Comment: "orders",
 				Columns: []model.Column{
 					{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
 					{Name: "user_id", PGType: typeinfo.T("int8"), NotNull: true},
 				},
 				FKs: []model.FK{{
 					Name: "orders_user_id_fkey", Columns: []string{"user_id"},
-					RefSchema: "shop", RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE",
+					RefSchema: "public", RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE",
 				}},
 				Indexes: []model.Index{{
 					Name: "orders_user_id_idx", Columns: []string{"user_id"},
@@ -58,7 +58,7 @@ func TestChainApplyRenderMatchesLegacy(t *testing.T) {
 		t.Fatal(err)
 	}
 	desired := twoTableDesired()
-	d := &diff.SchemaDiff{TablesAdded: []string{"shop.users", "shop.orders"}}
+	d := &diff.SchemaDiff{TablesAdded: []string{"public.users", "public.orders"}}
 	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if len(m.DDLOps) == 0 {
 		t.Fatal("expected DDL ops from generate")
@@ -115,7 +115,7 @@ func TestReconstructModelRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	desired := twoTableDesired()
-	d := &diff.SchemaDiff{TablesAdded: []string{"shop.users", "shop.orders"}}
+	d := &diff.SchemaDiff{TablesAdded: []string{"public.users", "public.orders"}}
 	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
 	if _, err := GenerateEdge(p, m, desired, nil, rev.Revision{}, rev.RegistryPresent, "genesis"); err != nil {
 		t.Fatalf("GenerateEdge: %v", err)
