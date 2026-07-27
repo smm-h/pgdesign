@@ -137,6 +137,50 @@ func TestFragmentRestrictionsHonored(t *testing.T) {
 	})
 }
 
+// TestGroupsGeneratedAndValid pins the Groups increment: with MinGroups>=1 the
+// model always carries groups, every group is non-empty, and every referenced
+// table exists — so the model still Builds + validates cleanly (resolveGroups
+// rejects unknown table references with E227).
+func TestGroupsGeneratedAndValid(t *testing.T) {
+	cfg := Config{
+		MinSchemas: 1, MaxSchemas: 2,
+		MinTables: 1, MaxTables: 3,
+		MinExtraColumns: 0, MaxExtraColumns: 2,
+		PGVersion: 16,
+		MinGroups: 1, MaxGroups: 3,
+	}
+	rapid.Check(t, func(rt *rapid.T) {
+		raws := Draw(rt, cfg)
+		known := make(map[string]bool)
+		for _, raw := range raws {
+			for _, tbl := range raw.Tables {
+				known[tbl.Name] = true
+			}
+		}
+		var groupCount int
+		for _, raw := range raws {
+			for name, members := range raw.Groups {
+				groupCount++
+				if len(members) == 0 {
+					rt.Fatalf("group %q is empty", name)
+				}
+				for _, m := range members {
+					if !known[m] {
+						rt.Fatalf("group %q references unknown table %q", name, m)
+					}
+				}
+			}
+		}
+		if groupCount == 0 {
+			rt.Fatal("MinGroups>=1 but no groups generated")
+		}
+		buildErrs, validateErrs := buildAndValidate(raws)
+		if len(buildErrs) > 0 || len(validateErrs) > 0 {
+			rt.Fatalf("model with groups invalid: build=%v validate=%v", buildErrs, validateErrs)
+		}
+	})
+}
+
 // TestDeterministicUnderSeed pins that generation is deterministic: the same
 // rapid seed yields byte-identical models. rapid's integrated shrinking relies
 // on this, and it is a stated 1.6 verification obligation.

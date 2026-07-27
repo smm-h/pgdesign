@@ -58,6 +58,15 @@ type Config struct {
 	// the primary key), so the pool tracks the registry instead of a hardcoded
 	// copy that could drift.
 	ColumnTypes []string
+
+	// MinGroups and MaxGroups bound the number of [groups] entries per model
+	// (inclusive). Each group references a random non-empty subset of the
+	// model's tables. Groups are schema-global identity (they participate in the
+	// revision and, since the reverse-conformance work, in diff); generating
+	// them lets identity/diff property tests exercise the group collection
+	// rather than always seeing it empty. Zero groups is a valid model, so the
+	// range is NOT defaulted away — DefaultConfig leaves it 0..2 explicitly.
+	MinGroups, MaxGroups int
 }
 
 // pkColumnName is the fixed name of the surrogate primary-key column every
@@ -77,6 +86,7 @@ func DefaultConfig() Config {
 		MinExtraColumns: 0, MaxExtraColumns: 5,
 		PGVersion:   16,
 		ColumnTypes: defaultColumnTypes(),
+		MinGroups:   0, MaxGroups: 2,
 	}
 }
 
@@ -128,6 +138,7 @@ func Generator(cfg Config) *rapid.Generator[[]*parse.RawSchema] {
 		for s := 0; s < nSchemas; s++ {
 			raws = append(raws, genSchema(t, cfg, s))
 		}
+		genGroups(t, cfg, raws)
 		return raws
 	})
 }
@@ -136,6 +147,45 @@ func Generator(cfg Config) *rapid.Generator[[]*parse.RawSchema] {
 // generator built for cfg.
 func Draw(t *rapid.T, cfg Config) []*parse.RawSchema {
 	return Generator(cfg).Draw(t, "model")
+}
+
+// genGroups attaches [groups] entries to the model, drawn from the full set of
+// generated (globally-unique) table names. Groups are model-level: they are
+// merged across raw schemas by BuildMulti, so all groups are attached to the
+// first raw schema. Each group references a random non-empty subset of tables,
+// so resolveGroups always validates cleanly (every referenced table exists).
+func genGroups(t *rapid.T, cfg Config, raws []*parse.RawSchema) {
+	if cfg.MaxGroups == 0 || len(raws) == 0 {
+		return
+	}
+	var allTables []string
+	for _, raw := range raws {
+		for _, tbl := range raw.Tables {
+			allTables = append(allTables, tbl.Name)
+		}
+	}
+	if len(allTables) == 0 {
+		return
+	}
+	nGroups := rapid.IntRange(cfg.MinGroups, cfg.MaxGroups).Draw(t, "group_count")
+	if nGroups == 0 {
+		return
+	}
+	groups := make(map[string][]string, nGroups)
+	for g := 0; g < nGroups; g++ {
+		var members []string
+		for i, tbl := range allTables {
+			if rapid.Bool().Draw(t, fmt.Sprintf("group_%d_has_%d", g, i)) {
+				members = append(members, tbl)
+			}
+		}
+		if len(members) == 0 {
+			// Guarantee a non-empty group so the entry is meaningful.
+			members = []string{allTables[rapid.IntRange(0, len(allTables)-1).Draw(t, fmt.Sprintf("group_%d_fallback", g))]}
+		}
+		groups[fmt.Sprintf("group_%d", g)] = members
+	}
+	raws[0].Groups = groups
 }
 
 func genSchema(t *rapid.T, cfg Config, s int) *parse.RawSchema {
