@@ -1,6 +1,7 @@
 package enc
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -24,6 +25,23 @@ const (
 	KindComposite    Kind = "composite" //
 	KindSMType       Kind = "sm_type"   // a state-machine type definition (identity carrier)
 	KindRegistrySnap Kind = "registry"  // the semtype registry snapshot (import-surface residue channel; empty for identity)
+
+	// KindDML and KindRaw are PSEUDO-TARGET kinds for data/opaque-SQL migration
+	// ops (roadmap 5.1, edge_format.md TENSION 2). They never name a schema
+	// object: a DML op changes rows and a RawSQL op is opaque, so neither
+	// resolves in a manifest. The grammar is PINNED by the edge format:
+	//
+	//	Key{Kind:"dml", Name:"<edge-seq>"} -> "dml:<edge-seq>"
+	//	Key{Kind:"raw", Name:"<edge-seq>"} -> "raw:<edge-seq>"
+	//
+	// where <edge-seq> is the op's zero-based position within its edge. The
+	// label is per-edge-unique and cross-edge-meaningless (op 0 of any edge
+	// renders "dml:0"), which is exactly what edge identity needs: it keeps
+	// identical data edges byte-identical without pretending a data op names a
+	// schema object. Pseudo-target keys are MANIFEST NO-OPS: they never appear
+	// in a revision manifest and are never resolved by the consistency checker.
+	KindDML Kind = "dml" // pseudo-target for data-manipulation ops (backfill/transform)
+	KindRaw Kind = "raw" // pseudo-target for opaque RawSQL bodies (SM triggers, partman config)
 )
 
 // Key is a kind-qualified manifest key: (kind, schema, name) plus, for
@@ -126,3 +144,13 @@ func KeyForComposite(c model.CompositeType) Key {
 func KeyForStateMachine(sm model.StateMachine) Key {
 	return Key{Kind: KindSMType, Schema: sm.Schema, Name: sm.Name}
 }
+
+// KeyForDML mints the PINNED pseudo-target key for a data-manipulation op at
+// the given zero-based edge sequence. It renders "dml:<seq>" and never resolves
+// in a manifest (edge_format.md TENSION 2).
+func KeyForDML(seq int) Key { return Key{Kind: KindDML, Name: strconv.Itoa(seq)} }
+
+// KeyForRaw mints the PINNED pseudo-target key for an opaque RawSQL op at the
+// given zero-based edge sequence. It renders "raw:<seq>" and never resolves in a
+// manifest (edge_format.md TENSION 2).
+func KeyForRaw(seq int) Key { return Key{Kind: KindRaw, Name: strconv.Itoa(seq)} }

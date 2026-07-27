@@ -74,3 +74,19 @@ func TestKeyStringForms(t *testing.T) {
 		}
 	}
 }
+
+// TestPseudoTargetGrammar pins the edge_format.md TENSION 2 grammar for DML/raw
+// pseudo-targets: byte-stable and identity-load-bearing.
+func TestPseudoTargetGrammar(t *testing.T) {
+	cases := map[string]string{
+		KeyForDML(0).String(): "dml:0",
+		KeyForDML(7).String(): "dml:7",
+		KeyForRaw(0).String(): "raw:0",
+		KeyForRaw(3).String(): "raw:3",
+	}
+	for got, want := range cases {
+		if got != want {
+			t.Errorf("pseudo-target = %q, want %q", got, want)
+		}
+	}
+}
