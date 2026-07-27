@@ -64,11 +64,44 @@ func NewManager(baseURL string) (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("derive maintenance URL: %w", err)
 	}
+	// Bound every testdb dial. NewManager itself never connects, and Create/Drop
+	// dial with an unbounded context.Background(); on a host that is UNREACHABLE but
+	// not actively refusing (dropped packets, an unroutable address), an unbounded
+	// pgx.Connect hangs until the go-test timeout — which stalled serve's (and
+	// discover's / introspect's) TestMain for the full 10-minute limit instead of
+	// skip-cleaning. A connect_timeout on the base URL (inherited by ephemeral URLs
+	// via SwapDatabase and by pools) makes an unreachable server fail fast, so the
+	// os.Exit(0) skip in those TestMains actually fires.
+	maintenanceURL, err = ensureConnectTimeout(maintenanceURL, defaultConnectTimeoutSeconds)
+	if err != nil {
+		return nil, fmt.Errorf("bound maintenance URL connect timeout: %w", err)
+	}
 
 	return &Manager{
 		maintenanceURL: maintenanceURL,
 		baseName:       baseName,
 	}, nil
+}
+
+// defaultConnectTimeoutSeconds bounds every testdb connection dial. Generous enough
+// for a slow-but-reachable server, small enough that an unreachable one fails in
+// seconds rather than hanging the test binary until the go-test timeout.
+const defaultConnectTimeoutSeconds = 10
+
+// ensureConnectTimeout adds a connect_timeout (in seconds) to a PostgreSQL
+// connection URL when the caller has not already set one. A caller-provided value
+// is respected (never overridden).
+func ensureConnectTimeout(dbURL string, seconds int) (string, error) {
+	u, err := url.Parse(dbURL)
+	if err != nil {
+		return "", fmt.Errorf("parse URL: %w", err)
+	}
+	q := u.Query()
+	if q.Get("connect_timeout") == "" {
+		q.Set("connect_timeout", strconv.Itoa(seconds))
+		u.RawQuery = q.Encode()
+	}
+	return u.String(), nil
 }
 
 // connectMaintenance opens a connection to the maintenance database.
