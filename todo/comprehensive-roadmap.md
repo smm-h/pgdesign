@@ -1557,7 +1557,19 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   blocking). Multi-database rule: synthetic-prefix revisions are
   per-database stamps; shared prefix files are the union; databases at
   different boundaries are supported. Existing semver files become the
-  linear prefix with synthetic checksum-verified revisions. serve updated
+  linear prefix with synthetic checksum-verified revisions. AS-BUILT
+  DEVIATION (audit-ruled SOUND, 2026-07): the prefix folds to a SINGLE
+  GENESIS EDGE (empty -> rN from the reconciled model) with journal-side
+  per-row synthetic edge_ids — a literal linear fold is unbuildable
+  (legacy TOMLs carry no structured defs, so whole-object creates cannot
+  become self-contained ops; the raw-blob alternative provably violates
+  A2's manifest-no-op rule: distinct intermediate revisions would need
+  manifests the TOMLs cannot produce). The reconcile gate pins every
+  upgraded DB to rN, so boundary == rN by construction; A1's
+  view-reproduction holds via per-row synthetic edge_ids. Two owner
+  notes: the pre-upgrade guard makes continued legacy multi-apply
+  impossible once a DB has legacy rows (deliberate one-way adoption);
+  brand-new projects enter chain mode via 5.9's generate retargeting. serve updated
   (BEFORE phase 8's rework — the files are co-edited): handleMigrations
   repointed to the view; version endpoint updated for the new naming.
   Store<->chain<->files consistency check = Merkle closure PLUS
