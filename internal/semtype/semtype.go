@@ -183,6 +183,23 @@ func (r *Registry) IsBuiltin(name string) bool {
 	return ok && td.Source == "builtin"
 }
 
+// BuiltinNames returns the names of all registered builtin types (Source
+// "builtin"), sorted for deterministic iteration. It lets generators and
+// tooling draw column types from the real registry rather than a hardcoded
+// copy that could silently drift when the builtin set changes.
+func (r *Registry) BuiltinNames() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var names []string
+	for name, td := range r.types {
+		if td.Source == "builtin" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
 // typeDefsEqual returns true if two TypeDefs have equivalent definitions.
 func typeDefsEqual(a, b *TypeDef) bool {
 	if a.Kind != b.Kind || !a.BaseType.Equal(b.BaseType) || a.NotNull != b.NotNull {
