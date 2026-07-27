@@ -87,6 +87,23 @@ type opBody struct {
 	BlobID      string   `json:"blob_id,omitempty"`      // raw/dml opaque SQL blob id
 	Seq         int      `json:"seq,omitempty"`          // edge-seq for dml/raw pseudo-targets
 	Down        *opBody  `json:"down,omitempty"`         // embedded inverse (declared-inverse)
+
+	// Delta is the scalar-field DDLOp for a NESTED-MODIFIER, alter, drop, or
+	// RLS op (roadmap 5.1b). These render purely from scalar fields — no pointer
+	// def — so the delta carries exactly the fields OpToSQL reads and rendering
+	// re-invokes OpToSQL for byte-identity (no re-implemented SQL). The delta
+	// NEVER inlines a structured def (that would be a lossy mirror, L2); pointer
+	// defs and the recursive Down are stripped when a delta is built.
+	Delta *DDLOp `json:"delta,omitempty"`
+	// PostDefID is the OWNING OBJECT's POST-STATE content id (roadmap 5.1b
+	// resolution): for a nested-modifier op, the manifest key it targets is the
+	// owning table/enum/domain, and endpoint simulation maps that key to this id
+	// (the object AFTER the op). It is the "post-state def id" the amendment
+	// mandates so nested-modifier ops become manifest-representable.
+	PostDefID string `json:"post_def_id,omitempty"`
+	// OldTable is the pre-rename owning-object qualified name (rename_table only),
+	// so simulation can delete the old manifest key and insert the new one.
+	OldTable string `json:"old_table,omitempty"`
 }
 
 // canonicalJSON marshals v with the same byte discipline as enc/rev/chain:
@@ -137,12 +154,14 @@ func invClassForKind(kind string) chain.InvertibilityClass {
 	case "create_table", "create_view", "create_materialized_view",
 		"create_sequence", "create_composite_type", "create_domain",
 		"create_function", "create_trigger", "create_policy",
-		"create_partition":
+		"create_partition", "create_enum",
+		"rename_column", "rename_table":
 		return chain.MechanicallyInvertible
 	case "create_or_replace_view", "create_or_replace_function",
-		"alter_sequence",
+		"alter_sequence", "schema_meta",
 		// RawSQL-bodied families carry a recorded inverse.
 		"create_sm_trigger_function", "create_sm_trigger",
+		"create_deny_mutation_function", "create_append_only_trigger",
 		"create_partman_parent", "update_partman_retention",
 		"update_partman_premake",
 		// DML inverses are vacuous (data is not restored).
@@ -160,6 +179,7 @@ func invClassForKind(kind string) chain.InvertibilityClass {
 func rawTargeted(kind string) bool {
 	switch kind {
 	case "create_sm_trigger_function", "create_sm_trigger",
+		"create_deny_mutation_function", "create_append_only_trigger",
 		"create_partman_parent", "update_partman_retention",
 		"update_partman_premake":
 		return true
@@ -194,6 +214,8 @@ func dropKindFor(kind string) string {
 		return "drop_trigger"
 	case "create_policy":
 		return "drop_policy"
+	case "create_enum":
+		return "drop_enum"
 	default:
 		return ""
 	}

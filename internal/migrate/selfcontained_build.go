@@ -44,12 +44,20 @@ func putJSONDef(store *objstore.Store, v any) (string, error) {
 // invertibility, and resolves the down (structural for mechanical creates,
 // embedded for declared-inverse).
 func newOp(store *objstore.Store, kind string, target enc.Key, up opBody) (SelfContainedOp, error) {
+	return newOpWithClass(store, kind, target, up, invClassForKind(kind))
+}
+
+// newOpWithClass finalizes a self-contained op with an EXPLICIT L4 class. The
+// conversion shim (roadmap 5.1b) uses it because a legacy op's invertibility is
+// determined by its recorded DownOp (Irreversible -> non-invertible; a real down
+// -> declared-inverse), not by the kind alone. Kind-based builders keep using
+// newOp, which derives the class from invClassForKind.
+func newOpWithClass(store *objstore.Store, kind string, target enc.Key, up opBody, inv chain.InvertibilityClass) (SelfContainedOp, error) {
 	up.Kind = kind
 	payload, err := putBody(store, up)
 	if err != nil {
 		return SelfContainedOp{}, err
 	}
-	inv := invClassForKind(kind)
 	op := SelfContainedOp{kind: kind, target: target, inv: inv, payload: payload}
 	down, err := deriveDown(store, op, up)
 	if err != nil {
@@ -68,6 +76,20 @@ func deriveDown(store *objstore.Store, up SelfContainedOp, body opBody) (*SelfCo
 		return nil, nil
 
 	case chain.MechanicallyInvertible:
+		// Renames invert to the swapped rename (roadmap 5.1b / 5.9 rename gate):
+		// the down is a pure structural function of the up delta, no prior state.
+		if up.kind == "rename_column" || up.kind == "rename_table" {
+			if body.Delta == nil {
+				return nil, fmt.Errorf("migrate: rename op %q carries no delta to invert", up.kind)
+			}
+			swapped := swapRename(*body.Delta)
+			down := opBody{Kind: up.kind, Delta: &swapped}
+			id, err := putBody(store, down)
+			if err != nil {
+				return nil, err
+			}
+			return &SelfContainedOp{kind: up.kind, target: up.target, inv: chain.NonInvertible, payload: id}, nil
+		}
 		dk := dropKindFor(up.kind)
 		if dk == "" {
 			return nil, fmt.Errorf("migrate: no structural inverse for mechanically-invertible kind %q", up.kind)
@@ -325,6 +347,30 @@ func BuildAlterSequence(store *objstore.Store, s model.Sequence, prev model.Sequ
 	down := opBody{Kind: "alter_sequence", Schema: schema, Name: prev.Name, DefID: prevID}
 	up := opBody{Schema: schema, Name: s.Name, DefID: defID, Down: &down}
 	return newOp(store, "alter_sequence", enc.Key{Kind: enc.KindSequence, Schema: schema, Name: s.Name}, up)
+}
+
+// ---- schema-meta family (roadmap 5.1b) ----
+
+// BuildSchemaMeta builds a schema_meta op covering Extensions/PGVersion/Groups
+// changes (the manifest's schema:<name> entry). The payload is the POST-STATE
+// schema-meta form id; simulation maps the schema key to it. The recorded
+// inverse restores the prior schema-meta form (prev; pass an empty-meta schema
+// for a genesis boundary).
+func BuildSchemaMeta(store *objstore.Store, desired *model.Schema, prev *model.Schema) (SelfContainedOp, error) {
+	defID, err := putDef(store, func() ([]byte, error) { return enc.EncodeSchemaMeta(desired) })
+	if err != nil {
+		return SelfContainedOp{}, err
+	}
+	if prev == nil {
+		prev = &model.Schema{Name: desired.Name}
+	}
+	prevID, err := putDef(store, func() ([]byte, error) { return enc.EncodeSchemaMeta(prev) })
+	if err != nil {
+		return SelfContainedOp{}, err
+	}
+	down := opBody{Kind: "schema_meta", Name: prev.Name, DefID: prevID}
+	up := opBody{Name: desired.Name, DefID: defID, Down: &down}
+	return newOp(store, "schema_meta", enc.Key{Kind: enc.KindSchemaMeta, Name: desired.Name}, up)
 }
 
 // ---- RawSQL-bodied and DML families (opaque blobs, declared inverse) ----

@@ -13,6 +13,8 @@ package migrate
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/smm-h/pgdesign/internal/enc"
 	"github.com/smm-h/pgdesign/internal/model"
@@ -34,6 +36,12 @@ func (o SelfContainedOp) RenderSQL(store *objstore.Store) (string, error) {
 // resolves the enum/domain closure. An unhandled kind with no blob is a hard
 // error, never a comment stub.
 func renderBody(store *objstore.Store, b opBody) (string, error) {
+	// Delta-rendered ops (nested-modifier / alter / drop / rls / rename) render
+	// by re-invoking the SINGLE SQL oracle OpToSQL on the stored scalar delta —
+	// byte-identical to generate by construction, no re-implemented SQL here.
+	if b.Delta != nil {
+		return OpToSQL(*b.Delta), nil
+	}
 	switch b.Kind {
 	case "create_table":
 		tbl, err := decodeTableDef(store, b.DefID)
@@ -122,6 +130,20 @@ func renderBody(store *objstore.Store, b opBody) (string, error) {
 		}
 		schema, parentName := splitQualifiedName(b.ParentTable)
 		return sql.CreatePartitionOf(schema, &spec, parentName, false), nil
+
+	case "create_enum":
+		e, err := decodeEnumDef(store, b.DefID)
+		if err != nil {
+			return "", err
+		}
+		return sql.CreateEnum(e.Schema, e.Name, e.Values, false), nil
+
+	case "schema_meta":
+		meta, err := decodeSchemaMetaDef(store, b.DefID)
+		if err != nil {
+			return "", err
+		}
+		return renderSchemaMeta(meta), nil
 
 	// ---- down / leaf ops (mirror the legacy OpToSQL drop renderers exactly) ----
 	case "drop_table":
@@ -217,6 +239,39 @@ func decodeDomainDef(store *objstore.Store, id string) (model.Domain, error) {
 		return model.Domain{}, err
 	}
 	return enc.DecodeDomain(data)
+}
+
+func decodeEnumDef(store *objstore.Store, id string) (model.Enum, error) {
+	data, err := getDef(store, id)
+	if err != nil {
+		return model.Enum{}, err
+	}
+	return enc.DecodeEnum(data)
+}
+
+func decodeSchemaMetaDef(store *objstore.Store, id string) (enc.SchemaMeta, error) {
+	data, err := getDef(store, id)
+	if err != nil {
+		return enc.SchemaMeta{}, err
+	}
+	return enc.DecodeSchemaMeta(data)
+}
+
+// renderSchemaMeta renders the DDL for a schema-meta op (roadmap 5.1b). Only the
+// extension set produces DDL (CREATE EXTENSION IF NOT EXISTS, deterministic
+// order); PGVersion and Groups are model-level metadata with no DDL surface. The
+// statement is idempotent so re-applying the post-state is safe.
+func renderSchemaMeta(meta enc.SchemaMeta) string {
+	if len(meta.Extensions) == 0 {
+		return "-- schema meta: no extension DDL"
+	}
+	exts := append([]string(nil), meta.Extensions...)
+	sort.Strings(exts)
+	lines := make([]string, len(exts))
+	for i, e := range exts {
+		lines[i] = sql.CreateExtension(e, true)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func decodeCompositeDef(store *objstore.Store, id string) (model.CompositeType, error) {

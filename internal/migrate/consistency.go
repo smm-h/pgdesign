@@ -18,16 +18,17 @@ package migrate
 //     a genesis edge's from-manifest is empty; other edges read their parent's
 //     recorded revision manifest.
 //
-// OpSimulator SCOPE (a stated limitation): it faithfully simulates the
-// WHOLE-TOP-LEVEL-OBJECT op families the 5.1 self-contained layer produces
-// (create/drop/or_replace/alter of tables, views, matviews, sequences,
-// composites, domains, functions), where the op's target manifest key and its
-// payload's def-id correspond exactly to a manifest entry. NESTED-MODIFIER ops
-// (create_trigger/create_policy/create_partition) change their owning table's
-// encoded bytes but do NOT carry the resulting table id, so they are NOT
-// manifest-representable at object granularity — the simulator returns a hard
-// error for them rather than silently faking the endpoint. This is honest given
-// the current op coverage; extending it waits on richer self-contained ops.
+// OpSimulator is TOTAL (roadmap 5.1b): it simulates EVERY self-contained op
+// kind. WHOLE-OBJECT creates/replaces set the target key to the payload's def
+// id; whole-object drops remove the key; NESTED-MODIFIER ops (columns, checks,
+// FKs, indexes, triggers, policies, rls, enum/domain modifiers) map the OWNING
+// object's key to the payload's POST-STATE def id (the amendment's adopted
+// resolution: the op carries the owner's post-state id, so endpoint simulation
+// is a key->id assignment, no IR-application engine); a rename_table deletes the
+// old key and inserts the new; a schema-meta op maps the schema key to the
+// post-state schema-meta form id; dml/raw pseudo-targets and refresh are
+// manifest no-ops. An op kind outside the inventory is a hard error, never a
+// silent fake.
 
 import (
 	"fmt"
@@ -144,39 +145,56 @@ func (s opSimulator) Simulate(from chain.Manifest, ops []chain.Op) (chain.Manife
 	return out, nil
 }
 
-// applyOp mutates the manifest for one op.
+// applyOp mutates the manifest for one op, per its simulation category.
 func (s opSimulator) applyOp(m chain.Manifest, op SelfContainedOp) error {
 	// Pseudo-target (dml/raw) ops are manifest no-ops (A2).
 	if op.target.Kind == enc.KindDML || op.target.Kind == enc.KindRaw {
 		return nil
 	}
+	cat, ok := categoryForKind(op.kind)
+	if !ok {
+		return fmt.Errorf("migrate: op simulator: op kind %q is not in the self-contained inventory", op.kind)
+	}
 	body, err := loadBody(s.store, op.payload)
 	if err != nil {
 		return err
 	}
-	switch op.kind {
-	// Whole-top-level-object creates/replaces: set the target key to the def id.
-	case "create_table", "create_view", "create_materialized_view",
-		"create_sequence", "create_composite_type", "create_domain",
-		"create_function", "create_or_replace_view", "create_or_replace_function",
-		"alter_sequence":
+	switch cat {
+	case catWholeCreate, catSchemaMeta:
 		if body.DefID == "" {
 			return fmt.Errorf("migrate: op simulator: %q payload has no def id", op.kind)
 		}
 		m[op.target] = body.DefID
 		return nil
-	// Whole-object drops: remove the key.
-	case "drop_table", "drop_view", "drop_materialized_view", "drop_sequence",
-		"drop_composite_type", "drop_domain", "drop_function":
+
+	case catWholeDrop:
 		delete(m, op.target)
 		return nil
-	// Nested-modifier ops change their owning table's bytes but do not carry the
-	// resulting table id — not manifest-representable at object granularity.
-	case "create_trigger", "create_policy", "create_partition",
-		"drop_trigger", "drop_policy":
-		return fmt.Errorf("migrate: op simulator: op %q (target %s) modifies its owning object without carrying the resulting object id — endpoint simulation is not defined for nested-modifier ops at the current op coverage", op.kind, op.target.String())
+
+	case catNestedModifier:
+		// The owning object's post-state id is the amendment's carried delta. When
+		// it is absent (the owner is dropped later in the same edge), leave the key
+		// untouched — a subsequent drop removes it and the endpoint still matches.
+		if body.PostDefID != "" {
+			m[op.target] = body.PostDefID
+		}
+		return nil
+
+	case catRenameTable:
+		if body.OldTable != "" {
+			schema, name := splitQualifiedName(body.OldTable)
+			delete(m, enc.Key{Kind: enc.KindTable, Schema: schema, Name: name})
+		}
+		if body.PostDefID != "" {
+			m[op.target] = body.PostDefID
+		}
+		return nil
+
+	case catManifestNoop, catPseudo:
+		return nil
+
 	default:
-		return fmt.Errorf("migrate: op simulator: unhandled op kind %q", op.kind)
+		return fmt.Errorf("migrate: op simulator: unhandled category for op kind %q", op.kind)
 	}
 }
 
