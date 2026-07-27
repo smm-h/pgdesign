@@ -77,7 +77,11 @@ func generateTSTransitionMap(smt model.SMTransitionMap) string {
 	typeName := toPascalCase(smt.TypeName)
 
 	fmt.Fprintf(&buf, "/** Maps each %s state to its allowed target states. */\n", typeName)
-	fmt.Fprintf(&buf, "export const %sTransitions: Record<%s, %s[]> = {\n", toCamelCase(smt.TypeName), typeName, typeName)
+	// Partial<Record<...>>: terminal states have no outgoing transitions and are
+	// absent as keys, so a total Record<Enum, ...> would fail tsc under strict
+	// (all union members required). Partial matches the Go/Python partial-map
+	// semantics.
+	fmt.Fprintf(&buf, "export const %sTransitions: Partial<Record<%s, %s[]>> = {\n", toCamelCase(smt.TypeName), typeName, typeName)
 
 	for _, from := range sortedFromStates(smt) {
 		tos := smt.Transitions[from]

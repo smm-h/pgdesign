@@ -13,30 +13,21 @@ import (
 // JavaConstraintsGenerator generates Java validation methods for table constraints.
 type JavaConstraintsGenerator struct{}
 
-// Generate produces a Java file with validate<TableName> static methods for each
-// table that has extractable constraints (NOT NULL, enum, CHECK, JSON schema).
-func (g *JavaConstraintsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
-	var buf bytes.Buffer
-	buf.WriteString(genkit.Header(genkit.CommentSlash))
-	buf.WriteString("// Regenerate with: pgdesign codegen --lang java --mode constraints <schema-files>\n")
-	if schema.Name != "" {
-		fmt.Fprintf(&buf, "// Schema: %s\n", schema.Name)
-	}
+// javaConstraintTableWork pairs a table with its extracted constraint set.
+type javaConstraintTableWork struct {
+	table model.Table
+	cs    ConstraintSet
+}
 
-	needsPattern := false
-
-	// Collect tables with constraints.
-	type tableWork struct {
-		table model.Table
-		cs    ConstraintSet
-	}
-	var work []tableWork
+// collectJavaConstraintWork gathers the tables that have extractable constraints
+// and reports whether any CHECK requires java.util.regex.Pattern.
+func collectJavaConstraintWork(schema *model.Schema) (work []javaConstraintTableWork, needsPattern bool) {
 	for _, tbl := range schema.Tables {
 		cs := ExtractConstraints(tbl, *schema)
 		if !cs.HasConstraints() {
 			continue
 		}
-		work = append(work, tableWork{table: tbl, cs: cs})
+		work = append(work, javaConstraintTableWork{table: tbl, cs: cs})
 		for _, expr := range cs.CheckExprs {
 			if pat := classifyCheck(expr); pat != nil {
 				if _, ok := pat.(*likePattern); ok {
@@ -45,42 +36,108 @@ func (g *JavaConstraintsGenerator) Generate(schema *model.Schema) ([]byte, []dia
 			}
 		}
 	}
+	return work, needsPattern
+}
 
-	if len(work) == 0 {
-		buf.WriteString("\n// No tables with extractable constraints.\n")
-		return buf.Bytes(), nil
-	}
-
-	// Write imports.
+// writeJavaConstraintsImports writes the import block for the Constraints class.
+func writeJavaConstraintsImports(buf *bytes.Buffer, needsPattern bool) {
 	buf.WriteString("\nimport java.util.ArrayList;\n")
 	buf.WriteString("import java.util.List;\n")
 	buf.WriteString("import java.util.Set;\n")
 	if needsPattern {
 		buf.WriteString("import java.util.regex.Pattern;\n")
 	}
+}
 
-	// Write ValidationError class.
-	buf.WriteString(`
+// javaValidationErrorType is the ValidationError record source (no imports).
+const javaValidationErrorType = `
 /**
  * Describes a single constraint violation.
  */
 public record ValidationError(String field, String message) {}
-`)
+`
 
-	// Write Constraints class.
+// Generate produces a Java file with validate<TableName> static methods for each
+// table that has extractable constraints (NOT NULL, enum, CHECK, JSON schema).
+// The combined form declares two public types (ValidationError and Constraints);
+// GenerateFiles is the compilable one-public-type-per-file form.
+func (g *JavaConstraintsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
+	var buf bytes.Buffer
+	buf.WriteString(genkit.Header(genkit.CommentSlash))
+	buf.WriteString("// Regenerate with: pgdesign codegen --lang java --mode constraints <schema-files>\n")
+	if schema.Name != "" {
+		fmt.Fprintf(&buf, "// Schema: %s\n", schema.Name)
+	}
+
+	work, needsPattern := collectJavaConstraintWork(schema)
+
+	if len(work) == 0 {
+		buf.WriteString("\n// No tables with extractable constraints.\n")
+		return buf.Bytes(), nil
+	}
+
+	writeJavaConstraintsImports(&buf, needsPattern)
+	buf.WriteString(javaValidationErrorType)
 	buf.WriteString(`
 public final class Constraints {
     private Constraints() {}
 `)
-
-	// Generate per-table validators.
 	for _, tw := range work {
 		writeJavaValidator(&buf, tw.table, tw.cs)
 	}
-
 	buf.WriteString("}\n")
 
 	return buf.Bytes(), nil
+}
+
+// GenerateFiles implements MultiFileGenerator, emitting ValidationError.java and
+// Constraints.java as separate single-public-type compilation units. When the
+// schema has no extractable constraints, a single Constraints.java carrying the
+// "no constraints" note is emitted so the stamp/orphan contracts still hold.
+func (g *JavaConstraintsGenerator) GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+	header := genkit.Header(genkit.CommentSlash)
+	regenLine := "// Regenerate with: pgdesign codegen --lang java --mode constraints <schema-files>\n"
+
+	work, needsPattern := collectJavaConstraintWork(schema)
+	files := make(map[string][]byte)
+
+	if len(work) == 0 {
+		var buf bytes.Buffer
+		buf.WriteString(header)
+		buf.WriteString(regenLine)
+		if schema.Name != "" {
+			fmt.Fprintf(&buf, "// Schema: %s\n", schema.Name)
+		}
+		buf.WriteString("\n// No tables with extractable constraints.\n")
+		files["Constraints.java"] = buf.Bytes()
+		return files, nil
+	}
+
+	// ValidationError.java
+	var veBuf bytes.Buffer
+	veBuf.WriteString(header)
+	veBuf.WriteString(javaValidationErrorType)
+	files["ValidationError.java"] = veBuf.Bytes()
+
+	// Constraints.java
+	var cBuf bytes.Buffer
+	cBuf.WriteString(header)
+	cBuf.WriteString(regenLine)
+	if schema.Name != "" {
+		fmt.Fprintf(&cBuf, "// Schema: %s\n", schema.Name)
+	}
+	writeJavaConstraintsImports(&cBuf, needsPattern)
+	cBuf.WriteString(`
+public final class Constraints {
+    private Constraints() {}
+`)
+	for _, tw := range work {
+		writeJavaValidator(&cBuf, tw.table, tw.cs)
+	}
+	cBuf.WriteString("}\n")
+	files["Constraints.java"] = cBuf.Bytes()
+
+	return files, nil
 }
 
 func writeJavaValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {

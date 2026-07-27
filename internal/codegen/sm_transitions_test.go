@@ -89,7 +89,7 @@ func TestTSTypesGenerator_TransitionMap(t *testing.T) {
 	}
 
 	// Transition map should be present.
-	if !strings.Contains(result, "export const orderStatusTransitions: Record<OrderStatus, OrderStatus[]>") {
+	if !strings.Contains(result, "export const orderStatusTransitions: Partial<Record<OrderStatus, OrderStatus[]>>") {
 		t.Errorf("missing orderStatusTransitions declaration, got:\n%s", result)
 	}
 

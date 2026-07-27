@@ -17,51 +17,43 @@ import (
 // foreign key metadata.
 type JavaJPAGenerator struct{}
 
-// Generate produces a Java source file with one @Entity class per table in the
-// schema.
-func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
-	var buf bytes.Buffer
-	header := genkit.Header(genkit.CommentSlash)
+// jpaField is one field of a generated JPA entity, with the imports its type
+// requires (so per-file import blocks can be assembled in GenerateFiles).
+type jpaField struct {
+	Annotations []string
+	JavaType    string
+	Name        string
+	Group       int // 0=columns, 1=ManyToOne, 2=OneToMany
+	Imports     []string
+}
 
-	if len(schema.Tables) == 0 {
-		buf.WriteString(header)
-		return buf.Bytes(), nil
-	}
+// jpaEntity is one generated @Entity class.
+type jpaEntity struct {
+	TableName string
+	ClassName string
+	Fields    []jpaField
+}
 
+// collectJPAEntities builds the entity model from the schema. It ensures the FK
+// graph is present. javax.persistence.* is required by every entity and is not
+// tracked per field.
+func collectJPAEntities(schema *model.Schema) []jpaEntity {
 	if schema.FKGraph == nil {
 		schema.BuildFKGraph()
 	}
 
-	// Collect entity information and imports.
-	type fieldInfo struct {
-		Annotations []string
-		JavaType    string
-		Name        string
-		Group       int // 0=columns, 1=ManyToOne, 2=OneToMany
-	}
-	type entityInfo struct {
-		TableName string
-		ClassName string
-		Fields    []fieldInfo
-	}
-
-	imports := make(map[string]bool)
-	imports["javax.persistence.*"] = true
-	var entities []entityInfo
-
+	var entities []jpaEntity
 	for _, tbl := range schema.Tables {
-		ei := entityInfo{
+		ei := jpaEntity{
 			TableName: tbl.Name,
 			ClassName: toPascalCase(tbl.Name),
 		}
 
-		// Build PK set.
 		pkSet := make(map[string]bool, len(tbl.PK))
 		for _, pk := range tbl.PK {
 			pkSet[pk] = true
 		}
 
-		// Build set of columns that are single-column FK sources.
 		fkColSet := make(map[string]model.FK)
 		for _, fk := range tbl.FKs {
 			if len(fk.Columns) == 1 {
@@ -83,9 +75,6 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 			} else if !col.NotNull {
 				javaType, typeImports = toJavaWrapper(javaType, typeImports)
 			}
-			for _, imp := range typeImports {
-				imports[imp] = true
-			}
 
 			var annotations []string
 			if pkSet[col.Name] {
@@ -105,11 +94,12 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 				annotations = append(annotations, fmt.Sprintf("@Column(name = %q, nullable = %s)", col.Name, nullable))
 			}
 
-			ei.Fields = append(ei.Fields, fieldInfo{
+			ei.Fields = append(ei.Fields, jpaField{
 				Annotations: annotations,
 				JavaType:    javaType,
 				Name:        toCamelCase(col.Name),
 				Group:       0,
+				Imports:     typeImports,
 			})
 		}
 
@@ -132,7 +122,7 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 				fmt.Sprintf("@JoinColumn(name = %q, nullable = %s)", fk.Columns[0], nullable),
 			}
 
-			ei.Fields = append(ei.Fields, fieldInfo{
+			ei.Fields = append(ei.Fields, jpaField{
 				Annotations: annotations,
 				JavaType:    refType,
 				Name:        fieldName,
@@ -152,22 +142,68 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 					continue
 				}
 				seen[e.FKName] = true
-				imports["java.util.List"] = true
 				refType := toPascalCase(e.FromTable)
 				fieldName := jpaRelFieldName(e.FromColumn, tbl.Name)
 				annotations := []string{
 					fmt.Sprintf("@OneToMany(mappedBy = %q)", fieldName),
 				}
-				ei.Fields = append(ei.Fields, fieldInfo{
+				ei.Fields = append(ei.Fields, jpaField{
 					Annotations: annotations,
 					JavaType:    "List<" + refType + ">",
 					Name:        toCamelCase(e.FromTable),
 					Group:       2,
+					Imports:     []string{"java.util.List"},
 				})
 			}
 		}
 
 		entities = append(entities, ei)
+	}
+	return entities
+}
+
+// writeJPAEntityBody writes the @Entity class declaration and its fields.
+func writeJPAEntityBody(buf *bytes.Buffer, ei jpaEntity) {
+	fmt.Fprintf(buf, "@Entity\n")
+	fmt.Fprintf(buf, "@Table(name = %q)\n", ei.TableName)
+	fmt.Fprintf(buf, "public class %s {\n", ei.ClassName)
+
+	lastGroup := -1
+	for _, f := range ei.Fields {
+		if lastGroup >= 0 && f.Group != lastGroup {
+			buf.WriteString("\n")
+		}
+		for _, ann := range f.Annotations {
+			fmt.Fprintf(buf, "    %s\n", ann)
+		}
+		fmt.Fprintf(buf, "    private %s %s;\n", f.JavaType, f.Name)
+		lastGroup = f.Group
+	}
+	buf.WriteString("}\n")
+}
+
+// Generate produces a single Java source file with one @Entity class per table.
+// This combined form has multiple public classes and is not legal Java for
+// multi-table schemas; GenerateFiles is the compilable, one-class-per-file form.
+func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Diagnostic) {
+	var buf bytes.Buffer
+	header := genkit.Header(genkit.CommentSlash)
+
+	if len(schema.Tables) == 0 {
+		buf.WriteString(header)
+		return buf.Bytes(), nil
+	}
+
+	entities := collectJPAEntities(schema)
+
+	imports := make(map[string]bool)
+	imports["javax.persistence.*"] = true
+	for _, ei := range entities {
+		for _, f := range ei.Fields {
+			for _, imp := range f.Imports {
+				imports[imp] = true
+			}
+		}
 	}
 
 	// Separate imports into groups: java.*, javax.*, third-party.
@@ -186,10 +222,7 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 	sort.Strings(javaxImports)
 	sort.Strings(thirdPartyImports)
 
-	// Write output.
 	buf.WriteString(header)
-
-	// Write imports.
 	buf.WriteString("\n")
 	for _, imp := range javaImports {
 		fmt.Fprintf(&buf, "import %s;\n", imp)
@@ -207,30 +240,39 @@ func (g *JavaJPAGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		}
 	}
 
-	// Write entity classes.
 	for _, ei := range entities {
 		buf.WriteString("\n")
-		fmt.Fprintf(&buf, "@Entity\n")
-		fmt.Fprintf(&buf, "@Table(name = %q)\n", ei.TableName)
-		fmt.Fprintf(&buf, "public class %s {\n", ei.ClassName)
-
-		// Write fields, inserting blank lines between groups.
-		lastGroup := -1
-		for _, f := range ei.Fields {
-			if lastGroup >= 0 && f.Group != lastGroup {
-				buf.WriteString("\n")
-			}
-			for _, ann := range f.Annotations {
-				fmt.Fprintf(&buf, "    %s\n", ann)
-			}
-			fmt.Fprintf(&buf, "    private %s %s;\n", f.JavaType, f.Name)
-			lastGroup = f.Group
-		}
-
-		buf.WriteString("}\n")
+		writeJPAEntityBody(&buf, ei)
 	}
 
 	return buf.Bytes(), nil
+}
+
+// GenerateFiles implements MultiFileGenerator, emitting one <Entity>.java per
+// table. Each file carries only the imports its own fields require (plus the
+// shared javax.persistence.*), so every file is a legal single-public-class
+// compilation unit.
+func (g *JavaJPAGenerator) GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+	header := genkit.Header(genkit.CommentSlash)
+	files := make(map[string][]byte)
+
+	for _, ei := range collectJPAEntities(schema) {
+		fileImports := make(map[string]bool)
+		for _, f := range ei.Fields {
+			for _, imp := range f.Imports {
+				fileImports[imp] = true
+			}
+		}
+
+		var buf bytes.Buffer
+		buf.WriteString(header)
+		writeJavaFileImports(&buf, fileImports)
+		buf.WriteString("\nimport javax.persistence.*;\n\n")
+		writeJPAEntityBody(&buf, ei)
+		files[ei.ClassName+".java"] = buf.Bytes()
+	}
+
+	return files, nil
 }
 
 // jpaRelFieldName derives the Java field name for a @ManyToOne relationship.

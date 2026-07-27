@@ -121,6 +121,111 @@ func (g *JavaTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnosti
 	return buf.Bytes(), nil
 }
 
+// GenerateFiles implements MultiFileGenerator, emitting one file per public
+// Java type: one <Enum>.java per enum, one <Record>.java per table, and a
+// Transitions.java holder class for state-machine transition maps. Java allows
+// only one public top-level type per file (with a matching filename), so the
+// single-file Generate output above is not legal Java for multi-type schemas;
+// this split is the compilable form.
+func (g *JavaTypesGenerator) GenerateFiles(schema *model.Schema) (map[string][]byte, []diagnostic.Diagnostic) {
+	header := genkit.Header(genkit.CommentSlash)
+	files := make(map[string][]byte)
+
+	// One file per enum.
+	for _, e := range schema.Enums {
+		var buf bytes.Buffer
+		buf.WriteString(header)
+		buf.WriteString("\n")
+		buf.WriteString(generateJavaEnum(e))
+		files[toPascalCase(e.Name)+".java"] = buf.Bytes()
+	}
+
+	// Transition maps live inside a holder class -- a bare `public static final
+	// Map ...` is not a legal top-level declaration in Java.
+	if len(schema.StateMachineTransitions) > 0 {
+		smBlock := GenerateTransitionMaps(schema.StateMachineTransitions, LangJava)
+		var buf bytes.Buffer
+		buf.WriteString(header)
+		buf.WriteString("\nimport java.util.Map;\nimport java.util.Set;\n\n")
+		buf.WriteString("public final class Transitions {\n")
+		buf.WriteString("    private Transitions() {}\n\n")
+		buf.WriteString(indentJavaBlock(smBlock))
+		buf.WriteString("}\n")
+		files["Transitions.java"] = buf.Bytes()
+	}
+
+	// One record file per table.
+	for _, tbl := range schema.Tables {
+		recImports := make(map[string]bool)
+		var fieldLines []string
+		for _, col := range tbl.Columns {
+			javaType, typeImports := pgTypeToJava(col)
+			for _, imp := range typeImports {
+				recImports[imp] = true
+			}
+			fieldLines = append(fieldLines, fmt.Sprintf("    %s %s", javaType, toCamelCase(col.Name)))
+		}
+
+		var buf bytes.Buffer
+		buf.WriteString(header)
+		writeJavaFileImports(&buf, recImports)
+		buf.WriteString("\n")
+		fmt.Fprintf(&buf, "/** Represents the %s table. */\n", tbl.Name)
+		fmt.Fprintf(&buf, "public record %s(\n", toPascalCase(tbl.Name))
+		buf.WriteString(strings.Join(fieldLines, ",\n"))
+		buf.WriteString("\n) {}\n")
+		files[toPascalCase(tbl.Name)+".java"] = buf.Bytes()
+	}
+
+	return files, nil
+}
+
+// writeJavaFileImports writes an import block for a single Java file, grouping
+// stdlib (java.*) imports before third-party ones, each group sorted. It emits a
+// leading blank line before the imports when the set is non-empty.
+func writeJavaFileImports(buf *bytes.Buffer, imports map[string]bool) {
+	var stdlib, thirdParty []string
+	for imp := range imports {
+		if strings.HasPrefix(imp, "java.") {
+			stdlib = append(stdlib, imp)
+		} else {
+			thirdParty = append(thirdParty, imp)
+		}
+	}
+	if len(stdlib) == 0 && len(thirdParty) == 0 {
+		return
+	}
+	sort.Strings(stdlib)
+	sort.Strings(thirdParty)
+	buf.WriteString("\n")
+	for _, imp := range stdlib {
+		fmt.Fprintf(buf, "import %s;\n", imp)
+	}
+	if len(stdlib) > 0 && len(thirdParty) > 0 {
+		buf.WriteString("\n")
+	}
+	for _, imp := range thirdParty {
+		fmt.Fprintf(buf, "import %s;\n", imp)
+	}
+}
+
+// indentJavaBlock indents every non-empty line of a rendered block by four
+// spaces so it nests cleanly inside a holder class body.
+func indentJavaBlock(block string) string {
+	lines := strings.Split(block, "\n")
+	var buf bytes.Buffer
+	for _, ln := range lines {
+		if ln == "" {
+			buf.WriteString("\n")
+			continue
+		}
+		buf.WriteString("    ")
+		buf.WriteString(ln)
+		buf.WriteString("\n")
+	}
+	return buf.String()
+}
+
 // pgTypeToJava maps a column's PostgreSQL type to a Java type string and
 // returns any import paths needed.
 func pgTypeToJava(col model.Column) (string, []string) {
