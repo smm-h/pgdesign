@@ -1079,7 +1079,12 @@ consumes N); modelgen's later increments grow alongside their consumers.
   representation — expected EMPTY for identity purposes (a verification test
   asserts it; if the test ever finds semantic registry state missing from the
   model collections, that state is added to the model, not to identity via
-  the snapshot); its sole role is import-surface reconstruction — with an
+  the snapshot — ESCAPE HATCH EXERCISED 2026-07: SM transition graphs with
+  per-state/per-transition comments had no model home; Schema.StateMachines
+  is now a first-class identity-bearing model collection with kind "sm_type"
+  encode/decode; states are SEMANTIC order — PG enum label order — and the
+  snapshot's emptiness test is unconditional over ALL models); its sole role
+  is import-surface reconstruction — with an
   explicit field policy (semantic + all comments; Source excluded) and the
   stale Source doc comment fixed. Allowlist completed: Index.IsAutoFK
   (excluded — enrich-derived), Table.PartmanManaged and Table.PartmanParent
