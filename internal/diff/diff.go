@@ -8,6 +8,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/risk"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
@@ -581,8 +582,8 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 		changed = true
 	}
 
-	// Generated comparison.
-	if desired.Generated != actual.Generated {
+	// Generated comparison (the generation expression compares via N).
+	if !sqlparse.ExprEqual(desired.Generated, actual.Generated) {
 		cc.GeneratedChanged = &[2]string{actual.Generated, desired.Generated}
 		changed = true
 	}
@@ -797,15 +798,31 @@ func intPtrEqualWithDefault(a, b *int, base string) bool {
 }
 
 // normalizeDefault returns a normalized default value for comparison.
-// DefaultExpr takes precedence over Default (literal).
+// DefaultExpr (a SQL expression) takes precedence over Default (a literal).
+//
+// Expression defaults route through N (the single ≈_syn computation). Literal
+// defaults are compared EXACTLY (trim only) — never lowercased: the old
+// ToLower was unsound, identifying the distinct literals 'Active' and 'active'
+// as equal and MISSING real drift. A literal is an opaque value, not an
+// expression, so routing it through N (which would parse a bare word as a
+// case-folded column reference) is wrong; exact comparison is correct.
 func normalizeDefault(literal *string, expr string) string {
 	if expr != "" {
-		return strings.ToLower(strings.TrimSpace(expr))
+		return sqlparse.NormalizeExpr(expr)
 	}
 	if literal != nil {
-		return strings.ToLower(strings.TrimSpace(*literal))
+		return strings.TrimSpace(*literal)
 	}
 	return ""
+}
+
+// domainDefaultKey normalizes a domain default (expression via N, literal
+// exact) into a comparison key. DefaultExpr takes precedence over the literal.
+func domainDefaultKey(literal, expr string) string {
+	if expr != "" {
+		return sqlparse.NormalizeExpr(expr)
+	}
+	return strings.TrimSpace(literal)
 }
 
 // diffFKs matches foreign keys by name.
@@ -868,7 +885,7 @@ func indexEqual(a, b *model.Index) bool {
 		a.Method == b.Method &&
 		mapEqual(a.Opclasses, b.Opclasses) &&
 		mapEqual(a.Collations, b.Collations) &&
-		a.Where == b.Where &&
+		sqlparse.ExprEqual(a.Where, b.Where) &&
 		sliceEqual(a.Include, b.Include) &&
 		mapEqual(a.With, b.With)
 }
@@ -943,7 +960,7 @@ func diffChecks(td *TableDiff, desired, actual *model.Table) {
 		td.ChecksRemoved = append(td.ChecksRemoved, c.Name)
 	}
 	for _, p := range matched {
-		if p.Desired.Expr != p.Actual.Expr {
+		if !sqlparse.ExprEqual(p.Desired.Expr, p.Actual.Expr) {
 			td.ChecksRemoved = append(td.ChecksRemoved, p.Actual.Name)
 			td.ChecksAdded = append(td.ChecksAdded, p.Desired)
 		}
@@ -970,7 +987,7 @@ func diffExclusions(td *TableDiff, desired, actual *model.Table) {
 }
 
 func exclusionEqual(a, b model.ExclusionConstraint) bool {
-	if a.Method != b.Method || a.Where != b.Where || a.Deferrable != b.Deferrable || a.InitiallyDeferred != b.InitiallyDeferred {
+	if a.Method != b.Method || !sqlparse.ExprEqual(a.Where, b.Where) || a.Deferrable != b.Deferrable || a.InitiallyDeferred != b.InitiallyDeferred {
 		return false
 	}
 	if len(a.Elements) != len(b.Elements) {
@@ -1068,11 +1085,11 @@ func diffPolicy(desired, actual *model.Policy) *PolicyDiff {
 		pd.RoleChanged = &[2]string{actual.Role, desired.Role}
 		changed = true
 	}
-	if desired.Using != actual.Using {
+	if !sqlparse.ExprEqual(desired.Using, actual.Using) {
 		pd.UsingChanged = &[2]string{actual.Using, desired.Using}
 		changed = true
 	}
-	if desired.WithCheck != actual.WithCheck {
+	if !sqlparse.ExprEqual(desired.WithCheck, actual.WithCheck) {
 		pd.WithCheckChanged = &[2]string{actual.WithCheck, desired.WithCheck}
 		changed = true
 	}
@@ -1873,22 +1890,26 @@ func diffDomain(desired, actual *model.Domain) *DomainDiff {
 		changed = true
 	}
 
-	if desired.Check != actual.Check {
+	if !sqlparse.ExprEqual(desired.Check, actual.Check) {
 		dd.CheckChanged = &[2]string{actual.Check, desired.Check}
 		changed = true
 	}
 
-	// Compare defaults: normalize DefaultExpr and Default into a single string for comparison.
-	desiredDefault := desired.DefaultExpr
-	if desiredDefault == "" {
-		desiredDefault = desired.Default
+	// Compare defaults via N: an expression default (DefaultExpr) routes through
+	// N; a literal default (Default) compares exactly. DefaultExpr takes
+	// precedence over the literal.
+	desiredRaw := desired.DefaultExpr
+	if desiredRaw == "" {
+		desiredRaw = desired.Default
 	}
-	actualDefault := actual.DefaultExpr
-	if actualDefault == "" {
-		actualDefault = actual.Default
+	actualRaw := actual.DefaultExpr
+	if actualRaw == "" {
+		actualRaw = actual.Default
 	}
+	desiredDefault := domainDefaultKey(desired.Default, desired.DefaultExpr)
+	actualDefault := domainDefaultKey(actual.Default, actual.DefaultExpr)
 	if desiredDefault != actualDefault {
-		dd.DefaultChanged = &[2]string{actualDefault, desiredDefault}
+		dd.DefaultChanged = &[2]string{actualRaw, desiredRaw}
 		changed = true
 	}
 

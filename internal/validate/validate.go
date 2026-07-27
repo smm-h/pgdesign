@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -14,6 +13,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/pgcap"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sqlexpr"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/pgdesign/internal/sqlutil"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
@@ -1722,7 +1722,7 @@ func checkDomainCheckDuplicate(schema *model.Schema, _ *Config) []diagnostic.Dia
 			}
 			// Replace VALUE in domain CHECK with the column name, then normalize both.
 			domExpr := replaceValue(dom.Check, col)
-			if normalizeExpr(domExpr) == normalizeExpr(chk.Expr) {
+			if sqlparse.ExprEqual(domExpr, chk.Expr) {
 				diags = append(diags, diagnostic.Diagnostic{
 					Severity:   diagnostic.Warning,
 					Code:       "W018",
@@ -1793,71 +1793,6 @@ func replaceValue(expr string, colName string) string {
 	return valueRe.ReplaceAllString(expr, colName)
 }
 
-// normalizeExpr produces a canonical string from an SQL expression for comparison.
-func normalizeExpr(expr string) string {
-	node, err := sqlexpr.Parse(expr)
-	if err != nil {
-		// Fallback: lowercase, collapse whitespace.
-		return collapseWhitespace(strings.ToLower(expr))
-	}
-	return canonicalString(node)
-}
-
-// canonicalString recursively produces a canonical string representation of an AST node.
-func canonicalString(node sqlexpr.Node) string {
-	if node == nil {
-		return ""
-	}
-	switch n := node.(type) {
-	case *sqlexpr.BinaryOp:
-		left := canonicalString(n.Left)
-		right := canonicalString(n.Right)
-		op := strings.ToUpper(n.Op)
-		// Sort commutative operands alphabetically.
-		if op == "AND" || op == "OR" {
-			parts := []string{left, right}
-			sort.Strings(parts)
-			return parts[0] + " " + op + " " + parts[1]
-		}
-		return left + " " + op + " " + right
-	case *sqlexpr.UnaryOp:
-		return canonicalString(n.Operand) + " " + strings.ToUpper(n.Op)
-	case *sqlexpr.ParenExpr:
-		// Strip parens for normalization.
-		return canonicalString(n.Inner)
-	case *sqlexpr.ColumnRef:
-		return strings.Join(n.Parts, ".")
-	case *sqlexpr.NullLiteral:
-		return "NULL"
-	case *sqlexpr.IntLiteral:
-		return strconv.Itoa(n.Value)
-	case *sqlexpr.FloatLiteral:
-		return strconv.FormatFloat(n.Value, 'f', -1, 64)
-	case *sqlexpr.StringLiteral:
-		return "'" + n.Value + "'"
-	case *sqlexpr.BoolLiteral:
-		if n.Value {
-			return "TRUE"
-		}
-		return "FALSE"
-	case *sqlexpr.FuncCall:
-		args := make([]string, len(n.Args))
-		for i, arg := range n.Args {
-			args[i] = canonicalString(arg)
-		}
-		return strings.ToUpper(n.Name) + "(" + strings.Join(args, ", ") + ")"
-	case *sqlexpr.Cast:
-		return canonicalString(n.Expr) + "::" + strings.ToUpper(n.TypeName)
-	default:
-		return fmt.Sprintf("%v", n)
-	}
-}
-
-// collapseWhitespace normalizes runs of whitespace to single spaces and trims.
-func collapseWhitespace(s string) string {
-	fields := strings.Fields(s)
-	return strings.Join(fields, " ")
-}
 
 // checkRangeSubsumption (W019): a CHECK constraint subsumed by another on the same column.
 func checkRangeSubsumption(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
