@@ -1115,6 +1115,41 @@ func TestPartmanSeparateIntervalRetention(t *testing.T) {
 	}
 }
 
+func TestPartmanScheduleEmitsCron(t *testing.T) {
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pg_partman", "pg_cron"},
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
+				},
+				PK: []string{"id"},
+				Partitioning: &model.PartitionSpec{
+					Strategy: "range",
+					Columns:  []string{"created_at"},
+				},
+				Maintenance: &model.MaintenanceConfig{
+					Interval: "1 month",
+					Premake:  4,
+					Schedule: "*/30 * * * *",
+				},
+			},
+		},
+	}
+
+	out := mustGenerate(t, schema, Options{Format: "sql"})
+	if !strings.Contains(out, "cron.schedule('partman-maintenance', '*/30 * * * *'") {
+		t.Errorf("expected cron.schedule call with the configured schedule, got:\n%s", out)
+	}
+	if !strings.Contains(out, "run_maintenance_proc") {
+		t.Errorf("expected run_maintenance_proc in cron job, got:\n%s", out)
+	}
+}
+
 func TestRLSPolicyGeneration(t *testing.T) {
 	schema := &model.Schema{
 		Name: "app",

@@ -2538,9 +2538,17 @@ func TestCreateExtensionInSchema(t *testing.T) {
 }
 
 func TestPartmanRunMaintenanceCron(t *testing.T) {
-	got := PartmanRunMaintenanceCron()
+	got := PartmanRunMaintenanceCron("*/30 * * * *")
 	// Golden assertion: exact SQL output for pg_cron scheduling of partman maintenance.
 	want := `SELECT cron.schedule('partman-maintenance', '*/30 * * * *', $$CALL partman.run_maintenance_proc()$$);`
+	if got != want {
+		t.Errorf("PartmanRunMaintenanceCron:\n  got:  %s\n  want: %s", got, want)
+	}
+}
+
+func TestPartmanRunMaintenanceCron_CustomSchedule(t *testing.T) {
+	got := PartmanRunMaintenanceCron("0 3 * * *")
+	want := `SELECT cron.schedule('partman-maintenance', '0 3 * * *', $$CALL partman.run_maintenance_proc()$$);`
 	if got != want {
 		t.Errorf("PartmanRunMaintenanceCron:\n  got:  %s\n  want: %s", got, want)
 	}

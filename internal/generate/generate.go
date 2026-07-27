@@ -210,6 +210,10 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 					sql.UpdatePartmanConfig(t.Schema, t.Name,
 						t.Maintenance.Retention, t.Maintenance.RetentionKeepTable))
 			}
+			if t.Maintenance.Schedule != "" {
+				partmanStmts = append(partmanStmts,
+					sql.PartmanRunMaintenanceCron(t.Maintenance.Schedule))
+			}
 		}
 	}
 	if len(partmanStmts) > 0 {

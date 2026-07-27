@@ -1972,6 +1972,12 @@ func (p *parser) parseMaintenance(tableName string, rt *RawTable) {
 			} else {
 				p.errorf("E010", tableName, "", "[tables.%s.maintenance].retention_keep_table must be a boolean", tableName)
 			}
+		case "schedule":
+			if v, ok := nodeString(kv.Val); ok {
+				maint.Schedule = &v
+			} else {
+				p.errorf("E010", tableName, "", "[tables.%s.maintenance].schedule must be a string (a pg_cron schedule expression)", tableName)
+			}
 		default:
 			p.warnf("W001", tableName, "", "unknown key in [tables.%s.maintenance]: %q", tableName, key)
 		}

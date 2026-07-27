@@ -71,3 +71,35 @@ func TestBuild_MaintenancePremakeRequired(t *testing.T) {
 		t.Errorf("expected error mentioning premake, got: %v", diags)
 	}
 }
+
+func TestBuild_MaintenanceScheduleRequiresPgCron(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	raw := maintenanceRawSchema()
+	sched := "*/30 * * * *"
+	raw.Tables[0].Maintenance.Schedule = &sched
+	// pg_cron NOT declared (only pg_partman).
+
+	_, diags := Build(raw, reg)
+	if !diags.HasErrors() {
+		t.Fatal("expected error when schedule is set without pg_cron declared")
+	}
+	if !hasErrorContaining(diags, "pg_cron") {
+		t.Errorf("expected error mentioning pg_cron, got: %v", diags)
+	}
+}
+
+func TestBuild_MaintenanceScheduleWithPgCron(t *testing.T) {
+	reg := semtype.NewBuiltinRegistry()
+	raw := maintenanceRawSchema()
+	raw.Meta.Extensions = []string{"pg_partman", "pg_cron"}
+	sched := "*/30 * * * *"
+	raw.Tables[0].Maintenance.Schedule = &sched
+
+	schema, diags := Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("schedule with pg_cron should build cleanly, got: %v", diags)
+	}
+	if schema.Tables[0].Maintenance.Schedule != "*/30 * * * *" {
+		t.Errorf("Schedule = %q, want %q", schema.Tables[0].Maintenance.Schedule, "*/30 * * * *")
+	}
+}

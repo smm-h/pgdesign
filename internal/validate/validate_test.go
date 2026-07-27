@@ -54,6 +54,53 @@ func TestE201_FKMissingOnDelete(t *testing.T) {
 	}
 }
 
+func TestW029_MaintenanceNoSchedule(t *testing.T) {
+	schema := &model.Schema{
+		Extensions: []string{"pg_partman"},
+		Tables: []model.Table{{
+			Name:    "events",
+			Schema:  "public",
+			Comment: "Events",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+			},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 month", Premake: 4,
+				// Schedule empty
+			},
+		}},
+	}
+
+	diags, _ := Validate(schema, nil)
+	if len(findByCode(diags, "W029")) == 0 {
+		t.Fatal("expected W029 when partman-managed table has no maintenance schedule")
+	}
+}
+
+func TestW029_MaintenanceWithScheduleNoWarn(t *testing.T) {
+	schema := &model.Schema{
+		Extensions: []string{"pg_partman", "pg_cron"},
+		Tables: []model.Table{{
+			Name:    "events",
+			Schema:  "public",
+			Comment: "Events",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+			},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 month", Premake: 4, Schedule: "*/30 * * * *",
+			},
+		}},
+	}
+
+	diags, _ := Validate(schema, nil)
+	if len(findByCode(diags, "W029")) != 0 {
+		t.Error("did not expect W029 when a maintenance schedule is set")
+	}
+}
+
 func TestE202_TableMissingComment(t *testing.T) {
 	schema := &model.Schema{
 		Tables: []model.Table{{

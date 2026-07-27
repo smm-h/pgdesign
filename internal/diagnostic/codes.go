@@ -124,6 +124,7 @@ package diagnostic
 // W024  tsvector column without GIN index (workload)
 // W025  Potential N+1 query pattern (workload)
 // W026  Sequential scan heavy table (workload)
+// W029  Partman-managed table has no maintenance schedule (pg_cron)
 //
 // === Info diagnostics (I001-I099) ===
 //

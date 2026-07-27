@@ -251,6 +251,17 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 					SourceFile:    t.SourceFile,
 				})
 			}
+			if t.Maintenance.Schedule != "" {
+				tuples = append(tuples, ddlTuple{
+					SQL:           sql.PartmanRunMaintenanceCron(t.Maintenance.Schedule),
+					Kind:          "partman",
+					Name:          t.Name + "_schedule",
+					Table:         t.Name,
+					Phase:         5,
+					Transactional: true,
+					SourceFile:    t.SourceFile,
+				})
+			}
 		}
 	}
 

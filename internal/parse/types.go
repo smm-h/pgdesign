@@ -234,6 +234,7 @@ type RawMaintenance struct {
 	Premake            *int
 	Retention          *string
 	RetentionKeepTable *bool
+	Schedule           *string // pg_cron schedule expression for run_maintenance_proc
 }
 
 // RawFunctionArg holds a function argument from [[functions.*.args]].

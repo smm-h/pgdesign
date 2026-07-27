@@ -163,6 +163,7 @@ func Validate(schema *model.Schema, config *Config) ([]diagnostic.Diagnostic, []
 		{"E225", checkFKInvalidOnDelete},
 		{"E226", checkSMReservedTriggerPrefix},
 		{"E228", checkCascadeIntoAppendOnly},
+		{"W029", checkMaintenanceSchedule},
 	}
 
 	for _, r := range rules {
@@ -2700,6 +2701,27 @@ func checkSMDeadEndState(schema *model.Schema, config *Config) []diagnostic.Diag
 				}
 			}
 		}
+	}
+	return diags
+}
+
+// checkMaintenanceSchedule (W029): a partman-managed table has no maintenance
+// schedule, so partition premaking/retention will not run automatically. The
+// operator can acknowledge this (e.g. an external scheduler) by suppressing
+// W029 via [suppress].
+func checkMaintenanceSchedule(schema *model.Schema, config *Config) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+	for _, t := range schema.Tables {
+		if t.Maintenance == nil || t.Maintenance.Schedule != "" {
+			continue
+		}
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity:   diagnostic.Warning,
+			Code:       "W029",
+			Table:      t.Name,
+			Message:    fmt.Sprintf("table %q is partman-managed but has no maintenance schedule; partition premaking and retention will not run automatically", t.Name),
+			Suggestion: "Set [tables." + t.Name + ".maintenance].schedule to a pg_cron expression, or suppress W029 to acknowledge an external scheduler",
+		})
 	}
 	return diags
 }

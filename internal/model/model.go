@@ -435,6 +435,7 @@ type MaintenanceConfig struct {
 	Premake            int    `json:"premake"`
 	Retention          string `json:"retention"`
 	RetentionKeepTable bool   `json:"retention_keep_table"`
+	Schedule           string `json:"schedule,omitempty"` // pg_cron schedule for run_maintenance_proc
 }
 
 // StrPtr returns a pointer to the given string. Used for constructing

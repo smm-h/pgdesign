@@ -730,10 +730,11 @@ WHERE parent_table = '%s';`, escapedRetention, keepTableStr, escapedQualified)
 }
 
 // PartmanRunMaintenanceCron generates a SELECT cron.schedule() call to create
-// a pg_cron job that runs partman.run_maintenance_proc() on a regular schedule.
-// This is golden-tested only; live cron verification is out of scope.
-func PartmanRunMaintenanceCron() string {
-	return `SELECT cron.schedule('partman-maintenance', '*/30 * * * *', $$CALL partman.run_maintenance_proc()$$);`
+// a pg_cron job that runs partman.run_maintenance_proc() on the given cron
+// schedule (e.g. "*/30 * * * *"). Requires the pg_cron extension.
+func PartmanRunMaintenanceCron(schedule string) string {
+	escaped := strings.ReplaceAll(schedule, "'", "''")
+	return fmt.Sprintf(`SELECT cron.schedule('partman-maintenance', '%s', $$CALL partman.run_maintenance_proc()$$);`, escaped)
 }
 
 // AlterTableOwner generates an ALTER TABLE ... OWNER TO statement.

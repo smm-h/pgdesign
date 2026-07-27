@@ -2808,3 +2808,45 @@ id = "id"
 		t.Errorf("expected nil groups when no [groups] section, got %v", schema.Groups)
 	}
 }
+
+func TestParseMaintenanceSchedule(t *testing.T) {
+	content := `
+[meta]
+version = 1
+schema = "public"
+extensions = ["pg_partman", "pg_cron"]
+
+[tables.events]
+comment = "Events"
+[tables.events.columns]
+id = "id"
+created_at = "timestamp"
+
+[tables.events.partitioning]
+strategy = "range"
+column = "created_at"
+
+[tables.events.maintenance]
+interval = "1 month"
+premake = 4
+retention = "6 months"
+schedule = "*/30 * * * *"
+`
+	schema, diags := Bytes([]byte(content))
+	if schema == nil {
+		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	}
+	if hasFatalErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if len(schema.Tables) != 1 {
+		t.Fatalf("len(tables) = %d, want 1", len(schema.Tables))
+	}
+	m := schema.Tables[0].Maintenance
+	if m == nil {
+		t.Fatal("expected maintenance to be parsed")
+	}
+	if m.Schedule == nil || *m.Schedule != "*/30 * * * *" {
+		t.Errorf("maintenance.schedule = %v, want '*/30 * * * *'", m.Schedule)
+	}
+}

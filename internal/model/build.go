@@ -67,23 +67,36 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 func validateMaintenanceExtension(schema *Schema) diagnostic.Diagnostics {
 	var diags diagnostic.Diagnostics
 	hasPartman := false
+	hasCron := false
 	for _, ext := range schema.Extensions {
-		if ext == "pg_partman" {
+		switch ext {
+		case "pg_partman":
 			hasPartman = true
-			break
+		case "pg_cron":
+			hasCron = true
 		}
-	}
-	if hasPartman {
-		return nil
 	}
 	for i := range schema.Tables {
 		t := &schema.Tables[i]
-		if t.Maintenance != nil {
+		if t.Maintenance == nil {
+			continue
+		}
+		if !hasPartman {
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity: diagnostic.Error,
 				Code:     "E010",
 				Table:    t.Name,
 				Message:  fmt.Sprintf("[tables.%s.maintenance] requires the pg_partman extension to be declared in [meta].extensions", t.Name),
+			})
+		}
+		// A maintenance schedule is executed via pg_cron; declaring one without
+		// pg_cron would emit a cron.schedule() call that fails at apply time.
+		if t.Maintenance.Schedule != "" && !hasCron {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E010",
+				Table:    t.Name,
+				Message:  fmt.Sprintf("[tables.%s.maintenance].schedule requires the pg_cron extension to be declared in [meta].extensions", t.Name),
 			})
 		}
 	}
@@ -734,6 +747,9 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, s
 		}
 		if rt.Maintenance.RetentionKeepTable != nil {
 			mc.RetentionKeepTable = *rt.Maintenance.RetentionKeepTable
+		}
+		if rt.Maintenance.Schedule != nil {
+			mc.Schedule = *rt.Maintenance.Schedule
 		}
 		// interval is required for any partman-managed table.
 		if mc.Interval == "" {
