@@ -140,3 +140,4 @@
 {"id":"18c63e59fe80c01014f7b6db3fdf426198c04c3984b8220f","commits":["9ce577bac93688d452ce974c01b0cea7fe724561"],"user_facing":true,"description":"`DROP INDEX CONCURRENTLY` migration steps now emit `IF EXISTS`, so re-applying a migration after an interrupted concurrent index drop no longer fails on the already-absent index.","type":"fix"}
 {"id":"18c63e69c079946f8f804a4a77b74a31b5fdcc2f33b856a0","commits":["59d6604250a2e20891d6bee831fb7612753a30aa"],"user_facing":false}
 {"id":"18c63ea4c82b77c826146eb4b5c54aed9ad35c53aeca7ef3","commits":["bb77e389ddbaba288992c4b753289169e9421fcd"],"user_facing":false}
+{"id":"18c63ef00c5cc4838a95a4d39e6a4dc6938227997903125a","commits":["d41883a5d638fa6a28ed03841e9bfbd71f44421d"],"user_facing":false}
