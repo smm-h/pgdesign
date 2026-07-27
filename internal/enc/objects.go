@@ -1,6 +1,7 @@
 package enc
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -94,6 +95,105 @@ func EncodeObjects(s *model.Schema) (map[Key][]byte, error) {
 	return out, nil
 }
 
+// PeekKind reads the self-describing "kind" field from a per-object canonical
+// form without fully decoding it. It is what lets a whole-model form (roadmap
+// 1.5) — an ordered concatenation of per-object forms carrying no external
+// keys — route each form to the right decoder: the manifest key is not needed
+// for decoding, only the kind, and the kind travels inside the bytes.
+func PeekKind(b []byte) (Kind, error) {
+	var head struct {
+		Kind Kind `json:"kind"`
+	}
+	if err := json.Unmarshal(b, &head); err != nil {
+		return "", fmt.Errorf("enc: peek kind: %w", err)
+	}
+	if head.Kind == "" {
+		return "", fmt.Errorf("enc: peek kind: form carries no kind field")
+	}
+	return head.Kind, nil
+}
+
+// DecodeObject decodes a single per-object canonical form and merges it into s.
+// The schema-global header (KindSchemaMeta) sets the schema-level fields; every
+// other kind appends to its collection. It is the shared per-object decode
+// dispatch used by both DecodeObjects (keyed map) and the whole-model form
+// decoder in roadmap 1.5 (keyless ordered concatenation). DecodeObject does NOT
+// Canonicalize — the caller does that once after all objects are merged.
+func DecodeObject(s *model.Schema, b []byte) error {
+	kind, err := PeekKind(b)
+	if err != nil {
+		return err
+	}
+	switch kind {
+	case KindSchemaMeta:
+		meta, err := DecodeSchemaMeta(b)
+		if err != nil {
+			return err
+		}
+		s.Name = meta.Name
+		s.Extensions = meta.Extensions
+		s.Groups = meta.Groups
+		s.PGVersion = meta.PGVersion
+	case KindTable:
+		t, err := DecodeTable(b)
+		if err != nil {
+			return err
+		}
+		s.Tables = append(s.Tables, t)
+	case KindView:
+		v, err := DecodeView(b)
+		if err != nil {
+			return err
+		}
+		s.Views = append(s.Views, v)
+	case KindMatView:
+		mv, err := DecodeMaterializedView(b)
+		if err != nil {
+			return err
+		}
+		s.MaterializedViews = append(s.MaterializedViews, mv)
+	case KindSequence:
+		sq, err := DecodeSequence(b)
+		if err != nil {
+			return err
+		}
+		s.Sequences = append(s.Sequences, sq)
+	case KindFunction:
+		fn, err := DecodeFunction(b)
+		if err != nil {
+			return err
+		}
+		s.Functions = append(s.Functions, fn)
+	case KindEnum:
+		e, err := DecodeEnum(b)
+		if err != nil {
+			return err
+		}
+		s.Enums = append(s.Enums, e)
+	case KindDomain:
+		d, err := DecodeDomain(b)
+		if err != nil {
+			return err
+		}
+		s.Domains = append(s.Domains, d)
+	case KindComposite:
+		c, err := DecodeCompositeType(b)
+		if err != nil {
+			return err
+		}
+		s.CompositeTypes = append(s.CompositeTypes, c)
+	case KindSMType:
+		sm, err := DecodeStateMachine(b)
+		if err != nil {
+			return err
+		}
+		s.StateMachines = append(s.StateMachines, sm)
+	default:
+		return fmt.Errorf("enc: DecodeObject: unknown kind %q", kind)
+	}
+	return nil
+}
+
 // DecodeObjects reconstructs a schema from a per-object encoding produced by
 // EncodeObjects, then Canonicalizes it (rebuilding the derived caches and
 // canonical ordering the encoding deliberately omits). Together with
@@ -103,73 +203,11 @@ func DecodeObjects(objs map[Key][]byte) (*model.Schema, error) {
 	s := &model.Schema{}
 	sawMeta := false
 	for k, b := range objs {
-		switch k.Kind {
-		case KindSchemaMeta:
-			meta, err := DecodeSchemaMeta(b)
-			if err != nil {
-				return nil, err
-			}
-			s.Name = meta.Name
-			s.Extensions = meta.Extensions
-			s.Groups = meta.Groups
-			s.PGVersion = meta.PGVersion
+		if k.Kind == KindSchemaMeta {
 			sawMeta = true
-		case KindTable:
-			t, err := DecodeTable(b)
-			if err != nil {
-				return nil, err
-			}
-			s.Tables = append(s.Tables, t)
-		case KindView:
-			v, err := DecodeView(b)
-			if err != nil {
-				return nil, err
-			}
-			s.Views = append(s.Views, v)
-		case KindMatView:
-			mv, err := DecodeMaterializedView(b)
-			if err != nil {
-				return nil, err
-			}
-			s.MaterializedViews = append(s.MaterializedViews, mv)
-		case KindSequence:
-			sq, err := DecodeSequence(b)
-			if err != nil {
-				return nil, err
-			}
-			s.Sequences = append(s.Sequences, sq)
-		case KindFunction:
-			fn, err := DecodeFunction(b)
-			if err != nil {
-				return nil, err
-			}
-			s.Functions = append(s.Functions, fn)
-		case KindEnum:
-			e, err := DecodeEnum(b)
-			if err != nil {
-				return nil, err
-			}
-			s.Enums = append(s.Enums, e)
-		case KindDomain:
-			d, err := DecodeDomain(b)
-			if err != nil {
-				return nil, err
-			}
-			s.Domains = append(s.Domains, d)
-		case KindComposite:
-			c, err := DecodeCompositeType(b)
-			if err != nil {
-				return nil, err
-			}
-			s.CompositeTypes = append(s.CompositeTypes, c)
-		case KindSMType:
-			sm, err := DecodeStateMachine(b)
-			if err != nil {
-				return nil, err
-			}
-			s.StateMachines = append(s.StateMachines, sm)
-		default:
-			return nil, fmt.Errorf("enc: DecodeObjects: unknown key kind %q", k.Kind)
+		}
+		if err := DecodeObject(s, b); err != nil {
+			return nil, err
 		}
 	}
 	if !sawMeta {
