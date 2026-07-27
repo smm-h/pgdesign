@@ -37,3 +37,4 @@
 {"id":"18c603656fa10de53ba01ed2e2914ec89298e98e65d20d95","commits":["c95ed98fe7edd82603cdd92d16a04e6b9aed2c40"],"user_facing":true,"description":"**An explicit `--dir migrations` flag is now honored over config.** Previously indistinguishable from the default, so pgdesign.toml's migrations_dir silently won.","type":"fix"}
 {"id":"18c603d83da3033567909e7bbcc24a0b8e254185deb67bc2","commits":["6ffe557293d1fb6bc963e0f935f29c5f71b17ea2"],"user_facing":true,"description":"**`pgdesign codegen` gains `--groups`/`--source` filters and now matches `build` byte-for-byte.** Standalone codegen routes through the same planner, filters, and orphan-refusal write path as build.","type":"feature"}
 {"id":"18c604c6cc93a13ddd702131e2f44a938ea58b2a9f334e05","commits":["502b7f6223c81d48e7a801b806dd2014917a7859"],"user_facing":false}
+{"id":"18c604ed6c66c282cda53d6b87c4413c9a613906454c006e","commits":["819eed4882987edceec87b6b09b5d6b0d3b33000"],"user_facing":false}
