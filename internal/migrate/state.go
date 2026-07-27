@@ -61,16 +61,6 @@ func RecordMigration(ctx context.Context, conn *pgx.Conn, version, checksum, des
 	return nil
 }
 
-// RemoveMigration deletes a migration record from the tracking table.
-func RemoveMigration(ctx context.Context, conn *pgx.Conn, version string) error {
-	_, err := conn.Exec(ctx,
-		"DELETE FROM pgdesign_migrations WHERE version = $1", version)
-	if err != nil {
-		return fmt.Errorf("remove migration %s: %w", version, err)
-	}
-	return nil
-}
-
 // AcquireAdvisoryLock acquires a session-level advisory lock for migrations.
 // Returns true if the lock was acquired, false if another migration is in progress.
 func AcquireAdvisoryLock(ctx context.Context, conn *pgx.Conn) (bool, error) {

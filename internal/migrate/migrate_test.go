@@ -1557,18 +1557,6 @@ func TestIntegration_StateTracking(t *testing.T) {
 	if versions[0] != "0.1.0" || versions[1] != "0.2.0" {
 		t.Errorf("versions = %v, want [0.1.0, 0.2.0]", versions)
 	}
-
-	// Remove a migration.
-	if err := RemoveMigration(ctx, conn, "0.2.0"); err != nil {
-		t.Fatalf("remove: %v", err)
-	}
-	versions, err = AppliedVersions(ctx, conn)
-	if err != nil {
-		t.Fatalf("query: %v", err)
-	}
-	if len(versions) != 1 || versions[0] != "0.1.0" {
-		t.Errorf("versions = %v, want [0.1.0]", versions)
-	}
 }
 
 func TestIntegration_AdvisoryLock(t *testing.T) {
