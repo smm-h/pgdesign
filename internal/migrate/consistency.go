@@ -66,7 +66,50 @@ func VerifyChainConsistency(p *ChainProject) error {
 			return err
 		}
 	}
+
+	// (4) CONSOLIDATION INTEGRITY (roadmap 5.3): every consolidation edge's
+	// superseded-edge-id set must resolve to a known edge, and the sets must be
+	// pairwise DISJOINT (the A6 invariant, re-verified here — SquashChain enforces
+	// it at creation, the checker re-verifies it).
+	if err := verifyConsolidations(all); err != nil {
+		return err
+	}
 	return nil
+}
+
+// verifyConsolidations re-verifies the A6 disjointness invariant across ALL
+// consolidation edges (live + archived — a nested consolidation supersedes an
+// archived consolidation) and that every superseded id resolves to a known edge
+// (no dangling supersede reference — the archived originals must be present).
+func verifyConsolidations(all []Edge) error {
+	known := make(map[string]bool, len(all))
+	for _, e := range all {
+		known[e.ID()] = true
+	}
+	claimedBy := map[string]string{} // superseded edge id -> consolidation id that claims it
+	for _, e := range all {
+		if !e.Consolidation {
+			continue
+		}
+		for _, sid := range e.SupersededEdgeIDs {
+			if !known[sid] {
+				return fmt.Errorf("migrate: consistency: consolidation %s supersedes edge %s, which is not present in the chain or archive (dangling supersede reference)", e.ID()[:12], sid[:min12(sid)])
+			}
+			if other, ok := claimedBy[sid]; ok {
+				return fmt.Errorf("migrate: consistency: A6 disjointness violation: edge %s is superseded by both consolidation %s and %s (consolidation ranges must be pairwise disjoint)", sid[:min12(sid)], other[:12], e.ID()[:12])
+			}
+			claimedBy[sid] = e.ID()
+		}
+	}
+	return nil
+}
+
+// min12 clamps a hex id slice bound to 12 for compact messages (guards short ids).
+func min12(s string) int {
+	if len(s) < 12 {
+		return len(s)
+	}
+	return 12
 }
 
 // verifyEpochHomogeneity asserts every edge carries enc.CodecVersion (the store's

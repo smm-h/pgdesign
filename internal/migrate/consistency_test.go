@@ -113,6 +113,40 @@ func TestConsistencyMixedEpochRejected(t *testing.T) {
 	}
 }
 
+// TestConsistencyConsolidationDangling: the checker re-verifies consolidation
+// integrity. Tampering a consolidation edge's superseded list to reference an
+// edge that does not exist is caught as a dangling supersede reference. (The
+// superseded list is non-identity metadata, so this tamper survives LoadEdge's
+// content-hash check — the consistency checker is the gate that catches it.)
+func TestConsistencyConsolidationDangling(t *testing.T) {
+	p, _, _, _, r1, _, r3 := threeEdgeChain(t)
+	res, err := SquashChain(p, r1.String(), r3.String(), "")
+	if err != nil {
+		t.Fatalf("SquashChain: %v", err)
+	}
+	if err := VerifyChainConsistency(p); err != nil {
+		t.Fatalf("pre-tamper consistency: %v", err)
+	}
+
+	path := filepath.Join(p.edgesPath(), res.ConsolidationFile)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bogus := strings.Repeat("0", 64)
+	tampered := strings.Replace(string(raw), res.SupersededIDs[0], bogus, 1)
+	if tampered == string(raw) {
+		t.Fatal("test setup: superseded id not found in edge file")
+	}
+	if err := os.WriteFile(path, []byte(tampered), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err = VerifyChainConsistency(p)
+	if err == nil || !strings.Contains(err.Error(), "dangling supersede reference") {
+		t.Fatalf("expected dangling supersede reference error, got %v", err)
+	}
+}
+
 func itoa(n int) string {
 	if n == 0 {
 		return "0"
