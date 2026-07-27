@@ -895,6 +895,89 @@ func EncodeCompositeType(c model.CompositeType) ([]byte, error) {
 }
 
 // ---------------------------------------------------------------------------
+// StateMachine (first-class SM type definition — identity carrier)
+// ---------------------------------------------------------------------------
+
+type smStateForm struct {
+	Name     string `json:"name"`
+	Terminal bool   `json:"terminal,omitempty"`
+	Comment  string `json:"comment,omitempty"`
+}
+
+type smTransitionForm struct {
+	Name     string            `json:"name"`
+	From     []string          `json:"from"`
+	To       string            `json:"to"`
+	Requires map[string]string `json:"requires,omitempty"`
+	Comment  string            `json:"comment,omitempty"`
+}
+
+type stateMachineForm struct {
+	Codec          int                `json:"codec"`
+	Kind           Kind               `json:"kind"`
+	Name           string             `json:"name"`
+	Schema         string             `json:"schema,omitempty"`
+	States         []smStateForm      `json:"states"`
+	Transitions    []smTransitionForm `json:"transitions,omitempty"`
+	InitialState   string             `json:"initial_state"`
+	EnforceTrigger bool               `json:"enforce_trigger,omitempty"`
+	Comment        string             `json:"comment,omitempty"`
+}
+
+func stateMachineToForm(sm model.StateMachine) stateMachineForm {
+	// State order is SEMANTIC (it becomes the enum label order), so states are
+	// preserved verbatim. Transitions are a canonical-only set and From is a
+	// source-state set — both sorted by Canonicalize, so the encoder emits them
+	// as-is.
+	states := make([]smStateForm, len(sm.States))
+	for i, s := range sm.States {
+		states[i] = smStateForm{Name: s.Name, Terminal: s.Terminal, Comment: s.Comment}
+	}
+	trs := make([]smTransitionForm, len(sm.Transitions))
+	for i, tr := range sm.Transitions {
+		trs[i] = smTransitionForm{
+			Name:     tr.Name,
+			From:     tr.From,
+			To:       tr.To,
+			Requires: tr.Requires,
+			Comment:  tr.Comment,
+		}
+	}
+	return stateMachineForm{
+		Codec: CodecVersion, Kind: KindSMType,
+		Name: sm.Name, Schema: sm.Schema, States: states, Transitions: trs,
+		InitialState: sm.InitialState, EnforceTrigger: sm.EnforceTrigger, Comment: sm.Comment,
+	}
+}
+
+func stateMachineFromForm(f stateMachineForm) model.StateMachine {
+	states := make([]model.SMState, len(f.States))
+	for i, s := range f.States {
+		states[i] = model.SMState{Name: s.Name, Terminal: s.Terminal, Comment: s.Comment}
+	}
+	trs := make([]model.SMTransition, len(f.Transitions))
+	for i, tr := range f.Transitions {
+		trs[i] = model.SMTransition{
+			Name:     tr.Name,
+			From:     tr.From,
+			To:       tr.To,
+			Requires: tr.Requires,
+			Comment:  tr.Comment,
+		}
+	}
+	return model.StateMachine{
+		Name: f.Name, Schema: f.Schema, States: states, Transitions: trs,
+		InitialState: f.InitialState, EnforceTrigger: f.EnforceTrigger, Comment: f.Comment,
+	}
+}
+
+// EncodeStateMachine returns the canonical bytes for a state-machine type
+// definition (the identity carrier for SM types).
+func EncodeStateMachine(sm model.StateMachine) ([]byte, error) {
+	return canonicalJSON(stateMachineToForm(sm))
+}
+
+// ---------------------------------------------------------------------------
 // Schema meta (the schema-global header)
 // ---------------------------------------------------------------------------
 

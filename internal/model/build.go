@@ -45,10 +45,16 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	enrichDiags := enrich(schema)
 	diags = append(diags, enrichDiags...)
 
+	// Populate the first-class state-machine collection BEFORE Canonicalize so
+	// it is canonicalized (name-sorted, transitions/From sorted) with everything
+	// else.
+	schema.StateMachines = resolveStateMachines(raw, reg)
+
 	// Phase 4: canonicalize — ordering + derived structures (FKGraph, TablesByName).
 	schema.Canonicalize()
 
-	// Extract state machine transition maps from the registry.
+	// Extract state machine transition maps from the registry (derived codegen
+	// convenience; excluded from identity).
 	schema.StateMachineTransitions = resolveStateMachineTransitions(raw, reg)
 
 	// Validate and copy groups.
@@ -161,10 +167,18 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	enrichDiags := enrich(schema)
 	diags = append(diags, enrichDiags...)
 
+	// Populate the first-class state-machine collection from all schemas BEFORE
+	// Canonicalize so it is canonicalized alongside everything else.
+	for _, raw := range raws {
+		schema.StateMachines = append(schema.StateMachines, resolveStateMachines(raw, reg)...)
+	}
+	schema.StateMachines = deduplicateStateMachines(schema.StateMachines)
+
 	// Phase 4: canonicalize — ordering (incl. cross-schema topo) + derived structures.
 	schema.Canonicalize()
 
-	// Extract state machine transition maps from all schemas.
+	// Extract state machine transition maps from all schemas (derived codegen
+	// convenience; excluded from identity).
 	for _, raw := range raws {
 		smts := resolveStateMachineTransitions(raw, reg)
 		schema.StateMachineTransitions = append(schema.StateMachineTransitions, smts...)
@@ -1338,6 +1352,66 @@ func resolveStateMachineTransitions(raw *parse.RawSchema, reg *semtype.Registry)
 			NamedTransitions: namedTrans,
 			EnforceTrigger:   td.EnforceTrigger,
 		})
+	}
+	return result
+}
+
+// resolveStateMachines builds the first-class, identity-bearing StateMachine
+// collection from the registry for every state-machine type declared in the raw
+// schema. Unlike resolveStateMachineTransitions (a derived from->to adjacency
+// for codegen), this preserves the FULL transition graph with per-state and
+// per-transition comments — the identity content the derived duplicate drops.
+func resolveStateMachines(raw *parse.RawSchema, reg *semtype.Registry) []StateMachine {
+	var result []StateMachine
+	for _, rt := range raw.Types {
+		if !strings.EqualFold(rt.Kind, "state_machine") {
+			continue
+		}
+		td, err := reg.Resolve(rt.Name)
+		if err != nil {
+			continue
+		}
+		sm := StateMachine{
+			Name:           td.Name,
+			Schema:         raw.Meta.Schema,
+			InitialState:   td.InitialState,
+			EnforceTrigger: td.EnforceTrigger,
+			Comment:        td.Comment,
+		}
+		for _, s := range td.States {
+			sm.States = append(sm.States, SMState{Name: s.Name, Terminal: s.Terminal, Comment: s.Comment})
+		}
+		for _, tr := range td.Transitions {
+			t := SMTransition{
+				Name:    tr.Name,
+				From:    append([]string(nil), tr.From...),
+				To:      tr.To,
+				Comment: tr.Comment,
+			}
+			if len(tr.Requires) > 0 {
+				t.Requires = make(map[string]string, len(tr.Requires))
+				for k, v := range tr.Requires {
+					t.Requires[k] = v
+				}
+			}
+			sm.Transitions = append(sm.Transitions, t)
+		}
+		result = append(result, sm)
+	}
+	return result
+}
+
+// deduplicateStateMachines removes duplicate StateMachine definitions by name
+// (a type may be referenced from multiple raw schemas in a multi-file build).
+func deduplicateStateMachines(sms []StateMachine) []StateMachine {
+	seen := make(map[string]bool, len(sms))
+	var result []StateMachine
+	for _, sm := range sms {
+		if seen[sm.Name] {
+			continue
+		}
+		seen[sm.Name] = true
+		result = append(result, sm)
 	}
 	return result
 }

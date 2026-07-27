@@ -85,26 +85,37 @@ the normalizer N lands, roadmap 1.2.)
 | `UniqueConstraint.Columns` | **SEMANTIC** | defines the backing unique index |
 | `CheckConstraint` / policy / view / function bodies | opaque | expression leaves; normalized by N (1.2), not here |
 
-## State-machine transitions (registry snapshot)
+## State-machine types (first-class model collection)
 
-State-machine transition identity flows through the **registry snapshot**
-(`EncodeRegistrySnapshot`), not the schema-side `Schema.StateMachineTransitions`
-(excluded per 1.5). See `snapshot.go`.
+State-machine identity flows through the first-class **model collection**
+`Schema.StateMachines` — encoded as `sm_type` objects (`EncodeStateMachine`,
+`KindSMType`). This carries the full transition graph WITH per-state and
+per-transition comments, populated by `build.go` from the registry for every SM
+type in use. The derived `Schema.StateMachineTransitions` (from→to adjacency for
+codegen) and the state-name `Enum` are separate; `StateMachineTransitions` is
+excluded from identity (derived, comment-less). The registry snapshot
+(`snapshot.go`) is NOT an identity input — it is empty for identity over all
+models.
 
 | Collection | Collection order | Intra-object order | Notes |
 |---|---|---|---|
-| snapshot `state_machines` | CANONICAL-ONLY (name-sorted) | — | `Registry.StateMachineTypes()` sorts by name |
-| `TypeDef.States` | — | **SEMANTIC** | becomes the enum label order |
-| `TypeDef.Transitions` | CANONICAL-ONLY | — | declaration order not observable |
-| `SMTransitionDef.From` | — | CANONICAL-ONLY (sorted) | source-state set |
-| `SMTransitionDef.Requires` | N/A (map, keys sorted) | — | param name → PG type |
+| `Schema.StateMachines` | CANONICAL-ONLY (name-sorted) | — | sorted by `Canonicalize` |
+| `StateMachine.States` | — | **SEMANTIC** | becomes the enum label order (`CREATE TYPE ... AS ENUM`); also the D2 node order |
+| `StateMachine.Transitions` | — | CANONICAL-ONLY (sorted by name, then to, then from-set) | declaration order not observable |
+| `SMTransition.From` | — | CANONICAL-ONLY (sorted) | source-state set |
+| `SMTransition.Requires` | N/A (map, keys sorted) | — | param name → PG type |
 
 ## Excluded from identity (allowlist)
 
 See `policy.go` for the machine-checked allowlist and per-field reasons. In
-summary: derived caches (`TablesByName`, `FKGraph`, `CycleGroups`), the
-schema-side `StateMachineTransitions` duplicate, `SourceFile` provenance,
+summary: derived caches (`TablesByName`, `FKGraph`, `CycleGroups`), the derived
+`StateMachineTransitions` codegen duplicate (identity flows through the
+first-class `StateMachines` collection instead), `SourceFile` provenance,
 `Index.IsAutoFK` (enrich-derived), `Table.PartmanManaged`/`PartmanParent`
 (introspect-path facts), and all `Source` provenance fields
 (`TypeDef.Source`, `fd.FuncDep.Source`) are excluded — the last so that
-relabeling provenance never flips identity.
+relabeling provenance never flips identity. The registry snapshot is not an
+identity input: every identity-bearing registry field now has a model home
+(`policy.go`'s `registryFieldPolicy` records each mapping, so a new registry
+field turns the totality guard red until it is given a model home or marked
+provenance).

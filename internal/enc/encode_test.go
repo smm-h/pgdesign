@@ -157,6 +157,7 @@ func TestSemanticCollectionsAreSlices(t *testing.T) {
 		{reflect.TypeOf(model.Function{}), "Args"},
 		{reflect.TypeOf(model.PartitionSpec{}), "Columns"},
 		{reflect.TypeOf(model.ExclusionConstraint{}), "Elements"},
+		{reflect.TypeOf(model.StateMachine{}), "States"},
 	}
 	for _, c := range cases {
 		f, ok := c.typ.FieldByName(c.field)

@@ -13,9 +13,12 @@ import (
 // envelope, or concatenation here; that is roadmap 1.5.
 //
 // The schema-global header is included under a KindSchemaMeta key so that
-// EncodeObjects / DecodeObjects round-trips the whole model. The registry
-// snapshot is a separate identity input (see EncodeRegistrySnapshot) and is not
-// part of this map.
+// EncodeObjects / DecodeObjects round-trips the whole model. State-machine
+// type definitions are first-class objects here (KindSMType) — they carry the
+// full transition graph with comments and are the identity carrier for SM
+// types. The registry snapshot is NOT an identity input (see snapshot.go): all
+// identity-bearing registry state now has a model home, so the snapshot is
+// empty for identity.
 func EncodeObjects(s *model.Schema) (map[Key][]byte, error) {
 	out := make(map[Key][]byte)
 
@@ -79,6 +82,12 @@ func EncodeObjects(s *model.Schema) (map[Key][]byte, error) {
 	for _, c := range s.CompositeTypes {
 		b, err := EncodeCompositeType(c)
 		if err := add(KeyForComposite(c), b, err); err != nil {
+			return nil, err
+		}
+	}
+	for _, sm := range s.StateMachines {
+		b, err := EncodeStateMachine(sm)
+		if err := add(KeyForStateMachine(sm), b, err); err != nil {
 			return nil, err
 		}
 	}
@@ -153,6 +162,12 @@ func DecodeObjects(objs map[Key][]byte) (*model.Schema, error) {
 				return nil, err
 			}
 			s.CompositeTypes = append(s.CompositeTypes, c)
+		case KindSMType:
+			sm, err := DecodeStateMachine(b)
+			if err != nil {
+				return nil, err
+			}
+			s.StateMachines = append(s.StateMachines, sm)
 		default:
 			return nil, fmt.Errorf("enc: DecodeObjects: unknown key kind %q", k.Kind)
 		}

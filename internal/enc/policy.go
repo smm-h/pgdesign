@@ -26,12 +26,13 @@ var modelFieldPolicy = map[string]structPolicy{
 		encoded: []string{
 			"Name", "Extensions", "Enums", "Domains", "CompositeTypes", "Tables",
 			"Views", "MaterializedViews", "Sequences", "Functions", "Groups", "PGVersion",
+			"StateMachines",
 		},
 		excluded: map[string]string{
 			"CycleGroups":             "derived cycle-safe-DDL grouping, recomputed by Canonicalize from the FK graph; not desired-model semantics",
 			"TablesByName":            "derived lookup cache (json:\"-\"), rebuilt by Canonicalize",
 			"FKGraph":                 "derived FK adjacency cache (json:\"-\"), rebuilt by Canonicalize",
-			"StateMachineTransitions": "schema-side duplicate of the registry SM type defs; excluded per roadmap 1.5 (SM transition identity flows through the registry snapshot / type-definition path)",
+			"StateMachineTransitions": "derived from->to adjacency for codegen (sorted target sets, no comments); a duplicate of StateMachines with less fidelity. SM identity flows through the first-class StateMachines collection (KindSMType objects), so this derived form is excluded per roadmap 1.5",
 		},
 	},
 	"Table": {
@@ -169,37 +170,75 @@ var modelFieldPolicy = map[string]structPolicy{
 			"Source": "FD provenance (\"declared\"/\"discovered\"/\"inferred\"); metadata that must not flip identity — mirrors the TypeDef.Source policy",
 		},
 	},
-}
-
-// registryFieldPolicy classifies the registry-snapshot structs. The snapshot
-// serializes only the SM transition residue that has no model-collection home;
-// every other TypeDef field either lives in a model collection or is provenance.
-var registryFieldPolicy = map[string]structPolicy{
-	"TypeDef": {
-		encoded: []string{"Name", "States", "Transitions", "InitialState", "EnforceTrigger", "Comment"},
-		excluded: map[string]string{
-			"Source":      "provenance metadata; excluded so Source relabeling does not flip identity",
-			"Kind":        "the snapshot residue is only state-machine types; kind is implied by the snapshot section",
-			"BaseType":    "for a state-machine type this equals the type's own Name (a self-referential enum); carries no identity beyond Name",
-			"NotNull":     "type-level nullability default is captured on resolved model columns (Column.NotNull)",
-			"Default":     "type-level default is captured on resolved model columns (Column.Default)",
-			"DefaultExpr": "type-level default expression is captured on resolved model columns (Column.DefaultExpr)",
-			"Check":       "scalar-type CHECK materializes into model Domains (Domain.Check); not part of the SM snapshot residue",
-			"Unique":      "captured on resolved model columns/constraints",
-			"EnumValues":  "state names materialize into model Enums (Enum.Values); the snapshot residue is the transition graph, not the value list",
-			"Fields":      "composite fields materialize into model CompositeTypes (CompositeType.Fields)",
-			"Generated":   "captured on resolved model columns (Column.Generated)",
-			"Stored":      "captured on resolved model columns (Column.Stored)",
-			"Identity":    "captured on resolved model columns (Column.Identity)",
-			"Array":       "captured on resolved model columns (Column.Array)",
-		},
+	// model.StateMachine is the first-class identity carrier for SM types
+	// (KindSMType objects). It reaches DDL through the state-name Enum it also
+	// materializes; the transition graph and comments live only here.
+	"StateMachine": {
+		encoded: []string{"Name", "Schema", "States", "Transitions", "InitialState", "EnforceTrigger", "Comment"},
+		excluded: map[string]string{},
 	},
-	"SMStateDef": {
+	"SMState": {
 		encoded:  []string{"Name", "Terminal", "Comment"},
 		excluded: map[string]string{},
 	},
-	"SMTransitionDef": {
+	"SMTransition": {
 		encoded:  []string{"Name", "From", "To", "Requires", "Comment"},
 		excluded: map[string]string{},
+	},
+}
+
+// registryFieldPolicy classifies the semtype registry structs. The registry
+// snapshot no longer serializes ANY registry struct into identity: every
+// identity-bearing piece of registry state now has a first-class MODEL home
+// (state-machine graphs in model.StateMachine, enum values in model.Enum,
+// composite fields in model.CompositeType, scalar CHECKs in model.Domain,
+// column-level type facts in model.Column). So every field below is EXCLUDED,
+// each reason naming its model home. The totality guard therefore turns red if
+// a new registry field is added, forcing the escape-hatch decision: if it
+// carries identity, give it a model home (and classify it here as homed);
+// otherwise mark it provenance/derived. See snapshot.go.
+var registryFieldPolicy = map[string]structPolicy{
+	"TypeDef": {
+		encoded: []string{},
+		excluded: map[string]string{
+			"Name":           "state-machine type name is homed in model.StateMachine.Name (and model.Enum.Name); enum/composite/domain names in their respective model collections",
+			"Kind":           "type-kind selects which model collection the type materializes into; not itself identity residue",
+			"BaseType":       "for a state-machine type this equals the type's own Name (a self-referential enum); scalar base types materialize into model.Domain.BaseType / Column.PGType",
+			"NotNull":        "type-level nullability default is captured on resolved model columns (Column.NotNull) / model.Domain.NotNull",
+			"Default":        "type-level default is captured on resolved model columns (Column.Default) / model.Domain.Default",
+			"DefaultExpr":    "type-level default expression is captured on resolved model columns (Column.DefaultExpr) / model.Domain.DefaultExpr",
+			"Check":          "scalar-type CHECK materializes into model.Domain.Check",
+			"Unique":         "captured on resolved model columns/constraints",
+			"Comment":        "type comment materializes into model.Enum.Comment / model.CompositeType.Comment / model.Domain.Comment, and (for SM types) model.StateMachine.Comment",
+			"EnumValues":     "state/enum values materialize into model.Enum.Values (and SM state names into model.StateMachine.States)",
+			"Fields":         "composite fields materialize into model.CompositeType.Fields",
+			"States":         "state-machine states materialize into model.StateMachine.States (with per-state comment/terminal)",
+			"Transitions":    "state-machine transitions materialize into model.StateMachine.Transitions (with per-transition comment)",
+			"InitialState":   "state-machine initial state materializes into model.StateMachine.InitialState",
+			"EnforceTrigger": "state-machine enforce-trigger flag materializes into model.StateMachine.EnforceTrigger",
+			"Generated":      "captured on resolved model columns (Column.Generated)",
+			"Stored":         "captured on resolved model columns (Column.Stored)",
+			"Identity":       "captured on resolved model columns (Column.Identity)",
+			"Array":          "captured on resolved model columns (Column.Array)",
+			"Source":         "provenance metadata; must not flip identity — it has no model home by design",
+		},
+	},
+	"SMStateDef": {
+		encoded: []string{},
+		excluded: map[string]string{
+			"Name":     "homed in model.SMState.Name",
+			"Terminal": "homed in model.SMState.Terminal",
+			"Comment":  "homed in model.SMState.Comment",
+		},
+	},
+	"SMTransitionDef": {
+		encoded: []string{},
+		excluded: map[string]string{
+			"Name":     "homed in model.SMTransition.Name",
+			"From":     "homed in model.SMTransition.From",
+			"To":       "homed in model.SMTransition.To",
+			"Requires": "homed in model.SMTransition.Requires",
+			"Comment":  "homed in model.SMTransition.Comment",
+		},
 	},
 }

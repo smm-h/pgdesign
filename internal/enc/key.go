@@ -22,7 +22,8 @@ const (
 	KindEnum         Kind = "enum"      //
 	KindDomain       Kind = "domain"    //
 	KindComposite    Kind = "composite" //
-	KindRegistrySnap Kind = "registry"  // the semtype registry snapshot (SM transition residue)
+	KindSMType       Kind = "sm_type"   // a state-machine type definition (identity carrier)
+	KindRegistrySnap Kind = "registry"  // the semtype registry snapshot (import-surface residue channel; empty for identity)
 )
 
 // Key is a kind-qualified manifest key: (kind, schema, name) plus, for
@@ -119,4 +120,9 @@ func KeyForDomain(d model.Domain) Key {
 // KeyForComposite returns the manifest key for a composite type.
 func KeyForComposite(c model.CompositeType) Key {
 	return Key{Kind: KindComposite, Schema: c.Schema, Name: c.Name}
+}
+
+// KeyForStateMachine returns the manifest key for a state-machine type.
+func KeyForStateMachine(sm model.StateMachine) Key {
+	return Key{Kind: KindSMType, Schema: sm.Schema, Name: sm.Name}
 }

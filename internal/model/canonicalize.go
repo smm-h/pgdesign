@@ -2,6 +2,7 @@ package model
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/smm-h/pgdesign/internal/graph"
 )
@@ -79,6 +80,29 @@ func (s *Schema) Canonicalize() {
 	// order); sort recursively by child name so permutations converge.
 	for i := range s.Tables {
 		canonicalizePartition(s.Tables[i].Partitioning)
+	}
+
+	// 1f2. State-machine type definitions: name-sorted collection. Within each,
+	// transitions are a CANONICAL-ONLY set (sorted by name, then target, then
+	// source set) and each transition's From is a source-state SET (sorted).
+	// States are NOT sorted — their declaration order is SEMANTIC (it becomes the
+	// enum label order in the generated CREATE TYPE ... AS ENUM).
+	sort.Slice(s.StateMachines, func(a, b int) bool { return s.StateMachines[a].Name < s.StateMachines[b].Name })
+	for i := range s.StateMachines {
+		sm := &s.StateMachines[i]
+		for j := range sm.Transitions {
+			sort.Strings(sm.Transitions[j].From)
+		}
+		sort.Slice(sm.Transitions, func(a, b int) bool {
+			ta, tb := sm.Transitions[a], sm.Transitions[b]
+			if ta.Name != tb.Name {
+				return ta.Name < tb.Name
+			}
+			if ta.To != tb.To {
+				return ta.To < tb.To
+			}
+			return strings.Join(ta.From, ",") < strings.Join(tb.From, ",")
+		})
 	}
 
 	// 1f. Topological ordering with alphabetical tie-break. Tables carry

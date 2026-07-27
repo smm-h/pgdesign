@@ -2,104 +2,61 @@ package enc
 
 import "github.com/smm-h/pgdesign/internal/semtype"
 
-// The registry snapshot serializes the semtype registry residue: the type
-// information that has NO representation in the model-level collections.
+// The registry snapshot is the channel for semtype registry state that has NO
+// representation in the model-level collections. After the state-machine
+// escape-hatch fix (roadmap 1.1), there is NO such residue: every
+// identity-bearing piece of registry state now has a first-class model home —
 //
-// Type identity flows through the MODEL collections wherever it can: enum
-// values land in model.Enums, composite fields in model.CompositeTypes, and
-// builtin-derived scalar CHECKs materialize into model.Domains (so a change to
-// the builtin email regex flips identity via Domain.Check with no special
-// case). What remains WITHOUT a model home is the state-machine TRANSITION
-// GRAPH — its transitions, per-transition Requires and comments, initial state,
-// and enforce-trigger flag. The schema-side model.Schema.StateMachineTransitions
-// is a derived duplicate that 1.5 excludes and that carries no transition
-// comments at all, so the transition residue is snapshotted here.
+//   - enum values          -> model.Enum.Values
+//   - composite fields      -> model.CompositeType.Fields
+//   - scalar-type CHECKs     -> model.Domain.Check (builtin-derived too, so a
+//     change to the builtin email regex flips identity via Domain.Check with
+//     no special case)
+//   - state-machine graphs   -> model.StateMachine (KindSMType objects): states
+//     with comments/terminal, transitions with comments/requires, initial
+//     state, enforce-trigger flag, and type comment — the full identity
+//     content, including the nested transition comments that previously had no
+//     model home.
 //
-// Consequently the snapshot is EMPTY (no state machines) for models built from
-// the increment-A generator and for any type-free schema — verified by
-// TestRegistrySnapshotEmptyForFlatModels. If a future check ever finds
-// semantic registry state that is missing from the model collections, the fix
-// is to add that state to the model, not to widen identity through this
-// snapshot.
-//
-// Field policy: semantic content plus ALL comments; TypeDef.Source is EXCLUDED
-// so relabeling a type's Source does not flip identity.
-
-type smStateForm struct {
-	Name     string `json:"name"`
-	Terminal bool   `json:"terminal,omitempty"`
-	Comment  string `json:"comment,omitempty"`
-}
-
-type smTransitionForm struct {
-	Name     string            `json:"name"`
-	From     []string          `json:"from"`
-	To       string            `json:"to"`
-	Requires map[string]string `json:"requires,omitempty"`
-	Comment  string            `json:"comment,omitempty"`
-}
-
-type smTypeForm struct {
-	Name           string             `json:"name"`
-	States         []smStateForm      `json:"states"`
-	Transitions    []smTransitionForm `json:"transitions,omitempty"`
-	InitialState   string             `json:"initial_state"`
-	EnforceTrigger bool               `json:"enforce_trigger,omitempty"`
-	Comment        string             `json:"comment,omitempty"`
-}
+// Consequently the snapshot is GENUINELY EMPTY for identity over ALL models,
+// including state-machine-bearing ones — verified by
+// TestRegistrySnapshotEmptyForFlatModels (now unconditional). It is NOT an
+// identity input: EncodeObjects does not include it, and identity never
+// consumes it. The channel is retained for its import-surface reconstruction
+// role (roadmap 7.2 vendors the transitive type-definition closure as
+// first-class KindSMType/enum/domain/composite objects, so import surfaces are
+// reconstructed from those objects; this snapshot remains the designated home
+// for any FUTURE registry state that lacks a model home). If a future check
+// finds such state, the fix is to add it to the model — as the SM fix did —
+// not to widen identity through this snapshot.
 
 type registrySnapshotForm struct {
-	Codec         int          `json:"codec"`
-	Kind          Kind         `json:"kind"`
-	StateMachines []smTypeForm `json:"state_machines"`
+	Codec int  `json:"codec"`
+	Kind  Kind `json:"kind"`
 }
 
 func registrySnapshotToForm(reg *semtype.Registry) registrySnapshotForm {
-	form := registrySnapshotForm{Codec: CodecVersion, Kind: KindRegistrySnap, StateMachines: []smTypeForm{}}
-	if reg == nil {
-		return form
-	}
-	// StateMachineTypes returns SM TypeDefs sorted by name — a canonical
-	// collection order.
-	for _, td := range reg.StateMachineTypes() {
-		states := make([]smStateForm, len(td.States))
-		for i, s := range td.States {
-			// State order is SEMANTIC (it becomes the enum label order).
-			states[i] = smStateForm{Name: s.Name, Terminal: s.Terminal, Comment: s.Comment}
-		}
-		trs := make([]smTransitionForm, len(td.Transitions))
-		for i, tr := range td.Transitions {
-			// From is a SET; sort. Requires map keys are sorted by encoding/json.
-			trs[i] = smTransitionForm{
-				Name:     tr.Name,
-				From:     sortedCopy(tr.From),
-				To:       tr.To,
-				Requires: tr.Requires,
-				Comment:  tr.Comment,
-			}
-		}
-		form.StateMachines = append(form.StateMachines, smTypeForm{
-			Name:           td.Name,
-			States:         states,
-			Transitions:    trs,
-			InitialState:   td.InitialState,
-			EnforceTrigger: td.EnforceTrigger,
-			Comment:        td.Comment,
-		})
-	}
-	return form
+	// No residue: all identity-bearing registry state has a model home. The
+	// registry argument is retained for the import-surface reconstruction role
+	// and so this signature is stable when a future no-model-home residue field
+	// is added.
+	_ = reg
+	return registrySnapshotForm{Codec: CodecVersion, Kind: KindRegistrySnap}
 }
 
-// EncodeRegistrySnapshot returns the canonical bytes for the semtype registry
-// residue (see the package comment above). For a type-free or state-machine-free
-// registry the snapshot's state_machines list is empty.
+// EncodeRegistrySnapshot returns the canonical bytes for the registry residue
+// channel (see the package comment above). It is empty for every registry and
+// is NOT part of schema identity.
 func EncodeRegistrySnapshot(reg *semtype.Registry) ([]byte, error) {
 	return canonicalJSON(registrySnapshotToForm(reg))
 }
 
 // RegistrySnapshotEmpty reports whether the registry snapshot contributes
-// nothing to identity (no state-machine residue). This is the predicate
-// TestRegistrySnapshotEmptyForFlatModels asserts over generated models.
+// nothing to identity. It is unconditionally true: all identity-bearing
+// registry state has a model home, so there is no residue for ANY registry —
+// including state-machine-bearing ones. This is the escape-hatch invariant the
+// verification tests assert.
 func RegistrySnapshotEmpty(reg *semtype.Registry) bool {
-	return len(registrySnapshotToForm(reg).StateMachines) == 0
+	_ = reg
+	return true
 }

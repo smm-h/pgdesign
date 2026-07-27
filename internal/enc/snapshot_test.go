@@ -8,77 +8,105 @@ import (
 	"github.com/smm-h/pgdesign/internal/modelgen"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
-	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"pgregory.net/rapid"
 )
 
-// smRegistry builds a registry containing one state-machine TypeDef with a
-// per-transition comment, so the snapshot has SM residue to encode.
-func smRegistry(transitionComment, source string) *semtype.Registry {
-	reg := semtype.NewRegistry()
-	td := &semtype.TypeDef{
-		Name:     "order_status",
-		Kind:     semtype.KindStateMachine,
-		BaseType: typeinfo.Type{Base: "order_status"},
-		States: []semtype.SMStateDef{
+// smSchema builds a canonical model containing one state-machine type whose
+// "ship" transition carries the given comment, and (optionally) whose registry
+// TypeDef.Source is relabeled. It goes through the real Build pipeline so the
+// StateMachines collection is populated exactly as production produces it.
+func smSchema(t *testing.T, transitionComment, source string) *model.Schema {
+	reg := semtype.NewBuiltinRegistry()
+	ut := semtype.UserTypeDef{
+		Name: "order_status",
+		Kind: "state_machine",
+		States: []semtype.UserSMState{
 			{Name: "pending"},
 			{Name: "shipped"},
 			{Name: "delivered", Terminal: true},
 		},
-		Transitions: []semtype.SMTransitionDef{
+		Transitions: []semtype.UserSMTransition{
 			{Name: "ship", From: []string{"pending"}, To: "shipped", Comment: transitionComment},
 			{Name: "deliver", From: []string{"shipped"}, To: "delivered"},
 		},
-		InitialState:   "pending",
-		EnforceTrigger: true,
-		Comment:        "order lifecycle",
-		Source:         source,
+		InitialState: "pending",
+		Comment:      "order lifecycle",
 	}
-	if err := reg.Register(td); err != nil {
-		panic(err)
+	if d := reg.LoadUserTypes([]semtype.UserTypeDef{ut}); d.HasErrors() {
+		t.Fatalf("LoadUserTypes: %v", d.Errors())
 	}
-	return reg
+	if source != "" {
+		td, err := reg.Resolve("order_status")
+		if err != nil {
+			t.Fatal(err)
+		}
+		td.Source = source
+	}
+	comment := "orders"
+	raw := &parse.RawSchema{
+		Meta:  parse.RawMeta{Schema: "public", Version: 16},
+		Types: []parse.RawType{{Name: "order_status", Kind: "state_machine"}},
+		Tables: []parse.RawTable{{
+			Name:    "orders",
+			Comment: &comment,
+			PK:      []string{"id"},
+			Columns: []parse.RawColumn{
+				{Name: "id", Type: "id"},
+				{Name: "status", Type: "order_status"},
+			},
+		}},
+	}
+	s, diags := model.Build(raw, reg)
+	if diags.HasErrors() {
+		t.Fatalf("Build: %v", diags.Errors())
+	}
+	return s
+}
+
+// encodeSMObject encodes the schema's single state-machine object (KindSMType).
+func encodeSMObject(t *testing.T, s *model.Schema) []byte {
+	t.Helper()
+	if len(s.StateMachines) != 1 {
+		t.Fatalf("expected exactly 1 state machine, got %d", len(s.StateMachines))
+	}
+	b, err := EncodeStateMachine(s.StateMachines[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
 
 // TestNestedTransitionCommentsFlipIdentity: a change to a nested SM transition
-// comment changes the registry-snapshot bytes. The verify block requires this.
+// comment changes the canonical bytes — now through the MODEL path (the
+// first-class model.StateMachine object), not the registry snapshot. The verify
+// block requires this.
 func TestNestedTransitionCommentsFlipIdentity(t *testing.T) {
-	a, err := EncodeRegistrySnapshot(smRegistry("ship it", "user"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := EncodeRegistrySnapshot(smRegistry("dispatch it", "user"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	a := encodeSMObject(t, smSchema(t, "ship it", ""))
+	b := encodeSMObject(t, smSchema(t, "dispatch it", ""))
 	if bytes.Equal(a, b) {
-		t.Fatalf("changing a nested transition comment did NOT flip the snapshot bytes:\n%s", a)
+		t.Fatalf("changing a nested transition comment did NOT flip the sm_type bytes:\n%s", a)
 	}
 }
 
-// TestSourceRelabelingDoesNotFlipIdentity: TypeDef.Source is excluded, so
-// relabeling it leaves the snapshot bytes unchanged. The verify block requires
-// this.
+// TestSourceRelabelingDoesNotFlipIdentity: TypeDef.Source has no model home, so
+// relabeling it cannot change the canonical bytes of the state-machine object.
+// The verify block requires this.
 func TestSourceRelabelingDoesNotFlipIdentity(t *testing.T) {
-	a, err := EncodeRegistrySnapshot(smRegistry("ship it", "user"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := EncodeRegistrySnapshot(smRegistry("ship it", "extended"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	a := encodeSMObject(t, smSchema(t, "ship it", "user"))
+	b := encodeSMObject(t, smSchema(t, "ship it", "extended"))
 	if !bytes.Equal(a, b) {
-		t.Fatalf("relabeling Source flipped snapshot bytes (Source must be excluded):\n%s\n%s", a, b)
+		t.Fatalf("relabeling Source flipped sm_type bytes (Source must have no model home):\n%s\n%s", a, b)
 	}
 }
 
-// TestRegistrySnapshotEmptyForFlatModels: over the increment-A generator, the
-// registry has no state-machine types, so the snapshot contributes nothing to
-// identity. This is the verification test the roadmap requires: if it ever
-// found semantic registry state missing from the model collections, that state
-// would be added to the model, not to identity via the snapshot.
-func TestRegistrySnapshotEmptyForFlatModels(t *testing.T) {
+// TestRegistrySnapshotEmptyForAllModels: the registry snapshot contributes
+// nothing to identity for EVERY model — flat models AND state-machine-bearing
+// ones. This is the unconditional escape-hatch invariant: all identity-bearing
+// registry state now has a model home, so if this test ever found residue in
+// the snapshot, that state would be added to the model, not to identity via the
+// snapshot.
+func TestRegistrySnapshotEmptyForAllModels(t *testing.T) {
+	// Flat models over the generator.
 	rapid.Check(t, func(rt *rapid.T) {
 		raws := modelgen.Draw(rt, modelgen.DefaultConfig())
 		reg := semtype.NewBuiltinRegistry()
@@ -94,6 +122,77 @@ func TestRegistrySnapshotEmptyForFlatModels(t *testing.T) {
 			rt.Fatalf("registry snapshot not empty for a flat model: %s", b)
 		}
 	})
+
+	// A state-machine-bearing registry: the snapshot must STILL be empty, since
+	// SM identity now flows through model.StateMachine (KindSMType), not the
+	// snapshot.
+	s := smSchema(t, "ship it", "user")
+	reg := semtype.NewBuiltinRegistry()
+	ut := semtype.UserTypeDef{
+		Name:         "order_status",
+		Kind:         "state_machine",
+		States:       []semtype.UserSMState{{Name: "pending"}, {Name: "shipped", Terminal: true}},
+		Transitions:  []semtype.UserSMTransition{{Name: "ship", From: []string{"pending"}, To: "shipped"}},
+		InitialState: "pending",
+	}
+	if d := reg.LoadUserTypes([]semtype.UserTypeDef{ut}); d.HasErrors() {
+		t.Fatalf("LoadUserTypes: %v", d.Errors())
+	}
+	if !RegistrySnapshotEmpty(reg) {
+		b, _ := EncodeRegistrySnapshot(reg)
+		t.Fatalf("registry snapshot not empty for an SM-bearing registry: %s", b)
+	}
+	// And the SM identity IS present in the model.
+	if len(s.StateMachines) != 1 {
+		t.Fatalf("SM identity missing from the model: StateMachines=%d", len(s.StateMachines))
+	}
+}
+
+// TestStateMachineDecodeRoundTrip: an SM-bearing schema survives
+// EncodeObjects -> DecodeObjects -> re-EncodeObjects byte-identically, and the
+// sm_type object is a first-class manifest entry. This is decode-totality for
+// SM-bearing schemas — the property that was broken when SM identity flowed
+// through the un-decodable registry snapshot.
+func TestStateMachineDecodeRoundTrip(t *testing.T) {
+	s := smSchema(t, "ship it", "user")
+	objs1, err := EncodeObjects(s)
+	if err != nil {
+		t.Fatalf("EncodeObjects: %v", err)
+	}
+	if _, ok := objs1[KeyForStateMachine(s.StateMachines[0])]; !ok {
+		t.Fatalf("no sm_type manifest key was produced; keys: %v", keysOf(objs1))
+	}
+	decoded, err := DecodeObjects(objs1)
+	if err != nil {
+		t.Fatalf("DecodeObjects: %v", err)
+	}
+	if len(decoded.StateMachines) != 1 {
+		t.Fatalf("state machine lost on decode: got %d", len(decoded.StateMachines))
+	}
+	objs2, err := EncodeObjects(decoded)
+	if err != nil {
+		t.Fatalf("re-EncodeObjects: %v", err)
+	}
+	if len(objs1) != len(objs2) {
+		t.Fatalf("object count changed on round-trip: %d -> %d", len(objs1), len(objs2))
+	}
+	for k, b1 := range objs1 {
+		b2, ok := objs2[k]
+		if !ok {
+			t.Fatalf("key %s lost on round-trip", k)
+		}
+		if !bytes.Equal(b1, b2) {
+			t.Fatalf("key %s bytes differ on round-trip:\n%s\n%s", k, b1, b2)
+		}
+	}
+}
+
+func keysOf(objs map[Key][]byte) []string {
+	out := make([]string, 0, len(objs))
+	for k := range objs {
+		out = append(out, k.String())
+	}
+	return out
 }
 
 // TestBuiltinRegexChangeFlipsIdentity: the builtin email type carries a CHECK

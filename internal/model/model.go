@@ -46,6 +46,43 @@ type SMTransitionMap struct {
 	EnforceTrigger   bool                // whether to generate transition-enforcement trigger
 }
 
+// SMState is a single state of a state-machine type. Its declaration order is
+// SEMANTIC (it becomes the enum label order in the generated CREATE TYPE ... AS
+// ENUM), so the collection is never reordered.
+type SMState struct {
+	Name     string
+	Terminal bool
+	Comment  string
+}
+
+// SMTransition is a single named transition of a state-machine type. The
+// transition collection is a CANONICAL-ONLY set (declaration order is not
+// observable); From is a source-state SET.
+type SMTransition struct {
+	Name     string
+	From     []string          // source states (a set)
+	To       string            // target state
+	Requires map[string]string // required params: field name -> PG type
+	Comment  string
+}
+
+// StateMachine is the first-class model representation of a state-machine type
+// definition. It carries the full transition graph WITH comments — the identity
+// content that has no home in the derived StateMachineTransitions duplicate or
+// in the state-name Enum. Populated during Build() from the semtype registry
+// for every state-machine type in use. This is the identity carrier for
+// state-machine types (encoded as a first-class object by internal/enc); the
+// state names additionally materialize into a model Enum for DDL generation.
+type StateMachine struct {
+	Name           string
+	Schema         string
+	States         []SMState      // declaration order — SEMANTIC (becomes enum label order)
+	Transitions    []SMTransition // CANONICAL-ONLY set
+	InitialState   string
+	EnforceTrigger bool
+	Comment        string
+}
+
 // Schema is the top-level resolved schema.
 type Schema struct {
 	Name              string              `json:"name"`
@@ -65,7 +102,16 @@ type Schema struct {
 	FKGraph           *FKGraph            `json:"-"`
 	// StateMachineTransitions maps type names to their transition maps.
 	// Populated during Build() from the semtype registry for KindStateMachine types.
+	// This is a DERIVED codegen convenience (from->to adjacency, sorted target
+	// sets) and is EXCLUDED from canonical identity; StateMachines is the
+	// identity carrier.
 	StateMachineTransitions []SMTransitionMap `json:"state_machine_transitions,omitempty"`
+	// StateMachines is the first-class, identity-bearing collection of
+	// state-machine type definitions (full transition graph with comments).
+	// Populated during Build() from the semtype registry for every SM type in
+	// use; canonicalized (name-sorted, transitions sorted, From sets sorted;
+	// States kept in declaration order as it is SEMANTIC).
+	StateMachines []StateMachine `json:"state_machines,omitempty"`
 }
 
 // View represents a resolved view definition.

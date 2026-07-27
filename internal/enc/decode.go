@@ -103,6 +103,19 @@ func DecodeCompositeType(data []byte) (model.CompositeType, error) {
 	return compositeFromForm(f), nil
 }
 
+// DecodeStateMachine decodes canonical bytes into a state-machine type
+// definition.
+func DecodeStateMachine(data []byte) (model.StateMachine, error) {
+	var f stateMachineForm
+	if err := json.Unmarshal(data, &f); err != nil {
+		return model.StateMachine{}, fmt.Errorf("enc: decode state machine: %w", err)
+	}
+	if err := checkHeader(f.Codec, f.Kind, KindSMType); err != nil {
+		return model.StateMachine{}, err
+	}
+	return stateMachineFromForm(f), nil
+}
+
 // SchemaMeta is the decoded schema-global header. It is a distinct type from
 // model.Schema because a header carries only the schema-global fields, not the
 // per-object collections.
