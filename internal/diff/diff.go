@@ -3,6 +3,7 @@ package diff
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -910,7 +911,7 @@ func diffIndexes(td *TableDiff, desired, actual *model.Table) {
 
 func indexEqual(a, b *model.Index) bool {
 	return a.Name == b.Name &&
-		sliceEqual(a.Columns, b.Columns) &&
+		keyColumnsEqual(a.Columns, b.Columns) &&
 		boolSliceEqual(a.Desc, b.Desc) &&
 		a.Method == b.Method &&
 		mapEqual(a.Opclasses, b.Opclasses) &&
@@ -918,6 +919,48 @@ func indexEqual(a, b *model.Index) bool {
 		sqlparse.ExprEqual(a.Where, b.Where) &&
 		sliceEqual(a.Include, b.Include) &&
 		mapEqual(a.With, b.With)
+}
+
+// bareIdentifier matches an unquoted SQL identifier (a plain column name). A key
+// column that is NOT a bare identifier is an EXPRESSION (e.g. lower(email),
+// (a + b)) and must be compared via ≈_syn, not raw string equality.
+var bareIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
+
+// isExpressionColumn reports whether an index/exclusion key column is an
+// expression rather than a bare column reference. Anything containing a call,
+// operator, cast, quoting, or qualification is an expression.
+func isExpressionColumn(s string) bool {
+	return !bareIdentifier.MatchString(strings.TrimSpace(s))
+}
+
+// keyColumnEqual compares one index/exclusion KEY column. Plain identifiers
+// compare EXACTLY (a genuine column rename is a real change). Expression columns
+// compare via sqlparse.ExprEqual (≈_syn), so catalog-independent spelling
+// differences — function case, whitespace, cast-alias names — do not false-drift
+// a desired expression key against PostgreSQL's deparsed form. (The remaining
+// residue — catalog-dependent cast materialization like lower(email) vs
+// lower((email)::text) — is the ≈_pg boundary resolved by live round-trip
+// normalization on live paths, not by this pure comparison.)
+func keyColumnEqual(a, b string) bool {
+	if isExpressionColumn(a) || isExpressionColumn(b) {
+		return sqlparse.ExprEqual(a, b)
+	}
+	return a == b
+}
+
+// keyColumnsEqual compares two ordered lists of index/exclusion key columns
+// element-wise. Key-column ORDER is semantic (it defines the index), so this is
+// positional, not set comparison.
+func keyColumnsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !keyColumnEqual(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // boolSliceEqual returns true if two bool slices represent the same sort
@@ -1024,7 +1067,9 @@ func exclusionEqual(a, b model.ExclusionConstraint) bool {
 		return false
 	}
 	for i := range a.Elements {
-		if a.Elements[i].Column != b.Elements[i].Column || a.Elements[i].Operator != b.Elements[i].Operator {
+		// Exclusion element columns are index key columns and can be
+		// expressions; compare via ≈_syn, not raw string (see keyColumnEqual).
+		if !keyColumnEqual(a.Elements[i].Column, b.Elements[i].Column) || a.Elements[i].Operator != b.Elements[i].Operator {
 			return false
 		}
 	}
