@@ -1009,6 +1009,10 @@ func queryIndexes(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaNa
 		JOIN pg_class i ON i.oid = ix.indexrelid
 		JOIN pg_am am ON am.oid = i.relam
 		WHERE ix.indrelid = $1 AND NOT ix.indisprimary
+		  AND NOT EXISTS (
+		      SELECT 1 FROM pg_constraint c
+		      WHERE c.conindid = ix.indexrelid AND c.contype IN ('p', 'u')
+		  )
 		ORDER BY i.relname
 	`, tableOID)
 	if err != nil {

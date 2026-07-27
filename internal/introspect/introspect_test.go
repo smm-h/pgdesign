@@ -309,6 +309,37 @@ type indexInfo struct {
 	method  string
 }
 
+// TestIntrospectUniqueConstraintBackingIndexFiltered is the regression for the
+// rehearsal's "- index uq_*" false-drift: a UNIQUE constraint's auto-created
+// backing index must NOT be surfaced as a standalone index (it is reported under
+// Uniques). A desired model declares only the unique constraint, so leaking the
+// backing index into Indexes reports a spurious removed index on diff --live.
+func TestIntrospectUniqueConstraintBackingIndexFiltered(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+	users := findTable(schema.Tables, "users")
+	if users == nil {
+		t.Fatal("users table not found")
+	}
+	for _, idx := range users.Indexes {
+		if idx.Name == "uq_users_email" {
+			t.Errorf("unique-constraint backing index uq_users_email must not be surfaced as a standalone index (it belongs under Uniques)")
+		}
+	}
+	// The constraint itself is still reported under Uniques.
+	found := false
+	for _, uq := range users.Uniques {
+		if uq.Name == "uq_users_email" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("uq_users_email should be reported as a unique constraint")
+	}
+}
+
 func TestIntrospectUniqueConstraints(t *testing.T) {
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
