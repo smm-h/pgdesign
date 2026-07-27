@@ -55,6 +55,7 @@ func generatePerTablePgFile(tbl *model.Table, schema *model.Schema, smMap map[st
 	}
 
 	fmt.Fprintf(&buf, "\nfrom .protocols import PgContext, %s\n", rowType)
+	writeEnumImport(&buf, tableEnumClasses(tbl))
 
 	// Class.
 	fmt.Fprintf(&buf, "\n\nclass %sPg:\n", className)
@@ -503,6 +504,7 @@ func generatePgBackendFile(tables []model.Table, schema *model.Schema, smMap map
 		rowImports = append(rowImports, toPascalCase(tbl.Name)+"Row")
 	}
 	fmt.Fprintf(&buf, "\nfrom .protocols import PgContext, %s\n", strings.Join(rowImports, ", "))
+	writeEnumImport(&buf, tablesEnumClasses(tables))
 
 	// Import per-table delegates.
 	for _, tbl := range tables {

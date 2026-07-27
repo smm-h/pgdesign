@@ -72,6 +72,7 @@ func generatePerTableMemFile(tbl *model.Table, schema *model.Schema, smMap map[s
 	}
 
 	fmt.Fprintf(&buf, "\nfrom .protocols import InMemoryContext, %s\n", rowType)
+	writeEnumImport(&buf, tableEnumClasses(tbl))
 
 	// Import constraints.
 	constraintVar := strings.ToUpper(tbl.Name) + "_CONSTRAINTS"
@@ -561,6 +562,7 @@ func generateMemoryBackendFile(tables []model.Table, schema *model.Schema, smMap
 		rowImports = append(rowImports, toPascalCase(tbl.Name)+"Row")
 	}
 	fmt.Fprintf(&buf, "\nfrom .protocols import InMemoryContext, %s\n", strings.Join(rowImports, ", "))
+	writeEnumImport(&buf, tablesEnumClasses(tables))
 
 	// Import per-table delegates.
 	for _, tbl := range tables {

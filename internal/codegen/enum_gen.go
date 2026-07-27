@@ -208,8 +208,11 @@ func generateTSEnum(e model.Enum) string {
 	return buf.String()
 }
 
-// generatePythonEnum produces a Python StrEnum class for an enum.
-// The caller is responsible for adding "from enum import StrEnum" to the file.
+// generatePythonEnum produces a Python StrEnum class for an enum plus an
+// ergonomic typed parse() classmethod. StrEnum.__call__ already validates
+// (Role("bad") raises ValueError), so parse() is a typed alias, not
+// construction-closing machinery; it names the boundary for readable ingress.
+// The caller adds "from enum import StrEnum" to the file.
 func generatePythonEnum(e model.Enum) string {
 	var buf bytes.Buffer
 	className := toPascalCase(e.Name)
@@ -222,6 +225,10 @@ func generatePythonEnum(e model.Enum) string {
 		name := sanitizeEnumValue(v, LangPython)
 		fmt.Fprintf(&buf, "    %s = %q\n", name, v)
 	}
+	buf.WriteString("\n    @classmethod\n")
+	fmt.Fprintf(&buf, "    def parse(cls, value: str) -> \"%s\":\n", className)
+	buf.WriteString("        \"\"\"Return the member for value, raising ValueError if undefined.\"\"\"\n")
+	buf.WriteString("        return cls(value)\n")
 
 	return buf.String()
 }

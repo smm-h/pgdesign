@@ -205,6 +205,17 @@ func generateProtocolsFile(schema *model.Schema) ([]byte, []diagnostic.Diagnosti
 	if imports.needs["UUID"] {
 		buf.WriteString("from uuid import UUID\n")
 	}
+	if len(schema.Enums) > 0 {
+		buf.WriteString("from enum import StrEnum\n")
+	}
+
+	// Enum classes. The query-layer package now DEFINES the enum types its Row
+	// dataclasses and method signatures reference (previously only annotated,
+	// surviving via future annotations); Row.__post_init__ coerces to them.
+	if len(schema.Enums) > 0 {
+		buf.WriteString("\n\n# --- Enums ---\n\n")
+		buf.WriteString(GenerateEnums(schema.Enums, LangPython))
+	}
 
 	// Context types.
 	buf.WriteString("\n\n# --- Context Types ---\n")
@@ -277,6 +288,29 @@ func writeRowDataclass(buf *bytes.Buffer, tbl *model.Table) {
 	for _, col := range tbl.Columns {
 		pyType := columnPythonType(col)
 		fmt.Fprintf(buf, "    %s: %s\n", col.Name, pyType)
+	}
+
+	// __post_init__ coerces enum-typed fields from their raw string form to the
+	// branded StrEnum. It runs for every Row construction, so both PgBackend
+	// (asyncpg str rows) and InMemoryBackend (str-stored rows) yield enum-typed
+	// fields. StrEnum(member) == member, so coercion is idempotent.
+	var enumCols []model.Column
+	for _, col := range tbl.Columns {
+		if col.TypeKind == "enum" || col.TypeKind == "state_machine" {
+			enumCols = append(enumCols, col)
+		}
+	}
+	if len(enumCols) > 0 {
+		buf.WriteString("\n    def __post_init__(self) -> None:\n")
+		for _, col := range enumCols {
+			enumType := EnumTypeName(col.PGType.Base)
+			if col.NotNull {
+				fmt.Fprintf(buf, "        self.%s = %s(self.%s)\n", col.Name, enumType, col.Name)
+			} else {
+				fmt.Fprintf(buf, "        if self.%s is not None:\n", col.Name)
+				fmt.Fprintf(buf, "            self.%s = %s(self.%s)\n", col.Name, enumType, col.Name)
+			}
+		}
 	}
 }
 
@@ -717,6 +751,48 @@ func writeReaderMethodsForBackend(buf *bytes.Buffer, tbl *model.Table, fkGraph *
 }
 
 // --- Helpers ---
+
+// tableEnumClasses returns the branded enum class names referenced by a table's
+// columns, sorted. Delegate/backend files must import these from protocols so
+// their enum-typed method signatures resolve (they are defined in protocols.py).
+func tableEnumClasses(tbl *model.Table) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for _, col := range tbl.Columns {
+		if col.TypeKind == "enum" || col.TypeKind == "state_machine" {
+			n := EnumTypeName(col.PGType.Base)
+			if !seen[n] {
+				seen[n] = true
+				out = append(out, n)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// tablesEnumClasses returns the union of enum class names across several tables.
+func tablesEnumClasses(tables []model.Table) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for i := range tables {
+		for _, n := range tableEnumClasses(&tables[i]) {
+			if !seen[n] {
+				seen[n] = true
+				out = append(out, n)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// writeEnumImport emits a `from .protocols import <enums>` line when non-empty.
+func writeEnumImport(buf *bytes.Buffer, enums []string) {
+	if len(enums) > 0 {
+		fmt.Fprintf(buf, "from .protocols import %s\n", strings.Join(enums, ", "))
+	}
+}
 
 // buildSMTypeMap creates a lookup from semantic type name to its SMTransitionMap.
 func buildSMTypeMap(schema *model.Schema) map[string]*model.SMTransitionMap {

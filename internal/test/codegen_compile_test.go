@@ -307,6 +307,57 @@ func TestCompilePythonTypes(t *testing.T) {
 	runCompile(t, dir, nil, "mypy", "--strict", "schema_types.py")
 }
 
+// TestRunPythonQueryLayerEnums is the behavioral witness for the branded Python
+// query-layer (roadmap 4.1): both backends build rows via OrdersRow(**row), so
+// Row.__post_init__ coerces enum fields to the branded StrEnum. It generates the
+// memory backend (no asyncpg dependency), then runs Python to prove str inputs
+// yield enum-typed fields, the coercion is idempotent, invalid values raise, and
+// enum-typed rows pickle round-trip.
+func TestRunPythonQueryLayerEnums(t *testing.T) {
+	requireTool(t, "python3")
+	base := t.TempDir()
+	pkgDir := filepath.Join(base, "qlpkg")
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// Memory-only so the package imports no asyncpg (pg backend would).
+	gen := &codegen.PythonQueryLayerGenerator{Backends: []string{"memory"}}
+	files, diags := gen.GenerateFiles(loadCompileSchema(t))
+	failOnCompileErrDiags(t, diags)
+	writeFiles(t, pkgDir, files)
+
+	script := `import pickle
+from uuid import uuid4
+from qlpkg.protocols import OrdersRow, OrderStatus
+
+# String input (as both backends supply) is coerced to the branded enum.
+r = OrdersRow(id=uuid4(), account_id=uuid4(), status="pending", total_cents=5, note=None)
+assert isinstance(r.status, OrderStatus), type(r.status)
+assert r.status is OrderStatus.PENDING
+
+# Idempotent: an already-branded value passes through unchanged.
+r2 = OrdersRow(id=uuid4(), account_id=uuid4(), status=OrderStatus.SHIPPED, total_cents=1, note="x")
+assert r2.status is OrderStatus.SHIPPED
+
+# Invalid value is rejected at construction.
+try:
+    OrdersRow(id=uuid4(), account_id=uuid4(), status="bogus", total_cents=0, note=None)
+    raise SystemExit("expected ValueError for invalid enum")
+except ValueError:
+    pass
+
+# Enum-typed rows pickle round-trip.
+back = pickle.loads(pickle.dumps(r))
+assert isinstance(back.status, OrderStatus)
+assert back.status == OrderStatus.PENDING
+print("OK")
+`
+	if err := os.WriteFile(filepath.Join(base, "check.py"), []byte(script), 0o644); err != nil {
+		t.Fatalf("write check.py: %v", err)
+	}
+	runCompile(t, base, nil, "python3", "check.py")
+}
+
 func TestCompileJavaTypes(t *testing.T) {
 	requireTool(t, "javac")
 	dir := t.TempDir()
