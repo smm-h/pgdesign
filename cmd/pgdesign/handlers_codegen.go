@@ -118,7 +118,11 @@ func runCodegen(configOverride *string, quiet bool, kwargs map[string]interface{
 		Source:    source,
 		SplitMode: splitMode,
 	}
-	plan, err := PlanStandaloneCodegen(outputSchema, out)
+	// Pass the UNFILTERED schema: PlanStandaloneCodegen filters content per
+	// out.Groups/out.Source internally and computes the full-project revision
+	// from the unfiltered model (roadmap 4.2), so a filtered output still carries
+	// the full-project stamp.
+	plan, err := PlanStandaloneCodegen(schema, out)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1

@@ -42,6 +42,33 @@ const revisionPrefix = "pgdesign-revision: "
 // unknown trailing comment line, so enabling it is not a format break.
 const stampFormatVersion = 1
 
+// stampRevision is the full-project revision that Header stamps onto every
+// artifact it builds. It is the roadmap-4.2 "helper-internal addition (zero site
+// re-touches)": the ~36 generator call sites all route their banner through
+// Header(comment), so threading the producing revision here reaches every one of
+// them without touching a single generator.
+//
+// A build/generation funnel (build.Plan, the standalone codegen planner, and the
+// seed command) computes the full-project revision once via internal/rev and
+// calls SetRevision before generating, then resets it (SetRevision("")) after.
+// It is empty by default, so a generator invoked outside a funnel (unit tests,
+// stdout previews) emits the bare banner with no revision line — exactly the
+// pre-4.2 behavior. The CLI is single-process and generation is sequential, so
+// this package-level value needs no synchronization.
+var stampRevision string
+
+// SetRevision sets the full-project revision emitted on every subsequently built
+// Header stamp (and readable via CurrentRevision, which seed threads into its
+// own Stamp). The build funnel calls SetRevision(r) before generating and
+// SetRevision("") — typically via defer — afterward. Passing "" disables the
+// revision line.
+func SetRevision(r string) { stampRevision = r }
+
+// CurrentRevision returns the full-project revision Header currently stamps.
+// Writers that build a Stamp directly rather than through Header (seed, which
+// adds a free-text info line) read it to carry the same revision.
+func CurrentRevision() string { return stampRevision }
+
 // Stamp is a provenance header for a generated artifact and the ONLY writer of
 // the canonical banner. It renders the banner with a per-language comment
 // prefix, followed by optional free-text info lines (seed uses this for its
@@ -84,11 +111,13 @@ func (s Stamp) Render() string {
 	return b.String()
 }
 
-// Header renders a bare provenance banner (no info, no revision) for the given
-// comment prefix. It is the convenience form for the generators that need only
-// the canonical line.
+// Header renders the provenance banner for the given comment prefix, plus the
+// revision line when a full-project revision is currently threaded (see
+// SetRevision). It is the convenience form used by every generator that needs
+// only the canonical line; the revision is injected here so those call sites do
+// not change (roadmap 4.2).
 func Header(comment string) string {
-	return Stamp{Comment: comment}.Render()
+	return Stamp{Comment: comment, Revision: stampRevision}.Render()
 }
 
 // ParsedStamp is the result of parsing a generated artifact's header.

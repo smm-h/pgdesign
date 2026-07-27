@@ -48,10 +48,27 @@ type PlanResult struct {
 // rendering is non-deterministic (layout engine produces different coordinates
 // across runs), making byte-for-byte comparison unreliable.
 func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Registry) (*PlanResult, error) {
+	if err := validateGoCodegenColocation(cfg); err != nil {
+		return nil, err
+	}
+
 	result := &PlanResult{
 		Files:     make(map[string][]byte),
 		OwnedDirs: make(map[string]map[string]bool),
 	}
+
+	// Thread the full-project revision (roadmap 4.2, L6). It is computed once
+	// over the UNFILTERED, TOML-built model (registry-present class, L7) so every
+	// output — including group/source-filtered ones — carries the SAME
+	// full-project stamp: provenance, not content (byte-compare owns content).
+	// genkit.Header injects it into all generator banners; reset after so a
+	// later generator call outside a funnel emits the bare banner.
+	projectRev, err := rev.Compute(schema, rev.RegistryPresent)
+	if err != nil {
+		return nil, fmt.Errorf("build: compute project revision: %w", err)
+	}
+	genkit.SetRevision(projectRev.String())
+	defer genkit.SetRevision("")
 
 	extReg := extregistry.NewBuiltinRegistry()
 	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
@@ -104,7 +121,10 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 			if err != nil {
 				return nil, err
 			}
-			result.Files[outPath] = content
+			// doc is a Markdown data dictionary; the hash-comment banner (a
+			// Markdown heading) carries the full-project stamp (roadmap 4.2:
+			// doc is comment-stamped).
+			result.Files[outPath] = []byte(genkit.Header(genkit.CommentHash) + "\n" + string(content))
 
 		case "graphql":
 			content, err := planGenerate(name, outputSchema, "graphql", out, registry, extReg, result)
@@ -139,6 +159,50 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 	return result, nil
 }
 
+// validateGoCodegenColocation enforces the Go types/constraints co-location
+// requirement. The Go `constraints` generator emits `package schema` and
+// references the branded row structs and enum types the Go `types` generator
+// defines by bare name — Go has no configurable cross-package import path for
+// the schema package, so the two files only compile together in ONE directory.
+// When a build configures BOTH a Go `types` output and a Go `constraints`
+// output whose directories differ, the generated pair cannot compile; this is a
+// hard error naming both directories and the requirement. The check fires only
+// when both outputs are present (a lone constraints or lone types output may be
+// completed by hand-written or externally-generated code).
+func validateGoCodegenColocation(cfg *config.ResolvedConfig) error {
+	typesDirs := make(map[string]bool)
+	var constraintsDirs []string
+	for _, out := range cfg.Output {
+		if out.Format != "codegen" || out.Lang != "go" {
+			continue
+		}
+		dir := filepath.Dir(string(out.Path))
+		switch out.Mode {
+		case "types":
+			typesDirs[dir] = true
+		case "constraints":
+			constraintsDirs = append(constraintsDirs, dir)
+		}
+	}
+	if len(typesDirs) == 0 || len(constraintsDirs) == 0 {
+		return nil
+	}
+	sortedTypesDirs := make([]string, 0, len(typesDirs))
+	for d := range typesDirs {
+		sortedTypesDirs = append(sortedTypesDirs, d)
+	}
+	sort.Strings(sortedTypesDirs)
+	for _, cd := range constraintsDirs {
+		if !typesDirs[cd] {
+			return fmt.Errorf("build: Go constraints output directory %q differs from Go types output directory %q: "+
+				"the constraints file emits `package schema` and references the row structs and branded enums that the types file defines by bare name, "+
+				"so the two must be generated into the same directory to compile — set both outputs' paths to the same directory",
+				cd, strings.Join(sortedTypesDirs, ", "))
+		}
+	}
+	return nil
+}
+
 // applyOutputFilters narrows schema for a single output per its group and
 // source configuration. Both filters compose via AND: groups narrows first,
 // source narrows further. This is the single filtering rule shared by `build`
@@ -165,6 +229,17 @@ func PlanStandaloneCodegen(schema *model.Schema, out config.OutputConfig[config.
 		Files:     make(map[string][]byte),
 		OwnedDirs: make(map[string]map[string]bool),
 	}
+	// Full-project revision from the UNFILTERED model, so a group/source-filtered
+	// standalone codegen output carries the same full-project stamp build would
+	// give it (roadmap 4.2). schema is the caller's unfiltered model; the filter
+	// below narrows content only.
+	projectRev, err := rev.Compute(schema, rev.RegistryPresent)
+	if err != nil {
+		return nil, fmt.Errorf("codegen: compute project revision: %w", err)
+	}
+	genkit.SetRevision(projectRev.String())
+	defer genkit.SetRevision("")
+
 	outputSchema := applyOutputFilters(schema, out.Groups, out.Source)
 	if err := planCodegen("codegen", outputSchema, out, string(out.Path), result); err != nil {
 		return nil, err

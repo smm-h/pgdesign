@@ -20,7 +20,15 @@ import (
 // single genkit stamp writer (the stamp helper is a pure string formatter, so
 // seed's use of internal/diagnostic never crosses into it).
 func seedHeader() string {
-	return genkit.Stamp{Comment: genkit.CommentDash, Info: []string{"Seed data."}}.Render()
+	// Seed's stamp is honest provenance ONLY: seed content depends on
+	// --seed/--counts/--mode and is never freshness-checked (roadmap 4.2). It
+	// still carries the full-project revision when a funnel threads one (the seed
+	// command sets it via genkit.SetRevision); empty otherwise.
+	return genkit.Stamp{
+		Comment:  genkit.CommentDash,
+		Info:     []string{"Seed data."},
+		Revision: genkit.CurrentRevision(),
+	}.Render()
 }
 
 var wordList = []string{"alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"}

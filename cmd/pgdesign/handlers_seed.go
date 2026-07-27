@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/seed"
+	"github.com/smm-h/pgdesign/pkg/genkit"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
@@ -59,6 +61,17 @@ func registerSeedCmd(app *strictcli.App) {
 				Mode:   mode,
 				Apply:  apply,
 			}
+			// Thread the full-project revision so seed's provenance banner names
+			// the producing revision (roadmap 4.2). schema is the TOML-built
+			// model: registry-present class (L7). Reset after generation.
+			projectRev, revErr := rev.Compute(schema, rev.RegistryPresent)
+			if revErr != nil {
+				fmt.Fprintf(os.Stderr, "error: compute project revision: %v\n", revErr)
+				return strictcli.Exit(1)
+			}
+			genkit.SetRevision(projectRev.String())
+			defer genkit.SetRevision("")
+
 			sql, seedDiags := seed.Generate(schema, rows, rng, cfg)
 			if seedDiags.HasErrors() {
 				for _, d := range seedDiags.Errors() {
