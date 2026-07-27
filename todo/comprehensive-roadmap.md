@@ -1515,6 +1515,19 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
 - **Why:** L1 totality for ops (a migration that renders wrong SQL — empty
   or the WRONG OBJECT — is the worst artifact possible; today actual for
   several families); L2 keeps ops thin, reviewable, deduplicated.
+- **5.1b AMENDMENT (5.2 foundation round, 2026-07):** the thirteen families
+  cover Part III's LOSSY concerns, but chain conversion needs ALL ~70
+  generate-emitted op kinds self-contained (add/drop/alter column, checks,
+  FKs, indexes, RLS, enum alters, ...) PLUS endpoint simulability for
+  NESTED-MODIFIER ops. ADOPTED RESOLUTION (faithful to edge_format.md's
+  by-content-id rule): a nested-modifier op's payload carries the owning
+  object's POST-STATE def id AND the delta description — endpoint
+  simulation is then trivial (target key maps to the payload's post-state
+  id; no IR-application engine), rendering consumes the delta, and
+  self-containment stays total. A schema-meta op covers Extensions/
+  PGVersion/Groups changes (the manifest's schema:<name> entry). 5.1b
+  lands before 5.2's remaining items (generate-to-edge, apply, upgrade,
+  guard, serve, bridge).
 - **Verify:** Round-trip table test covers all thirteen families up and
   down; fallbacks gone; the mixed fixture renders byte-identically.
 
