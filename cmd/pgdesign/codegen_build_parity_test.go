@@ -118,6 +118,124 @@ func TestCodegenBuildParity_GroupFilter(t *testing.T) {
 	}
 }
 
+// writeSourcedProject creates a temp project with two schema files, each
+// contributing one table, plus a build [output] that emits Go constants
+// filtered to the first source file via `source`. Returns (projectRoot,
+// buildOutputAbsPath, schemaFilePaths).
+func writeSourcedProject(t *testing.T) (string, string, []string) {
+	t.Helper()
+	config.CodegenModes = SupportedModes()
+
+	dir := t.TempDir()
+	schemaA := `[meta]
+schema = "core"
+
+[tables.users]
+comment = "Core users table"
+
+[tables.users.columns.id]
+type = "id"
+
+[tables.users.columns.name]
+type = "short_text"
+`
+	schemaB := `[meta]
+schema = "extra"
+
+[tables.audit_log]
+comment = "Peripheral audit log"
+
+[tables.audit_log.columns.id]
+type = "id"
+
+[tables.audit_log.columns.note]
+type = "short_text"
+`
+	pathA := filepath.Join(dir, "schema_a.toml")
+	pathB := filepath.Join(dir, "schema_b.toml")
+	if err := os.WriteFile(pathA, []byte(schemaA), 0o644); err != nil {
+		t.Fatalf("write schema_a.toml: %v", err)
+	}
+	if err := os.WriteFile(pathB, []byte(schemaB), 0o644); err != nil {
+		t.Fatalf("write schema_b.toml: %v", err)
+	}
+
+	buildOut := filepath.Join(dir, "build_out", "tables.go")
+	cfg := fmt.Sprintf(`[project]
+schemas = ["schema_a.toml", "schema_b.toml"]
+
+[database]
+pg_version = 16
+
+[output.consts]
+format = "codegen"
+path = %q
+lang = "go"
+mode = "constants"
+source = ["schema_a.toml"]
+`, buildOut)
+	if err := os.WriteFile(filepath.Join(dir, "pgdesign.toml"), []byte(cfg), 0o644); err != nil {
+		t.Fatalf("write pgdesign.toml: %v", err)
+	}
+	return dir, buildOut, []string{pathA, pathB}
+}
+
+// TestCodegenBuildParity_SourceFilter is the source-filter sibling of
+// TestCodegenBuildParity_GroupFilter: it pins that standalone `codegen` and
+// `build` produce byte-identical output for the same artifact under a `source`
+// filter. Like the group case, standalone codegen once ignored
+// FilterByGroups/FilterBySource, so the same artifact had two contents
+// depending on the entry point.
+func TestCodegenBuildParity_SourceFilter(t *testing.T) {
+	dir, buildOut, schemaPaths := writeSourcedProject(t)
+	cfgPath := filepath.Join(dir, "pgdesign.toml")
+
+	// Build (canonical): writes the source-filtered constants file.
+	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+		t.Fatalf("runBuild exited %d", code)
+	}
+	buildContent, err := os.ReadFile(buildOut)
+	if err != nil {
+		t.Fatalf("read build output: %v", err)
+	}
+
+	// Standalone codegen with the same source filter, over both schema files,
+	// to a separate path whose parent already exists.
+	codegenOut := filepath.Join(dir, "codegen_tables.go")
+	kwargs := map[string]interface{}{
+		"path":       []interface{}{schemaPaths[0], schemaPaths[1]},
+		"lang":       "go",
+		"mode":       "constants",
+		"check":      false,
+		"split_mode": nil,
+		"db":         nil,
+		"output":     codegenOut,
+		"groups":     nil,
+		"source":     []interface{}{"schema_a.toml"},
+	}
+	if code := runCodegen(&cfgPath, true, kwargs); code != 0 {
+		t.Fatalf("runCodegen exited %d", code)
+	}
+	codegenContent, err := os.ReadFile(codegenOut)
+	if err != nil {
+		t.Fatalf("read codegen output: %v", err)
+	}
+
+	if string(buildContent) != string(codegenContent) {
+		t.Errorf("standalone codegen and build must be byte-identical under a source filter.\nbuild:\n%s\ncodegen:\n%s", buildContent, codegenContent)
+	}
+
+	// Sanity: the filtered artifact must include the kept source's table and
+	// exclude the table from the other source (guards against a trivially-empty
+	// output making the parity check vacuous).
+	if wantInclude := "users"; !contains(string(buildContent), wantInclude) {
+		t.Errorf("source-filtered build output should mention the kept table %q", wantInclude)
+	}
+	if wantExclude := "audit_log"; contains(string(buildContent), wantExclude) {
+		t.Errorf("source-filtered build output should not mention %q", wantExclude)
+	}
+}
+
 // TestCodegenWriteRefusesOrphans pins that a standalone codegen WRITE (not just
 // --check) refuses when an orphan file exists in an owned multi-file output
 // directory and never deletes it -- the same hard-error orphan behavior build
