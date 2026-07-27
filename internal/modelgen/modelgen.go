@@ -85,6 +85,11 @@ type Config struct {
 // generated table carries.
 const pkColumnName = "id"
 
+// fallbackTableIndex is the table index the pair-derivation uses when every table
+// in a schema was dropped and one must be added back. It is far beyond any
+// generated table index so the fallback name never collides with a dropped table.
+const fallbackTableIndex = 1_000_000
+
 // pkColumnType is the semantic type of the surrogate primary-key column: the
 // builtin "id" (a NOT NULL uuid defaulting to gen_random_uuid()).
 const pkColumnType = "id"
@@ -185,6 +190,14 @@ func DrawPair(t *rapid.T, cfg Config) (a, b []*parse.RawSchema) {
 	return p[0], p[1]
 }
 
+// ExamplePair draws a DETERMINISTIC model pair for the given seed, without a
+// rapid.T — the entry point DB-gated tests use to iterate a bounded number of
+// generated pairs in a plain loop (rapid's Example gives reproducible samples).
+func ExamplePair(cfg Config, seed int) (a, b []*parse.RawSchema) {
+	p := GeneratePair(cfg).Example(seed)
+	return p[0], p[1]
+}
+
 // deriveModel builds b from a by dropping/keeping/mutating a's tables and adding
 // new ones, preserving shared columns' types. It guarantees b has at least one
 // table overall so the post-state is a non-empty, buildable model.
@@ -208,9 +221,12 @@ func deriveModel(t *rapid.T, cfg Config, a []*parse.RawSchema) []*parse.RawSchem
 		total += len(nb.Tables)
 		b = append(b, nb)
 	}
-	// Guarantee a non-empty post-state: if every table was dropped, add one back.
+	// Guarantee a non-empty post-state: if every table was dropped, add one back
+	// with an index far beyond any original table's, so its name (t_0_<big>) can
+	// never collide with a dropped table's name — a collision would make diff match
+	// them and emit a bogus type-change ALTER on a "shared" column.
 	if total == 0 && len(b) > 0 {
-		b[0].Tables = append(b[0].Tables, genTable(t, cfg, 0, 0))
+		b[0].Tables = append(b[0].Tables, genTable(t, cfg, 0, fallbackTableIndex))
 	}
 	return b
 }
@@ -224,24 +240,25 @@ func deriveTable(t *rapid.T, cfg Config, tbl parse.RawTable) parse.RawTable {
 		Comment: tbl.Comment,
 		PK:      tbl.PK,
 	}
-	nextCol := 0
 	for ci, col := range tbl.Columns {
 		if col.Name == pkColumnName {
 			nt.Columns = append(nt.Columns, col) // never drop the PK
 			continue
 		}
-		// Track the highest col_ index so new columns get fresh names.
-		nextCol = len(tbl.Columns)
 		if rapid.Bool().Draw(t, fmt.Sprintf("drop_col_%s_%d", tbl.Name, ci)) {
 			continue // drop this non-PK column
 		}
 		nt.Columns = append(nt.Columns, col) // keep name AND type
 	}
+	// New columns use a DISTINCT "nc_" prefix so they can never collide with a kept
+	// "col_N" column — a name collision would make diff see a same-named column with
+	// a different type and emit a type-change ALTER (which is exactly what the pair
+	// derivation must never produce).
 	nNew := rapid.IntRange(0, cfg.MaxExtraColumns).Draw(t, fmt.Sprintf("add_cols_%s", tbl.Name))
 	for k := 0; k < nNew; k++ {
 		colType := rapid.SampledFrom(cfg.ColumnTypes).Draw(t, fmt.Sprintf("%s_newcol_%d_type", tbl.Name, k))
 		nt.Columns = append(nt.Columns, parse.RawColumn{
-			Name: fmt.Sprintf("col_%d", nextCol+k),
+			Name: fmt.Sprintf("nc_%d", k),
 			Type: colType,
 		})
 	}
