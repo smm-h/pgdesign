@@ -446,7 +446,9 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, collErr.Error())
 		return
 	}
-	d := diff.Diff(desired, actual)
+	// actual is introspected (registry-absent); use the introspected diff path so
+	// class-aware fields (semantic type names) do not false-drift.
+	d := diff.DiffLive(desired, actual, nil)
 	writeJSON(w, http.StatusOK, d)
 }
 

@@ -523,6 +523,9 @@ func formatColumnChange(b *strings.Builder, cc *ColumnChange) {
 	if cc.StatisticsChanged != nil {
 		fmt.Fprintf(b, "    statistics: %s -> %s\n", formatOptionalInt(cc.StatisticsChanged[0]), formatOptionalInt(cc.StatisticsChanged[1]))
 	}
+	if cc.SemanticTypeNameChanged != nil {
+		fmt.Fprintf(b, "    semantic_type: %q -> %q\n", cc.SemanticTypeNameChanged[0], cc.SemanticTypeNameChanged[1])
+	}
 }
 
 func boolStr(v bool) string {

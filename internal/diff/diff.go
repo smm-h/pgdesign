@@ -115,7 +115,17 @@ type ColumnChange struct {
 	CollationChanged  *[2]string          `json:"collation_changed,omitempty"`
 	JSONSchemaChanged *[2]string          `json:"json_schema_changed,omitempty"`
 	StatisticsChanged *[2]*int            `json:"statistics_changed,omitempty"`
-	Risk              risk.Classification `json:"risk"`
+	// SemanticTypeNameChanged reports a change in the column's declared semantic
+	// type name (e.g. a pure-alias scalar `email` vs `text`). It is CLASS-AWARE:
+	// compared only when both sides are registry-present models (diff --against,
+	// diff --base, chain, conformance). An introspected `actual` carries no
+	// semantic types, so comparing would false-drift; the introspected diff paths
+	// (migrate, diff --live, serve) suppress it. Two DDL-identical models with
+	// different semantic type names have DISTINCT revisions (SemanticTypeName is
+	// encoded) yet produce different codegen — reporting it satisfies the reverse
+	// conformance direction (diff-empty implies revision-equal).
+	SemanticTypeNameChanged *[2]string          `json:"semantic_type_name_changed,omitempty"`
+	Risk                    risk.Classification `json:"risk"`
 }
 
 // EnumDiff describes changes to an enum type.
@@ -410,11 +420,13 @@ func (d *SchemaDiff) Summary() string {
 	return strings.Join(parts, ", ")
 }
 
-// Diff compares desired (from TOML) against actual (from introspection) and
-// returns a structured diff. Items in desired but not in actual are "added";
-// items in actual but not in desired are "removed".
+// Diff compares two registry-present models (desired vs actual) and returns a
+// structured diff. Items in desired but not in actual are "added"; items in
+// actual but not in desired are "removed". Both sides are the SAME model class
+// (L7): semantic type names are compared. Use DiffLive when actual is an
+// introspected (registry-absent) schema.
 func Diff(desired, actual *model.Schema) *SchemaDiff {
-	return DiffLive(desired, actual, nil)
+	return diffSchemas(desired, actual, nil, false)
 }
 
 // LiveNormalizer resolves the ≈_pg RESIDUE that pure N cannot reach:
@@ -434,19 +446,28 @@ type LiveNormalizer interface {
 	NormalizeExprForTable(schema, table, expr string) string
 }
 
-// DiffLive is Diff with an optional LiveNormalizer. When ln is non-nil (the
-// diff --live path), the DESIRED side's table-scoped expressions are
-// round-tripped through the target DB before comparison, resolving the
-// catalog-dependent cast residue. ln == nil is the pure path (identical to
-// Diff). The caller's desired schema is never mutated — a normalized copy is
-// built.
+// DiffLive compares a registry-present desired model against an INTROSPECTED
+// (registry-absent) actual schema, with an optional LiveNormalizer. Because the
+// introspected side carries no semantic type information (L7 — a different model
+// class), class-aware fields such as Column.SemanticTypeName are NOT compared,
+// so they never false-drift. When ln is non-nil (the diff --live path), the
+// DESIRED side's table-scoped expressions are round-tripped through the target
+// DB before comparison, resolving the catalog-dependent cast residue. The
+// caller's desired schema is never mutated — a normalized copy is built.
 func DiffLive(desired, actual *model.Schema, ln LiveNormalizer) *SchemaDiff {
+	return diffSchemas(desired, actual, ln, true)
+}
+
+// diffSchemas is the shared implementation. actualIntrospected suppresses
+// class-aware comparisons (semantic type names) that only make sense between two
+// registry-present models.
+func diffSchemas(desired, actual *model.Schema, ln LiveNormalizer, actualIntrospected bool) *SchemaDiff {
 	if ln != nil {
 		desired = liveNormalizeDesired(desired, ln)
 	}
 	d := &SchemaDiff{}
 
-	diffTables(d, desired, actual)
+	diffTables(d, desired, actual, actualIntrospected)
 	diffEnums(d, desired, actual)
 	diffExtensions(d, desired, actual)
 	diffViews(d, desired, actual)
@@ -522,7 +543,7 @@ func stringSetEqual(a, b []string) bool {
 // Partman-managed children (detected during introspection) are excluded from
 // existence drift: they appear in the live DB but are created/dropped by partman,
 // so they should not be flagged as added or removed.
-func diffTables(d *SchemaDiff, desired, actual *model.Schema) {
+func diffTables(d *SchemaDiff, desired, actual *model.Schema, actualIntrospected bool) {
 	added, removed, matched := matchObjects(desired.Tables, actual.Tables, func(t model.Table) string {
 		return tableKey(&t)
 	})
@@ -537,7 +558,7 @@ func diffTables(d *SchemaDiff, desired, actual *model.Schema) {
 		d.TablesRemoved = append(d.TablesRemoved, tableKey(&t))
 	}
 	for _, p := range matched {
-		td := diffTable(&p.Desired, &p.Actual)
+		td := diffTable(&p.Desired, &p.Actual, actualIntrospected)
 		if !isTableDiffEmpty(&td) {
 			d.TablesChanged = append(d.TablesChanged, td)
 		}
@@ -552,10 +573,10 @@ func tableKey(t *model.Table) string {
 }
 
 // diffTable diffs two matched tables.
-func diffTable(desired, actual *model.Table) TableDiff {
+func diffTable(desired, actual *model.Table, actualIntrospected bool) TableDiff {
 	td := TableDiff{Name: tableKey(desired)}
 
-	diffColumns(&td, desired, actual)
+	diffColumns(&td, desired, actual, actualIntrospected)
 	diffFKs(&td, desired, actual)
 	diffIndexes(&td, desired, actual)
 	diffUniques(&td, desired, actual)
@@ -636,7 +657,7 @@ func isTableDiffEmpty(td *TableDiff) bool {
 }
 
 // diffColumns matches columns by name and classifies changes with risk.
-func diffColumns(td *TableDiff, desired, actual *model.Table) {
+func diffColumns(td *TableDiff, desired, actual *model.Table, actualIntrospected bool) {
 	added, removed, matched := matchObjects(desired.Columns, actual.Columns, func(c model.Column) string {
 		return c.Name
 	})
@@ -647,7 +668,7 @@ func diffColumns(td *TableDiff, desired, actual *model.Table) {
 		td.ColumnsRemoved = append(td.ColumnsRemoved, c.Name)
 	}
 	for _, p := range matched {
-		cc := diffColumn(&p.Desired, &p.Actual)
+		cc := diffColumn(&p.Desired, &p.Actual, actualIntrospected)
 		if cc != nil {
 			td.ColumnsChanged = append(td.ColumnsChanged, *cc)
 		}
@@ -655,7 +676,7 @@ func diffColumns(td *TableDiff, desired, actual *model.Table) {
 }
 
 // diffColumn compares two matched columns and returns nil if identical.
-func diffColumn(desired, actual *model.Column) *ColumnChange {
+func diffColumn(desired, actual *model.Column, actualIntrospected bool) *ColumnChange {
 	cc := ColumnChange{Name: desired.Name}
 	changed := false
 
@@ -729,6 +750,17 @@ func diffColumn(desired, actual *model.Column) *ColumnChange {
 	// Statistics comparison.
 	if !intPtrEqual(desired.Statistics, actual.Statistics) {
 		cc.StatisticsChanged = &[2]*int{actual.Statistics, desired.Statistics}
+		changed = true
+	}
+
+	// Semantic type name comparison (CLASS-AWARE). Only meaningful between two
+	// registry-present models: an introspected actual carries no semantic types,
+	// so a comparison would always false-drift. When both sides are model-class
+	// (diff --against/--base, chain, conformance), a pure-alias scalar type change
+	// (same PGType, different semantic name) is DDL-identical yet codegen-visible
+	// and revision-distinct, so it must be reported.
+	if !actualIntrospected && desired.SemanticTypeName != actual.SemanticTypeName {
+		cc.SemanticTypeNameChanged = &[2]string{actual.SemanticTypeName, desired.SemanticTypeName}
 		changed = true
 	}
 

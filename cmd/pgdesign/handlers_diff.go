@@ -101,7 +101,16 @@ func registerDiffCmd(app *strictcli.App) {
 				fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
 				return strictcli.Exit(1)
 			}
-			d := diff.DiffLive(schema, actual, ln)
+			// --live compares against an introspected (registry-absent) schema, so
+			// class-aware fields (semantic type names) are suppressed. --against and
+			// --base compare two registry-present models, so those fields ARE
+			// compared (Diff).
+			var d *diff.SchemaDiff
+			if liveURL != "" {
+				d = diff.DiffLive(schema, actual, ln)
+			} else {
+				d = diff.Diff(schema, actual)
+			}
 
 			if kwargs["json"].(bool) {
 				fmt.Println(diff.FormatJSON(d))
