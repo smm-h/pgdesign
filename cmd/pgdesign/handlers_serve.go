@@ -36,10 +36,9 @@ func registerServeCmd(app *strictcli.App) {
 				schemaNames = []string{"public"}
 			}
 
-			migrationsDir := "migrations"
-			if cfg.Project.MigrationsDir != "" {
-				migrationsDir = string(cfg.Project.MigrationsDir)
-			}
+			// serve has no --dir flag; the config's migrations_dir (else the
+			// "migrations" default) applies via the shared resolver.
+			migrationsDir := resolveMigrationsDir(nil, string(cfg.Project.MigrationsDir))
 
 			poolCfg := serve.PoolConfig{
 				MaxConns: cfg.Database.PoolMaxConns,

@@ -60,6 +60,23 @@ func kwargsOptInt(kwargs map[string]interface{}, key string) *int {
 	return &i
 }
 
+// resolveMigrationsDir resolves the effective migrations directory using the
+// Default(nil)+was-set pattern (the `output` flag is the blueprint). dirFlag is
+// the raw --dir flag value: nil when the user did not pass --dir, a pointer to
+// the exact string when they did. An explicit flag ALWAYS wins verbatim -- even
+// "--dir migrations" -- so it is distinguishable from the unset default. Only
+// when --dir is absent does the project config's migrations_dir apply, falling
+// back to the literal "migrations" when neither is set.
+func resolveMigrationsDir(dirFlag *string, cfgDir string) string {
+	if dirFlag != nil {
+		return *dirFlag
+	}
+	if cfgDir != "" {
+		return cfgDir
+	}
+	return "migrations"
+}
+
 // toIfaces converts []string to []interface{} for strictcli.Choices().
 func toIfaces(ss []string) []interface{} {
 	out := make([]interface{}, len(ss))

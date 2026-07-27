@@ -189,7 +189,7 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 		},
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 		),
 		strictcli.WithArgs(
 			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
@@ -230,10 +230,7 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dir := kwargs["dir"].(string)
-			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-				dir = string(cfg.Project.MigrationsDir)
-			}
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			schemaNames := []string{"public"}
 			if schema.Name != "" && schema.Name != "public" {
@@ -319,7 +316,7 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
 			strictcli.StringFlag("version", "Semantic version string for the generated migration", strictcli.Default(nil)),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 		),
 		strictcli.WithArgs(
 			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
@@ -345,10 +342,7 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dir := kwargs["dir"].(string)
-			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-				dir = string(cfg.Project.MigrationsDir)
-			}
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			dryRun := kwargs["dry_run"].(bool)
 
@@ -392,7 +386,7 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 		},
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing", strictcli.Default(false)),
 		),
 	)
@@ -498,10 +492,7 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dir := kwargs["dir"].(string)
-			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-				dir = string(cfg.Project.MigrationsDir)
-			}
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			lockTimeout := cfg.Migrate.LockTimeout
 
@@ -545,7 +536,7 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 		},
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.StringFlag("to", "Target version to rollback to (exclusive -- this version stays applied)", strictcli.Default("")),
 		),
 	)
@@ -568,10 +559,7 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dir := kwargs["dir"].(string)
-			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-				dir = string(cfg.Project.MigrationsDir)
-			}
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			ctx := context.Background()
 			conn, err := pgx.Connect(ctx, dbURL)
@@ -637,7 +625,7 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 		},
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 		),
 	)
 }
@@ -665,10 +653,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dir := kwargs["dir"].(string)
-			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-				dir = string(cfg.Project.MigrationsDir)
-			}
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			from := kwargs["from"].(string)
 			if from == "" {
@@ -745,7 +730,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 		strictcli.WithFlags(
 			strictcli.StringFlag("from", "First migration version to include in the squash range"),
 			strictcli.StringFlag("to", "Last migration version to include in the squash range"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.StringFlag("db", "PostgreSQL connection URL (REQUIRED) for the mandatory M200 applied-version safety check"),
 		),
 	)
@@ -764,12 +749,12 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 			}
 
 			shadow := kwargs["shadow"].(bool)
-			dir := kwargs["dir"].(string)
+			dirFlag := kwargsOptString(kwargs, "dir")
 			timeout := kwargs["timeout"].(int)
 			paths := kwargsStrSlice(kwargs["path"])
 
 			if shadow {
-				return strictcli.Exit(runMigrateTestShadow(dbURL, dir, timeout, paths, cfgOverride, quiet))
+				return strictcli.Exit(runMigrateTestShadow(dbURL, dirFlag, timeout, paths, cfgOverride, quiet))
 			}
 
 			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
@@ -778,9 +763,7 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-				dir = string(cfg.Project.MigrationsDir)
-			}
+			dir := resolveMigrationsDir(dirFlag, string(cfg.Project.MigrationsDir))
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 			defer cancel()
@@ -948,7 +931,7 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 		},
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.IntFlag("timeout", "Maximum time in seconds before the test run is aborted", strictcli.Default(60)),
 			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema", strictcli.Default(false)),
 		),
@@ -958,8 +941,10 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 	)
 }
 
-// runMigrateTestShadow implements --shadow mode.
-func runMigrateTestShadow(dbURL, dir string, timeout int, paths []string, configOverride *string, quiet bool) int {
+// runMigrateTestShadow implements --shadow mode. dirFlag is the raw --dir flag
+// value (nil when unset) so an explicit "--dir migrations" is distinguishable
+// from the default.
+func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []string, configOverride *string, quiet bool) int {
 	if len(paths) == 0 {
 		fmt.Fprintln(os.Stderr, "error: schema path is required for --shadow mode")
 		return 1
@@ -976,9 +961,7 @@ func runMigrateTestShadow(dbURL, dir string, timeout int, paths []string, config
 		return 1
 	}
 
-	if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-		dir = string(cfg.Project.MigrationsDir)
-	}
+	dir := resolveMigrationsDir(dirFlag, string(cfg.Project.MigrationsDir))
 
 	schemaNames := []string{"public"}
 	if schema.Name != "" && schema.Name != "public" {
@@ -1258,10 +1241,7 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dir := kwargs["dir"].(string)
-			if dir == "migrations" && cfg.Project.MigrationsDir != "" {
-				dir = string(cfg.Project.MigrationsDir)
-			}
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			description := kwargs["description"].(string)
 
@@ -1285,7 +1265,7 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 		},
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.StringFlag("version", "Version label for the baseline record"),
 			strictcli.StringFlag("description", "Human-readable description", strictcli.Default("Initial baseline")),
 		),
