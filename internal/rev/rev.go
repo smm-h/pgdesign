@@ -232,14 +232,41 @@ type Envelope struct {
 // matches the class-tagged hash of the embedded model bytes — the whole point
 // of embedding the bytes verbatim. A mismatch (re-encoded or tampered model
 // bytes) is a hard error.
+//
+// Parse performs three independent integrity checks, in order:
+//
+//  1. The outer envelope format_version must equal FormatVersion. An envelope
+//     framed by a different serializer generation is rejected before its bytes
+//     are trusted, rather than being silently reinterpreted under the current
+//     framing.
+//  2. The class named in the revision string must equal the class marker baked
+//     INSIDE the embedded whole-model bytes (L7). The two are written together
+//     by Marshal, so a divergence means the revision string was forged onto
+//     bytes of a different model class — accepting it would let a caller
+//     compare, under the wrong class tag, a revision whose bytes belong to
+//     another class. This is caught even though the hash already commits to the
+//     in-bytes class, because the outer string's class is what tags the
+//     returned Revision and thus governs future cross-class Equal checks.
+//  3. The revision (class-tagged hash) must match a fresh hash of the embedded
+//     model bytes, catching any tamper of the bytes themselves.
 func Parse(data []byte) (Envelope, error) {
 	var f envelopeForm
 	if err := json.Unmarshal(data, &f); err != nil {
 		return Envelope{}, fmt.Errorf("rev: parse envelope: %w", err)
 	}
+	if f.FormatVersion != FormatVersion {
+		return Envelope{}, fmt.Errorf("rev: envelope format_version %d, want %d", f.FormatVersion, FormatVersion)
+	}
 	class, sum, err := splitRevision(f.Revision)
 	if err != nil {
 		return Envelope{}, err
+	}
+	bytesClass, err := peekModelClass(f.Model)
+	if err != nil {
+		return Envelope{}, err
+	}
+	if bytesClass != class {
+		return Envelope{}, fmt.Errorf("rev: envelope revision-string class %q does not match embedded model-bytes class %q (forged envelope)", class, bytesClass)
 	}
 	got := revisionOf(f.Model, class)
 	want := Revision{class: class, sum: sum}
@@ -256,6 +283,22 @@ func Parse(data []byte) (Envelope, error) {
 		Model:         f.Model,
 		Diagnostics:   f.Diagnostics,
 	}, nil
+}
+
+// peekModelClass reads the class marker from canonical whole-model bytes without
+// fully decoding the model. It is what lets Parse cross-check the in-bytes class
+// (the L7 marker) against the revision string's class.
+func peekModelClass(canonicalBytes []byte) (ModelClass, error) {
+	var head struct {
+		Class ModelClass `json:"class"`
+	}
+	if err := json.Unmarshal(canonicalBytes, &head); err != nil {
+		return "", fmt.Errorf("rev: peek model class: %w", err)
+	}
+	if !head.Class.valid() {
+		return "", fmt.Errorf("rev: embedded model bytes carry unknown model class %q", head.Class)
+	}
+	return head.Class, nil
 }
 
 // DecodeModel reconstructs the schema from canonical whole-model bytes (the

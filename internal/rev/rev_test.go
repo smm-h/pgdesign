@@ -150,6 +150,61 @@ func TestEnvelopeTamperDetected(t *testing.T) {
 	}
 }
 
+// TestParseRejectsForgedClass is the forged-envelope rider (1.5 audit): the
+// class named in the revision STRING must match the class marker baked inside
+// the embedded model BYTES. An envelope whose string claims one class over
+// bytes of another must be rejected — otherwise the returned Revision would
+// carry a class tag its bytes do not, corrupting future cross-class Equal.
+func TestParseRejectsForgedClass(t *testing.T) {
+	body, err := Marshal(sampleSchema(), RegistryAbsent, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f envelopeForm
+	if err := json.Unmarshal(body, &f); err != nil {
+		t.Fatal(err)
+	}
+	// Forge: keep the registry_absent MODEL BYTES verbatim, but relabel the
+	// revision STRING's class to registry_present (same hex digest). The digest
+	// still matches the bytes (the class is not folded into the hash), so only
+	// the explicit in-bytes-vs-string class cross-check can catch this.
+	_, sum, err := splitRevision(f.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forged := Revision{class: RegistryPresent, sum: sum}
+	f.Revision = forged.String()
+	tampered, err := compactJSON(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Parse(tampered); err == nil {
+		t.Fatal("expected Parse to reject an envelope whose revision-string class does not match the embedded model-bytes class")
+	}
+}
+
+// TestParseRejectsWrongFormatVersion is the outer-format_version rider (1.5
+// audit): an envelope framed under a different serializer generation is
+// rejected before its bytes are trusted.
+func TestParseRejectsWrongFormatVersion(t *testing.T) {
+	body, err := Marshal(sampleSchema(), RegistryPresent, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f envelopeForm
+	if err := json.Unmarshal(body, &f); err != nil {
+		t.Fatal(err)
+	}
+	f.FormatVersion = FormatVersion + 1
+	tampered, err := compactJSON(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Parse(tampered); err == nil {
+		t.Fatal("expected Parse to reject an envelope with a mismatched outer format_version")
+	}
+}
+
 // TestOneSerializerIdenticalBodies is the 1.5 verify item: `generate json` and
 // serve's /schema response call THE SAME function, so identical inputs yield
 // byte-identical bodies. Both paths ultimately call Marshal; here we assert
