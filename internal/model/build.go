@@ -709,6 +709,16 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, s
 				Message:  fmt.Sprintf("[tables.%s.maintenance] requires \"interval\" key for partman-managed tables", rt.Name),
 			})
 		}
+		// premake is required: a silent zero disables partman premaking, so the
+		// operator must state it explicitly rather than have it default to 0.
+		if rt.Maintenance.Premake == nil {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E010",
+				Table:    rt.Name,
+				Message:  fmt.Sprintf("[tables.%s.maintenance] requires \"premake\" key for partman-managed tables (a missing value would silently disable partition premaking)", rt.Name),
+			})
+		}
 		t.Maintenance = mc
 	}
 
