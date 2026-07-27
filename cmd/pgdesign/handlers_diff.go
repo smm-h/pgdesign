@@ -107,7 +107,11 @@ func registerDiffCmd(app *strictcli.App) {
 			// compared (Diff).
 			var d *diff.SchemaDiff
 			if liveURL != "" {
-				d = diff.DiffLive(schema, actual, ln)
+				// Resolve the live server version onto the desired model before
+				// diffing so a pinned-but-stale or unpinned [meta].version does not
+				// surface as a spurious "pg_version changed" (mirrors the migrate
+				// plan/generate paths).
+				d = liveReportDiff(schema, actual, ln)
 			} else {
 				d = diff.Diff(schema, actual)
 			}

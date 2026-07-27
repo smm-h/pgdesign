@@ -50,6 +50,25 @@ func TestMigrationDiff_UnpinnedPGVersionNoSpuriousDrift(t *testing.T) {
 	}
 }
 
+// TestLiveReportDiff_UnpinnedPGVersionNoSpuriousDrift is the regression for the
+// diff --live foot-gun: the report path called diff.DiffLive directly (without
+// resolving the live server version onto the desired model first), so an in-sync
+// project with an unpinned/stale [meta].version surfaced a spurious
+// "pg_version changed".
+func TestLiveReportDiff_UnpinnedPGVersionNoSpuriousDrift(t *testing.T) {
+	// RED: diffing before applying the live version reports spurious drift.
+	desired, actual := inSyncSchemas()
+	if d := diff.DiffLive(desired, actual, nil); d.IsEmpty() {
+		t.Fatalf("precondition: expected spurious PGVersionChanged when diffing before applying the live version, got empty")
+	}
+
+	// GREEN: liveReportDiff (the diff --live seam) applies the live version first.
+	desired, actual = inSyncSchemas()
+	if d := liveReportDiff(desired, actual, nil); !d.IsEmpty() {
+		t.Fatalf("liveReportDiff reported spurious drift for an in-sync unpinned schema: %s", d.Summary())
+	}
+}
+
 // TestMigrationDiff_SuppressesSemanticTypeName confirms the introspected diff
 // path does not false-drift on semantic type names (the actual side, being
 // introspected, carries none). This is the reverse of the model-to-model case

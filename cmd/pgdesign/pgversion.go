@@ -52,16 +52,23 @@ func applyLivePGVersion(schema *model.Schema, live int) {
 	}
 }
 
-// migrationDiff is the migrate plan/generate/test diff seam: it resolves the
-// live PG version onto the desired schema (so an unpinned pg_version does not
-// register as a spurious PGVersionChanged) and THEN diffs against the
-// introspected actual. actual is always introspected (registry-absent) on these
-// paths, so DiffLive is used — class-aware fields (semantic type names) do not
-// false-drift. Extracted as a helper so the ordering (apply-then-diff) is
-// unit-testable without a live database.
-func migrationDiff(desired, actual *model.Schema) *diff.SchemaDiff {
+// liveReportDiff resolves the live PG version onto the desired schema (so a
+// pinned-but-stale or unpinned [meta].version does not register as a spurious
+// PGVersionChanged against the live server) and THEN diffs against the
+// introspected actual through the optional live round-trip normalizer. The
+// live server's version is the ground truth; comparing the declared version
+// against it is meaningless for drift. Every path that diffs a desired model
+// against an introspected live database (migrate plan/generate/test, diff
+// --live) must go through this seam.
+func liveReportDiff(desired, actual *model.Schema, ln diff.LiveNormalizer) *diff.SchemaDiff {
 	applyLivePGVersion(desired, actual.PGVersion)
-	return diff.DiffLive(desired, actual, nil)
+	return diff.DiffLive(desired, actual, ln)
+}
+
+// migrationDiff is the migrate plan/generate/test diff seam: liveReportDiff with
+// no live normalizer (those paths resolve the cast residue elsewhere).
+func migrationDiff(desired, actual *model.Schema) *diff.SchemaDiff {
+	return liveReportDiff(desired, actual, nil)
 }
 
 // requireSchemaPGVersion returns the schema's resolved PG version (already
