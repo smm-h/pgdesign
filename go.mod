@@ -6,8 +6,9 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/pganalyze/pg_query_go/v6 v6.2.2
 	github.com/smm-h/go-toml-edit v0.2.2
-	github.com/smm-h/strictcli/go v0.23.0
+	github.com/smm-h/strictcli/go v0.26.0
 	github.com/wasilibs/go-pgquery v0.0.0-20260616022436-0b34969e40e5
+	google.golang.org/protobuf v1.36.11
 	oss.terrastruct.com/d2 v0.7.1
 	pgregory.net/rapid v1.3.0
 )
@@ -38,6 +39,5 @@ require (
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 	oss.terrastruct.com/util-go v0.0.0-20250213174338-243d8661088a // indirect
 )
