@@ -42,6 +42,15 @@ type SchemaDiff struct {
 	FunctionsRemoved         []string               `json:"functions_removed,omitempty"`
 	FunctionsChanged         []FunctionDiff         `json:"functions_changed,omitempty"`
 	SMTransitionsChanged     []SMTransitionDiff     `json:"sm_transitions_changed,omitempty"`
+	// PGVersionChanged and GroupsChanged report schema-global identity fields
+	// that the differ historically ignored despite their being part of the
+	// revision (Part III). They exist to satisfy the REVERSE conformance
+	// direction (diff-empty implies revision-equal): under-reporting either one
+	// would let two models with distinct revisions diff empty. PGVersionChanged
+	// is [old, new]; GroupsChanged is set (a bool wrapper) when the group->table
+	// map differs.
+	PGVersionChanged *[2]int `json:"pg_version_changed,omitempty"`
+	GroupsChanged    bool    `json:"groups_changed,omitempty"`
 }
 
 // SMTransitionDiff describes changes to a state machine type's transitions.
@@ -284,7 +293,9 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.FunctionsAdded) == 0 &&
 		len(d.FunctionsRemoved) == 0 &&
 		len(d.FunctionsChanged) == 0 &&
-		len(d.SMTransitionsChanged) == 0
+		len(d.SMTransitionsChanged) == 0 &&
+		d.PGVersionChanged == nil &&
+		!d.GroupsChanged
 }
 
 // Summary returns a human-readable summary of the diff.
@@ -389,6 +400,12 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.SMTransitionsChanged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d state machine(s) transitions changed", n))
 	}
+	if d.PGVersionChanged != nil {
+		parts = append(parts, fmt.Sprintf("pg_version changed (%d -> %d)", d.PGVersionChanged[0], d.PGVersionChanged[1]))
+	}
+	if d.GroupsChanged {
+		parts = append(parts, "table groups changed")
+	}
 
 	return strings.Join(parts, ", ")
 }
@@ -439,8 +456,66 @@ func DiffLive(desired, actual *model.Schema, ln LiveNormalizer) *SchemaDiff {
 	diffDomains(d, desired, actual)
 	diffFunctions(d, desired, actual)
 	diffSMTransitions(d, desired, actual)
+	diffSchemaMeta(d, desired, actual)
 
 	return d
+}
+
+// diffSchemaMeta compares the schema-global identity fields that are part of a
+// model's revision but were historically invisible to the differ (Part III):
+// the target PostgreSQL version (which silently alters emitted DDL) and the
+// table groups. Reporting them is a REVERSE-conformance obligation
+// (diff-empty implies revision-equal); both are encoded into canonical bytes,
+// so a change to either flips the revision and must therefore be a non-empty
+// diff.
+func diffSchemaMeta(d *SchemaDiff, desired, actual *model.Schema) {
+	if desired.PGVersion != actual.PGVersion {
+		d.PGVersionChanged = &[2]int{actual.PGVersion, desired.PGVersion}
+	}
+	if !groupsEqual(desired.Groups, actual.Groups) {
+		d.GroupsChanged = true
+	}
+}
+
+// groupsEqual reports whether two group->table maps are equal. Group membership
+// order is not semantic (groups are a canonical-only collection for filtering),
+// so table lists are compared as SETS; the map itself is compared key-wise.
+func groupsEqual(a, b map[string][]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for name, at := range a {
+		bt, ok := b[name]
+		if !ok {
+			return false
+		}
+		if !stringSetEqual(at, bt) {
+			return false
+		}
+	}
+	return true
+}
+
+// stringSetEqual reports whether two string slices contain the same elements,
+// ignoring order and duplicates.
+func stringSetEqual(a, b []string) bool {
+	as := make(map[string]struct{}, len(a))
+	for _, v := range a {
+		as[v] = struct{}{}
+	}
+	bs := make(map[string]struct{}, len(b))
+	for _, v := range b {
+		bs[v] = struct{}{}
+	}
+	if len(as) != len(bs) {
+		return false
+	}
+	for v := range as {
+		if _, ok := bs[v]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // diffTables matches tables by schema-qualified name and diffs matched pairs.
