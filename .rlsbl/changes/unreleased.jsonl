@@ -88,3 +88,4 @@
 {"id":"18c6268eabffd9d175372e17480547ae94bc8c573665ab69","commits":["6e7ded807d8ed56b9b7d0191a9743b0d5d2831dc"],"user_facing":false}
 {"id":"18c6275a68c576628b2b9e49029e4addb0a459cb03b2fa5a","commits":["51dbe24192eedafd23625232512cd5c7f5efd35d"],"user_facing":true,"description":"**Generated Java code now uses one public type per file.** The `types`, `jpa`, and `constraints` Java codegen modes emit a directory of single-public-type files (e.g. `Accounts.java`, `Role.java`, `Constraints.java`) instead of one multi-type file, which is the layout the Java compiler requires. Regenerate Java output after upgrading.","type":"breaking"}
 {"id":"18c6275a706d72ce1bd3d13f3bf941e1be67fe702a11892a","commits":["51dbe24192eedafd23625232512cd5c7f5efd35d"],"user_facing":false}
+{"id":"18c6276fd4f6b64eebe61331a33c43879ff79bc3fbdd1d48","commits":["31e837acbcc9e7c93aba6625b614581ca583d8f5"],"user_facing":false}
