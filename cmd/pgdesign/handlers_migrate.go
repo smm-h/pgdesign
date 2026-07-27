@@ -1274,6 +1274,14 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 	}
 	defer conn.Close(ctx)
 
+	// Pre-upgrade guard FIRST — before any shadow database is created — so a
+	// pre-upgrade database is refused (naming `migrate upgrade`) exactly like
+	// every other --db subcommand, rather than silently proceeding.
+	if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
 	rows, err := conn.Query(ctx, "SELECT datname FROM pg_database WHERE datname LIKE 'pgdesign_shadow_%'")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: cannot check for stale shadow databases: %v\n", err)
