@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -13,6 +14,37 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
+
+// lockTimeoutPattern matches a valid PostgreSQL lock_timeout value: a
+// non-negative integer optionally followed by a time unit. This rejects any
+// value that could break out of the SET / set_config call.
+var lockTimeoutPattern = regexp.MustCompile(`^\s*\d+\s*(us|ms|s|min|h|d)?\s*$`)
+
+// validateLockTimeout returns the effective lock_timeout, defaulting to "5s"
+// when empty, and errors if the value is not a well-formed timeout. It guards
+// the value before it reaches PostgreSQL.
+func validateLockTimeout(lockTimeout string) (string, error) {
+	if lockTimeout == "" {
+		return "5s", nil
+	}
+	if !lockTimeoutPattern.MatchString(lockTimeout) {
+		return "", fmt.Errorf("invalid lock_timeout %q: expected a non-negative integer with an optional unit (us, ms, s, min, h, d)", lockTimeout)
+	}
+	return strings.TrimSpace(lockTimeout), nil
+}
+
+// setLockTimeout applies lock_timeout to the session using a parameterized
+// set_config call (no string interpolation), after validating the value.
+func setLockTimeout(ctx context.Context, conn *pgx.Conn, lockTimeout string) error {
+	v, err := validateLockTimeout(lockTimeout)
+	if err != nil {
+		return err
+	}
+	if _, err := conn.Exec(ctx, "SELECT set_config('lock_timeout', $1, false)", v); err != nil {
+		return fmt.Errorf("set lock_timeout: %w", err)
+	}
+	return nil
+}
 
 // Apply discovers pending migrations in migrationsDir, applies them in semver
 // order, and returns the list of applied versions. lockTimeout sets the
@@ -125,11 +157,8 @@ func applyOne(ctx context.Context, conn *pgx.Conn, mf migrationFile, lockTimeout
 	}
 
 	// Set lock_timeout for this session (persists across transactions).
-	if lockTimeout == "" {
-		lockTimeout = "5s"
-	}
-	if _, err := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = '%s'", lockTimeout)); err != nil {
-		return fmt.Errorf("set lock_timeout: %w", err)
+	if err := setLockTimeout(ctx, conn, lockTimeout); err != nil {
+		return err
 	}
 
 	if HasPhases(m) {

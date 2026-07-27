@@ -50,11 +50,8 @@ func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTim
 	}
 
 	// Set lock_timeout.
-	if lockTimeout == "" {
-		lockTimeout = "5s"
-	}
-	if _, err := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = '%s'", lockTimeout)); err != nil {
-		return "", fmt.Errorf("set lock_timeout: %w", err)
+	if err := setLockTimeout(ctx, conn, lockTimeout); err != nil {
+		return "", err
 	}
 
 	tx, err := conn.Begin(ctx)
@@ -215,11 +212,8 @@ func RollbackTo(ctx context.Context, conn *pgx.Conn, migrationsDir, targetVersio
 	}
 
 	// Set lock_timeout.
-	if lockTimeout == "" {
-		lockTimeout = "5s"
-	}
-	if _, err := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = '%s'", lockTimeout)); err != nil {
-		return nil, fmt.Errorf("set lock_timeout: %w", err)
+	if err := setLockTimeout(ctx, conn, lockTimeout); err != nil {
+		return nil, err
 	}
 
 	// Execute rollbacks in order (most recent first).
