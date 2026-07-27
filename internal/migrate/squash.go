@@ -8,28 +8,33 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// SquashResult holds the result of a squash operation.
+// SquashResult holds the result of a legacy-mode (semver-TOML) squash.
+//
+// The op-list OPTIMIZER (inverse-pair cancellation, sequential type merging, and
+// CREATE TABLE folding) was RETIRED in roadmap 5.3: squash is now defined as
+// ORDERED CONCATENATION, never a rewriting system (the roadmap: "today's
+// optimizeDDLOps and its tests ... RETIRE with it as superseded dead code"). The
+// legacy path keeps only the minimal concatenation + phase-strip + down-build
+// mechanics pre-upgrade projects still need. Chain-mode consolidation lives in
+// squash_chain.go.
 type SquashResult struct {
-	Squashed        *Migration // The combined migration
-	OriginalPaths   []string   // Paths of original migration files that were squashed
-	OriginalCount   int        // Number of migrations squashed
-	CancelledPairs  int        // Number of inverse pairs cancelled
-	MergedOps       int        // Number of ops merged (e.g., sequential type changes)
-	ConsolidatedOps int        // Number of ops folded into CREATE TABLE
+	Squashed      *Migration // The combined migration
+	OriginalPaths []string   // Paths of original migration files that were squashed
+	OriginalCount int        // Number of migrations squashed
 }
 
-// SquashMigrations squashes all migrations in the given directory from version
-// `from` to version `to` (both inclusive) into a single migration.
+// SquashMigrations squashes all LEGACY (semver-TOML) migrations in the given
+// directory from version `from` to version `to` (both inclusive) into a single
+// migration. Chain-mode projects use SquashChain (squash_chain.go); this path is
+// guarded off for them.
 //
 // It is a MANDATORY-DB operation: the caller must supply a live connection so
 // the M200 applied-version safety check can run. Squashing a range that
-// contains applied migrations would desynchronize the tracking table, so the
-// operation refuses. This blocks offline squash even of never-applied ranges
-// (a deliberate stopgap; the durable fix is the phase-5 op-chain rewrite).
-//
-// This does NOT fix the squash rewrite mechanics (orphaned ops from
-// dependency-unaware pair cancellation remain); it only prevents squashing an
-// applied range.
+// contains applied migrations would desynchronize the LEGACY tracking table, so
+// the operation refuses. This blocks offline squash even of never-applied ranges
+// (a deliberate stopgap for the legacy path; chain mode replaces the M200 refusal
+// with the consolidation model — originals archive intact and mid-range databases
+// resume via the path-finder — so applied state is irrelevant there).
 func SquashMigrations(ctx context.Context, conn *pgx.Conn, dir, from, to string) (*SquashResult, error) {
 	if err := guardChainMode(dir, "squash", "5.3"); err != nil {
 		return nil, err
@@ -109,7 +114,10 @@ func squashFiles(dir, from, to string) (*SquashResult, error) {
 		originalPaths = append(originalPaths, mf.path)
 	}
 
-	// Concatenate all ops.
+	// Concatenate all ops in order. The op-list optimizer (cancellation / merging
+	// / CREATE TABLE folding) was retired in roadmap 5.3 — squash is ORDERED
+	// CONCATENATION, never a rewriting system. DML/RawSQL ops are preserved
+	// verbatim by construction (concatenation never drops or folds).
 	var allDDL []DDLOp
 	var allDML []DMLOp
 	for _, m := range migrations {
@@ -117,25 +125,22 @@ func squashFiles(dir, from, to string) (*SquashResult, error) {
 		allDML = append(allDML, m.DMLOps...)
 	}
 
-	// Optimize: cancel inverse pairs, merge sequential type changes,
-	// and consolidate ops into CREATE TABLE.
-	optimizedDDL, cancelledPairs, mergedOps, consolidatedOps := optimizeDDLOps(allDDL)
-
-	// Build combined down ops.
-	squashedDown := buildSquashedDown(optimizedDDL, allDML)
-
-	// Apply down ops to the optimized DDL.
-	for i := range optimizedDDL {
+	// Build combined down ops (reversibility propagates: any irreversible member
+	// makes the whole squash irreversible).
+	squashedDown := buildSquashedDown(allDDL, allDML)
+	for i := range allDDL {
 		if i < len(squashedDown) {
-			optimizedDDL[i].Down = squashedDown[i]
+			allDDL[i].Down = squashedDown[i]
 		}
 	}
 
-	// Strip phase annotations: squashed output is end-state DDL.
-	for i := range optimizedDDL {
-		optimizedDDL[i].Phase = ""
-		for j := range optimizedDDL[i].ConsolidatedOps {
-			optimizedDDL[i].ConsolidatedOps[j].Phase = ""
+	// Strip phase annotations: squashed output is end-state DDL. ConsolidatedOps
+	// carried on a create_table (populated by generate for the TOML round-trip,
+	// unrelated to the retired squash optimizer) get their phases stripped too.
+	for i := range allDDL {
+		allDDL[i].Phase = ""
+		for j := range allDDL[i].ConsolidatedOps {
+			allDDL[i].ConsolidatedOps[j].Phase = ""
 		}
 	}
 	for i := range allDML {
@@ -145,176 +150,15 @@ func squashFiles(dir, from, to string) (*SquashResult, error) {
 	squashed := &Migration{
 		Version:     to,
 		Description: fmt.Sprintf("Squashed from %s to %s", from, to),
-		DDLOps:      optimizedDDL,
+		DDLOps:      allDDL,
 		DMLOps:      allDML,
 	}
 
 	return &SquashResult{
-		Squashed:        squashed,
-		OriginalPaths:   originalPaths,
-		OriginalCount:   len(inRange),
-		CancelledPairs:  cancelledPairs,
-		MergedOps:       mergedOps,
-		ConsolidatedOps: consolidatedOps,
+		Squashed:      squashed,
+		OriginalPaths: originalPaths,
+		OriginalCount: len(inRange),
 	}, nil
-}
-
-// optimizeDDLOps cancels inverse pairs, merges sequential type changes, and
-// consolidates add/FK/index/constraint ops into preceding create_table ops.
-// Returns the optimized ops and counts of each optimization applied.
-func optimizeDDLOps(ops []DDLOp) ([]DDLOp, int, int, int) {
-	cancelledPairs := 0
-	mergedOps := 0
-	consolidatedCount := 0
-
-	// Build a list tracking which ops are cancelled.
-	cancelled := make([]bool, len(ops))
-
-	// Pass 1: Cancel inverse pairs.
-	// Scan for add/drop pairs on the same target. Later op cancels earlier op.
-	for i := 0; i < len(ops); i++ {
-		if cancelled[i] {
-			continue
-		}
-		for j := i + 1; j < len(ops); j++ {
-			if cancelled[j] {
-				continue
-			}
-			if isInversePair(ops[i], ops[j]) {
-				cancelled[i] = true
-				cancelled[j] = true
-				cancelledPairs++
-				break
-			}
-		}
-	}
-
-	// Collect non-cancelled ops.
-	var result []DDLOp
-	for i, op := range ops {
-		if !cancelled[i] {
-			result = append(result, op)
-		}
-	}
-
-	// Pass 2: Merge sequential alter_column_type on the same table.column.
-	// Keep only the final type change.
-	merged := make([]bool, len(result))
-	for i := 0; i < len(result); i++ {
-		if merged[i] || result[i].Op != "alter_column_type" {
-			continue
-		}
-		for j := i + 1; j < len(result); j++ {
-			if merged[j] {
-				continue
-			}
-			if result[j].Op == "alter_column_type" &&
-				result[j].Table == result[i].Table &&
-				result[j].Column == result[i].Column {
-				// Keep j (the later one), cancel i.
-				merged[i] = true
-				mergedOps++
-				break
-			}
-		}
-	}
-
-	var final []DDLOp
-	for i, op := range result {
-		if !merged[i] {
-			final = append(final, op)
-		}
-	}
-
-	// Pass 3: Consolidate add_column, add_fk, create_index, add_unique,
-	// add_check, add_exclusion into a preceding create_table on the same table.
-	consolidatable := map[string]bool{
-		"add_column": true, "add_fk": true, "create_index": true, "add_index": true,
-		"add_unique": true, "add_check": true, "add_exclusion": true,
-	}
-
-	consolidated := make([]bool, len(final))
-	for i := 0; i < len(final); i++ {
-		if final[i].Op != "create_table" {
-			continue
-		}
-		for j := i + 1; j < len(final); j++ {
-			if consolidated[j] {
-				continue
-			}
-			if !consolidatable[final[j].Op] {
-				continue
-			}
-			if final[j].Table != final[i].Table {
-				continue
-			}
-			final[i].ConsolidatedOps = append(final[i].ConsolidatedOps, final[j])
-			consolidated[j] = true
-			consolidatedCount++
-		}
-	}
-
-	var afterConsolidate []DDLOp
-	for i, op := range final {
-		if !consolidated[i] {
-			afterConsolidate = append(afterConsolidate, op)
-		}
-	}
-
-	return afterConsolidate, cancelledPairs, mergedOps, consolidatedCount
-}
-
-// isInversePair returns true if op2 undoes op1.
-func isInversePair(op1, op2 DDLOp) bool {
-	inversePairs := [][2]string{
-		{"add_column", "drop_column"},
-		{"create_table", "drop_table"},
-		{"create_index", "drop_index"},
-		{"create_index_concurrently", "drop_index"},
-		{"create_index_concurrently", "drop_index_concurrently"},
-		{"add_fk", "drop_fk"},
-		{"add_unique", "drop_unique"},
-		{"add_check", "drop_check"},
-		{"create_enum", "drop_enum"},
-		{"set_not_null", "drop_not_null"},
-		{"create_function", "drop_function"},
-		{"create_trigger", "drop_trigger"},
-	}
-
-	for _, pair := range inversePairs {
-		if op1.Op == pair[0] && op2.Op == pair[1] {
-			return sameTarget(op1, op2)
-		}
-	}
-	return false
-}
-
-// sameTarget checks if two ops target the same database object.
-func sameTarget(op1, op2 DDLOp) bool {
-	switch op1.Op {
-	case "add_column", "drop_column":
-		return op1.Table == op2.Table && op1.Column == op2.Column
-	case "create_table", "drop_table":
-		return op1.Table == op2.Table
-	case "create_index", "create_index_concurrently", "drop_index", "drop_index_concurrently":
-		return op1.Name == op2.Name
-	case "add_fk", "drop_fk":
-		return op1.Name == op2.Name
-	case "add_unique", "drop_unique":
-		return op1.Name == op2.Name
-	case "add_check", "drop_check":
-		return op1.Name == op2.Name
-	case "create_enum", "drop_enum":
-		return op1.Name == op2.Name
-	case "set_not_null", "drop_not_null":
-		return op1.Table == op2.Table && op1.Column == op2.Column
-	case "create_function", "drop_function":
-		return op1.Name == op2.Name
-	case "create_trigger", "drop_trigger":
-		return op1.Name == op2.Name
-	default:
-		return false
-	}
 }
 
 // buildSquashedDown creates down ops for each DDL op in the squashed migration.

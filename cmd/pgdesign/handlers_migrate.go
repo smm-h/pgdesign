@@ -941,15 +941,6 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 				fmt.Printf("  Description: %s\n", result.Squashed.Description)
 				fmt.Printf("  DDL ops: %d\n", len(result.Squashed.DDLOps))
 				fmt.Printf("  DML ops: %d\n", len(result.Squashed.DMLOps))
-				if result.CancelledPairs > 0 {
-					fmt.Printf("  Cancelled inverse pairs: %d\n", result.CancelledPairs)
-				}
-				if result.MergedOps > 0 {
-					fmt.Printf("  Merged ops: %d\n", result.MergedOps)
-				}
-				if result.ConsolidatedOps > 0 {
-					fmt.Printf("  Consolidated into CREATE TABLE: %d\n", result.ConsolidatedOps)
-				}
 			}
 
 			return strictcli.Exit(0)
