@@ -394,7 +394,6 @@ func makeCodegenKwargs(schemaPath, lang, mode, output string, check bool) map[st
 		"mode":       mode,
 		"check":      check,
 		"split_mode": nil,
-		"db":         nil,
 	}
 	if output != "" {
 		kwargs["output"] = output
