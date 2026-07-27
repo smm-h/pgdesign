@@ -272,6 +272,28 @@ func TestCompileTSTypes(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "tsconfig.json"), []byte(tsconfig), 0o644); err != nil {
 		t.Fatalf("write tsconfig: %v", err)
 	}
+	// Exhaustiveness witness: a switch over the kept union that assigns the
+	// default case to `never` fails to compile if any member is unhandled, and
+	// parseRole is the validating boundary. Both must type-check (roadmap 4.1).
+	exhaustive := `import { Role, parseRole } from "./types";
+
+export function label(r: Role): string {
+  switch (r) {
+    case "admin": return "a";
+    case "user": return "u";
+    case "guest": return "g";
+    default: {
+      const _exhaustive: never = r;
+      return _exhaustive;
+    }
+  }
+}
+
+export const parsed: Role = parseRole("admin");
+`
+	if err := os.WriteFile(filepath.Join(dir, "exhaustive.ts"), []byte(exhaustive), 0o644); err != nil {
+		t.Fatalf("write exhaustive.ts: %v", err)
+	}
 	runCompile(t, dir, nil, "tsc", "--noEmit", "-p", "tsconfig.json")
 }
 

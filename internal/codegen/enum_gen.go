@@ -183,14 +183,29 @@ func generateGoEnum(e model.Enum) string {
 	return buf.String()
 }
 
-// generateTSEnum produces a TypeScript string literal union type for an enum.
+// generateTSEnum produces a TypeScript string literal union type for an enum
+// plus a validating parse function for boundary ingress. The union is kept (it
+// preserves compile-closure and exhaustiveness narrowing); parseXxx is the
+// runtime boundary that rejects values the compiler cannot see (JSON, DB rows).
 func generateTSEnum(e model.Enum) string {
 	quoted := make([]string, len(e.Values))
 	for i, v := range e.Values {
 		quoted[i] = fmt.Sprintf("%q", v)
 	}
 	typeName := toPascalCase(e.Name)
-	return fmt.Sprintf("export type %s = %s;\n", typeName, strings.Join(quoted, " | "))
+	valuesConst := typeName + "Values"
+
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "export type %s = %s;\n\n", typeName, strings.Join(quoted, " | "))
+	fmt.Fprintf(&buf, "export const %s: readonly %s[] = [%s] as const;\n\n", valuesConst, typeName, strings.Join(quoted, ", "))
+	fmt.Fprintf(&buf, "/** Parses s into a %s, throwing if s is not a defined value. */\n", typeName)
+	fmt.Fprintf(&buf, "export function parse%s(s: string): %s {\n", typeName, typeName)
+	fmt.Fprintf(&buf, "  if ((%s as readonly string[]).includes(s)) {\n", valuesConst)
+	fmt.Fprintf(&buf, "    return s as %s;\n", typeName)
+	buf.WriteString("  }\n")
+	fmt.Fprintf(&buf, "  throw new Error(`invalid %s: ${s}`);\n", typeName)
+	buf.WriteString("}\n")
+	return buf.String()
 }
 
 // generatePythonEnum produces a Python StrEnum class for an enum.
