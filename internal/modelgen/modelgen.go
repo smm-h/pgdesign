@@ -67,6 +67,18 @@ type Config struct {
 	// rather than always seeing it empty. Zero groups is a valid model, so the
 	// range is NOT defaulted away — DefaultConfig leaves it 0..2 explicitly.
 	MinGroups, MaxGroups int
+
+	// IncludeStateMachines is the L10 UNRESTRICTED-vs-INJECTIVE fragment knob
+	// (roadmap 1.6 / 5.8). The INJECTIVE fragment (false) excludes state-machine
+	// types, which introspect lossily as plain enums — so the re-introspection
+	// oracle only ever runs over models where introspection is injective. The
+	// UNRESTRICTED side (true) admits SM types for the manifest oracle, which is
+	// not lossy. NOTE (flagged): SM-type GENERATION is the remaining modelgen
+	// increment; until it lands this knob is the wired extension point and the
+	// generator emits the injective fragment either way. The L10 split-oracle
+	// STRUCTURE is already in place, so adding SM generation later needs no test
+	// reshape — only this generator gains SM emission when the knob is true.
+	IncludeStateMachines bool
 }
 
 // pkColumnName is the fixed name of the surrogate primary-key column every
@@ -147,6 +159,93 @@ func Generator(cfg Config) *rapid.Generator[[]*parse.RawSchema] {
 // generator built for cfg.
 func Draw(t *rapid.T, cfg Config) []*parse.RawSchema {
 	return Generator(cfg).Draw(t, "model")
+}
+
+// GeneratePair draws a MODEL PAIR (a, b) for L10's round-trip property: b is
+// a's model mutated by structural edits — tables and columns added and dropped —
+// that keep every SHARED column's type FIXED. That invariant is what makes the
+// pair applyable: diff(a,b) lowers only to table and column add/drop ops, never a
+// column-type-change ALTER (which would need a USING cast that empty-table apply
+// cannot always satisfy). Both a and b are independently valid models. Groups are
+// forced off for the pair so the diff stays focused on table/column DDL.
+func GeneratePair(cfg Config) *rapid.Generator[[2][]*parse.RawSchema] {
+	cfg = withDefaults(cfg)
+	cfg.MinGroups, cfg.MaxGroups = 0, 0 // pairs exercise table/column DDL, not groups
+	return rapid.Custom(func(t *rapid.T) [2][]*parse.RawSchema {
+		a := Generator(cfg).Draw(t, "model_a")
+		b := deriveModel(t, cfg, a)
+		return [2][]*parse.RawSchema{a, b}
+	})
+}
+
+// DrawPair is a convenience for property tests: it draws one model pair from the
+// pair generator built for cfg.
+func DrawPair(t *rapid.T, cfg Config) (a, b []*parse.RawSchema) {
+	p := GeneratePair(cfg).Draw(t, "model_pair")
+	return p[0], p[1]
+}
+
+// deriveModel builds b from a by dropping/keeping/mutating a's tables and adding
+// new ones, preserving shared columns' types. It guarantees b has at least one
+// table overall so the post-state is a non-empty, buildable model.
+func deriveModel(t *rapid.T, cfg Config, a []*parse.RawSchema) []*parse.RawSchema {
+	b := make([]*parse.RawSchema, 0, len(a))
+	total := 0
+	for si, raw := range a {
+		nb := &parse.RawSchema{Meta: raw.Meta}
+		nextIdx := len(raw.Tables)
+		for ti, tbl := range raw.Tables {
+			if rapid.Bool().Draw(t, fmt.Sprintf("drop_table_%d_%d", si, ti)) {
+				continue // drop this table in b
+			}
+			nb.Tables = append(nb.Tables, deriveTable(t, cfg, tbl))
+		}
+		// Add new tables (globally-unique names beyond a's index range).
+		nNew := rapid.IntRange(0, cfg.MaxTables).Draw(t, fmt.Sprintf("add_tables_%d", si))
+		for k := 0; k < nNew; k++ {
+			nb.Tables = append(nb.Tables, genTable(t, cfg, si, nextIdx+k))
+		}
+		total += len(nb.Tables)
+		b = append(b, nb)
+	}
+	// Guarantee a non-empty post-state: if every table was dropped, add one back.
+	if total == 0 && len(b) > 0 {
+		b[0].Tables = append(b[0].Tables, genTable(t, cfg, 0, 0))
+	}
+	return b
+}
+
+// deriveTable copies tbl into b, keeping the surrogate PK and every column's TYPE
+// fixed. It may drop some non-PK columns and append new ones (new names never
+// collide with kept columns because they index beyond the original count).
+func deriveTable(t *rapid.T, cfg Config, tbl parse.RawTable) parse.RawTable {
+	nt := parse.RawTable{
+		Name:    tbl.Name,
+		Comment: tbl.Comment,
+		PK:      tbl.PK,
+	}
+	nextCol := 0
+	for ci, col := range tbl.Columns {
+		if col.Name == pkColumnName {
+			nt.Columns = append(nt.Columns, col) // never drop the PK
+			continue
+		}
+		// Track the highest col_ index so new columns get fresh names.
+		nextCol = len(tbl.Columns)
+		if rapid.Bool().Draw(t, fmt.Sprintf("drop_col_%s_%d", tbl.Name, ci)) {
+			continue // drop this non-PK column
+		}
+		nt.Columns = append(nt.Columns, col) // keep name AND type
+	}
+	nNew := rapid.IntRange(0, cfg.MaxExtraColumns).Draw(t, fmt.Sprintf("add_cols_%s", tbl.Name))
+	for k := 0; k < nNew; k++ {
+		colType := rapid.SampledFrom(cfg.ColumnTypes).Draw(t, fmt.Sprintf("%s_newcol_%d_type", tbl.Name, k))
+		nt.Columns = append(nt.Columns, parse.RawColumn{
+			Name: fmt.Sprintf("col_%d", nextCol+k),
+			Type: colType,
+		})
+	}
+	return nt
 }
 
 // genGroups attaches [groups] entries to the model, drawn from the full set of

@@ -78,6 +78,28 @@ func TestOracle_GeneratedModelsAreValid(t *testing.T) {
 	})
 }
 
+// TestOracle_GeneratedPairsAreValid is the pair-generator oracle: for every drawn
+// (a, b), BOTH models Build + Canonicalize + validate cleanly. This guarantees
+// L10's round-trip inputs are always valid on both endpoints (the derivation must
+// never mint an invalid post-state).
+func TestOracle_GeneratedPairsAreValid(t *testing.T) {
+	rapid.Check(t, func(rt *rapid.T) {
+		a, b := DrawPair(rt, DefaultConfig())
+		for label, raws := range map[string][]*parse.RawSchema{"a": a, "b": b} {
+			buildErrs, validateErrs := buildAndValidate(raws)
+			for _, d := range buildErrs {
+				rt.Errorf("pair %s Build error: %s %s (table=%s col=%s)", label, d.Code, d.Message, d.Table, d.Column)
+			}
+			for _, d := range validateErrs {
+				rt.Errorf("pair %s validate error: %s %s (table=%s col=%s)", label, d.Code, d.Message, d.Table, d.Column)
+			}
+			if len(buildErrs) > 0 || len(validateErrs) > 0 {
+				rt.FailNow()
+			}
+		}
+	})
+}
+
 // TestOracle_SingleColumnFragment exercises the smallest fragment (one schema,
 // one table, no extra columns) to pin that the minimal shape — a bare
 // surrogate-PK table — is itself valid.
