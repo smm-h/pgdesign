@@ -93,15 +93,8 @@ func (s *Schema) Canonicalize() {
 		for j := range sm.Transitions {
 			sort.Strings(sm.Transitions[j].From)
 		}
-		sort.Slice(sm.Transitions, func(a, b int) bool {
-			ta, tb := sm.Transitions[a], sm.Transitions[b]
-			if ta.Name != tb.Name {
-				return ta.Name < tb.Name
-			}
-			if ta.To != tb.To {
-				return ta.To < tb.To
-			}
-			return strings.Join(ta.From, ",") < strings.Join(tb.From, ",")
+		sort.SliceStable(sm.Transitions, func(a, b int) bool {
+			return smTransitionKey(sm.Transitions[a]) < smTransitionKey(sm.Transitions[b])
 		})
 	}
 
@@ -117,6 +110,37 @@ func (s *Schema) Canonicalize() {
 	// 2. Rebuild derived structures from the canonical tables.
 	s.buildTablesByName()
 	s.BuildFKGraph()
+}
+
+// smTransitionKey builds a TOTAL, deterministic sort key for a state-machine
+// transition. Transitions are a canonical-only set, so their order must be a
+// pure function of their content. The earlier key was (Name, To, joined-From)
+// with an unstable sort — non-total, because two transitions sharing all three
+// (differing only in Requires or Comment) sorted nondeterministically. The key
+// now includes every field: Name, To, From (a sorted set), Requires (a map,
+// serialized in sorted key order), and Comment. \x1f (unit separator) delimits
+// components so field boundaries cannot be forged by content containing the
+// delimiter's textual form.
+func smTransitionKey(t SMTransition) string {
+	reqKeys := make([]string, 0, len(t.Requires))
+	for k := range t.Requires {
+		reqKeys = append(reqKeys, k)
+	}
+	sort.Strings(reqKeys)
+	var req strings.Builder
+	for _, k := range reqKeys {
+		req.WriteString(k)
+		req.WriteByte('=')
+		req.WriteString(t.Requires[k])
+		req.WriteByte('\x1e')
+	}
+	return strings.Join([]string{
+		t.Name,
+		t.To,
+		strings.Join(t.From, ","),
+		req.String(),
+		t.Comment,
+	}, "\x1f")
 }
 
 // canonicalizePartition recursively sorts a partition subtree's children by
