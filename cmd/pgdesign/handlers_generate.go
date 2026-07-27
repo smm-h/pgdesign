@@ -8,6 +8,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/generate"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
@@ -65,6 +66,9 @@ func registerGenerateCmd(app *strictcli.App) {
 				Format:          kwargs["format"].(string),
 				TypeRegistry:    typeReg,
 				ExtRegistry:     extReg,
+				// The generate command operates on a TOML-built model, which
+				// carries type information: registry-present class (L7).
+				ModelClass: rev.RegistryPresent,
 			}
 
 			out, genDiags, genErr := generate.Generate(schema, opts)

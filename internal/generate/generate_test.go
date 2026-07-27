@@ -1,7 +1,6 @@
 package generate
 
 import (
-	"encoding/json"
 	"flag"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sql"
 	"github.com/smm-h/pgdesign/internal/typeinfo"
@@ -446,13 +446,32 @@ func TestJSONFormat(t *testing.T) {
 		CycleGroups: [][]string{{"users"}},
 	}
 
-	opts := Options{Format: "json"}
+	// The json format now emits the canonical whole-model envelope
+	// {format_version, revision, model, diagnostics?} (roadmap 1.5), not a raw
+	// model.Schema marshal. ModelClass is required for the json format.
+	opts := Options{Format: "json", ModelClass: rev.RegistryPresent}
 	out := mustGenerate(t, schema, opts)
 
-	// Must be valid JSON.
-	var roundTripped model.Schema
-	if err := json.Unmarshal([]byte(out), &roundTripped); err != nil {
-		t.Fatalf("JSON output is not valid JSON: %v\nOutput:\n%s", err, out)
+	// Must be a valid, revision-verified envelope (Parse re-hashes the embedded
+	// model bytes and checks them against the revision field).
+	env, err := rev.Parse([]byte(out))
+	if err != nil {
+		t.Fatalf("envelope Parse failed: %v\nOutput:\n%s", err, out)
+	}
+	if env.FormatVersion != rev.FormatVersion {
+		t.Errorf("expected format_version %d, got %d", rev.FormatVersion, env.FormatVersion)
+	}
+	if env.Revision.Class() != rev.RegistryPresent {
+		t.Errorf("expected registry-present class, got %s", env.Revision.Class())
+	}
+
+	// Decode the embedded canonical model bytes back into a schema.
+	roundTripped, class, err := rev.DecodeModel(env.Model)
+	if err != nil {
+		t.Fatalf("DecodeModel failed: %v", err)
+	}
+	if class != rev.RegistryPresent {
+		t.Errorf("expected registry-present class from DecodeModel, got %s", class)
 	}
 
 	// Verify key fields survived the round-trip.

@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/testdb"
 	"github.com/smm-h/pgdesign/internal/workload"
 )
@@ -122,12 +124,23 @@ func TestGetSchema(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
 
-	var result map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode response: %v", err)
+	// The /schema response is now the canonical whole-model envelope
+	// {format_version, revision, model, diagnostics?} (roadmap 1.5), not the old
+	// {schema, diagnostics} shape. rev.Parse verifies the embedded model bytes
+	// hash to the revision; the introspect path is registry-absent (L7).
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
 	}
-	if _, ok := result["schema"]; !ok {
-		t.Fatal("expected 'schema' key in response")
+	env, err := rev.Parse(body)
+	if err != nil {
+		t.Fatalf("envelope Parse failed: %v\nbody: %s", err, body)
+	}
+	if env.Revision.Class() != rev.RegistryAbsent {
+		t.Errorf("expected registry-absent class on the introspect path, got %s", env.Revision.Class())
+	}
+	if len(env.Model) == 0 {
+		t.Fatal("expected non-empty embedded model bytes")
 	}
 }
 

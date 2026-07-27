@@ -8,6 +8,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
@@ -42,7 +43,9 @@ func buildDeterminismSchema(t *testing.T, name string) *model.Schema {
 
 func mustGen(t *testing.T, schema *model.Schema, format string) string {
 	t.Helper()
-	out, _, err := generate.Generate(schema, generate.Options{IncludeComments: true, Format: format})
+	// The json format emits the canonical whole-model envelope, which requires
+	// a model class; these fixtures are TOML-built (registry-present, L7).
+	out, _, err := generate.Generate(schema, generate.Options{IncludeComments: true, Format: format, ModelClass: rev.RegistryPresent})
 	if err != nil {
 		t.Fatalf("generate %s: %v", format, err)
 	}

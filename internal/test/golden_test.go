@@ -10,6 +10,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
@@ -77,7 +78,10 @@ func TestGolden(t *testing.T) {
 	}{
 		{"sql", ".sql", generate.Options{IncludeComments: true, Format: "sql"}},
 		{"d2", ".d2", generate.Options{Format: "d2"}},
-		{"json", ".json", generate.Options{Format: "json"}},
+		// The json format now emits the canonical whole-model envelope (roadmap
+		// 1.5); ModelClass is required. These goldens are TOML-built:
+		// registry-present (L7).
+		{"json", ".json", generate.Options{Format: "json", ModelClass: rev.RegistryPresent}},
 	}
 
 	for _, entry := range tomlFiles {

@@ -12,6 +12,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/splitfmt"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
@@ -196,6 +197,9 @@ func planGenerate(name string, schema *model.Schema, format string, out config.O
 		Format:       format,
 		TypeRegistry: registry,
 		ExtRegistry:  extReg,
+		// build operates on a TOML-built model: registry-present class (L7).
+		// Ignored for every format except json.
+		ModelClass: rev.RegistryPresent,
 	}
 
 	content, genDiags, err := generate.Generate(schema, opts)

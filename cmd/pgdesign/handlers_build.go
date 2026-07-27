@@ -13,6 +13,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/pkg/genkit"
 	"github.com/smm-h/strictcli/go/strictcli"
@@ -165,6 +166,13 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 		if err := cmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: safegit commit failed: %v\n", err)
 		}
+	}
+
+	// Print the whole-model revision: the content identity of the model these
+	// outputs were generated from. build operates on a TOML-built model, so it
+	// is registry-present (L7).
+	if r, err := rev.Compute(schema, rev.RegistryPresent); err == nil && !quiet {
+		fmt.Fprintf(os.Stderr, "revision %s\n", r)
 	}
 
 	return 0

@@ -2,7 +2,6 @@
 package generate
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sql"
 )
@@ -18,9 +18,14 @@ import (
 type Options struct {
 	Idempotent      bool
 	IncludeComments bool
-	Format          string // "sql", "json", "d2", "svg", "doc", "graphql"
-	TypeRegistry    *semtype.Registry      // optional: enables state machine trigger generation and D2 state diagrams
-	ExtRegistry     *extregistry.Registry  // optional: resolves extension DDL names (e.g. pgvector -> vector)
+	Format          string                // "sql", "json", "d2", "svg", "doc", "graphql"
+	TypeRegistry    *semtype.Registry     // optional: enables state machine trigger generation and D2 state diagrams
+	ExtRegistry     *extregistry.Registry // optional: resolves extension DDL names (e.g. pgvector -> vector)
+	// ModelClass tags the JSON envelope's revision with its model class (L7).
+	// Required for Format "json" (there is no implicit default); ignored for
+	// every other format. Build/generate paths pass rev.RegistryPresent;
+	// introspected models would pass rev.RegistryAbsent.
+	ModelClass rev.ModelClass
 }
 
 // Generate produces DDL output for the given schema according to opts.
@@ -32,7 +37,7 @@ func Generate(schema *model.Schema, opts Options) (string, []diagnostic.Diagnost
 	case "d2":
 		return GenerateD2(schema, opts.TypeRegistry), nil, nil
 	case "json":
-		out, err := generateJSON(schema)
+		out, err := generateJSON(schema, opts.ModelClass)
 		return out, nil, err
 	case "svg":
 		d2Source := GenerateD2(schema, opts.TypeRegistry)
@@ -50,13 +55,17 @@ func Generate(schema *model.Schema, opts Options) (string, []diagnostic.Diagnost
 	}
 }
 
-// generateJSON produces pretty-printed JSON output of the full schema. The
-// schema is already in canonical order (model.Canonicalize runs at build time),
-// so it is marshalled directly.
-func generateJSON(schema *model.Schema) (string, error) {
-	data, err := json.MarshalIndent(schema, "", "  ")
+// generateJSON produces the canonical whole-model JSON envelope
+// {format_version, revision, model, diagnostics?}. It routes through the single
+// whole-model serializer (internal/rev) that serve's /schema response also
+// calls, so the two produce byte-identical bodies for the same model (L1: one
+// serializer everywhere). The embedded `model` bytes are the canonical
+// whole-model form the `revision` hashes; the divergent direct-marshal
+// serializer that used to live here is gone.
+func generateJSON(schema *model.Schema, class rev.ModelClass) (string, error) {
+	data, err := rev.Marshal(schema, class, nil)
 	if err != nil {
-		return "", fmt.Errorf("json marshal: %w", err)
+		return "", fmt.Errorf("json envelope: %w", err)
 	}
 	return string(data), nil
 }

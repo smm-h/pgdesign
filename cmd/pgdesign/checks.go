@@ -14,6 +14,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/discover"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/workload"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
@@ -95,15 +96,23 @@ func checkValidation(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) str
 		return r.Found("validation errors found")
 	}
 
+	// The whole-model revision is the content identity of the validated model
+	// (registry-present, since it is TOML-built — L7). Surface it on the check
+	// outcome so a passing validate names the exact revision it validated.
+	revStr := ""
+	if rv, rvErr := rev.Compute(schema, rev.RegistryPresent); rvErr == nil {
+		revStr = " (revision " + rv.String() + ")"
+	}
+
 	warnings := diagnostic.Diagnostics(diags).Warnings()
 	if len(warnings) > 0 {
 		for _, w := range warnings {
 			r.Warn(diagDetail(w))
 		}
-		return r.Found(fmt.Sprintf("%d validation warning(s)", len(warnings)))
+		return r.Found(fmt.Sprintf("%d validation warning(s)%s", len(warnings), revStr))
 	}
 
-	return r.Passed("all validation checks passed")
+	return r.Passed("all validation checks passed" + revStr)
 }
 
 // resolveDBURL looks for a database connection URL in the config file or

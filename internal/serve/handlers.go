@@ -21,6 +21,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/migrate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/validate"
 	"github.com/smm-h/pgdesign/internal/workload"
@@ -45,7 +46,14 @@ func (s *Server) connStr() string {
 	return s.pool.Config().ConnString()
 }
 
-// handleSchema introspects the DB and returns the full IR as JSON.
+// handleSchema introspects the DB and returns the canonical whole-model JSON
+// envelope {format_version, revision, model, diagnostics?}. The model is
+// introspected, so it lacks a type registry: registry-absent class (L7). This
+// routes through the SAME whole-model serializer as `generate json`
+// (internal/rev), so their bodies are byte-identical for the same model. The
+// old {schema, diagnostics} shape is WRAPPED, not dropped — diagnostics survive
+// under the envelope's diagnostics key; the payload-key change is
+// consumer-visible.
 func (s *Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 	schema, diags, err := introspect.Introspect(r.Context(), s.connStr(), s.schemas)
 	if err != nil {
@@ -53,11 +61,14 @@ func (s *Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type schemaResponse struct {
-		Schema      *model.Schema           `json:"schema"`
-		Diagnostics []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	body, err := rev.Marshal(schema, rev.RegistryAbsent, diags)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("envelope: %v", err))
+		return
 	}
-	writeJSON(w, http.StatusOK, schemaResponse{Schema: schema, Diagnostics: diags})
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
 }
 
 // handleSchemaD2 introspects the DB and returns D2 text.
