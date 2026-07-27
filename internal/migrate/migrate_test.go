@@ -568,6 +568,60 @@ func TestGenerateMigration_MaintenanceIntervalChangeError(t *testing.T) {
 	}
 }
 
+func TestGenerateMigration_MaintenanceInitialSetup(t *testing.T) {
+	desired := &model.Schema{
+		Name:       "public",
+		Extensions: []string{"pg_partman"},
+		Tables: []model.Table{
+			{
+				Name:   "events",
+				Schema: "public",
+				Partitioning: &model.PartitionSpec{
+					Strategy: "range",
+					Columns:  []string{"created_at"},
+				},
+				Maintenance: &model.MaintenanceConfig{
+					Interval: "1 month", Premake: 4, Retention: "6 months",
+				},
+			},
+		},
+	}
+
+	d := &diff.SchemaDiff{
+		TablesChanged: []diff.TableDiff{
+			{
+				Name: "events",
+				MaintenanceChanged: &diff.MaintenanceDiff{
+					InitialSetup:     true,
+					RetentionChanged: &[2]string{"", "6 months"},
+					PremakeChanged:   &[2]int{0, 4},
+				},
+			},
+		},
+	}
+
+	m, diags := GenerateMigration(d, desired, "0.6.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	if diagnostic.Diagnostics(diags).HasErrors() {
+		t.Fatalf("initial setup must not hard-error, got: %v", diags)
+	}
+	// Must emit create_partman_parent (registration), NOT a hard error.
+	foundParent := false
+	for _, op := range m.DDLOps {
+		if op.Op == "create_partman_parent" {
+			foundParent = true
+			if !strings.Contains(op.RawSQL, "partman.create_parent") {
+				t.Errorf("expected partman.create_parent in RawSQL, got: %s", op.RawSQL)
+			}
+			if !strings.Contains(op.RawSQL, "p_interval := '1 month'") {
+				t.Errorf("expected p_interval := '1 month', got: %s", op.RawSQL)
+			}
+		}
+	}
+	if !foundParent {
+		t.Error("expected create_partman_parent op for initial setup")
+	}
+}
+
 func TestOpToSQL_CreatePartition(t *testing.T) {
 	childSpec := &model.PartitionSpec{
 		Name:  "events_2025",

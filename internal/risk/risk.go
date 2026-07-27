@@ -110,6 +110,10 @@ const (
 	OpDisableRLS   OpType = "disable_rls"
 	OpForceRLS     OpType = "force_rls"
 	OpNoForceRLS   OpType = "no_force_rls"
+
+	OpCreatePartmanParent    OpType = "create_partman_parent"
+	OpUpdatePartmanRetention OpType = "update_partman_retention"
+	OpUpdatePartmanPremake   OpType = "update_partman_premake"
 )
 
 // OpContext provides context about the operation environment for risk assessment.
@@ -517,6 +521,16 @@ func classifyBase(op OpType, ctx OpContext) Classification {
 			LockType:   LockAccessExclusive,
 			Reversible: true,
 			Suggestion: "Removing forced RLS exempts the table owner from policies",
+		}
+
+	case OpCreatePartmanParent, OpUpdatePartmanRetention, OpUpdatePartmanPremake:
+		// Partman registration and part_config updates touch only pg_partman's
+		// own bookkeeping; they take no lock on user data and are reversible by
+		// re-running with the previous values.
+		return Classification{
+			RiskLevel:  Safe,
+			LockType:   LockNone,
+			Reversible: true,
 		}
 
 	default:

@@ -4496,3 +4496,40 @@ func TestMaintenanceDiff_NoChange(t *testing.T) {
 		t.Errorf("identical maintenance config should produce empty diff, got: %s", d.Summary())
 	}
 }
+
+// TestMaintenanceDiff_InitialSetup verifies that going from no maintenance
+// (actual) to a maintenance config (desired) is classified as initial partman
+// setup, NOT as an interval change. Initial setup emits create_parent; only a
+// change between two existing configs can be an interval change (hard error).
+func TestMaintenanceDiff_InitialSetup(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Maintenance: &model.MaintenanceConfig{
+				Interval: "1 month", Premake: 4, Retention: "6 months",
+			},
+		}},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{{
+			Name: "events", Schema: "public",
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			// no Maintenance
+		}},
+	}
+	d := Diff(desired, actual)
+	if d.IsEmpty() {
+		t.Fatal("initial maintenance setup should produce a diff")
+	}
+	md := d.TablesChanged[0].MaintenanceChanged
+	if md == nil {
+		t.Fatal("expected MaintenanceChanged to be set")
+	}
+	if !md.InitialSetup {
+		t.Error("expected InitialSetup = true when actual has no maintenance")
+	}
+	if md.IntervalChanged != nil {
+		t.Error("initial setup must NOT be reported as an interval change (would be a spurious hard error)")
+	}
+}

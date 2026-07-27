@@ -242,6 +242,12 @@ type PartitionDiff struct {
 
 // MaintenanceDiff describes changes to a table's partman maintenance configuration.
 type MaintenanceDiff struct {
+	// InitialSetup is true when the actual side has no maintenance config and
+	// the desired side introduces one -- partman registration (create_parent),
+	// not a per-field update. When set, IntervalChanged is left nil so the
+	// migrate layer does not mistake first-time setup for an interval change
+	// (which is a hard error requiring repartitioning).
+	InitialSetup     bool       `json:"initial_setup,omitempty"`
 	IntervalChanged  *[2]string `json:"interval_changed,omitempty"`
 	PremakeChanged   *[2]int    `json:"premake_changed,omitempty"`
 	RetentionChanged *[2]string `json:"retention_changed,omitempty"`
@@ -1163,6 +1169,10 @@ func diffMaintenance(desired, actual *model.MaintenanceConfig) *MaintenanceDiff 
 	md := &MaintenanceDiff{}
 	changed := false
 
+	// Initial setup: actual has no partman config, desired introduces one.
+	// This is create_parent registration, not a field-level interval change.
+	initialSetup := actual == nil && desired != nil
+
 	// Get effective values (zero values for nil configs).
 	var dInterval, aInterval string
 	var dPremake, aPremake int
@@ -1180,6 +1190,24 @@ func diffMaintenance(desired, actual *model.MaintenanceConfig) *MaintenanceDiff 
 		aPremake = actual.Premake
 		aRetention = actual.Retention
 		aKeepTable = actual.RetentionKeepTable
+	}
+
+	if initialSetup {
+		// Everything is "new" -- record the setup flag and the resulting
+		// retention/premake so the migrate layer can emit create_parent plus
+		// any config UPDATE. Do NOT set IntervalChanged: the interval is part
+		// of the initial create_parent, not a repartitioning change.
+		md.InitialSetup = true
+		if dPremake != 0 {
+			md.PremakeChanged = &[2]int{0, dPremake}
+		}
+		if dRetention != "" {
+			md.RetentionChanged = &[2]string{"", dRetention}
+		}
+		if dKeepTable {
+			md.RetentionKeepTableChanged = &[2]bool{false, dKeepTable}
+		}
+		return md
 	}
 
 	if dInterval != aInterval {

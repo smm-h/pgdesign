@@ -974,59 +974,89 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		if td.MaintenanceChanged != nil {
 			md := td.MaintenanceChanged
 
-			// Interval change: hard error (requires repartitioning).
-			// pg_partman does not support forward-only interval changes. Verified
-			// empirically against pg_partman 5.4.3: empty partition sets cause
-			// maintenance to be a silent no-op; non-empty sets fail with a
-			// partition overlap error. This hard error is correct and permanent.
-			if md.IntervalChanged != nil {
-				diags = append(diags, diagnostic.Diagnostic{
-					Severity: diagnostic.Error,
-					Code:     "MAINTENANCE_INTERVAL_CHANGE",
-					Table:    td.Name,
-					Message:  fmt.Sprintf("partition interval change on %s (%q -> %q) requires repartitioning (not yet supported)", td.Name, md.IntervalChanged[0], md.IntervalChanged[1]),
-				})
-			}
-
-			// Retention change: safe UPDATE partman.part_config.
-			if md.RetentionChanged != nil || md.RetentionKeepTableChanged != nil {
+			if md.InitialSetup {
+				// Initial partman registration: emit create_parent, then any
+				// non-default retention config. This is NOT an interval change.
 				parentTable := findTable(desired, td.Name)
-				retention := ""
-				keepTable := false
-				schemaName := ""
-				if parentTable != nil {
-					schemaName = parentTable.Schema
-					if parentTable.Maintenance != nil {
-						retention = parentTable.Maintenance.Retention
-						keepTable = parentTable.Maintenance.RetentionKeepTable
+				if parentTable != nil && parentTable.Maintenance != nil && parentTable.Partitioning != nil && len(parentTable.Partitioning.Columns) > 0 {
+					mc := parentTable.Maintenance
+					parentOp := DDLOp{
+						Op:     "create_partman_parent",
+						Table:  td.Name,
+						RawSQL: pgsql.CreatePartmanParent(parentTable.Schema, td.Name, parentTable.Partitioning.Columns[0], mc.Interval, mc.Premake),
+					}
+					m.DDLOps = append(m.DDLOps, parentOp)
+					diags = append(diags, classifyOp(parentOp, risk.OpCreatePartmanParent, risk.OpContext{PGVersion: desired.PGVersion})...)
+
+					if mc.Retention != "" {
+						retOp := DDLOp{
+							Op:     "update_partman_retention",
+							Table:  td.Name,
+							RawSQL: pgsql.UpdatePartmanConfig(parentTable.Schema, td.Name, mc.Retention, mc.RetentionKeepTable),
+						}
+						m.DDLOps = append(m.DDLOps, retOp)
+						diags = append(diags, classifyOp(retOp, risk.OpUpdatePartmanRetention, risk.OpContext{PGVersion: desired.PGVersion})...)
 					}
 				}
-				op := DDLOp{
-					Op:     "update_partman_retention",
-					Table:  td.Name,
-					RawSQL: pgsql.UpdatePartmanConfig(schemaName, td.Name, retention, keepTable),
+			} else {
+				// Interval change between two existing configs: hard error
+				// (requires repartitioning). pg_partman does not support
+				// forward-only interval changes. Verified empirically against
+				// pg_partman 5.4.3: empty partition sets cause maintenance to be
+				// a silent no-op; non-empty sets fail with a partition overlap
+				// error. This hard error is correct and permanent.
+				if md.IntervalChanged != nil {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity:   diagnostic.Error,
+						Code:       "MAINTENANCE_INTERVAL_CHANGE",
+						Table:      td.Name,
+						Message:    fmt.Sprintf("partition interval change on %s (%q -> %q) requires repartitioning (not yet supported)", td.Name, md.IntervalChanged[0], md.IntervalChanged[1]),
+						Suggestion: "Create a new partitioned table with the desired interval, migrate rows into it, and swap it in; pg_partman cannot re-interval an existing parent in place.",
+					})
 				}
-				m.DDLOps = append(m.DDLOps, op)
-			}
 
-			// Premake change: safe UPDATE partman.part_config.
-			if md.PremakeChanged != nil {
-				parentTable := findTable(desired, td.Name)
-				premake := 0
-				schemaName := ""
-				if parentTable != nil {
-					schemaName = parentTable.Schema
-					if parentTable.Maintenance != nil {
-						premake = parentTable.Maintenance.Premake
+				// Retention change: safe UPDATE partman.part_config.
+				if md.RetentionChanged != nil || md.RetentionKeepTableChanged != nil {
+					parentTable := findTable(desired, td.Name)
+					retention := ""
+					keepTable := false
+					schemaName := ""
+					if parentTable != nil {
+						schemaName = parentTable.Schema
+						if parentTable.Maintenance != nil {
+							retention = parentTable.Maintenance.Retention
+							keepTable = parentTable.Maintenance.RetentionKeepTable
+						}
 					}
+					op := DDLOp{
+						Op:     "update_partman_retention",
+						Table:  td.Name,
+						RawSQL: pgsql.UpdatePartmanConfig(schemaName, td.Name, retention, keepTable),
+					}
+					m.DDLOps = append(m.DDLOps, op)
+					diags = append(diags, classifyOp(op, risk.OpUpdatePartmanRetention, risk.OpContext{PGVersion: desired.PGVersion})...)
 				}
-				qualified := pgsql.QualifiedName(schemaName, td.Name)
-				op := DDLOp{
-					Op:     "update_partman_premake",
-					Table:  td.Name,
-					RawSQL: fmt.Sprintf("UPDATE partman.part_config SET premake = %d WHERE parent_table = '%s';", premake, qualified),
+
+				// Premake change: safe UPDATE partman.part_config.
+				if md.PremakeChanged != nil {
+					parentTable := findTable(desired, td.Name)
+					premake := 0
+					schemaName := ""
+					if parentTable != nil {
+						schemaName = parentTable.Schema
+						if parentTable.Maintenance != nil {
+							premake = parentTable.Maintenance.Premake
+						}
+					}
+					qualified := pgsql.QualifiedName(schemaName, td.Name)
+					op := DDLOp{
+						Op:     "update_partman_premake",
+						Table:  td.Name,
+						RawSQL: fmt.Sprintf("UPDATE partman.part_config SET premake = %d WHERE parent_table = '%s';", premake, qualified),
+					}
+					m.DDLOps = append(m.DDLOps, op)
+					diags = append(diags, classifyOp(op, risk.OpUpdatePartmanPremake, risk.OpContext{PGVersion: desired.PGVersion})...)
 				}
-				m.DDLOps = append(m.DDLOps, op)
 			}
 		}
 
