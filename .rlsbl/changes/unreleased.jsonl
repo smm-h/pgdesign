@@ -17,7 +17,7 @@
 {"id":"18c5fe5994833bb4601a37820f5c43cfb2a94126bfd6bba1","commits":["10f5bbb4dbde8cd2e790658aad3c4c868fb1dc1b"],"user_facing":false}
 {"id":"18c5fe81ff540fe213d4ba0724b842f9be34dca7cfbc1c58","commits":["99e526ed5e5737edc5b6feae5444ea9ccfdfa65f"],"user_facing":true,"description":"`[tables.*.maintenance]` now requires an explicit `premake` value; omitting it is a hard error instead of silently disabling partman premaking","type":"fix"}
 {"id":"18c5fe934771626ced3d48aca5184517a24c347ad40d2ec1","commits":["d66e773d095b71c2dec97470de0a9e568c4d3966"],"user_facing":false}
-{"id":"18c5fea3bbfb3ac687c765eda3bf49b29c7b4d3bb0e972e4","commits":["e1f95c5b1c909dd4cfaacf8ac7f18e3a6200a724"],"user_facing":false}
+{"id":"18c5fea3bbfb3ac687c765eda3bf49b29c7b4d3bb0e972e4","commits":["e1f95c5b1c909dd4cfaacf8ac7f18e3a6200a724"],"user_facing":true,"description":"**Partman config migrations now apply.** Changing partition retention or premake generated migration ops that silently rendered as '-- unknown op' comments and did nothing at apply time; they now emit the correct UPDATE partman.part_config statements.","type":"fix"}
 {"id":"18c5feccd5f4ff44d0a1ce4cd5a048899425ef49c3ac13f1","commits":["568b69a9380a3e424b6b1f4c904d1eefd8cfd7e4"],"user_facing":false}
 {"id":"18c5ff0b8065393cd5dff92eeffd48db9efefaf81df118c6","commits":["3062d0714e4f0abec8ab273ed0bb7f382e2f019d"],"user_facing":false}
 {"id":"18c5ff249acc10e603a6f8c9205345a39215df0498b93134","commits":["e0d2bd7a2b5bfd73efd249c110138bb7a72bf4b8"],"user_facing":false}
