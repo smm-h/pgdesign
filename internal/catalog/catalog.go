@@ -188,6 +188,37 @@ func Column(ctx context.Context, q Querier, pgVersion int, schema, table, column
 	return &info, true, nil
 }
 
+// ColumnTypeMatches reports whether the column's type equals expectedType by OID
+// via to_regtype — the alias-robust, pure-computable probe (roadmap 5.5+5.7
+// matching-strategy resolution). to_regtype resolves aliases (int4 == integer,
+// varchar == character varying) to the same OID, so equivalent spellings do NOT
+// false-drift. It returns the found canonical type text for diagnostics. When the
+// column is absent, present is false. A NULL to_regtype (unparseable expectedType)
+// yields match=false rather than an error.
+//
+// NOTE (typmod gap): to_regtype discards the type modifier, so this OID probe does
+// not distinguish e.g. varchar(10) from varchar(20) on the same base type. Length/
+// precision drift on an unchanged base type is not caught by the type probe; it is
+// a documented limitation of the pure to_regtype probe (a full typmod comparison
+// would require the round-trip mechanism reserved for definitional bodies).
+func ColumnTypeMatches(ctx context.Context, q Querier, schema, table, column, expectedType string) (match, present bool, found string, err error) {
+	rel := qualified(schema, table)
+	err = q.QueryRow(ctx, `
+		SELECT COALESCE(a.atttypid = to_regtype($3)::oid, false),
+		       format_type(a.atttypid, a.atttypmod)
+		FROM pg_attribute a
+		WHERE a.attrelid = to_regclass($1) AND a.attname = $2
+		      AND a.attnum > 0 AND NOT a.attisdropped`,
+		rel, column, expectedType).Scan(&match, &found)
+	if err == pgx.ErrNoRows {
+		return false, false, "", nil
+	}
+	if err != nil {
+		return false, false, "", fmt.Errorf("catalog: probe column type %s.%s: %w", rel, column, err)
+	}
+	return match, true, found, nil
+}
+
 // ConstraintDef returns pg_get_constraintdef for the named constraint on the
 // table, or ("", false) when absent. The returned text is the canonical Postgres
 // rendering used for present-and-matching precondition comparison.

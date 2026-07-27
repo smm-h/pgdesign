@@ -323,7 +323,7 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edg
 // current DB state (q is the segment tx for transactional ops, the conn for
 // non-transactional ops). A violated precondition is a hard error naming
 // object/expected/found.
-func checkPreconditions(ctx context.Context, q catalog.Querier, store *objstore.Store, op SelfContainedOp) error {
+func checkPreconditions(ctx context.Context, q predicate.Execer, store *objstore.Store, op SelfContainedOp) error {
 	pres, err := op.preconditions(store)
 	if err != nil {
 		return err

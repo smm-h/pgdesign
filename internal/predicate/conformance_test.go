@@ -34,6 +34,7 @@ CREATE TABLE users (
     id integer PRIMARY KEY,
     name text NOT NULL,
     age integer,
+    note text DEFAULT 'hi',
     CONSTRAINT users_age_chk CHECK (age >= 0)
 );
 CREATE INDEX ix_users_name ON users (name);
@@ -55,13 +56,16 @@ func sqlVerdict(ctx context.Context, t *testing.T, conn *pgx.Conn, p Preconditio
 	return err == nil
 }
 
-func b(v bool) *bool { return &v }
+func b(v bool) *bool     { return &v }
 func s(v string) *string { return &v }
 
 // TestConformanceAndMatrix is the conformance matrix: for every (precondition,
 // state) case, the Go executor and the SQL renderer must return IDENTICAL
 // verdicts, and that verdict must equal the expected one. This pins the two
-// computations of the predicate against each other and against the world.
+// computations of the predicate against each other and against the world under the
+// matching-strategy resolution: OID probes for types, in-DB round-trip for
+// definitional bodies (constraint def / column default), booleans for not-null and
+// index validity.
 func TestConformanceAndMatrix(t *testing.T) {
 	ctx, conn := setupDB(t)
 	v, err := catalog.Version(ctx, conn)
@@ -69,19 +73,13 @@ func TestConformanceAndMatrix(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Catalog-canonical constraint def, to show the canonical spelling also matches.
 	usersAgeDef := func() string {
 		def, _, err := catalog.ConstraintDef(ctx, conn, "public", "users", "users_age_chk")
 		if err != nil {
 			t.Fatal(err)
 		}
 		return def
-	}()
-	ixDef := func() string {
-		ix, _, err := catalog.Index(ctx, conn, "public", "ix_users_name")
-		if err != nil {
-			t.Fatal(err)
-		}
-		return ix.Def
 	}()
 
 	cases := []struct {
@@ -109,20 +107,30 @@ func TestConformanceAndMatrix(t *testing.T) {
 		{"drop column missing", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "missing", PGVersion: v}, false},
 		{"drop constraint present", Precondition{Existence: MustBePresent, Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk"}, true},
 
-		// Present-and-matching (alters): column attributes.
-		{"column type matches", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnType: "integer"}}, true},
-		{"column type mismatch (wrong type)", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnType: "text"}}, false},
+		// Column TYPE — OID probe (alias-robust). int4/int MUST NOT false-drift vs integer.
+		{"column type matches canonical", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnType: "integer"}}, true},
+		{"column type matches alias int4 (no false drift)", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnType: "int4"}}, true},
+		{"column type matches alias int (no false drift)", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnType: "int"}}, true},
+		{"column type mismatch (genuine wrong type)", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnType: "text"}}, false},
+		{"column type unparseable expected (mismatch)", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnType: "no_such_type"}}, false},
+
+		// Column NOT NULL — boolean.
 		{"column notnull matches", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "name", PGVersion: v, Match: &Match{ColumnNotNull: b(true)}}, true},
 		{"column notnull mismatch", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnNotNull: b(true)}}, false},
+
+		// Column DEFAULT — "no default" boolean case + round-trip case.
 		{"column default matches (none)", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnDefault: s("")}}, true},
+		{"column default round-trip matches (model spelling)", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "note", PGVersion: v, Match: &Match{ColumnDefault: s("'hi'")}}, true},
+		{"column default round-trip mismatch", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "note", PGVersion: v, Match: &Match{ColumnDefault: s("'bye'")}}, false},
+		{"column default expected-none but present (drift)", Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "note", PGVersion: v, Match: &Match{ColumnDefault: s("")}}, false},
 
-		// Present-and-matching: constraint def.
-		{"constraint def matches", Precondition{Existence: MustBePresent, Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk", Match: &Match{ConstraintDef: usersAgeDef}}, true},
-		{"constraint def mismatch", Precondition{Existence: MustBePresent, Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk", Match: &Match{ConstraintDef: "CHECK ((age > 100))"}}, false},
+		// Constraint DEF — round-trip. Equivalent spellings must NOT false-drift.
+		{"constraint def matches canonical", Precondition{Existence: MustBePresent, Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk", Match: &Match{ConstraintDef: usersAgeDef}}, true},
+		{"constraint def matches model spelling (no false drift)", Precondition{Existence: MustBePresent, Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk", Match: &Match{ConstraintDef: "CHECK (age >= 0)"}}, true},
+		{"constraint def genuine mismatch", Precondition{Existence: MustBePresent, Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk", Match: &Match{ConstraintDef: "CHECK (age > 100)"}}, false},
 
-		// Present-and-matching: index def + validity.
-		{"index def matches valid", Precondition{Existence: MustBePresent, Class: ClassIndex, Schema: "public", Name: "ix_users_name", Match: &Match{IndexDef: ixDef, IndexMustBeValid: true}}, true},
-		{"index def mismatch", Precondition{Existence: MustBePresent, Class: ClassIndex, Schema: "public", Name: "ix_users_name", Match: &Match{IndexDef: "CREATE INDEX bogus ON public.users USING btree (id)"}}, false},
+		// Index — existence + validity boolean (definition body is existence-only).
+		{"index present and valid", Precondition{Existence: MustBePresent, Class: ClassIndex, Schema: "public", Name: "ix_users_name", Match: &Match{IndexMustBeValid: true}}, true},
 	}
 
 	for _, c := range cases {
@@ -183,6 +191,27 @@ func TestPreciseError(t *testing.T) {
 	}
 	e := r.Err().Error()
 	for _, want := range []string{"column public.users.age type", "expected text", "found integer"} {
+		if !contains(e, want) {
+			t.Errorf("error %q missing %q", e, want)
+		}
+	}
+}
+
+// TestConstraintDefPreciseError checks the round-trip mismatch names the canonical
+// expected and found constraint bodies.
+func TestConstraintDefPreciseError(t *testing.T) {
+	ctx, conn := setupDB(t)
+	p := Precondition{Existence: MustBePresent, Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk", Match: &Match{ConstraintDef: "CHECK (age > 100)"}}
+	r, err := Check(ctx, conn, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.OK {
+		t.Fatal("expected constraint mismatch")
+	}
+	e := r.Err().Error()
+	// Expected is PG's canonical round-trip of the model text; found is the live def.
+	for _, want := range []string{"age > 100", "age >= 0"} {
 		if !contains(e, want) {
 			t.Errorf("error %q missing %q", e, want)
 		}

@@ -63,21 +63,54 @@ const (
 // Match, when non-nil on a MustBePresent precondition, additionally requires the
 // present object's attribute(s) to equal these (present-AND-matching). Only the
 // fields relevant to the class are consulted. Nil means existence-only.
+//
+// Present-and-matching comparisons are LIVE-PATH comparisons (roadmap 5.5+5.7
+// matching-strategy resolution): they run against the target DB, so the fields
+// carry MODEL text (alias-spelled, non-canonical) and each is compared with a
+// strategy that is robust to equivalent spellings:
+//
+//   - ColumnType    — OID probe via to_regtype (alias-robust, pure-computable);
+//   - ColumnNotNull — boolean;
+//   - ColumnDefault — in-DB round-trip (temp column SET DEFAULT, pg_get_expr);
+//   - ConstraintDef — in-DB round-trip (temp table ADD CONSTRAINT, pg_get_constraintdef);
+//   - IndexMustBeValid — boolean (pg_index.indisvalid).
+//
+// Index DEFINITION bodies are NOT compared (existence + validity only): a clean
+// round-trip cannot reach them because pg_get_indexdef embeds the index name and
+// owning table, which differ for the throwaway temp object. This is the documented
+// existence-only class for indexes.
 type Match struct {
 	// Column attributes (ClassColumn).
-	ColumnType    string  // expected type; "" = don't check
-	ColumnNotNull *bool   // expected NOT NULL; nil = don't check
-	ColumnDefault *string // expected default expr; nil = don't check
+	ColumnType    string  // expected type (model text); OID probe. "" = don't check
+	ColumnNotNull *bool   // expected NOT NULL; boolean. nil = don't check
+	ColumnDefault *string // expected default expr (model text); round-trip. nil = don't check
 
-	// ConstraintDef is the expected pg_get_constraintdef text (ClassConstraint).
+	// ConstraintDef is the expected constraint clause (model text, e.g.
+	// "CHECK (age >= 0)"); compared by round-trip against pg_get_constraintdef.
 	ConstraintDef string // "" = don't check
 
-	// IndexDef is the expected pg_get_indexdef text (ClassIndex).
-	IndexDef string // "" = don't check
 	// IndexMustBeValid requires pg_index.indisvalid (ClassIndex) — the resume
 	// protocol keys on this: a present-but-INVALID index (interrupted CIC) is a
 	// mismatch, not a match.
 	IndexMustBeValid bool
+}
+
+// needsRoundTrip reports whether the precondition's Match requires an in-DB
+// round-trip (definitional body: a non-empty constraint clause or a non-empty
+// column default). Existence, OID-type, not-null, and index-validity checks are
+// pure catalog reads and never need the temp-object round-trip.
+func (p Precondition) needsRoundTrip() bool {
+	if p.Existence != MustBePresent || p.Match == nil {
+		return false
+	}
+	switch p.Class {
+	case ClassConstraint:
+		return p.Match.ConstraintDef != ""
+	case ClassColumn:
+		return p.Match.ColumnDefault != nil && *p.Match.ColumnDefault != ""
+	default:
+		return false
+	}
 }
 
 // Precondition is one structured domain-check statement for an op.

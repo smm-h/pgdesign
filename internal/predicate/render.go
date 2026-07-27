@@ -6,12 +6,24 @@ import (
 )
 
 // RenderAssert compiles a precondition into a DO block that RAISEs EXCEPTION when
-// the precondition is VIOLATED (the SQL backend of the same IR). It computes a
-// boolean `ok` with the same meaning as the Go executor's Result.OK and raises
-// when it is false. This is the RAISE-on-mismatch primitive generate --idempotent
-// builds on, and the second computation of the predicate the conformance matrix
-// pins against the Go executor.
+// the precondition is VIOLATED (the SQL backend of the same IR). This is the
+// RAISE-on-mismatch primitive generate --idempotent builds on, and the second
+// computation of the predicate the conformance matrix pins against the Go executor.
+//
+// Two shapes:
+//
+//   - existence / OID-type / not-null / index-validity are pure boolean catalog
+//     reads → a single `IF NOT (<ok>) THEN RAISE` guard;
+//   - definitional bodies (constraint def, non-empty column default) need the in-DB
+//     round-trip → a DECLARE block that canonicalizes the MODEL text through a
+//     throwaway temp object and compares PG's own pg_get_* form to the live one.
+//
+// Both compute the SAME verdict as the Go executor, keeping the conformance matrix
+// honest.
 func RenderAssert(p Precondition) string {
+	if p.needsRoundTrip() {
+		return renderRoundTripAssert(p)
+	}
 	okExpr := okExpr(p)
 	msg := fmt.Sprintf("pgdesign precondition violated: %s (expected %s)", p.object(), p.Existence.String())
 	return fmt.Sprintf(`DO $pgdpred$
@@ -23,7 +35,110 @@ END
 $pgdpred$;`, okExpr, escapeLit(msg))
 }
 
-// okExpr builds the boolean SQL expression that is true iff the precondition holds.
+// renderRoundTripAssert emits the DECLARE-block DO for a definitional-body
+// precondition: it first enforces the boolean guard (existence + any OID-type /
+// not-null dimensions), then round-trips the MODEL text and compares.
+func renderRoundTripAssert(p Precondition) string {
+	presentMsg := escapeLit(fmt.Sprintf("pgdesign precondition violated: %s (expected present)", p.object()))
+	guard := okExpr(p) // existence AND boolean match dimensions (round-trip dims excluded)
+	switch p.Class {
+	case ClassConstraint:
+		return renderConstraintRoundTrip(p, guard, presentMsg)
+	case ClassColumn:
+		return renderDefaultRoundTrip(p, guard, presentMsg)
+	default:
+		// Unreachable: needsRoundTrip only returns true for the two classes above.
+		okExpr := okExpr(p)
+		return fmt.Sprintf("DO $pgdpred$\nBEGIN\n    IF NOT (%s) THEN\n        RAISE EXCEPTION '%s';\n    END IF;\nEND\n$pgdpred$;", okExpr, presentMsg)
+	}
+}
+
+// renderConstraintRoundTrip clones the owning table into a temp table, adds the
+// MODEL constraint clause, and compares PG's pg_get_constraintdef to the live one.
+func renderConstraintRoundTrip(p Precondition, guard, presentMsg string) string {
+	src := qualIdent(p.Schema, p.Table)
+	relTable := sqlLit(src)
+	mismatchMsg := escapeLit(fmt.Sprintf("pgdesign precondition violated: %s (definition mismatch)", p.object()))
+	return fmt.Sprintf(`DO $pgdpred$
+DECLARE
+    found_def text;
+    expected_def text;
+BEGIN
+    IF NOT (%s) THEN
+        RAISE EXCEPTION '%s';
+    END IF;
+    SELECT pg_get_constraintdef(con.oid) INTO found_def
+        FROM pg_constraint con
+        WHERE con.conrelid = to_regclass(%s) AND con.conname = %s;
+    DROP TABLE IF EXISTS %s;
+    CREATE TEMP TABLE %s (LIKE %s);
+    ALTER TABLE %s ADD CONSTRAINT %s %s;
+    SELECT pg_get_constraintdef(con.oid) INTO expected_def
+        FROM pg_constraint con
+        JOIN pg_class r ON r.oid = con.conrelid
+        WHERE r.relname = %s AND con.conname = '_pgd_c' AND r.relnamespace = pg_my_temp_schema();
+    DROP TABLE IF EXISTS %s;
+    IF found_def IS DISTINCT FROM expected_def THEN
+        RAISE EXCEPTION '%s: expected %%, found %%', expected_def, found_def;
+    END IF;
+END
+$pgdpred$;`,
+		guard, presentMsg,
+		relTable, sqlLit(p.Name),
+		quoteIdent(tempName),
+		quoteIdent(tempName), src,
+		quoteIdent(tempName), quoteIdent("_pgd_c"), p.Match.ConstraintDef,
+		sqlLit(tempName),
+		quoteIdent(tempName),
+		mismatchMsg)
+}
+
+// renderDefaultRoundTrip clones the owning table into a temp table, sets the MODEL
+// default on the target column, and compares PG's pg_get_expr to the live one.
+func renderDefaultRoundTrip(p Precondition, guard, presentMsg string) string {
+	src := qualIdent(p.Schema, p.Table)
+	relTable := sqlLit(src)
+	mismatchMsg := escapeLit(fmt.Sprintf("pgdesign precondition violated: %s (default mismatch)", p.object()))
+	return fmt.Sprintf(`DO $pgdpred$
+DECLARE
+    found_def text;
+    expected_def text;
+BEGIN
+    IF NOT (%s) THEN
+        RAISE EXCEPTION '%s';
+    END IF;
+    SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') INTO found_def
+        FROM pg_attribute a
+        LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+        WHERE a.attrelid = to_regclass(%s) AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped;
+    DROP TABLE IF EXISTS %s;
+    CREATE TEMP TABLE %s (LIKE %s);
+    ALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;
+    SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') INTO expected_def
+        FROM pg_attribute a
+        JOIN pg_class r ON r.oid = a.attrelid
+        LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+        WHERE r.relname = %s AND a.attname = %s AND r.relnamespace = pg_my_temp_schema();
+    DROP TABLE IF EXISTS %s;
+    IF found_def IS DISTINCT FROM expected_def THEN
+        RAISE EXCEPTION '%s: expected %%, found %%', expected_def, found_def;
+    END IF;
+END
+$pgdpred$;`,
+		guard, presentMsg,
+		relTable, sqlLit(p.Name),
+		quoteIdent(tempName),
+		quoteIdent(tempName), src,
+		quoteIdent(tempName), quoteIdent(p.Name), *p.Match.ColumnDefault,
+		sqlLit(tempName), sqlLit(p.Name),
+		quoteIdent(tempName),
+		mismatchMsg)
+}
+
+// okExpr builds the boolean SQL expression that is true iff the precondition's
+// existence and boolean-match dimensions hold. Round-trip dimensions (constraint
+// def, non-empty column default) are excluded — those are compared by the
+// round-trip DO block, not here.
 func okExpr(p Precondition) string {
 	exists := existsExpr(p)
 	switch p.Existence {
@@ -86,9 +201,11 @@ func existsExpr(p Precondition) string {
 	}
 }
 
-// matchExpr builds a boolean SQL expression: does the present object match
-// p.Match? It uses EXACT equality on the catalog's own rendering, mirroring the
-// Go executor's comparison.
+// matchExpr builds a boolean SQL expression for the BOOLEAN match dimensions only:
+// column TYPE (OID probe via to_regtype — alias-robust), column NOT NULL, the
+// "no default" case, and index VALIDITY. Definitional-body dimensions (constraint
+// def, non-empty column default) return "true" here and are compared by the
+// round-trip DO block instead.
 func matchExpr(p Precondition) string {
 	m := p.Match
 	relTable := sqlLit(qualIdent(p.Schema, p.Table))
@@ -97,46 +214,37 @@ func matchExpr(p Precondition) string {
 	case ClassColumn:
 		var conds []string
 		if m.ColumnType != "" {
+			// OID equality via to_regtype: int4 == integer, varchar == character
+			// varying resolve to the same OID, so equivalent spellings do not drift.
 			conds = append(conds, fmt.Sprintf(
-				"(SELECT format_type(a.atttypid, a.atttypmod) FROM pg_attribute a WHERE a.attrelid = to_regclass(%s) AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped) = %s",
-				relTable, sqlLit(p.Name), sqlLit(m.ColumnType)))
+				"(SELECT COALESCE(a.atttypid = to_regtype(%s)::oid, false) FROM pg_attribute a WHERE a.attrelid = to_regclass(%s) AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped) IS TRUE",
+				sqlLit(m.ColumnType), relTable, sqlLit(p.Name)))
 		}
 		if m.ColumnNotNull != nil {
 			conds = append(conds, fmt.Sprintf(
 				"(SELECT a.attnotnull FROM pg_attribute a WHERE a.attrelid = to_regclass(%s) AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped) = %t",
 				relTable, sqlLit(p.Name), *m.ColumnNotNull))
 		}
-		if m.ColumnDefault != nil {
+		if m.ColumnDefault != nil && *m.ColumnDefault == "" {
+			// Asserting NO default is a pure boolean read; a non-empty default is a
+			// round-trip dimension handled elsewhere.
 			conds = append(conds, fmt.Sprintf(
-				"(SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') FROM pg_attribute a LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum WHERE a.attrelid = to_regclass(%s) AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped) = %s",
-				relTable, sqlLit(p.Name), sqlLit(*m.ColumnDefault)))
+				"(SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') FROM pg_attribute a LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum WHERE a.attrelid = to_regclass(%s) AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped) = ''",
+				relTable, sqlLit(p.Name)))
 		}
 		if len(conds) == 0 {
 			return "true"
 		}
 		return "(" + strings.Join(conds, ") AND (") + ")"
-	case ClassConstraint:
-		if m.ConstraintDef == "" {
-			return "true"
-		}
-		return fmt.Sprintf(
-			"(SELECT pg_get_constraintdef(con.oid) FROM pg_constraint con WHERE con.conrelid = to_regclass(%s) AND con.conname = %s) = %s",
-			relTable, sqlLit(p.Name), sqlLit(m.ConstraintDef))
 	case ClassIndex:
-		var conds []string
 		if m.IndexMustBeValid {
-			conds = append(conds, fmt.Sprintf(
-				"(SELECT i.indisvalid FROM pg_index i WHERE i.indexrelid = to_regclass(%s)) IS TRUE", rel))
+			return fmt.Sprintf(
+				"(SELECT i.indisvalid FROM pg_index i WHERE i.indexrelid = to_regclass(%s)) IS TRUE", rel)
 		}
-		if m.IndexDef != "" {
-			conds = append(conds, fmt.Sprintf(
-				"pg_get_indexdef(to_regclass(%s)) = %s", rel, sqlLit(m.IndexDef)))
-		}
-		if len(conds) == 0 {
-			return "true"
-		}
-		return "(" + strings.Join(conds, ") AND (") + ")"
+		return "true"
 	default:
+		// ClassConstraint def is a round-trip dimension; all other classes have no
+		// match semantics.
 		return "true"
 	}
 }
