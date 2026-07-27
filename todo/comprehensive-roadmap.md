@@ -1722,7 +1722,11 @@ subphase numbers retained for reference; they land together.)
   fold keeps one comparison engine.
 - **Verify:** Clean apply over the comprehensive fixture reports empty;
   out-of-band ALTER mid-migration surfaces; managed objects invisible; the
-  dual-oracle L10 property test green over generated pairs.
+  dual-oracle L10 property test green over generated pairs. HANDOFF NOTE
+  (1.2 audit, 2026-07): the diff --live e2e currently uses an inline
+  expression-scoped fixture — 5.8 must swap it to the shared comprehensive
+  fixture and add a live RLS policy to the e2e, per 1.2's original Verify
+  line.
 
 ### 5.9 Pure generation — L5
 - **What:** migrate generate = diff(deserialize(head manifest via
