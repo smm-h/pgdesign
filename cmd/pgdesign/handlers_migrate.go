@@ -16,6 +16,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/introspect"
+	"github.com/smm-h/pgdesign/internal/livenorm"
 	"github.com/smm-h/pgdesign/internal/migrate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/rev"
@@ -1445,6 +1446,120 @@ func printSchemaDiffSummary(d *diff.SchemaDiff) {
 	if len(d.CompositeTypesRemoved) > 0 {
 		fmt.Printf("  Composite types in shadow but not in TOML: %s\n", strings.Join(d.CompositeTypesRemoved, ", "))
 	}
+}
+
+func registerMigrateUpgradeCmd(g *strictcli.Group) {
+	g.Command("upgrade", "One-time adoption of a legacy (semver-TOML) database onto the on-disk chain. Verifies the schema TOML matches the live database exactly (refusing to stamp over drift), folds the existing pgdesign_migrations rows into the chain journal, writes the content-addressed prefix edge, and stamps this database's upgrade boundary in a single transaction. Requires a clean working tree for the schema files when inside a git repository. Run once per database; a fresh database uses `migrate apply` directly.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
+
+			dbURL := kwargsDBURL(kwargs)
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate upgrade")
+				return strictcli.Exit(1)
+			}
+
+			paths := kwargsStrSlice(kwargs["path"])
+			desired, _, exitCode := parseAndBuild(cfgOverride, paths)
+			if exitCode != 0 {
+				return strictcli.Exit(exitCode)
+			}
+
+			cfg, cfgErr := loadProjectConfig(cfgOverride, paths[0])
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
+
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
+
+			schemaNames := []string{"public"}
+			if desired.Name != "" && desired.Name != "public" {
+				schemaNames = []string{desired.Name}
+			} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
+				schemaNames = cfgNames
+			}
+
+			schemaFiles, err := resolveSchemaPaths(cfgOverride, paths)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			ctx := context.Background()
+			conn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			defer conn.Close(ctx)
+
+			// Introspect the live database for the reconcile, resolving the live PG
+			// version onto the desired model so an unpinned pg_version does not
+			// register as spurious drift (mirrors migrate generate/plan).
+			actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: introspect: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			if len(diags) > 0 {
+				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+			}
+			if diagnostic.Diagnostics(diags).HasErrors() {
+				return strictcli.Exit(1)
+			}
+			applyLivePGVersion(desired, actual.PGVersion)
+
+			p, err := migrate.OpenChainProject(dir)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			// LIVE ROUND-TRIP NORMALIZATION for the reconcile (best-effort).
+			var ln diff.LiveNormalizer
+			if n, nerr := livenorm.New(ctx, dbURL); nerr == nil {
+				defer n.Close()
+				ln = n
+			}
+
+			report, err := migrate.Upgrade(ctx, conn, p, desired, actual, ln, dir, schemaFiles, nil)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
+			if report.AlreadyUpgraded {
+				if !quiet {
+					fmt.Println("Already upgraded: this database is already on the chain (chain_position present). Nothing to do.")
+				}
+				return strictcli.Exit(0)
+			}
+
+			if len(report.Amnesty) > 0 {
+				fmt.Fprintf(os.Stderr, "CHECKSUM AMNESTY: %d migration file(s) differ from their recorded checksum (historical post-apply edits; the fold proceeded by content):\n", len(report.Amnesty))
+				for _, a := range report.Amnesty {
+					fmt.Fprintf(os.Stderr, "  %s\n    recorded: %s\n    actual:   %s\n", a.File, a.Recorded, a.Actual)
+				}
+			}
+
+			if !quiet {
+				fmt.Printf("Upgraded to the on-disk chain.\n")
+				fmt.Printf("  Boundary revision: %s\n", report.Boundary)
+				fmt.Printf("  Prefix edge:       %s\n", report.PrefixEdgeFile)
+				fmt.Printf("  Folded rows:       %d\n", report.PrefixRows)
+			}
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the database to upgrade", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+		),
+	)
 }
 
 func registerMigrateBaselineCmd(g *strictcli.Group) {
