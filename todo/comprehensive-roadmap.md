@@ -1777,6 +1777,22 @@ subphase numbers retained for reference; they land together.)
   fixture and add a live RLS policy to the e2e, per 1.2's original Verify
   line.
 
+**5.8 AUDIT HANDOFFS (2026-07):** (a) MIGRATE COMMENT EMISSION is a real
+functional hole — comment-only TOML changes lower to zero ops (ErrNoEdgeOps)
+and chain-created tables land WITHOUT their mandatory comments; reconcile's
+stripComments papers over it; fix = COMMENT ON inside create_table render +
+a comment_change op consuming diff's CommentChanged, then DELETE
+stripComments so reconcile certifies comments. (b) modelgen's SM increment
+(IncludeStateMachines is a declared no-op) — until it generates SM types,
+L10's manifest oracle is redundant with re-introspection. (c) ROUND-TRIP
+HARDENING list for 5.10's ecosystem alignment: schema-qualified domain-name
+introspection; PERMISSIVE-default normalization; partman children excluded
+not removed; partman interval 1 month/1 mon; json_schema documented as
+non-round-trippable (pgdesign-only attribute — explicit exclusion note, not
+a fix). (d) Journal-DELETE design note: rollback erases the edge's journal
+rows; the rollback EVENT itself is not journaled (accepted; L5's trace =
+current applied reality).
+
 ### 5.9 Pure generation — L5
 - **What:** migrate generate = diff(deserialize(head manifest via
   objstore), current model) — pure, no DB. ALWAYS emits large-table-safe
