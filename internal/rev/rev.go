@@ -84,6 +84,12 @@ type Revision struct {
 // Class returns the model class this revision belongs to.
 func (r Revision) Class() ModelClass { return r.class }
 
+// IsZero reports whether r is the zero Revision — no class and no digest. The
+// chain package (roadmap 1.4) uses it to represent a GENESIS edge's NULL parent:
+// a genesis edge has no from-revision, modeled as the zero Revision rather than
+// a sentinel value.
+func (r Revision) IsZero() bool { return r.class == "" && len(r.sum) == 0 }
+
 // Hex returns the lowercase hex SHA-256 digest (without a class prefix).
 func (r Revision) Hex() string { return hex.EncodeToString(r.sum) }
 

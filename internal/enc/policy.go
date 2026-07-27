@@ -11,6 +11,27 @@ package enc
 //
 // The reason strings are the contract; keep them accurate.
 
+// EncodedModelFields returns, for every DDL-reaching model struct (keyed by its
+// unqualified struct name, matching reflect.Type.Name()), the list of exported
+// field names the encoder serializes into canonical bytes. It is a copy of the
+// encoder's own field policy — the SAME registry the totality guard
+// (policy_test.go) checks for completeness — exposed so downstream kernel
+// verification can be DRIVEN BY the encoder's notion of identity rather than a
+// hand-maintained parallel list. The chief consumer is roadmap 1.4's
+// diff-totality mutation guard: it perturbs each encoded field and asserts diff
+// is non-empty, retiring the diff-under-reporting defect class by construction.
+//
+// The returned map is freshly allocated; mutating it does not affect the policy.
+func EncodedModelFields() map[string][]string {
+	out := make(map[string][]string, len(modelFieldPolicy))
+	for name, p := range modelFieldPolicy {
+		fields := make([]string, len(p.encoded))
+		copy(fields, p.encoded)
+		out[name] = fields
+	}
+	return out
+}
+
 // structPolicy classifies the exported fields of a single struct.
 type structPolicy struct {
 	// encoded lists the exported field names serialized into canonical bytes.
