@@ -1,3 +1,4 @@
+format_version = 1
 # Fixture for the execution-backed DDL matrix test (python_ddl_exec_test.go).
 # Exercises every DDL tuple kind that is executable on a vanilla PostgreSQL
 # server without extra extensions or cluster-wide state:

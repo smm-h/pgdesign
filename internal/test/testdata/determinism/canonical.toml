@@ -1,3 +1,4 @@
+format_version = 1
 # Determinism fixture: exercises every map-sourced collection with >= 2 entries
 # so that Canonicalize's alphabetical ordering is actually observable. Includes a
 # materialized view with 2 indexes, tables with 2+ FKs / indexes / checks /

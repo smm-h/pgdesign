@@ -1,3 +1,4 @@
+format_version = 1
 # Representative schema for the codegen determinism contract test.
 # Deliberately exercises: multiple enums, multiple CHECK constraints,
 # a scalar domain type, a state machine, FKs, uniques, and indexes --

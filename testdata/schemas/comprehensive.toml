@@ -1,3 +1,4 @@
+format_version = 1
 # Comprehensive test schema exercising all pgdesign features.
 # Domain: project management platform.
 

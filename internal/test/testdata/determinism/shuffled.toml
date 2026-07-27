@@ -1,3 +1,4 @@
+format_version = 1
 # Same schema as canonical.toml, but the declaration order of the map-sourced
 # collections (checks, indexes, uniques, policies, fks) is permuted. Column order
 # and enum value order are IDENTICAL to canonical.toml (those are semantic and

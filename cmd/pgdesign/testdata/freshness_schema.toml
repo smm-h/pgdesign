@@ -1,3 +1,4 @@
+format_version = 1
 # Fixture for the build-freshness and orphan-detection tests.
 # Deliberately contains NO state machine type: state ordering is currently
 # nondeterministic across schema builds (parse/convert.go iterates the states
