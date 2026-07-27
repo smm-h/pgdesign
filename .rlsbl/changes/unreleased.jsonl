@@ -32,7 +32,7 @@
 {"id":"18c601ae50c3c5be244fbdf43dbc489397dc99347a050599","commits":["01a7b84591e0ed8105ef96c2459af886da888a71"],"user_facing":false}
 {"id":"18c601bd38adc305116f9e7350a846e49cc6aa84a48e7bb5","commits":["8efe835eebf54318688ec595961c786fd165c58d"],"user_facing":false}
 {"id":"18c601fbb2068d6c196c77de8bbc45edae33234fa260c48d","commits":["fc02013f1a958558740228673db3871bfdfc537e"],"user_facing":false}
-{"id":"18c602dcf19d84fc558d518f0006472e8181d312b8ca2211","commits":["ce7e82f55fe27dae578c41417139545a63eaa7ed"],"user_facing":false}
+{"id":"18c602dcf19d84fc558d518f0006472e8181d312b8ca2211","commits":["ce7e82f55fe27dae578c41417139545a63eaa7ed"],"user_facing":true,"description":"**GraphQL SDL nullability could be wrong for same-named tables across schemas.** FK-field nullability was computed from a bare-name table map (last schema won); it now reads the owning table's columns.","type":"fix"}
 {"id":"18c60341abf5d7f1cd342d037bd949ea850db80511aaf326","commits":["753a715b8102ccbdb1c2d3e34fee6b6db3b8ca58"],"user_facing":false}
 {"id":"18c603656fa10de53ba01ed2e2914ec89298e98e65d20d95","commits":["c95ed98fe7edd82603cdd92d16a04e6b9aed2c40"],"user_facing":false}
 {"id":"18c603d83da3033567909e7bbcc24a0b8e254185deb67bc2","commits":["6ffe557293d1fb6bc963e0f935f29c5f71b17ea2"],"user_facing":false}
