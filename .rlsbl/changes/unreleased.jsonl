@@ -90,3 +90,4 @@
 {"id":"18c6275a706d72ce1bd3d13f3bf941e1be67fe702a11892a","commits":["51dbe24192eedafd23625232512cd5c7f5efd35d"],"user_facing":false}
 {"id":"18c6276fd4f6b64eebe61331a33c43879ff79bc3fbdd1d48","commits":["31e837acbcc9e7c93aba6625b614581ca583d8f5"],"user_facing":false}
 {"id":"18c6289e4af21368c0ff880038d644d3aee816d3c56e9f47","commits":["572db69b2831362fd8d2908edec2bcf4540f4db7"],"user_facing":true,"description":"**Hermetic checks no longer connect via a config database URL.** Running `check --hermetic` with the database env unset but a URL configured in pgdesign.toml previously connected anyway; it now skips DB-backed checks visibly.","type":"fix"}
+{"id":"18c628adecc382f5c454d2be1bc4429a8bb7f3d4aa4ecd2a","commits":["096fa904fbb9bf5dfd317bca7d83c783a23b60df"],"user_facing":false}
