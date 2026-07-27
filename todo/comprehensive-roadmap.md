@@ -1548,7 +1548,11 @@ precondition -> execute -> journal} -> 5.6 -> 5.8; TRACK B (parallel): 5.3 ->
   carrying differing codec epochs = UNCONDITIONAL HARD ERROR naming both
   epochs and the offending edges — mixed epochs are corruption; epochs
   change only via the event-time procedure, never incrementally);
-  6.2 and 7.2 invoke the same checker. PRE-UPGRADE GUARD: post-release, EVERY
+  6.2 and 7.2 invoke the same checker. HANDOFF NOTE (1.4 audit, 2026-07):
+  chain.Manifest is CLASS-BLIND (it drops the whole-model preamble's
+  class/codec/format-version) — revision-equal <=> manifest-equal holds
+  same-class only; this checker must stay class-aware when comparing
+  manifests against class-tagged revisions. PRE-UPGRADE GUARD: post-release, EVERY
   migrate subcommand (apply, rollback, status, baseline, squash) run against a
   PRE-UPGRADE database (old tracking table present, no chain_position)
   HARD-ERRORS naming `migrate upgrade` — nothing may misbehave against, or
