@@ -232,7 +232,7 @@ func buildTuples(schema *model.Schema) ([]ddlTuple, []model.Table, []diagnostic.
 				continue
 			}
 			tuples = append(tuples, ddlTuple{
-				SQL:           sql.CreatePartmanParent(t.Schema, t.Name, t.Partitioning.Columns[0], t.Maintenance.Retention, t.Maintenance.Premake),
+				SQL:           sql.CreatePartmanParent(t.Schema, t.Name, t.Partitioning.Columns[0], t.Maintenance.Interval, t.Maintenance.Premake),
 				Kind:          "partman",
 				Name:          t.Name,
 				Table:         t.Name,

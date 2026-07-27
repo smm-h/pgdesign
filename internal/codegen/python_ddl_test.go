@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
@@ -343,6 +344,64 @@ func TestPythonDDL_SingleTable(t *testing.T) {
 	// Single-element tuple must have trailing comma.
 	if !strings.Contains(output, `("users",)`) {
 		t.Error("single-element TABLE_NAMES tuple should have trailing comma")
+	}
+}
+
+// TestPythonDDL_PartmanUsesInterval verifies that the partman create_parent
+// tuple passes the maintenance Interval (partition width) as p_interval, not
+// the Retention value. This mirrors the already-fixed generate path; python_ddl
+// previously passed Retention as p_interval, silently misconfiguring partman.
+func TestPythonDDL_PartmanUsesInterval(t *testing.T) {
+	schema := &model.Schema{
+		Name:       "app",
+		Extensions: []string{"pg_partman"},
+		Tables: []model.Table{
+			{
+				Name:    "events",
+				Schema:  "app",
+				Comment: "Event log",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					{Name: "created_at", PGType: typeinfo.MustParse("timestamptz"), NotNull: true},
+				},
+				PK: []string{"id"},
+				Partitioning: &model.PartitionSpec{
+					Strategy: "range",
+					Columns:  []string{"created_at"},
+				},
+				Maintenance: &model.MaintenanceConfig{
+					Interval:           "1 month",
+					Premake:            4,
+					Retention:          "6 months",
+					RetentionKeepTable: false,
+				},
+			},
+		},
+	}
+
+	tuples, _, diags := buildTuples(schema)
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error {
+			t.Fatalf("buildTuples error: [%s] %s", d.Code, d.Message)
+		}
+	}
+
+	var partmanSQL string
+	for _, tu := range tuples {
+		if tu.Kind == "partman" && strings.Contains(tu.SQL, "create_parent") {
+			partmanSQL = tu.SQL
+			break
+		}
+	}
+	if partmanSQL == "" {
+		t.Fatal("no partman create_parent tuple found")
+	}
+
+	if !strings.Contains(partmanSQL, "p_interval := '1 month'") {
+		t.Errorf("expected p_interval := '1 month' (the Interval), got:\n%s", partmanSQL)
+	}
+	if strings.Contains(partmanSQL, "p_interval := '6 months'") {
+		t.Errorf("p_interval must be the Interval ('1 month'), not the Retention ('6 months'):\n%s", partmanSQL)
 	}
 }
 
