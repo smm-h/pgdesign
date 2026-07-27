@@ -56,9 +56,6 @@ func renderRoundTripAssert(p Precondition) string {
 // renderConstraintRoundTrip clones the owning table into a temp table, adds the
 // MODEL constraint clause, and compares PG's pg_get_constraintdef to the live one.
 func renderConstraintRoundTrip(p Precondition, guard, presentMsg string) string {
-	src := qualIdent(p.Schema, p.Table)
-	relTable := sqlLit(src)
-	mismatchMsg := escapeLit(fmt.Sprintf("pgdesign precondition violated: %s (definition mismatch)", p.object()))
 	return fmt.Sprintf(`DO $pgdpred$
 DECLARE
     found_def text;
@@ -67,38 +64,14 @@ BEGIN
     IF NOT (%s) THEN
         RAISE EXCEPTION '%s';
     END IF;
-    SELECT pg_get_constraintdef(con.oid) INTO found_def
-        FROM pg_constraint con
-        WHERE con.conrelid = to_regclass(%s) AND con.conname = %s;
-    DROP TABLE IF EXISTS %s;
-    CREATE TEMP TABLE %s (LIKE %s);
-    ALTER TABLE %s ADD CONSTRAINT %s %s;
-    SELECT pg_get_constraintdef(con.oid) INTO expected_def
-        FROM pg_constraint con
-        JOIN pg_class r ON r.oid = con.conrelid
-        WHERE r.relname = %s AND con.conname = '_pgd_c' AND r.relnamespace = pg_my_temp_schema();
-    DROP TABLE IF EXISTS %s;
-    IF found_def IS DISTINCT FROM expected_def THEN
-        RAISE EXCEPTION '%s: expected %%, found %%', expected_def, found_def;
-    END IF;
+%s
 END
-$pgdpred$;`,
-		guard, presentMsg,
-		relTable, sqlLit(p.Name),
-		quoteIdent(tempName),
-		quoteIdent(tempName), src,
-		quoteIdent(tempName), quoteIdent("_pgd_c"), p.Match.ConstraintDef,
-		sqlLit(tempName),
-		quoteIdent(tempName),
-		mismatchMsg)
+$pgdpred$;`, guard, presentMsg, constraintCompareBlock(p, "    "))
 }
 
 // renderDefaultRoundTrip clones the owning table into a temp table, sets the MODEL
 // default on the target column, and compares PG's pg_get_expr to the live one.
 func renderDefaultRoundTrip(p Precondition, guard, presentMsg string) string {
-	src := qualIdent(p.Schema, p.Table)
-	relTable := sqlLit(src)
-	mismatchMsg := escapeLit(fmt.Sprintf("pgdesign precondition violated: %s (default mismatch)", p.object()))
 	return fmt.Sprintf(`DO $pgdpred$
 DECLARE
     found_def text;
@@ -107,32 +80,68 @@ BEGIN
     IF NOT (%s) THEN
         RAISE EXCEPTION '%s';
     END IF;
-    SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') INTO found_def
-        FROM pg_attribute a
-        LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
-        WHERE a.attrelid = to_regclass(%s) AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped;
-    DROP TABLE IF EXISTS %s;
-    CREATE TEMP TABLE %s (LIKE %s);
-    ALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;
-    SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') INTO expected_def
-        FROM pg_attribute a
-        JOIN pg_class r ON r.oid = a.attrelid
-        LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
-        WHERE r.relname = %s AND a.attname = %s AND r.relnamespace = pg_my_temp_schema();
-    DROP TABLE IF EXISTS %s;
-    IF found_def IS DISTINCT FROM expected_def THEN
-        RAISE EXCEPTION '%s: expected %%, found %%', expected_def, found_def;
-    END IF;
+%s
 END
-$pgdpred$;`,
-		guard, presentMsg,
-		relTable, sqlLit(p.Name),
-		quoteIdent(tempName),
-		quoteIdent(tempName), src,
-		quoteIdent(tempName), quoteIdent(p.Name), *p.Match.ColumnDefault,
-		sqlLit(tempName), sqlLit(p.Name),
-		quoteIdent(tempName),
-		mismatchMsg)
+$pgdpred$;`, guard, presentMsg, defaultCompareBlock(p, "    "))
+}
+
+// constraintCompareBlock renders the round-trip comparison statements for a
+// constraint definitional body: read the live pg_get_constraintdef, canonicalize
+// the MODEL clause through a throwaway temp table, and RAISE (naming object /
+// expected / found) when they differ. The block assumes the owning table exists
+// and the constraint is present (both callers guarantee this before entering it).
+// indent is prepended to every line so the same block nests either at BEGIN level
+// (RenderAssert) or inside an ELSE branch (RenderIdempotentCreate).
+func constraintCompareBlock(p Precondition, indent string) string {
+	src := qualIdent(p.Schema, p.Table)
+	relTable := sqlLit(src)
+	mismatchMsg := escapeLit(fmt.Sprintf("pgdesign precondition violated: %s (definition mismatch)", p.object()))
+	lines := []string{
+		"SELECT pg_get_constraintdef(con.oid) INTO found_def",
+		"    FROM pg_constraint con",
+		fmt.Sprintf("    WHERE con.conrelid = to_regclass(%s) AND con.conname = %s;", relTable, sqlLit(p.Name)),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s;", quoteIdent(tempName)),
+		fmt.Sprintf("CREATE TEMP TABLE %s (LIKE %s);", quoteIdent(tempName), src),
+		fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s %s;", quoteIdent(tempName), quoteIdent("_pgd_c"), p.Match.ConstraintDef),
+		"SELECT pg_get_constraintdef(con.oid) INTO expected_def",
+		"    FROM pg_constraint con",
+		"    JOIN pg_class r ON r.oid = con.conrelid",
+		fmt.Sprintf("    WHERE r.relname = %s AND con.conname = '_pgd_c' AND r.relnamespace = pg_my_temp_schema();", sqlLit(tempName)),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s;", quoteIdent(tempName)),
+		"IF found_def IS DISTINCT FROM expected_def THEN",
+		fmt.Sprintf("    RAISE EXCEPTION '%s: expected %%, found %%', expected_def, found_def;", mismatchMsg),
+		"END IF;",
+	}
+	return indent + strings.Join(lines, "\n"+indent)
+}
+
+// defaultCompareBlock renders the round-trip comparison statements for a column
+// default: read the live pg_get_expr, canonicalize the MODEL default through a
+// throwaway temp table, and RAISE (naming object / expected / found) when they
+// differ. See constraintCompareBlock for the indent contract.
+func defaultCompareBlock(p Precondition, indent string) string {
+	src := qualIdent(p.Schema, p.Table)
+	relTable := sqlLit(src)
+	mismatchMsg := escapeLit(fmt.Sprintf("pgdesign precondition violated: %s (default mismatch)", p.object()))
+	lines := []string{
+		"SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') INTO found_def",
+		"    FROM pg_attribute a",
+		"    LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum",
+		fmt.Sprintf("    WHERE a.attrelid = to_regclass(%s) AND a.attname = %s AND a.attnum > 0 AND NOT a.attisdropped;", relTable, sqlLit(p.Name)),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s;", quoteIdent(tempName)),
+		fmt.Sprintf("CREATE TEMP TABLE %s (LIKE %s);", quoteIdent(tempName), src),
+		fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET DEFAULT %s;", quoteIdent(tempName), quoteIdent(p.Name), *p.Match.ColumnDefault),
+		"SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '') INTO expected_def",
+		"    FROM pg_attribute a",
+		"    JOIN pg_class r ON r.oid = a.attrelid",
+		"    LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum",
+		fmt.Sprintf("    WHERE r.relname = %s AND a.attname = %s AND r.relnamespace = pg_my_temp_schema();", sqlLit(tempName), sqlLit(p.Name)),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s;", quoteIdent(tempName)),
+		"IF found_def IS DISTINCT FROM expected_def THEN",
+		fmt.Sprintf("    RAISE EXCEPTION '%s: expected %%, found %%', expected_def, found_def;", mismatchMsg),
+		"END IF;",
+	}
+	return indent + strings.Join(lines, "\n"+indent)
 }
 
 // okExpr builds the boolean SQL expression that is true iff the precondition's

@@ -9,6 +9,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/predicate"
 	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/pgdesign/internal/sql"
@@ -256,12 +257,31 @@ func generateSQL(schema *model.Schema, opts Options) (string, []diagnostic.Diagn
 	}
 
 	// 8. ALTER TABLE ADD CONSTRAINT ... CHECK
+	// In idempotent mode CHECK constraints route through predicate.RenderIdempotentCreate:
+	// create when absent, and when a same-named constraint is already present, round-trip
+	// the MODEL clause against pg_get_constraintdef and RAISE on definition drift (rather
+	// than silently skipping). Alias-spelled but equivalent clauses converge and do not raise.
 	var ckStmts []string
 	for i := range tables {
 		t := &tables[i]
 		for _, ck := range t.Checks {
 			ckCopy := ck
-			ckStmts = append(ckStmts, sql.AlterTableAddCheck(t.Schema, t.Name, &ckCopy, opts.Idempotent))
+			if opts.Idempotent {
+				name := ckCopy.Name
+				if name == "" {
+					name = sql.ConstraintName(t.Name, "ck")
+				}
+				pre := predicate.Precondition{
+					Class:  predicate.ClassConstraint,
+					Schema: t.Schema,
+					Table:  t.Name,
+					Name:   name,
+					Match:  &predicate.Match{ConstraintDef: fmt.Sprintf("CHECK (%s)", ckCopy.Expr)},
+				}
+				ckStmts = append(ckStmts, predicate.RenderIdempotentCreate(pre, sql.AlterTableAddCheck(t.Schema, t.Name, &ckCopy, false)))
+			} else {
+				ckStmts = append(ckStmts, sql.AlterTableAddCheck(t.Schema, t.Name, &ckCopy, false))
+			}
 		}
 	}
 	if len(ckStmts) > 0 {

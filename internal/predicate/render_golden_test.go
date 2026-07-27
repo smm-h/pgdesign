@@ -100,3 +100,72 @@ $pgdpred$;`,
 		})
 	}
 }
+
+// TestRenderIdempotentCreateGolden pins the DO-block SQL the idempotent-create
+// renderer emits. A definitional-body class (CHECK constraint) creates when absent
+// and round-trips the MODEL clause to RAISE on drift; an existence-only class (enum)
+// degrades to create-if-absent with NO false RAISE. This is the exact SQL shape
+// generate --idempotent now ships for constraints.
+func TestRenderIdempotentCreateGolden(t *testing.T) {
+	cases := []struct {
+		name      string
+		p         Precondition
+		createSQL string
+		want      string
+	}{
+		{
+			name: "constraint: create-if-absent, round-trip RAISE on drift",
+			p: Precondition{
+				Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk",
+				Match: &Match{ConstraintDef: "CHECK (age >= 0)"},
+			},
+			createSQL: `ALTER TABLE "public"."users" ADD CONSTRAINT "users_age_chk" CHECK (age >= 0);`,
+			want: `DO $pgdidem$
+DECLARE
+    found_def text;
+    expected_def text;
+BEGIN
+    IF NOT (EXISTS (SELECT 1 FROM pg_constraint con WHERE con.conrelid = to_regclass('"public"."users"') AND con.conname = 'users_age_chk')) THEN
+        ALTER TABLE "public"."users" ADD CONSTRAINT "users_age_chk" CHECK (age >= 0);
+    ELSE
+        SELECT pg_get_constraintdef(con.oid) INTO found_def
+            FROM pg_constraint con
+            WHERE con.conrelid = to_regclass('"public"."users"') AND con.conname = 'users_age_chk';
+        DROP TABLE IF EXISTS "_pgd_pre_rt";
+        CREATE TEMP TABLE "_pgd_pre_rt" (LIKE "public"."users");
+        ALTER TABLE "_pgd_pre_rt" ADD CONSTRAINT "_pgd_c" CHECK (age >= 0);
+        SELECT pg_get_constraintdef(con.oid) INTO expected_def
+            FROM pg_constraint con
+            JOIN pg_class r ON r.oid = con.conrelid
+            WHERE r.relname = '_pgd_pre_rt' AND con.conname = '_pgd_c' AND r.relnamespace = pg_my_temp_schema();
+        DROP TABLE IF EXISTS "_pgd_pre_rt";
+        IF found_def IS DISTINCT FROM expected_def THEN
+            RAISE EXCEPTION 'pgdesign precondition violated: constraint users_age_chk on public.users (definition mismatch): expected %, found %', expected_def, found_def;
+        END IF;
+    END IF;
+END
+$pgdidem$;`,
+		},
+		{
+			name:      "enum: existence-only create-if-absent (no false RAISE)",
+			p:         Precondition{Class: ClassEnum, Schema: "public", Name: "status"},
+			createSQL: `CREATE TYPE "public"."status" AS ENUM ('a', 'b');`,
+			want: `DO $pgdidem$
+BEGIN
+    IF NOT ((SELECT t.typtype = 'e' FROM pg_type t WHERE t.oid = to_regtype('"public"."status"')) IS TRUE) THEN
+        CREATE TYPE "public"."status" AS ENUM ('a', 'b');
+    END IF;
+END
+$pgdidem$;`,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := RenderIdempotentCreate(c.p, c.createSQL)
+			if got != c.want {
+				t.Errorf("RenderIdempotentCreate mismatch\n--- got ---\n%s\n--- want ---\n%s", got, c.want)
+			}
+		})
+	}
+}

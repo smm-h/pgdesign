@@ -303,6 +303,49 @@ func TestIdempotentMode(t *testing.T) {
 	}
 }
 
+// TestIdempotentCheckConstraintRoundTrip verifies that generate --idempotent emits
+// the create-if-absent-OR-verify DO block for CHECK constraints (roadmap 5.5+5.7):
+// it round-trips the MODEL clause through pg_get_constraintdef and RAISEs on drift,
+// instead of the old silent create-if-absent guard.
+func TestIdempotentCheckConstraintRoundTrip(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:    "accounts",
+				Schema:  "app",
+				Comment: "accounts",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("integer"), NotNull: true},
+					{Name: "age", PGType: typeinfo.MustParse("integer"), NotNull: true},
+				},
+				PK:     []string{"id"},
+				Checks: []model.CheckConstraint{{Name: "ck_accounts_age", Expr: "age >= 0"}},
+			},
+		},
+	}
+
+	out := mustGenerate(t, schema, Options{Idempotent: true, Format: "sql"})
+
+	for _, want := range []string{
+		"DO $pgdidem$",
+		"ALTER TABLE app.accounts ADD CONSTRAINT ck_accounts_age CHECK (age >= 0);",
+		"pg_get_constraintdef(con.oid) INTO found_def",
+		"CREATE TEMP TABLE \"_pgd_pre_rt\" (LIKE \"app\".\"accounts\")",
+		"IF found_def IS DISTINCT FROM expected_def THEN",
+		"(definition mismatch): expected %, found %",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("idempotent CHECK output missing %q, got:\n%s", want, out)
+		}
+	}
+	// The old create-if-absent-only constraint guard (pg_constraint existence with
+	// no drift RAISE) must NOT be what a CHECK renders now.
+	if strings.Contains(out, "IF NOT EXISTS (\n    SELECT 1 FROM pg_constraint") {
+		t.Errorf("CHECK still uses the silent create-if-absent guard, got:\n%s", out)
+	}
+}
+
 // TestIdempotentMode_StateMachineEnum verifies that a state machine type
 // (which materializes as an enum during Build) also gets the valid DO-block
 // idempotent form, never CREATE TYPE IF NOT EXISTS.
