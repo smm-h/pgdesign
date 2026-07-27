@@ -1,9 +1,24 @@
 package migrate
 
 import (
+	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// TestSquashMigrations_RequiresDB verifies the 0.6(d) stopgap: the exported
+// SquashMigrations refuses to run without a database connection, since the
+// M200 applied-version safety check is mandatory.
+func TestSquashMigrations_RequiresDB(t *testing.T) {
+	_, err := SquashMigrations(context.Background(), nil, t.TempDir(), "0.1.0", "0.2.0")
+	if err == nil {
+		t.Fatal("expected error when conn is nil (mandatory M200 check)")
+	}
+	if !strings.Contains(err.Error(), "database connection") {
+		t.Errorf("expected error about the required database connection, got: %v", err)
+	}
+}
 
 func TestSquashMigrations_Basic(t *testing.T) {
 	dir := t.TempDir()
@@ -50,7 +65,7 @@ func TestSquashMigrations_Basic(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 	WriteMigrationFile(filepath.Join(dir, "0.3.0.toml"), m3)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.3.0")
+	result, err := squashFiles(dir, "0.1.0", "0.3.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -119,7 +134,7 @@ func TestSquashMigrations_InversePairCancellation(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -164,7 +179,7 @@ func TestSquashMigrations_MergeAlterColumnType(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -209,7 +224,7 @@ func TestSquashMigrations_IrreversiblePropagation(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -228,7 +243,7 @@ func TestSquashMigrations_InvalidRange(t *testing.T) {
 	dir := t.TempDir()
 
 	// from > to
-	_, err := SquashMigrations(dir, "0.2.0", "0.1.0")
+	_, err := squashFiles(dir, "0.2.0", "0.1.0")
 	if err == nil {
 		t.Fatal("expected error for from > to")
 	}
@@ -237,12 +252,12 @@ func TestSquashMigrations_InvalidRange(t *testing.T) {
 func TestSquashMigrations_InvalidSemver(t *testing.T) {
 	dir := t.TempDir()
 
-	_, err := SquashMigrations(dir, "not-semver", "0.1.0")
+	_, err := squashFiles(dir, "not-semver", "0.1.0")
 	if err == nil {
 		t.Fatal("expected error for invalid from")
 	}
 
-	_, err = SquashMigrations(dir, "0.1.0", "not-semver")
+	_, err = squashFiles(dir, "0.1.0", "not-semver")
 	if err == nil {
 		t.Fatal("expected error for invalid to")
 	}
@@ -259,7 +274,7 @@ func TestSquashMigrations_SingleMigration(t *testing.T) {
 	}
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m)
 
-	_, err := SquashMigrations(dir, "0.1.0", "0.1.0")
+	_, err := squashFiles(dir, "0.1.0", "0.1.0")
 	if err == nil {
 		t.Fatal("expected error for single migration")
 	}
@@ -276,7 +291,7 @@ func TestSquashMigrations_NoMigrationsInRange(t *testing.T) {
 	}
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m)
 
-	_, err := SquashMigrations(dir, "0.5.0", "0.9.0")
+	_, err := squashFiles(dir, "0.5.0", "0.9.0")
 	if err == nil {
 		t.Fatal("expected error for no migrations in range")
 	}
@@ -302,7 +317,7 @@ func TestSquashMigrations_PreservesOutOfRangeMigrations(t *testing.T) {
 		WriteMigrationFile(filepath.Join(dir, v+".toml"), m)
 	}
 
-	result, err := SquashMigrations(dir, "0.2.0", "0.3.0")
+	result, err := squashFiles(dir, "0.2.0", "0.3.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -357,7 +372,7 @@ func TestSquashMigrations_WithDMLOps(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -403,7 +418,7 @@ func TestSquashMigrations_RoundTrip(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -563,7 +578,7 @@ func TestSquashMigrations_ConsolidateIntoCreateTable(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 	WriteMigrationFile(filepath.Join(dir, "0.3.0.toml"), m3)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.3.0")
+	result, err := squashFiles(dir, "0.1.0", "0.3.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -625,7 +640,7 @@ func TestSquashMigrations_ConsolidateOnlyMatchingTable(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 	WriteMigrationFile(filepath.Join(dir, "0.3.0.toml"), m3)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.3.0")
+	result, err := squashFiles(dir, "0.1.0", "0.3.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -688,7 +703,7 @@ func TestSquashMigrations_ConsolidatedRoundTrip(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -746,7 +761,7 @@ func TestSquashMigrations_ConsolidateExclusion(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -794,7 +809,7 @@ func TestSquashMigrations_StripPhases(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}
@@ -830,7 +845,7 @@ func TestSquashMigrations_StripPhasesFromConsolidated(t *testing.T) {
 	WriteMigrationFile(filepath.Join(dir, "0.1.0.toml"), m1)
 	WriteMigrationFile(filepath.Join(dir, "0.2.0.toml"), m2)
 
-	result, err := SquashMigrations(dir, "0.1.0", "0.2.0")
+	result, err := squashFiles(dir, "0.1.0", "0.2.0")
 	if err != nil {
 		t.Fatalf("SquashMigrations: %v", err)
 	}

@@ -683,45 +683,20 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 			}
 
 			dbURL := kwargs["db"].(string)
-			if dbURL != "" {
-				ctx := context.Background()
-				conn, err := pgx.Connect(ctx, dbURL)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error: connect for safety check: %v\n", err)
-					return strictcli.Exit(1)
-				}
-				defer conn.Close(ctx)
-
-				if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
-					fmt.Fprintf(os.Stderr, "error: %v\n", err)
-					return strictcli.Exit(1)
-				}
-
-				applied, err := migrate.AppliedVersions(ctx, conn)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "error: %v\n", err)
-					return strictcli.Exit(1)
-				}
-
-				var appliedInRange []string
-				for _, v := range applied {
-					if migrate.InSemverRange(v, from, to) {
-						appliedInRange = append(appliedInRange, v)
-					}
-				}
-
-				if len(appliedInRange) > 0 {
-					diags := []diagnostic.Diagnostic{{
-						Severity: diagnostic.Error,
-						Code:     "M200",
-						Message:  fmt.Sprintf("cannot squash: %d migration(s) in range [%s, %s] have been applied: %v; squashing would desynchronize the tracking table", len(appliedInRange), from, to, appliedInRange),
-					}}
-					fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
-					return strictcli.Exit(1)
-				}
+			if dbURL == "" {
+				fmt.Fprintln(os.Stderr, "error: --db is required for migrate squash (the M200 applied-version safety check is mandatory; offline squash is not permitted)")
+				return strictcli.Exit(1)
 			}
 
-			result, err := migrate.SquashMigrations(dir, from, to)
+			ctx := context.Background()
+			conn, err := pgx.Connect(ctx, dbURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: connect for safety check: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			defer conn.Close(ctx)
+
+			result, err := migrate.SquashMigrations(ctx, conn, dir, from, to)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
@@ -772,7 +747,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 			strictcli.StringFlag("from", "First migration version to include in the squash range"),
 			strictcli.StringFlag("to", "Last migration version to include in the squash range"),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
-			strictcli.StringFlag("db", "PostgreSQL connection URL for pre-squash safety check", strictcli.Default("")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL (REQUIRED) for the mandatory M200 applied-version safety check"),
 		),
 	)
 }

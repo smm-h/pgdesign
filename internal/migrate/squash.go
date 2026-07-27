@@ -1,8 +1,11 @@
 package migrate
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // SquashResult holds the result of a squash operation.
@@ -17,7 +20,45 @@ type SquashResult struct {
 
 // SquashMigrations squashes all migrations in the given directory from version
 // `from` to version `to` (both inclusive) into a single migration.
-func SquashMigrations(dir, from, to string) (*SquashResult, error) {
+//
+// It is a MANDATORY-DB operation: the caller must supply a live connection so
+// the M200 applied-version safety check can run. Squashing a range that
+// contains applied migrations would desynchronize the tracking table, so the
+// operation refuses. This blocks offline squash even of never-applied ranges
+// (a deliberate stopgap; the durable fix is the phase-5 op-chain rewrite).
+//
+// This does NOT fix the squash rewrite mechanics (orphaned ops from
+// dependency-unaware pair cancellation remain); it only prevents squashing an
+// applied range.
+func SquashMigrations(ctx context.Context, conn *pgx.Conn, dir, from, to string) (*SquashResult, error) {
+	if conn == nil {
+		return nil, fmt.Errorf("migrate squash requires a database connection (--db) for the M200 applied-version safety check; offline squash is not permitted, even for never-applied ranges")
+	}
+
+	// M200: refuse to squash a range that contains any applied migration.
+	if err := EnsureMigrationsTable(ctx, conn); err != nil {
+		return nil, err
+	}
+	applied, err := AppliedVersions(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+	var appliedInRange []string
+	for _, v := range applied {
+		if InSemverRange(v, from, to) {
+			appliedInRange = append(appliedInRange, v)
+		}
+	}
+	if len(appliedInRange) > 0 {
+		return nil, fmt.Errorf("M200: cannot squash: %d migration(s) in range [%s, %s] have been applied: %v; squashing would desynchronize the tracking table", len(appliedInRange), from, to, appliedInRange)
+	}
+
+	return squashFiles(dir, from, to)
+}
+
+// squashFiles performs the pure file-level squash mechanics with no database
+// interaction. SquashMigrations wraps it with the M200 safety check.
+func squashFiles(dir, from, to string) (*SquashResult, error) {
 	// Validate semver format.
 	if _, _, _, err := semverParts(from); err != nil {
 		return nil, fmt.Errorf("invalid --from version %q: %w", from, err)
