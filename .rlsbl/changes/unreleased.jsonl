@@ -103,3 +103,4 @@
 {"id":"18c62d595b063da72d6ce322090e4cf48850489766c74792","commits":["be8e36b18575ed5aac26bf742f523ead429eb2f9"],"user_facing":true,"description":"`build` now hard-errors when a Go `gorm` codegen output is split from the Go `constraints` that reference its row structs and enums, and when Go `types` and `gorm` target the same directory (duplicate row-struct definitions that never compiled).","type":"fix"}
 {"id":"18c62d59fdbe249b3cc915473b89421587d90fc047a18028","commits":["3fce1626252b5a362cb87b93f0876f5ebd3e7dde"],"user_facing":false}
 {"id":"18c62e8bbed430ae4159fbe2ad6447958185f49b2d941aaa","commits":["dda376dee092ce254e19a5a637589926af6220b0"],"user_facing":false}
+{"id":"18c62f7e9be8bce2ba5fc4dd6da24f31923a1dfb452a0d01","commits":["a3c3d980d7b5533b47274fb7ce4bd3a6894c9a44"],"user_facing":false}
