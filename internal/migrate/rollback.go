@@ -40,6 +40,14 @@ func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTim
 	}
 	latest := applied[len(applied)-1]
 
+	// A baseline row applied NOTHING (its schema pre-existed pgdesign); running
+	// its file down-ops would DROP objects pgdesign never created — a data-loss
+	// bug. Baseline rows are recorded with the checksum literal "baseline"
+	// (baseline.go). Refuse to reverse them (roadmap 5.6).
+	if err := refuseBaselineRow(ctx, conn, latest); err != nil {
+		return "", err
+	}
+
 	// Load the migration file.
 	path := filepath.Join(migrationsDir, latest+".toml")
 	m, err := ParseMigrationFile(path)
@@ -204,8 +212,13 @@ func RollbackTo(ctx context.Context, conn *pgx.Conn, migrationsDir, targetVersio
 	}
 
 	// Pre-check: load and verify reversibility of ALL migrations before starting.
+	// A baseline row applied nothing; reversing its file down-ops would DROP
+	// objects pgdesign never created (roadmap 5.6). Refuse before any execution.
 	migrations := make([]*Migration, len(toRollback))
 	for i, version := range toRollback {
+		if err := refuseBaselineRow(ctx, conn, version); err != nil {
+			return nil, fmt.Errorf("cannot rollback to %s: %w", targetVersion, err)
+		}
 		path := filepath.Join(migrationsDir, version+".toml")
 		m, err := ParseMigrationFile(path)
 		if err != nil {
@@ -316,6 +329,26 @@ func RollbackTo(ctx context.Context, conn *pgx.Conn, migrationsDir, targetVersio
 	}
 
 	return rolledBack, nil
+}
+
+// refuseBaselineRow returns a hard error when the recorded migration is a
+// baseline row (checksum literal "baseline"). A baseline row records that the
+// database's schema was adopted as-is — pgdesign applied NOTHING — so there are
+// no real effects to reverse. Running the migration file's down-ops against such
+// a row DROPs objects pgdesign never created (the live data-loss bug, roadmap
+// 5.6). The recorded checksum is the durable, DB-side signal that survives even
+// when the file bytes have drifted.
+func refuseBaselineRow(ctx context.Context, conn *pgx.Conn, version string) error {
+	var checksum string
+	err := conn.QueryRow(ctx,
+		"SELECT checksum FROM pgdesign_migrations WHERE version = $1", version).Scan(&checksum)
+	if err != nil {
+		return fmt.Errorf("read checksum for %s: %w", version, err)
+	}
+	if checksum == "baseline" {
+		return fmt.Errorf("migration %s is a baseline row (it applied nothing) — refusing to run its file down-ops, which would DROP objects pgdesign never created", version)
+	}
+	return nil
 }
 
 // checkReversibility verifies that all ops in the migration have reversible
