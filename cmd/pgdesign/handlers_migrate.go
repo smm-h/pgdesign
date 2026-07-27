@@ -394,7 +394,6 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write", strictcli.Default("migrations")),
 			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing", strictcli.Default(false)),
-			strictcli.IntFlag("timeout", "Advisory lock acquisition timeout in seconds before aborting", strictcli.Default(30)),
 		),
 	)
 }

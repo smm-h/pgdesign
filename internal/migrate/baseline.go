@@ -107,7 +107,7 @@ func Baseline(ctx context.Context, conn *pgx.Conn, migrationsDir string, targetV
 	if maxApplied != "" {
 		for _, mf := range toRecord {
 			if compareSemver(mf.version, maxApplied) < 0 && !existingSet[mf.version] {
-				return fmt.Errorf("out-of-order migration detected: version %s was discovered but version %s is already applied; this migration file appears to have been added after later versions were applied -- use 'migrate baseline --adopt' to explicitly confirm adoption of out-of-order migrations", mf.version, maxApplied)
+				return fmt.Errorf("out-of-order migration detected: version %s was discovered but version %s is already applied; this migration file appears to have been added after later versions were applied -- resolve the ordering (renumber or apply the missing versions) before baselining", mf.version, maxApplied)
 			}
 		}
 	}
