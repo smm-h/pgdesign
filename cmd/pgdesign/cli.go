@@ -25,6 +25,12 @@ func main() {
 
 	app := strictcli.NewApp("pgdesign", Version, "PostgreSQL schema compiler",
 		strictcli.WithChecksEmbed(checksToml),
+		// PGDESIGN_DB is the single connection env for every database-backed
+		// command and check. Every --db / --live flag binds to it via
+		// ConnectionURLFlag (registration-time enforcement prevents an unbound
+		// DB-URL flag). It is hermetic-suppressed: under --hermetic, DB work
+		// resolves as absent and skips visibly instead of connecting.
+		strictcli.WithConnectionEnv("PGDESIGN_DB", "PostgreSQL connection URL for database-backed commands and checks"),
 	)
 
 	app.SetCheckContext(func() strictcli.CheckContext {

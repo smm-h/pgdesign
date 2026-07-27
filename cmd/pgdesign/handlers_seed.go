@@ -122,7 +122,7 @@ func registerSeedCmd(app *strictcli.App) {
 			strictcli.IntFlag("seed", "Random number generator seed for deterministic output", strictcli.Default(nil)),
 			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
 			strictcli.BoolFlag("apply", "Insert generated seed data directly into the database", strictcli.Default(false)),
-			strictcli.StringFlag("db", "PostgreSQL connection URL, required when using --apply", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL, required when using --apply", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("schema", "PostgreSQL schema name to filter seed generation to", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.StringFlag("format", "SQL output format for generated seed data statements", strictcli.Default("insert"), strictcli.Choices("insert", "copy")),
 			strictcli.BoolFlag("clean", "Emit TRUNCATE CASCADE statements before inserting seeds", strictcli.Default(false)),

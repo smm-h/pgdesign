@@ -57,6 +57,18 @@ func kwargsOptString(kwargs map[string]interface{}, key string) *string {
 	return &s
 }
 
+// kwargsDBURL extracts the resolved value of a ConnectionURLFlag-bound --db
+// flag. The flag is optional at parse time (Default(nil)) with a PGDESIGN_DB env
+// fallback handled by the framework (cli > env, hermetic-suppressed); this
+// returns "" when neither the flag nor the env supplied a value, so a command
+// that requires a database can enforce it loudly at the handler.
+func kwargsDBURL(kwargs map[string]interface{}) string {
+	if v := kwargsOptString(kwargs, "db"); v != nil {
+		return *v
+	}
+	return ""
+}
+
 // kwargsOptInt extracts an optional int flag. Returns nil when not provided.
 func kwargsOptInt(kwargs map[string]interface{}, key string) *int {
 	v := kwargs[key]

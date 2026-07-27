@@ -85,7 +85,7 @@ func registerStatsCmd(app *strictcli.App) {
 	app.Command("stats", "Analyze database statistics, index usage, and health",
 		handleStats,
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.BoolFlag("json", "Output all statistics in machine-readable JSON format", strictcli.Default(false)),
 			strictcli.StringFlag("schema", "PostgreSQL schema name to analyze (repeatable for multiple)", strictcli.Repeatable(), strictcli.Unique(true)),
 		),
@@ -96,7 +96,7 @@ func registerStatsCmd(app *strictcli.App) {
 }
 
 func handleStats(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-	dbURL := kwargs["db"].(string)
+	dbURL := kwargsDBURL(kwargs)
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for stats")
 		return strictcli.Exit(1)

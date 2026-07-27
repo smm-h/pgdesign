@@ -14,7 +14,7 @@ func registerServeCmd(app *strictcli.App) {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for serve")
 				return strictcli.Exit(1)
@@ -62,7 +62,7 @@ func registerServeCmd(app *strictcli.App) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.IntFlag("port", "TCP port number for the HTTP API server to listen on", strictcli.Default(8080)),
 			strictcli.StringFlag("schema", "PostgreSQL schema name to serve via the API (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.IntFlag("timeout", "Maximum time in seconds for each HTTP request to complete", strictcli.Default(30)),

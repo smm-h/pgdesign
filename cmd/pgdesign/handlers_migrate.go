@@ -38,7 +38,7 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate plan")
 				return strictcli.Exit(1)
@@ -194,7 +194,7 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 		),
 		strictcli.WithArgs(
@@ -221,7 +221,7 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate generate")
 				return strictcli.Exit(1)
@@ -334,7 +334,7 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("version", "Semantic version string for the generated migration", strictcli.Default(nil)),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 		),
@@ -350,7 +350,7 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate apply")
 				return strictcli.Exit(1)
@@ -405,7 +405,7 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing", strictcli.Default(false)),
 		),
@@ -500,7 +500,7 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate rollback")
 				return strictcli.Exit(1)
@@ -555,7 +555,7 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.StringFlag("to", "Target version to rollback to (exclusive -- this version stays applied)", strictcli.Default("")),
 		),
@@ -567,7 +567,7 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 			cfgOverride := kwargsConfigOverride(kwargs)
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate status")
 				return strictcli.Exit(1)
@@ -644,7 +644,7 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 		),
 	)
@@ -686,7 +686,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate squash (the M200 applied-version safety check is mandatory; offline squash is not permitted)")
 				return strictcli.Exit(1)
@@ -751,7 +751,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 			strictcli.StringFlag("from", "First migration version to include in the squash range"),
 			strictcli.StringFlag("to", "Last migration version to include in the squash range"),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
-			strictcli.StringFlag("db", "PostgreSQL connection URL (REQUIRED) for the mandatory M200 applied-version safety check"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL (REQUIRED) for the mandatory M200 applied-version safety check", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),
 	)
 }
@@ -762,7 +762,7 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate test")
 				return strictcli.Exit(1)
@@ -950,7 +950,7 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.IntFlag("timeout", "Maximum time in seconds before the test run is aborted", strictcli.Default(60)),
 			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema", strictcli.Default(false)),
@@ -1242,7 +1242,7 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
 
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate baseline")
 				return strictcli.Exit(1)
@@ -1283,7 +1283,7 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.StringFlag("version", "Version label for the baseline record"),
 			strictcli.StringFlag("description", "Human-readable description", strictcli.Default("Initial baseline")),

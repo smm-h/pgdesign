@@ -122,7 +122,7 @@ func registerDiffCmd(app *strictcli.App) {
 		},
 		strictcli.WithFlags(
 			strictcli.BoolFlag("json", "Output the schema diff in machine-readable JSON format", strictcli.Default(false)),
-			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil)),
+			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("against", "Path to TOML schema file or directory to compare against", strictcli.Default(nil)),
 			strictcli.StringFlag("base", "Git ref to compare the current schema against (e.g., main)", strictcli.Default(nil)),
 		),

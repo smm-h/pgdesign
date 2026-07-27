@@ -18,7 +18,7 @@ import (
 func registerTestdbSetupCmd(g *strictcli.Group) {
 	g.Command("setup", "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.",
 		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for testdb setup")
 				return strictcli.Exit(1)
@@ -54,7 +54,7 @@ func registerTestdbSetupCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("ddl", "Path to the SQL DDL file to apply to the test database"),
 		),
 	)
@@ -63,7 +63,7 @@ func registerTestdbSetupCmd(g *strictcli.Group) {
 func registerTestdbTeardownCmd(g *strictcli.Group) {
 	g.Command("teardown", "Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.",
 		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for testdb teardown")
 				return strictcli.Exit(1)
@@ -95,7 +95,7 @@ func registerTestdbTeardownCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),
 	)
 }
@@ -103,7 +103,7 @@ func registerTestdbTeardownCmd(g *strictcli.Group) {
 func registerTestdbGCCmd(g *strictcli.Group) {
 	g.Command("gc", "Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.",
 		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			dbURL := kwargs["db"].(string)
+			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for testdb gc")
 				return strictcli.Exit(1)
@@ -160,7 +160,7 @@ func registerTestdbGCCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("older-than", "Drop databases older than this duration (e.g., 2h, 30m)"),
 		),
 	)
