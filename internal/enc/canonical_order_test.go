@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // TestViewDependsOnIsCanonical: a view's DependsOn is a dependency SET, so two
@@ -85,5 +86,49 @@ func TestFunctionDependsOnIsCanonical(t *testing.T) {
 	}
 	if !bytes.Equal(a, b) {
 		t.Fatalf("function DependsOn order not canonicalized (must be a sorted set):\n%s\n%s", a, b)
+	}
+}
+
+// TestPartitionChildrenAreCanonical: partition children are a CANONICAL-ONLY set
+// (bound-distinguished), so two tables whose child partitions are declared in
+// different orders must encode identically. Canonicalize sorts children by name
+// recursively.
+func TestPartitionChildrenAreCanonical(t *testing.T) {
+	mk := func(children []model.PartitionSpec) *model.Schema {
+		s := &model.Schema{
+			Name: "public",
+			Tables: []model.Table{
+				{
+					Name: "events", Schema: "public", Comment: "partitioned",
+					Columns: []model.Column{
+						{Name: "id", PGType: typeinfo.Type{Base: "int4"}, NotNull: true},
+						{Name: "ts", PGType: typeinfo.Type{Base: "timestamptz"}, NotNull: true},
+					},
+					PK: []string{"id", "ts"},
+					Partitioning: &model.PartitionSpec{
+						Strategy: "RANGE",
+						Columns:  []string{"ts"},
+						Children: children,
+					},
+				},
+			},
+		}
+		s.Canonicalize()
+		return s
+	}
+	childA := model.PartitionSpec{Name: "events_2024_01", Bound: "FROM ('2024-01-01') TO ('2024-02-01')"}
+	childB := model.PartitionSpec{Name: "events_2024_02", Bound: "FROM ('2024-02-01') TO ('2024-03-01')"}
+	childC := model.PartitionSpec{Name: "events_2024_03", Bound: "FROM ('2024-03-01') TO ('2024-04-01')"}
+
+	a, err := EncodeTable(mk([]model.PartitionSpec{childA, childB, childC}).Tables[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := EncodeTable(mk([]model.PartitionSpec{childC, childA, childB}).Tables[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(a, b) {
+		t.Fatalf("partition children order not canonicalized (must be a sorted set):\n%s\n%s", a, b)
 	}
 }

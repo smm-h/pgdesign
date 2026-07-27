@@ -74,7 +74,14 @@ func (s *Schema) Canonicalize() {
 		sort.Strings(s.Functions[i].DependsOn)
 	}
 
-	// 1e. Topological ordering with alphabetical tie-break. Tables carry
+	// 1e. Partition children are a CANONICAL-ONLY set (each child is
+	// bound-distinguished, so PostgreSQL does not observe their declaration
+	// order); sort recursively by child name so permutations converge.
+	for i := range s.Tables {
+		canonicalizePartition(s.Tables[i].Partitioning)
+	}
+
+	// 1f. Topological ordering with alphabetical tie-break. Tables carry
 	// CycleGroups (used for cycle-safe DDL); views/matviews/functions fall
 	// back to a deterministic order even under a cycle (which PostgreSQL
 	// rejects at apply time anyway).
@@ -86,6 +93,19 @@ func (s *Schema) Canonicalize() {
 	// 2. Rebuild derived structures from the canonical tables.
 	s.buildTablesByName()
 	s.BuildFKGraph()
+}
+
+// canonicalizePartition recursively sorts a partition subtree's children by
+// child name. Children are a CANONICAL-ONLY set (bound-distinguished), so their
+// declaration order is not observable and must not affect identity.
+func canonicalizePartition(p *PartitionSpec) {
+	if p == nil {
+		return
+	}
+	sort.Slice(p.Children, func(a, b int) bool { return p.Children[a].Name < p.Children[b].Name })
+	for i := range p.Children {
+		canonicalizePartition(&p.Children[i])
+	}
 }
 
 // topoSortViewsStable orders views by their DependsOn edges with an

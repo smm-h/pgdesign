@@ -57,6 +57,12 @@ the normalizer N lands, roadmap 1.2.)
 | `Table.Triggers` | CANONICAL-ONLY (name-sorted) | — | PG fires same-event triggers in **name** order, so name-canonicalization coincides with firing order |
 | `Table.Dependencies` | CANONICAL-ONLY | CANONICAL-ONLY (determinant/dependent sorted) | declared FDs; each FD is a set→set |
 
+## Materialized view
+
+| Collection | Collection order | Intra-object order | Notes |
+|---|---|---|---|
+| `MaterializedView.Indexes` | CANONICAL-ONLY (name-sorted) | — | index set; `Canonicalize` sorts by name (same rule as `Table.Indexes`) |
+
 ## Intra-object element orders
 
 | Collection | Intra-object order | Notes |
