@@ -23,7 +23,10 @@ Op identity is `(edge_id, seq)`: `edge_id` is the content-derived edge identity
 - `phase` — `''` (single-phase) or `expand`/`migrate`/`contract`.
 - `op_kind` — op family (`create_table`, `add_column`, `dml`, `raw`, …).
 - `target` — `enc.Key.String()` of the op's target object; a pseudo-key for
-  DML/RawSQL ops (see the TENSION on op targets below).
+  DML/RawSQL ops (`dml:<edge-seq>` / `raw:<edge-seq>`, grammar pinned in
+  `edge_format.md` TENSION 2). This column is one of the two homes of a
+  pseudo-target key (the other is the edge's op projection); pseudo-keys never
+  appear in a manifest or the consistency checker.
 - `invertibility` — the UP op's L4 class.
 - `down_op` — the serialized down-op reference `{kind,target,invertibility,payload_id}`
   resolvable via objstore; `NULL` iff the op is non-invertible (CHECK-enforced).
@@ -86,6 +89,15 @@ HAVING bool_and(status = 'confirmed');
   `old.applied_at`. Verbatim preservation is a FOLD-TIME action, not a view
   branch. This is precisely what lets the upgrade's
   ASSERT-view-reproduces-snapshot step pass on its own columns (5.0/5.2).
+- **One view row per prefix migration (edge_id distinctness).** The view groups
+  by `edge_id` (§ the view), so the fold MUST give each old tracking row a
+  DISTINCT `edge_id` or two old migrations would collapse into one grouped row.
+  The fold does exactly this: it mints a distinct synthetic revision per old row
+  (the per-database synthetic-prefix revision, 5.2), and the synthetic op's
+  `edge_id` is derived from that per-row synthetic revision — so the `GROUP BY
+  edge_id` yields exactly ONE row per prefix migration, never a merge. The single
+  synthetic op is that edge's only op, so `bool_and(status = 'confirmed')` is
+  trivially true and `max(confirmed_at)` is `old.applied_at` verbatim.
 
 ## pgdesign_chain_position
 

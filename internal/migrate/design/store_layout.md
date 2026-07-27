@@ -48,8 +48,16 @@ example: `testdata/revision-shop.json`; pinned by `revision_roundtrip_test.go`.
 - **Reconstruction path (5.9's "deserialize head manifest via objstore"):**
   resolve each id via `objstore.Get`, decode with `enc.DecodeObject`,
   `Canonicalize`, and `rev.Compute(model, class)` — the result MUST equal
-  `revision`. `revision_roundtrip_test.go` mechanically checks this, and that the
-  cross-class `Equal` does not error (class marker preserved).
+  `revision`. A cross-class `rev.Equal` MUST ERROR (L7): comparing revisions of
+  different model classes is a type error, never a silent `false`. What the
+  fixture PINS is the opposite success condition: because the revision FILE
+  carries the class and reconstruction reads `class` back from the file, the
+  re-derived revision is the SAME class as the recorded one, so `Equal` returns a
+  clean `(bool, nil)` and the comparison SUCCEEDS. If the class marker were lost
+  the reconstruction would land in a different class and `Equal` would error —
+  which is precisely how `revision_roundtrip_test.go` mechanically proves the
+  class carriage: it asserts `Equal` returns no error (same-class), then asserts
+  equal.
 
 The authoritative revision remains `rev.Compute` over the whole-model form; the
 manifest file is the store-facing index over the same per-object bytes. Storing
