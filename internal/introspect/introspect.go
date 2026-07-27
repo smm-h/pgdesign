@@ -5,13 +5,13 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 	pg "github.com/pganalyze/pg_query_go/v6"
 	pg_query "github.com/wasilibs/go-pgquery"
 
+	"github.com/smm-h/pgdesign/internal/catalog"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/pgcap"
@@ -362,26 +362,11 @@ func applyEnumTypeKinds(schema *model.Schema) {
 }
 
 // queryPGVersion returns the major PostgreSQL version number.
+// queryPGVersion delegates to the shared scoped catalog layer (roadmap 5.5+5.7),
+// the single place per-object pg_catalog queries live, so introspect and the
+// migration predicate executor never grow divergent version probes.
 func queryPGVersion(ctx context.Context, conn *pgx.Conn) (int, error) {
-	var versionStr string
-	err := conn.QueryRow(ctx, "SHOW server_version").Scan(&versionStr)
-	if err != nil {
-		return 0, err
-	}
-	// Parse major version from strings like "17.5 (Fedora 17.5-1.fc42)"
-	// or "16.2" or "15.0beta1".
-	parts := strings.SplitN(versionStr, ".", 2)
-	if len(parts) == 0 {
-		return 0, fmt.Errorf("cannot parse version %q", versionStr)
-	}
-	// The major version part may contain non-digits in beta/rc versions,
-	// but the leading digits are the major version.
-	majorStr := strings.TrimSpace(parts[0])
-	major, err := strconv.Atoi(majorStr)
-	if err != nil {
-		return 0, fmt.Errorf("cannot parse major version from %q: %w", versionStr, err)
-	}
-	return major, nil
+	return catalog.Version(ctx, conn)
 }
 
 // queryExtensions returns installed extensions (excluding plpgsql).
