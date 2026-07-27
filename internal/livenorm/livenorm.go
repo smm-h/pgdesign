@@ -104,12 +104,21 @@ func (n *Normalizer) roundTrip(schema, table, expr string) (string, bool) {
 		return "", false
 	}
 
+	// Scope the lookup to THIS session's own temp namespace. The temp table
+	// name (_pgd_rt_<counter>) and the constraint name (_pgd_c) are per-session
+	// but NOT globally unique: a concurrent session's counter starts at 0 too,
+	// so two sessions can both hold a _pgd_rt_1 with a _pgd_c constraint (each in
+	// its own pg_temp_N schema, both visible in pg_class). Without the namespace
+	// scope this query could match — or ambiguously pick between — the OTHER
+	// session's constraint. pg_my_temp_schema() is the OID of the current
+	// session's temp namespace, so it isolates the lookup to our own temp object.
 	var def string
 	err := n.conn.QueryRow(n.ctx,
 		`SELECT pg_get_constraintdef(c.oid)
 		   FROM pg_constraint c
 		   JOIN pg_class r ON r.oid = c.conrelid
-		  WHERE r.relname = $1 AND c.conname = '_pgd_c'`,
+		  WHERE r.relname = $1 AND c.conname = '_pgd_c'
+		    AND r.relnamespace = pg_my_temp_schema()`,
 		tmp,
 	).Scan(&def)
 	if err != nil {

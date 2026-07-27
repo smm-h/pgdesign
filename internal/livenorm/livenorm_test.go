@@ -3,6 +3,7 @@ package livenorm
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -124,5 +125,82 @@ func TestForwardSimulationFallback(t *testing.T) {
 	// what adds the ::text on the reachable path).
 	if got == sqlparse.NormalizeExpr("status = 'active'::text") {
 		t.Error("forward-sim unexpectedly materialized the catalog cast")
+	}
+}
+
+// TestRoundTripNamespaceScoped is the concurrent-session regression: two
+// sessions each create a temp table with the SAME name (_pgd_rt_1) carrying a
+// _pgd_c constraint (per-session counters both start at 0, so the names are not
+// globally unique). Both temp tables are visible in the shared catalog, so a
+// lookup keyed only on relname + conname collides across sessions. The fix
+// scopes the lookup to pg_my_temp_schema(), isolating each session to its own
+// temp object. This test proves the collision exists (unscoped count == 2) and
+// that the scoped lookup returns each session's OWN constraint.
+func TestRoundTripNamespaceScoped(t *testing.T) {
+	testdb.SkipIfNoPostgres(t)
+	ctx := context.Background()
+	url := testDBURL()
+
+	admin, err := pgx.Connect(ctx, url)
+	if err != nil {
+		t.Skipf("connect: %v", err)
+	}
+	defer admin.Close(ctx)
+	if _, err := admin.Exec(ctx, `DROP TABLE IF EXISTS livenorm_ns`); err != nil {
+		t.Fatalf("drop pre-existing: %v", err)
+	}
+	if _, err := admin.Exec(ctx, `CREATE TABLE livenorm_ns (price int NOT NULL)`); err != nil {
+		t.Fatalf("create table: %v", err)
+	}
+	defer admin.Exec(ctx, `DROP TABLE IF EXISTS livenorm_ns`)
+
+	// Two independent sessions, each with a colliding _pgd_rt_1 / _pgd_c.
+	setup := func(check string) *pgx.Conn {
+		c, err := pgx.Connect(ctx, url)
+		if err != nil {
+			t.Skipf("connect session: %v", err)
+		}
+		if _, err := c.Exec(ctx, `CREATE TEMP TABLE _pgd_rt_1 (LIKE livenorm_ns)`); err != nil {
+			t.Fatalf("create temp: %v", err)
+		}
+		if _, err := c.Exec(ctx, `ALTER TABLE _pgd_rt_1 ADD CONSTRAINT _pgd_c CHECK (`+check+`)`); err != nil {
+			t.Fatalf("add check: %v", err)
+		}
+		return c
+	}
+	connA := setup("price > 111")
+	defer connA.Close(ctx)
+	connB := setup("price > 222")
+	defer connB.Close(ctx)
+
+	// The collision is real: keyed on relname+conname alone, both sessions'
+	// constraints match.
+	var unscoped int
+	if err := connA.QueryRow(ctx,
+		`SELECT count(*) FROM pg_constraint c JOIN pg_class r ON r.oid = c.conrelid
+		  WHERE r.relname = '_pgd_rt_1' AND c.conname = '_pgd_c'`).Scan(&unscoped); err != nil {
+		t.Fatalf("unscoped count: %v", err)
+	}
+	if unscoped < 2 {
+		t.Fatalf("expected the cross-session collision to be visible (>=2 matches), got %d", unscoped)
+	}
+
+	// The scoped lookup (the one roundTrip uses) returns each session's OWN def.
+	scoped := func(c *pgx.Conn) string {
+		var def string
+		if err := c.QueryRow(ctx,
+			`SELECT pg_get_constraintdef(c.oid) FROM pg_constraint c
+			   JOIN pg_class r ON r.oid = c.conrelid
+			  WHERE r.relname = '_pgd_rt_1' AND c.conname = '_pgd_c'
+			    AND r.relnamespace = pg_my_temp_schema()`).Scan(&def); err != nil {
+			t.Fatalf("scoped lookup: %v", err)
+		}
+		return def
+	}
+	if defA := scoped(connA); !strings.Contains(defA, "111") {
+		t.Errorf("session A got the wrong constraint def: %q", defA)
+	}
+	if defB := scoped(connB); !strings.Contains(defB, "222") {
+		t.Errorf("session B got the wrong constraint def: %q", defB)
 	}
 }
