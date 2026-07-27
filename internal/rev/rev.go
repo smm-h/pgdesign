@@ -111,6 +111,28 @@ func (r Revision) Equal(other Revision) (bool, error) {
 	return bytes.Equal(r.sum, other.sum), nil
 }
 
+// ParseRevision reconstructs a Revision from its "<class>:<hex>" string form (the
+// inverse of String). The empty string yields the zero Revision — a genesis
+// edge's null parent (chain.Edge models it as Revision{}). It is the
+// deserialization counterpart the on-disk chain (roadmap 5.2) needs to
+// reconstruct edge parent/target revisions as GRAPH-NODE IDENTITIES from edge
+// files. The returned Revision carries the class and digest parsed from the
+// string and is used ONLY for identity comparison (String/Equal); it is NOT a
+// certificate that any model hashes to it — store<->chain closure and
+// edge-endpoint consistency are verified separately against the object store
+// (roadmap 5.2's consistency checker). Its class is validated, so a malformed or
+// unknown-class string is a hard error rather than a silently-wrong Revision.
+func ParseRevision(s string) (Revision, error) {
+	if s == "" {
+		return Revision{}, nil
+	}
+	class, sum, err := splitRevision(s)
+	if err != nil {
+		return Revision{}, err
+	}
+	return Revision{class: class, sum: sum}, nil
+}
+
 // wholeModelForm is the canonical whole-model structure: a versioned preamble
 // (format version, codec epoch, model class) followed by the per-object forms
 // in sorted manifest-key order. The Objects entries are enc's per-object

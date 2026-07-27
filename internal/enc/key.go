@@ -1,6 +1,7 @@
 package enc
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -143,6 +144,69 @@ func KeyForComposite(c model.CompositeType) Key {
 // KeyForStateMachine returns the manifest key for a state-machine type.
 func KeyForStateMachine(sm model.StateMachine) Key {
 	return Key{Kind: KindSMType, Schema: sm.Schema, Name: sm.Name}
+}
+
+// ParseKey reconstructs a Key from its String() form — the inverse used by the
+// on-disk revision manifest (roadmap 5.2, store_layout.md), whose entries are a
+// sorted map keyed by Key.String(). It handles every OBJECT kind (the kinds that
+// appear in a manifest); the pseudo-target kinds dml/raw NEVER appear in a
+// manifest, so ParseKey rejects them as a hard error rather than silently
+// admitting a data op into the schema-object namespace.
+//
+// Grammar (mirrors String):
+//
+//	schema:name                -> KindSchemaMeta
+//	registry:                  -> KindRegistrySnap
+//	function:schema.name(args) -> KindFunction (ArgSig = "(args)")
+//	kind:schema.name           -> other kinds, schema-qualified
+//	kind:name                  -> other kinds, no schema
+//
+// Object names are unquoted identifiers with no '.', so the qualifier splits on
+// the sole '.' when present. ParseKey round-trips every KeyFor* construction:
+// ParseKey(k.String()) == k for object kinds.
+func ParseKey(s string) (Key, error) {
+	colon := strings.IndexByte(s, ':')
+	if colon < 0 {
+		return Key{}, fmt.Errorf("enc: malformed manifest key %q (no kind prefix)", s)
+	}
+	kind := Kind(s[:colon])
+	rest := s[colon+1:]
+	switch kind {
+	case KindDML, KindRaw:
+		return Key{}, fmt.Errorf("enc: pseudo-target key %q is not a manifest key (dml/raw never resolve in a manifest)", s)
+	case KindSchemaMeta:
+		return Key{Kind: kind, Name: rest}, nil
+	case KindRegistrySnap:
+		if rest != "" {
+			return Key{}, fmt.Errorf("enc: malformed registry key %q (want %q)", s, "registry:")
+		}
+		return Key{Kind: kind}, nil
+	case KindFunction:
+		argSig := ""
+		if lp := strings.IndexByte(rest, '('); lp >= 0 {
+			if !strings.HasSuffix(rest, ")") {
+				return Key{}, fmt.Errorf("enc: malformed function key %q (unterminated arg signature)", s)
+			}
+			argSig = rest[lp:]
+			rest = rest[:lp]
+		}
+		schema, name := splitQualified(rest)
+		return Key{Kind: kind, Schema: schema, Name: name, ArgSig: argSig}, nil
+	case KindTable, KindView, KindMatView, KindSequence, KindEnum, KindDomain, KindComposite, KindSMType:
+		schema, name := splitQualified(rest)
+		return Key{Kind: kind, Schema: schema, Name: name}, nil
+	default:
+		return Key{}, fmt.Errorf("enc: unknown manifest key kind %q in %q", kind, s)
+	}
+}
+
+// splitQualified splits a "schema.name" qualifier on its sole '.', returning
+// ("", qualifier) when unqualified.
+func splitQualified(q string) (schema, name string) {
+	if dot := strings.IndexByte(q, '.'); dot >= 0 {
+		return q[:dot], q[dot+1:]
+	}
+	return "", q
 }
 
 // KeyForDML mints the PINNED pseudo-target key for a data-manipulation op at
