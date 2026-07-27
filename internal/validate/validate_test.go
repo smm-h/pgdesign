@@ -2536,6 +2536,143 @@ func TestW015_ConsistentOnDelete_NoDiag(t *testing.T) {
 	}
 }
 
+// --- Two-schema cascade diagnostics: qualified text + per-schema scoping ---
+
+// cascadeChainTables returns a depth-4 CASCADE chain a->b->c->d->e in the given
+// schema (deleting from e cascades into d, c, b, a).
+func cascadeChainTables(sch string) []model.Table {
+	col := func(names ...string) []model.Column {
+		cs := make([]model.Column, len(names))
+		for i, n := range names {
+			cs[i] = model.Column{Name: n, PGType: typeinfo.T("uuid"), NotNull: true}
+		}
+		return cs
+	}
+	fk := func(name, col, ref string) []model.FK {
+		return []model.FK{{Name: name, Columns: []string{col}, RefSchema: sch, RefTable: ref, RefColumns: []string{"id"}, OnDelete: "CASCADE"}}
+	}
+	return []model.Table{
+		{Name: "a", Schema: sch, Comment: "A", PK: []string{"id"}, Columns: col("id", "b_id"), FKs: fk("fk_b", "b_id", "b")},
+		{Name: "b", Schema: sch, Comment: "B", PK: []string{"id"}, Columns: col("id", "c_id"), FKs: fk("fk_c", "c_id", "c")},
+		{Name: "c", Schema: sch, Comment: "C", PK: []string{"id"}, Columns: col("id", "d_id"), FKs: fk("fk_d", "d_id", "d")},
+		{Name: "d", Schema: sch, Comment: "D", PK: []string{"id"}, Columns: col("id", "e_id"), FKs: fk("fk_e", "e_id", "e")},
+		{Name: "e", Schema: sch, Comment: "E", PK: []string{"id"}, Columns: col("id")},
+	}
+}
+
+// TestW013_TwoSchemasQualifiedChain pins the qualified chain text in W013 and
+// verifies the two same-named chains never merge across schemas.
+func TestW013_TwoSchemasQualifiedChain(t *testing.T) {
+	var tables []model.Table
+	tables = append(tables, cascadeChainTables("public")...)
+	tables = append(tables, cascadeChainTables("archive")...)
+	schema := &model.Schema{Tables: tables}
+	schema.BuildFKGraph()
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W013")
+
+	var pub, arc string
+	for _, d := range found {
+		if strings.Contains(d.Message, "public.e -> public.d -> public.c -> public.b -> public.a") {
+			pub = d.Message
+		}
+		if strings.Contains(d.Message, "archive.e -> archive.d -> archive.c -> archive.b -> archive.a") {
+			arc = d.Message
+		}
+		// No message may mix schemas (proof the graphs stayed separate).
+		if strings.Contains(d.Message, "public.") && strings.Contains(d.Message, "archive.") {
+			t.Errorf("W013 message mixes schemas (graphs merged): %s", d.Message)
+		}
+	}
+	if pub == "" {
+		t.Errorf("expected a W013 with the qualified public chain, got: %v", found)
+	}
+	if arc == "" {
+		t.Errorf("expected a W013 with the qualified archive chain, got: %v", found)
+	}
+}
+
+// TestW014_TwoSchemasQualifiedBreadth pins the qualified target/chain text in
+// W014 and verifies per-schema breadth (each hub sees 5 spokes, not 10).
+func TestW014_TwoSchemasQualifiedBreadth(t *testing.T) {
+	spoke := func(sch, name string) model.Table {
+		return model.Table{Name: name, Schema: sch, Comment: name, PK: []string{"id"},
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "hub_id", PGType: typeinfo.T("uuid"), NotNull: true}},
+			FKs:     []model.FK{{Name: "fk_" + name + "_hub", Columns: []string{"hub_id"}, RefSchema: sch, RefTable: "hub", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}}
+	}
+	build := func(sch string) []model.Table {
+		ts := []model.Table{{Name: "hub", Schema: sch, Comment: "Hub", PK: []string{"id"},
+			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}}}
+		for _, s := range []string{"s1", "s2", "s3", "s4", "s5"} {
+			ts = append(ts, spoke(sch, s))
+		}
+		return ts
+	}
+	var tables []model.Table
+	tables = append(tables, build("public")...)
+	tables = append(tables, build("archive")...)
+	schema := &model.Schema{Tables: tables}
+	schema.BuildFKGraph()
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W014")
+
+	sawPublic, sawArchive := false, false
+	for _, d := range found {
+		if strings.Contains(d.Message, `"public.hub" cascades to 5 tables`) {
+			sawPublic = true
+		}
+		if strings.Contains(d.Message, `"archive.hub" cascades to 5 tables`) {
+			sawArchive = true
+		}
+	}
+	if !sawPublic {
+		t.Errorf("expected W014 for public.hub with breadth 5, got: %v", found)
+	}
+	if !sawArchive {
+		t.Errorf("expected W014 for archive.hub with breadth 5, got: %v", found)
+	}
+}
+
+// TestW015_TwoSchemasQualifiedTarget pins the qualified target name in W015
+// across two same-named "target" tables.
+func TestW015_TwoSchemasQualifiedTarget(t *testing.T) {
+	build := func(sch string) []model.Table {
+		return []model.Table{
+			{Name: "target", Schema: sch, Comment: "Target", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}}},
+			{Name: "child_a", Schema: sch, Comment: "Child A", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
+				FKs:     []model.FK{{Name: "fk_target_a", Columns: []string{"target_id"}, RefSchema: sch, RefTable: "target", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "child_b", Schema: sch, Comment: "Child B", PK: []string{"id"},
+				Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "target_id", PGType: typeinfo.T("uuid"), NotNull: true}},
+				FKs:     []model.FK{{Name: "fk_target_b", Columns: []string{"target_id"}, RefSchema: sch, RefTable: "target", RefColumns: []string{"id"}, OnDelete: "RESTRICT"}}},
+		}
+	}
+	var tables []model.Table
+	tables = append(tables, build("public")...)
+	tables = append(tables, build("archive")...)
+	schema := &model.Schema{Tables: tables}
+	schema.BuildFKGraph()
+
+	diags, _ := Validate(schema, nil)
+	found := findByCode(diags, "W015")
+
+	sawPublic, sawArchive := false, false
+	for _, d := range found {
+		if strings.Contains(d.Message, `to "public.target"`) {
+			sawPublic = true
+		}
+		if strings.Contains(d.Message, `to "archive.target"`) {
+			sawArchive = true
+		}
+	}
+	if !sawPublic || !sawArchive {
+		t.Errorf("expected qualified W015 for both public.target and archive.target, got: %v", found)
+	}
+}
+
 // --- I001: Natural key candidate ---
 
 func TestI001_NaturalKeyCandidate(t *testing.T) {

@@ -371,6 +371,39 @@ func TestNPlusOne_Detected(t *testing.T) {
 	}
 }
 
+// TestNPlusOne_TwoSchemasQualifiedGraph feeds DetectNPlusOne a graph built the
+// real way (BuildFKGraph, so maps are keyed by TableKey) with same-named tables
+// in two schemas. N+1 detection iterates edge values, so it works unchanged
+// against the qualified-keyed graph.
+func TestNPlusOne_TwoSchemasQualifiedGraph(t *testing.T) {
+	s := &model.Schema{
+		Tables: []model.Table{
+			{Name: "account", Schema: "public"},
+			{Name: "entry", Schema: "public", FKs: []model.FK{
+				{Name: "fk_entry_account", Columns: []string{"account_id"}, RefSchema: "public", RefTable: "account", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+			}},
+			{Name: "account", Schema: "archive"},
+			{Name: "entry", Schema: "archive", FKs: []model.FK{
+				{Name: "fk_entry_account", Columns: []string{"account_id"}, RefSchema: "archive", RefTable: "account", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+			}},
+		},
+	}
+	s.BuildFKGraph()
+
+	stats := []StatementStats{
+		{Query: "SELECT * FROM entry WHERE account_id = $1", Calls: 50000, Tables: []string{"entry"}},
+		{Query: "SELECT * FROM account", Calls: 100, Tables: []string{"account"}},
+	}
+	diags := DetectNPlusOne(s.FKGraph, stats)
+	found := findByCode(diags, "W025")
+	if len(found) == 0 {
+		t.Fatalf("expected at least one W025 against the qualified two-schema graph, got %d", len(found))
+	}
+	if found[0].Table != "entry" {
+		t.Errorf("expected W025 table 'entry', got %q", found[0].Table)
+	}
+}
+
 func TestNPlusOne_RatioBelowThreshold(t *testing.T) {
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{

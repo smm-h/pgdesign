@@ -353,6 +353,99 @@ func TestFKGraph_CascadeHandlesCycles(t *testing.T) {
 	}
 }
 
+// TestFKGraph_TwoSchemasSameName is the core scoping guarantee: two schemas
+// each declare tables named "account" and "entry", with entry -> account FKs
+// inside each schema. Under (schema, name) keying the two graphs must never
+// merge — each account sees exactly its own referencing entry, never the
+// other schema's.
+func TestFKGraph_TwoSchemasSameName(t *testing.T) {
+	s := &Schema{
+		Tables: []Table{
+			{Name: "account", Schema: "public"},
+			{Name: "entry", Schema: "public", FKs: []FK{
+				{Name: "fk_entry_account", Columns: []string{"account_id"}, RefSchema: "public", RefTable: "account", RefColumns: []string{"id"}, OnDelete: "CASCADE"},
+			}},
+			{Name: "account", Schema: "archive"},
+			{Name: "entry", Schema: "archive", FKs: []FK{
+				{Name: "fk_entry_account", Columns: []string{"account_id"}, RefSchema: "archive", RefTable: "account", RefColumns: []string{"id"}, OnDelete: "SET NULL"},
+			}},
+		},
+	}
+	s.BuildFKGraph()
+	g := s.FKGraph
+
+	// Each account has exactly one incoming edge, from its own schema's entry.
+	if got := len(g.Reverse["public.account"]); got != 1 {
+		t.Fatalf("public.account: expected 1 reverse edge, got %d (cross-schema contamination?)", got)
+	}
+	if e := g.Reverse["public.account"][0]; e.FromSchema != "public" {
+		t.Errorf("public.account reverse edge from schema %q, want public", e.FromSchema)
+	}
+	if got := len(g.Reverse["archive.account"]); got != 1 {
+		t.Fatalf("archive.account: expected 1 reverse edge, got %d", got)
+	}
+	if e := g.Reverse["archive.account"][0]; e.FromSchema != "archive" {
+		t.Errorf("archive.account reverse edge from schema %q, want archive", e.FromSchema)
+	}
+
+	// Fan counts are per-schema.
+	if g.FanIn["public.account"] != 1 || g.FanIn["archive.account"] != 1 {
+		t.Errorf("per-schema FanIn wrong: public=%d archive=%d", g.FanIn["public.account"], g.FanIn["archive.account"])
+	}
+
+	// Cascade honors the per-schema ON DELETE action: public entry CASCADEs,
+	// archive entry SET NULLs (no cascade).
+	if chain := g.CascadeChain("public.account"); len(chain) != 1 || chain[0] != "public.entry" {
+		t.Errorf("CascadeChain(public.account) = %v, want [public.entry]", chain)
+	}
+	if chain := g.CascadeChain("archive.account"); chain != nil {
+		t.Errorf("CascadeChain(archive.account) = %v, want nil (SET NULL)", chain)
+	}
+}
+
+// TestWalkCascade_DepthBounded exercises the maxDepth parameter on the walker
+// against a linear cascade chain a -> b -> c -> d (deleting d cascades up to a).
+func TestWalkCascade_DepthBounded(t *testing.T) {
+	s := &Schema{
+		Tables: []Table{
+			{Name: "d", Schema: "public"},
+			{Name: "c", Schema: "public", FKs: []FK{{Name: "fk_c_d", Columns: []string{"d_id"}, RefSchema: "public", RefTable: "d", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "b", Schema: "public", FKs: []FK{{Name: "fk_b_c", Columns: []string{"c_id"}, RefSchema: "public", RefTable: "c", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "a", Schema: "public", FKs: []FK{{Name: "fk_a_b", Columns: []string{"b_id"}, RefSchema: "public", RefTable: "b", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+		},
+	}
+	s.BuildFKGraph()
+	g := s.FKGraph
+
+	longest := func(maxDepth int) int {
+		max := 0
+		g.WalkCascade("public.d", TowardReferencing, maxDepth, followCascadeOnly, func(path []FKEdge) {
+			if len(path) > max {
+				max = len(path)
+			}
+		})
+		return max
+	}
+
+	if got := longest(1); got != 1 {
+		t.Errorf("maxDepth=1 longest path = %d, want 1", got)
+	}
+	if got := longest(2); got != 2 {
+		t.Errorf("maxDepth=2 longest path = %d, want 2", got)
+	}
+	if got := longest(0); got != 3 {
+		t.Errorf("maxDepth=0 (unbounded) longest path = %d, want 3", got)
+	}
+	// The bounded walk must still visit the shorter prefixes.
+	var visits int
+	g.WalkCascade("public.d", TowardReferencing, 1, followCascadeOnly, func(path []FKEdge) {
+		visits++
+	})
+	if visits != 1 {
+		t.Errorf("maxDepth=1 visit count = %d, want 1 (only d->c)", visits)
+	}
+}
+
 func TestTablesByName_PopulatedByBuild(t *testing.T) {
 	reg := testRegistry()
 	raw := &parse.RawSchema{

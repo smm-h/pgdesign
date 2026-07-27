@@ -194,6 +194,38 @@ func TestGraphQLForeignKeys(t *testing.T) {
 	}
 }
 
+// TestGraphQLTwoSchemasSameName verifies the graphql generator runs cleanly on
+// same-named tables across two schemas and still emits per-schema FK reverse
+// relations (the FKGraph lookup is scoped by TableKey).
+func TestGraphQLTwoSchemasSameName(t *testing.T) {
+	build := func(sch string) []model.Table {
+		return []model.Table{
+			{Name: "account", Schema: sch, Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+			}, PK: []string{"id"}},
+			{Name: "entry", Schema: sch, Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				{Name: "account_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+			}, PK: []string{"id"},
+				FKs: []model.FK{{Name: "fk_entry_account", Columns: []string{"account_id"}, RefSchema: sch, RefTable: "account", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+		}
+	}
+	schema := &model.Schema{}
+	schema.Tables = append(schema.Tables, build("public")...)
+	schema.Tables = append(schema.Tables, build("archive")...)
+	schema.Canonicalize()
+
+	out := mustGenerate(t, schema, Options{Format: "graphql"})
+
+	// Forward relation entry -> account and reverse relation account -> [entry].
+	if !strings.Contains(out, "account: Account!") {
+		t.Errorf("expected FK relation account: Account! on Entry, got:\n%s", out)
+	}
+	if !strings.Contains(out, "entry: [Entry!]!") {
+		t.Errorf("expected reverse relation entry: [Entry!]! on Account, got:\n%s", out)
+	}
+}
+
 func TestGraphQLNullableFK(t *testing.T) {
 	schema := &model.Schema{
 		Name: "app",

@@ -137,6 +137,56 @@ func TestFilterByGroups_RebuildsFKGraph(t *testing.T) {
 	}
 }
 
+// TestFilterByGroups_TwoSchemasBareToQualified pins the bare-to-qualified
+// group rule: a bare group entry "entry" selects the same-named table in every
+// schema (public.entry and archive.entry), and the filtered graph carries both
+// per-schema FK edges without collision.
+func TestFilterByGroups_TwoSchemasBareToQualified(t *testing.T) {
+	s := &Schema{
+		Tables: []Table{
+			{Name: "account", Schema: "public", Comment: "a", PK: []string{"id"},
+				Columns: []Column{{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true}}},
+			{Name: "entry", Schema: "public", Comment: "e", PK: []string{"id"},
+				Columns: []Column{{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true}, {Name: "account_id", PGType: typeinfo.MustParse("uuid"), NotNull: true}},
+				FKs:     []FK{{Name: "fk_entry_account", Columns: []string{"account_id"}, RefSchema: "public", RefTable: "account", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+			{Name: "account", Schema: "archive", Comment: "a", PK: []string{"id"},
+				Columns: []Column{{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true}}},
+			{Name: "entry", Schema: "archive", Comment: "e", PK: []string{"id"},
+				Columns: []Column{{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true}, {Name: "account_id", PGType: typeinfo.MustParse("uuid"), NotNull: true}},
+				FKs:     []FK{{Name: "fk_entry_account", Columns: []string{"account_id"}, RefSchema: "archive", RefTable: "account", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
+		},
+		Groups: map[string][]string{"entries": {"entry"}},
+	}
+	s.Canonicalize()
+
+	filtered := s.FilterByGroups([]string{"entries"})
+	if len(filtered.Tables) != 2 {
+		t.Fatalf("expected 2 tables (both entries), got %d: %v", len(filtered.Tables), tableKeys(filtered.Tables))
+	}
+	got := map[string]bool{}
+	for _, tbl := range filtered.Tables {
+		got[TableKey(tbl.Schema, tbl.Name)] = true
+	}
+	if !got["public.entry"] || !got["archive.entry"] {
+		t.Errorf("filtered tables = %v, want public.entry and archive.entry", tableKeys(filtered.Tables))
+	}
+	// Each entry's FK to its own account survives in the rebuilt graph.
+	if n := filtered.FKGraph.FanOut["public.entry"]; n != 1 {
+		t.Errorf("filtered public.entry FanOut = %d, want 1", n)
+	}
+	if n := filtered.FKGraph.FanOut["archive.entry"]; n != 1 {
+		t.Errorf("filtered archive.entry FanOut = %d, want 1", n)
+	}
+}
+
+func tableKeys(tables []Table) []string {
+	keys := make([]string, len(tables))
+	for i, t := range tables {
+		keys[i] = TableKey(t.Schema, t.Name)
+	}
+	return keys
+}
+
 // TestFilterBySource_RebuildsFKGraph is the analogous red test for the
 // source-file filter path. Each table lives in its own source file so the
 // filter can isolate one.
