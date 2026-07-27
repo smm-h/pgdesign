@@ -21,3 +21,4 @@
 {"id":"18c5feccd5f4ff44d0a1ce4cd5a048899425ef49c3ac13f1","commits":["568b69a9380a3e424b6b1f4c904d1eefd8cfd7e4"],"user_facing":false}
 {"id":"18c5ff0b8065393cd5dff92eeffd48db9efefaf81df118c6","commits":["3062d0714e4f0abec8ab273ed0bb7f382e2f019d"],"user_facing":false}
 {"id":"18c5ff249acc10e603a6f8c9205345a39215df0498b93134","commits":["e0d2bd7a2b5bfd73efd249c110138bb7a72bf4b8"],"user_facing":false}
+{"id":"18c5ff627b7b49f58c335d07b0c141f8a7143e1a43be0fc2","commits":["01fa69780e8d16f4c4f2eee78b8d9d2784ec53a5"],"user_facing":true,"description":"New `[tables.*.maintenance].schedule` key schedules automatic partition maintenance via pg_cron; a partman-managed table with no schedule now warns (W029)","type":"feature"}
