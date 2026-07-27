@@ -353,22 +353,7 @@
         "columns": [
           "occurred_at"
         ],
-        "children": [
-          {
-            "strategy": "",
-            "columns": null,
-            "name": "events_2024_q1",
-            "bound": "FROM ('2024-01-01') TO ('2024-04-01')",
-            "children": null
-          },
-          {
-            "strategy": "",
-            "columns": null,
-            "name": "events_2024_q2",
-            "bound": "FROM ('2024-04-01') TO ('2024-07-01')",
-            "children": null
-          }
-        ]
+        "children": null
       },
       "maintenance": {
         "interval": "1 month",

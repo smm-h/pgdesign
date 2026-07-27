@@ -59,11 +59,6 @@ CREATE TABLE app.comments (
     CONSTRAINT pk_comments PRIMARY KEY (id)
 );
 
-CREATE TABLE app.events_2024_q1 PARTITION OF app.events
-  FOR VALUES FROM ('2024-01-01') TO ('2024-04-01');
-CREATE TABLE app.events_2024_q2 PARTITION OF app.events
-  FOR VALUES FROM ('2024-04-01') TO ('2024-07-01');
-
 SELECT partman.create_parent(
   p_parent_table := 'app.events',
   p_control := 'occurred_at',

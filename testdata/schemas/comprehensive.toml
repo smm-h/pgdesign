@@ -207,17 +207,12 @@ on_delete = "CASCADE"
 [tables.events.indexes.idx_events_project_time]
 columns = ["project_id", "occurred_at DESC"]
 
+# Partman-managed: partman creates and drops partition children automatically,
+# so no manual [[tables.events.partitioning.partitions]] are declared (that
+# combination is a hard error -- partman owns the child lifecycle).
 [tables.events.partitioning]
 strategy = "range"
 column = "occurred_at"
-
-[[tables.events.partitioning.partitions]]
-name = "events_2024_q1"
-bound = "FROM ('2024-01-01') TO ('2024-04-01')"
-
-[[tables.events.partitioning.partitions]]
-name = "events_2024_q2"
-bound = "FROM ('2024-04-01') TO ('2024-07-01')"
 
 [tables.events.maintenance]
 interval = "1 month"
