@@ -1076,7 +1076,7 @@ func triggerEqual(a, b *model.Trigger) bool {
 		sliceEqual(a.Events, b.Events) &&
 		a.Timing == b.Timing &&
 		a.ForEach == b.ForEach &&
-		a.When == b.When &&
+		sqlparse.ExprEqual(a.When, b.When) &&
 		a.Constraint == b.Constraint &&
 		a.Deferrable == b.Deferrable &&
 		a.InitiallyDeferred == b.InitiallyDeferred &&
