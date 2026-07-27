@@ -151,10 +151,31 @@ func (s *Server) handleMigrations(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, migrations)
 }
 
+// migrationVersionPath resolves the on-disk path for a migration version,
+// enforcing that it stays within migrationsDir. It returns ok=false for any
+// version containing a path separator or ".." segment, or whose resolved path
+// escapes migrationsDir -- defeating path traversal (e.g. "../../etc/passwd").
+func migrationVersionPath(migrationsDir, version string) (string, bool) {
+	if version == "" || strings.ContainsAny(version, `/\`) || strings.Contains(version, "..") {
+		return "", false
+	}
+	path := filepath.Join(migrationsDir, version+".toml")
+	cleanDir := filepath.Clean(migrationsDir)
+	rel, err := filepath.Rel(cleanDir, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return path, true
+}
+
 // handleMigrationVersion reads and parses a specific migration file by version.
 func (s *Server) handleMigrationVersion(w http.ResponseWriter, r *http.Request) {
 	version := r.PathValue("version")
-	path := filepath.Join(s.migrationsDir, version+".toml")
+	path, ok := migrationVersionPath(s.migrationsDir, version)
+	if !ok {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid migration version %q", version))
+		return
+	}
 
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("migration %q not found", version))
