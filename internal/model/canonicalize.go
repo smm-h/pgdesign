@@ -59,7 +59,22 @@ func (s *Schema) Canonicalize() {
 	sort.Slice(s.Sequences, func(a, b int) bool { return s.Sequences[a].Name < s.Sequences[b].Name })
 	sort.Strings(s.Extensions)
 
-	// 1d. Topological ordering with alphabetical tie-break. Tables carry
+	// 1d. DependsOn is a dependency SET, not a positional list: two models that
+	// declare the same dependencies in different orders are ≈_syn-equal and must
+	// encode identically. topoSort consumes DependsOn as an edge set
+	// (order-insensitive), so sorting it here is purely canonical and cannot
+	// change the resulting object order.
+	for i := range s.Views {
+		sort.Strings(s.Views[i].DependsOn)
+	}
+	for i := range s.MaterializedViews {
+		sort.Strings(s.MaterializedViews[i].DependsOn)
+	}
+	for i := range s.Functions {
+		sort.Strings(s.Functions[i].DependsOn)
+	}
+
+	// 1e. Topological ordering with alphabetical tie-break. Tables carry
 	// CycleGroups (used for cycle-safe DDL); views/matviews/functions fall
 	// back to a deterministic order even under a cycle (which PostgreSQL
 	// rejects at apply time anyway).

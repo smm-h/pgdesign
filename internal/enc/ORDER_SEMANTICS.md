@@ -70,7 +70,10 @@ the normalizer N lands, roadmap 1.2.)
 | `CompositeType.Fields` | **SEMANTIC** | composite attribute order |
 | `Function.Args` | **SEMANTIC** | positional argument order; also the overload signature |
 | `PartitionSpec.Columns` | **SEMANTIC** | partition-key column order |
-| `PartitionSpec.Children` | CANONICAL-ONLY | child partitions (bound-distinguished) |
+| `PartitionSpec.Children` | CANONICAL-ONLY (name-sorted, recursive) | child partitions (bound-distinguished); `Canonicalize` sorts by child name |
+| `View.DependsOn` | CANONICAL-ONLY (sorted) | dependency SET; `Canonicalize` sorts it (topo-sort consumes it order-insensitively) |
+| `MaterializedView.DependsOn` | CANONICAL-ONLY (sorted) | dependency SET; sorted by `Canonicalize` |
+| `Function.DependsOn` | CANONICAL-ONLY (sorted) | dependency SET; sorted by `Canonicalize` |
 | `ExclusionConstraint.Elements` | **SEMANTIC** | ordering of the backing index's columns — treated like index key columns |
 | `Trigger.Events` | CANONICAL-ONLY (sorted) | `{INSERT, UPDATE, DELETE}` is a set; DDL order is not observable |
 | `UniqueConstraint.Columns` | **SEMANTIC** | defines the backing unique index |
