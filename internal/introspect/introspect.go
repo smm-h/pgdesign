@@ -130,10 +130,12 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 	applyEnumTypeKinds(schema)
 
 	// Annotate partman-managed partition children so the diff can exclude
-	// them from existence drift. This is a best-effort query: if partman
-	// is not installed, the query silently returns nothing.
+	// them from existence drift, and read each managed parent's maintenance
+	// config (interval/premake/retention) back into the model. Only runs when
+	// pg_partman is declared; a query failure at that point is a real problem
+	// and is surfaced as a diagnostic rather than silently swallowed.
 	if hasExtension(exts, "pg_partman") {
-		annotatePartmanChildren(ctx, conn, schema)
+		diags = append(diags, annotatePartmanChildren(ctx, conn, schema)...)
 	}
 
 	// Canonicalize the introspected schema: alphabetical ordering for
@@ -156,37 +158,86 @@ func hasExtension(exts []string, name string) bool {
 	return false
 }
 
-// annotatePartmanChildren queries partman.part_config for managed parents and
-// marks introspected children of those parents as PartmanManaged. This allows
-// the diff system to exclude them from existence drift (partman creates and
-// drops children automatically; they should not appear as added/removed).
-func annotatePartmanChildren(ctx context.Context, conn *pgx.Conn, schema *model.Schema) {
-	// Query partman.part_config to find managed parent tables.
-	// The parent_table column contains schema-qualified names like "public.events".
+// partmanParentConfig holds the maintenance settings read from a single
+// partman.part_config row.
+type partmanParentConfig struct {
+	interval  string
+	premake   int
+	retention string
+	keepTable bool
+}
+
+// annotatePartmanChildren queries partman.part_config for managed parents,
+// marks introspected children of those parents as PartmanManaged (so the diff
+// excludes them from existence drift), and reads each parent's maintenance
+// config back into the model. A query failure is reported as a diagnostic:
+// pg_partman is declared, so part_config must be readable.
+func annotatePartmanChildren(ctx context.Context, conn *pgx.Conn, schema *model.Schema) []diagnostic.Diagnostic {
+	var diags []diagnostic.Diagnostic
+
+	// Query partman.part_config for managed parents and their config.
+	// parent_table is schema-qualified, e.g. "public.events".
 	rows, err := conn.Query(ctx, `
-		SELECT parent_table FROM partman.part_config
+		SELECT parent_table, partition_interval, premake,
+		       COALESCE(retention, ''), retention_keep_table
+		FROM partman.part_config
 	`)
 	if err != nil {
-		// partman schema might not be accessible; silently skip.
-		return
+		return append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Warning,
+			Code:     "I200",
+			Message:  fmt.Sprintf("pg_partman is declared but partman.part_config could not be read: %v; partman-managed maintenance config was not introspected", err),
+		})
 	}
 	defer rows.Close()
 
-	managedParents := make(map[string]bool)
+	managedParents := make(map[string]partmanParentConfig)
 	for rows.Next() {
-		var parentTable string
-		if err := rows.Scan(&parentTable); err != nil {
-			return
+		var parentTable, interval, retention string
+		var premake int
+		var keepTable bool
+		if err := rows.Scan(&parentTable, &interval, &premake, &retention, &keepTable); err != nil {
+			return append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Code:     "I200",
+				Message:  fmt.Sprintf("failed to scan partman.part_config row: %v", err),
+			})
 		}
-		managedParents[parentTable] = true
+		managedParents[parentTable] = partmanParentConfig{
+			interval:  interval,
+			premake:   premake,
+			retention: retention,
+			keepTable: keepTable,
+		}
 	}
-	if rows.Err() != nil || len(managedParents) == 0 {
-		return
+	if err := rows.Err(); err != nil {
+		return append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Warning,
+			Code:     "I200",
+			Message:  fmt.Sprintf("error iterating partman.part_config: %v", err),
+		})
+	}
+	if len(managedParents) == 0 {
+		return diags
 	}
 
-	// Build a map of table OID/name to check if they inherit from a managed parent.
-	// We query pg_inherits to find child -> parent relationships, then cross-reference
-	// with the managed parents set.
+	// Populate maintenance config on each managed parent table in the model.
+	for i := range schema.Tables {
+		t := &schema.Tables[i]
+		qualified := t.Schema + "." + t.Name
+		cfg, ok := managedParents[qualified]
+		if !ok {
+			continue
+		}
+		t.Maintenance = &model.MaintenanceConfig{
+			Interval:           cfg.interval,
+			Premake:            cfg.premake,
+			Retention:          cfg.retention,
+			RetentionKeepTable: cfg.keepTable,
+		}
+	}
+
+	// Cross-reference pg_inherits to mark managed children.
 	childRows, err := conn.Query(ctx, `
 		SELECT child_ns.nspname || '.' || child_cl.relname AS child_table,
 		       parent_ns.nspname || '.' || parent_cl.relname AS parent_table
@@ -197,26 +248,36 @@ func annotatePartmanChildren(ctx context.Context, conn *pgx.Conn, schema *model.
 		JOIN pg_namespace parent_ns ON parent_cl.relnamespace = parent_ns.oid
 	`)
 	if err != nil {
-		return
+		return append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Warning,
+			Code:     "I200",
+			Message:  fmt.Sprintf("failed to read pg_inherits for partman child detection: %v", err),
+		})
 	}
 	defer childRows.Close()
 
-	// Map child qualified name -> parent qualified name.
 	childToParent := make(map[string]string)
 	for childRows.Next() {
 		var childTable, parentTable string
 		if err := childRows.Scan(&childTable, &parentTable); err != nil {
-			return
+			return append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Warning,
+				Code:     "I200",
+				Message:  fmt.Sprintf("failed to scan pg_inherits row: %v", err),
+			})
 		}
-		if managedParents[parentTable] {
+		if _, ok := managedParents[parentTable]; ok {
 			childToParent[childTable] = parentTable
 		}
 	}
-	if childRows.Err() != nil || len(childToParent) == 0 {
-		return
+	if err := childRows.Err(); err != nil {
+		return append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Warning,
+			Code:     "I200",
+			Message:  fmt.Sprintf("error iterating pg_inherits: %v", err),
+		})
 	}
 
-	// Annotate matching tables in the schema.
 	for i := range schema.Tables {
 		t := &schema.Tables[i]
 		qualified := t.Schema + "." + t.Name
@@ -225,6 +286,8 @@ func annotatePartmanChildren(ctx context.Context, conn *pgx.Conn, schema *model.
 			t.PartmanParent = parent
 		}
 	}
+
+	return diags
 }
 
 // applyEnumTypeKinds sets Column.TypeKind = "enum" on every table column whose

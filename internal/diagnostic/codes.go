@@ -141,3 +141,9 @@ package diagnostic
 // W101  2NF violation (partial dependency)
 // W102  3NF violation (transitive dependency)
 // W103  BCNF violation
+//
+// === Introspection diagnostics (I200-I299) ===
+//
+// I200  Live introspection could not read expected catalog state
+//       (e.g. pg_partman is declared but partman.part_config is unreadable);
+//       the corresponding model detail was left unpopulated.
