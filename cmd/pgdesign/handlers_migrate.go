@@ -863,8 +863,16 @@ func opSummary(op migrate.DDLOp) string {
 	return target
 }
 
+// displayRevString renders a possibly-empty (genesis) revision for CLI output.
+func displayRevString(s string) string {
+	if s == "" {
+		return "genesis"
+	}
+	return s
+}
+
 func registerMigrateSquashCmd(g *strictcli.Group) {
-	g.Command("squash", "Consolidate a range of sequential migration files into a single optimized migration. Recognizes 12 types of inverse operation pairs for cancellation, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. The original migration files are replaced with one combined migration file.",
+	g.Command("squash", "Consolidate a range of sequential migrations. In chain mode (a migrations/chain/ project) squash mints a CONSOLIDATION EDGE whose op-list is the ordered concatenation of the range, retiring the superseded originals intact to migrations/archive/ (never a rewrite) so mid-range databases resume via the path-finder; --from/--to are revision-or-edge references. In legacy (semver-TOML) mode squash concatenates the range into one combined migration file. --db is required.",
 		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
@@ -907,6 +915,36 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
+			// Chain mode: consolidation edge (never a rewrite). The M200 applied-check
+			// dies here — originals archive intact and mid-range DBs resume via the
+			// path-finder, so applied state is irrelevant.
+			if migrate.IsChainMode(dir) {
+				p, err := migrate.OpenChainProject(dir)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				slug := ""
+				if s := kwargsOptString(kwargs, "slug"); s != nil {
+					slug = *s
+				}
+				res, err := migrate.SquashChain(p, from, to, slug)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				if !quiet {
+					fmt.Printf("Consolidated %d edges into %s\n", len(res.SupersededIDs), res.ConsolidationFile)
+					fmt.Printf("  From: %s\n", displayRevString(res.FromRevision))
+					fmt.Printf("  To:   %s\n", res.ToRevision)
+					fmt.Printf("  Ops: %d\n", res.OpCount)
+					fmt.Printf("  Down form: %s\n", res.DownForm)
+					fmt.Printf("  Archived %d originals to %s\n", len(res.ArchivedFiles), filepath.Join(dir, "archive"))
+				}
+				return strictcli.Exit(0)
+			}
+
+			// Legacy (semver-TOML) mode: concatenate into one combined file.
 			result, err := migrate.SquashMigrations(ctx, conn, dir, from, to)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -946,10 +984,11 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("from", "First migration version to include in the squash range"),
-			strictcli.StringFlag("to", "Last migration version to include in the squash range"),
+			strictcli.StringFlag("from", "Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix)"),
+			strictcli.StringFlag("to", "End of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode)"),
+			strictcli.StringFlag("slug", "Display slug for the consolidation edge (chain mode; auto-derived from endpoint hashes when omitted)", strictcli.Default(nil)),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
-			strictcli.StringFlag("db", "PostgreSQL connection URL (REQUIRED) for the mandatory M200 applied-version safety check", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL (REQUIRED); the pre-upgrade guard runs against it (legacy mode also runs the M200 applied-version check)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),
 	)
 }
