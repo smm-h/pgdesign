@@ -115,13 +115,34 @@ func checkValidation(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) str
 	return r.Passed("all validation checks passed" + revStr)
 }
 
-// resolveDBURL looks for a database connection URL in the config file or
-// environment. Returns empty string if no URL is available.
-func resolveDBURL[P config.PathKind](cfg *config.Config[P]) string {
-	if cfg.Database.URL != "" {
-		return cfg.Database.URL
+// resolveCheckDBURL resolves the database URL for a check via the framework's
+// connection-env capability (PGDESIGN_DB), with the project config as the
+// documented last layer (resolution order cli > env > config; checks carry no
+// CLI flag, so it is env > config). Under --hermetic the framework resolves the
+// connection env as absent and the config layer is skipped too, so DB-backed
+// checks skip VISIBLY. Returns (url, hermetic): hermetic is true when
+// --hermetic suppressed the connection env, so the caller can name the skip.
+//
+// NOTE (flagged): the framework's ConnectionEnvReader returns (value, present)
+// where present==false covers BOTH --hermetic suppression and a genuinely-unset
+// env; it exposes no dedicated hermetic accessor. To honor hermetic even when a
+// config URL is present (hermetic must not connect), a single os.LookupEnv is
+// used PURELY to detect suppression (env set in the process yet hidden by the
+// framework). The URL value itself never comes from a raw env read.
+func resolveCheckDBURL[P config.PathKind](ctx strictcli.CheckContext, cfg *config.Config[P]) (url string, hermetic bool) {
+	if reader, ok := ctx.(strictcli.ConnectionEnvReader); ok {
+		if v, present := reader.ConnectionEnvValue("PGDESIGN_DB"); present {
+			return v, false
+		}
+		if _, set := os.LookupEnv("PGDESIGN_DB"); set {
+			// Env is set in the process but the framework hid it: --hermetic.
+			return "", true
+		}
 	}
-	return os.Getenv("PGDESIGN_DB")
+	if cfg.Database.URL != "" {
+		return cfg.Database.URL, false
+	}
+	return "", false
 }
 
 func checkNF(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.CheckOutcome {
@@ -140,7 +161,9 @@ func checkNF(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.Ch
 	// nil override: globals are not reachable in check functions (see
 	// loadSchemaForCheck); with a nil override the error is always nil.
 	cfg, _ := loadProjectConfig(nil, root)
-	dbURL := resolveDBURL(cfg)
+	// Under --hermetic dbURL is "" (connection env suppressed), so FD discovery
+	// is skipped and only the pure NF audit runs — no connection is attempted.
+	dbURL, _ := resolveCheckDBURL(ctx, cfg)
 
 	// If a DB URL is available, discover FDs for tables without declared dependencies.
 	if dbURL != "" {
@@ -433,7 +456,10 @@ func checkWorkload(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strict
 	// nil override: globals are not reachable in check functions (see
 	// loadSchemaForCheck); with a nil override the error is always nil.
 	cfg, _ := loadProjectConfig(nil, root)
-	dbURL := resolveDBURL(cfg)
+	dbURL, hermetic := resolveCheckDBURL(ctx, cfg)
+	if hermetic {
+		return r.Skipped("hermetic mode: database checks suppressed (PGDESIGN_DB not consulted under --hermetic)")
+	}
 	if dbURL == "" {
 		return r.Skipped("no database URL configured (set database.url in pgdesign.toml or PGDESIGN_DB env)")
 	}
