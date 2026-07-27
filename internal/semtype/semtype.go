@@ -80,7 +80,7 @@ type TypeDef struct {
 	Stored         bool              // whether generated column is stored
 	Identity       string            // identity generation: "ALWAYS" or "BY DEFAULT"
 	Array          bool
-	Source         string // "builtin" or "user" — metadata, not compared by typeDefsEqual
+	Source         string // "builtin", "user", or "extended" — provenance metadata, not compared by typeDefsEqual and excluded from canonical identity (internal/enc)
 }
 
 // Registry holds named TypeDefs with thread-safe read access.
