@@ -226,6 +226,44 @@ func TestGraphQLTwoSchemasSameName(t *testing.T) {
 	}
 }
 
+// TestGraphQLTwoSchemasSameNameDifferingNullability pins the FK-nullability
+// collision: two same-named tables in different schemas whose FK column
+// nullability DIFFERS must each emit their own relation nullability. The bug
+// keyed a column lookup by bare table name (last-write-wins), so both Entry
+// blocks inherited whichever schema was processed last.
+func TestGraphQLTwoSchemasSameNameDifferingNullability(t *testing.T) {
+	build := func(sch string, fkNotNull bool) []model.Table {
+		return []model.Table{
+			{Name: "account", Schema: sch, Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+			}, PK: []string{"id"}},
+			{Name: "entry", Schema: sch, Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				{Name: "account_id", PGType: typeinfo.MustParse("uuid"), NotNull: fkNotNull},
+			}, PK: []string{"id"},
+				FKs: []model.FK{{Name: "fk_entry_account", Columns: []string{"account_id"}, RefSchema: sch, RefTable: "account", RefColumns: []string{"id"}, OnDelete: "SET NULL"}}},
+		}
+	}
+	schema := &model.Schema{}
+	// public: FK column NOT NULL -> account: Account!
+	schema.Tables = append(schema.Tables, build("public", true)...)
+	// archive: FK column nullable -> account: Account
+	schema.Tables = append(schema.Tables, build("archive", false)...)
+	schema.Canonicalize()
+
+	out := mustGenerate(t, schema, Options{Format: "graphql"})
+
+	// Both nullabilities must be present: the NOT NULL relation from public and
+	// the nullable relation from archive. With the collision bug only one form
+	// appears (both Entry blocks share the last-written column map).
+	if !strings.Contains(out, "account: Account!") {
+		t.Errorf("expected NOT NULL FK relation account: Account! (from public), got:\n%s", out)
+	}
+	if !strings.Contains(out, "account: Account\n") {
+		t.Errorf("expected nullable FK relation account: Account (from archive), got:\n%s", out)
+	}
+}
+
 func TestGraphQLNullableFK(t *testing.T) {
 	schema := &model.Schema{
 		Name: "app",

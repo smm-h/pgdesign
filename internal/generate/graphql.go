@@ -90,16 +90,6 @@ func generateGraphQL(schema *model.Schema) string {
 		b.WriteString("}\n")
 	}
 
-	// Build column lookup per table for FK nullability checks.
-	colNotNull := make(map[string]map[string]bool) // table name -> column name -> NotNull
-	for _, t := range tables {
-		m := make(map[string]bool, len(t.Columns))
-		for _, col := range t.Columns {
-			m[col.Name] = col.NotNull
-		}
-		colNotNull[t.Name] = m
-	}
-
 	// Types.
 	for _, t := range tables {
 		b.WriteString("\n")
@@ -111,6 +101,14 @@ func generateGraphQL(schema *model.Schema) string {
 		pkCols := make(map[string]bool, len(t.PK))
 		for _, pk := range t.PK {
 			pkCols[pk] = true
+		}
+
+		// Build this table's own column nullability lookup. Keyed on the
+		// table's own Columns (never a shared bare-name map) so same-named
+		// tables in different schemas cannot collide on FK nullability.
+		colNotNull := make(map[string]bool, len(t.Columns))
+		for _, col := range t.Columns {
+			colNotNull[col.Name] = col.NotNull
 		}
 
 		// Columns.
@@ -154,7 +152,7 @@ func generateGraphQL(schema *model.Schema) string {
 		for _, fk := range t.FKs {
 			allNotNull := true
 			for _, fkCol := range fk.Columns {
-				if !colNotNull[t.Name][fkCol] {
+				if !colNotNull[fkCol] {
 					allNotNull = false
 					break
 				}
