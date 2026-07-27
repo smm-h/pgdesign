@@ -827,7 +827,7 @@ func domainDefaultKey(literal, expr string) string {
 
 // diffFKs matches foreign keys by name.
 func diffFKs(td *TableDiff, desired, actual *model.Table) {
-	added, removed, matched := matchObjects(desired.FKs, actual.FKs, func(fk model.FK) string {
+	added, removed, matched := matchObjectsTrunc(desired.FKs, actual.FKs, func(fk model.FK) string {
 		return fk.Name
 	})
 	for _, fk := range added {
@@ -858,7 +858,7 @@ func fkEqual(a, b *model.FK) bool {
 
 // diffIndexes matches indexes by name.
 func diffIndexes(td *TableDiff, desired, actual *model.Table) {
-	added, removed, matched := matchObjects(desired.Indexes, actual.Indexes, func(idx model.Index) string {
+	added, removed, matched := matchObjectsTrunc(desired.Indexes, actual.Indexes, func(idx model.Index) string {
 		return idx.Name
 	})
 	for _, idx := range added {
@@ -924,7 +924,7 @@ func mapEqual(a, b map[string]string) bool {
 
 // diffUniques matches unique constraints by name.
 func diffUniques(td *TableDiff, desired, actual *model.Table) {
-	added, removed, matched := matchObjects(desired.Uniques, actual.Uniques, func(u model.UniqueConstraint) string {
+	added, removed, matched := matchObjectsTrunc(desired.Uniques, actual.Uniques, func(u model.UniqueConstraint) string {
 		return u.Name
 	})
 	for _, u := range added {
@@ -950,7 +950,7 @@ func uniqueEqual(a, b model.UniqueConstraint) bool {
 
 // diffChecks matches check constraints by name.
 func diffChecks(td *TableDiff, desired, actual *model.Table) {
-	added, removed, matched := matchObjects(desired.Checks, actual.Checks, func(c model.CheckConstraint) string {
+	added, removed, matched := matchObjectsTrunc(desired.Checks, actual.Checks, func(c model.CheckConstraint) string {
 		return c.Name
 	})
 	for _, c := range added {
@@ -969,7 +969,7 @@ func diffChecks(td *TableDiff, desired, actual *model.Table) {
 
 // diffExclusions matches exclusion constraints by name.
 func diffExclusions(td *TableDiff, desired, actual *model.Table) {
-	added, removed, matched := matchObjects(desired.Exclusions, actual.Exclusions, func(e model.ExclusionConstraint) string {
+	added, removed, matched := matchObjectsTrunc(desired.Exclusions, actual.Exclusions, func(e model.ExclusionConstraint) string {
 		return e.Name
 	})
 	for _, e := range added {
@@ -1495,7 +1495,7 @@ func diffMaterializedView(desired, actual *model.MaterializedView) *Materialized
 	}
 
 	// Diff indexes.
-	idxAdded, idxRemoved, idxMatched := matchObjects(desired.Indexes, actual.Indexes, func(idx model.Index) string {
+	idxAdded, idxRemoved, idxMatched := matchObjectsTrunc(desired.Indexes, actual.Indexes, func(idx model.Index) string {
 		return idx.Name
 	})
 	for _, idx := range idxAdded {

@@ -102,3 +102,31 @@ func TestFalseDriftIndexPredicate(t *testing.T) {
 		t.Fatalf("FALSE DRIFT: equivalent index predicate spellings reported as changed: %s", d.Summary())
 	}
 }
+
+// TestNamedatalenTruncationMatch is the RED-then-GREEN fixture for the
+// NAMEDATALEN name-matching class: a desired content-derived constraint name
+// can exceed 63 bytes, while the same constraint introspected from a live DB
+// comes back NAMEDATALEN-truncated (63 bytes). Exact name matching sees them as
+// distinct (a false drop+add); truncation-aware matching pairs them.
+func TestNamedatalenTruncationMatch(t *testing.T) {
+	longName := "products_price_must_be_strictly_positive_and_within_reasonable_bounds_check" // > 63 bytes
+	if len(longName) <= 63 {
+		t.Fatalf("test fixture name must exceed 63 bytes, got %d", len(longName))
+	}
+	truncated := longName[:63]
+
+	desired := schemaWith(model.Table{
+		Name: "products", Schema: "public",
+		Columns: []model.Column{{Name: "price", PGType: typeinfo.T("int4"), NotNull: true}},
+		Checks:  []model.CheckConstraint{{Name: longName, Expr: "price > 0"}},
+	})
+	actual := schemaWith(model.Table{
+		Name: "products", Schema: "public",
+		Columns: []model.Column{{Name: "price", PGType: typeinfo.T("int4"), NotNull: true}},
+		Checks:  []model.CheckConstraint{{Name: truncated, Expr: "price > 0"}},
+	})
+
+	if d := Diff(desired, actual); !d.IsEmpty() {
+		t.Fatalf("NAMEDATALEN FALSE DRIFT: long name and its 63-byte truncation not matched: %s", d.Summary())
+	}
+}
