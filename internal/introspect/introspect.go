@@ -663,12 +663,13 @@ func queryTables(ctx context.Context, conn *pgx.Conn, schemaName string, pgVersi
 		t.Exclusions = excls
 
 		// Triggers
-		trigs, trigDiags, err := queryTriggers(ctx, conn, ti.oid, schemaName)
+		trigs, appendOnly, trigDiags, err := queryTriggers(ctx, conn, ti.oid, schemaName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("triggers for %s.%s: %w", schemaName, ti.name, err)
 		}
 		diags = append(diags, trigDiags...)
 		t.Triggers = trigs
+		t.AppendOnly = appendOnly
 
 		// Policies
 		pols, err := queryPolicies(ctx, conn, ti.oid)
@@ -1404,7 +1405,12 @@ func splitExclusionElements(s string) []string {
 // and pgdesign-managed triggers (whose backing function matches
 // isManagedObjectName: pgdesign_deny_mutation and _pgdesign_sm_* state-machine
 // functions) via the single Go predicate.
-func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaName string) ([]model.Trigger, []diagnostic.Diagnostic, error) {
+// denyMutationFunc is the backing function of pgdesign's append-only
+// deny-mutation trigger. Its presence on a table is the 0.4 append-only
+// predicate: the table denies UPDATE/DELETE via this managed machinery.
+const denyMutationFunc = "pgdesign_deny_mutation"
+
+func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaName string) ([]model.Trigger, bool, []diagnostic.Diagnostic, error) {
 	rows, err := conn.Query(ctx, `
 		SELECT
 			t.tgname,
@@ -1424,12 +1430,13 @@ func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaN
 		ORDER BY t.tgname
 	`, tableOID)
 	if err != nil {
-		return nil, nil, err
+		return nil, false, nil, err
 	}
 	defer rows.Close()
 
 	var triggers []model.Trigger
 	var diags []diagnostic.Diagnostic
+	var appendOnly bool
 	for rows.Next() {
 		var (
 			name         string
@@ -1443,7 +1450,14 @@ func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaN
 			triggerdef   string
 		)
 		if err := rows.Scan(&name, &funcName, &tgtype, &isConstraint, &deferrable, &initDeferred, &oldTable, &newTable, &triggerdef); err != nil {
-			return nil, nil, err
+			return nil, false, nil, err
+		}
+
+		// The deny-mutation trigger is the append-only machinery: record the
+		// flag so the table introspects as AppendOnly, then filter the trigger
+		// itself below (it is pgdesign's own managed object, not user schema).
+		if funcName == denyMutationFunc {
+			appendOnly = true
 		}
 
 		// Skip pgdesign-managed triggers, identified by their backing function
@@ -1476,7 +1490,7 @@ func queryTriggers(ctx context.Context, conn *pgx.Conn, tableOID uint32, schemaN
 		}
 		triggers = append(triggers, trig)
 	}
-	return triggers, diags, rows.Err()
+	return triggers, appendOnly, diags, rows.Err()
 }
 
 // decodeTriggerTiming extracts the timing (BEFORE/AFTER/INSTEAD OF) from tgtype bitmask.

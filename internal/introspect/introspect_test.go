@@ -364,6 +364,30 @@ func TestIntrospectUniqueConstraints(t *testing.T) {
 	}
 }
 
+// TestIntrospectAppendOnly is the regression for the rehearsal's
+// append_only false->true drift: a table carrying pgdesign's deny-mutation
+// machinery (a trigger backed by pgdesign_deny_mutation) must be introspected
+// with AppendOnly = true, so a desired model with append_only = true reconciles
+// clean instead of false-drifting.
+func TestIntrospectAppendOnly(t *testing.T) {
+	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
+	if err != nil {
+		t.Fatalf("Introspect failed: %v", err)
+	}
+	posts := findTable(schema.Tables, "posts")
+	if posts == nil {
+		t.Fatal("posts table not found")
+	}
+	if !posts.AppendOnly {
+		t.Error("posts carries the deny-mutation trigger and must introspect as AppendOnly = true")
+	}
+	// A table without the machinery is not append-only.
+	users := findTable(schema.Tables, "users")
+	if users != nil && users.AppendOnly {
+		t.Error("users has no deny-mutation trigger and must not be AppendOnly")
+	}
+}
+
 func TestIntrospectCheckConstraints(t *testing.T) {
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
