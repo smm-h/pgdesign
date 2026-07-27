@@ -1411,7 +1411,12 @@ consumes N); modelgen's later increments grow alongside their consumers.
   exempt = svg (non-deterministic) and .sqlsplit (sealed format). Stamp =
   FULL-PROJECT revision always; filtered outputs carry the full-project
   stamp (provenance, not content — byte-compare owns content). Stated cost:
-  one schema edit re-stamps every generated file (intended).
+  one schema edit re-stamps every generated file (intended). DOCUMENTED
+  EXCEPTION (4.2 audit, 2026-07): filtered JSON outputs carry the FILTERED
+  revision in-band — the envelope's integrity law (revision ==
+  hash(embedded bytes), L2/L7) structurally forbids a full-project stamp
+  on a filtered model; comment-stamped formats carry the full-project
+  revision as specified.
 - **Why:** L6: artifacts must say which revision produced them; full-project
   stamping resolves the filtered-output paradox; naming the exempt classes
   prevents unclassified stamp-disagreement sources.
@@ -1826,6 +1831,11 @@ subphase numbers retained for reference; they land together.)
   eroding the seam: with L5's pure generation, even the migration is
   pure, so the DB tier is exactly the genuinely-live work — and the
   checkNF split is what makes "pure tier" true rather than aspirational.
+  OBLIGATION (4.2 audit): genkit's stamp revision is package-global
+  mutable state whose sole guardrail is "no two generation funnels run
+  concurrently in one process" — 6.1 must either keep revise's funnels
+  strictly sequential (and assert it) or convert stamping to
+  context-threading in the same pass.
   Commit-before-DB-tier is sound: the migration is repo-level and pure;
   per-database applicability is re-checked fail-closed at apply.
 - **Verify:** End-to-end: edit -> revise -> outputs + chained migration +
