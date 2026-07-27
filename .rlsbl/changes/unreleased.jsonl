@@ -141,3 +141,4 @@
 {"id":"18c63e69c079946f8f804a4a77b74a31b5fdcc2f33b856a0","commits":["59d6604250a2e20891d6bee831fb7612753a30aa"],"user_facing":false}
 {"id":"18c63ea4c82b77c826146eb4b5c54aed9ad35c53aeca7ef3","commits":["bb77e389ddbaba288992c4b753289169e9421fcd"],"user_facing":false}
 {"id":"18c63ef00c5cc4838a95a4d39e6a4dc6938227997903125a","commits":["d41883a5d638fa6a28ed03841e9bfbd71f44421d"],"user_facing":false}
+{"id":"18c640d5ed802569a37f63bfba6d43c08b27ecce2ac03cb1","commits":["7f65801722d45ac992314459923323fdae40d6aa"],"user_facing":true,"description":"`migrate apply` now checks a precondition for every migration op against the live database and hard-errors on schema drift, naming the object, the expected state, and the state found. Concurrent index build/drop and enum-add steps journal via an intent/confirm protocol so an interrupted apply resumes safely (an interrupted concurrent index build is rebuilt to a valid index on the next apply).","type":"feature"}
