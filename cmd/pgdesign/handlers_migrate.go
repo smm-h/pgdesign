@@ -10,15 +10,30 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/dbutil"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/introspect"
 	"github.com/smm-h/pgdesign/internal/migrate"
+	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
+
+// preUpgradeGuardURL connects to dbURL solely to run the pre-upgrade guard, then
+// closes. Used by the DB-diffing subcommands (plan, legacy generate) that do not
+// hold a persistent connection at preflight time.
+func preUpgradeGuardURL(ctx context.Context, dbURL string) error {
+	conn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		return fmt.Errorf("connect: %w", err)
+	}
+	defer conn.Close(ctx)
+	return migrate.GuardNotPreUpgrade(ctx, conn)
+}
 
 func registerMigratePlanCmd(g *strictcli.Group) {
 	g.Command("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.",
@@ -52,6 +67,10 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 			}
 
 			ctx := context.Background()
+			if err := preUpgradeGuardURL(ctx, dbURL); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 			actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -221,22 +240,29 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
+
+			// Chain-mode project: pure generation against the reconstructed head
+			// model (no DB), routing through GenerateEdge. Identity is
+			// content-derived, so there is no --version to assign.
+			if migrate.IsChainMode(dir) {
+				return strictcli.Exit(handleMigrateGenerateChain(schema, dir, cfg, quiet))
+			}
+
+			// Legacy-mode: introspect the live DB and write a semver TOML. The
+			// --version flag was removed; the next version is auto-derived (max
+			// existing + patch bump) as the transitional behavior.
 			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate generate")
 				return strictcli.Exit(1)
 			}
 
-			version := ""
-			if v := kwargsOptString(kwargs, "version"); v != nil {
-				version = *v
-			}
-			if version == "" {
-				fmt.Fprintln(os.Stderr, "error: --version is required for migrate generate")
+			version, verr := migrate.NextSemverVersion(dir)
+			if verr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", verr)
 				return strictcli.Exit(1)
 			}
-
-			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			schemaNames := []string{"public"}
 			if schema.Name != "" && schema.Name != "public" {
@@ -246,6 +272,10 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 			}
 
 			ctx := context.Background()
+			if err := preUpgradeGuardURL(ctx, dbURL); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 			actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -334,14 +364,104 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("version", "Semantic version string for the generated migration", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server (legacy-mode only; chain-mode generate is pure)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 		),
 		strictcli.WithArgs(
 			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
 		),
 	)
+}
+
+// handleMigrateGenerateChain generates a chain edge for a chain-mode project. It
+// is PURE (no database): the head model is reconstructed from the on-disk manifest
+// + object store (prev), diffed against the built schema (desired), lowered to
+// ops, and written as a content-addressed edge (plus its objects and to-revision
+// manifest) via GenerateEdge. A genesis edge is produced for an empty chain.
+func handleMigrateGenerateChain(schema *model.Schema, dir string, cfg *config.RawConfig, quiet bool) int {
+	if _, pgErr := requireSchemaPGVersion(schema); pgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+		return 1
+	}
+	p, err := migrate.OpenChainProject(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	head, prev, err := migrate.ChainHead(p)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
+	// Diff baseline: the reconstructed head model, or an empty model at genesis
+	// (matched pg_version so an unpinned change does not register spuriously).
+	base := prev
+	if base == nil {
+		base = &model.Schema{Name: schema.Name, PGVersion: schema.PGVersion}
+	}
+	if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
+		return 1
+	}
+	d := diff.Diff(schema, base)
+	if d.IsEmpty() {
+		fmt.Println("No changes detected. Nothing to generate.")
+		return 0
+	}
+
+	m, migDiags := migrate.GenerateMigration(d, schema, "", nil,
+		cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold,
+		extregistry.NewBuiltinRegistry())
+	if len(migDiags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
+	}
+	if len(m.DDLOps) == 0 && len(m.DMLOps) == 0 {
+		fmt.Println("No operations generated. Nothing to write.")
+		return 0
+	}
+
+	slug := slugifyDescription(m.Description)
+	name, err := migrate.GenerateEdge(p, m, schema, prev, head, rev.RegistryPresent, slug)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: generate edge: %v\n", err)
+		return 1
+	}
+	if !quiet {
+		fmt.Printf("Generated edge: %s\n", name)
+		fmt.Printf("  Description: %s\n", m.Description)
+		fmt.Printf("  DDL ops: %d\n", len(m.DDLOps))
+		fmt.Printf("  DML ops: %d\n", len(m.DMLOps))
+	}
+	return 0
+}
+
+// slugifyDescription turns a migration description into a filesystem-safe edge
+// slug: lowercase alphanumerics separated by single hyphens, capped in length. An
+// empty result falls back to "migration".
+func slugifyDescription(desc string) string {
+	var b strings.Builder
+	prevHyphen := false
+	for _, r := range strings.ToLower(desc) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevHyphen = false
+		default:
+			if !prevHyphen && b.Len() > 0 {
+				b.WriteByte('-')
+				prevHyphen = true
+			}
+		}
+		if b.Len() >= 40 {
+			break
+		}
+	}
+	s := strings.Trim(b.String(), "-")
+	if s == "" {
+		return "migration"
+	}
+	return s
 }
 
 func registerMigrateApplyCmd(g *strictcli.Group) {
@@ -374,11 +494,22 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 			}
 			defer conn.Close(ctx)
 
-			if dryRun {
-				return strictcli.Exit(handleMigrateApplyDryRun(ctx, conn, dir, quiet))
+			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
 			}
 
 			lockTimeout := cfg.Migrate.LockTimeout
+
+			// Chain-mode project: route through the on-disk chain (path-finder +
+			// self-contained renderer). Legacy-mode projects keep the semver path.
+			if migrate.IsChainMode(dir) {
+				return strictcli.Exit(handleMigrateApplyChain(ctx, conn, dir, lockTimeout, dryRun, quiet))
+			}
+
+			if dryRun {
+				return strictcli.Exit(handleMigrateApplyDryRun(ctx, conn, dir, quiet))
+			}
 
 			applied, err := migrate.Apply(ctx, conn, dir, lockTimeout)
 			if err != nil {
@@ -410,6 +541,66 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing", strictcli.Default(false)),
 		),
 	)
+}
+
+// handleMigrateApplyChain applies (or previews, with dryRun) an on-disk chain
+// project: the path-finder chooses the edges from the database's chain position,
+// and each edge's ops render through the self-contained renderer. dry-run prints
+// the chosen edges and their SQL without executing.
+func handleMigrateApplyChain(ctx context.Context, conn *pgx.Conn, dir, lockTimeout string, dryRun, quiet bool) int {
+	p, err := migrate.OpenChainProject(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+
+	if dryRun {
+		plans, err := migrate.PlanApplyChain(ctx, conn, p)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		if len(plans) == 0 {
+			if !quiet {
+				fmt.Println("No pending migrations.")
+			}
+			return 0
+		}
+		for i, plan := range plans {
+			if i > 0 {
+				fmt.Println()
+			}
+			fmt.Printf("-- Edge: %s %s\n", plan.Edge.ID()[:12], plan.Edge.Slug)
+			for _, stmt := range plan.SQL {
+				if stmt != "" {
+					fmt.Println(stmt)
+				}
+			}
+		}
+		return 0
+	}
+
+	applied, err := migrate.ApplyChain(ctx, conn, p, lockTimeout, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		if len(applied) > 0 {
+			fmt.Fprintf(os.Stderr, "Applied before failure: %v\n", applied)
+		}
+		return 1
+	}
+	if len(applied) == 0 {
+		if !quiet {
+			fmt.Println("No pending migrations.")
+		}
+		return 0
+	}
+	if !quiet {
+		fmt.Printf("Applied %d edge(s):\n", len(applied))
+		for _, v := range applied {
+			fmt.Printf("  - %s\n", v)
+		}
+	}
+	return 0
 }
 
 // handleMigrateApplyDryRun shows the SQL that would be executed without
@@ -524,6 +715,11 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 			}
 			defer conn.Close(ctx)
 
+			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
 			toVersion := kwargs["to"].(string)
 			if toVersion != "" {
 				rolledBack, err := migrate.RollbackTo(ctx, conn, dir, toVersion, lockTimeout)
@@ -588,6 +784,11 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 			defer conn.Close(ctx)
+
+			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 
 			if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -700,6 +901,11 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 			}
 			defer conn.Close(ctx)
 
+			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+
 			result, err := migrate.SquashMigrations(ctx, conn, dir, from, to)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -794,6 +1000,11 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 			defer conn.Close(ctx)
+
+			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 
 			if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -1271,6 +1482,11 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 			defer conn.Close(ctx)
+
+			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 
 			if err := migrate.Baseline(ctx, conn, dir, version, description); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
