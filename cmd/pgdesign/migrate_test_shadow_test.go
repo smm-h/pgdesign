@@ -35,7 +35,8 @@ func cmdEphemeralDB(t *testing.T) *testdb.EphemeralDB {
 	return mgr.SetupForTest(t, testdb.CreateOptions{})
 }
 
-const shadowGuardSchema = `[tables.items]
+const shadowGuardSchema = `format_version = 1
+[tables.items]
 comment = "items"
 
 [tables.items.columns.id]

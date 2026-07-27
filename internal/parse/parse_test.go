@@ -141,7 +141,8 @@ func TestColumnOrderPreservation(t *testing.T) {
 
 func TestErrorRecovery(t *testing.T) {
 	// Create a TOML with unknown keys and a missing type field
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 unknown_key = "hello"
@@ -162,59 +163,24 @@ weird_field = "what"
 		t.Fatal(err)
 	}
 
+	// The strictspec shape gate replaces the old "continue past errors, return a
+	// partial schema" behavior: a document with shape violations (unknown keys,
+	// a column missing its required type) is rejected in one pass, before the
+	// native walk, and the schema is nil. All violations are reported together.
 	schema, diags := File(path)
-	if schema == nil {
-		t.Fatalf("expected partial schema on error, got nil")
+	if schema != nil {
+		t.Errorf("expected nil schema (walk skipped) on gate failure, got non-nil")
 	}
-
-	// Should still parse what it can
-	if schema.Meta.Version != 1 {
-		t.Errorf("meta.version = %d, want 1", schema.Meta.Version)
+	if _, ok := hasCode(diags, "STRICTSPEC_KEY_UNKNOWN"); !ok {
+		t.Errorf("expected STRICTSPEC_KEY_UNKNOWN for unknown_key/weird_field, got: %v", diags)
 	}
-	if schema.Meta.Schema != "test" {
-		t.Errorf("meta.schema = %q, want %q", schema.Meta.Schema, "test")
+	if _, ok := hasCode(diags, "STRICTSPEC_TYPE_MISSING_REQUIRED"); !ok {
+		t.Errorf("expected STRICTSPEC_TYPE_MISSING_REQUIRED for the no_type column, got: %v", diags)
 	}
-
-	// Should have the table with both columns
-	if len(schema.Tables) != 1 {
-		t.Fatalf("len(tables) = %d, want 1", len(schema.Tables))
-	}
-	tbl := schema.Tables[0]
-	if len(tbl.Columns) != 2 {
-		t.Fatalf("len(columns) = %d, want 2", len(tbl.Columns))
-	}
-
-	// Check diagnostics: expect warnings for unknown keys, error for missing type
-	var warnings, errors int
 	for _, d := range diags {
-		switch d.Severity {
-		case diagnostic.Warning:
-			warnings++
-		case diagnostic.Error:
-			errors++
+		if d.Severity != diagnostic.Error {
+			t.Errorf("expected all gate diagnostics to be errors, got %v", d)
 		}
-	}
-
-	// unknown_key in meta (1 warning), weird_field in column (1 warning)
-	if warnings < 2 {
-		t.Errorf("expected at least 2 warnings, got %d; diags: %v", warnings, diags)
-	}
-
-	// missing type on no_type column (1 error)
-	if errors < 1 {
-		t.Errorf("expected at least 1 error, got %d; diags: %v", errors, diags)
-	}
-
-	// Verify the missing-type column still has partial data
-	noType := tbl.Columns[0]
-	if noType.Name != "no_type" {
-		t.Errorf("columns[0].name = %q, want %q", noType.Name, "no_type")
-	}
-	if noType.Nullable == nil || *noType.Nullable != true {
-		t.Errorf("columns[0].nullable = %v, want true", noType.Nullable)
-	}
-	if noType.Type != "" {
-		t.Errorf("columns[0].type = %q, want empty", noType.Type)
 	}
 }
 
@@ -359,7 +325,8 @@ schemas = ["s.toml"]
 `), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "s.toml"), []byte(`[meta]
+	if err := os.WriteFile(filepath.Join(tmpDir, "s.toml"), []byte(`format_version = 1
+[meta]
 version = 1
 schema = "test"
 `), 0644); err != nil {
@@ -405,7 +372,8 @@ func TestFilesWithMissingFile(t *testing.T) {
 }
 
 func TestOpclassSingleString(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -441,7 +409,8 @@ opclass = "gin_trgm_ops"
 }
 
 func TestOpclassPerColumnMap(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -486,7 +455,8 @@ opclass = { title = "gin_trgm_ops", body = "gin_trgm_ops" }
 }
 
 func TestOpclassPerColumnMixed(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -527,7 +497,8 @@ opclass = { name = "varchar_pattern_ops", code = "text_ops" }
 }
 
 func TestPolicies(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -634,7 +605,8 @@ with_check = "channel_id = current_setting('app.channel_id')::uuid"
 }
 
 func TestPolicyType(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -686,7 +658,8 @@ with_check = "user_id = current_user()"
 }
 
 func TestForceRLS(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -731,7 +704,8 @@ type = "id"
 }
 
 func TestArrayColumn(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -797,7 +771,8 @@ type = "integer"
 }
 
 func TestAppendOnly(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -865,6 +840,7 @@ func TestJSONSchemaAttribute(t *testing.T) {
 
 func TestJSONSchemaFileMissing(t *testing.T) {
 	schema, diags := Bytes([]byte(`
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -900,6 +876,7 @@ func TestJSONSchemaFileNotFound(t *testing.T) {
 	dir := t.TempDir()
 	tomlPath := filepath.Join(dir, "test.toml")
 	os.WriteFile(tomlPath, []byte(`
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -934,6 +911,7 @@ func TestJSONSchemaFileInvalidJSON(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "bad.json"), []byte(`{not valid json`), 0644)
 	tomlPath := filepath.Join(dir, "test.toml")
 	os.WriteFile(tomlPath, []byte(`
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -963,7 +941,8 @@ json_schema = "bad.json"
 }
 
 func TestIndexWithParams(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1002,7 +981,8 @@ with = { m = "16", ef_construction = "200" }
 }
 
 func TestViewParsing(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1049,32 +1029,28 @@ depends_on = ["users"]
 }
 
 func TestViewMissingQuery(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
 [views.broken]
 comment = "No query"
 `
+	// The strictspec shape gate now owns query required: the document is
+	// rejected before the native walk (schema nil).
 	schema, diags := Bytes([]byte(content))
-	if schema == nil {
-		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	if schema != nil {
+		t.Errorf("expected nil schema on gate failure, got non-nil")
 	}
-
-	var hasError bool
-	for _, d := range diags {
-		if d.Severity == diagnostic.Error && d.Code == "E011" {
-			hasError = true
-			break
-		}
-	}
-	if !hasError {
-		t.Error("expected E011 error for missing query field")
+	if _, ok := hasCode(diags, "STRICTSPEC_TYPE_MISSING_REQUIRED"); !ok {
+		t.Errorf("expected STRICTSPEC_TYPE_MISSING_REQUIRED for missing query, got: %v", diags)
 	}
 }
 
 func TestViewUnknownKey(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1082,25 +1058,19 @@ schema = "test"
 query = "SELECT 1"
 unknown_field = "oops"
 `
+	// Unknown keys are now a hard error owned by the strictspec shape gate.
 	schema, diags := Bytes([]byte(content))
-	if schema == nil {
-		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	if schema != nil {
+		t.Errorf("expected nil schema on gate failure, got non-nil")
 	}
-
-	var hasWarning bool
-	for _, d := range diags {
-		if d.Severity == diagnostic.Warning && d.Code == "W001" {
-			hasWarning = true
-			break
-		}
-	}
-	if !hasWarning {
-		t.Error("expected W001 warning for unknown key in view")
+	if _, ok := hasCode(diags, "STRICTSPEC_KEY_UNKNOWN"); !ok {
+		t.Errorf("expected STRICTSPEC_KEY_UNKNOWN for unknown key, got: %v", diags)
 	}
 }
 
 func TestParseMaterializedView_Basic(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1142,7 +1112,8 @@ comment = "Monthly order statistics"
 }
 
 func TestParseMaterializedView_WithDataFalse(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1169,7 +1140,8 @@ with_data = false
 }
 
 func TestParseMaterializedView_WithIndexes(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1209,32 +1181,28 @@ unique = true
 }
 
 func TestParseMaterializedView_MissingQuery(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
 [materialized_views.bad]
 comment = "no query"
 `
+	// The strictspec shape gate now owns query required: the document is
+	// rejected before the native walk (schema nil).
 	schema, diags := Bytes([]byte(content))
-	if schema == nil {
-		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	if schema != nil {
+		t.Errorf("expected nil schema on gate failure, got non-nil")
 	}
-
-	var hasError bool
-	for _, d := range diags {
-		if d.Severity == diagnostic.Error && d.Code == "E011" {
-			hasError = true
-			break
-		}
-	}
-	if !hasError {
-		t.Error("expected E011 error for missing query field")
+	if _, ok := hasCode(diags, "STRICTSPEC_TYPE_MISSING_REQUIRED"); !ok {
+		t.Errorf("expected STRICTSPEC_TYPE_MISSING_REQUIRED for missing query, got: %v", diags)
 	}
 }
 
 func TestParseMaterializedView_DependsOn(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1261,7 +1229,8 @@ depends_on = ["orders"]
 }
 
 func TestPartitionSingleColumn(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1303,7 +1272,8 @@ column = "created_at"
 }
 
 func TestPartitionMultiColumn(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1351,7 +1321,8 @@ columns = ["year", "region"]
 }
 
 func TestPartitionBothColumnAndColumnsError(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1388,7 +1359,8 @@ columns = ["created_at"]
 }
 
 func TestParseColumnCollation(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1431,7 +1403,8 @@ collation = "de_DE"
 }
 
 func TestParseColumnStatistics(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1474,7 +1447,8 @@ statistics = 1000
 }
 
 func TestParseIndexCollation_String(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1513,7 +1487,8 @@ collation = "C"
 }
 
 func TestParseIndexCollation_Map(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1558,7 +1533,8 @@ collation = { first_name = "de_DE", last_name = "C" }
 }
 
 func TestParseColumnCollationAndStatistics(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1608,7 +1584,8 @@ statistics = 1000
 }
 
 func TestParseExclusion(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1690,7 +1667,8 @@ initially_deferred = true
 }
 
 func TestParseExclusionLengthMismatch(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1729,7 +1707,8 @@ operators = ["="]
 }
 
 func TestParseExclusionDefaults(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1778,6 +1757,7 @@ operators = ["=", "&&"]
 
 func TestParseUniqueDeferrable(t *testing.T) {
 	input := `
+format_version = 1
 [tables.users]
 comment = "users table"
 
@@ -1814,6 +1794,7 @@ initially_deferred = true
 
 func TestParseUniqueDefaults(t *testing.T) {
 	input := `
+format_version = 1
 [tables.users]
 comment = "users table"
 
@@ -1841,7 +1822,8 @@ columns = ["email"]
 }
 
 func TestSequenceParsing_Basic(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1898,7 +1880,8 @@ comment = "Order ID sequence"
 }
 
 func TestSequenceParsing_Minimal(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1947,7 +1930,8 @@ schema = "test"
 }
 
 func TestSequenceParsing_UnknownKey(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -1955,50 +1939,38 @@ schema = "test"
 start = 1
 unknown_field = "bad"
 `
+	// Unknown keys are now a hard error owned by the strictspec shape gate.
 	schema, diags := Bytes([]byte(content))
-	if schema == nil {
-		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	if schema != nil {
+		t.Errorf("expected nil schema on gate failure, got non-nil")
 	}
-
-	var hasWarning bool
-	for _, d := range diags {
-		if d.Severity == diagnostic.Warning && d.Code == "W001" {
-			hasWarning = true
-			break
-		}
-	}
-	if !hasWarning {
-		t.Error("expected W001 warning for unknown key in sequence")
+	if _, ok := hasCode(diags, "STRICTSPEC_KEY_UNKNOWN"); !ok {
+		t.Errorf("expected STRICTSPEC_KEY_UNKNOWN for unknown key, got: %v", diags)
 	}
 }
 
 func TestSequenceParsing_InvalidTypes(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
 [sequences.bad]
 start = "not_a_number"
 `
+	// Base-type mismatches are now owned by the strictspec shape gate.
 	schema, diags := Bytes([]byte(content))
-	if schema == nil {
-		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	if schema != nil {
+		t.Errorf("expected nil schema on gate failure, got non-nil")
 	}
-
-	var hasError bool
-	for _, d := range diags {
-		if d.Severity == diagnostic.Error && d.Code == "E010" {
-			hasError = true
-			break
-		}
-	}
-	if !hasError {
-		t.Error("expected E010 error for invalid type on sequence field")
+	if _, ok := hasCode(diags, "STRICTSPEC_TYPE_NOT_INTEGER"); !ok {
+		t.Errorf("expected STRICTSPEC_TYPE_NOT_INTEGER for string in integer field, got: %v", diags)
 	}
 }
 
 func TestSequenceParsing_Multiple(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -2036,6 +2008,7 @@ start = 100
 
 func TestFunctionParsing_WithBody(t *testing.T) {
 	toml := `
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -2125,6 +2098,7 @@ default = "0.0"
 
 func TestFunctionParsing_Procedure(t *testing.T) {
 	toml := `
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -2160,6 +2134,7 @@ func TestFunctionParsing_WithFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	toml := `
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -2187,6 +2162,7 @@ file = "calc.sql"
 
 func TestFunctionParsing_MissingLanguage(t *testing.T) {
 	toml := `
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -2195,21 +2171,16 @@ schema = "test"
 returns = "integer"
 body = "SELECT 1;"
 `
+	// function.language required is now owned by the strictspec shape gate.
 	_, diags := Bytes([]byte(toml))
-	found := false
-	for _, d := range diags {
-		if d.Code == "E011" && d.Severity == diagnostic.Error {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected E011 error for missing language, got %v", diags)
+	if _, ok := hasCode(diags, "STRICTSPEC_TYPE_MISSING_REQUIRED"); !ok {
+		t.Errorf("expected STRICTSPEC_TYPE_MISSING_REQUIRED for missing language, got %v", diags)
 	}
 }
 
 func TestFunctionParsing_MissingBody(t *testing.T) {
 	toml := `
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -2233,6 +2204,7 @@ returns = "integer"
 
 func TestFunctionParsing_BothBodyAndFile(t *testing.T) {
 	toml := `
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -2258,6 +2230,7 @@ file = "calc.sql"
 
 func TestFunctionParsing_MissingReturns(t *testing.T) {
 	toml := `
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -2281,6 +2254,7 @@ body = "SELECT 1;"
 
 func TestFunctionParsing_ArgsWithDefaults(t *testing.T) {
 	toml := `
+format_version = 1
 [meta]
 version = 1
 schema = "test"
@@ -2327,7 +2301,8 @@ default = "true"
 }
 
 func TestStateMachineTypeParsing(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -2463,7 +2438,8 @@ comment = "Cancel the order"
 }
 
 func TestStateMachineTypeParsing_TransitionMissingRequired(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "test"
 
@@ -2477,20 +2453,13 @@ initial = "a"
 [[types.bad_sm.transitions]]
 comment = "missing name, from, to"
 `
+	// transition name/from/to required is now owned by the strictspec shape gate.
 	schema, diags := Bytes([]byte(content))
-	if schema == nil {
-		t.Fatalf("expected schema, got nil; diags: %v", diags)
+	if schema != nil {
+		t.Errorf("expected nil schema on gate failure, got non-nil")
 	}
-
-	// Should have E011 errors for missing name, from, to.
-	e011Count := 0
-	for _, d := range diags {
-		if d.Code == "E011" && d.Severity == diagnostic.Error {
-			e011Count++
-		}
-	}
-	if e011Count < 3 {
-		t.Errorf("expected at least 3 E011 errors (name, from, to), got %d; diags: %v", e011Count, diags)
+	if _, ok := hasCode(diags, "STRICTSPEC_TYPE_MISSING_REQUIRED"); !ok {
+		t.Errorf("expected STRICTSPEC_TYPE_MISSING_REQUIRED for missing transition fields, got: %v", diags)
 	}
 }
 
@@ -2505,7 +2474,8 @@ func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 }
 
 func TestTriggerParsing(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 schema = "app"
 version = 1
 
@@ -2609,7 +2579,8 @@ referencing_new = "new_rows"
 }
 
 func TestTriggerParsing_MinimalTrigger(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 schema = "app"
 version = 1
 
@@ -2674,7 +2645,8 @@ timing = "BEFORE"
 }
 
 func TestTriggerParsing_MissingRequired(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 schema = "app"
 version = 1
 
@@ -2690,20 +2662,15 @@ comment = "missing required"
 `
 	_, diags := Bytes([]byte(content))
 
-	// Should have E010 errors for missing function, events, timing.
-	e010Count := 0
-	for _, d := range diags {
-		if d.Code == "E010" && d.Severity == diagnostic.Error {
-			e010Count++
-		}
-	}
-	if e010Count < 3 {
-		t.Errorf("expected at least 3 E010 errors (function, events, timing), got %d; diags: %v", e010Count, diags)
+	// trigger function/events/timing required is now owned by the shape gate.
+	if _, ok := hasCode(diags, "STRICTSPEC_TYPE_MISSING_REQUIRED"); !ok {
+		t.Errorf("expected STRICTSPEC_TYPE_MISSING_REQUIRED for missing trigger fields, got: %v", diags)
 	}
 }
 
 func TestTriggerParsing_UnknownKey(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 schema = "app"
 version = 1
 
@@ -2722,41 +2689,39 @@ unknown_key = "value"
 `
 	_, diags := Bytes([]byte(content))
 
-	found := false
-	for _, d := range diags {
-		if d.Code == "W001" && d.Severity == diagnostic.Warning {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected W001 warning for unknown key, got: %v", diags)
+	// Unknown keys are now a hard error owned by the strictspec shape gate.
+	if _, ok := hasCode(diags, "STRICTSPEC_KEY_UNKNOWN"); !ok {
+		t.Errorf("expected STRICTSPEC_KEY_UNKNOWN for unknown key, got: %v", diags)
 	}
 }
 
 func TestParseGroups(t *testing.T) {
 	content := `
+format_version = 1
 [meta]
 version = 1
 schema = "public"
 
 [tables.users]
 comment = "Users table"
-[tables.users.columns]
-id = "id"
-name = "short_text"
+[tables.users.columns.id]
+type = "id"
+[tables.users.columns.name]
+type = "short_text"
 
 [tables.orders]
 comment = "Orders table"
-[tables.orders.columns]
-id = "id"
-total = "money"
+[tables.orders.columns.id]
+type = "id"
+[tables.orders.columns.total]
+type = "money"
 
 [tables.products]
 comment = "Products table"
-[tables.products.columns]
-id = "id"
-name = "short_text"
+[tables.products.columns.id]
+type = "id"
+[tables.products.columns.name]
+type = "short_text"
 
 [groups]
 core = ["users", "orders"]
@@ -2788,14 +2753,15 @@ catalog = ["products"]
 
 func TestParseGroupsEmpty(t *testing.T) {
 	content := `
+format_version = 1
 [meta]
 version = 1
 schema = "public"
 
 [tables.users]
 comment = "Users"
-[tables.users.columns]
-id = "id"
+[tables.users.columns.id]
+type = "id"
 `
 	schema, diags := Bytes([]byte(content))
 	if schema == nil {
@@ -2811,6 +2777,7 @@ id = "id"
 
 func TestParseMaintenanceSchedule(t *testing.T) {
 	content := `
+format_version = 1
 [meta]
 version = 1
 schema = "public"
@@ -2818,9 +2785,10 @@ extensions = ["pg_partman", "pg_cron"]
 
 [tables.events]
 comment = "Events"
-[tables.events.columns]
-id = "id"
-created_at = "timestamp"
+[tables.events.columns.id]
+type = "id"
+[tables.events.columns.created_at]
+type = "timestamp"
 
 [tables.events.partitioning]
 strategy = "range"

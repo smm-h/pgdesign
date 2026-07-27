@@ -11,6 +11,7 @@ import (
 // composite field order affects ROW(...) construction, tuple comparison, and
 // the CREATE TYPE ... AS (...) DDL.
 const compositeFieldOrderTOML = `
+format_version = 1
 [meta]
 version = 1
 schema = "public"

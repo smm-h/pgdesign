@@ -350,7 +350,8 @@ func TestIdempotentCheckConstraintRoundTrip(t *testing.T) {
 // (which materializes as an enum during Build) also gets the valid DO-block
 // idempotent form, never CREATE TYPE IF NOT EXISTS.
 func TestIdempotentMode_StateMachineEnum(t *testing.T) {
-	content := `[meta]
+	content := `format_version = 1
+[meta]
 version = 1
 schema = "app"
 

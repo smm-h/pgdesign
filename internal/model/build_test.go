@@ -1446,6 +1446,7 @@ func TestBuild_ExtendsComposite(t *testing.T) {
 // Fields are declared deliberately non-alphabetically.
 func TestBuild_CompositeFieldDeclarationOrder(t *testing.T) {
 	const src = `
+format_version = 1
 [meta]
 version = 1
 schema = "public"

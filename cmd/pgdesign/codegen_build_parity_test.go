@@ -17,7 +17,8 @@ func writeGroupedProject(t *testing.T) (string, string) {
 	config.CodegenModes = SupportedModes()
 
 	dir := t.TempDir()
-	schema := `[meta]
+	schema := `format_version = 1
+[meta]
 schema = "parity"
 
 [tables.users]
@@ -134,7 +135,8 @@ func TestCodegenBuildParity_GroupFilter(t *testing.T) {
 func TestCoLocatedGoEnumDeclaredOnce(t *testing.T) {
 	config.CodegenModes = SupportedModes()
 	dir := t.TempDir()
-	schema := `[meta]
+	schema := `format_version = 1
+[meta]
 schema = "cogen"
 
 [types.role]
@@ -225,7 +227,8 @@ func writeSourcedProject(t *testing.T) (string, string, []string) {
 	config.CodegenModes = SupportedModes()
 
 	dir := t.TempDir()
-	schemaA := `[meta]
+	schemaA := `format_version = 1
+[meta]
 schema = "core"
 
 [tables.users]
@@ -237,7 +240,8 @@ type = "id"
 [tables.users.columns.name]
 type = "short_text"
 `
-	schemaB := `[meta]
+	schemaB := `format_version = 1
+[meta]
 schema = "extra"
 
 [tables.audit_log]

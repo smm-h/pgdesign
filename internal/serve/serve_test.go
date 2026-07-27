@@ -151,6 +151,7 @@ func TestPostValidateValid(t *testing.T) {
 	defer ts.Close()
 
 	toml := `
+format_version = 1
 [meta]
 version = 1
 
@@ -192,6 +193,7 @@ func TestPostValidateInvalid(t *testing.T) {
 
 	// Invalid TOML: missing type on column.
 	toml := `
+format_version = 1
 [meta]
 version = 1
 

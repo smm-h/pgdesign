@@ -11,6 +11,7 @@ import (
 // alphabetical position. Declaration order is the semantic order: PostgreSQL
 // enum value order affects comparison operators and ORDER BY.
 const stateOrderTOML = `
+format_version = 1
 [meta]
 version = 1
 schema = "public"
