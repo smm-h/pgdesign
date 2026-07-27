@@ -71,3 +71,4 @@
 {"id":"18c60e36c10e522effd8812ff8444b9884c9f9c731b7e07e","commits":["f5984112cee5a622a44d359171f546f03aff9caa"],"user_facing":true,"description":"**Schema diff now reports PostgreSQL version and table-group changes.** `diff` (and the migrate plan/diff surfaces built on it) previously ignored changes to the target `pg_version` and to `[groups]`, even though both alter the schema; they are now surfaced as changes.","type":"fix"}
 {"id":"18c60e494a12ad166c4ac8a8689f4edd85f0676db8f5a983","commits":["caf9b3ef72ecb248a23fc0fb96fe611cc59a66c5"],"user_facing":false}
 {"id":"18c60f6296edc9d02022826807054c7886c1a1e8b6f51c4e","commits":["8a93702862e078014357156ddccd486b6fc3cfd1"],"user_facing":false}
+{"id":"18c60f6668e88812d9670fc8f6b44ec69d10070572302452","commits":["266aa6e8b5181bf3048af3db3be7c623fed32452"],"user_facing":false}
