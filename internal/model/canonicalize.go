@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/graph"
+	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
 // Canonicalize is the shared finalize routine that puts a resolved Schema into
@@ -28,13 +29,21 @@ import (
 //     (now canonical) tables. Callers that mutate the table set — the group
 //     and source filters — rely on this to avoid carrying a stale graph.
 //
-//  3. Extension point. Once expression normalization lands (roadmap 1.2),
-//     Canonicalize will N-normalize expression fields (CHECK/policy/index
-//     predicates, defaults) into the IR here, activating full L1(a). Until
-//     then, identity is structural with opaque expression leaves.
+//  3. Expression normalization (roadmap 1.2, activating full L1(a)).
+//     N-normalizes every expression-bearing field into the IR (defaults, CHECK
+//     expressions, index/exclusion predicates, policy USING/WITH CHECK,
+//     generated-column expressions, domain CHECK/default). This is what makes
+//     enc(a) = enc(b) iff a ≈_syn b hold over expressions, not just structure.
+//     N is best-effort total: an expression that does not parse (user SQL can
+//     be partial) is left VERBATIM (trimmed) rather than erroring, so schemas
+//     that Build accepted before still Build.
 //
 // Canonicalize is idempotent: running it twice yields the same result.
 func (s *Schema) Canonicalize() {
+	// 0. Expression normalization (see step 3 in the doc comment). Runs first;
+	// it does not affect any name-based ordering below.
+	s.normalizeExpressions()
+
 	// 1a. Per-table collections: alphabetical by name.
 	for i := range s.Tables {
 		t := &s.Tables[i]
@@ -141,6 +150,57 @@ func smTransitionKey(t SMTransition) string {
 		req.String(),
 		t.Comment,
 	}, "\x1f")
+}
+
+// normExpr N-normalizes a non-empty expression string in place, leaving empty
+// strings untouched. Parse failures return the input verbatim (per N), so this
+// never rejects previously-accepted schemas.
+func normExpr(s *string) {
+	if *s != "" {
+		*s = sqlparse.NormalizeExpr(*s)
+	}
+}
+
+// normalizeExpressions N-normalizes every expression-bearing field in the model
+// (roadmap 1.2). Index/exclusion KEY-COLUMN entries are deliberately NOT
+// normalized: they are stored as bare strings mixing plain identifiers with
+// expression columns, and round-tripping a plain identifier through N would
+// re-quote reserved-word column names and case-fold others — mangling stable
+// identifiers. Only unambiguous full-expression fields are normalized here;
+// predicates (WHERE) are.
+func (s *Schema) normalizeExpressions() {
+	for i := range s.Tables {
+		t := &s.Tables[i]
+		for j := range t.Columns {
+			normExpr(&t.Columns[j].DefaultExpr)
+			normExpr(&t.Columns[j].Generated)
+		}
+		for j := range t.Checks {
+			normExpr(&t.Checks[j].Expr)
+		}
+		for j := range t.Indexes {
+			normExpr(&t.Indexes[j].Where)
+		}
+		for j := range t.Exclusions {
+			normExpr(&t.Exclusions[j].Where)
+		}
+		for j := range t.Policies {
+			normExpr(&t.Policies[j].Using)
+			normExpr(&t.Policies[j].WithCheck)
+		}
+	}
+	for i := range s.MaterializedViews {
+		for j := range s.MaterializedViews[i].Indexes {
+			normExpr(&s.MaterializedViews[i].Indexes[j].Where)
+		}
+	}
+	// Domain CHECK/default expressions are deliberately NOT normalized here.
+	// They are outside the roadmap's Canonicalize field list, and a domain
+	// CHECK's `VALUE` keyword parses as an ordinary column reference that N
+	// would case-fold to `value` — an unconventional, lossy rewrite of the
+	// canonical uppercase form PostgreSQL renders. The differ still compares
+	// domain expressions via N (both sides fold identically), so false drift is
+	// avoided without mutating the stored IR.
 }
 
 // canonicalizePartition recursively sorts a partition subtree's children by

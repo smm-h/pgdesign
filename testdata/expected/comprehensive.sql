@@ -78,8 +78,8 @@ ALTER TABLE app.comments ADD CONSTRAINT fk_comments_task FOREIGN KEY (task_id) R
 
 ALTER TABLE app.tasks ADD CONSTRAINT uq_tasks_project_title UNIQUE (project_id, title);
 
-ALTER TABLE app.audit_log ADD CONSTRAINT ck_metadata_title_type CHECK (metadata ? 'title' AND jsonb_typeof(metadata->'title') = 'string');
-ALTER TABLE app.audit_log ADD CONSTRAINT ck_metadata_value_type CHECK (metadata ? 'value' AND jsonb_typeof(metadata->'value') = 'number');
+ALTER TABLE app.audit_log ADD CONSTRAINT ck_metadata_title_type CHECK (metadata ? 'title' AND jsonb_typeof(metadata -> 'title') = 'string');
+ALTER TABLE app.audit_log ADD CONSTRAINT ck_metadata_value_type CHECK (metadata ? 'value' AND jsonb_typeof(metadata -> 'value') = 'number');
 ALTER TABLE app.tasks ADD CONSTRAINT ck_tasks_positive_hours CHECK (estimated_hours >= 0);
 
 CREATE INDEX idx_audit_log_project ON app.audit_log (project_id, created_at DESC);

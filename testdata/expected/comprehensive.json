@@ -241,11 +241,11 @@
       "checks": [
         {
           "name": "ck_metadata_title_type",
-          "expr": "metadata ? 'title' AND jsonb_typeof(metadata-\u003e'title') = 'string'"
+          "expr": "metadata ? 'title' AND jsonb_typeof(metadata -\u003e 'title') = 'string'"
         },
         {
           "name": "ck_metadata_value_type",
-          "expr": "metadata ? 'value' AND jsonb_typeof(metadata-\u003e'value') = 'number'"
+          "expr": "metadata ? 'value' AND jsonb_typeof(metadata -\u003e 'value') = 'number'"
         }
       ],
       "exclusions": null,

@@ -1546,8 +1546,8 @@ func TestJSONSchemaCheckConstraints(t *testing.T) {
 				},
 				PK: []string{"id"},
 				Checks: []model.CheckConstraint{
-					{Name: "ck_metadata_title_type", Expr: "metadata ? 'title' AND jsonb_typeof(metadata->'title') = 'string'"},
-					{Name: "ck_metadata_price_type", Expr: "metadata ? 'price' AND jsonb_typeof(metadata->'price') = 'number'"},
+					{Name: "ck_metadata_title_type", Expr: "metadata ? 'title' AND jsonb_typeof(metadata -> 'title') = 'string'"},
+					{Name: "ck_metadata_price_type", Expr: "metadata ? 'price' AND jsonb_typeof(metadata -> 'price') = 'number'"},
 				},
 			},
 		},
@@ -1559,13 +1559,13 @@ func TestJSONSchemaCheckConstraints(t *testing.T) {
 	if !strings.Contains(out, "ck_metadata_title_type") {
 		t.Errorf("expected CHECK for title type, got:\n%s", out)
 	}
-	if !strings.Contains(out, "metadata ? 'title' AND jsonb_typeof(metadata->'title') = 'string'") {
+	if !strings.Contains(out, "metadata ? 'title' AND jsonb_typeof(metadata -> 'title') = 'string'") {
 		t.Errorf("expected jsonb_typeof check for title, got:\n%s", out)
 	}
 	if !strings.Contains(out, "ck_metadata_price_type") {
 		t.Errorf("expected CHECK for price type, got:\n%s", out)
 	}
-	if !strings.Contains(out, "metadata ? 'price' AND jsonb_typeof(metadata->'price') = 'number'") {
+	if !strings.Contains(out, "metadata ? 'price' AND jsonb_typeof(metadata -> 'price') = 'number'") {
 		t.Errorf("expected jsonb_typeof check for price, got:\n%s", out)
 	}
 }
