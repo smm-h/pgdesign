@@ -27,17 +27,24 @@ func kwargsConfigOverride(kwargs map[string]interface{}) *string {
 	return &s
 }
 
-// kwargsStrSlice converts a variadic arg ([]interface{} of strings) to []string.
+// kwargsStrSlice converts a variadic arg or list flag to []string. It tolerates
+// both the []interface{} form (variadic positional args) and the []string form
+// (strictcli list flags).
 func kwargsStrSlice(v interface{}) []string {
-	if v == nil {
+	switch raw := v.(type) {
+	case nil:
+		return nil
+	case []string:
+		return raw
+	case []interface{}:
+		out := make([]string, len(raw))
+		for i, r := range raw {
+			out[i] = r.(string)
+		}
+		return out
+	default:
 		return nil
 	}
-	raw := v.([]interface{})
-	out := make([]string, len(raw))
-	for i, r := range raw {
-		out[i] = r.(string)
-	}
-	return out
 }
 
 // kwargsOptString extracts an optional string flag. Returns nil when not provided.

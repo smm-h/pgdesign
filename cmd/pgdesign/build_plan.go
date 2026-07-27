@@ -68,14 +68,7 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 		}
 
 		// Filter schema tables by groups and/or source files when configured.
-		// Both filters compose via AND: groups narrows first, source narrows further.
-		outputSchema := schema
-		if len(out.Groups) > 0 {
-			outputSchema = outputSchema.FilterByGroups(out.Groups)
-		}
-		if len(out.Source) > 0 {
-			outputSchema = outputSchema.FilterBySource(out.Source)
-		}
+		outputSchema := applyOutputFilters(schema, out.Groups, out.Source)
 
 		switch out.Format {
 		case "sql":
@@ -136,6 +129,47 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 		}
 	}
 
+	return result, nil
+}
+
+// applyOutputFilters narrows schema for a single output per its group and
+// source configuration. Both filters compose via AND: groups narrows first,
+// source narrows further. This is the single filtering rule shared by `build`
+// and the standalone `codegen` command so the same artifact never has two
+// contents depending on the entry point.
+func applyOutputFilters(schema *model.Schema, groups, source []string) *model.Schema {
+	out := schema
+	if len(groups) > 0 {
+		out = out.FilterByGroups(groups)
+	}
+	if len(source) > 0 {
+		out = out.FilterBySource(source)
+	}
+	return out
+}
+
+// PlanStandaloneCodegen plans a single codegen output through the exact planner
+// path `build` uses: group/source filtering, header handling, and owned-dir
+// bookkeeping all match build. The standalone `codegen` command is a thin
+// caller of this, so its written artifacts and orphan behavior are identical to
+// build's for the same output configuration.
+func PlanStandaloneCodegen(schema *model.Schema, out config.OutputConfig[config.AbsolutePath]) (*PlanResult, error) {
+	result := &PlanResult{
+		Files:     make(map[string][]byte),
+		OwnedDirs: make(map[string]map[string]bool),
+	}
+	outputSchema := applyOutputFilters(schema, out.Groups, out.Source)
+	if err := planCodegen("codegen", outputSchema, out, string(out.Path), result); err != nil {
+		return nil, err
+	}
+	// Mirror Plan's post-pass: configured/produced paths inside an owned
+	// directory are owned, never orphans.
+	if len(result.OwnedDirs) > 0 {
+		result.markOwnedIfInside(string(out.Path))
+		for fp := range result.Files {
+			result.markOwnedIfInside(fp)
+		}
+	}
 	return result, nil
 }
 

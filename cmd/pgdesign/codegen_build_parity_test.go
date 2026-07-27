@@ -1,0 +1,173 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/smm-h/pgdesign/internal/config"
+)
+
+// writeGroupedProject creates a temp project with two tables assigned to two
+// groups plus a build [output] that emits Go constants filtered to the "core"
+// group. Returns (projectRoot, buildOutputAbsPath).
+func writeGroupedProject(t *testing.T) (string, string) {
+	t.Helper()
+	config.CodegenModes = SupportedModes()
+
+	dir := t.TempDir()
+	schema := `[meta]
+schema = "parity"
+
+[tables.users]
+comment = "Core users table"
+
+[tables.users.columns.id]
+type = "id"
+
+[tables.users.columns.name]
+type = "short_text"
+
+[tables.audit_log]
+comment = "Peripheral audit log"
+
+[tables.audit_log.columns.id]
+type = "id"
+
+[tables.audit_log.columns.note]
+type = "short_text"
+
+[groups]
+core = ["users"]
+extra = ["audit_log"]
+`
+	if err := os.WriteFile(filepath.Join(dir, "schema.toml"), []byte(schema), 0o644); err != nil {
+		t.Fatalf("write schema.toml: %v", err)
+	}
+
+	buildOut := filepath.Join(dir, "build_out", "tables.go")
+	cfg := fmt.Sprintf(`[project]
+schemas = ["schema.toml"]
+
+[database]
+pg_version = 16
+
+[output.consts]
+format = "codegen"
+path = %q
+lang = "go"
+mode = "constants"
+groups = ["core"]
+`, buildOut)
+	if err := os.WriteFile(filepath.Join(dir, "pgdesign.toml"), []byte(cfg), 0o644); err != nil {
+		t.Fatalf("write pgdesign.toml: %v", err)
+	}
+	return dir, buildOut
+}
+
+// TestCodegenBuildParity_GroupFilter pins that the standalone `codegen` command
+// and `build` produce byte-identical output for the same artifact, INCLUDING
+// under a group filter. Before consolidation, standalone codegen ignored
+// FilterByGroups/FilterBySource, so the same artifact had two contents
+// depending on the entry point.
+func TestCodegenBuildParity_GroupFilter(t *testing.T) {
+	dir, buildOut := writeGroupedProject(t)
+	schemaPath := filepath.Join(dir, "schema.toml")
+	cfgPath := filepath.Join(dir, "pgdesign.toml")
+
+	// Build (canonical): writes the group-filtered constants file.
+	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+		t.Fatalf("runBuild exited %d", code)
+	}
+	buildContent, err := os.ReadFile(buildOut)
+	if err != nil {
+		t.Fatalf("read build output: %v", err)
+	}
+
+	// Standalone codegen with the same group filter, to a separate path whose
+	// parent already exists (isolating the content divergence from directory
+	// creation).
+	codegenOut := filepath.Join(dir, "codegen_tables.go")
+	kwargs := map[string]interface{}{
+		"path":       []interface{}{schemaPath},
+		"lang":       "go",
+		"mode":       "constants",
+		"check":      false,
+		"split_mode": nil,
+		"db":         nil,
+		"output":     codegenOut,
+		"groups":     []interface{}{"core"},
+		"source":     nil,
+	}
+	if code := runCodegen(&cfgPath, true, kwargs); code != 0 {
+		t.Fatalf("runCodegen exited %d", code)
+	}
+	codegenContent, err := os.ReadFile(codegenOut)
+	if err != nil {
+		t.Fatalf("read codegen output: %v", err)
+	}
+
+	if string(buildContent) != string(codegenContent) {
+		t.Errorf("standalone codegen and build must be byte-identical under a group filter.\nbuild:\n%s\ncodegen:\n%s", buildContent, codegenContent)
+	}
+
+	// Sanity: the filtered artifact must exclude the peripheral table.
+	if wantExclude := "audit_log"; contains(string(buildContent), wantExclude) {
+		t.Errorf("group-filtered build output should not mention %q", wantExclude)
+	}
+}
+
+// TestCodegenWriteRefusesOrphans pins that a standalone codegen WRITE (not just
+// --check) refuses when an orphan file exists in an owned multi-file output
+// directory and never deletes it -- the same hard-error orphan behavior build
+// enforces. Before write-path consolidation the standalone write path did no
+// orphan detection at all.
+func TestCodegenWriteRefusesOrphans(t *testing.T) {
+	dir := writeFreshnessProject(t, "faceted")
+	schemaPath := filepath.Join(dir, "schema.toml")
+	outDir := filepath.Join(dir, "gen")
+
+	write := func() int {
+		return runCodegen(nil, true, map[string]interface{}{
+			"path":       []interface{}{schemaPath},
+			"lang":       "python",
+			"mode":       "ddl",
+			"check":      false,
+			"split_mode": "faceted",
+			"db":         nil,
+			"output":     outDir,
+			"groups":     nil,
+			"source":     nil,
+		})
+	}
+
+	// First write is clean.
+	if code := write(); code != 0 {
+		t.Fatalf("initial codegen write exited %d", code)
+	}
+
+	// Plant an orphan inside the owned directory.
+	orphan := filepath.Join(outDir, "leftover.py")
+	if err := os.WriteFile(orphan, []byte("# leftover\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A subsequent write must refuse (orphan is a hard error) and must not
+	// delete the orphan.
+	if code := write(); code != 1 {
+		t.Fatalf("codegen write with orphan must exit 1, got %d", code)
+	}
+	if _, err := os.Stat(orphan); err != nil {
+		t.Fatalf("codegen write must never delete the orphan: %v", err)
+	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}

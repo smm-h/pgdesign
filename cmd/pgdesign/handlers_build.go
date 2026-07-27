@@ -149,20 +149,10 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 	}
 
 	// Write all planned files to disk.
-	var writtenFiles []string
-	for _, p := range paths {
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			fmt.Fprintf(os.Stderr, "build: %v\n", err)
-			return 1
-		}
-		if err := os.WriteFile(p, plan.Files[p], 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "build: %v\n", err)
-			return 1
-		}
-		if !quiet {
-			fmt.Fprintf(os.Stderr, "wrote %s (%d bytes)\n", p, len(plan.Files[p]))
-		}
-		writtenFiles = append(writtenFiles, p)
+	writtenFiles, err := writePlanFiles(paths, plan.Files, quiet)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "build: %v\n", err)
+		return 1
 	}
 	writtenFiles = append(writtenFiles, svgFiles...)
 
@@ -178,6 +168,27 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 	}
 
 	return 0
+}
+
+// writePlanFiles writes each planned file (in the given path order) to disk,
+// creating parent directories as needed. It is the single multi-file write path
+// shared by `build` and the standalone `codegen` command. Returns the list of
+// written paths (for downstream auto-commit).
+func writePlanFiles(paths []string, files map[string][]byte, quiet bool) ([]string, error) {
+	var written []string
+	for _, p := range paths {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			return written, err
+		}
+		if err := os.WriteFile(p, files[p], 0o644); err != nil {
+			return written, err
+		}
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "wrote %s (%d bytes)\n", p, len(files[p]))
+		}
+		written = append(written, p)
+	}
+	return written, nil
 }
 
 // handleBuildDryRun compares planned files against disk and reports per-file
