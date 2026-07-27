@@ -358,6 +358,33 @@ print("OK")
 	runCompile(t, base, nil, "python3", "check.py")
 }
 
+// pyModuleAvailable reports whether python3 can import the given module.
+func pyModuleAvailable(mod string) bool {
+	if _, err := exec.LookPath("python3"); err != nil {
+		return false
+	}
+	return exec.Command("python3", "-c", "import "+mod).Run() == nil
+}
+
+// TestCompilePythonSQLAlchemy type-checks the branded sqlalchemy models: enum
+// columns are sa.Enum(PyEnumClass) with the branded StrEnum both as column type
+// and Mapped[...] annotation (roadmap 4.1). It needs mypy AND an importable
+// sqlalchemy (a library, not a toolchain binary); it SKIPS when sqlalchemy is
+// absent even under PGDESIGN_REQUIRE_COMPILE_TOOLCHAINS, since that variable
+// gates toolchain binaries, not optional third-party libraries. CI must
+// provision sqlalchemy for this check to run.
+func TestCompilePythonSQLAlchemy(t *testing.T) {
+	requireTool(t, "mypy")
+	if !pyModuleAvailable("sqlalchemy") {
+		t.Skip("sqlalchemy not importable (provision it in CI to run this check)")
+	}
+	dir := t.TempDir()
+	out, diags := (&codegen.PythonSQLAlchemyGenerator{}).Generate(loadCompileSchema(t))
+	failOnCompileErrDiags(t, diags)
+	writeFiles(t, dir, map[string][]byte{"models.py": out})
+	runCompile(t, dir, nil, "mypy", "--strict", "models.py")
+}
+
 func TestCompileJavaTypes(t *testing.T) {
 	requireTool(t, "javac")
 	dir := t.TempDir()

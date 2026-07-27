@@ -277,14 +277,21 @@ func TestPythonSQLAlchemyGenerator_Enums(t *testing.T) {
 
 	result := string(out)
 
-	// sa.Enum column type with declared values and type name.
-	if !strings.Contains(result, `Enum("active", "inactive", "banned", name="account_status")`) {
-		t.Errorf("missing sa.Enum column type with values and name, got:\n%s", result)
+	// Branded: sa.Enum references the generated StrEnum class, and the class is
+	// defined in the file with a StrEnum import.
+	if !strings.Contains(result, `Enum(AccountStatus)`) {
+		t.Errorf("missing sa.Enum(PyEnumClass) column type, got:\n%s", result)
+	}
+	if !strings.Contains(result, "class AccountStatus(StrEnum):") {
+		t.Errorf("missing branded enum class definition, got:\n%s", result)
+	}
+	if !strings.Contains(result, "from enum import StrEnum") {
+		t.Error("missing StrEnum import")
 	}
 
-	// Python type stays str.
-	if !containsSAField(result, "status", "str") {
-		t.Error("missing or incorrect status field (expected str)")
+	// Python type is the branded enum class.
+	if !containsSAField(result, "status", "AccountStatus") {
+		t.Error("missing or incorrect status field (expected AccountStatus)")
 	}
 
 	// Enum must be in the sqlalchemy imports.
@@ -327,11 +334,14 @@ func TestPythonSQLAlchemyGenerator_StateMachine(t *testing.T) {
 
 	result := string(out)
 
-	if !strings.Contains(result, `Enum("pending", "shipped", "delivered", name="order_state")`) {
-		t.Errorf("missing sa.Enum column type for state machine, got:\n%s", result)
+	if !strings.Contains(result, `Enum(OrderState)`) {
+		t.Errorf("missing sa.Enum(PyEnumClass) column type for state machine, got:\n%s", result)
 	}
-	if !containsSAField(result, "state", "str") {
-		t.Error("missing or incorrect state field (expected str)")
+	if !strings.Contains(result, "class OrderState(StrEnum):") {
+		t.Errorf("missing branded state-machine enum class, got:\n%s", result)
+	}
+	if !containsSAField(result, "state", "OrderState") {
+		t.Error("missing or incorrect state field (expected OrderState)")
 	}
 }
 

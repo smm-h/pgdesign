@@ -36,18 +36,15 @@ func pgTypeToSA(col model.Column, enumsByName map[string]*model.Enum) saTypeInfo
 		return saTypeInfo{SAColumnType: "Integer", PythonType: "int", SAImport: "Integer"}
 	}
 
-	// Enum and state machine columns map to sa.Enum with the declared values.
-	// The Python type stays str: sa.Enum stores/returns plain strings.
+	// Enum and state machine columns map to sa.Enum(PyEnumClass) with the branded
+	// StrEnum class as both the column type and the mapped Python type, so the
+	// ORM validates against and returns the branded enum rather than plain str.
 	if col.TypeKind == "enum" || col.TypeKind == "state_machine" {
 		if e, ok := enumsByName[col.PGType.Base]; ok {
-			parts := make([]string, 0, len(e.Values)+1)
-			for _, v := range e.Values {
-				parts = append(parts, fmt.Sprintf("%q", v))
-			}
-			parts = append(parts, fmt.Sprintf("name=%q", e.Name))
+			className := EnumTypeName(e.Name)
 			return saTypeInfo{
-				SAColumnType: "Enum(" + strings.Join(parts, ", ") + ")",
-				PythonType:   "str",
+				SAColumnType: "Enum(" + className + ")",
+				PythonType:   className,
 				SAImport:     "Enum",
 			}
 		}
@@ -145,6 +142,7 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 	needAny := false
 	needText := false
 	needForeignKey := false
+	usedEnumNames := make(map[string]bool)
 
 	for _, tbl := range schema.Tables {
 		ci := classInfo{
@@ -168,6 +166,14 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 		// Generate column fields.
 		for _, col := range tbl.Columns {
 			info := pgTypeToSA(col, enumsByName)
+
+			// Track branded enum classes referenced so their definitions and the
+			// StrEnum import are emitted.
+			if col.TypeKind == "enum" || col.TypeKind == "state_machine" {
+				if e, ok := enumsByName[col.PGType.Base]; ok {
+					usedEnumNames[e.Name] = true
+				}
+			}
 
 			// Track imports.
 			if info.SAImport != "" {
@@ -308,6 +314,9 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 	if pyStdImports["Decimal"] {
 		stdlibLines = append(stdlibLines, "from decimal import Decimal")
 	}
+	if len(usedEnumNames) > 0 {
+		stdlibLines = append(stdlibLines, "from enum import StrEnum")
+	}
 	// Typing imports.
 	var typingItems []string
 	if needAny {
@@ -358,6 +367,19 @@ func (g *PythonSQLAlchemyGenerator) Generate(schema *model.Schema) ([]byte, []di
 
 	// ORM imports (always needed).
 	buf.WriteString("from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship\n")
+
+	// Branded enum class definitions (the generator now emits these; sa.Enum
+	// references the class, and Mapped[EnumClass] carries the branded type).
+	if len(usedEnumNames) > 0 {
+		var used []model.Enum
+		for i := range schema.Enums {
+			if usedEnumNames[schema.Enums[i].Name] {
+				used = append(used, schema.Enums[i])
+			}
+		}
+		buf.WriteString("\n\n")
+		buf.WriteString(GenerateEnums(used, LangPython))
+	}
 
 	// Base class.
 	buf.WriteString("\n\nclass Base(DeclarativeBase):\n    pass\n")
