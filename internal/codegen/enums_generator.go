@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
@@ -33,8 +34,17 @@ func (g *EnumsGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.Di
 	}
 
 	// Write language-specific preamble.
-	if g.Lang == LangPython {
+	switch g.Lang {
+	case LangPython:
 		buf.WriteString("\nfrom enum import StrEnum\n")
+	case LangGo:
+		// The branded Go enum block references json/driver/fmt; frame it as a
+		// compilable package.
+		buf.WriteString("\npackage schema\n\nimport (\n")
+		for _, imp := range goEnumImports {
+			fmt.Fprintf(&buf, "\t%q\n", imp)
+		}
+		buf.WriteString(")\n")
 	}
 
 	buf.WriteString("\n")

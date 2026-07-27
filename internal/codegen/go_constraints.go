@@ -21,7 +21,12 @@ func (g *GoConstraintsGenerator) Generate(schema *model.Schema) ([]byte, []diagn
 	if schema.Name != "" {
 		fmt.Fprintf(&buf, "// Schema: %s\n", schema.Name)
 	}
-	buf.WriteString("\npackage constraints\n")
+	// Validators live in the same package as the branded row structs and enum
+	// types they validate: Go has no configurable cross-package import path for
+	// the schema package, so same-package reference is the only self-contained
+	// compilable form. Row structs (Accounts) and branded enums (Role) are
+	// referenced directly; enum fields validate via .String()/.IsValid().
+	buf.WriteString("\npackage schema\n")
 
 	needsRegexp := false
 
@@ -93,9 +98,24 @@ func writeGoValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 	fmt.Fprintf(buf, "func %s(row %s) []ValidationError {\n", funcName, typeName)
 	buf.WriteString("\tvar errs []ValidationError\n")
 
-	// NOT NULL checks (only meaningful for string types in Go).
+	// Enum columns are branded structs whose zero value is detectably invalid;
+	// track them so the NOT NULL check uses !IsValid() rather than a == "" check
+	// that no longer type-checks against the struct type.
+	enumCols := make(map[string]bool, len(cs.EnumFields))
+	for col := range cs.EnumFields {
+		enumCols[col] = true
+	}
+
+	// NOT NULL checks. String columns use the empty-string zero value; branded
+	// enum columns use the branded zero value, which .IsValid() rejects.
 	for _, col := range cs.NotNullFields {
 		goField := toPascalCase(col)
+		if enumCols[col] {
+			fmt.Fprintf(buf, "\tif !row.%s.IsValid() {\n", goField)
+			fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: \"must be a defined value\"})\n", col)
+			buf.WriteString("\t}\n")
+			continue
+		}
 		pgType := columnPGType(table, col)
 		if isStringPGType(pgType) {
 			fmt.Fprintf(buf, "\tif row.%s == \"\" {\n", goField)
@@ -104,10 +124,11 @@ func writeGoValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 		}
 	}
 
-	// Enum checks.
+	// Enum value checks: switch on the branded value's .String() so the cases
+	// stay plain string literals against the underlying value.
 	for _, ef := range cs.SortedEnumFields() {
 		goField := toPascalCase(ef.Column)
-		fmt.Fprintf(buf, "\tswitch row.%s {\n", goField)
+		fmt.Fprintf(buf, "\tswitch row.%s.String() {\n", goField)
 		fmt.Fprintf(buf, "\tcase ")
 		for i, v := range ef.Values {
 			if i > 0 {
@@ -118,8 +139,17 @@ func writeGoValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 		buf.WriteString(":\n")
 		buf.WriteString("\t\t// valid\n")
 		buf.WriteString("\tdefault:\n")
-		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: fmt.Sprintf(\"invalid value %%q\", row.%s)})\n", ef.Column, goField)
+		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: fmt.Sprintf(\"invalid value %%q\", row.%s.String())})\n", ef.Column, goField)
 		buf.WriteString("\t}\n")
+	}
+
+	// Nullable columns map to Go pointer fields; a CHECK only applies to a
+	// present value, so wrap those checks in a nil guard and dereference.
+	nullable := make(map[string]bool, len(table.Columns))
+	for _, c := range table.Columns {
+		if !c.NotNull && !c.Array {
+			nullable[c.Name] = true
+		}
 	}
 
 	// CHECK constraint checks.
@@ -130,14 +160,25 @@ func writeGoValidator(buf *bytes.Buffer, table model.Table, cs ConstraintSet) {
 			fmt.Fprintf(buf, "\t// CHECK on %s: %s (unrecognized pattern, skipped)\n", ce.Column, ce.Expr)
 			continue
 		}
-		writeGoCheckPattern(buf, ce.Column, goField, pat)
+		fieldExpr := "row." + goField
+		if nullable[ce.Column] {
+			fmt.Fprintf(buf, "\tif row.%s != nil {\n", goField)
+			fieldExpr = "(*row." + goField + ")"
+		}
+		writeGoCheckPattern(buf, ce.Column, fieldExpr, pat)
+		if nullable[ce.Column] {
+			buf.WriteString("\t}\n")
+		}
 	}
 
 	buf.WriteString("\treturn errs\n")
 	buf.WriteString("}\n")
 }
 
-func writeGoCheckPattern(buf *bytes.Buffer, col, goField string, pat checkPattern) {
+// writeGoCheckPattern emits a validation branch. fieldExpr is the Go value
+// expression for the column (e.g. "row.Slug" or "(*row.Note)" for a nullable
+// column already nil-guarded by the caller).
+func writeGoCheckPattern(buf *bytes.Buffer, col, fieldExpr string, pat checkPattern) {
 	switch p := pat.(type) {
 	case *rangePattern:
 		// The CHECK passes when value >= low (if LowIncl) or value > low (if !LowIncl).
@@ -153,20 +194,20 @@ func writeGoCheckPattern(buf *bytes.Buffer, col, goField string, pat checkPatter
 		} else {
 			highOp = ">=" // fails when value >= high
 		}
-		fmt.Fprintf(buf, "\tif row.%s %s %s || row.%s %s %s {\n", goField, lowOp, p.Low, goField, highOp, p.High)
+		fmt.Fprintf(buf, "\tif %s %s %s || %s %s %s {\n", fieldExpr, lowOp, p.Low, fieldExpr, highOp, p.High)
 		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: \"value out of range\"})\n", col)
 		buf.WriteString("\t}\n")
 
 	case *comparisonPattern:
 		failOp := invertComparisonOp(p.Op)
-		fmt.Fprintf(buf, "\tif row.%s %s %s {\n", goField, failOp, p.Value)
+		fmt.Fprintf(buf, "\tif %s %s %s {\n", fieldExpr, failOp, p.Value)
 		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: \"failed check: %s\"})\n", col, escapeGoString(p.Op+" "+p.Value))
 		buf.WriteString("\t}\n")
 
 	case *lengthPattern:
 		failOp := invertComparisonOp(p.Op)
-		fmt.Fprintf(buf, "\tif len(row.%s) %s %d {\n", goField, failOp, p.Value)
-		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: fmt.Sprintf(\"length must be %s %d, got %%d\", len(row.%s))})\n", col, p.Op, p.Value, goField)
+		fmt.Fprintf(buf, "\tif len(%s) %s %d {\n", fieldExpr, failOp, p.Value)
+		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: fmt.Sprintf(\"length must be %s %d, got %%d\", len(%s))})\n", col, p.Op, p.Value, fieldExpr)
 		buf.WriteString("\t}\n")
 
 	case *likePattern:
@@ -177,9 +218,9 @@ func writeGoCheckPattern(buf *bytes.Buffer, col, goField string, pat checkPatter
 		varName := col + "Re"
 		fmt.Fprintf(buf, "\t%s := regexp.MustCompile(%q)\n", varName, regex)
 		if p.IsNegated() {
-			fmt.Fprintf(buf, "\tif %s.MatchString(row.%s) {\n", varName, goField)
+			fmt.Fprintf(buf, "\tif %s.MatchString(%s) {\n", varName, fieldExpr)
 		} else {
-			fmt.Fprintf(buf, "\tif !%s.MatchString(row.%s) {\n", varName, goField)
+			fmt.Fprintf(buf, "\tif !%s.MatchString(%s) {\n", varName, fieldExpr)
 		}
 		fmt.Fprintf(buf, "\t\terrs = append(errs, ValidationError{Field: %q, Message: \"does not match required pattern\"})\n", col)
 		buf.WriteString("\t}\n")

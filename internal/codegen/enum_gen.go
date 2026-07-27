@@ -105,7 +105,17 @@ func GenerateEnums(enums []model.Enum, lang Lang) string {
 	return strings.Join(parts, "\n")
 }
 
-// generateGoEnum produces a Go type + const block for an enum.
+// goEnumImports lists the stdlib import paths the branded Go enum block needs
+// (json/driver/fmt for the validating boundary methods). Callers that emit the
+// Go enum block must union these into the file's import set.
+var goEnumImports = []string{"database/sql/driver", "encoding/json", "fmt"}
+
+// generateGoEnum produces a BRANDED Go enum: an opaque struct with an
+// unexported value field, package-level var members (a const of struct type is
+// illegal), a validating ParseXxx constructor, and Stringer/Valuer/Marshaler
+// plus validating Scanner/Unmarshalers routed through ParseXxx. The zero value
+// (empty value field) is detectably invalid via IsValid/ParseXxx, so a value
+// that never passed a boundary cannot masquerade as a defined member.
 func generateGoEnum(e model.Enum) string {
 	var buf bytes.Buffer
 	typeName := toPascalCase(e.Name)
@@ -113,12 +123,62 @@ func generateGoEnum(e model.Enum) string {
 	if e.Comment != "" {
 		fmt.Fprintf(&buf, "// %s %s\n", typeName, e.Comment)
 	}
-	fmt.Fprintf(&buf, "type %s string\n\nconst (\n", typeName)
+	// Opaque struct: the value is unexported so it cannot be constructed with an
+	// arbitrary string outside this package.
+	fmt.Fprintf(&buf, "type %s struct{ value string }\n\n", typeName)
+
+	// Var members (const of struct type is illegal in Go).
+	buf.WriteString("var (\n")
 	for _, v := range e.Values {
-		constName := typeName + sanitizeEnumValue(v, LangGo)
-		fmt.Fprintf(&buf, "\t%s %s = %q\n", constName, typeName, v)
+		memberName := typeName + sanitizeEnumValue(v, LangGo)
+		fmt.Fprintf(&buf, "\t%s = %s{%q}\n", memberName, typeName, v)
 	}
-	buf.WriteString(")\n")
+	buf.WriteString(")\n\n")
+
+	// Validating constructor.
+	fmt.Fprintf(&buf, "// Parse%s returns the %s for s, or an error if s is not a defined value.\n", typeName, typeName)
+	fmt.Fprintf(&buf, "func Parse%s(s string) (%s, error) {\n", typeName, typeName)
+	buf.WriteString("\tswitch s {\n")
+	for _, v := range e.Values {
+		memberName := typeName + sanitizeEnumValue(v, LangGo)
+		fmt.Fprintf(&buf, "\tcase %q:\n\t\treturn %s, nil\n", v, memberName)
+	}
+	fmt.Fprintf(&buf, "\tdefault:\n\t\treturn %s{}, fmt.Errorf(\"invalid %s: %%q\", s)\n\t}\n}\n\n", typeName, typeName)
+
+	// Stringer.
+	fmt.Fprintf(&buf, "// String returns the underlying enum value.\n")
+	fmt.Fprintf(&buf, "func (e %s) String() string { return e.value }\n\n", typeName)
+
+	// IsValid: the zero value (value == "") is not a defined member.
+	fmt.Fprintf(&buf, "// IsValid reports whether e holds a defined enum value (the zero value does not).\n")
+	fmt.Fprintf(&buf, "func (e %s) IsValid() bool {\n\t_, err := Parse%s(e.value)\n\treturn err == nil\n}\n\n", typeName, typeName)
+
+	// Valuer.
+	fmt.Fprintf(&buf, "// Value implements driver.Valuer.\n")
+	fmt.Fprintf(&buf, "func (e %s) Value() (driver.Value, error) { return e.value, nil }\n\n", typeName)
+
+	// MarshalJSON.
+	fmt.Fprintf(&buf, "// MarshalJSON implements json.Marshaler.\n")
+	fmt.Fprintf(&buf, "func (e %s) MarshalJSON() ([]byte, error) { return json.Marshal(e.value) }\n\n", typeName)
+
+	// UnmarshalJSON via Parse (validating).
+	fmt.Fprintf(&buf, "// UnmarshalJSON implements json.Unmarshaler, validating via Parse%s.\n", typeName)
+	fmt.Fprintf(&buf, "func (e *%s) UnmarshalJSON(data []byte) error {\n", typeName)
+	buf.WriteString("\tvar s string\n\tif err := json.Unmarshal(data, &s); err != nil {\n\t\treturn err\n\t}\n")
+	fmt.Fprintf(&buf, "\tv, err := Parse%s(s)\n\tif err != nil {\n\t\treturn err\n\t}\n\t*e = v\n\treturn nil\n}\n\n", typeName)
+
+	// UnmarshalText via Parse (validating).
+	fmt.Fprintf(&buf, "// UnmarshalText implements encoding.TextUnmarshaler, validating via Parse%s.\n", typeName)
+	fmt.Fprintf(&buf, "func (e *%s) UnmarshalText(text []byte) error {\n", typeName)
+	fmt.Fprintf(&buf, "\tv, err := Parse%s(string(text))\n\tif err != nil {\n\t\treturn err\n\t}\n\t*e = v\n\treturn nil\n}\n\n", typeName)
+
+	// sql.Scanner via Parse (validating).
+	fmt.Fprintf(&buf, "// Scan implements sql.Scanner, validating via Parse%s.\n", typeName)
+	fmt.Fprintf(&buf, "func (e *%s) Scan(src any) error {\n", typeName)
+	fmt.Fprintf(&buf, "\tif src == nil {\n\t\treturn fmt.Errorf(\"cannot scan NULL into %s\")\n\t}\n", typeName)
+	buf.WriteString("\tvar s string\n\tswitch v := src.(type) {\n\tcase string:\n\t\ts = v\n\tcase []byte:\n\t\ts = string(v)\n\tdefault:\n")
+	fmt.Fprintf(&buf, "\t\treturn fmt.Errorf(\"cannot scan %%T into %s\", src)\n\t}\n", typeName)
+	fmt.Fprintf(&buf, "\tv, err := Parse%s(s)\n\tif err != nil {\n\t\treturn err\n\t}\n\t*e = v\n\treturn nil\n}\n", typeName)
 
 	return buf.String()
 }

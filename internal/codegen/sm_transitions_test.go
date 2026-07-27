@@ -54,9 +54,9 @@ func TestGoTypesGenerator_TransitionMap(t *testing.T) {
 
 	result := string(out)
 
-	// Enum type should be present.
-	if !strings.Contains(result, "type OrderStatus string") {
-		t.Error("missing OrderStatus enum type")
+	// Branded enum type should be present.
+	if !strings.Contains(result, "type OrderStatus struct{ value string }") {
+		t.Error("missing OrderStatus branded enum type")
 	}
 
 	// Transition map should be present.

@@ -32,6 +32,12 @@ type PlanResult struct {
 	// outputs own nothing; only MultiFileGenerator outputs own their
 	// directory. Two outputs sharing a directory union their sets.
 	OwnedDirs map[string]map[string]bool
+	// enumDirs records output directories where a Go generator has already
+	// emitted the branded enum block. Go's `types` and `gorm` modes both emit
+	// enums into `package schema`; when they co-generate into one directory,
+	// the first claims the directory and later enum-emitting Go generators
+	// suppress their block so each enum is declared exactly once.
+	enumDirs map[string]bool
 	// Diagnostics collected during generation (warnings, info).
 	Diagnostics []diagnostic.Diagnostic
 }
@@ -262,6 +268,27 @@ func planCodegen(name string, schema *model.Schema, out config.OutputConfig[conf
 	// Configure split mode for Python DDL generators.
 	if ddlGen, ok := gen.(*codegen.PythonDDLGenerator); ok && out.SplitMode != "" {
 		ddlGen.SplitMode = codegen.SplitMode(out.SplitMode)
+	}
+
+	// Co-generation-aware enum dedup for Go: the first enum-emitting Go
+	// generator claims its output directory; later ones (types/gorm) suppress
+	// their enum block so co-generated files share one declaration set.
+	claimEnumDir := func() bool {
+		dir := filepath.Dir(outPath)
+		if result.enumDirs == nil {
+			result.enumDirs = make(map[string]bool)
+		}
+		if result.enumDirs[dir] {
+			return true // already claimed: suppress
+		}
+		result.enumDirs[dir] = true
+		return false
+	}
+	switch g := gen.(type) {
+	case *codegen.GoTypesGenerator:
+		g.SuppressEnums = claimEnumDir()
+	case *codegen.GoGormGenerator:
+		g.SuppressEnums = claimEnumDir()
 	}
 
 	// MultiFileGenerator: collect all files into the plan. The output path is

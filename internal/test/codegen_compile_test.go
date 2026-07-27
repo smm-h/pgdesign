@@ -151,15 +151,116 @@ func TestCompileGoTypes(t *testing.T) {
 	dir := t.TempDir()
 	files := generateTypeFiles(t, &codegen.GoTypesGenerator{}, "types.go")
 	writeFiles(t, dir, files)
-
 	// A throwaway module providing the uuid dependency the generated structs
 	// reference. `go mod tidy` resolves it; CI has module network access.
+	goModWithUUID(t, dir)
+	runCompile(t, dir, nil, "go", "mod", "tidy")
+	runCompile(t, dir, nil, "go", "build", "./...")
+}
+
+// goModWithUUID writes a throwaway module whose only dependency is the uuid
+// package the generated structs reference.
+func goModWithUUID(t *testing.T, dir string) {
+	t.Helper()
 	goMod := "module pgdesigncompile\n\ngo 1.23\n\nrequire github.com/google/uuid v1.6.0\n"
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
+}
+
+// TestCompileGoConstraints compiles the branded `constraints` mode alongside the
+// `types` mode. go_constraints shares package schema with the branded row
+// structs and enum types it validates (no cross-package import path is
+// configurable), switches on the branded value's .String(), and uses
+// !IsValid() for NOT NULL branded-enum columns, so it only compiles against the
+// branded types (roadmap 4.1).
+func TestCompileGoConstraints(t *testing.T) {
+	requireTool(t, "go")
+	dir := t.TempDir()
+	writeFiles(t, dir, generateTypeFiles(t, &codegen.GoTypesGenerator{}, "types.go"))
+	files, diags := (&codegen.GoConstraintsGenerator{}).Generate(loadCompileSchema(t))
+	failOnCompileErrDiags(t, diags)
+	writeFiles(t, dir, map[string][]byte{"constraints.go": files})
+	goModWithUUID(t, dir)
 	runCompile(t, dir, nil, "go", "mod", "tidy")
 	runCompile(t, dir, nil, "go", "build", "./...")
+	runCompile(t, dir, nil, "go", "vet", "./...")
+}
+
+// TestCompileGoEnumAllIngress compiles AND runs an all-ingress round-trip over
+// the branded Go enum: literal member, Parse (accept + reject), zero-value
+// invalidity, JSON marshal/unmarshal (validating), sql.Scan (string/bytes/nil/
+// reject), and driver.Value. It is the behavioral witness that every ingress
+// validates and round-trips (roadmap 4.1 "Go all-ingress round-trip").
+func TestCompileGoEnumAllIngress(t *testing.T) {
+	requireTool(t, "go")
+	dir := t.TempDir()
+	writeFiles(t, dir, generateTypeFiles(t, &codegen.GoTypesGenerator{}, "types.go"))
+	roundtrip := []byte(`package schema
+
+import (
+	"database/sql/driver"
+	"encoding/json"
+	"testing"
+)
+
+func TestRoleAllIngress(t *testing.T) {
+	// Literal member + Stringer.
+	if RoleAdmin.String() != "admin" {
+		t.Fatalf("String: %q", RoleAdmin.String())
+	}
+	// Parse: accept and reject.
+	r, err := ParseRole("user")
+	if err != nil || r != RoleUser {
+		t.Fatalf("ParseRole(user): %v %v", r, err)
+	}
+	if _, err := ParseRole("nope"); err == nil {
+		t.Fatal("ParseRole must reject unknown")
+	}
+	// Zero value is detectably invalid.
+	var z Role
+	if z.IsValid() {
+		t.Fatal("zero value must be invalid")
+	}
+	// JSON round-trip, validating.
+	b, err := json.Marshal(RoleGuest)
+	if err != nil || string(b) != "\"guest\"" {
+		t.Fatalf("MarshalJSON: %q %v", b, err)
+	}
+	var back Role
+	if err := json.Unmarshal(b, &back); err != nil || back != RoleGuest {
+		t.Fatalf("UnmarshalJSON: %v %v", back, err)
+	}
+	if err := json.Unmarshal([]byte("\"bad\""), &back); err == nil {
+		t.Fatal("UnmarshalJSON must reject unknown")
+	}
+	// sql.Scan: string, bytes, reject, nil.
+	var s Role
+	if err := s.Scan("admin"); err != nil || s != RoleAdmin {
+		t.Fatalf("Scan string: %v %v", s, err)
+	}
+	if err := s.Scan([]byte("user")); err != nil || s != RoleUser {
+		t.Fatalf("Scan bytes: %v %v", s, err)
+	}
+	if err := s.Scan("bad"); err == nil {
+		t.Fatal("Scan must reject unknown")
+	}
+	if err := s.Scan(nil); err == nil {
+		t.Fatal("Scan must reject NULL")
+	}
+	// driver.Value.
+	v, err := RoleAdmin.Value()
+	if err != nil || v != driver.Value("admin") {
+		t.Fatalf("Value: %v %v", v, err)
+	}
+}
+`)
+	if err := os.WriteFile(filepath.Join(dir, "roundtrip_test.go"), roundtrip, 0o644); err != nil {
+		t.Fatalf("write roundtrip_test.go: %v", err)
+	}
+	goModWithUUID(t, dir)
+	runCompile(t, dir, nil, "go", "mod", "tidy")
+	runCompile(t, dir, nil, "go", "test", "./...")
 }
 
 func TestCompileTSTypes(t *testing.T) {

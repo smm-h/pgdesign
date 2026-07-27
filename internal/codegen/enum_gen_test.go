@@ -102,12 +102,21 @@ func testEnum() model.Enum {
 
 func TestGenerateGoEnum(t *testing.T) {
 	out := GenerateEnums([]model.Enum{testEnum()}, LangGo)
+	// Branded enum: opaque struct + var members + validating Parse + boundary
+	// methods (Stringer/Valuer/Marshaler and Parse-routed Scanner/Unmarshalers).
 	for _, want := range []string{
-		"type Status string",
-		"const (",
-		`StatusActive Status = "active"`,
-		`StatusInProgress Status = "in-progress"`,
-		`StatusBanned Status = "banned"`,
+		"type Status struct{ value string }",
+		`StatusActive = Status{"active"}`,
+		`StatusInProgress = Status{"in-progress"}`,
+		`StatusBanned = Status{"banned"}`,
+		"func ParseStatus(s string) (Status, error)",
+		`return Status{}, fmt.Errorf("invalid Status: %q", s)`,
+		"func (e Status) String() string { return e.value }",
+		"func (e Status) Value() (driver.Value, error)",
+		"func (e Status) MarshalJSON() ([]byte, error)",
+		"func (e *Status) UnmarshalJSON(data []byte) error",
+		"func (e *Status) UnmarshalText(text []byte) error",
+		"func (e *Status) Scan(src any) error",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Go enum output missing %q\ngot:\n%s", want, out)

@@ -12,7 +12,14 @@ import (
 )
 
 // GoTypesGenerator generates Go struct types corresponding to database tables.
-type GoTypesGenerator struct{}
+//
+// SuppressEnums omits the branded enum block (types + Parse + methods) and its
+// imports. The build orchestrator sets it when another Go generator in the same
+// output package already emits enums, so co-generation (e.g. types + gorm into
+// one package) declares each enum exactly once.
+type GoTypesGenerator struct {
+	SuppressEnums bool
+}
 
 // Generate produces a Go source file with one struct per table in the schema.
 // Each struct has exported fields matching the table's columns, with db struct
@@ -67,6 +74,13 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 		structs = append(structs, si)
 	}
 
+	emitEnums := !g.SuppressEnums && len(schema.Enums) > 0
+	if emitEnums {
+		for _, imp := range goEnumImports {
+			imports[imp] = true
+		}
+	}
+
 	// Write header and package.
 	buf.WriteString(header)
 
@@ -98,10 +112,12 @@ func (g *GoTypesGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.
 	}
 
 	// Write enums.
-	enumBlock := GenerateEnums(schema.Enums, LangGo)
-	if enumBlock != "" {
-		buf.WriteString("\n")
-		buf.WriteString(enumBlock)
+	if emitEnums {
+		enumBlock := GenerateEnums(schema.Enums, LangGo)
+		if enumBlock != "" {
+			buf.WriteString("\n")
+			buf.WriteString(enumBlock)
+		}
 	}
 
 	// Write state machine transition maps.

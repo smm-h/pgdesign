@@ -14,7 +14,14 @@ import (
 
 // GoGormGenerator generates Go structs with GORM struct tags corresponding to
 // database tables, including BelongsTo and HasMany relationship fields.
-type GoGormGenerator struct{}
+//
+// SuppressEnums omits the branded enum block and its imports so co-generation
+// with another enum-emitting Go generator declares each enum once. gorm-only
+// consumers keep the block (SuppressEnums defaults false); the branded fields
+// ride the same Scanner/Valuer as the types mode.
+type GoGormGenerator struct {
+	SuppressEnums bool
+}
 
 // Generate produces a Go source file with one GORM-tagged struct per table in
 // the schema, plus relationship fields derived from foreign key metadata.
@@ -174,6 +181,13 @@ func (g *GoGormGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 		structs = append(structs, si)
 	}
 
+	emitEnums := !g.SuppressEnums && len(schema.Enums) > 0
+	if emitEnums {
+		for _, imp := range goEnumImports {
+			imports[imp] = true
+		}
+	}
+
 	// Write header and package.
 	buf.WriteString(header)
 
@@ -205,10 +219,12 @@ func (g *GoGormGenerator) Generate(schema *model.Schema) ([]byte, []diagnostic.D
 	}
 
 	// Write enums.
-	enumBlock := GenerateEnums(schema.Enums, LangGo)
-	if enumBlock != "" {
-		buf.WriteString("\n")
-		buf.WriteString(enumBlock)
+	if emitEnums {
+		enumBlock := GenerateEnums(schema.Enums, LangGo)
+		if enumBlock != "" {
+			buf.WriteString("\n")
+			buf.WriteString(enumBlock)
+		}
 	}
 
 	// Write structs.

@@ -117,6 +117,90 @@ func TestCodegenBuildParity_GroupFilter(t *testing.T) {
 	}
 }
 
+// TestCoGenerationEnumDedup verifies the co-generation-aware enum dedup: when
+// Go `types` and `gorm` outputs share one package directory, the branded enum
+// block is emitted EXACTLY ONCE across the two files (a second declaration would
+// not compile). gorm-only consumers keep their block; the dedup only fires when
+// a sibling already claimed the directory.
+func TestCoGenerationEnumDedup(t *testing.T) {
+	config.CodegenModes = SupportedModes()
+	dir := t.TempDir()
+	schema := `[meta]
+schema = "cogen"
+
+[types.role]
+kind = "enum"
+values = ["admin", "user", "guest"]
+comment = "Account role"
+
+[tables.accounts]
+comment = "Accounts"
+
+[tables.accounts.columns.id]
+type = "id"
+
+[tables.accounts.columns.role]
+type = "role"
+`
+	if err := os.WriteFile(filepath.Join(dir, "schema.toml"), []byte(schema), 0o644); err != nil {
+		t.Fatalf("write schema.toml: %v", err)
+	}
+	pkgDir := filepath.Join(dir, "schemapkg")
+	typesOut := filepath.Join(pkgDir, "types.go")
+	gormOut := filepath.Join(pkgDir, "gorm.go")
+	cfg := fmt.Sprintf(`[project]
+schemas = ["schema.toml"]
+
+[database]
+pg_version = 16
+
+[output.gotypes]
+format = "codegen"
+path = %q
+lang = "go"
+mode = "types"
+
+[output.gogorm]
+format = "codegen"
+path = %q
+lang = "go"
+mode = "gorm"
+`, typesOut, gormOut)
+	cfgPath := filepath.Join(dir, "pgdesign.toml")
+	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
+		t.Fatalf("write pgdesign.toml: %v", err)
+	}
+	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+		t.Fatalf("runBuild exited %d", code)
+	}
+	typesContent, err := os.ReadFile(typesOut)
+	if err != nil {
+		t.Fatalf("read types output: %v", err)
+	}
+	gormContent, err := os.ReadFile(gormOut)
+	if err != nil {
+		t.Fatalf("read gorm output: %v", err)
+	}
+	combined := string(typesContent) + string(gormContent)
+	if n := countSubstr(combined, "type Role struct"); n != 1 {
+		t.Fatalf("branded enum Role must be declared exactly once across co-generated files, got %d\ntypes:\n%s\ngorm:\n%s", n, typesContent, gormContent)
+	}
+}
+
+// countSubstr counts non-overlapping occurrences of sub in s.
+func countSubstr(s, sub string) int {
+	n := 0
+	for i := 0; i+len(sub) <= len(s); {
+		if s[i:i+len(sub)] == sub {
+			n++
+			i += len(sub)
+		} else {
+			i++
+		}
+	}
+	return n
+}
+
 // writeSourcedProject creates a temp project with two schema files, each
 // contributing one table, plus a build [output] that emits Go constants
 // filtered to the first source file via `source`. Returns (projectRoot,
