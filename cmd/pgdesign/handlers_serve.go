@@ -28,10 +28,10 @@ func registerServeCmd(app *strictcli.App) {
 
 			port := kwargs["port"].(int)
 
+			// Namespaces come from the explicit --schema flag; absent, default to
+			// public. (The config lists schema FILE paths, not PG namespace names,
+			// so it never correctly drove introspection namespaces.)
 			schemaNames := kwargsStrSlice(kwargs["schema"])
-			if len(schemaNames) == 0 {
-				schemaNames = configSchemaNames(cfg)
-			}
 			if len(schemaNames) == 0 {
 				schemaNames = []string{"public"}
 			}

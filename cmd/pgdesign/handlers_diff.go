@@ -68,7 +68,7 @@ func registerDiffCmd(app *strictcli.App) {
 			switch {
 			case liveURL != "":
 				var code int
-				actual, code = diffLive(cfgOverride, paths, schema, liveURL)
+				actual, code = diffLive(schema, liveURL)
 				if code != 0 {
 					return strictcli.Exit(code)
 				}
@@ -133,19 +133,8 @@ func registerDiffCmd(app *strictcli.App) {
 }
 
 // diffLive introspects a live database and returns the "actual" schema.
-func diffLive(configOverride *string, paths []string, schema *model.Schema, dbURL string) (*model.Schema, int) {
-	cfg, cfgErr := loadProjectConfig(configOverride, paths[0])
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-		return nil, 1
-	}
-
-	schemaNames := []string{"public"}
-	if schema.Name != "" && schema.Name != "public" {
-		schemaNames = []string{schema.Name}
-	} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
-		schemaNames = cfgNames
-	}
+func diffLive(schema *model.Schema, dbURL string) (*model.Schema, int) {
+	schemaNames := modelSchemaNames(schema)
 
 	ctx := context.Background()
 	actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)

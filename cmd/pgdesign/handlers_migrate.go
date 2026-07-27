@@ -60,12 +60,7 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			schemaNames := []string{"public"}
-			if schema.Name != "" && schema.Name != "public" {
-				schemaNames = []string{schema.Name}
-			} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
-				schemaNames = cfgNames
-			}
+			schemaNames := modelSchemaNames(schema)
 
 			ctx := context.Background()
 			if err := preUpgradeGuardURL(ctx, dbURL); err != nil {
@@ -265,12 +260,7 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			schemaNames := []string{"public"}
-			if schema.Name != "" && schema.Name != "public" {
-				schemaNames = []string{schema.Name}
-			} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
-				schemaNames = cfgNames
-			}
+			schemaNames := modelSchemaNames(schema)
 
 			ctx := context.Background()
 			if err := preUpgradeGuardURL(ctx, dbURL); err != nil {
@@ -1225,12 +1215,7 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 
 	dir := resolveMigrationsDir(dirFlag, string(cfg.Project.MigrationsDir))
 
-	schemaNames := []string{"public"}
-	if schema.Name != "" && schema.Name != "public" {
-		schemaNames = []string{schema.Name}
-	} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
-		schemaNames = cfgNames
-	}
+	schemaNames := modelSchemaNames(schema)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
@@ -1504,12 +1489,7 @@ func registerMigrateUpgradeCmd(g *strictcli.Group) {
 
 			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
-			schemaNames := []string{"public"}
-			if desired.Name != "" && desired.Name != "public" {
-				schemaNames = []string{desired.Name}
-			} else if cfgNames := configSchemaNames(cfg); len(cfgNames) > 0 {
-				schemaNames = cfgNames
-			}
+			schemaNames := modelSchemaNames(desired)
 
 			schemaFiles, err := resolveSchemaPaths(cfgOverride, paths)
 			if err != nil {

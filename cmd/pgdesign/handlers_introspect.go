@@ -16,7 +16,6 @@ func registerIntrospectCmd(app *strictcli.App) {
 	app.Command("introspect", "Introspect a live PostgreSQL database into TOML schema",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 			quiet := kwargsQuiet(kwargs)
-			cfgOverride := kwargsConfigOverride(kwargs)
 
 			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
@@ -24,16 +23,10 @@ func registerIntrospectCmd(app *strictcli.App) {
 				return strictcli.Exit(1)
 			}
 
-			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
-			if cfgErr != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-				return strictcli.Exit(1)
-			}
-
+			// Namespaces come from the explicit --schema flag; absent, default to
+			// public. (The config lists schema FILE paths, not PG namespace names,
+			// so it never correctly drove introspection namespaces.)
 			schemaNames := kwargsStrSlice(kwargs["schema"])
-			if len(schemaNames) == 0 {
-				schemaNames = configSchemaNames(cfg)
-			}
 			if len(schemaNames) == 0 {
 				schemaNames = []string{"public"}
 			}

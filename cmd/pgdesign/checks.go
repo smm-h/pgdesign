@@ -480,10 +480,7 @@ func checkWorkload(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strict
 	}
 
 	// Sequential scan analysis
-	schemaNames := configSchemaNames(cfg)
-	if len(schemaNames) == 0 {
-		schemaNames = []string{"public"}
-	}
+	schemaNames := modelSchemaNames(schema)
 	scanStats, scanErr := workload.QueryTableScanStats(bgCtx, conn, schemaNames)
 	if scanErr == nil {
 		allDiags = append(allDiags, workload.DetectSeqScanHeavy(scanStats)...)

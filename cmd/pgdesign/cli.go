@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/config"
@@ -141,18 +142,45 @@ func loadProjectConfig(configOverride *string, path string) (*config.RawConfig, 
 	return cfg, nil
 }
 
-// configSchemaNames derives PostgreSQL schema names from config.Project.Schemas
-// by stripping the .toml extension from each file basename. Returns nil if no
-// schemas are configured.
-func configSchemaNames[P config.PathKind](cfg *config.Config[P]) []string {
-	if len(cfg.Project.Schemas) == 0 {
-		return nil
+// modelSchemaNames returns the distinct PostgreSQL namespace names the built
+// model's objects live in, sorted, defaulting to ["public"] when nothing carries
+// an explicit schema. These are the namespaces to introspect when diffing the
+// model against a live database.
+//
+// It replaces the earlier configSchemaNames, which derived namespaces from the
+// config's schema FILE basenames — a bug: a multi-file project split across
+// trace.toml/dispatch.toml/auth.toml whose tables all live in `public` was
+// introspected against nonexistent namespaces (trace/dispatch/auth), yielding
+// empty introspection and total false drift. Namespaces come from the tables'
+// `schema=` attribute, never from filenames.
+func modelSchemaNames(schema *model.Schema) []string {
+	seen := make(map[string]bool)
+	var names []string
+	add := func(s string) {
+		if s == "" {
+			s = "public"
+		}
+		if !seen[s] {
+			seen[s] = true
+			names = append(names, s)
+		}
 	}
-	names := make([]string, len(cfg.Project.Schemas))
-	for i, s := range cfg.Project.Schemas {
-		base := filepath.Base(string(s))
-		names[i] = strings.TrimSuffix(base, ".toml")
+	for i := range schema.Tables {
+		add(schema.Tables[i].Schema)
 	}
+	for i := range schema.Views {
+		add(schema.Views[i].Schema)
+	}
+	for i := range schema.MaterializedViews {
+		add(schema.MaterializedViews[i].Schema)
+	}
+	for i := range schema.Sequences {
+		add(schema.Sequences[i].Schema)
+	}
+	if len(names) == 0 {
+		return []string{"public"}
+	}
+	sort.Strings(names)
 	return names
 }
 
