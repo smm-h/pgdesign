@@ -269,6 +269,19 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, p *ChainProject, e Edge, hoo
 		if nonTx {
 			resume := intents[seq]
 			if !resume {
+				// FRESH path: check the precondition BEFORE writing the intent row, so
+				// drift aborts the edge pre-intent — a drifted op never leaves an orphan
+				// intent row behind (rider 5). The check sees the current state through
+				// the open segment (preceding ops' uncommitted effects) or the conn when
+				// no segment is open. RESUME deliberately skips the precondition (the
+				// object may already be half-built in Postgres's own state model, L8).
+				var q predicate.Execer = conn
+				if tx != nil {
+					q = tx
+				}
+				if err := checkPreconditions(ctx, q, store, from, op); err != nil {
+					return fmt.Errorf("op %d (%s): %w", seq, op.kind, err)
+				}
 				// Write the intent row and commit the (possibly preceding) segment so
 				// it durably lands BEFORE the effect runs — the applied view never
 				// shows a partial edge as applied, and resume has a durable marker.
@@ -282,7 +295,7 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, p *ChainProject, e Edge, hoo
 			if err := commitSeg(); err != nil {
 				return fmt.Errorf("commit before non-transactional op %d (%s): %w", seq, op.kind, err)
 			}
-			if err := executeNonTransactionalOp(ctx, conn, store, from, op, resume); err != nil {
+			if err := executeNonTransactionalOp(ctx, conn, store, op, resume); err != nil {
 				return fmt.Errorf("op %d (%s): %w", seq, op.kind, err)
 			}
 			// Confirm (+ advance if final) atomically in a small transaction.
@@ -374,45 +387,32 @@ func checkPreconditions(ctx context.Context, q predicate.Execer, store *objstore
 	return nil
 }
 
-// executeNonTransactionalOp runs a non-transactional op idempotently. On a fresh
-// run it checks the op's precondition then executes; on resume it applies the
-// class-specific protocol in Postgres's own state model (L8).
-func executeNonTransactionalOp(ctx context.Context, conn *pgx.Conn, store *objstore.Store, from *model.Schema, op SelfContainedOp, resume bool) error {
+// executeNonTransactionalOp runs a non-transactional op idempotently. The op's
+// precondition is checked by the caller on the FRESH path (before the intent row,
+// rider 5) — this function assumes it has already passed and only EXECUTES: a fresh
+// run runs the op's rendered SQL, a resume applies the class-specific protocol in
+// Postgres's own state model (L8). RESUME never re-checks the precondition (the
+// object may already be half-built).
+func executeNonTransactionalOp(ctx context.Context, conn *pgx.Conn, store *objstore.Store, op SelfContainedOp, resume bool) error {
 	switch op.kind {
 	case "create_index_concurrently":
-		return resumeCreateIndexConcurrently(ctx, conn, store, from, op, resume)
-	case "drop_index_concurrently":
-		// DROP INDEX CONCURRENTLY IF EXISTS is idempotent; its precondition (index
-		// present) is checked only on a fresh run — on resume the index may already
-		// be gone, which IF EXISTS handles.
-		if !resume {
-			if err := checkPreconditions(ctx, conn, store, from, op); err != nil {
-				return err
-			}
-		}
-		return execNonTxStatements(ctx, conn, store, op)
+		return resumeCreateIndexConcurrently(ctx, conn, store, op, resume)
 	default:
-		// Version-conditional enum-add (pre-12) and any other non-transactional op:
-		// ADD VALUE IF NOT EXISTS is idempotent, so resume simply re-runs.
-		if !resume {
-			if err := checkPreconditions(ctx, conn, store, from, op); err != nil {
-				return err
-			}
-		}
+		// drop_index_concurrently (DROP ... IF EXISTS), version-conditional enum-add
+		// (ADD VALUE IF NOT EXISTS), and any other non-transactional op are idempotent
+		// in PG's own state model, so both fresh and resume simply run the SQL.
 		return execNonTxStatements(ctx, conn, store, op)
 	}
 }
 
 // resumeCreateIndexConcurrently implements the create-index resume protocol
 // (roadmap L8): an interrupted CREATE INDEX CONCURRENTLY leaves an INVALID index
-// of the target name that IF NOT EXISTS would skip forever. On resume, if the
-// index is present AND valid it was built before the crash (nothing to do); if it
-// is absent or INVALID, DROP INDEX CONCURRENTLY IF EXISTS then rebuild.
-func resumeCreateIndexConcurrently(ctx context.Context, conn *pgx.Conn, store *objstore.Store, from *model.Schema, op SelfContainedOp, resume bool) error {
+// of the target name that IF NOT EXISTS would skip forever. On a fresh run it just
+// executes (the caller already checked the precondition). On resume, if the index
+// is present AND valid it was built before the crash (nothing to do); if it is
+// absent or INVALID, DROP INDEX CONCURRENTLY IF EXISTS then rebuild.
+func resumeCreateIndexConcurrently(ctx context.Context, conn *pgx.Conn, store *objstore.Store, op SelfContainedOp, resume bool) error {
 	if !resume {
-		if err := checkPreconditions(ctx, conn, store, from, op); err != nil {
-			return err
-		}
 		return execNonTxStatements(ctx, conn, store, op)
 	}
 	schema, name, err := indexTargetName(store, op)

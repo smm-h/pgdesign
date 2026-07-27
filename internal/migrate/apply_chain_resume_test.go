@@ -87,7 +87,7 @@ func TestResumeCICRebuildsInvalidIndex(t *testing.T) {
 
 	store, op := buildCICOp(t)
 	// Resume: the protocol drops the invalid index and rebuilds a valid (non-unique) one.
-	if err := executeNonTransactionalOp(ctx, conn, store, nil, op, true); err != nil {
+	if err := executeNonTransactionalOp(ctx, conn, store, op, true); err != nil {
 		t.Fatalf("resume CIC: %v", err)
 	}
 	info, ok, err := catalog.Index(ctx, conn, "public", "ix_t_email")
@@ -126,7 +126,7 @@ func TestResumeCICValidLeftAsIs(t *testing.T) {
 	}
 
 	store, op := buildCICOp(t)
-	if err := executeNonTransactionalOp(ctx, conn, store, nil, op, true); err != nil {
+	if err := executeNonTransactionalOp(ctx, conn, store, op, true); err != nil {
 		t.Fatalf("resume CIC (valid): %v", err)
 	}
 	// The index is untouched (same oid — not dropped and rebuilt).
@@ -173,15 +173,15 @@ func TestResumeDropCICIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Fresh run: precondition (index present) holds, the index is dropped.
-	if err := executeNonTransactionalOp(ctx, conn, store, nil, op, false); err != nil {
+	// Fresh run executes the drop (the precondition is the caller's concern now).
+	if err := executeNonTransactionalOp(ctx, conn, store, op, false); err != nil {
 		t.Fatalf("drop-CIC fresh run: %v", err)
 	}
 	if _, ok, _ := catalog.Index(ctx, conn, "public", "ix_t_email"); ok {
 		t.Fatal("index should be gone after the drop")
 	}
 	// Resume run: the index is already gone; IF EXISTS makes it a clean no-op.
-	if err := executeNonTransactionalOp(ctx, conn, store, nil, op, true); err != nil {
+	if err := executeNonTransactionalOp(ctx, conn, store, op, true); err != nil {
 		t.Fatalf("drop-CIC resume must be idempotent, got: %v", err)
 	}
 }
