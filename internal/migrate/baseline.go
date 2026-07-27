@@ -25,6 +25,9 @@ import (
 // migration file was added after later versions were applied. This is a hard
 // error requiring explicit adoption.
 func Baseline(ctx context.Context, conn *pgx.Conn, migrationsDir string, targetVersion string, description string) error {
+	if err := guardChainMode(migrationsDir, "baseline", "5.10"); err != nil {
+		return err
+	}
 	// Acquire advisory lock (same pattern as Apply).
 	acquired, err := AcquireAdvisoryLock(ctx, conn)
 	if err != nil {

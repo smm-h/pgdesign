@@ -13,6 +13,9 @@ import (
 // Returns the version that was rolled back. lockTimeout sets the PostgreSQL
 // lock_timeout (e.g. "5s"); empty defaults to "5s".
 func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTimeout string) (string, error) {
+	if err := guardChainMode(migrationsDir, "rollback", "5.6"); err != nil {
+		return "", err
+	}
 	if err := EnsureMigrationsTable(ctx, conn); err != nil {
 		return "", err
 	}
@@ -144,6 +147,9 @@ func Rollback(ctx context.Context, conn *pgx.Conn, migrationsDir string, lockTim
 // that were successfully rolled back. On partial failure, returns both the
 // rolled-back versions and the error.
 func RollbackTo(ctx context.Context, conn *pgx.Conn, migrationsDir, targetVersion, lockTimeout string) ([]string, error) {
+	if err := guardChainMode(migrationsDir, "rollback", "5.6"); err != nil {
+		return nil, err
+	}
 	if err := EnsureMigrationsTable(ctx, conn); err != nil {
 		return nil, err
 	}

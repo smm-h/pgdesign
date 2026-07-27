@@ -31,6 +31,9 @@ type SquashResult struct {
 // dependency-unaware pair cancellation remain); it only prevents squashing an
 // applied range.
 func SquashMigrations(ctx context.Context, conn *pgx.Conn, dir, from, to string) (*SquashResult, error) {
+	if err := guardChainMode(dir, "squash", "5.3"); err != nil {
+		return nil, err
+	}
 	if conn == nil {
 		return nil, fmt.Errorf("migrate squash requires a database connection (--db) for the M200 applied-version safety check; offline squash is not permitted, even for never-applied ranges")
 	}
