@@ -377,6 +377,70 @@ func TestResolveSquashEndpoint(t *testing.T) {
 	}
 }
 
+// TestSquashChainAddIndexDropReplay: an add-column + create-index then drop-column
+// sequence replays correctly through a consolidation edge. Concatenation has NO
+// cancellation to get wrong (the retired optimizer's orphaned-index bug is gone by
+// deletion): the consolidation carries the FULL op sequence, and the endpoint
+// checker confirms it reproduces the range's to-manifest.
+func TestSquashChainAddIndexDropReplay(t *testing.T) {
+	p, err := OpenChainProject(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// m1: t(id,label). m2: t + column tmp + index on tmp. m3: tmp dropped, table
+	// extra added (so R3 != R1 — a same-revision range would be rejected).
+	m1 := tableModel("t")
+	m2 := tableModelWithTmpIndex()
+	m3 := tableModel("t", "extra")
+
+	r1 := appendEdge(t, p, m1, nil, rev.Revision{}, "create-t", "")
+	r2 := appendEdge(t, p, m2, m1, r1, "add-tmp-index", "")
+	r3 := appendEdge(t, p, m3, m2, r2, "drop-tmp-add-extra", "")
+	if err := VerifyChainConsistency(p); err != nil {
+		t.Fatalf("pre-squash consistency: %v", err)
+	}
+
+	// Op counts of the range (e2 ; e3) before squashing.
+	live, _ := p.LoadLiveEdges()
+	rangeOps := 0
+	for _, e := range live {
+		if eq, _ := e.Parent.Equal(r1); eq {
+			rangeOps += len(e.Ops)
+		}
+		if eq, _ := e.Parent.Equal(r2); eq {
+			rangeOps += len(e.Ops)
+		}
+	}
+
+	res, err := SquashChain(p, r1.String(), r3.String(), "")
+	if err != nil {
+		t.Fatalf("SquashChain: %v", err)
+	}
+	// Nothing cancelled or folded: the consolidation carries every range op.
+	if res.OpCount != rangeOps {
+		t.Errorf("consolidation op count %d != range op count %d (concatenation must not drop ops)", res.OpCount, rangeOps)
+	}
+	// The endpoint checker confirms the consolidation reproduces R3 from R1.
+	if err := VerifyChainConsistency(p); err != nil {
+		t.Fatalf("post-squash consistency (replay reproduces the to-manifest): %v", err)
+	}
+}
+
+// tableModelWithTmpIndex builds t(id,label,tmp) with an index on tmp.
+func tableModelWithTmpIndex() *model.Schema {
+	s := &model.Schema{Name: "public", PGVersion: 16, Tables: []model.Table{{
+		Name: "t", Schema: "public", PK: []string{"id"}, Comment: "t table",
+		Columns: []model.Column{
+			{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			{Name: "label", PGType: typeinfo.T("text"), NotNull: true},
+			{Name: "tmp", PGType: typeinfo.T("text"), NotNull: true},
+		},
+		Indexes: []model.Index{{Name: "t_tmp_idx", Columns: []string{"tmp"}}},
+	}}}
+	s.Canonicalize()
+	return s
+}
+
 // TestSquashChainRejectsSingleEdge: a range spanning a single edge has nothing to
 // consolidate.
 func TestSquashChainRejectsSingleEdge(t *testing.T) {
