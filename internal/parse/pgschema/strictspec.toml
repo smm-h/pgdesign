@@ -1,0 +1,64 @@
+# strictspec manifest for pgdesign's schema-document surface.
+#
+# Registers pgdesign's three custom scalars (identifier, pgtype, sql-expression)
+# per spec/appendix-custom-scalars.md and drives Go validator generation for
+# pgdesign.schema.toml. Registration travels WITH the schema: a schema using
+# these scalars is only meaningful alongside this manifest. Regenerate with:
+#   strictspec gen --manifest strictspec.toml
+#
+# Lexeme rules are calibrated to what pgdesign's real corpus contains
+# (internal/parse/parse.go + the 28 in-repo schema TOMLs are the source of truth),
+# not the paper defaults verbatim. See per-scalar notes.
+
+meta_version = 1
+format_version = 1
+
+# identifier: PRECISE refinement. Fully captures the SQL/programming identifier
+# grammar; length caps at Postgres' 63-code-point limit (the regex cannot cap
+# length). Used for bare identifier VALUES (pk/fk/unique column lists, table
+# refs, state names, composite field names as map keys are constrained by
+# key_pattern instead).
+[[scalars]]
+name = "identifier"
+base = "string"
+lexeme_rule = "^[A-Za-z_][A-Za-z0-9_]*$"
+length = { max = 63 }
+bindings = { go = "string", python = "str", ts = "string" }
+rendering = { inherits = "string" }
+description = "A SQL/programming identifier; anchored, RE2, fully captured by the regex."
+
+# pgtype: SURFACE-syntax refinement. Captures the SHAPE of a type reference
+# (optionally-qualified name, optional parenthesised params, optional array
+# suffix) but NOT existence — that is a domain fact owned by pgdesign's
+# typeinfo/semtype/extregistry. Every column type, composite field type,
+# function arg/return type, and scalar base_type in the corpus is a bare name.
+[[scalars]]
+name = "pgtype"
+base = "string"
+lexeme_rule = "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)?(\\([0-9]+(,[0-9]+)?\\))?(\\[\\])?$"
+length = { max = 128 }
+bindings = { go = "string", python = "str", ts = "string" }
+rendering = { inherits = "string" }
+description = "A Postgres type reference by SURFACE SYNTAX: int4, pg_catalog.numeric, numeric(10,2), text[]."
+
+# sql-expression: EFFECTIVELY-OPAQUE end of the spectrum. SQL is not a regular
+# language; the regex asserts only NON-EMPTINESS. `(?s)` makes `.` match
+# newlines so multi-line expression bodies (CHECK bodies, view queries, function
+# bodies) are accepted. Grammaticality/semantics are pgdesign-native downstream
+# (sqlexpr recursive-descent parser, sqlparse WASM go-pgquery).
+[[scalars]]
+name = "sql-expression"
+base = "string"
+lexeme_rule = "(?s)^.+$"
+length = { min = 1, max = 8192 }
+bindings = { go = "string", python = "str", ts = "string" }
+rendering = { inherits = "string" }
+description = "An arbitrary SQL expression fragment (CHECK body, default expr, view query). Only non-emptiness/length checked."
+
+[[schemas]]
+path = "pgdesign.schema.toml"
+
+  [[schemas.targets]]
+  lang = "go"
+  output = "pgdesign_gen.go"
+  package = "pgschema"

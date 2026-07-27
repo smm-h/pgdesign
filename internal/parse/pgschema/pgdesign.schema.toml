@@ -1,0 +1,713 @@
+# pgdesign schema-document shape, in strictspec surface syntax.
+#
+# This is the DOCUMENT-SHAPE authority for pgdesign schema TOMLs: it owns
+# well-formedness (record tree), closed records (unknown keys are a hard error),
+# base-type conformance (string/integer/boolean/number/array), required fields,
+# and the three custom-scalar lexeme refinements (identifier/pgtype/
+# sql-expression, registered in strictspec.toml). It does NOT own semantics:
+# type existence, FK/enum-value/reference resolution, SQL grammaticality, normal
+# form, and cross-field mutual-exclusivity stay in pgdesign's model/validate
+# layer (one authority per property).
+#
+# Complete against internal/parse/parse.go's accepted shape (the knownKeys sets
+# and the six node coercers) and the 28 in-repo schema TOMLs. Every schema
+# document must now carry a top-level `format_version = 1` (the strictspec
+# version gate) — added to the corpus by scripts/stamp_format_version.sh.
+
+name = "pgdesign-schema"
+meta_version = 1
+format_version = 1
+document_syntax = "toml"
+role = "schema"
+root = "Schema"
+targets = ["go"]
+description = "A pgdesign PostgreSQL schema document: meta, types, tables, views, materialized views, sequences, functions, and groups."
+
+# --- root -------------------------------------------------------------------
+
+[types.Schema]
+type = "record"
+
+[types.Schema.fields.meta]
+type = "Meta"
+required = false
+
+[types.Schema.fields.types]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Schema.fields.types.value]
+type = "TypeDef"
+
+[types.Schema.fields.tables]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Schema.fields.tables.value]
+type = "Table"
+
+[types.Schema.fields.views]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Schema.fields.views.value]
+type = "View"
+
+[types.Schema.fields.materialized_views]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Schema.fields.materialized_views.value]
+type = "MatView"
+
+[types.Schema.fields.sequences]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Schema.fields.sequences.value]
+type = "Sequence"
+
+[types.Schema.fields.functions]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Schema.fields.functions.value]
+type = "Function"
+
+# [groups]: group name -> list of table names.
+[types.Schema.fields.groups]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Schema.fields.groups.value]
+type = "array"
+[types.Schema.fields.groups.value.item]
+type = "identifier"
+
+# --- meta -------------------------------------------------------------------
+
+[types.Meta]
+type = "record"
+[types.Meta.fields.version]
+type = "integer"
+required = false
+description = "PostgreSQL major version target (RawMeta.Version)."
+[types.Meta.fields.schema]
+type = "identifier"
+required = false
+description = "Namespace / schema name (RawMeta.Schema)."
+[types.Meta.fields.extensions]
+type = "array"
+required = false
+[types.Meta.fields.extensions.item]
+type = "identifier"
+
+# --- types ------------------------------------------------------------------
+
+[types.TypeDef]
+type = "record"
+[types.TypeDef.fields.kind]
+type = "string"
+required = false
+description = "composite | enum | scalar | state_machine (value validated by semtype)."
+[types.TypeDef.fields.extends]
+type = "identifier"
+required = false
+[types.TypeDef.fields.base_type]
+type = "pgtype"
+required = false
+[types.TypeDef.fields.values]
+type = "array"
+required = false
+[types.TypeDef.fields.values.item]
+type = "string"
+[types.TypeDef.fields.not_null]
+type = "boolean"
+required = false
+[types.TypeDef.fields.default]
+type = "string"
+required = false
+[types.TypeDef.fields.default_expr]
+type = "sql-expression"
+required = false
+[types.TypeDef.fields.check]
+type = "sql-expression"
+required = false
+[types.TypeDef.fields.unique]
+type = "boolean"
+required = false
+[types.TypeDef.fields.array]
+type = "boolean"
+required = false
+[types.TypeDef.fields.comment]
+type = "string"
+required = false
+[types.TypeDef.fields.initial]
+type = "identifier"
+required = false
+[types.TypeDef.fields.enforce]
+type = "boolean"
+required = false
+# [types.X.fields]: composite field name -> PG type.
+[types.TypeDef.fields.fields]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "semantic"
+[types.TypeDef.fields.fields.value]
+type = "pgtype"
+# [types.X.states.Y]: state machine states.
+[types.TypeDef.fields.states]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "semantic"
+[types.TypeDef.fields.states.value]
+type = "SMState"
+# [[types.X.transitions]]: state machine transitions.
+[types.TypeDef.fields.transitions]
+type = "array"
+required = false
+[types.TypeDef.fields.transitions.item]
+type = "SMTransition"
+
+[types.SMState]
+type = "record"
+[types.SMState.fields.terminal]
+type = "boolean"
+required = false
+[types.SMState.fields.comment]
+type = "string"
+required = false
+
+[types.SMTransition]
+type = "record"
+[types.SMTransition.fields.name]
+type = "identifier"
+required = true
+[types.SMTransition.fields.from]
+type = "array"
+required = true
+min_len = 1
+[types.SMTransition.fields.from.item]
+type = "identifier"
+[types.SMTransition.fields.to]
+type = "identifier"
+required = true
+[types.SMTransition.fields.requires]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.SMTransition.fields.requires.value]
+type = "string"
+[types.SMTransition.fields.comment]
+type = "string"
+required = false
+
+# --- tables -----------------------------------------------------------------
+
+[types.Table]
+type = "record"
+[types.Table.fields.comment]
+type = "string"
+required = false
+description = "All tables require a comment — enforced semantically by model, not shape."
+[types.Table.fields.pk]
+type = "array"
+required = false
+[types.Table.fields.pk.item]
+type = "identifier"
+[types.Table.fields.enable_rls]
+type = "boolean"
+required = false
+[types.Table.fields.force_rls]
+type = "boolean"
+required = false
+[types.Table.fields.append_only]
+type = "boolean"
+required = false
+[types.Table.fields.columns]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "semantic"
+[types.Table.fields.columns.value]
+type = "Column"
+[types.Table.fields.fks]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Table.fields.fks.value]
+type = "FK"
+[types.Table.fields.indexes]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Table.fields.indexes.value]
+type = "Index"
+[types.Table.fields.unique]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Table.fields.unique.value]
+type = "Unique"
+[types.Table.fields.checks]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Table.fields.checks.value]
+type = "Check"
+[types.Table.fields.exclusions]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Table.fields.exclusions.value]
+type = "Exclusion"
+[types.Table.fields.policies]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Table.fields.policies.value]
+type = "Policy"
+[types.Table.fields.triggers]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Table.fields.triggers.value]
+type = "Trigger"
+[types.Table.fields.partitioning]
+type = "Partitioning"
+required = false
+[types.Table.fields.dependencies]
+type = "array"
+required = false
+[types.Table.fields.dependencies.item]
+type = "Dependency"
+[types.Table.fields.maintenance]
+type = "Maintenance"
+required = false
+
+[types.Column]
+type = "record"
+[types.Column.fields.type]
+type = "pgtype"
+required = true
+description = "RawColumn.Type — a PG type reference (required at parse)."
+[types.Column.fields.nullable]
+type = "boolean"
+required = false
+[types.Column.fields.default]
+type = "string"
+required = false
+description = "Literal default value (may be the empty string)."
+[types.Column.fields.default_expr]
+type = "sql-expression"
+required = false
+[types.Column.fields.generated]
+type = "sql-expression"
+required = false
+[types.Column.fields.stored]
+type = "boolean"
+required = false
+[types.Column.fields.array]
+type = "boolean"
+required = false
+[types.Column.fields.comment]
+type = "string"
+required = false
+[types.Column.fields.json_schema]
+type = "string"
+required = false
+description = "Path to an external JSON Schema file (existence/validity checked natively)."
+[types.Column.fields.collation]
+type = "string"
+required = false
+[types.Column.fields.statistics]
+type = "integer"
+required = false
+
+[types.FK]
+type = "record"
+[types.FK.fields.columns]
+type = "array"
+required = false
+[types.FK.fields.columns.item]
+type = "identifier"
+[types.FK.fields.ref_table]
+type = "string"
+required = false
+description = "Referenced table, optionally schema-qualified (e.g. \"auth.users\"); value owned by model."
+[types.FK.fields.ref_columns]
+type = "array"
+required = false
+[types.FK.fields.ref_columns.item]
+type = "identifier"
+[types.FK.fields.on_delete]
+type = "string"
+required = false
+description = "CASCADE | RESTRICT | SET NULL | SET DEFAULT | NO ACTION (contains spaces; value owned by model)."
+
+[types.Index]
+type = "record"
+[types.Index.fields.columns]
+type = "array"
+required = false
+[types.Index.fields.columns.item]
+type = "string"
+description = "Column names, optionally with a sort suffix (e.g. \"created_at DESC\")."
+[types.Index.fields.method]
+type = "string"
+required = false
+[types.Index.fields.opclass]
+type = "StringOrStringMap"
+required = false
+[types.Index.fields.collation]
+type = "StringOrStringMap"
+required = false
+[types.Index.fields.where]
+type = "sql-expression"
+required = false
+[types.Index.fields.include]
+type = "array"
+required = false
+[types.Index.fields.include.item]
+type = "string"
+[types.Index.fields.unique]
+type = "boolean"
+required = false
+[types.Index.fields.with]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.Index.fields.with.value]
+type = "string"
+
+# opclass / collation accept EITHER a single string (applied to all columns) OR
+# an inline table of per-column strings. node-kind-union dispatches by node kind
+# (string vs record/inline-table).
+[types.StringOrStringMap]
+type = "node-kind-union"
+description = "A single string, or an inline table mapping column name -> string."
+[types.StringOrStringMap.arms.string]
+type = "string"
+[types.StringOrStringMap.arms.map]
+type = "map"
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.StringOrStringMap.arms.map.value]
+type = "string"
+
+[types.Unique]
+type = "record"
+[types.Unique.fields.columns]
+type = "array"
+required = false
+[types.Unique.fields.columns.item]
+type = "identifier"
+[types.Unique.fields.deferrable]
+type = "boolean"
+required = false
+[types.Unique.fields.initially_deferred]
+type = "boolean"
+required = false
+
+[types.Check]
+type = "record"
+[types.Check.fields.expr]
+type = "sql-expression"
+required = false
+description = "CHECK body (non-empty; required semantically by model)."
+
+[types.Exclusion]
+type = "record"
+[types.Exclusion.fields.columns]
+type = "array"
+required = false
+[types.Exclusion.fields.columns.item]
+type = "string"
+[types.Exclusion.fields.operators]
+type = "array"
+required = false
+[types.Exclusion.fields.operators.item]
+type = "string"
+[types.Exclusion.fields.method]
+type = "string"
+required = false
+[types.Exclusion.fields.where]
+type = "sql-expression"
+required = false
+[types.Exclusion.fields.deferrable]
+type = "boolean"
+required = false
+[types.Exclusion.fields.initially_deferred]
+type = "boolean"
+required = false
+
+[types.Policy]
+type = "record"
+[types.Policy.fields.type]
+type = "string"
+required = false
+description = "PERMISSIVE | RESTRICTIVE (value owned by model)."
+[types.Policy.fields.for]
+type = "string"
+required = false
+[types.Policy.fields.to]
+type = "string"
+required = false
+[types.Policy.fields.using]
+type = "sql-expression"
+required = false
+[types.Policy.fields.with_check]
+type = "sql-expression"
+required = false
+[types.Policy.fields.error_code]
+type = "string"
+required = false
+[types.Policy.fields.error_message]
+type = "string"
+required = false
+
+[types.Trigger]
+type = "record"
+[types.Trigger.fields.function]
+type = "identifier"
+required = true
+description = "Trigger function name."
+[types.Trigger.fields.events]
+type = "array"
+required = true
+min_len = 1
+[types.Trigger.fields.events.item]
+type = "string"
+[types.Trigger.fields.timing]
+type = "string"
+required = true
+[types.Trigger.fields.for_each]
+type = "string"
+required = false
+[types.Trigger.fields.when]
+type = "sql-expression"
+required = false
+[types.Trigger.fields.constraint]
+type = "boolean"
+required = false
+[types.Trigger.fields.deferrable]
+type = "boolean"
+required = false
+[types.Trigger.fields.initially_deferred]
+type = "boolean"
+required = false
+[types.Trigger.fields.referencing_old]
+type = "string"
+required = false
+[types.Trigger.fields.referencing_new]
+type = "string"
+required = false
+[types.Trigger.fields.comment]
+type = "string"
+required = false
+
+# Partitioning is recursive: sub-partitions are themselves partitioning records.
+[types.Partitioning]
+type = "record"
+[types.Partitioning.fields.strategy]
+type = "string"
+required = false
+[types.Partitioning.fields.column]
+type = "string"
+required = false
+[types.Partitioning.fields.columns]
+type = "array"
+required = false
+[types.Partitioning.fields.columns.item]
+type = "string"
+[types.Partitioning.fields.name]
+type = "string"
+required = false
+[types.Partitioning.fields.bound]
+type = "sql-expression"
+required = false
+[types.Partitioning.fields.partitions]
+type = "array"
+required = false
+[types.Partitioning.fields.partitions.item]
+type = "Partitioning"
+
+[types.Dependency]
+type = "record"
+[types.Dependency.fields.determinant]
+type = "array"
+required = false
+[types.Dependency.fields.determinant.item]
+type = "string"
+[types.Dependency.fields.dependent]
+type = "array"
+required = false
+[types.Dependency.fields.dependent.item]
+type = "string"
+
+[types.Maintenance]
+type = "record"
+[types.Maintenance.fields.interval]
+type = "string"
+required = false
+[types.Maintenance.fields.premake]
+type = "integer"
+required = false
+[types.Maintenance.fields.retention]
+type = "string"
+required = false
+[types.Maintenance.fields.retention_keep_table]
+type = "boolean"
+required = false
+[types.Maintenance.fields.schedule]
+type = "string"
+required = false
+
+# --- views ------------------------------------------------------------------
+
+[types.View]
+type = "record"
+[types.View.fields.query]
+type = "sql-expression"
+required = true
+[types.View.fields.comment]
+type = "string"
+required = false
+[types.View.fields.depends_on]
+type = "array"
+required = false
+[types.View.fields.depends_on.item]
+type = "string"
+
+[types.MatView]
+type = "record"
+[types.MatView.fields.query]
+type = "sql-expression"
+required = true
+[types.MatView.fields.comment]
+type = "string"
+required = false
+[types.MatView.fields.depends_on]
+type = "array"
+required = false
+[types.MatView.fields.depends_on.item]
+type = "string"
+[types.MatView.fields.with_data]
+type = "boolean"
+required = false
+[types.MatView.fields.indexes]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+order = "incidental"
+[types.MatView.fields.indexes.value]
+type = "Index"
+
+# --- sequences --------------------------------------------------------------
+
+[types.Sequence]
+type = "record"
+[types.Sequence.fields.start]
+type = "integer"
+required = false
+[types.Sequence.fields.increment]
+type = "integer"
+required = false
+[types.Sequence.fields.min_value]
+type = "integer"
+required = false
+[types.Sequence.fields.max_value]
+type = "integer"
+required = false
+[types.Sequence.fields.cache]
+type = "integer"
+required = false
+[types.Sequence.fields.cycle]
+type = "boolean"
+required = false
+[types.Sequence.fields.owned_by]
+type = "string"
+required = false
+[types.Sequence.fields.comment]
+type = "string"
+required = false
+
+# --- functions --------------------------------------------------------------
+
+[types.Function]
+type = "record"
+[types.Function.fields.language]
+type = "string"
+required = true
+[types.Function.fields.returns]
+type = "pgtype"
+required = false
+description = "Required unless procedure = true (conditional check owned by model)."
+[types.Function.fields.body]
+type = "sql-expression"
+required = false
+[types.Function.fields.file]
+type = "string"
+required = false
+description = "Path to a SQL body file (body OR file required; check owned by model)."
+[types.Function.fields.comment]
+type = "string"
+required = false
+[types.Function.fields.volatility]
+type = "string"
+required = false
+[types.Function.fields.parallel]
+type = "string"
+required = false
+[types.Function.fields.security_definer]
+type = "boolean"
+required = false
+[types.Function.fields.procedure]
+type = "boolean"
+required = false
+[types.Function.fields.cost]
+type = "number"
+required = false
+[types.Function.fields.rows]
+type = "number"
+required = false
+[types.Function.fields.depends_on]
+type = "array"
+required = false
+[types.Function.fields.depends_on.item]
+type = "string"
+[types.Function.fields.args]
+type = "array"
+required = false
+[types.Function.fields.args.item]
+type = "FunctionArg"
+
+[types.FunctionArg]
+type = "record"
+[types.FunctionArg.fields.name]
+type = "identifier"
+required = true
+[types.FunctionArg.fields.type]
+type = "pgtype"
+required = true
+[types.FunctionArg.fields.default]
+type = "string"
+required = false
