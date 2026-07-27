@@ -220,7 +220,8 @@ type journalRow struct {
 }
 
 // journalConfirmedOp writes a confirmed op row (status='confirmed', confirmed_at=now())
-// via exec (a tx for transactional ops, the conn for non-transactional ops).
+// via exec. Used for TRANSACTIONAL ops: the row is written INSIDE the op's
+// transaction, so it commits or rolls back atomically with the op's effect (L8).
 func journalConfirmedOp(ctx context.Context, exec sqlExecer, r journalRow) error {
 	_, err := exec.Exec(ctx,
 		`INSERT INTO pgdesign_migration_ops
@@ -232,4 +233,62 @@ func journalConfirmedOp(ctx context.Context, exec sqlExecer, r journalRow) error
 		return fmt.Errorf("migrate: journal op %s/%d (%s): %w", r.EdgeID, r.Seq, r.OpKind, err)
 	}
 	return nil
+}
+
+// journalIntentOp writes an INTENT row (status='intended', confirmed_at NULL) for
+// a NON-TRANSACTIONAL op (roadmap L8). It is committed BEFORE the op's effect runs
+// so the applied view never shows a partial edge as applied, and so a resume has a
+// durable marker to recover from.
+func journalIntentOp(ctx context.Context, exec sqlExecer, r journalRow) error {
+	_, err := exec.Exec(ctx,
+		`INSERT INTO pgdesign_migration_ops
+		 (edge_id, seq, phase, op_kind, target, invertibility, down_op, status, version_label, description, checksum)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, 'intended', $8, $9, $10)`,
+		r.EdgeID, r.Seq, r.Phase, r.OpKind, r.Target, r.Invertibility, r.DownOp,
+		r.VersionLabel, r.Description, r.Checksum)
+	if err != nil {
+		return fmt.Errorf("migrate: journal intent %s/%d (%s): %w", r.EdgeID, r.Seq, r.OpKind, err)
+	}
+	return nil
+}
+
+// confirmIntentOp flips a NON-TRANSACTIONAL op's intent row to confirmed after its
+// effect has durably executed. Paired with journalIntentOp to close the intent →
+// confirm protocol (L8).
+func confirmIntentOp(ctx context.Context, exec sqlExecer, edgeID string, seq int) error {
+	_, err := exec.Exec(ctx,
+		`UPDATE pgdesign_migration_ops SET status = 'confirmed', confirmed_at = now()
+		 WHERE edge_id = $1 AND seq = $2`, edgeID, seq)
+	if err != nil {
+		return fmt.Errorf("migrate: confirm op %s/%d: %w", edgeID, seq, err)
+	}
+	return nil
+}
+
+// loadEdgeOpStatus returns, for an edge, the set of confirmed seqs and the set of
+// seqs with a lingering (unconfirmed) INTENT row. Confirmed seqs are SKIPPED on
+// resume (mid-edge resume); intent seqs drive the non-transactional resume
+// protocol.
+func loadEdgeOpStatus(ctx context.Context, conn *pgx.Conn, edgeID string) (confirmed, intents map[int]bool, err error) {
+	confirmed = map[int]bool{}
+	intents = map[int]bool{}
+	rows, err := conn.Query(ctx,
+		"SELECT seq, status FROM pgdesign_migration_ops WHERE edge_id = $1", edgeID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("migrate: load edge op status for %s: %w", edgeID[:12], err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var seq int
+		var status string
+		if err := rows.Scan(&seq, &status); err != nil {
+			return nil, nil, err
+		}
+		if status == "confirmed" {
+			confirmed[seq] = true
+		} else {
+			intents[seq] = true
+		}
+	}
+	return confirmed, intents, rows.Err()
 }

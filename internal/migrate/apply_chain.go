@@ -33,11 +33,22 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/catalog"
 	"github.com/smm-h/pgdesign/internal/chain"
 	"github.com/smm-h/pgdesign/internal/enc"
 	"github.com/smm-h/pgdesign/internal/objstore"
+	"github.com/smm-h/pgdesign/internal/predicate"
+	"github.com/smm-h/pgdesign/internal/sql"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
+
+// indexQualified renders a schema-qualified (or bare) quoted index name.
+func indexQualified(schema, name string) string {
+	if schema == "" {
+		return sql.QuoteIdent(name)
+	}
+	return sql.QualifiedName(schema, name)
+}
 
 // ApplyHooks carries optional test seams. AfterOp runs after an op executes and
 // journals, before the edge's transaction commits; a non-nil error aborts the
@@ -147,11 +158,23 @@ func ensureChainStructures(ctx context.Context, conn *pgx.Conn) error {
 	return tx.Commit(ctx)
 }
 
-// applyEdge executes one edge's ops with the legacy execution semantics preserved
-// (single transaction, non-transactional breakouts) and journals each op as
-// confirmed. Stale rows from a prior crashed attempt at this edge are cleared
-// first (the position was not advanced, so those rows never represented a
-// completed edge). The edge's final transaction advances chain_position.
+// applyEdge executes one edge's ops as the single pass PRECONDITION -> EXECUTE ->
+// JOURNAL (roadmap 5.5+5.7). Per op:
+//
+//   - PRECONDITION: the op's domain check runs against the current DB state via the
+//     predicate Go executor (creates require their object absent; drops/alters
+//     require it present). Unexpected state is a hard error naming
+//     object/expected/found — drift is loud, never absorbed (L5).
+//   - EXECUTE: the op's rendered SQL.
+//   - JOURNAL: a pgdesign_migration_ops row. TRANSACTIONAL ops journal a confirmed
+//     row INSIDE the op's segment transaction (atomic with the effect).
+//     NON-TRANSACTIONAL ops (create/drop index concurrently; pre-12 enum-add) use
+//     an INTENT-then-CONFIRM protocol whose resume is idempotent in Postgres's own
+//     state model (pg_index.indisvalid; IF EXISTS).
+//
+// RESUME (mid-edge): already-confirmed ops are SKIPPED; a lingering intent row
+// drives the non-transactional resume protocol. chain_position advances in the
+// transaction that confirms the edge's FINAL op.
 func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edge, hooks *ApplyHooks) error {
 	edgeID := e.ID()
 	checksum, err := edgeFileChecksum(e)
@@ -159,24 +182,48 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edg
 		return err
 	}
 	slug := e.Slug
-	// Clear any partial rows from a prior crashed attempt and mark this edge
-	// in-progress (both autocommit; safe because chain_position still points at
-	// the parent — the edge is not applied).
+	finalSeq := len(e.Ops) - 1
+
+	confirmed, intents, err := loadEdgeOpStatus(ctx, conn, edgeID)
+	if err != nil {
+		return err
+	}
 	if err := setInProgressEdge(ctx, conn, &edgeID); err != nil {
 		return err
 	}
-	if _, err := conn.Exec(ctx, "DELETE FROM pgdesign_migration_ops WHERE edge_id = $1", edgeID); err != nil {
-		return fmt.Errorf("migrate: clear stale journal rows for edge %s: %w", edgeID[:12], err)
-	}
 
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin: %w", err)
+	var tx pgx.Tx // the current transactional segment; nil when none is open
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+	beginSeg := func() error {
+		if tx == nil {
+			t, err := conn.Begin(ctx)
+			if err != nil {
+				return fmt.Errorf("begin: %w", err)
+			}
+			tx = t
+		}
+		return nil
 	}
-	defer tx.Rollback(ctx)
+	commitSeg := func() error {
+		if tx != nil {
+			if err := tx.Commit(ctx); err != nil {
+				return err
+			}
+			tx = nil
+		}
+		return nil
+	}
 
 	for seq, op := range e.Ops {
-		sqlStmt, err := op.RenderSQL(store)
+		if confirmed[seq] {
+			continue // mid-edge resume: a confirmed op does not re-run its precondition
+		}
+		isFinal := seq == finalSeq
+		row, err := journalRowFor(op, seq, slug, edgeID, checksum)
 		if err != nil {
 			return err
 		}
@@ -184,42 +231,63 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edg
 		if err != nil {
 			return err
 		}
-		row, err := journalRowFor(op, seq, slug, edgeID, checksum)
-		if err != nil {
-			return err
-		}
 
 		if nonTx {
-			// Commit the current transaction, execute outside, journal via the conn,
-			// then start a fresh transaction (mirrors legacy applyOne).
-			if err := tx.Commit(ctx); err != nil {
-				return fmt.Errorf("commit before non-transactional op %d (%s): %w", seq, op.kind, err)
-			}
-			stmts, err := sqlparse.SplitStatements(sqlStmt)
-			if err != nil {
-				return fmt.Errorf("parse non-transactional op %d (%s): %w", seq, op.kind, err)
-			}
-			for _, stmt := range stmts {
-				if _, err := conn.Exec(ctx, stmt); err != nil {
-					return fmt.Errorf("non-transactional op %d (%s): %w", seq, op.kind, err)
+			resume := intents[seq]
+			if !resume {
+				// Write the intent row and commit the (possibly preceding) segment so
+				// it durably lands BEFORE the effect runs — the applied view never
+				// shows a partial edge as applied, and resume has a durable marker.
+				if err := beginSeg(); err != nil {
+					return err
+				}
+				if err := journalIntentOp(ctx, tx, row); err != nil {
+					return err
 				}
 			}
-			if err := journalConfirmedOp(ctx, conn, row); err != nil {
+			if err := commitSeg(); err != nil {
+				return fmt.Errorf("commit before non-transactional op %d (%s): %w", seq, op.kind, err)
+			}
+			if err := executeNonTransactionalOp(ctx, conn, store, op, resume); err != nil {
+				return fmt.Errorf("op %d (%s): %w", seq, op.kind, err)
+			}
+			// Confirm (+ advance if final) atomically in a small transaction.
+			t2, err := conn.Begin(ctx)
+			if err != nil {
+				return fmt.Errorf("begin confirm for op %d: %w", seq, err)
+			}
+			if err := confirmIntentOp(ctx, t2, edgeID, seq); err != nil {
+				_ = t2.Rollback(ctx)
 				return err
+			}
+			if isFinal {
+				if err := advanceChainPosition(ctx, t2, e.Target.String()); err != nil {
+					_ = t2.Rollback(ctx)
+					return err
+				}
+			}
+			if err := t2.Commit(ctx); err != nil {
+				return fmt.Errorf("commit confirm for op %d: %w", seq, err)
 			}
 			if hooks.AfterOp != nil {
 				if err := hooks.AfterOp(edgeID, seq); err != nil {
 					return err
 				}
 			}
-			tx, err = conn.Begin(ctx)
-			if err != nil {
-				return fmt.Errorf("begin after non-transactional op %d: %w", seq, err)
-			}
-			defer tx.Rollback(ctx)
 			continue
 		}
 
+		// Transactional op: precondition + execute + journal, all in the segment tx.
+		if err := beginSeg(); err != nil {
+			return err
+		}
+		if err := checkPreconditions(ctx, tx, store, op); err != nil {
+			return fmt.Errorf("op %d (%s): %w", seq, op.kind, err)
+		}
+		sqlStmt, err := op.RenderSQL(store)
+		if err != nil {
+			return err
+		}
 		stmts, err := sqlparse.SplitStatements(sqlStmt)
 		if err != nil {
 			return fmt.Errorf("parse op %d (%s): %w", seq, op.kind, err)
@@ -234,17 +302,134 @@ func applyEdge(ctx context.Context, conn *pgx.Conn, store *objstore.Store, e Edg
 		}
 		if hooks.AfterOp != nil {
 			if err := hooks.AfterOp(edgeID, seq); err != nil {
-				return err // defer tx.Rollback undoes this edge's uncommitted work
+				return err // defer tx.Rollback undoes this segment's uncommitted work
+			}
+		}
+		if isFinal {
+			if err := advanceChainPosition(ctx, tx, e.Target.String()); err != nil {
+				return err
+			}
+			if err := commitSeg(); err != nil {
+				return err
 			}
 		}
 	}
 
-	// The edge's final transaction advances the position atomically with the
-	// last op's confirm.
-	if err := advanceChainPosition(ctx, tx, e.Target.String()); err != nil {
+	// Defensive: a residual open segment (never expected, since the final op commits).
+	return commitSeg()
+}
+
+// checkPreconditions evaluates every precondition an op declares against the
+// current DB state (q is the segment tx for transactional ops, the conn for
+// non-transactional ops). A violated precondition is a hard error naming
+// object/expected/found.
+func checkPreconditions(ctx context.Context, q catalog.Querier, store *objstore.Store, op SelfContainedOp) error {
+	pres, err := op.preconditions(store)
+	if err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	for _, p := range pres {
+		r, err := predicate.Check(ctx, q, p)
+		if err != nil {
+			return err
+		}
+		if err := r.Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// executeNonTransactionalOp runs a non-transactional op idempotently. On a fresh
+// run it checks the op's precondition then executes; on resume it applies the
+// class-specific protocol in Postgres's own state model (L8).
+func executeNonTransactionalOp(ctx context.Context, conn *pgx.Conn, store *objstore.Store, op SelfContainedOp, resume bool) error {
+	switch op.kind {
+	case "create_index_concurrently":
+		return resumeCreateIndexConcurrently(ctx, conn, store, op, resume)
+	case "drop_index_concurrently":
+		// DROP INDEX CONCURRENTLY IF EXISTS is idempotent; its precondition (index
+		// present) is checked only on a fresh run — on resume the index may already
+		// be gone, which IF EXISTS handles.
+		if !resume {
+			if err := checkPreconditions(ctx, conn, store, op); err != nil {
+				return err
+			}
+		}
+		return execNonTxStatements(ctx, conn, store, op)
+	default:
+		// Version-conditional enum-add (pre-12) and any other non-transactional op:
+		// ADD VALUE IF NOT EXISTS is idempotent, so resume simply re-runs.
+		if !resume {
+			if err := checkPreconditions(ctx, conn, store, op); err != nil {
+				return err
+			}
+		}
+		return execNonTxStatements(ctx, conn, store, op)
+	}
+}
+
+// resumeCreateIndexConcurrently implements the create-index resume protocol
+// (roadmap L8): an interrupted CREATE INDEX CONCURRENTLY leaves an INVALID index
+// of the target name that IF NOT EXISTS would skip forever. On resume, if the
+// index is present AND valid it was built before the crash (nothing to do); if it
+// is absent or INVALID, DROP INDEX CONCURRENTLY IF EXISTS then rebuild.
+func resumeCreateIndexConcurrently(ctx context.Context, conn *pgx.Conn, store *objstore.Store, op SelfContainedOp, resume bool) error {
+	if !resume {
+		if err := checkPreconditions(ctx, conn, store, op); err != nil {
+			return err
+		}
+		return execNonTxStatements(ctx, conn, store, op)
+	}
+	schema, name, err := indexTargetName(store, op)
+	if err != nil {
+		return err
+	}
+	info, present, err := catalog.Index(ctx, conn, schema, name)
+	if err != nil {
+		return err
+	}
+	if present && info.Valid {
+		return nil // built valid before the crash; the confirm step finishes the edge
+	}
+	dropStmt := fmt.Sprintf("DROP INDEX CONCURRENTLY IF EXISTS %s", indexQualified(schema, name))
+	if _, err := conn.Exec(ctx, dropStmt); err != nil {
+		return fmt.Errorf("resume: drop invalid index %s: %w", name, err)
+	}
+	return execNonTxStatements(ctx, conn, store, op)
+}
+
+// execNonTxStatements renders an op and executes its (split) statements via the
+// autocommit connection.
+func execNonTxStatements(ctx context.Context, conn *pgx.Conn, store *objstore.Store, op SelfContainedOp) error {
+	sqlStmt, err := op.RenderSQL(store)
+	if err != nil {
+		return err
+	}
+	stmts, err := sqlparse.SplitStatements(sqlStmt)
+	if err != nil {
+		return fmt.Errorf("parse non-transactional op (%s): %w", op.kind, err)
+	}
+	for _, stmt := range stmts {
+		if _, err := conn.Exec(ctx, stmt); err != nil {
+			return fmt.Errorf("non-transactional op (%s): %w", op.kind, err)
+		}
+	}
+	return nil
+}
+
+// indexTargetName resolves the (schema, index-name) of a concurrent-index op from
+// its stored delta.
+func indexTargetName(store *objstore.Store, op SelfContainedOp) (string, string, error) {
+	body, err := loadBody(store, op.payload)
+	if err != nil {
+		return "", "", err
+	}
+	if body.Delta == nil {
+		return "", "", fmt.Errorf("migrate: concurrent-index op %s has no delta", op.kind)
+	}
+	schema, _ := splitQualifiedName(body.Delta.Table)
+	return schema, body.Delta.Name, nil
 }
 
 // journalRowFor builds the confirmed journal row for one op. The down-op is the
