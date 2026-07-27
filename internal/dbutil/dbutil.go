@@ -20,14 +20,3 @@ func SwapDatabase(dbURL, newDB string) (string, error) {
 func MaintenanceURL(dbURL string) (string, error) {
 	return SwapDatabase(dbURL, "postgres")
 }
-
-// ResolveURL returns the first non-empty string from the arguments.
-// Intended usage: ResolveURL(flagValue, configValue, envVarValue)
-func ResolveURL(values ...string) string {
-	for _, v := range values {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
