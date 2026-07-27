@@ -36,7 +36,6 @@ import (
 	"github.com/smm-h/pgdesign/internal/chain"
 	"github.com/smm-h/pgdesign/internal/enc"
 	"github.com/smm-h/pgdesign/internal/objstore"
-	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
 )
 
@@ -288,16 +287,7 @@ func edgeFileChecksum(e Edge) (string, error) {
 		}
 		return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 	}
-	f := edgeFileJSON{
-		FormatVersion: rev.FormatVersion,
-		Codec:         enc.CodecVersion,
-		Class:         string(e.Class),
-		Parent:        revString(e.Parent),
-		Target:        e.Target.String(),
-		Slug:          e.Slug,
-		Ops:           serializeOps(e.Ops),
-	}
-	data, err := canonicalOpJSON(f)
+	data, err := canonicalOpJSON(edgeToJSON(e))
 	if err != nil {
 		return "", err
 	}

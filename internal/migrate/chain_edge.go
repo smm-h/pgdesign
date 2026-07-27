@@ -49,11 +49,20 @@ type Edge struct {
 	File     string            // absolute path this edge was loaded from ("" if in-memory)
 	Archived bool              // true when loaded from archive/ (traversal-only)
 	// Consolidation marks a squash consolidation edge (roadmap 5.3). The
-	// path-finder prefers consolidation edges as its 4a tie-break. It is not yet
-	// persisted in the edge file (5.3 owns that); loaded edges are always false
-	// until 5.3 records the superseded-edge set. The seam exists so the path-finder
-	// is total and consolidation-ready now.
+	// path-finder prefers consolidation edges as its 4a tie-break. It is persisted
+	// in the edge file (the "consolidation" marker) and read back by LoadEdge.
 	Consolidation bool
+	// SupersededEdgeIDs is the set of chain-edge ids this consolidation supersedes
+	// (the archived originals whose op-lists it concatenates), persisted as the
+	// edge file's "superseded" list. It is EMPTY for a non-consolidation edge and
+	// NON-EMPTY for a consolidation edge (LoadEdge enforces that biconditional).
+	// The A6 disjointness invariant (path_finder.md) is checked against these sets
+	// at CREATION time (SquashChain) and re-verified by VerifyChainConsistency.
+	// Like the per-op down cache, these fields are NON-IDENTITY metadata: they are
+	// NOT part of chain.Edge.ID(), so a consolidation edge and a hypothetical plain
+	// edge with identical ops/endpoints/slug would collide on identity — a case the
+	// op-list concatenation makes practically unreachable (see edge_format.md).
+	SupersededEdgeIDs []string
 }
 
 // chainEdge projects to the kernel's identity/graph edge.
@@ -72,6 +81,8 @@ func (e Edge) ID() string { return e.chainEdge().ID() }
 func (e Edge) IsGenesis() bool { return e.Parent.IsZero() }
 
 // edgeFileJSON is the on-disk edge-artifact body (edge_format.md § Body schema).
+// consolidation/superseded are the roadmap-5.3 additions (omitempty so ordinary
+// edges serialize byte-identically to the pre-5.3 format).
 type edgeFileJSON struct {
 	FormatVersion int      `json:"format_version"`
 	Codec         int      `json:"codec"`
@@ -80,6 +91,25 @@ type edgeFileJSON struct {
 	Target        string   `json:"target"`
 	Slug          string   `json:"slug"`
 	Ops           []OpJSON `json:"ops"`
+	Consolidation bool     `json:"consolidation,omitempty"` // squash consolidation marker (5.3)
+	Superseded    []string `json:"superseded,omitempty"`    // superseded edge ids (5.3)
+}
+
+// edgeToJSON projects an Edge to its on-disk body. It is the single builder both
+// the file writer (encodeEdge) and the apply-surface checksum (edgeFileChecksum)
+// use, so the two never diverge on which fields the file carries.
+func edgeToJSON(e Edge) edgeFileJSON {
+	return edgeFileJSON{
+		FormatVersion: rev.FormatVersion,
+		Codec:         enc.CodecVersion,
+		Class:         string(e.Class),
+		Parent:        revString(e.Parent),
+		Target:        e.Target.String(),
+		Slug:          e.Slug,
+		Ops:           serializeOps(e.Ops),
+		Consolidation: e.Consolidation,
+		Superseded:    e.SupersededEdgeIDs,
+	}
 }
 
 // edgeFileName returns the content-derived filename for an edge id and slug.
@@ -126,15 +156,12 @@ func (p *ChainProject) encodeEdge(e Edge) (data []byte, name string, err error) 
 	if e.Target.Class() != e.Class {
 		return nil, "", fmt.Errorf("migrate: edge target class %q != edge class %q", e.Target.Class(), e.Class)
 	}
-	f := edgeFileJSON{
-		FormatVersion: rev.FormatVersion,
-		Codec:         enc.CodecVersion,
-		Class:         string(e.Class),
-		Parent:        revString(e.Parent),
-		Target:        e.Target.String(),
-		Slug:          e.Slug,
-		Ops:           serializeOps(e.Ops),
+	// Internal biconditional (also enforced at load): a consolidation edge lists
+	// its superseded originals; a plain edge lists none.
+	if err := checkConsolidationShape(e.Consolidation, e.SupersededEdgeIDs); err != nil {
+		return nil, "", err
 	}
+	f := edgeToJSON(e)
 	b, err := canonicalOpJSON(f)
 	if err != nil {
 		return nil, "", fmt.Errorf("migrate: encode edge: %w", err)
@@ -209,7 +236,16 @@ func (p *ChainProject) LoadEdge(path string, archived bool) (Edge, error) {
 		}
 		ops[i] = op
 	}
-	e := Edge{Parent: parent, Target: target, Slug: f.Slug, Class: class, Ops: ops, File: path, Archived: archived}
+	// Consolidation metadata (5.3): non-identity, so verified for internal shape
+	// here (biconditional) and for cross-edge disjointness by the checker.
+	if err := checkConsolidationShape(f.Consolidation, f.Superseded); err != nil {
+		return Edge{}, fmt.Errorf("migrate: edge %q: %w", path, err)
+	}
+	e := Edge{
+		Parent: parent, Target: target, Slug: f.Slug, Class: class, Ops: ops,
+		File: path, Archived: archived,
+		Consolidation: f.Consolidation, SupersededEdgeIDs: f.Superseded,
+	}
 	// The filename must carry the reconstructed edge's content-hash prefix.
 	base := filepath.Base(path)
 	want := edgeFileName(e.ID(), f.Slug)
@@ -217,6 +253,22 @@ func (p *ChainProject) LoadEdge(path string, archived bool) (Edge, error) {
 		return Edge{}, fmt.Errorf("migrate: edge file %q does not match its content-derived name %q (edge content-hash prefix mismatch — tampered or corrupt)", base, want)
 	}
 	return e, nil
+}
+
+// checkConsolidationShape enforces the consolidation/superseded biconditional: a
+// consolidation edge must list at least one superseded edge id, and a
+// non-consolidation edge must list none. This is a cheap single-edge integrity
+// check (LoadEdge's id-prefix hash covers identity facets but NOT this
+// non-identity metadata); the cross-edge A6 disjointness invariant is the
+// checker's job (VerifyChainConsistency).
+func checkConsolidationShape(consolidation bool, superseded []string) error {
+	if consolidation && len(superseded) == 0 {
+		return fmt.Errorf("consolidation edge has no superseded edge ids")
+	}
+	if !consolidation && len(superseded) > 0 {
+		return fmt.Errorf("non-consolidation edge lists %d superseded edge ids", len(superseded))
+	}
+	return nil
 }
 
 // readEdgeCodec reads just the codec epoch field from an edge file, for the

@@ -85,6 +85,22 @@ from graph topology at listing time, never stored as identity.
 - `target` — the to-revision string (`<class>:<hex>`).
 - `slug` — human display name; participates in identity (two otherwise-identical
   edges with different slugs are different edges).
+- `consolidation` (roadmap 5.3, omitempty) — `true` marks a SQUASH CONSOLIDATION
+  edge (a parallel edge whose op-list is the ordered concatenation of a superseded
+  path). Absent/false on ordinary edges. The path-finder prefers consolidation
+  edges in its 4a tie-break.
+- `superseded` (roadmap 5.3, omitempty) — the list of chain-edge ids this
+  consolidation supersedes (the archived originals whose op-lists it
+  concatenates). Present iff `consolidation` is true (the reader enforces the
+  biconditional). The A6 disjointness invariant (path_finder.md) is checked
+  against these sets at CREATION time (`SquashChain`) and re-verified by the
+  consistency checker. Like `down`, these two fields are NON-IDENTITY metadata:
+  `chain.Edge.ID()` does NOT hash them, so a consolidation edge and a hypothetical
+  plain edge with identical ops/endpoints/slug would share an id — a case the
+  op-list concatenation (which mixes intermediate churn no net-diff edge produces)
+  makes practically unreachable. The single-edge biconditional is verified at load;
+  the cross-edge disjointness and the superseded-ids-resolve-to-archive property
+  are the consistency checker's job.
 - `ops[]` — the ordered op-list. Each entry carries exactly the facets
   `chain.Edge.ID()` observes plus the DOWN reference:
   - `kind` — op family.
