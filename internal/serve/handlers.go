@@ -105,7 +105,13 @@ func (s *Server) handleSchemaSVG(w http.ResponseWriter, r *http.Request) {
 	w.Write(svg)
 }
 
-// handleMigrations queries the pgdesign_migrations table.
+// handleMigrations returns applied migrations. PRECEDENCE (serve is read-only, so
+// it serves whichever tracking surface a database presents): the chain-era
+// pgdesign_applied_migrations VIEW when it exists (post-upgrade databases); else
+// the legacy pgdesign_migrations table when only it exists (pre-upgrade
+// databases the migrate subcommands force through `migrate upgrade`, but serve
+// keeps reading); else 200 [] when neither exists. Both surfaces expose the same
+// (version, applied_at, description, checksum) shape.
 func (s *Server) handleMigrations(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -116,26 +122,41 @@ func (s *Server) handleMigrations(w http.ResponseWriter, r *http.Request) {
 		Checksum    string    `json:"checksum"`
 	}
 
-	// Check if the migrations table exists.
-	var exists bool
-	err := s.pool.QueryRow(ctx,
-		`SELECT EXISTS (
-			SELECT 1 FROM information_schema.tables
-			WHERE table_name = 'pgdesign_migrations'
-		)`).Scan(&exists)
+	relExists := func(rel string) (bool, error) {
+		var exists bool
+		err := s.pool.QueryRow(ctx, "SELECT to_regclass($1) IS NOT NULL", rel).Scan(&exists)
+		return exists, err
+	}
+
+	viewExists, err := relExists("pgdesign_applied_migrations")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("check migrations view: %v", err))
+		return
+	}
+	legacyExists, err := relExists("pgdesign_migrations")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("check migrations table: %v", err))
 		return
 	}
-	if !exists {
+
+	// version_label is served as `version` from the view (the preserved semver for
+	// prefix rows, the edge_id for post-upgrade edges); applied_at orders both.
+	var query string
+	switch {
+	case viewExists:
+		query = `SELECT version, applied_at, COALESCE(description, ''), checksum
+			FROM pgdesign_applied_migrations
+			ORDER BY applied_at`
+	case legacyExists:
+		query = `SELECT version, applied_at, COALESCE(description, ''), checksum
+			FROM pgdesign_migrations
+			ORDER BY applied_at`
+	default:
 		writeJSON(w, http.StatusOK, []migration{})
 		return
 	}
 
-	rows, err := s.pool.Query(ctx,
-		`SELECT version, applied_at, description, checksum
-		FROM pgdesign_migrations
-		ORDER BY applied_at`)
+	rows, err := s.pool.Query(ctx, query)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("query migrations: %v", err))
 		return
@@ -179,9 +200,20 @@ func migrationVersionPath(migrationsDir, version string) (string, bool) {
 	return path, true
 }
 
-// handleMigrationVersion reads and parses a specific migration file by version.
+// handleMigrationVersion serves a single migration by name. For a chain-mode
+// project (migrations/chain/ present) it returns the raw JSON edge artifact keyed
+// by its content-derived filename (or the 12-hex edge-id prefix); for a legacy
+// project it parses and returns the semver .toml file. Path traversal is defeated
+// in both modes (no separators / ".." segments; resolved path must stay within
+// the store directory).
 func (s *Server) handleMigrationVersion(w http.ResponseWriter, r *http.Request) {
 	version := r.PathValue("version")
+
+	if migrate.IsChainMode(s.migrationsDir) {
+		s.serveChainEdge(w, version)
+		return
+	}
+
 	path, ok := migrationVersionPath(s.migrationsDir, version)
 	if !ok {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid migration version %q", version))
@@ -200,6 +232,46 @@ func (s *Server) handleMigrationVersion(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, m)
+}
+
+// serveChainEdge returns the raw JSON edge artifact for a chain-mode project. ref
+// is either the exact edge filename or the 12-hex edge-id prefix; it must contain
+// no path separator or ".." segment (traversal defense preserved from the legacy
+// path). The edge is looked up in migrations/chain/ (live edges only).
+func (s *Server) serveChainEdge(w http.ResponseWriter, ref string) {
+	if ref == "" || strings.ContainsAny(ref, `/\`) || strings.Contains(ref, "..") {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid edge reference %q", ref))
+		return
+	}
+	chainDir := filepath.Join(s.migrationsDir, "chain")
+	entries, err := os.ReadDir(chainDir)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("read chain dir: %v", err))
+		return
+	}
+	var match string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), "edge-") || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		// Exact filename, or the content-hash prefix (edge-<12hex>-...).
+		if e.Name() == ref || strings.HasPrefix(e.Name(), "edge-"+ref+"-") {
+			match = e.Name()
+			break
+		}
+	}
+	if match == "" {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("edge %q not found", ref))
+		return
+	}
+	data, err := os.ReadFile(filepath.Join(chainDir, match))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("read edge: %v", err))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
 }
 
 // handleStats returns database statistics for all tables in the configured schemas.
