@@ -140,5 +140,11 @@ on_delete = "CASCADE"
 [tables.orders.checks.ck_orders_total_positive]
 expr = "total_cents >= 0"
 
+# A CHECK on the NULLABLE `note` column: exercises go_constraints' nil-guard +
+# deref branch (a nullable column is a Go pointer field) so the compile check
+# (TestCompileGoConstraints) actually compiles that generated code path.
+[tables.orders.checks.ck_orders_note_len]
+expr = "LENGTH(note) <= 500"
+
 [tables.orders.indexes.idx_orders_account]
 columns = ["account_id"]

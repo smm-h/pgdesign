@@ -114,6 +114,47 @@ func TestGoConstraintsGenerator_Generate(t *testing.T) {
 	}
 }
 
+// TestGoConstraintsGenerator_NullableCheckNilGuard pins the nullable-column
+// CHECK handling: a nullable column maps to a Go pointer field, so a CHECK on it
+// must be nil-guarded and dereferenced (go_constraints.go:164-171). Without the
+// guard the generated code would dereference a nil pointer at runtime; without
+// the deref it would not type-check against the pointer field. The check is a
+// LENGTH check so the emitted deref appears inside len(...).
+func TestGoConstraintsGenerator_NullableCheckNilGuard(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{
+			{
+				Name: "notes",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("bigint"), NotNull: true},
+					// Nullable text column with a CHECK -> pointer field + deref.
+					{Name: "body", PGType: typeinfo.MustParse("text"), NotNull: false},
+				},
+				PK: []string{"id"},
+				Checks: []model.CheckConstraint{
+					{Name: "ck_notes_body_len", Expr: "LENGTH(body) <= 500"},
+				},
+			},
+		},
+	}
+
+	gen := &GoConstraintsGenerator{}
+	out, diags := gen.Generate(schema)
+	if len(diags) > 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	result := string(out)
+
+	// The nullable column's CHECK is wrapped in a nil guard.
+	if !strings.Contains(result, "if row.Body != nil {") {
+		t.Errorf("missing nil guard for nullable CHECK column, got:\n%s", result)
+	}
+	// The value is dereferenced when used.
+	if !strings.Contains(result, "len((*row.Body))") {
+		t.Errorf("missing deref of nullable CHECK column, got:\n%s", result)
+	}
+}
+
 func TestGoConstraintsGenerator_EmptySchema(t *testing.T) {
 	schema := &model.Schema{
 		Name: "empty",
