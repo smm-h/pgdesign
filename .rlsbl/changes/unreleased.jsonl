@@ -61,3 +61,4 @@
 {"id":"18c60af5a0c8235acd020ae33fe143a19004abb18cb614ed","commits":["227af3f25ed4b2f271899939d283e6d9f8b07fd8"],"user_facing":true,"description":"**Trigger WHEN conditions no longer report false drift on equivalent spellings.** They now compare through the same expression normalizer as CHECK constraints and policies.","type":"fix"}
 {"id":"18c60b8ef9c54e9a9b82862134654273a05f64872fa33dbe","commits":["88e337927a2599e2febcf19376d3cb262ba7d8c2"],"user_facing":false}
 {"id":"18c60c54bed4a033ba12de757e3c480da40736ba41d52ae4","commits":["3fb5919d00b2dacd4fec582841cdd1c3a6ae5564"],"user_facing":false}
+{"id":"18c60c58410ebc2551213ed7c0004125b848de4043ea142a","commits":["baf269b4b51816066f865127e2408d9451cd11ee"],"user_facing":false}
