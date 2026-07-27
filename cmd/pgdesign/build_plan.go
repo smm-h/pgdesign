@@ -32,12 +32,6 @@ type PlanResult struct {
 	// outputs own nothing; only MultiFileGenerator outputs own their
 	// directory. Two outputs sharing a directory union their sets.
 	OwnedDirs map[string]map[string]bool
-	// enumDirs records output directories where a Go generator has already
-	// emitted the branded enum block. Go's `types` and `gorm` modes both emit
-	// enums into `package schema`; when they co-generate into one directory,
-	// the first claims the directory and later enum-emitting Go generators
-	// suppress their block so each enum is declared exactly once.
-	enumDirs map[string]bool
 	// Diagnostics collected during generation (warnings, info).
 	Diagnostics []diagnostic.Diagnostic
 }
@@ -159,18 +153,29 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 	return result, nil
 }
 
-// validateGoCodegenColocation enforces the Go types/constraints co-location
-// requirement. The Go `constraints` generator emits `package schema` and
-// references the branded row structs and enum types the Go `types` generator
-// defines by bare name — Go has no configurable cross-package import path for
-// the schema package, so the two files only compile together in ONE directory.
-// When a build configures BOTH a Go `types` output and a Go `constraints`
-// output whose directories differ, the generated pair cannot compile; this is a
-// hard error naming both directories and the requirement. The check fires only
-// when both outputs are present (a lone constraints or lone types output may be
-// completed by hand-written or externally-generated code).
+// validateGoCodegenColocation enforces the Go `package schema` co-location
+// rules. Two Go codegen modes emit the branded row structs and enum types into
+// `package schema`: `types` and `gorm`. They are STRUCT PROVIDERS. The
+// `constraints` mode emits `package schema` too, but defines no row structs or
+// enums — it references the provider's structs (Accounts) and branded enums
+// (Role, via .String()/.IsValid()) by bare name. Go has no configurable
+// cross-package import path for the schema package, so all three only compile
+// when co-located in ONE directory. Two rules follow:
+//
+//  1. At most one struct provider per directory. `types` and `gorm` define the
+//     SAME row struct names, so two providers in one directory produce duplicate
+//     definitions that do not compile (enum dedup never deduplicated row
+//     structs). Hard error naming the directory and the offending modes.
+//
+//  2. A `constraints` output must sit in a directory that also contains a struct
+//     provider (types or gorm) — whichever is configured. When a provider is
+//     configured but in a DIFFERENT directory, the pair cannot compile: hard
+//     error naming both directories. The check fires only when a provider is
+//     configured somewhere; a lone constraints output (no provider anywhere) may
+//     be completed by hand-written or externally-generated structs and is left
+//     alone.
 func validateGoCodegenColocation(cfg *config.ResolvedConfig) error {
-	typesDirs := make(map[string]bool)
+	providerModesByDir := make(map[string][]string) // dir -> struct-provider modes (types/gorm)
 	var constraintsDirs []string
 	for _, out := range cfg.Output {
 		if out.Format != "codegen" || out.Lang != "go" {
@@ -178,26 +183,45 @@ func validateGoCodegenColocation(cfg *config.ResolvedConfig) error {
 		}
 		dir := filepath.Dir(string(out.Path))
 		switch out.Mode {
-		case "types":
-			typesDirs[dir] = true
+		case "types", "gorm":
+			providerModesByDir[dir] = append(providerModesByDir[dir], out.Mode)
 		case "constraints":
 			constraintsDirs = append(constraintsDirs, dir)
 		}
 	}
-	if len(typesDirs) == 0 || len(constraintsDirs) == 0 {
+
+	// Rule 1: at most one struct provider per directory. Iterate dirs in sorted
+	// order so the reported error is deterministic when several dirs offend.
+	providerDirs := make([]string, 0, len(providerModesByDir))
+	for d := range providerModesByDir {
+		providerDirs = append(providerDirs, d)
+	}
+	sort.Strings(providerDirs)
+	for _, dir := range providerDirs {
+		modes := providerModesByDir[dir]
+		if len(modes) > 1 {
+			sorted := append([]string(nil), modes...)
+			sort.Strings(sorted)
+			return fmt.Errorf("build: Go codegen directory %q has multiple struct-providing outputs (%s): "+
+				"the Go `types` and `gorm` modes each define the same branded row structs and enum types in `package schema`, "+
+				"so at most one may target a given directory — duplicate definitions would not compile; "+
+				"split them into separate directories (each is a self-contained package)",
+				dir, strings.Join(sorted, ", "))
+		}
+	}
+
+	// Rule 2: constraints must co-locate with a struct provider, when one is
+	// configured anywhere.
+	if len(providerDirs) == 0 || len(constraintsDirs) == 0 {
 		return nil
 	}
-	sortedTypesDirs := make([]string, 0, len(typesDirs))
-	for d := range typesDirs {
-		sortedTypesDirs = append(sortedTypesDirs, d)
-	}
-	sort.Strings(sortedTypesDirs)
 	for _, cd := range constraintsDirs {
-		if !typesDirs[cd] {
-			return fmt.Errorf("build: Go constraints output directory %q differs from Go types output directory %q: "+
-				"the constraints file emits `package schema` and references the row structs and branded enums that the types file defines by bare name, "+
-				"so the two must be generated into the same directory to compile — set both outputs' paths to the same directory",
-				cd, strings.Join(sortedTypesDirs, ", "))
+		if _, ok := providerModesByDir[cd]; !ok {
+			return fmt.Errorf("build: Go constraints output directory %q has no Go struct provider (types or gorm); "+
+				"the configured provider directories are %q: "+
+				"the constraints file emits `package schema` and references the row structs and branded enums a provider defines by bare name, "+
+				"so it must be generated into the same directory as a `types` or `gorm` output to compile",
+				cd, strings.Join(providerDirs, ", "))
 		}
 	}
 	return nil
@@ -343,27 +367,6 @@ func planCodegen(name string, schema *model.Schema, out config.OutputConfig[conf
 	// Configure split mode for Python DDL generators.
 	if ddlGen, ok := gen.(*codegen.PythonDDLGenerator); ok && out.SplitMode != "" {
 		ddlGen.SplitMode = codegen.SplitMode(out.SplitMode)
-	}
-
-	// Co-generation-aware enum dedup for Go: the first enum-emitting Go
-	// generator claims its output directory; later ones (types/gorm) suppress
-	// their enum block so co-generated files share one declaration set.
-	claimEnumDir := func() bool {
-		dir := filepath.Dir(outPath)
-		if result.enumDirs == nil {
-			result.enumDirs = make(map[string]bool)
-		}
-		if result.enumDirs[dir] {
-			return true // already claimed: suppress
-		}
-		result.enumDirs[dir] = true
-		return false
-	}
-	switch g := gen.(type) {
-	case *codegen.GoTypesGenerator:
-		g.SuppressEnums = claimEnumDir()
-	case *codegen.GoGormGenerator:
-		g.SuppressEnums = claimEnumDir()
 	}
 
 	// MultiFileGenerator: collect all files into the plan. The output path is

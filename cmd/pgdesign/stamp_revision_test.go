@@ -316,3 +316,86 @@ func TestValidateGoCodegenColocation_SameDirOK(t *testing.T) {
 		t.Fatalf("lone Go constraints output should not be gated: %v", err)
 	}
 }
+
+// TestValidateGoCodegenColocation_GormConstraintsMismatchIsHardError verifies the
+// guard treats Go `gorm` as a struct provider for `constraints` exactly like Go
+// `types`: gorm also emits the branded row structs and enums into package schema
+// that constraints references by bare name. A gorm+constraints pair in DIFFERENT
+// directories cannot compile and is a hard error naming both directories.
+func TestValidateGoCodegenColocation_GormConstraintsMismatchIsHardError(t *testing.T) {
+	schema := minimalSchema()
+	cfg := &config.ResolvedConfig{
+		Output: map[string]config.OutputConfig[config.AbsolutePath]{
+			"gorm":        {Format: "codegen", Path: "/tmp/a/gorm.go", Lang: "go", Mode: "gorm"},
+			"constraints": {Format: "codegen", Path: "/tmp/b/constraints.go", Lang: "go", Mode: "constraints"},
+		},
+	}
+	_, err := Plan(schema, cfg, semtype.NewRegistry())
+	if err == nil {
+		t.Fatal("expected hard error for split-directory Go gorm/constraints")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "/tmp/a") || !strings.Contains(msg, "/tmp/b") {
+		t.Errorf("error should name both directories, got: %s", msg)
+	}
+}
+
+// TestValidateGoCodegenColocation_GormConstraintsSameDirOK verifies co-located Go
+// gorm+constraints outputs pass: gorm supplies the row structs and branded enums
+// the constraints file validates, so one directory compiles.
+func TestValidateGoCodegenColocation_GormConstraintsSameDirOK(t *testing.T) {
+	schema := minimalSchema()
+	cfg := &config.ResolvedConfig{
+		Output: map[string]config.OutputConfig[config.AbsolutePath]{
+			"gorm":        {Format: "codegen", Path: "/tmp/schema/gorm.go", Lang: "go", Mode: "gorm"},
+			"constraints": {Format: "codegen", Path: "/tmp/schema/constraints.go", Lang: "go", Mode: "constraints"},
+		},
+	}
+	if _, err := Plan(schema, cfg, semtype.NewRegistry()); err != nil {
+		t.Fatalf("co-located Go gorm+constraints should be allowed: %v", err)
+	}
+}
+
+// TestValidateGoCodegenColocation_TypesGormSameDirIsHardError verifies that Go
+// `types` and `gorm` are mutually exclusive struct providers per directory: both
+// define the SAME branded row structs (type Accounts struct) in package schema,
+// so two providers in one directory produce duplicate definitions that do not
+// compile (enum dedup never deduplicated row structs). This is a hard error
+// naming the directory.
+func TestValidateGoCodegenColocation_TypesGormSameDirIsHardError(t *testing.T) {
+	schema := minimalSchema()
+	cfg := &config.ResolvedConfig{
+		Output: map[string]config.OutputConfig[config.AbsolutePath]{
+			"types": {Format: "codegen", Path: "/tmp/schema/types.go", Lang: "go", Mode: "types"},
+			"gorm":  {Format: "codegen", Path: "/tmp/schema/gorm.go", Lang: "go", Mode: "gorm"},
+		},
+	}
+	_, err := Plan(schema, cfg, semtype.NewRegistry())
+	if err == nil {
+		t.Fatal("expected hard error for Go types+gorm sharing one directory")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "/tmp/schema") {
+		t.Errorf("error should name the shared directory, got: %s", msg)
+	}
+	if !strings.Contains(msg, "types") || !strings.Contains(msg, "gorm") {
+		t.Errorf("error should name both struct-providing modes, got: %s", msg)
+	}
+}
+
+// TestValidateGoCodegenColocation_TypesGormSeparateDirsOK verifies that Go
+// `types` and `gorm` in SEPARATE directories are allowed: each is a
+// self-contained package (each emits its own row structs and enum block), so
+// they form two valid, independent packages.
+func TestValidateGoCodegenColocation_TypesGormSeparateDirsOK(t *testing.T) {
+	schema := minimalSchema()
+	cfg := &config.ResolvedConfig{
+		Output: map[string]config.OutputConfig[config.AbsolutePath]{
+			"types": {Format: "codegen", Path: "/tmp/a/types.go", Lang: "go", Mode: "types"},
+			"gorm":  {Format: "codegen", Path: "/tmp/b/gorm.go", Lang: "go", Mode: "gorm"},
+		},
+	}
+	if _, err := Plan(schema, cfg, semtype.NewRegistry()); err != nil {
+		t.Fatalf("Go types and gorm in separate directories should be allowed: %v", err)
+	}
+}
