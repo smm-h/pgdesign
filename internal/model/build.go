@@ -55,7 +55,39 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	groupDiags := resolveGroups(schema, raw.Groups)
 	diags = append(diags, groupDiags...)
 
+	// Partman maintenance requires pg_partman to be declared as an extension.
+	diags = append(diags, validateMaintenanceExtension(schema)...)
+
 	return schema, diags
+}
+
+// validateMaintenanceExtension checks that every table declaring partman
+// maintenance also declares the pg_partman extension. A silent skip when
+// pg_partman is undeclared would leave the maintenance config inert.
+func validateMaintenanceExtension(schema *Schema) diagnostic.Diagnostics {
+	var diags diagnostic.Diagnostics
+	hasPartman := false
+	for _, ext := range schema.Extensions {
+		if ext == "pg_partman" {
+			hasPartman = true
+			break
+		}
+	}
+	if hasPartman {
+		return nil
+	}
+	for i := range schema.Tables {
+		t := &schema.Tables[i]
+		if t.Maintenance != nil {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E010",
+				Table:    t.Name,
+				Message:  fmt.Sprintf("[tables.%s.maintenance] requires the pg_partman extension to be declared in [meta].extensions", t.Name),
+			})
+		}
+	}
+	return diags
 }
 
 // BuildMulti constructs a resolved Schema from multiple raw schemas and a type
@@ -130,6 +162,9 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	merged := mergeGroups(raws)
 	groupDiags := resolveGroups(schema, merged)
 	diags = append(diags, groupDiags...)
+
+	// Partman maintenance requires pg_partman across the merged extension set.
+	diags = append(diags, validateMaintenanceExtension(schema)...)
 
 	return schema, diags
 }
@@ -717,6 +752,34 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, s
 				Code:     "E010",
 				Table:    rt.Name,
 				Message:  fmt.Sprintf("[tables.%s.maintenance] requires \"premake\" key for partman-managed tables (a missing value would silently disable partition premaking)", rt.Name),
+			})
+		}
+		// pg_partman only manages RANGE-partitioned parents. Maintenance without
+		// RANGE partitioning would emit contradictory or inert DDL.
+		if rt.Partitioning == nil {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E010",
+				Table:    rt.Name,
+				Message:  fmt.Sprintf("[tables.%s.maintenance] requires RANGE partitioning; table %q has no partitioning", rt.Name, rt.Name),
+			})
+		} else if !strings.EqualFold(rt.Partitioning.Strategy, "RANGE") {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E010",
+				Table:    rt.Name,
+				Message:  fmt.Sprintf("[tables.%s.maintenance] requires RANGE partitioning; strategy is %q", rt.Name, rt.Partitioning.Strategy),
+			})
+		}
+		// Manual partition children and partman maintenance are mutually
+		// exclusive: partman creates and drops children automatically, so
+		// declaring them by hand produces contradictory DDL.
+		if rt.Partitioning != nil && len(rt.Partitioning.Partitions) > 0 {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error,
+				Code:     "E010",
+				Table:    rt.Name,
+				Message:  fmt.Sprintf("[tables.%s.maintenance] cannot be combined with manual partition children; partman manages children automatically", rt.Name),
 			})
 		}
 		t.Maintenance = mc
