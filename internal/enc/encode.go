@@ -109,8 +109,14 @@ func columnToForm(c model.Column) columnForm {
 		NotNull:          c.NotNull,
 		Default:          c.Default,
 		DefaultExpr:      c.DefaultExpr,
-		Generated:        c.Generated,
-		Stored:           c.Stored,
+		Generated: c.Generated,
+		// STORED vs VIRTUAL is only semantic for GENERATED columns. On a
+		// non-generated column Stored has zero DDL effect, so it must NOT enter
+		// identity — a user setting stored=true on a plain column would otherwise
+		// flip the revision with no observable consequence. Normalize it out of the
+		// encoded form when Generated is empty (byte-faithful decode∘enc holds: the
+		// decoded Stored=false re-encodes to the same absent field).
+		Stored:           c.Stored && c.Generated != "",
 		Identity:         c.Identity,
 		Comment:          c.Comment,
 		SemanticTypeName: c.SemanticTypeName,

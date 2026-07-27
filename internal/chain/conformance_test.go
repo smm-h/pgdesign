@@ -1,6 +1,7 @@
 package chain_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -134,11 +135,17 @@ type perturbSite struct {
 // artifact of the guard's synthetic perturbation, not an under-reporting bug.
 // A blind field NOT on this list turns the guard RED (the by-construction
 // protection). See the report for the flagged rationale.
+//
+// NOTE: the guard is REVISION-AWARE (see blindKeysFor): a perturbation that
+// leaves the canonical bytes (hence the revision) unchanged is NOT a
+// diff-blindness — the two models are identity-equal, so diff-empty is CORRECT.
+// This is why Column.Stored is absent: the encoder normalizes Stored out for
+// non-generated columns, so perturbing it there does not move identity, and the
+// guard skips it. TypeKind and Schema.Name remain: perturbing them DOES change
+// the canonical bytes yet diff stays empty, so they are genuine (accepted) blinds.
 var acceptedDiffBlind = map[string]string{
-	"Column.SemanticTypeName": "the semantic type name resolves to Column.PGType (which diff compares via typesEqualWithDefaults); two valid models cannot share a PGType yet differ here, so diff need not compare it independently",
-	"Column.TypeKind":         "the resolved type-kind tag is a function of Column.PGType / type resolution; it cannot vary independently of the type diff already compares",
-	"Column.Stored":           "STORED vs VIRTUAL is only semantic for GENERATED columns; Build defaults Stored=true for every column, so on a non-generated column it never distinguishes valid models (diff compares it conditionally, guarded by Generated!=\"\")",
-	"Schema.Name":             "the top-level model name is not a schema object; diff compares each table/view/etc by its OWN schema-qualified key (per-object Schema fields), so the model-level Name carries no object identity diff must track",
+	"Column.TypeKind": "the resolved type-kind tag is a function of Column.PGType / type resolution; it cannot vary independently of the type diff already compares",
+	"Schema.Name":     "the top-level model name is not a schema object; diff compares each table/view/etc by its OWN schema-qualified key (per-object Schema fields), so the model-level Name carries no object identity diff must track",
 }
 
 // collectSites walks an addressable struct value of a registered model type,
@@ -335,6 +342,11 @@ func blindKeysFor(t rapid.TB, m *model.Schema, encFields map[string][]string) ma
 		t.Fatalf("base vs identical copy is non-empty (deep-copy fidelity issue): %s", d.Summary())
 	}
 
+	baseCanon, err := rev.CanonicalBytes(base, rev.RegistryPresent)
+	if err != nil {
+		t.Fatalf("CanonicalBytes(base): %v", err)
+	}
+
 	var sites []perturbSite
 	collectSites(reflect.ValueOf(base).Elem(), "Schema", "", encFields, &sites)
 
@@ -346,6 +358,14 @@ func blindKeysFor(t rapid.TB, m *model.Schema, encFields map[string][]string) ma
 			t.Fatalf("site %d not found", i)
 		}
 		pert.Canonicalize()
+		// REVISION-AWARE: if the perturbation did not change the canonical bytes,
+		// it did not change identity, so the two models ARE identity-equal and a
+		// diff-empty is CORRECT (the forward conformance direction), not a
+		// blindness. The encoder legitimately normalizes some fields out (e.g.
+		// Stored on non-generated columns); those perturbations must not count.
+		if pertCanon, cerr := rev.CanonicalBytes(pert, rev.RegistryPresent); cerr == nil && bytes.Equal(baseCanon, pertCanon) {
+			continue
+		}
 		if diff.Diff(base, pert).IsEmpty() {
 			blind[site.key] = true
 		}
