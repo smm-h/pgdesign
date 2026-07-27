@@ -171,7 +171,10 @@ func IsNonTransactional(op DDLOp) bool {
 func opCreateTable(op DDLOp) string {
 	if op.TableDef != nil {
 		schema, _ := splitQualifiedName(op.Table)
-		return sql.CreateTable(op.TableDef, schema, false, 0, nil, nil)
+		// PGVersion is honored uniformly (never hardcoded 0), so version-gated
+		// DDL (e.g. STORED vs VIRTUAL generated columns) renders under the op's
+		// recorded target version.
+		return sql.CreateTable(op.TableDef, schema, false, op.PGVersion, nil, nil)
 	}
 
 	// Consolidation path: build a table from the create_table op's fields
@@ -283,7 +286,7 @@ func opCreateTableConsolidated(op DDLOp) string {
 		}
 	}
 
-	return sql.CreateTable(tbl, schema, false, 0, nil, nil)
+	return sql.CreateTable(tbl, schema, false, op.PGVersion, nil, nil)
 }
 
 func opCreatePartition(op DDLOp) string {
@@ -606,11 +609,11 @@ func opDropFunction(op DDLOp) string {
 func opCreateTrigger(op DDLOp) string {
 	if op.TriggerDef != nil {
 		schema, tableName := splitQualifiedName(op.Table)
-		return sql.CreateTrigger(schema, tableName, *op.TriggerDef, false, 0)
+		return sql.CreateTrigger(schema, tableName, *op.TriggerDef, false, op.PGVersion)
 	}
 	// Legacy: append-only trigger.
 	schema, tableName := splitQualifiedName(op.Table)
-	return sql.CreateAppendOnlyTrigger(schema, tableName, false, 0)
+	return sql.CreateAppendOnlyTrigger(schema, tableName, false, op.PGVersion)
 }
 
 func opDropTrigger(op DDLOp) string {

@@ -297,11 +297,12 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		table := findTable(desired, tableName)
 		ctx := tableCtx(tableName)
 		op := DDLOp{
-			Op:       "create_table",
-			Table:    tableName,
-			Comment:  tableComment(table),
-			PK:       tablePK(table),
-			TableDef: table,
+			Op:        "create_table",
+			Table:     tableName,
+			Comment:   tableComment(table),
+			PK:        tablePK(table),
+			PGVersion: desired.PGVersion,
+			TableDef:  table,
 			Down: &DownOp{
 				Ops: []DDLOp{{Op: "drop_table", Table: tableName}},
 			},
