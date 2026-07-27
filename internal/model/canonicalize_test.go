@@ -227,3 +227,65 @@ func TestFilterBySource_RebuildsFKGraph(t *testing.T) {
 		t.Errorf("filtered FanIn[users] = %d, want 0 (posts was filtered out)", got)
 	}
 }
+
+// TestCanonicalize_SMTransitionTieBreakDeterministic is the regression for the
+// state-machine transition tie-break. Transitions are a CANONICAL-ONLY set, so
+// their order after Canonicalize must be a pure function of their content —
+// including the fields (Requires, Comment) that an earlier, non-total sort key
+// ignored. Two transitions that share Name/From/To but differ only in Requires,
+// and another pair that differ only in Comment, must land in a deterministic
+// order regardless of input order. We Canonicalize two schemas whose transition
+// slices are reverse-permuted and assert the canonical orders coincide.
+func TestCanonicalize_SMTransitionTieBreakDeterministic(t *testing.T) {
+	// Two transitions identical except in Requires, plus two identical except in
+	// Comment. Without Requires/Comment in the sort key these tie and sort
+	// nondeterministically.
+	mk := func(order []int) *Schema {
+		trans := []SMTransition{
+			{Name: "advance", From: []string{"open"}, To: "closed", Requires: map[string]string{"reason": "text"}},
+			{Name: "advance", From: []string{"open"}, To: "closed", Requires: map[string]string{"actor": "text"}},
+			{Name: "reopen", From: []string{"closed"}, To: "open", Comment: "by admin"},
+			{Name: "reopen", From: []string{"closed"}, To: "open", Comment: "by owner"},
+		}
+		permuted := make([]SMTransition, len(order))
+		for i, idx := range order {
+			permuted[i] = trans[idx]
+		}
+		return &Schema{
+			StateMachines: []StateMachine{{
+				Name:        "ticket_state",
+				States:      []SMState{{Name: "open"}, {Name: "closed"}},
+				Transitions: permuted,
+			}},
+		}
+	}
+
+	forward := mk([]int{0, 1, 2, 3})
+	reversed := mk([]int{3, 2, 1, 0})
+	forward.Canonicalize()
+	reversed.Canonicalize()
+
+	keys := func(s *Schema) []string {
+		out := make([]string, len(s.StateMachines[0].Transitions))
+		for i, tr := range s.StateMachines[0].Transitions {
+			out[i] = smTransitionKey(tr)
+		}
+		return out
+	}
+	fk := keys(forward)
+	rk := keys(reversed)
+	if len(fk) != len(rk) {
+		t.Fatalf("length mismatch: %d vs %d", len(fk), len(rk))
+	}
+	for i := range fk {
+		if fk[i] != rk[i] {
+			t.Fatalf("transition order not deterministic under permutation:\n  forward[%d]=%q\n  reversed[%d]=%q", i, fk[i], i, rk[i])
+		}
+	}
+	// Also assert the order is strictly sorted by the total key (no ties left).
+	for i := 1; i < len(fk); i++ {
+		if fk[i-1] >= fk[i] {
+			t.Errorf("transitions not strictly ordered by total key at %d: %q >= %q", i, fk[i-1], fk[i])
+		}
+	}
+}
