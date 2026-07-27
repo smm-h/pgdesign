@@ -21,7 +21,6 @@ func registerCodegenCmd(app *strictcli.App) {
 			return strictcli.Exit(runCodegen(cfgOverride, quiet, kwargs))
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
 			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toIfaces(SupportedModeNames())...)),
 			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),

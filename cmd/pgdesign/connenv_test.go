@@ -37,7 +37,6 @@ func TestDBFlagsAdvertiseConnectionEnv(t *testing.T) {
 		{"introspect", "--help"},
 		{"stats", "--help"},
 		{"serve", "--help"},
-		{"codegen", "--help"},
 		{"seed", "--help"},
 		{"diff", "--help"},
 		{"migrate", "plan", "--help"},
