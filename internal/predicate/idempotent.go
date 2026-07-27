@@ -46,6 +46,12 @@ import (
 //	ENUM / DOMAIN / COMPOSITE            — EXISTENCE-ONLY. A type's body (labels,
 //	    CHECK, fields) has no LIKE-cloneable temp carrier the round-trip can use,
 //	    and CREATE TYPE has no IF NOT EXISTS; create-if-absent via a pg_type probe.
+//	ENUM VALUE (ClassEnumValue)          — NATIVE IF NOT EXISTS. ALTER TYPE ... ADD
+//	    VALUE IF NOT EXISTS is idempotent in PG's own state model, so the label add
+//	    needs no DO-block wrapper: absent -> added, present -> no-op. This is the
+//	    non-transactional enum-add class the apply loop resumes by simply re-running
+//	    (executeNonTransactionalOp's default arm). No definitional body to drift —
+//	    an enum value is its own identity, so there is no false-mismatch to raise.
 //	TABLE / VIEW / MATVIEW / SEQUENCE    — EXISTENCE-ONLY. Whole-relation bodies
 //	    are out of round-trip reach (self-referential names); create-if-absent
 //	    (native IF NOT EXISTS / CREATE OR REPLACE handles these upstream, so
