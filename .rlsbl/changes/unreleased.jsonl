@@ -15,3 +15,4 @@
 {"id":"18c5f9b9753332b664b6ef75ae344b96abad3a64ea01f635","commits":["aa99bebda58c610fa4358c2123be35f336354245"],"user_facing":false}
 {"id":"18c5fa1a360dc4c8f3328302f2c44f4b80315beb8a44a2d7","commits":["09d1d444908b1b4187ac234689b367a5b8168854"],"user_facing":false}
 {"id":"18c5fe5994833bb4601a37820f5c43cfb2a94126bfd6bba1","commits":["10f5bbb4dbde8cd2e790658aad3c4c868fb1dc1b"],"user_facing":false}
+{"id":"18c5fe81ff540fe213d4ba0724b842f9be34dca7cfbc1c58","commits":["99e526ed5e5737edc5b6feae5444ea9ccfdfa65f"],"user_facing":true,"description":"`[tables.*.maintenance]` now requires an explicit `premake` value; omitting it is a hard error instead of silently disabling partman premaking","type":"fix"}
