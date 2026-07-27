@@ -1099,11 +1099,21 @@ func diffIndexes(td *TableDiff, desired, actual *model.Table) {
 	}
 }
 
+// indexMethod returns an index's access method, defaulting an unspecified method
+// to "btree" (PostgreSQL's default). A desired index that omits the method must
+// reconcile with the introspected index whose method is the materialized "btree".
+func indexMethod(m string) string {
+	if m == "" {
+		return "btree"
+	}
+	return m
+}
+
 func indexEqual(a, b *model.Index) bool {
 	return a.Name == b.Name &&
 		keyColumnsEqual(a.Columns, b.Columns) &&
 		boolSliceEqual(a.Desc, b.Desc) &&
-		a.Method == b.Method &&
+		indexMethod(a.Method) == indexMethod(b.Method) &&
 		mapEqual(a.Opclasses, b.Opclasses) &&
 		mapEqual(a.Collations, b.Collations) &&
 		sqlparse.ExprEqual(a.Where, b.Where) &&

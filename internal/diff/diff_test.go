@@ -695,6 +695,44 @@ func TestIndexChanged(t *testing.T) {
 	}
 }
 
+// TestIndexUnspecifiedMethodNoDrift is the regression for the rehearsal's
+// partial-index false-drift ("~ index idx_*"): a desired index with no explicit
+// method (Method == "") must reconcile with the introspected index whose method
+// is the materialized "btree". PostgreSQL defaults an index's access method to
+// btree, so "" and "btree" name the same index.
+func TestIndexUnspecifiedMethodNoDrift(t *testing.T) {
+	desiredIdx := model.Index{
+		Name:    "idx_events_active",
+		Columns: []string{"status"},
+		Where:   "deleted_at IS NULL",
+		// Method omitted (defaults to btree).
+	}
+	actualIdx := model.Index{
+		Name:    "idx_events_active",
+		Columns: []string{"status"},
+		Where:   "deleted_at IS NULL",
+		Method:  "btree", // introspection materializes the default access method
+	}
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Indexes: []model.Index{desiredIdx}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Indexes: []model.Index{actualIdx}},
+		},
+	}
+	if d := DiffLive(desired, actual, nil); !d.IsEmpty() {
+		t.Fatalf("expected clean reconcile for unspecified vs btree method, got drift: %s", d.Summary())
+	}
+	// A genuinely different method still drifts.
+	desired.Tables[0].Indexes[0].Method = "hash"
+	if d := DiffLive(desired, actual, nil); d.IsEmpty() {
+		t.Fatal("expected drift for hash vs btree, got clean")
+	}
+}
+
 // TestColumnTypeKindIgnored locks in that TypeKind does NOT participate in
 // column comparison. This is load-bearing for diff --live: introspection can
 // only classify enum-backed types as "enum" (pgdesign state machines are
