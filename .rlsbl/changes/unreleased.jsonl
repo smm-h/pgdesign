@@ -67,3 +67,4 @@
 {"id":"18c60cdcf85513b4e1d9184cae4c49968d03aa4e9b41256a","commits":["9b8016b5981e933b88d2973aa8a07180db31bb93"],"user_facing":false}
 {"id":"18c60cf58856072d415ed7c0c67e4633b8a53dc8d07315f7","commits":["e68748bded7a90fca88c4b862ba113ce0608f69e"],"user_facing":false}
 {"id":"18c60e1e1d4a9ec36d90e8708cb44ea0bafa7d2ed9865b1a","commits":["ffd37607b7908fc125919ee5830c8ce042664684"],"user_facing":false}
+{"id":"18c60e266bed3d1d24caebbe8a97483989fffa3b69dbde7d","commits":["33082f7a3ec7b87bc3d1c711bbd169c3ced4a0bd"],"user_facing":true,"description":"**Fixed mixed-case unquoted index/exclusion key columns false-drifting in diff.** A desired unquoted key column such as `Email` no longer reports a spurious change against PostgreSQL's lowercased introspected form; unquoted identifiers now fold to lowercase (matching PG), while quoted identifiers stay case-sensitive.","type":"fix"}
