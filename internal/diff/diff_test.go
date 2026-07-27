@@ -436,6 +436,39 @@ func TestDefaultChanged(t *testing.T) {
 	}
 }
 
+// TestDefaultCastWrappedLiteralNoDrift is the regression for the rehearsal's
+// jsonb default false-drift: a desired expression-default like '{}'::jsonb must
+// reconcile with the introspected bare literal {} (introspection reduces the
+// stored '{}'::jsonb to the literal {} via parseSimpleDefault). The
+// expression-vs-literal comparison must not report DefaultChanged.
+func TestDefaultCastWrappedLiteralNoDrift(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "meta", PGType: typeinfo.T("jsonb"), NotNull: true, DefaultExpr: "'{}'::jsonb"},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "events", Schema: "public", Columns: []model.Column{
+				{Name: "meta", PGType: typeinfo.T("jsonb"), NotNull: true, Default: model.StrPtr("{}")},
+			}},
+		},
+	}
+	d := DiffLive(desired, actual, nil)
+	if !d.IsEmpty() {
+		t.Fatalf("expected clean reconcile for '{}'::jsonb vs literal {}, got drift: %s", d.Summary())
+	}
+
+	// The same holds for a text default 'active'::text vs literal active.
+	desired.Tables[0].Columns[0] = model.Column{Name: "meta", PGType: typeinfo.T("text"), NotNull: true, DefaultExpr: "'active'::text"}
+	actual.Tables[0].Columns[0] = model.Column{Name: "meta", PGType: typeinfo.T("text"), NotNull: true, Default: model.StrPtr("active")}
+	if d := DiffLive(desired, actual, nil); !d.IsEmpty() {
+		t.Fatalf("expected clean reconcile for 'active'::text vs literal active, got drift: %s", d.Summary())
+	}
+}
+
 func TestCommentChanged(t *testing.T) {
 	desired := &model.Schema{
 		Tables: []model.Table{

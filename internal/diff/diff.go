@@ -946,6 +946,16 @@ func intPtrEqualWithDefault(a, b *int, base string) bool {
 // case-folded column reference) is wrong; exact comparison is correct.
 func normalizeDefault(literal *string, expr string) string {
 	if expr != "" {
+		// A cast-wrapped quoted literal (e.g. '{}'::jsonb, 'active'::text) is
+		// semantically the bare literal. Introspection already reduces the live
+		// default to the bare form (parseSimpleDefault), so a desired
+		// expression-default carrying the explicit cast must reduce the same way
+		// or it false-drifts against the introspected literal. Reduce it here so
+		// both sides converge (fixes the ≈_pg cast-materialization residue for
+		// literal defaults without a database round-trip).
+		if lit, ok := reduceCastWrappedLiteral(expr); ok {
+			return lit
+		}
 		return sqlparse.NormalizeExpr(expr)
 	}
 	if literal != nil {
@@ -954,10 +964,83 @@ func normalizeDefault(literal *string, expr string) string {
 	return ""
 }
 
+// reduceCastWrappedLiteral reduces a default expression that is a single quoted
+// string literal followed by ::type cast(s) (optionally a COLLATE clause) to its
+// bare inner value — mirroring introspection's parseSimpleDefault/parseQuotedDefault
+// so a desired '{}'::jsonb reconciles with an introspected literal {}. It returns
+// ("", false) for anything that is not a simple cast-wrapped quoted literal (a
+// genuine expression, left to N).
+func reduceCastWrappedLiteral(expr string) (string, bool) {
+	s := strings.TrimSpace(expr)
+	if s == "" || s[0] != '\'' {
+		return "", false
+	}
+	var val strings.Builder
+	i := 1
+	closed := false
+	for i < len(s) {
+		if s[i] == '\'' {
+			if i+1 < len(s) && s[i+1] == '\'' { // '' escape
+				val.WriteByte('\'')
+				i += 2
+				continue
+			}
+			i++ // consume the closing quote
+			closed = true
+			break
+		}
+		val.WriteByte(s[i])
+		i++
+	}
+	if !closed {
+		return "", false
+	}
+	// Everything after the closing quote must be only ::cast chains / COLLATE.
+	if strings.TrimSpace(stripDefaultCastChain(s[i:])) != "" {
+		return "", false
+	}
+	return val.String(), true
+}
+
+// stripDefaultCastChain removes a chain of ::type casts (and a trailing COLLATE
+// clause) from the tail of a default expression. It mirrors introspection's
+// stripCastChain so the two sides reduce identically.
+func stripDefaultCastChain(s string) string {
+	s = strings.TrimSpace(s)
+	for strings.HasPrefix(s, "::") {
+		s = s[2:]
+		j := 0
+		for j < len(s) {
+			c := s[j]
+			if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '.' || c == '[' || c == ']' {
+				j++
+				continue
+			}
+			if c == ' ' {
+				after := strings.TrimLeft(s[j:], " ")
+				if strings.HasPrefix(after, "::") || strings.HasPrefix(strings.ToUpper(after), "COLLATE") || after == "" {
+					break
+				}
+				j++
+				continue
+			}
+			break
+		}
+		s = strings.TrimSpace(s[j:])
+	}
+	return s
+}
+
 // domainDefaultKey normalizes a domain default (expression via N, literal
 // exact) into a comparison key. DefaultExpr takes precedence over the literal.
+// A cast-wrapped quoted literal reduces to its bare form (same residue fix as
+// normalizeDefault) so an explicit '{}'::jsonb reconciles with the introspected
+// literal {}.
 func domainDefaultKey(literal, expr string) string {
 	if expr != "" {
+		if lit, ok := reduceCastWrappedLiteral(expr); ok {
+			return lit
+		}
 		return sqlparse.NormalizeExpr(expr)
 	}
 	return strings.TrimSpace(literal)
