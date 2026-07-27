@@ -396,6 +396,36 @@ func (d *SchemaDiff) Summary() string {
 // returns a structured diff. Items in desired but not in actual are "added";
 // items in actual but not in desired are "removed".
 func Diff(desired, actual *model.Schema) *SchemaDiff {
+	return DiffLive(desired, actual, nil)
+}
+
+// LiveNormalizer resolves the ≈_pg RESIDUE that pure N cannot reach:
+// catalog-dependent cast materialization (e.g. `status = 'active'` vs the
+// PG-stored `status = 'active'::text`). It round-trips a desired-side
+// expression through the target database — PG computes its own canonical form —
+// so the desired side matches the introspected (already PG-canonical) side.
+//
+// It is used ONLY on the live diff path (diff --live). Identity NEVER consumes
+// its output: the pure/encoding path has no database. Implementations are
+// best-effort total — an expression a round-trip cannot reach (referencing an
+// absent table/column) falls to the minimal forward-simulation rule set, which
+// is N itself.
+type LiveNormalizer interface {
+	// NormalizeExprForTable returns the target DB's canonical form of expr in
+	// the context of schema.table. schema may be "" for the default schema.
+	NormalizeExprForTable(schema, table, expr string) string
+}
+
+// DiffLive is Diff with an optional LiveNormalizer. When ln is non-nil (the
+// diff --live path), the DESIRED side's table-scoped expressions are
+// round-tripped through the target DB before comparison, resolving the
+// catalog-dependent cast residue. ln == nil is the pure path (identical to
+// Diff). The caller's desired schema is never mutated — a normalized copy is
+// built.
+func DiffLive(desired, actual *model.Schema, ln LiveNormalizer) *SchemaDiff {
+	if ln != nil {
+		desired = liveNormalizeDesired(desired, ln)
+	}
 	d := &SchemaDiff{}
 
 	diffTables(d, desired, actual)

@@ -130,3 +130,51 @@ func TestNamedatalenTruncationMatch(t *testing.T) {
 		t.Fatalf("NAMEDATALEN FALSE DRIFT: long name and its 63-byte truncation not matched: %s", d.Summary())
 	}
 }
+
+// fakeLiveNormalizer simulates catalog-dependent cast materialization: it
+// rewrites the desired-side literal comparison to the PG-stored ::text form,
+// mimicking what a live round-trip produces.
+type fakeLiveNormalizer struct{ calls int }
+
+func (f *fakeLiveNormalizer) NormalizeExprForTable(schema, table, expr string) string {
+	f.calls++
+	if expr == "state = 'x'" {
+		return "state = 'x'::text"
+	}
+	return expr
+}
+
+// TestDiffLiveNormalizesDesiredSide proves DiffLive round-trips the DESIRED side
+// through the LiveNormalizer so the catalog-dependent residue converges, and
+// that plain Diff (no normalizer) is unaffected (identity never consumes
+// round-trip output).
+func TestDiffLiveNormalizesDesiredSide(t *testing.T) {
+	mk := func(expr string) *model.Schema {
+		return schemaWith(model.Table{
+			Name: "t", Schema: "public",
+			Columns: []model.Column{{Name: "state", PGType: typeinfo.T("text"), NotNull: true}},
+			Checks:  []model.CheckConstraint{{Name: "c", Expr: expr}},
+		})
+	}
+	desired := mk("state = 'x'")           // TOML form
+	actual := mk("state = 'x'::text")      // PG-introspected form
+
+	// Pure diff: N alone cannot reach the ::text residue, so drift is reported.
+	if Diff(desired, actual).IsEmpty() {
+		t.Fatal("expected pure diff to report the catalog-dependent residue as drift")
+	}
+
+	// Live diff: the normalizer materializes the cast on the desired side.
+	ln := &fakeLiveNormalizer{}
+	if d := DiffLive(desired, actual, ln); !d.IsEmpty() {
+		t.Fatalf("expected live diff to converge via round-trip, got: %s", d.Summary())
+	}
+	if ln.calls == 0 {
+		t.Fatal("expected DiffLive to invoke the LiveNormalizer")
+	}
+
+	// The caller's desired schema must be untouched.
+	if desired.Tables[0].Checks[0].Expr != "state = 'x'" {
+		t.Fatalf("DiffLive mutated the caller's desired schema: %q", desired.Tables[0].Checks[0].Expr)
+	}
+}

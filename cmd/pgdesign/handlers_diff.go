@@ -13,6 +13,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
 	"github.com/smm-h/pgdesign/internal/introspect"
+	"github.com/smm-h/pgdesign/internal/livenorm"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -62,6 +63,7 @@ func registerDiffCmd(app *strictcli.App) {
 			}
 
 			var actual *model.Schema
+			var ln diff.LiveNormalizer
 
 			switch {
 			case liveURL != "":
@@ -69,6 +71,15 @@ func registerDiffCmd(app *strictcli.App) {
 				actual, code = diffLive(cfgOverride, paths, schema, liveURL)
 				if code != 0 {
 					return strictcli.Exit(code)
+				}
+				// LIVE ROUND-TRIP NORMALIZATION: resolve the catalog-dependent
+				// cast residue by round-tripping the desired side through the
+				// target DB. Best-effort: if the normalizer connection fails,
+				// fall back to pure N (the diff still runs, just without the
+				// residue resolution).
+				if n, err := livenorm.New(context.Background(), liveURL); err == nil {
+					defer n.Close()
+					ln = n
 				}
 
 			case againstPath != "":
@@ -86,7 +97,7 @@ func registerDiffCmd(app *strictcli.App) {
 				}
 			}
 
-			d := diff.Diff(schema, actual)
+			d := diff.DiffLive(schema, actual, ln)
 
 			if kwargs["json"].(bool) {
 				fmt.Println(diff.FormatJSON(d))
