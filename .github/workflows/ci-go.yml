@@ -29,6 +29,10 @@ jobs:
     env:
       PGDESIGN_DB: postgres://test:test@localhost:5432/postgres?sslmode=disable
       PGDESIGN_REQUIRE_DB: '1'
+      # Make the DB-free compile checks (internal/test/codegen_compile_test.go)
+      # hard-fail if any of the six language toolchains is missing, so CI can
+      # never silently skip a language. Every toolchain below must be provisioned.
+      PGDESIGN_REQUIRE_COMPILE_TOOLCHAINS: '1'
     steps:
       - uses: actions/checkout@v6
       # go.mod: go 1.26.3
@@ -39,5 +43,44 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+
+      # --- Compile-check toolchains (4.0) + conformance-suite runtimes ---
+      # Java: javac for the Java compile check; also unblocks conformance if
+      # gradle is present (it is not provisioned here, so those stay skipped).
+      - name: Set up Java (javac)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      # Kotlin: kotlinc for the Kotlin compile check (needs a JDK, set up above).
+      - name: Set up Kotlin (kotlinc)
+        run: |
+          KOTLIN_VERSION=2.0.20
+          curl -sSL "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip" -o /tmp/kotlin.zip
+          unzip -q /tmp/kotlin.zip -d "$HOME/kotlin"
+          echo "$HOME/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+      # Zig: zig build-obj for the Zig compile check.
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+      # Node + TypeScript: tsc for the TS compile check; node/npx also unblock
+      # the TypeScript DB conformance test (npm install + npx tsx).
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install TypeScript (tsc)
+        run: npm install -g typescript@5
+      # Python: mypy for the Python compile check; psycopg + pytest also unblock
+      # the Python DB conformance test.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install Python toolchain (mypy, psycopg, pytest)
+        run: pip install mypy 'psycopg[binary]' pytest
+
       - run: go vet ./...
       - run: go test ./... -race -short -timeout=10m
