@@ -57,6 +57,7 @@ func buildApp() *strictcli.App {
 	app.RegisterWarnCheck("structural", checkStructural)
 	app.RegisterWarnCheck("workload", checkWorkload)
 	app.RegisterErrorCheck("build", checkBuild)
+	app.RegisterErrorCheck("revision", checkRevision)
 
 	registerGlobals(app)
 

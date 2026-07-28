@@ -57,6 +57,13 @@ func registerIntrospectCmd(app *strictcli.App) {
 					fmt.Fprintf(os.Stderr, "error: cannot write output file: %v\n", err)
 					return strictcli.Exit(1)
 				}
+				// introspect --output is a SCAFFOLDING writer (roadmap 6.2): a NEW
+				// candidate source file, outside the revision invariant and never
+				// flagged. Adopting it as project source is a source edit that
+				// changes the revision — say so.
+				if !quiet {
+					fmt.Fprintf(os.Stderr, "%s: %s\n", *output, introspectAdoptionNote)
+				}
 			} else {
 				fmt.Print(string(data))
 			}

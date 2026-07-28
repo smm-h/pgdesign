@@ -55,3 +55,11 @@ fast = true
 pure = true
 needs_network = false
 depends_on = ["validation"]
+
+[checks.revision]
+tags = ["revision"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["validation"]

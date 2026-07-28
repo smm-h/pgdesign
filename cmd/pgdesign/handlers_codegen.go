@@ -152,6 +152,25 @@ func runCodegen(configOverride *string, quiet bool, kwargs map[string]interface{
 		return 1
 	}
 
+	// PARTIAL-WRITER REFUSAL (roadmap 6.2): codegen --output is the one partial
+	// writer. Writing a single artifact while sibling [output] artifacts sit at a
+	// different revision would leave the project in a mixed-revision tree, so
+	// refuse and name the stale siblings. The check reuses the same per-output
+	// machinery as `check --tag revision`.
+	stale, staleErr := partialWriteStaleSiblings(configOverride, paths, outputPath, schema)
+	if staleErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", staleErr)
+		return 1
+	}
+	if len(stale) > 0 {
+		fmt.Fprintln(os.Stderr, "codegen --output: refusing to write; sibling outputs are at a different revision:")
+		for _, s := range stale {
+			fmt.Fprintf(os.Stderr, "  %s\n", s)
+		}
+		fmt.Fprintln(os.Stderr, "error: run `pgdesign build` to regenerate all outputs at one revision")
+		return 1
+	}
+
 	outPaths := make([]string, 0, len(plan.Files))
 	for p := range plan.Files {
 		outPaths = append(outPaths, p)

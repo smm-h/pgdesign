@@ -85,6 +85,13 @@ func fmtFile(filePath string, cfg *format.Config, checkOnly bool) int {
 		fmt.Fprintf(os.Stderr, "error: cannot write file: %v\n", err)
 		return 1
 	}
+	// fmt is a SOURCE-EDITING writer (roadmap 6.2): a rewrite that actually
+	// changed the file changed the schema source, hence the project revision, so
+	// every derived output is now stale. Print the follow-up notice; the revision
+	// check catches the staleness.
+	if !bytes.Equal(input, formatted) {
+		fmt.Fprintf(os.Stderr, "%s: %s\n", filePath, fmtRevisionNotice)
+	}
 	return 0
 }
 
