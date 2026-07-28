@@ -32,6 +32,7 @@ type Config[P PathKind] struct {
 	Migrate    MigrateConfig              `toml:"migrate"`
 	Extensions []ExtensionConfig          `toml:"extensions"`
 	Suppress   map[string]string          `toml:"suppress"`
+	Renames    RenamesConfig              `toml:"renames"`
 	Output     map[string]OutputConfig[P] `toml:"-"`
 
 	// SourcePath is the absolute path to the pgdesign.toml file that was loaded.
@@ -91,6 +92,32 @@ type OutputConfig[P PathKind] struct {
 	Idempotent bool     `toml:"idempotent"` // for sql: add IF NOT EXISTS
 	Comments   *bool    `toml:"comments"`   // for sql: include COMMENT ON (default true)
 	SplitMode  string   `toml:"split_mode"` // for codegen ddl python: "faceted" or "self-contained"
+}
+
+// RenamesConfig holds the [renames] section: declared table and column renames
+// consumed at migration diff time (roadmap 5.9 rename gate). It is a pure,
+// committed, CI-safe directive — never part of any schema's identity. TOML shape
+// (inline-table arrays):
+//
+//	[renames]
+//	tables  = [ { from = "old_table", to = "new_table" } ]
+//	columns = [ { table = "users", from = "email_addr", to = "email" } ]
+type RenamesConfig struct {
+	Tables  []TableRename  `toml:"tables"`
+	Columns []ColumnRename `toml:"columns"`
+}
+
+// TableRename is one declared table rename (old -> new).
+type TableRename struct {
+	From string `toml:"from"`
+	To   string `toml:"to"`
+}
+
+// ColumnRename is one declared column rename within a table (old -> new).
+type ColumnRename struct {
+	Table string `toml:"table"`
+	From  string `toml:"from"`
+	To    string `toml:"to"`
 }
 
 // ExtensionConfig holds [[extensions]] array-of-tables entries.
@@ -195,6 +222,21 @@ func (c *Config[P]) Check() error {
 					errs = append(errs, fmt.Errorf("output.%s: source[%d] must be a non-empty string", name, i))
 				}
 			}
+		}
+	}
+
+	for i, r := range c.Renames.Tables {
+		if r.From == "" || r.To == "" {
+			errs = append(errs, fmt.Errorf("renames.tables[%d]: both from and to are required", i))
+		} else if r.From == r.To {
+			errs = append(errs, fmt.Errorf("renames.tables[%d]: from and to are identical (%q) — not a rename", i, r.From))
+		}
+	}
+	for i, r := range c.Renames.Columns {
+		if r.Table == "" || r.From == "" || r.To == "" {
+			errs = append(errs, fmt.Errorf("renames.columns[%d]: table, from and to are all required", i))
+		} else if r.From == r.To {
+			errs = append(errs, fmt.Errorf("renames.columns[%d]: from and to are identical (%q) — not a rename", i, r.From))
 		}
 	}
 
