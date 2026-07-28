@@ -32,6 +32,16 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry) string {
 		sections = append(sections, renderD2Table(&t))
 	}
 
+	// Render imported tables as minimal REFERENCE shapes (roadmap 7.3/7.4, union
+	// site 4). They are owned by another project, so they get a distinct,
+	// schema-qualified reference shape rather than a full sql_table — this is the
+	// first-class reference shape class phase 9 preserves. They are nested under a
+	// container named for their target schema, so the shape id is schema-qualified
+	// and FK edges can point at it unambiguously.
+	for i := range schema.ImportedTables {
+		sections = append(sections, renderD2ImportedRef(&schema.ImportedTables[i]))
+	}
+
 	// Render FK edges after all tables.
 	for _, t := range tables {
 		for _, fk := range t.FKs {
@@ -165,7 +175,32 @@ func renderD2Edge(t *model.Table, fk *model.FK) string {
 		label = "NO ACTION"
 	}
 
+	// Imported FK targets (roadmap 7.3, union site 4): point at the
+	// schema-qualified reference shape (container.shape), NOT a bare table name.
+	// The previous emitter dropped fk.RefSchema entirely, so a cross-project edge
+	// would dangle or collide with a same-named local table. The reference shape is
+	// minimal (no columns), so the edge connects to the shape itself.
+	if fk.RefAlias != "" {
+		return fmt.Sprintf("%s.%s -> %s.%s: %s", t.Name, srcCols, fk.RefSchema, fk.RefTable, label)
+	}
+
 	return fmt.Sprintf("%s.%s -> %s.%s: %s", t.Name, srcCols, fk.RefTable, refCols, label)
+}
+
+// renderD2ImportedRef renders an imported table as a minimal, schema-qualified
+// reference shape. It is nested under a container named for the table's target
+// schema, so its D2 id is "<schema>.<name>" — the qualification FK edges use to
+// target it. It carries only a label and a distinct dashed style; the columns are
+// deliberately omitted (imported tables are references, not this project's DDL).
+func renderD2ImportedRef(t *model.Table) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s.%s: {\n", t.Schema, t.Name)
+	fmt.Fprintf(&b, "  shape: page\n")
+	fmt.Fprintf(&b, "  label: \"<<imported>>\\n%s.%s\"\n", t.Schema, t.Name)
+	b.WriteString("  style.fill: \"#eeeeee\"\n")
+	b.WriteString("  style.stroke-dash: 3\n")
+	b.WriteString("}")
+	return b.String()
 }
 
 // renderD2View produces a D2 rectangle block for a view.

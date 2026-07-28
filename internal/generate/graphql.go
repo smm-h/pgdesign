@@ -157,9 +157,19 @@ func generateGraphQL(schema *model.Schema) string {
 					break
 				}
 			}
+			// Imported FK targets (roadmap 7.3, union site 5): qualify the relation
+			// type (and field) with the target schema so the field points at the
+			// imported reference type — never at a bare, possibly-colliding local
+			// type name, and never at an UNDEFINED type (the SDL would not compile).
+			fieldName := toCamelCase(fk.RefTable)
+			typeName := toPascalCase(fk.RefTable)
+			if fk.RefAlias != "" {
+				fieldName = toCamelCase(fk.RefSchema + "_" + fk.RefTable)
+				typeName = toPascalCase(fk.RefSchema + "_" + fk.RefTable)
+			}
 			fkFields = append(fkFields, fkField{
-				fieldName: toCamelCase(fk.RefTable),
-				typeName:  toPascalCase(fk.RefTable),
+				fieldName: fieldName,
+				typeName:  typeName,
 				notNull:   allNotNull,
 			})
 		}
@@ -199,6 +209,56 @@ func generateGraphQL(schema *model.Schema) string {
 			b.WriteString("!]!\n")
 		}
 
+		b.WriteString("}\n")
+	}
+
+	// Minimal REFERENCE types for imported tables (roadmap 7.3/7.4). Without a type
+	// definition the imported relation fields above would reference undefined
+	// types and the SDL would not compile. Each reference type is schema-qualified
+	// (matching the relation field's typeName) and carries only its columns — it is
+	// a reference shape, not this project's generated type. Emitted in the
+	// imported-tables' canonical (name-sorted) order.
+	for i := range schema.ImportedTables {
+		it := &schema.ImportedTables[i]
+		b.WriteString("\n")
+		b.WriteString("\"\"\"Imported reference: ")
+		b.WriteString(it.Schema)
+		b.WriteString(".")
+		b.WriteString(it.Name)
+		b.WriteString(" (owned by another project)\"\"\"\n")
+		b.WriteString("type ")
+		b.WriteString(toPascalCase(it.Schema + "_" + it.Name))
+		b.WriteString(" {\n")
+		pk := make(map[string]bool, len(it.PK))
+		for _, p := range it.PK {
+			pk[p] = true
+		}
+		for j := range it.Columns {
+			col := &it.Columns[j]
+			var gqlType string
+			if pk[col.Name] {
+				gqlType = "ID"
+			} else {
+				gqlType = pgTypeToGraphQL(col, false)
+			}
+			b.WriteString("  ")
+			b.WriteString(toCamelCase(col.Name))
+			b.WriteString(": ")
+			if col.Array {
+				b.WriteString("[")
+				b.WriteString(gqlType)
+				b.WriteString("!]")
+				if col.NotNull {
+					b.WriteString("!")
+				}
+			} else {
+				b.WriteString(gqlType)
+				if col.NotNull {
+					b.WriteString("!")
+				}
+			}
+			b.WriteString("\n")
+		}
 		b.WriteString("}\n")
 	}
 

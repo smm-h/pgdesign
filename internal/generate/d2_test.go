@@ -458,3 +458,60 @@ func TestGenerateD2_NilRegistry(t *testing.T) {
 		t.Errorf("expected items table, got:\n%s", out)
 	}
 }
+
+// TestGenerateD2ImportedRef verifies the fail-closed import union (roadmap
+// 7.3/7.4): imported tables render as minimal, schema-qualified reference shapes
+// and FK edges point at them qualified. The whole diagram must still compile.
+func TestGenerateD2ImportedRef(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+				FKs: []model.FK{
+					{Name: "fk_orders_user", Columns: []string{"user_id"}, RefSchema: "framework", RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE", RefAlias: "fw"},
+				},
+			},
+		},
+		ImportedTables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "framework",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+	schema.Canonicalize()
+
+	out := GenerateD2(schema, nil)
+
+	// Minimal reference shape, schema-qualified.
+	if !strings.Contains(out, "framework.users: {") {
+		t.Errorf("expected imported reference shape framework.users, got:\n%s", out)
+	}
+	if !strings.Contains(out, "<<imported>>") {
+		t.Errorf("expected imported reference label, got:\n%s", out)
+	}
+	// The imported table must NOT render as a full sql_table.
+	if strings.Contains(out, "framework.users: {\n  shape: sql_table") {
+		t.Errorf("imported table must be a reference shape, not sql_table, got:\n%s", out)
+	}
+	// The FK edge is schema-qualified toward the reference shape.
+	if !strings.Contains(out, "orders.user_id -> framework.users:") {
+		t.Errorf("expected qualified imported FK edge, got:\n%s", out)
+	}
+
+	// The whole diagram compiles.
+	if _, err := RenderSVG(out); err != nil {
+		t.Fatalf("D2 with imported reference shape failed to compile: %v\nsource:\n%s", err, out)
+	}
+}

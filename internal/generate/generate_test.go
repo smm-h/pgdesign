@@ -2903,3 +2903,51 @@ func TestIdempotentAddColumnGuards(t *testing.T) {
 		}
 	})
 }
+
+// TestGenerateSQLExcludesImportedTables verifies the fail-closed sweep (roadmap
+// 7.4): the app's DDL never emits CREATE TABLE for an imported reference table,
+// but the local FK constraint still references it schema-qualified.
+func TestGenerateSQLExcludesImportedTables(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:    "orders",
+				Schema:  "app",
+				Comment: "orders",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+				FKs: []model.FK{
+					{Name: "fk_orders_user", Columns: []string{"user_id"}, RefSchema: "framework", RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE", RefAlias: "fw"},
+				},
+			},
+		},
+		ImportedTables: []model.Table{
+			{
+				Name:    "users",
+				Schema:  "framework",
+				Comment: "imported",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+	schema.Canonicalize()
+
+	out := mustGenerate(t, schema, Options{IncludeComments: true, Format: "sql"})
+
+	if strings.Contains(out, "CREATE TABLE framework.users") {
+		t.Errorf("imported table must not get CREATE TABLE, got:\n%s", out)
+	}
+	if !strings.Contains(out, "CREATE TABLE app.orders") {
+		t.Errorf("expected local CREATE TABLE app.orders, got:\n%s", out)
+	}
+	if !strings.Contains(out, "REFERENCES framework.users") {
+		t.Errorf("expected schema-qualified FK to imported table, got:\n%s", out)
+	}
+}

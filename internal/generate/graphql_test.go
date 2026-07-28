@@ -456,3 +456,56 @@ func TestGraphQLGoldenFile(t *testing.T) {
 		t.Errorf("golden file mismatch.\n--- got ---\n%s\n--- expected ---\n%s", got, expected)
 	}
 }
+
+// TestGraphQLImportedFK verifies the fail-closed import union (roadmap 7.3/7.4):
+// an FK to an imported table gets a schema-qualified relation field pointing at a
+// minimal reference type, and that reference type is emitted so the SDL compiles.
+func TestGraphQLImportedFK(t *testing.T) {
+	schema := &model.Schema{
+		Name: "app",
+		Tables: []model.Table{
+			{
+				Name:   "orders",
+				Schema: "app",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "user_id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+				},
+				PK: []string{"id"},
+				FKs: []model.FK{
+					{Name: "fk_orders_user", Columns: []string{"user_id"}, RefSchema: "framework", RefTable: "users", RefColumns: []string{"id"}, OnDelete: "CASCADE", RefAlias: "fw"},
+				},
+			},
+		},
+		ImportedTables: []model.Table{
+			{
+				Name:   "users",
+				Schema: "framework",
+				Columns: []model.Column{
+					{Name: "id", PGType: typeinfo.MustParse("uuid"), NotNull: true},
+					{Name: "email", PGType: typeinfo.MustParse("text"), NotNull: true},
+				},
+				PK: []string{"id"},
+			},
+		},
+	}
+	schema.Canonicalize()
+
+	out := mustGenerate(t, schema, Options{Format: "graphql"})
+
+	// Qualified relation field on Orders pointing at the reference type.
+	if !strings.Contains(out, "frameworkUsers: FrameworkUsers!") {
+		t.Errorf("expected qualified imported relation frameworkUsers: FrameworkUsers!, got:\n%s", out)
+	}
+	// The reference type must be defined (so the SDL compiles).
+	if !strings.Contains(out, "type FrameworkUsers {") {
+		t.Errorf("expected minimal reference type FrameworkUsers, got:\n%s", out)
+	}
+	if !strings.Contains(out, "email: String!") {
+		t.Errorf("expected imported reference column email, got:\n%s", out)
+	}
+	// No bare Users type (fail-closed: imported table is not a generated type).
+	if strings.Contains(out, "type Users {") {
+		t.Errorf("imported table must not produce a bare 'type Users', got:\n%s", out)
+	}
+}
