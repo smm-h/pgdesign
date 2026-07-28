@@ -37,7 +37,7 @@ func preUpgradeGuardURL(ctx context.Context, dbURL string) error {
 }
 
 func registerMigratePlanCmd(g *strictcli.Group) {
-	g.Command("plan", "Plan migrations by diffing the TOML schema against a live database without writing any files. Shows which tables, columns, indexes, and constraints would change, along with risk levels and required lock types for each operation. Useful for previewing changes before generating migration files.",
+	g.Command("plan", "Preview the migration chain PURELY, without touching any database (roadmap 5.9). In a chain-mode project it enumerates the edges from GENESIS -- or from an explicit --from revision -- to the single live head, in path-finder order, listing each edge's id, slug, and op summary. Drift preview against a live database is `diff --live`'s job; per-database pending is `migrate status`'s. A legacy (semver-TOML) project keeps the old live-diff plan (requires --db) until it is upgraded to the chain.",
 		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
@@ -48,146 +48,173 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 				return strictcli.Exit(exitCode)
 			}
 
-			dbURL := kwargsDBURL(kwargs)
-			if dbURL == "" {
-				fmt.Fprintln(os.Stderr, "error: --db is required for migrate plan")
+			cfg, cfgErr := loadProjectConfig(cfgOverride, paths[0])
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 				return strictcli.Exit(1)
 			}
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
-			schemaNames := modelSchemaNames(schema)
-
-			ctx := context.Background()
-			if err := preUpgradeGuardURL(ctx, dbURL); err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return strictcli.Exit(1)
-			}
-			actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return strictcli.Exit(1)
-			}
-			if len(diags) > 0 {
-				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
-			}
-			if diagnostic.Diagnostics(diags).HasErrors() {
-				return strictcli.Exit(1)
-			}
-
-			if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
-				return strictcli.Exit(1)
-			}
-			// migrationDiff resolves the live PG version onto the desired schema
-			// BEFORE diffing. Otherwise an in-sync project with an UNPINNED
-			// pg_version (schema version 0) diffs against the live server version and
-			// reports a spurious PGVersionChanged, losing "No changes detected".
-			d := migrationDiff(schema, actual)
-			if d.IsEmpty() {
-				if !quiet {
-					fmt.Println("No changes detected. Schema is up to date.")
+			// Chain-mode project: PURE enumeration of pending edges from genesis
+			// (or --from) to head. No database is consulted.
+			if migrate.IsChainMode(dir) {
+				from := ""
+				if f := kwargsOptString(kwargs, "from"); f != nil {
+					from = *f
 				}
-				return strictcli.Exit(0)
+				return strictcli.Exit(handleMigratePlanChain(dir, from, quiet))
 			}
 
-			if _, pgErr := requireSchemaPGVersion(schema); pgErr != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
-				return strictcli.Exit(1)
-			}
-
-			m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", extregistry.NewBuiltinRegistry())
-
-			fmt.Println("Migration plan:")
-			fmt.Printf("  Description: %s\n", m.Description)
-			fmt.Println()
-
-			if migrate.HasPhases(m) {
-				ddlIdx := 0
-				dmlIdx := 0
-				for _, phase := range []string{migrate.PhaseExpand, migrate.PhaseMigrate, migrate.PhaseContract} {
-					hasOps := false
-					for _, op := range m.DDLOps {
-						if op.Phase == phase {
-							hasOps = true
-							break
-						}
-					}
-					if !hasOps {
-						for _, op := range m.DMLOps {
-							if op.Phase == phase {
-								hasOps = true
-								break
-							}
-						}
-					}
-					if !hasOps {
-						continue
-					}
-
-					fmt.Printf("  -- Phase: %s --\n", phase)
-					for _, op := range m.DDLOps {
-						if op.Phase != phase {
-							continue
-						}
-						ddlIdx++
-						sqlStmt := migrate.OpToSQL(op)
-						fmt.Printf("  %d. [%s] %s\n", ddlIdx, op.Op, opSummary(op))
-						fmt.Printf("     SQL: %s\n", sqlStmt)
-						if op.Down != nil {
-							if op.Down.Irreversible {
-								fmt.Println("     Down: IRREVERSIBLE")
-							} else {
-								fmt.Println("     Down: reversible")
-							}
-						}
-						fmt.Println()
-					}
-					for _, op := range m.DMLOps {
-						if op.Phase != phase {
-							continue
-						}
-						dmlIdx++
-						fmt.Printf("  DML %d. [%s]\n", dmlIdx, op.Op)
-						fmt.Printf("     SQL: %s\n", op.SQL)
-						fmt.Println()
-					}
-				}
-			} else {
-				for i, op := range m.DDLOps {
-					sqlStmt := migrate.OpToSQL(op)
-					fmt.Printf("  %d. [%s] %s\n", i+1, op.Op, opSummary(op))
-					fmt.Printf("     SQL: %s\n", sqlStmt)
-					if op.Down != nil {
-						if op.Down.Irreversible {
-							fmt.Println("     Down: IRREVERSIBLE")
-						} else {
-							fmt.Println("     Down: reversible")
-						}
-					}
-					fmt.Println()
-				}
-
-				for i, op := range m.DMLOps {
-					fmt.Printf("  DML %d. [%s]\n", i+1, op.Op)
-					fmt.Printf("     SQL: %s\n", op.SQL)
-					fmt.Println()
-				}
-			}
-
-			if len(migDiags) > 0 {
-				fmt.Println("Diagnostics:")
-				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
-			}
-
-			return strictcli.Exit(0)
+			// Legacy (semver-TOML) project: retains the live-diff plan until it is
+			// upgraded to the chain.
+			return strictcli.Exit(handleMigratePlanLegacy(kwargs, schema, cfg, quiet))
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL (legacy-mode only; chain-mode plan is pure and ignores it)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("from", "Chain-mode only: revision string to enumerate from (pure input); absent enumerates from genesis", strictcli.Default(nil)),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 		),
 		strictcli.WithArgs(
 			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
 		),
 	)
+}
+
+// handleMigratePlanChain prints the pure chain plan: the ordered pending edges
+// from `from` (or genesis) to the live head. It reads only on-disk edges.
+func handleMigratePlanChain(dir, from string, quiet bool) int {
+	p, err := migrate.OpenChainProject(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	edges, err := migrate.PlanChainEdges(p, from)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	start := displayRevString(from)
+	if len(edges) == 0 {
+		if !quiet {
+			fmt.Printf("Nothing to plan: %s is already at the head.\n", start)
+		}
+		return 0
+	}
+	if !quiet {
+		fmt.Printf("Migration plan (pure, no database): %s -> head\n", start)
+		fmt.Printf("%d edge(s):\n", len(edges))
+	}
+	for i, e := range edges {
+		fmt.Printf("  %d. %s %s\n", i+1, e.ID()[:12], e.Slug)
+		fmt.Printf("     %s\n", planEdgeOpSummary(e))
+	}
+	return 0
+}
+
+// planEdgeOpSummary renders a compact per-edge op summary (kind counts in
+// stable order) for the pure plan.
+func planEdgeOpSummary(e migrate.Edge) string {
+	if len(e.Ops) == 0 {
+		return "(no ops)"
+	}
+	counts := map[string]int{}
+	var order []string
+	for _, o := range e.Ops {
+		k := o.Kind()
+		if counts[k] == 0 {
+			order = append(order, k)
+		}
+		counts[k]++
+	}
+	parts := make([]string, 0, len(order))
+	for _, k := range order {
+		if counts[k] == 1 {
+			parts = append(parts, k)
+		} else {
+			parts = append(parts, fmt.Sprintf("%s x%d", k, counts[k]))
+		}
+	}
+	return fmt.Sprintf("%d op(s): %s", len(e.Ops), strings.Join(parts, ", "))
+}
+
+// handleMigratePlanLegacy is the pre-chain plan: introspect a live database,
+// diff the TOML schema against it, and print the would-be migration. Retained
+// until a project is upgraded to the chain.
+func handleMigratePlanLegacy(kwargs map[string]interface{}, schema *model.Schema, cfg *config.RawConfig, quiet bool) int {
+	_ = cfg
+	dbURL := kwargsDBURL(kwargs)
+	if dbURL == "" {
+		fmt.Fprintln(os.Stderr, "error: --db is required for legacy-mode migrate plan")
+		return 1
+	}
+
+	schemaNames := modelSchemaNames(schema)
+
+	ctx := context.Background()
+	if err := preUpgradeGuardURL(ctx, dbURL); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return 1
+	}
+	if len(diags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+	}
+	if diagnostic.Diagnostics(diags).HasErrors() {
+		return 1
+	}
+
+	if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
+		return 1
+	}
+	d := migrationDiff(schema, actual)
+	if d.IsEmpty() {
+		if !quiet {
+			fmt.Println("No changes detected. Schema is up to date.")
+		}
+		return 0
+	}
+
+	if _, pgErr := requireSchemaPGVersion(schema); pgErr != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
+		return 1
+	}
+
+	m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", extregistry.NewBuiltinRegistry())
+
+	fmt.Println("Migration plan:")
+	fmt.Printf("  Description: %s\n", m.Description)
+	fmt.Println()
+
+	for i, op := range m.DDLOps {
+		sqlStmt := migrate.OpToSQL(op)
+		fmt.Printf("  %d. [%s] %s\n", i+1, op.Op, opSummary(op))
+		fmt.Printf("     SQL: %s\n", sqlStmt)
+		if op.Down != nil {
+			if op.Down.Irreversible {
+				fmt.Println("     Down: IRREVERSIBLE")
+			} else {
+				fmt.Println("     Down: reversible")
+			}
+		}
+		fmt.Println()
+	}
+	for i, op := range m.DMLOps {
+		fmt.Printf("  DML %d. [%s]\n", i+1, op.Op)
+		fmt.Printf("     SQL: %s\n", op.SQL)
+		fmt.Println()
+	}
+
+	if len(migDiags) > 0 {
+		fmt.Println("Diagnostics:")
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
+	}
+
+	return 0
 }
 
 func registerMigrateGenerateCmd(g *strictcli.Group) {

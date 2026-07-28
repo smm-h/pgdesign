@@ -156,6 +156,16 @@ func parentModelForEdge(p *ChainProject, e Edge) (*model.Schema, error) {
 	return from, nil
 }
 
+// PlanChainEdges is the PURE preview (roadmap 5.9): it enumerates the ordered
+// edges from a starting revision to the single live head, reading only the
+// on-disk chain — no database. from is "" to enumerate from GENESIS, or an
+// explicit revision string. It returns an empty slice when from is already the
+// head. This is `migrate plan`'s engine; per-database pending is `migrate
+// status`'s job (it resolves against a live chain_position).
+func PlanChainEdges(p *ChainProject, from string) ([]Edge, error) {
+	return findApplyPath(p, from)
+}
+
 // findApplyPath loads the live + archive edges and asks the path-finder for the
 // ordered edges from pos to the single live head.
 func findApplyPath(p *ChainProject, pos string) ([]Edge, error) {
