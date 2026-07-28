@@ -153,6 +153,11 @@
       "type": "doc"
     },
     {
+      "path": "internal-migrate-design.md",
+      "title": "internal/migrate/design",
+      "type": "doc"
+    },
+    {
       "path": "internal-migrate.md",
       "title": "internal/migrate",
       "type": "doc"
@@ -160,6 +165,11 @@
     {
       "path": "internal-model.md",
       "title": "internal/model",
+      "type": "doc"
+    },
+    {
+      "path": "internal-parse-pgschema.md",
+      "title": "internal/parse/pgschema",
       "type": "doc"
     },
     {
@@ -289,5 +299,5 @@
     }
   ],
   "posts": [],
-  "last_gen": "2026-07-11T12:57:02.476733+00:00"
+  "last_gen": "2026-07-28T01:53:36.325580+00:00"
 }

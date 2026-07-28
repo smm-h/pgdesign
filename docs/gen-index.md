@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: "API reference index for pgdesign covering 27 modules"
+description: "API reference index for pgdesign covering 29 modules"
 generated: true
 seeded: true
 nav_group: "API Reference"
@@ -25,8 +25,10 @@ order: 90
 - [internal/graph](internal-graph.html)
 - [internal/introspect](internal-introspect.html)
 - [internal/migrate](internal-migrate.html)
+- [internal/migrate/design](internal-migrate-design.html)
 - [internal/model](internal-model.html)
 - [internal/parse](internal-parse.html)
+- [internal/parse/pgschema](internal-parse-pgschema.html)
 - [internal/risk](internal-risk.html)
 - [internal/seed](internal-seed.html)
 - [internal/semtype](internal-semtype.html)
