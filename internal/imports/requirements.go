@@ -12,13 +12,16 @@ import (
 // consumer's own declarations (roadmap 7.3): the consumer must re-declare every
 // extension the imported surface requires, and its pg_version must be >= the
 // imported floor. The lockfile carries these (7.2 InferRequirements); 7.3 turns
-// them into hard errors so an offline build that would fail at apply time — a
-// missing extension type, or a version-gated feature the consumer's target cannot
-// run — fails loudly at build instead.
+// them into hard errors surfaced by the `check --tag imports` framework
+// (cmd checkImports calls this) — NOT by the build/parseAndBuild path. So a
+// consumer that would fail at apply time (a missing extension type, or a
+// version-gated feature the consumer's target cannot run) fails loudly at CHECK
+// time, in CI, before ever reaching apply.
 //
-//   - E238... wait, those are live codes; drift codes E230-E237 are 7.1/7.2.
-//     Requirement violations use E241 (missing extension) and E242 (pg_version
-//     below floor), naming the requiring alias.
+//   - Requirement violations use E241 (missing extension) and E242 (pg_version
+//     below floor), naming the requiring alias. (These are distinct from the live
+//     import-verification codes E238/E239/E240 raised by revise's DB tier and the
+//     drift codes E230-E237 from 7.1/7.2.)
 //
 // consumer supplies the project's own declared Extensions and PGVersion. aliases
 // is the set of declared import aliases; only those with a committed lockfile are
