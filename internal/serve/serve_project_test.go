@@ -221,3 +221,43 @@ func TestProjectMode_SMDiagramRenders(t *testing.T) {
 		t.Fatalf("project-mode D2 differs from generate D2 with the same registry")
 	}
 }
+
+// TestProjectMode_D2QueryParams verifies the d2 endpoint maps query params onto
+// D2 options (roadmap 9.1: serve params) and rejects invalid values.
+func TestProjectMode_D2QueryParams(t *testing.T) {
+	schema, reg := buildTestProject(t, smTOML)
+	srv := NewProject(schema, reg, nil, []string{"public"}, "")
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	// direction override flows through to the diagram source.
+	resp, err := http.Get(ts.URL + "/api/schema/d2?direction=right")
+	if err != nil {
+		t.Fatalf("GET d2?direction=right: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if !strings.HasPrefix(string(body), "direction: right\n") {
+		t.Fatalf("expected direction: right, got:\n%s", string(body))
+	}
+
+	// Matches generate's output for the equivalent options.
+	wantOpts := generate.DefaultD2Options()
+	wantOpts.Direction = "right"
+	if string(body) != generate.GenerateD2(schema, reg, wantOpts) {
+		t.Fatalf("serve d2 output differs from generate for direction=right")
+	}
+
+	// Invalid layout (TALA) is a 400.
+	resp2, err := http.Get(ts.URL + "/api/schema/d2?layout=tala")
+	if err != nil {
+		t.Fatalf("GET d2?layout=tala: %v", err)
+	}
+	resp2.Body.Close()
+	if resp2.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for tala layout, got %d", resp2.StatusCode)
+	}
+}
