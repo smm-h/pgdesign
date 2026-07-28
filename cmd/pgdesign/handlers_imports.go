@@ -26,7 +26,7 @@ func registerImportLockCmd(g *strictcli.Group) {
 			return runImportPin(kwargs, false)
 		},
 		strictcli.WithArgs(
-			strictcli.NewArg("alias", "Alias to lock (default: all declared aliases)", strictcli.ArgRequired(false)),
+			strictcli.NewArg("alias", "Name of the single [imports] alias to lock; omit to lock every alias declared in pgdesign.toml", strictcli.ArgRequired(false)),
 		),
 	)
 }
@@ -37,7 +37,7 @@ func registerImportUpdateCmd(g *strictcli.Group) {
 			return runImportPin(kwargs, true)
 		},
 		strictcli.WithArgs(
-			strictcli.NewArg("alias", "Alias to update (default: all declared aliases)", strictcli.ArgRequired(false)),
+			strictcli.NewArg("alias", "Name of the single [imports] alias to re-resolve and update; omit to update every declared alias", strictcli.ArgRequired(false)),
 		),
 	)
 }

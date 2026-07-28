@@ -28,7 +28,7 @@ func registerBuildCmd(app *strictcli.App) {
 		},
 		strictcli.WithFlags(
 			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files", strictcli.Default(false)),
-			strictcli.BoolFlag("auto-commit", "Automatically git commit generated output files", strictcli.Default(true)),
+			strictcli.BoolFlag("auto-commit", "Automatically git commit the generated output files after a successful build; pass --no-auto-commit to leave them in the working tree", strictcli.Default(true)),
 			strictcli.StringFlag("db", "PostgreSQL connection URL; required only when a [output.<name>.d2] sets live_stats=true", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),
 	)

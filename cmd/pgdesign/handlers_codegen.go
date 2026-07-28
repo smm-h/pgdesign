@@ -24,7 +24,7 @@ func registerCodegenCmd(app *strictcli.App) {
 			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
 			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toIfaces(SupportedModeNames())...)),
 			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.StringFlag("split-mode", "Split Python DDL output mode", strictcli.Default(nil), strictcli.Choices("faceted", "self-contained")),
+			strictcli.StringFlag("split-mode", "How to split multi-file Python DDL output: 'faceted' writes one file per object kind, 'self-contained' emits a single importable module", strictcli.Default(nil), strictcli.Choices("faceted", "self-contained")),
 			strictcli.ListFlag(strictcli.TypeStr, "groups", "Restrict generation to tables in these schema groups (matches build's per-output group filtering)", strictcli.Default(nil), strictcli.Unique(true)),
 			strictcli.ListFlag(strictcli.TypeStr, "source", "Restrict generation to tables from these source file basenames (matches build's per-output source filtering)", strictcli.Default(nil), strictcli.Unique(true)),
 			strictcli.BoolFlag("check", "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file", strictcli.Default(false)),

@@ -1856,7 +1856,7 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
 			strictcli.StringFlag("version", "Version label for the baseline record (legacy semver-TOML mode only)", strictcli.Default("")),
-			strictcli.StringFlag("description", "Human-readable description", strictcli.Default("Initial baseline")),
+			strictcli.StringFlag("description", "Human-readable note recorded with the baseline, shown in migrate status and history output", strictcli.Default("Initial baseline")),
 		),
 		strictcli.WithArgs(
 			strictcli.NewArg("path", "Schema TOML file(s) or directory (chain mode; selects the schema search-path to introspect)", strictcli.Variadic(), strictcli.ArgRequired(false)),
