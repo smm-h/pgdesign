@@ -73,6 +73,8 @@ type DDLOp struct {
 	FuncArgSig    string
 
 	TableDef            *model.Table            // full table def for create_table (not serialized)
+	TableEnums          []model.Enum            // enum closure for create_table type qualification (not serialized)
+	TableDomains        []model.Domain          // domain closure for create_table type qualification (not serialized)
 	PartitionChildSpec  *model.PartitionSpec    // child spec for create_partition (not serialized)
 	ParentTable         string                  // parent table for create_partition
 	ViewDef             *model.View             // full view def for create_view/drop_view (not serialized)

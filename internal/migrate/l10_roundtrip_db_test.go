@@ -11,7 +11,9 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
+	"github.com/smm-h/pgdesign/internal/enc"
 	"github.com/smm-h/pgdesign/internal/extregistry"
+	"github.com/smm-h/pgdesign/internal/introspect"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/modelgen"
 	"github.com/smm-h/pgdesign/internal/parse"
@@ -338,6 +340,146 @@ func l10Manager(t *testing.T) *testdb.Manager {
 		t.Skipf("no database manager: %v", err)
 	}
 	return mgr
+}
+
+// l10SMConfig is the UNRESTRICTED-fragment config (roadmap 5.8b): l10Config plus
+// state-machine types ON. It feeds the manifest-oracle-only round-trip, whose
+// domain includes SM types (introspection-lossy, so excluded from the injective
+// re-introspection oracle).
+func l10SMConfig() modelgen.Config {
+	cfg := l10Config()
+	cfg.IncludeStateMachines = true
+	return cfg
+}
+
+// TestL10StateMachineManifestRoundTrip is L10 over the UNRESTRICTED generator
+// (roadmap 5.8b): applying gen(diff(a,b)) to a world at revision(a) lands it at
+// revision(b) for SM-bearing models, verified by the MANIFEST oracle ONLY. The
+// re-introspection oracle is deliberately skipped (dbURL="" on apply) because a
+// state_machine type introspects LOSSILY as a plain enum — so this test proves
+// the split oracle's raison d'être is real: assertSMManifestSplit checks that the
+// recorded manifest carries the first-class sm_type object while re-introspecting
+// the same applied database recovers only the state enum, no state machine.
+func TestL10StateMachineManifestRoundTrip(t *testing.T) {
+	mgr := l10Manager(t)
+	cfg := l10SMConfig()
+
+	sawSM := 0
+	for i := 0; i < l10Iterations(); i++ {
+		rawsA, rawsB := modelgen.ExamplePair(cfg, i)
+		a := l10Build(t, rawsA)
+		b := l10Build(t, rawsB)
+		if len(b.StateMachines) == 0 {
+			continue // generator drew no SM type this iteration (rare); nothing to prove
+		}
+		sawSM++
+
+		i := i
+		t.Run(fmt.Sprintf("sm_pair_%d", i), func(t *testing.T) {
+			ctx := context.Background()
+			ephDB := mgr.SetupForTest(t, testdb.CreateOptions{})
+			conn, err := ephDB.Connect(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close(ctx)
+
+			p, err := OpenChainProject(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// World -> revision(a). Reconcile is SKIPPED (empty URL): SM types are
+			// introspection-lossy, so the re-introspection oracle does not apply here.
+			l10EnsureSchemas(t, ctx, conn, a)
+			l10WriteGenesis(t, p, a)
+			if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err != nil {
+				t.Fatalf("l10 SM: apply a (genesis): %v", err)
+			}
+			revA, err := rev.Compute(a, rev.RegistryPresent)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !l10WriteDelta(t, p, a, b, revA) {
+				l10ManifestOracle(t, ctx, conn, p, b) // b == a: already landed
+				assertSMManifestSplit(t, ctx, conn, p, ephDB.URL, b)
+				return
+			}
+			if _, err := ApplyChain(ctx, conn, p, "", "5s", nil); err != nil {
+				t.Fatalf("l10 SM: apply a->b: %v", err)
+			}
+
+			// MANIFEST oracle: the recorded revision(b) manifest reconstructs to b.
+			l10ManifestOracle(t, ctx, conn, p, b)
+			// SPLIT PROOF: the manifest carries the sm_type object; re-introspection
+			// of the same database recovers only the state enum.
+			assertSMManifestSplit(t, ctx, conn, p, ephDB.URL, b)
+		})
+	}
+	if sawSM == 0 {
+		t.Skip("no SM-bearing models generated in the bounded sample")
+	}
+}
+
+// assertSMManifestSplit is the concrete proof that the split oracle is real: for
+// every state machine in b, (1) the recorded revision(b) manifest carries a
+// first-class sm_type object (KindSMType) — the manifest oracle observes the SM
+// KIND; and (2) re-introspecting the applied database recovers the SM's state set
+// as a plain ENUM with NO state machine — introspection is lossy, so the
+// re-introspection oracle could not certify this landing.
+func assertSMManifestSplit(t *testing.T, ctx context.Context, conn *pgx.Conn, p *ChainProject, dbURL string, b *model.Schema) {
+	t.Helper()
+	revB, err := rev.Compute(b, rev.RegistryPresent)
+	if err != nil {
+		t.Fatalf("compute revision(b): %v", err)
+	}
+	man, err := p.ReadRevisionManifest(revB)
+	if err != nil {
+		t.Fatalf("read revision(b) manifest: %v", err)
+	}
+
+	schemaNames := make(map[string]bool)
+	for _, sm := range b.StateMachines {
+		schemaNames[sm.Schema] = true
+
+		// (1) The manifest carries the first-class sm_type object.
+		wantKey := enc.KeyForStateMachine(sm)
+		if _, ok := man[wantKey]; !ok {
+			t.Fatalf("sm_type %q absent from revision(b) manifest — the manifest oracle is not certifying the SM kind", sm.Name)
+		}
+	}
+
+	// (2) Re-introspection is lossy: the SM surfaces as a plain enum, no state machine.
+	var names []string
+	for s := range schemaNames {
+		if s == "" {
+			s = "public"
+		}
+		names = append(names, s)
+	}
+	actual, diags, err := introspect.Introspect(ctx, dbURL, names)
+	if err != nil {
+		t.Fatalf("introspect: %v", err)
+	}
+	if diagnostic.Diagnostics(diags).HasErrors() {
+		t.Fatalf("introspect diagnostics: %v", diags)
+	}
+	if len(actual.StateMachines) != 0 {
+		t.Fatalf("introspection recovered %d state machines; expected 0 (SM kind is not reconstructable from pg_catalog)", len(actual.StateMachines))
+	}
+	for _, sm := range b.StateMachines {
+		foundEnum := false
+		for _, e := range actual.Enums {
+			if e.Name == sm.Name && e.Schema == sm.Schema {
+				foundEnum = true
+				break
+			}
+		}
+		if !foundEnum {
+			t.Fatalf("introspection did not recover the state enum for SM %q (expected the states as a plain enum)", sm.Name)
+		}
+	}
 }
 
 // l10Config is the small generator config the L10 tests draw from: a single

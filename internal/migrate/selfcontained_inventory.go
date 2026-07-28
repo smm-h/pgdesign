@@ -382,6 +382,8 @@ func deltaOf(op DDLOp) *DDLOp {
 	d.Down = nil
 	d.ConsolidatedOps = nil
 	d.TableDef = nil
+	d.TableEnums = nil
+	d.TableDomains = nil
 	d.PartitionChildSpec = nil
 	d.ViewDef = nil
 	d.MaterializedViewDef = nil

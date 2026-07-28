@@ -205,7 +205,10 @@ func deriveModel(t *rapid.T, cfg Config, a []*parse.RawSchema) []*parse.RawSchem
 	b := make([]*parse.RawSchema, 0, len(a))
 	total := 0
 	for si, raw := range a {
-		nb := &parse.RawSchema{Meta: raw.Meta}
+		// Carry the user types (e.g. state machines) forward so a table that keeps
+		// its SM column still resolves its type in b — the pair mutates tables and
+		// columns, never the type closure.
+		nb := &parse.RawSchema{Meta: raw.Meta, Types: raw.Types}
 		nextIdx := len(raw.Tables)
 		for ti, tbl := range raw.Tables {
 			if rapid.Bool().Draw(t, fmt.Sprintf("drop_table_%d_%d", si, ti)) {
@@ -241,8 +244,10 @@ func deriveTable(t *rapid.T, cfg Config, tbl parse.RawTable) parse.RawTable {
 		PK:      tbl.PK,
 	}
 	for ci, col := range tbl.Columns {
-		if col.Name == pkColumnName {
-			nt.Columns = append(nt.Columns, col) // never drop the PK
+		// Never drop the PK or the state-machine column: both are protected so the
+		// shared-column-type invariant holds and the SM type stays used in b.
+		if col.Name == pkColumnName || col.Name == smColumnName {
+			nt.Columns = append(nt.Columns, col)
 			continue
 		}
 		if rapid.Bool().Draw(t, fmt.Sprintf("drop_col_%s_%d", tbl.Name, ci)) {
@@ -304,6 +309,13 @@ func genGroups(t *rapid.T, cfg Config, raws []*parse.RawSchema) {
 	raws[0].Groups = groups
 }
 
+// smColumnName is the fixed name of the state-machine column injected into a
+// table when IncludeStateMachines is on. Like the PK column, it is protected from
+// the pair derivation's random column drops so the SM type stays USED across the
+// round-trip (an SM column keeps the state enum live and the sm_type manifest
+// entry exercised on both endpoints).
+const smColumnName = "sm_state"
+
 func genSchema(t *rapid.T, cfg Config, s int) *parse.RawSchema {
 	schemaName := fmt.Sprintf("schema_%d", s)
 	nTables := rapid.IntRange(cfg.MinTables, cfg.MaxTables).Draw(t, fmt.Sprintf("table_count_%d", s))
@@ -316,7 +328,62 @@ func genSchema(t *rapid.T, cfg Config, s int) *parse.RawSchema {
 	for i := 0; i < nTables; i++ {
 		raw.Tables = append(raw.Tables, genTable(t, cfg, s, i))
 	}
+	// State-machine increment (roadmap 1.6 / 5.8b): when enabled, declare one SM
+	// type in this schema and reference it from the first table via the protected
+	// SM column. The SM type materializes a state enum (DDL) plus the first-class
+	// sm_type object (identity/manifest), so the model exercises the manifest side
+	// that re-introspection cannot observe (introspect sees only the enum).
+	if cfg.IncludeStateMachines && len(raw.Tables) > 0 {
+		smType, initial := genStateMachine(t, fmt.Sprintf("sm_status_%d", s))
+		raw.Types = append(raw.Types, smType)
+		raw.Tables[0].Columns = append(raw.Tables[0].Columns, parse.RawColumn{
+			Name:    smColumnName,
+			Type:    smType.Name,
+			Default: &initial, // matches the SM initial state (validate E224)
+		})
+	}
 	return raw
+}
+
+// genStateMachine draws a valid state-machine RawType (roadmap 5.8b): 2..4 states
+// with the last marked terminal, a linear transition chain so every state is
+// reachable from the initial state (no W027), no transition requires (no E223),
+// and an enforcement trigger. It returns the type and its initial state. Named to
+// avoid collisions with generated table/column names.
+func genStateMachine(t *rapid.T, name string) (parse.RawType, string) {
+	nStates := rapid.IntRange(2, 4).Draw(t, name+"_state_count")
+	states := make([]parse.RawSMState, nStates)
+	stateNames := make([]string, nStates)
+	for i := 0; i < nStates; i++ {
+		sn := fmt.Sprintf("st_%d", i)
+		stateNames[i] = sn
+		st := parse.RawSMState{Name: sn}
+		if i == nStates-1 {
+			term := true
+			st.Terminal = &term
+		}
+		states[i] = st
+	}
+	var transitions []parse.RawSMTransition
+	for i := 0; i < nStates-1; i++ {
+		transitions = append(transitions, parse.RawSMTransition{
+			Name: fmt.Sprintf("advance_%d", i),
+			From: []string{stateNames[i]},
+			To:   stateNames[i+1],
+		})
+	}
+	initial := stateNames[0]
+	enforce := true
+	comment := fmt.Sprintf("Generated state machine %s", name)
+	return parse.RawType{
+		Name:           name,
+		Kind:           "state_machine",
+		States:         states,
+		Transitions:    transitions,
+		InitialState:   &initial,
+		EnforceTrigger: &enforce,
+		Comment:        &comment,
+	}, initial
 }
 
 func genTable(t *rapid.T, cfg Config, s, i int) parse.RawTable {

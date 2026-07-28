@@ -321,6 +321,11 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			PK:        tablePK(table),
 			PGVersion: desired.PGVersion,
 			TableDef:  table,
+			// Enum/domain closure so a column whose type is a user enum or domain
+			// renders SCHEMA-QUALIFIED (e.g. an SM state enum in a non-public schema);
+			// without it the type reference is bare and fails to resolve on apply.
+			TableEnums:   desired.Enums,
+			TableDomains: desired.Domains,
 			Down: &DownOp{
 				Ops: []DDLOp{{Op: "drop_table", Table: tableName}},
 			},

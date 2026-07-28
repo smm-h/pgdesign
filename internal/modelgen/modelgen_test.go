@@ -203,6 +203,77 @@ func TestGroupsGeneratedAndValid(t *testing.T) {
 	})
 }
 
+// smConfig is the unrestricted-fragment config for the state-machine increment
+// (roadmap 5.8b): SM types ON, plus the same injective-safe scalar column pool the
+// L10 pairs use, so the only lossy element is the SM type itself.
+func smConfig() Config {
+	return Config{
+		MinSchemas: 1, MaxSchemas: 2,
+		MinTables: 1, MaxTables: 3,
+		MinExtraColumns: 0, MaxExtraColumns: 2,
+		PGVersion:            16,
+		MinGroups:            0, MaxGroups: 0,
+		ColumnTypes:          []string{"counter", "flag"},
+		IncludeStateMachines: true,
+	}
+}
+
+// TestOracle_StateMachineModelsAreValid pins the SM increment (roadmap 5.8b):
+// every model generated with IncludeStateMachines Builds + Canonicalizes AND
+// passes validate with zero errors, with the SM type registered. This exercises
+// the E223/E224 and reachability paths on generated SM types (a linear reachable
+// chain, no requires, default = initial state).
+func TestOracle_StateMachineModelsAreValid(t *testing.T) {
+	rapid.Check(t, func(rt *rapid.T) {
+		raws := Draw(rt, smConfig())
+
+		// The generator actually emitted an SM type (the increment is live).
+		sawSM := false
+		for _, raw := range raws {
+			for _, ty := range raw.Types {
+				if ty.Kind == "state_machine" {
+					sawSM = true
+				}
+			}
+		}
+		if !sawSM {
+			rt.Fatal("IncludeStateMachines is on but no state_machine type was generated")
+		}
+
+		buildErrs, validateErrs := buildAndValidate(raws)
+		for _, d := range buildErrs {
+			rt.Errorf("SM Build error: %s %s (table=%s col=%s)", d.Code, d.Message, d.Table, d.Column)
+		}
+		for _, d := range validateErrs {
+			rt.Errorf("SM validate error: %s %s (table=%s col=%s)", d.Code, d.Message, d.Table, d.Column)
+		}
+		if len(buildErrs) > 0 || len(validateErrs) > 0 {
+			rt.FailNow()
+		}
+	})
+}
+
+// TestOracle_StateMachinePairsAreValid pins that SM-bearing PAIRS are both valid,
+// so L10's SM round-trip inputs are always buildable on both endpoints (the SM
+// type and its column survive the pair derivation).
+func TestOracle_StateMachinePairsAreValid(t *testing.T) {
+	rapid.Check(t, func(rt *rapid.T) {
+		a, b := DrawPair(rt, smConfig())
+		for label, raws := range map[string][]*parse.RawSchema{"a": a, "b": b} {
+			buildErrs, validateErrs := buildAndValidate(raws)
+			for _, d := range buildErrs {
+				rt.Errorf("SM pair %s Build error: %s %s", label, d.Code, d.Message)
+			}
+			for _, d := range validateErrs {
+				rt.Errorf("SM pair %s validate error: %s %s (table=%s col=%s)", label, d.Code, d.Message, d.Table, d.Column)
+			}
+			if len(buildErrs) > 0 || len(validateErrs) > 0 {
+				rt.FailNow()
+			}
+		}
+	})
+}
+
 // TestDeterministicUnderSeed pins that generation is deterministic: the same
 // rapid seed yields byte-identical models. rapid's integrated shrinking relies
 // on this, and it is a stated 1.6 verification obligation.

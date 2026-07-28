@@ -175,8 +175,9 @@ func opCreateTable(op DDLOp) string {
 		schema, _ := splitQualifiedName(op.Table)
 		// PGVersion is honored uniformly (never hardcoded 0), so version-gated
 		// DDL (e.g. STORED vs VIRTUAL generated columns) renders under the op's
-		// recorded target version.
-		return withTableComments(sql.CreateTable(op.TableDef, schema, false, op.PGVersion, nil, nil), schema, op.TableDef)
+		// recorded target version. The enum/domain closure schema-qualifies user
+		// type references (e.g. an SM state enum in a non-public schema).
+		return withTableComments(sql.CreateTable(op.TableDef, schema, false, op.PGVersion, op.TableEnums, op.TableDomains), schema, op.TableDef)
 	}
 
 	// Consolidation path: build a table from the create_table op's fields

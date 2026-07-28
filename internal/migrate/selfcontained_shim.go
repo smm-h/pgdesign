@@ -183,9 +183,42 @@ func shimWholeCreate(store *objstore.Store, op DDLOp, desired *model.Schema) (st
 	if op.Op == "create_or_replace_view" {
 		b.Replace = true
 	}
-	// Enum/domain closure is left EMPTY so create_table renders with the nil
-	// closure OpToSQL uses (byte-identical to generate).
+	// create_table carries the enum/domain closure the op recorded so rendering
+	// schema-qualifies user type references (an SM state enum in a non-public
+	// schema would otherwise render bare and fail to resolve on apply). The closure
+	// is the SAME slice opCreateTable renders from, so chain and legacy renders stay
+	// byte-identical. It does NOT affect the def id (the table encoding), so the
+	// manifest entry is unchanged.
+	if op.Op == "create_table" {
+		enumIDs, domainIDs, err := storeTypeClosure(store, op.TableEnums, op.TableDomains)
+		if err != nil {
+			return "", enc.Key{}, opBody{}, err
+		}
+		b.EnumIDs = enumIDs
+		b.DomainIDs = domainIDs
+	}
 	return op.Op, key, b, nil
+}
+
+// storeTypeClosure stores a create_table op's enum/domain closure by content id,
+// preserving order so the decoded closure qualifies column types identically to
+// the legacy OpToSQL render.
+func storeTypeClosure(store *objstore.Store, enums []model.Enum, domains []model.Domain) (enumIDs, domainIDs []string, err error) {
+	for _, e := range enums {
+		id, err := putDef(store, func() ([]byte, error) { return enc.EncodeEnum(e) })
+		if err != nil {
+			return nil, nil, err
+		}
+		enumIDs = append(enumIDs, id)
+	}
+	for _, d := range domains {
+		id, err := putDef(store, func() ([]byte, error) { return enc.EncodeDomain(d) })
+		if err != nil {
+			return nil, nil, err
+		}
+		domainIDs = append(domainIDs, id)
+	}
+	return enumIDs, domainIDs, nil
 }
 
 // createDefID resolves a whole-object create's def id: the post-state object from
