@@ -2,6 +2,33 @@
 
 # Changelog
 
+## 0.25.3
+
+Make the live-stats test tolerate PostgreSQL's non-deterministic n_live_tup estimate so CI passes and the release can publish.
+
+<details>
+<summary>Context</summary>
+
+0.25.0, 0.25.1, and 0.25.2 were tagged but never reached npm/PyPI: the publish
+gate refused because CI failed. The last blocker was TestBuildLiveStatsPopulatesD2,
+which asserted an exact n_live_tup value; that stat is a non-deterministic
+estimate (PG < 18 double-counts and updates asynchronously). The test now asserts
+only that a plausible row count is rendered. This infra release carries only that
+test-determinism fix; it is the first artifact to actually publish, delivering the
+user-facing 0.25.1 fixes (see the 0.25.1 CHANGELOG section) to registries.
+
+</details>
+
+### Infrastructure
+
+- Make the live-stats test tolerate PostgreSQL's non-deterministic n_live_tup estimate so CI passes and the release can publish.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.25.2
 
 Make a PostgreSQL-version-dependent live-stats test deterministic so CI passes and the release can publish.
@@ -22,12 +49,6 @@ CHANGELOG section) to registries. No user-facing delta over 0.25.1.
 ### Infrastructure
 
 - Make a PostgreSQL-version-dependent live-stats test deterministic so CI passes and the release can publish.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.25.1
 
