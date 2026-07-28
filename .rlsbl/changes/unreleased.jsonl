@@ -189,3 +189,4 @@
 {"format_version":1,"id":"18c6538d2b0c6b5ae1aff5a62ff74703b810ee5dea1bd87a","commits":["3906ac240728aacfedccec1446da1ff82b92ea51","984be59a615d1c428dbbad413e42824728fe67c6"],"user_facing":false}
 {"format_version":1,"id":"18c653a04a4df03889ca18716a37478a97ae6fcc08cc0ca3","commits":["18c825e9bee6f510dc393823d6f76ed9708a6cfe"],"user_facing":false}
 {"format_version":1,"id":"18c654e70973fe5d847bf2c44ba84ae39b812ac80854f67e","commits":["2b24e0689f4cbf287d3b6c841c2eb70fbcdfa2ad"],"user_facing":false}
+{"format_version":1,"id":"18c654e71390a14c8c4a4f9cada24eb09843191419c34f28","commits":["716f2a5e1874085ae5aa2b280843134444760f72"],"user_facing":true,"description":"`build` now fails hard when its auto-commit step fails, instead of warning and leaving regenerated outputs uncommitted.","type":"fix"}
