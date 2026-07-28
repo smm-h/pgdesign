@@ -41,6 +41,10 @@ func TestQualifiedName(t *testing.T) {
 		{"game", "players", "game.players"},
 		{"public", "user", `public."user"`},
 		{"schema", "items", `"schema".items`},
+		// An empty schema yields the UNQUALIFIED name, never the latent `"".table`
+		// (an empty-string schema quotes to `""`, which is invalid SQL).
+		{"", "players", "players"},
+		{"", "user", `"user"`},
 	}
 
 	for _, tt := range tests {

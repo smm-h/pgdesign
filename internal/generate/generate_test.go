@@ -2399,7 +2399,7 @@ func TestExclusionConstraintDDL(t *testing.T) {
 
 	out := mustGenerate(t, schema, Options{Format: "sql"})
 
-	expected := `ALTER TABLE "".bookings ADD CONSTRAINT no_overlap EXCLUDE USING gist (room_id WITH =, during WITH &&);`
+	expected := `ALTER TABLE bookings ADD CONSTRAINT no_overlap EXCLUDE USING gist (room_id WITH =, during WITH &&);`
 	if !strings.Contains(out, expected) {
 		t.Errorf("expected exclusion DDL:\n%s\n\ngot:\n%s", expected, out)
 	}
@@ -2432,7 +2432,7 @@ func TestExclusionConstraintDDLWithWhere(t *testing.T) {
 
 	out := mustGenerate(t, schema, Options{Format: "sql"})
 
-	expected := `ALTER TABLE "".bookings ADD CONSTRAINT no_overlap EXCLUDE USING gist (room_id WITH =, during WITH &&) WHERE (active = true) DEFERRABLE INITIALLY DEFERRED;`
+	expected := `ALTER TABLE bookings ADD CONSTRAINT no_overlap EXCLUDE USING gist (room_id WITH =, during WITH &&) WHERE (active = true) DEFERRABLE INITIALLY DEFERRED;`
 	if !strings.Contains(out, expected) {
 		t.Errorf("expected exclusion DDL:\n%s\n\ngot:\n%s", expected, out)
 	}

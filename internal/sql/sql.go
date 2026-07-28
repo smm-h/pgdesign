@@ -81,8 +81,14 @@ func isIdentChar(ch rune) bool {
 		ch == '_'
 }
 
-// QualifiedName returns a schema-qualified name with proper quoting.
+// QualifiedName returns a schema-qualified name with proper quoting. An empty
+// schema yields the UNQUALIFIED name: quoting an empty string produces `""`,
+// which would render the invalid `"".table` — so the guard lives here, centrally,
+// killing that class for every caller.
 func QualifiedName(schema, name string) string {
+	if schema == "" {
+		return QuoteIdent(name)
+	}
 	return QuoteIdent(schema) + "." + QuoteIdent(name)
 }
 
