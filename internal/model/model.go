@@ -324,6 +324,14 @@ type FK struct {
 	RefTable   string   `json:"ref_table"`
 	RefColumns []string `json:"ref_columns"`
 	OnDelete   string   `json:"on_delete"`
+	// RefAlias is the import alias an `alias:table` ref_table resolved through
+	// (roadmap 7.1). It is empty for same-project FKs. It is PROVENANCE, not
+	// identity: RefSchema/RefTable already carry the resolved (schema, table),
+	// so the alias never enters canonical encoding — two FKs pointing at the
+	// same resolved target are identical regardless of how the reference was
+	// spelled. 7.3 consumes it to route imported-FK targets through
+	// ImportedTables instead of the owned Tables slice.
+	RefAlias string `json:"-"`
 }
 
 // Index represents a resolved index definition.

@@ -14,9 +14,39 @@ import (
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
+// BuildOption customizes model construction. Options are the extension point for
+// build inputs that come from OUTSIDE the schema TOML (e.g. the project's
+// [imports] declarations, which live in pgdesign.toml). Existing callers pass no
+// options and get the same behavior as before.
+type BuildOption func(*buildOptions)
+
+// buildOptions holds the resolved build inputs threaded through resolution.
+type buildOptions struct {
+	// imports maps a declared import alias to its target PostgreSQL schema
+	// (the [imports.<alias>].schema config value). An `alias:table` FK ref_table
+	// resolves to (imports[alias], table). A reference to an undeclared alias is
+	// a hard build error.
+	imports map[string]string
+}
+
+// WithImports supplies the project's declared import aliases (alias -> target PG
+// schema) so `alias:table` FK references resolve at build time (roadmap 7.1).
+func WithImports(imports map[string]string) BuildOption {
+	return func(o *buildOptions) { o.imports = imports }
+}
+
+func applyBuildOptions(opts []BuildOption) buildOptions {
+	var o buildOptions
+	for _, fn := range opts {
+		fn(&o)
+	}
+	return o
+}
+
 // Build constructs a resolved Schema from raw parse output and a type registry.
 // It returns the schema (possibly partial) and any diagnostics encountered.
-func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Diagnostics) {
+func Build(raw *parse.RawSchema, reg *semtype.Registry, opts ...BuildOption) (*Schema, diagnostic.Diagnostics) {
+	o := applyBuildOptions(opts)
 	var diags diagnostic.Diagnostics
 
 	schema := &Schema{
@@ -26,7 +56,7 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 	}
 
 	// Phase 1: resolve
-	tables, enums, compositeTypes, domains, resolveDiags := resolve(raw, reg)
+	tables, enums, compositeTypes, domains, resolveDiags := resolve(raw, reg, o.imports)
 	diags = append(diags, resolveDiags...)
 	schema.Enums = enums
 	schema.CompositeTypes = compositeTypes
@@ -63,6 +93,9 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Dia
 
 	// Partman maintenance requires pg_partman to be declared as an extension.
 	diags = append(diags, validateMaintenanceExtension(schema)...)
+
+	// Alias references are permitted ONLY in FK ref_table; reject them elsewhere.
+	diags = append(diags, validateAliasScoping(schema, o.imports)...)
 
 	return schema, diags
 }
@@ -113,11 +146,12 @@ func validateMaintenanceExtension(schema *Schema) diagnostic.Diagnostics {
 // registry. Tables, enums, and extensions from all schemas are merged into one
 // Schema. Each table's Schema field is set from its source RawSchema's meta.schema.
 // The returned Schema.Name is empty (multi-schema has no single name).
-func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagnostic.Diagnostics) {
+func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry, opts ...BuildOption) (*Schema, diagnostic.Diagnostics) {
 	if len(raws) == 1 {
-		return Build(raws[0], reg)
+		return Build(raws[0], reg, opts...)
 	}
 
+	o := applyBuildOptions(opts)
 	var diags diagnostic.Diagnostics
 
 	schema := &Schema{}
@@ -140,7 +174,7 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 	// Phase 1: resolve all schemas.
 	var allTables []Table
 	for _, raw := range raws {
-		tables, enums, compositeTypes, domains, resolveDiags := resolve(raw, reg)
+		tables, enums, compositeTypes, domains, resolveDiags := resolve(raw, reg, o.imports)
 		diags = append(diags, resolveDiags...)
 		schema.Enums = append(schema.Enums, enums...)
 		schema.CompositeTypes = append(schema.CompositeTypes, compositeTypes...)
@@ -192,6 +226,9 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry) (*Schema, diagno
 
 	// Partman maintenance requires pg_partman across the merged extension set.
 	diags = append(diags, validateMaintenanceExtension(schema)...)
+
+	// Alias references are permitted ONLY in FK ref_table; reject them elsewhere.
+	diags = append(diags, validateAliasScoping(schema, o.imports)...)
 
 	return schema, diags
 }
@@ -253,7 +290,7 @@ func resolveGroups(schema *Schema, groups map[string][]string) diagnostic.Diagno
 }
 
 // resolve expands semantic types into PG types and builds model structs.
-func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []CompositeType, []Domain, diagnostic.Diagnostics) {
+func resolve(raw *parse.RawSchema, reg *semtype.Registry, imports map[string]string) ([]Table, []Enum, []CompositeType, []Domain, diagnostic.Diagnostics) {
 	var diags diagnostic.Diagnostics
 	var tables []Table
 	var enums []Enum
@@ -354,7 +391,7 @@ func resolve(raw *parse.RawSchema, reg *semtype.Registry) ([]Table, []Enum, []Co
 
 	// Resolve tables.
 	for _, rt := range raw.Tables {
-		t, tableDiags := resolveTable(rt, raw.Meta.Schema, reg, raw.SourceFile)
+		t, tableDiags := resolveTable(rt, raw.Meta.Schema, reg, raw.SourceFile, imports)
 		diags = append(diags, tableDiags...)
 		if t != nil {
 			tables = append(tables, *t)
@@ -589,7 +626,7 @@ func resolveSequences(raw *parse.RawSchema, schema *Schema) ([]Sequence, diagnos
 }
 
 // resolveTable resolves a single raw table into a model Table.
-func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, sourceFile string) (*Table, diagnostic.Diagnostics) {
+func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, sourceFile string, imports map[string]string) (*Table, diagnostic.Diagnostics) {
 	var diags diagnostic.Diagnostics
 
 	t := &Table{
@@ -616,7 +653,8 @@ func resolveTable(rt parse.RawTable, schemaName string, reg *semtype.Registry, s
 
 	// Resolve FKs.
 	for name, rawFK := range rt.FKs {
-		fk := resolveFK(name, rawFK, schemaName)
+		fk, fkDiags := resolveFK(name, rawFK, schemaName, rt.Name, imports)
+		diags = append(diags, fkDiags...)
 		t.FKs = append(t.FKs, fk)
 	}
 
@@ -916,13 +954,54 @@ func resolvePK(rt parse.RawTable, columns []Column, diags *diagnostic.Diagnostic
 	return nil
 }
 
-// resolveFK converts a raw FK definition to a model FK.
-func resolveFK(name string, rawFK parse.RawFK, schemaName string) FK {
+// resolveFK converts a raw FK definition to a model FK, resolving the ref_table
+// reference. Resolution order (roadmap 7.1):
+//
+//  1. If ref_table contains ':' it is an import alias reference `alias:table`.
+//     The alias is resolved BEFORE any dot-split: it maps to the import's target
+//     PG schema, and the remainder is the (unqualified) table name. An undeclared
+//     alias is a hard error (E230); a qualified remainder is malformed (E232).
+//  2. Otherwise a '.' splits schema.table; a bare name inherits schemaName.
+func resolveFK(name string, rawFK parse.RawFK, schemaName, tableName string, imports map[string]string) (FK, diagnostic.Diagnostics) {
+	var diags diagnostic.Diagnostics
 	fk := FK{
 		Name:       name,
 		Columns:    rawFK.Columns,
 		RefColumns: rawFK.RefColumns,
 		OnDelete:   rawFK.OnDelete,
+	}
+
+	// Alias resolution happens BEFORE dot-split.
+	if idx := strings.IndexByte(rawFK.RefTable, ':'); idx >= 0 {
+		alias := rawFK.RefTable[:idx]
+		target := rawFK.RefTable[idx+1:]
+		if alias == "" || target == "" {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error, Code: "E232", Table: tableName,
+				Message: fmt.Sprintf("foreign key %q ref_table %q is malformed: expected alias:table", name, rawFK.RefTable),
+			})
+			return fk, diags
+		}
+		if strings.Contains(target, ".") {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error, Code: "E232", Table: tableName,
+				Message: fmt.Sprintf("foreign key %q ref_table %q is malformed: the target of an alias reference must be an unqualified table name (the alias already selects the schema)", name, rawFK.RefTable),
+			})
+			return fk, diags
+		}
+		targetSchema, ok := imports[alias]
+		if !ok {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error, Code: "E230", Table: tableName,
+				Message:    fmt.Sprintf("foreign key %q references unknown import alias %q; declare it under [imports] in pgdesign.toml", name, alias),
+				Suggestion: fmt.Sprintf("[imports.%s]\ngit = \"...\"\nref = \"...\"\nschema = \"...\"", alias),
+			})
+			return fk, diags
+		}
+		fk.RefSchema = targetSchema
+		fk.RefTable = target
+		fk.RefAlias = alias
+		return fk, diags
 	}
 
 	// Parse qualified ref table name (bare = same schema).
@@ -935,7 +1014,70 @@ func resolveFK(name string, rawFK parse.RawFK, schemaName string) FK {
 		fk.RefTable = rawFK.RefTable
 	}
 
-	return fk
+	return fk, diags
+}
+
+// validateAliasScoping enforces that import alias references (`alias:...`) appear
+// ONLY in FK ref_table. Any declared alias used as a prefix in a depends_on
+// entry or a view/matview query body is a hard error (E231) naming the
+// unsupported site — a typo'd alias in those positions must not silently become
+// a phantom dependency. With no declared imports there is nothing to police.
+func validateAliasScoping(schema *Schema, imports map[string]string) diagnostic.Diagnostics {
+	var diags diagnostic.Diagnostics
+	if len(imports) == 0 {
+		return diags
+	}
+	aliases := make([]string, 0, len(imports))
+	for a := range imports {
+		aliases = append(aliases, a)
+	}
+	sort.Strings(aliases)
+
+	reject := func(where, detail string) {
+		diags = append(diags, diagnostic.Diagnostic{
+			Severity: diagnostic.Error, Code: "E231",
+			Message: fmt.Sprintf("import alias reference is only supported in foreign key ref_table, not in %s (%s)", where, detail),
+		})
+	}
+	// containsAliasRef reports the first declared alias whose `alias:` prefix
+	// appears in s, or "" if none.
+	containsAliasRef := func(s string) string {
+		for _, a := range aliases {
+			if strings.Contains(s, a+":") {
+				return a
+			}
+		}
+		return ""
+	}
+
+	for _, v := range schema.Views {
+		for _, dep := range v.DependsOn {
+			if a := containsAliasRef(dep); a != "" {
+				reject("view depends_on", fmt.Sprintf("view %q references alias %q", v.Name, a))
+			}
+		}
+		if a := containsAliasRef(v.Query); a != "" {
+			reject("view query", fmt.Sprintf("view %q query references alias %q", v.Name, a))
+		}
+	}
+	for _, mv := range schema.MaterializedViews {
+		for _, dep := range mv.DependsOn {
+			if a := containsAliasRef(dep); a != "" {
+				reject("materialized view depends_on", fmt.Sprintf("materialized view %q references alias %q", mv.Name, a))
+			}
+		}
+		if a := containsAliasRef(mv.Query); a != "" {
+			reject("materialized view query", fmt.Sprintf("materialized view %q query references alias %q", mv.Name, a))
+		}
+	}
+	for _, fn := range schema.Functions {
+		for _, dep := range fn.DependsOn {
+			if a := containsAliasRef(dep); a != "" {
+				reject("function depends_on", fmt.Sprintf("function %q references alias %q", fn.Name, a))
+			}
+		}
+	}
+	return diags
 }
 
 // resolveIndex converts a raw index definition to a model Index.

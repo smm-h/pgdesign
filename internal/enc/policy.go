@@ -77,8 +77,10 @@ var modelFieldPolicy = map[string]structPolicy{
 		excluded: map[string]string{},
 	},
 	"FK": {
-		encoded:  []string{"Name", "Columns", "RefSchema", "RefTable", "RefColumns", "OnDelete"},
-		excluded: map[string]string{},
+		encoded: []string{"Name", "Columns", "RefSchema", "RefTable", "RefColumns", "OnDelete"},
+		excluded: map[string]string{
+			"RefAlias": "import-alias provenance (roadmap 7.1): which [imports] alias an alias:table ref_table resolved through. RefSchema/RefTable already carry the resolved target, so the alias must not flip identity — two FKs at the same resolved target are identical however the reference was spelled",
+		},
 	},
 	"Index": {
 		encoded: []string{"Name", "Columns", "Desc", "Method", "Opclasses", "Collations", "Where", "Include", "With", "Unique"},

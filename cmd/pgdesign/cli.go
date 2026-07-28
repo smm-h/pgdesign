@@ -348,10 +348,11 @@ func parseAndBuild(configOverride *string, paths []string) (*model.Schema, *semt
 	var schema *model.Schema
 	var buildDiags diagnostic.Diagnostics
 
+	buildOpts := []model.BuildOption{model.WithImports(importAliasSchemas(cfg))}
 	if len(raws) == 1 {
-		schema, buildDiags = model.Build(raws[0], reg)
+		schema, buildDiags = model.Build(raws[0], reg, buildOpts...)
 	} else {
-		schema, buildDiags = model.BuildMulti(raws, reg)
+		schema, buildDiags = model.BuildMulti(raws, reg, buildOpts...)
 	}
 
 	if buildDiags.HasErrors() {
@@ -397,6 +398,20 @@ func promoteNFViolations(diags []diagnostic.Diagnostic) []diagnostic.Diagnostic 
 		}
 	}
 	return result
+}
+
+// importAliasSchemas projects the project's [imports] declarations into the
+// alias -> target-PG-schema map model.WithImports consumes, so `alias:table` FK
+// references resolve at build time (roadmap 7.1). A nil config yields nil.
+func importAliasSchemas[P config.PathKind](cfg *config.Config[P]) map[string]string {
+	if cfg == nil || len(cfg.Imports) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(cfg.Imports))
+	for alias, d := range cfg.Imports {
+		m[alias] = d.Schema
+	}
+	return m
 }
 
 // configToUserExtensions converts config.ExtensionConfig entries to
