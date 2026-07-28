@@ -80,7 +80,7 @@ func TestCommentOnlyChangeProducesEdgeAndReconcilesInManifest(t *testing.T) {
 
 	// Genesis edge creates A.
 	dGen := diff.Diff(a, &model.Schema{Name: a.Name, PGVersion: a.PGVersion})
-	mGen, _ := GenerateMigration(dGen, a, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	mGen, _ := GenerateMigration(dGen, a, "0.1.0", extregistry.NewBuiltinRegistry())
 	revA, err := rev.Compute(a, rev.RegistryPresent)
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +94,7 @@ func TestCommentOnlyChangeProducesEdgeAndReconcilesInManifest(t *testing.T) {
 	if dDelta.IsEmpty() {
 		t.Fatal("expected a non-empty comment-only diff")
 	}
-	mDelta, _ := GenerateMigration(dDelta, b, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	mDelta, _ := GenerateMigration(dDelta, b, "0.2.0", extregistry.NewBuiltinRegistry())
 
 	// The comment-only change no longer trips the zero-op guard, and it produced a
 	// comment_on op for every object kind whose comment changed.
@@ -164,7 +164,7 @@ func TestReconcileCertifiesCommentChange(t *testing.T) {
 	// Genesis creates A; ApplyChain runs ReconcileAfterApply (live URL), so a clean
 	// return already certifies A's comments landed via create_table folding.
 	dGen := diff.Diff(a, &model.Schema{Name: a.Name, PGVersion: a.PGVersion})
-	mGen, _ := GenerateMigration(dGen, a, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	mGen, _ := GenerateMigration(dGen, a, "0.1.0", extregistry.NewBuiltinRegistry())
 	revA, err := rev.Compute(a, rev.RegistryPresent)
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +179,7 @@ func TestReconcileCertifiesCommentChange(t *testing.T) {
 	// Comment-only delta A -> B; apply it and reconcile clean (the COMMENT ON ops
 	// updated the live comments, so introspect matches target B exactly).
 	dDelta := diff.Diff(b, a)
-	mDelta, _ := GenerateMigration(dDelta, b, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	mDelta, _ := GenerateMigration(dDelta, b, "0.2.0", extregistry.NewBuiltinRegistry())
 	if _, err := GenerateEdge(p, mDelta, b, a, revA, rev.RegistryPresent, "recomment"); err != nil {
 		t.Fatalf("delta GenerateEdge (comment-only): %v", err)
 	}

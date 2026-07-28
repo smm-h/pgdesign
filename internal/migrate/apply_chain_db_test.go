@@ -46,7 +46,7 @@ func genesisChainProject(t *testing.T) *ChainProject {
 	}
 	desired := twoTableDesired()
 	d := &diff.SchemaDiff{TablesAdded: []string{"public.users", "public.orders"}}
-	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	m, _ := GenerateMigration(d, desired, "0.1.0", extregistry.NewBuiltinRegistry())
 	if _, err := GenerateEdge(p, m, desired, nil, rev.Revision{}, rev.RegistryPresent, "genesis"); err != nil {
 		t.Fatalf("GenerateEdge: %v", err)
 	}

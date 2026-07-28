@@ -62,7 +62,7 @@ func genesisEdgeFor(t *testing.T, p *ChainProject, desired *model.Schema) {
 	t.Helper()
 	base := &model.Schema{Name: desired.Name, PGVersion: desired.PGVersion}
 	d := diff.Diff(desired, base)
-	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	m, _ := GenerateMigration(d, desired, "0.1.0", extregistry.NewBuiltinRegistry())
 	if _, err := GenerateEdge(p, m, desired, nil, rev.Revision{}, rev.RegistryPresent, "genesis"); err != nil {
 		t.Fatalf("GenerateEdge: %v", err)
 	}

@@ -70,7 +70,7 @@ func l10WriteGenesis(t *testing.T, p *ChainProject, a *model.Schema) {
 	t.Helper()
 	base := &model.Schema{Name: a.Name, PGVersion: a.PGVersion}
 	d := diff.Diff(a, base)
-	m, _ := GenerateMigration(d, a, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	m, _ := GenerateMigration(d, a, "0.1.0", extregistry.NewBuiltinRegistry())
 	if _, err := GenerateEdge(p, m, a, nil, rev.Revision{}, rev.RegistryPresent, "genesis"); err != nil {
 		t.Fatalf("l10: genesis edge: %v", err)
 	}
@@ -84,7 +84,7 @@ func l10WriteDelta(t *testing.T, p *ChainProject, a, b *model.Schema, parentA re
 	if d.IsEmpty() {
 		return false
 	}
-	m, _ := GenerateMigration(d, b, "0.2.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	m, _ := GenerateMigration(d, b, "0.2.0", extregistry.NewBuiltinRegistry())
 	if _, err := GenerateEdge(p, m, b, a, parentA, rev.RegistryPresent, "a-to-b"); err != nil {
 		if err == ErrNoEdgeOps {
 			return false

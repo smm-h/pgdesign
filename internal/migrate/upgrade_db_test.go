@@ -543,7 +543,7 @@ func TestUpgradePostUpgradeApplyContinues(t *testing.T) {
 	if d.IsEmpty() {
 		t.Fatal("expected the new table to produce a non-empty diff")
 	}
-	m2, _ := GenerateMigration(d, desired2, "", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	m2, _ := GenerateMigration(d, desired2, "", extregistry.NewBuiltinRegistry())
 	if _, err := GenerateEdge(p, m2, desired2, prev, head, rev.RegistryPresent, "add-extra"); err != nil {
 		t.Fatalf("GenerateEdge (post-upgrade): %v", err)
 	}

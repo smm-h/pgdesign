@@ -61,7 +61,7 @@ func TestChainStatusOnUpgradedDB(t *testing.T) {
 	if d.IsEmpty() {
 		t.Fatal("expected a non-empty diff for the new table")
 	}
-	m2, _ := GenerateMigration(d, desired2, "", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	m2, _ := GenerateMigration(d, desired2, "", extregistry.NewBuiltinRegistry())
 	if _, err := GenerateEdge(p, m2, desired2, prev, head, rev.RegistryPresent, "add-extra"); err != nil {
 		t.Fatalf("GenerateEdge: %v", err)
 	}

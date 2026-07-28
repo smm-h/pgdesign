@@ -45,7 +45,7 @@ func twoEdgeChainProject(t *testing.T) (*ChainProject, rev.Revision, rev.Revisio
 
 	desired1 := twoTableDesired()
 	d1 := &diff.SchemaDiff{TablesAdded: []string{"public.users", "public.orders"}}
-	m1, _ := GenerateMigration(d1, desired1, "0.1.0", nil, 0, 0, reg)
+	m1, _ := GenerateMigration(d1, desired1, "0.1.0", reg)
 	if _, err := GenerateEdge(p, m1, desired1, nil, rev.Revision{}, rev.RegistryPresent, "genesis"); err != nil {
 		t.Fatalf("GenerateEdge genesis: %v", err)
 	}
@@ -56,7 +56,7 @@ func twoEdgeChainProject(t *testing.T) (*ChainProject, rev.Revision, rev.Revisio
 
 	desired2 := threeTableDesired()
 	d2 := diff.Diff(desired2, desired1)
-	m2, _ := GenerateMigration(d2, desired2, "0.2.0", nil, 0, 0, reg)
+	m2, _ := GenerateMigration(d2, desired2, "0.2.0", reg)
 	if _, err := GenerateEdge(p, m2, desired2, desired1, r1, rev.RegistryPresent, "add-products"); err != nil {
 		t.Fatalf("GenerateEdge add-products: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestChainRollbackNonInvertibleRefuses(t *testing.T) {
 	// Genesis creates users+orders+products.
 	desired1 := threeTableDesired()
 	d1 := &diff.SchemaDiff{TablesAdded: []string{"public.users", "public.orders", "public.products"}}
-	m1, _ := GenerateMigration(d1, desired1, "0.1.0", nil, 0, 0, reg)
+	m1, _ := GenerateMigration(d1, desired1, "0.1.0", reg)
 	if _, err := GenerateEdge(p, m1, desired1, nil, rev.Revision{}, rev.RegistryPresent, "genesis"); err != nil {
 		t.Fatalf("GenerateEdge genesis: %v", err)
 	}
@@ -337,7 +337,7 @@ func TestChainRollbackNonInvertibleRefuses(t *testing.T) {
 	// Second edge DROPS products (a non-invertible drop_table op).
 	desired2 := twoTableDesired()
 	d2 := diff.Diff(desired2, desired1)
-	m2, _ := GenerateMigration(d2, desired2, "0.2.0", nil, 0, 0, reg)
+	m2, _ := GenerateMigration(d2, desired2, "0.2.0", reg)
 	if _, err := GenerateEdge(p, m2, desired2, desired1, r1, rev.RegistryPresent, "drop-products"); err != nil {
 		t.Fatalf("GenerateEdge drop-products: %v", err)
 	}

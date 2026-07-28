@@ -43,7 +43,7 @@ func appendEdge(t *testing.T, p *ChainProject, desired, prev *model.Schema, pare
 	} else {
 		d = diff.Diff(desired, prev)
 	}
-	m, _ := GenerateMigration(d, desired, "", nil, 0, 0, reg)
+	m, _ := GenerateMigration(d, desired, "", reg)
 	if extraDML != "" {
 		m.DMLOps = append(m.DMLOps, DMLOp{Op: "backfill", SQL: extraDML})
 	}

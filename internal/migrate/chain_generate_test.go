@@ -41,7 +41,7 @@ func TestGenerateEdgeGenesis(t *testing.T) {
 	}
 	desired := genesisDesired()
 	d := &diff.SchemaDiff{TablesAdded: []string{"shop.users"}}
-	m, _ := GenerateMigration(d, desired, "0.1.0", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	m, _ := GenerateMigration(d, desired, "0.1.0", extregistry.NewBuiltinRegistry())
 
 	name, err := GenerateEdge(p, m, desired, nil, rev.Revision{}, rev.RegistryPresent, "create-users")
 	if err != nil {
