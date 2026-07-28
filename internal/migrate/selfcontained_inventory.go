@@ -52,7 +52,7 @@ package migrate
 //	add_fk                        | nested-modifier | delta   | declared-inverse (down drop_fk)
 //	add_fk_not_valid              | nested-modifier | delta   | declared-inverse (down drop_fk)
 //	drop_fk                       | nested-modifier | delta   | declared-inverse (down add_fk) / non-invertible
-//	validate_constraint           | nested-modifier | delta   | non-invertible (no meaningful down)
+//	validate_constraint           | nested-modifier | delta   | declared-inverse (down re-validates: a no-op that runs before the paired NOT-VALID add's drop_fk on reverse-order rollback) [5.9: generation always splits FK adds]
 //	create_index / add_index      | nested-modifier | delta   | declared-inverse (down drop_index)
 //	drop_index                    | nested-modifier | delta   | declared-inverse (down create_index) / non-invertible
 //	create_index_concurrently     | nested-modifier | delta   | declared-inverse (down drop_index_concurrently)

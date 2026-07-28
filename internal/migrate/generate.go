@@ -515,9 +515,41 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		diags = append(diags, classifyOp(op, risk.OpCreateFunction, risk.OpContext{PGVersion: desired.PGVersion})...)
 	}
 
+	// Table renames (5.9 rename gate): a resolved rename becomes a single
+	// data-preserving ALTER TABLE ... RENAME with a mechanically-invertible down.
+	for _, rn := range d.TablesRenamed {
+		op := DDLOp{
+			Op:    "rename_table",
+			Table: rn.From,
+			Name:  rn.To,
+			Down: &DownOp{
+				Ops: []DDLOp{{Op: "rename_table", Table: rn.To, Name: rn.From}},
+			},
+		}
+		m.DDLOps = append(m.DDLOps, op)
+		diags = append(diags, classifyOp(op, risk.OpRenameTable, risk.OpContext{PGVersion: desired.PGVersion})...)
+	}
+
 	// Phase 2: Table changes (add columns, alter columns, add constraints).
 	for _, td := range d.TablesChanged {
 		ctx := tableCtx(td.Name)
+
+		// Column renames (5.9 rename gate): data-preserving ALTER TABLE ...
+		// RENAME COLUMN, invertible down. Emitted before add/alter ops so the
+		// new name is in place for any follow-on column changes.
+		for _, rn := range td.ColumnsRenamed {
+			op := DDLOp{
+				Op:     "rename_column",
+				Table:  td.Name,
+				Column: rn.From,
+				Name:   rn.To,
+				Down: &DownOp{
+					Ops: []DDLOp{{Op: "rename_column", Table: td.Name, Column: rn.To, Name: rn.From}},
+				},
+			}
+			m.DDLOps = append(m.DDLOps, op)
+			diags = append(diags, classifyOp(op, risk.OpRenameColumn, ctx)...)
+		}
 
 		// Added columns.
 		for _, col := range td.ColumnsAdded {
@@ -1765,7 +1797,14 @@ func splitFKOp(op DDLOp) []DDLOp {
 		Op:    "validate_constraint",
 		Table: op.Table,
 		Name:  op.Name,
-		Down:  &DownOp{Irreversible: true},
+		// Inverse is a harmless re-validate: on a whole-edge rollback the ops
+		// reverse in reverse order, so this runs while the constraint still
+		// exists (before the paired add_fk_not_valid's drop_fk removes it), and
+		// VALIDATE CONSTRAINT on an already-valid constraint is a no-op. This
+		// keeps an FK-add edge invertible now that generation always splits.
+		Down: &DownOp{
+			Ops: []DDLOp{{Op: "validate_constraint", Table: op.Table, Name: op.Name}},
+		},
 	}
 	return []DDLOp{addNotValid, validate}
 }

@@ -378,6 +378,18 @@ func handleMigrateGenerateChain(schema *model.Schema, dir string, cfg *config.Ra
 		return 0
 	}
 
+	// Rename gate (5.9): resolve declared renames into data-preserving RENAME
+	// ops and HARD-ERROR on any undeclared/ambiguous plausible rename before the
+	// diff is lowered to a drop+create. prev (nil at genesis) is the true base.
+	if err := diff.ResolveRenames(d, schema, prev, configRenameSpec(cfg), false); err != nil {
+		fmt.Fprintf(os.Stderr, "error: rename gate: %v\n", err)
+		return 1
+	}
+	if d.IsEmpty() {
+		fmt.Println("No changes detected. Nothing to generate.")
+		return 0
+	}
+
 	m, migDiags := migrate.GenerateMigration(d, schema, "", extregistry.NewBuiltinRegistry())
 	if len(migDiags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
@@ -400,6 +412,22 @@ func handleMigrateGenerateChain(schema *model.Schema, dir string, cfg *config.Ra
 		fmt.Printf("  DML ops: %d\n", len(m.DMLOps))
 	}
 	return 0
+}
+
+// configRenameSpec converts the project config's [renames] directive into the
+// diff package's RenameSpec, consumed by the rename gate at diff time.
+func configRenameSpec(cfg *config.RawConfig) diff.RenameSpec {
+	if cfg == nil {
+		return diff.RenameSpec{}
+	}
+	spec := diff.RenameSpec{}
+	for _, t := range cfg.Renames.Tables {
+		spec.Tables = append(spec.Tables, diff.RenamePair{From: t.From, To: t.To})
+	}
+	for _, c := range cfg.Renames.Columns {
+		spec.Columns = append(spec.Columns, diff.ColumnRenameSpec{Table: c.Table, From: c.From, To: c.To})
+	}
+	return spec
 }
 
 // slugifyDescription turns a migration description into a filesystem-safe edge
