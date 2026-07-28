@@ -14,6 +14,15 @@ import (
 // OpToSQL converts a DDLOp to a SQL statement.
 func OpToSQL(op DDLOp) string {
 	switch op.Op {
+	case "create_sm_type", "drop_sm_type":
+		// Manifest-only state-machine TYPE op (roadmap 5.10 rider): no DDL. The
+		// SM's real objects (state enum, trigger function, trigger) are emitted by
+		// their own ops; this op exists only to carry the KindSMType manifest key.
+		qn := op.Name
+		if op.Schema != "" {
+			qn = op.Schema + "." + op.Name
+		}
+		return fmt.Sprintf("-- %s %s: manifest-only (DDL rides the state enum + trigger ops)", op.Op, qn)
 	case "create_table":
 		return opCreateTable(op)
 	case "create_partition":

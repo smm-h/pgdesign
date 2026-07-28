@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/smm-h/pgdesign/internal/enc"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/risk"
 	"github.com/smm-h/pgdesign/internal/sqlparse"
@@ -42,6 +43,18 @@ type SchemaDiff struct {
 	FunctionsRemoved         []string               `json:"functions_removed,omitempty"`
 	FunctionsChanged         []FunctionDiff         `json:"functions_changed,omitempty"`
 	SMTransitionsChanged     []SMTransitionDiff     `json:"sm_transitions_changed,omitempty"`
+	// StateMachinesAdded/Removed/Changed track the FIRST-CLASS, identity-bearing
+	// state-machine type objects (model.StateMachines — the KindSMType manifest
+	// objects), matched by schema-qualified name and compared by their encoded
+	// identity. They are what makes the differ see an SM type's whole-object
+	// identity: without them, an added/removed/changed SM type would be diff-blind
+	// (transitions and states are covered by SMTransitionsChanged / EnumsChanged,
+	// but the sm_type manifest key has no producer), so chain endpoint simulation
+	// (VerifyChainConsistency) would fail to reproduce the sm_type key. generate
+	// lowers each to a whole-object sm_type op (roadmap 5.10 rider).
+	StateMachinesAdded   []string `json:"state_machines_added,omitempty"`
+	StateMachinesRemoved []string `json:"state_machines_removed,omitempty"`
+	StateMachinesChanged []string `json:"state_machines_changed,omitempty"`
 	// PGVersionChanged and GroupsChanged report schema-global identity fields
 	// that the differ historically ignored despite their being part of the
 	// revision (Part III). They exist to satisfy the REVERSE conformance
@@ -336,6 +349,9 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.FunctionsRemoved) == 0 &&
 		len(d.FunctionsChanged) == 0 &&
 		len(d.SMTransitionsChanged) == 0 &&
+		len(d.StateMachinesAdded) == 0 &&
+		len(d.StateMachinesRemoved) == 0 &&
+		len(d.StateMachinesChanged) == 0 &&
 		d.PGVersionChanged == nil &&
 		len(d.TablesRenamed) == 0 &&
 		!d.GroupsChanged
@@ -443,6 +459,15 @@ func (d *SchemaDiff) Summary() string {
 	if n := len(d.SMTransitionsChanged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d state machine(s) transitions changed", n))
 	}
+	if n := len(d.StateMachinesAdded); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d state machine type(s) added", n))
+	}
+	if n := len(d.StateMachinesRemoved); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d state machine type(s) removed", n))
+	}
+	if n := len(d.StateMachinesChanged); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d state machine type(s) changed", n))
+	}
 	if d.PGVersionChanged != nil {
 		parts = append(parts, fmt.Sprintf("pg_version changed (%d -> %d)", d.PGVersionChanged[0], d.PGVersionChanged[1]))
 	}
@@ -510,6 +535,7 @@ func diffSchemas(desired, actual *model.Schema, ln LiveNormalizer, actualIntrosp
 	diffDomains(d, desired, actual)
 	diffFunctions(d, desired, actual)
 	diffSMTransitions(d, desired, actual)
+	diffStateMachines(d, desired, actual)
 	diffSchemaMeta(d, desired, actual)
 
 	return d
@@ -2247,6 +2273,58 @@ func diffDomain(desired, actual *model.Domain) *DomainDiff {
 		return nil
 	}
 	return dd
+}
+
+// smKey returns the schema-qualified name of a state-machine type (its manifest
+// identity key's display form).
+func smKey(sm *model.StateMachine) string {
+	if sm.Schema == "" {
+		return sm.Name
+	}
+	return sm.Schema + "." + sm.Name
+}
+
+// diffStateMachines compares the first-class, identity-bearing state-machine type
+// objects (model.StateMachines — the KindSMType manifest objects), matched by
+// schema-qualified name. A change is detected by encoded-identity inequality (the
+// same bytes the manifest hashes), so any identity-affecting change (states,
+// transitions, initial, enforce-trigger, comment) is caught. generate lowers each
+// to a whole-object sm_type op so endpoint simulation reproduces the sm_type key
+// (roadmap 5.10 rider).
+func diffStateMachines(d *SchemaDiff, desired, actual *model.Schema) {
+	added, removed, matched := matchObjects(desired.StateMachines, actual.StateMachines, func(sm model.StateMachine) string {
+		return smKey(&sm)
+	})
+	for _, sm := range added {
+		d.StateMachinesAdded = append(d.StateMachinesAdded, smKey(&sm))
+	}
+	for _, sm := range removed {
+		d.StateMachinesRemoved = append(d.StateMachinesRemoved, smKey(&sm))
+	}
+	for _, p := range matched {
+		db, err1 := enc.EncodeStateMachine(p.Desired)
+		ab, err2 := enc.EncodeStateMachine(p.Actual)
+		if err1 != nil || err2 != nil || !bytesEqual(db, ab) {
+			d.StateMachinesChanged = append(d.StateMachinesChanged, smKey(&p.Desired))
+		}
+	}
+	sort.Strings(d.StateMachinesAdded)
+	sort.Strings(d.StateMachinesRemoved)
+	sort.Strings(d.StateMachinesChanged)
+}
+
+// bytesEqual reports byte-slice equality (local helper to avoid a bytes import
+// churn in this large file).
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // diffSMTransitions compares state machine transition maps between two schemas.

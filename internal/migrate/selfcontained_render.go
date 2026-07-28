@@ -153,6 +153,13 @@ func renderBody(store *objstore.Store, b opBody) (string, error) {
 		}
 		return renderSchemaMeta(meta), nil
 
+	case "create_sm_type", "drop_sm_type":
+		// Manifest-only meta op (roadmap 5.10 rider): it carries the KindSMType
+		// manifest key so endpoint simulation reproduces it, but emits NO DDL — the
+		// SM's real DDL (state enum, trigger function, BEFORE UPDATE trigger) rides
+		// the create_enum / create_sm_trigger_function / create_sm_trigger ops.
+		return renderSMTypeMeta(b.Kind, b.Schema, b.Name), nil
+
 	// ---- down / leaf ops (mirror the legacy OpToSQL drop renderers exactly) ----
 	case "drop_table":
 		return fmt.Sprintf("DROP TABLE %s;", sql.QualifiedName(b.Schema, b.Name)), nil
@@ -269,6 +276,17 @@ func decodeSchemaMetaDef(store *objstore.Store, id string) (enc.SchemaMeta, erro
 // extension set produces DDL (CREATE EXTENSION IF NOT EXISTS, deterministic
 // order); PGVersion and Groups are model-level metadata with no DDL surface. The
 // statement is idempotent so re-applying the post-state is safe.
+// renderSMTypeMeta renders a manifest-only state-machine TYPE op as a comment
+// (roadmap 5.10 rider): no DDL, since the SM's real objects (state enum, trigger)
+// are emitted by their own ops. The comment records the op for readability.
+func renderSMTypeMeta(kind, schema, name string) string {
+	qn := name
+	if schema != "" {
+		qn = schema + "." + name
+	}
+	return fmt.Sprintf("-- %s %s: manifest-only (DDL rides the state enum + trigger ops)", kind, qn)
+}
+
 func renderSchemaMeta(meta enc.SchemaMeta) string {
 	if len(meta.Extensions) == 0 {
 		return "-- schema meta: no extension DDL"

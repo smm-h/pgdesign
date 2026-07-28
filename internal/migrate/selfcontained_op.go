@@ -155,6 +155,10 @@ func invClassForKind(kind string) chain.InvertibilityClass {
 		"create_sequence", "create_composite_type", "create_domain",
 		"create_function", "create_trigger", "create_policy",
 		"create_partition", "create_enum",
+		// create_sm_type is a manifest-only meta op (roadmap 5.10 rider): its
+		// structural inverse is drop_sm_type (also manifest-only), so it is
+		// mechanically invertible and SM-bearing edges remain rollback-capable.
+		"create_sm_type",
 		"rename_column", "rename_table",
 		// comment_on inverts by restoring the prior comment carried in the delta
 		// (a pure structural swap, like renames) — mechanically invertible.
@@ -219,6 +223,8 @@ func dropKindFor(kind string) string {
 		return "drop_policy"
 	case "create_enum":
 		return "drop_enum"
+	case "create_sm_type":
+		return "drop_sm_type"
 	default:
 		return ""
 	}

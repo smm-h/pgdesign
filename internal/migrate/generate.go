@@ -84,6 +84,24 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 	}
 
+	// State-machine TYPE objects (roadmap 5.10 rider). The sm_type op is a
+	// MANIFEST-ONLY meta op: it produces the KindSMType manifest key so endpoint
+	// simulation reproduces it, but renders NO DDL — the SM's actual DDL (the state
+	// enum, the trigger function, the BEFORE UPDATE trigger) rides the existing
+	// create_enum / create_sm_trigger_function / create_sm_trigger ops. An added or
+	// changed SM type lowers to create_sm_type (sets the key to the post-state form
+	// id); a removed one to drop_sm_type (deletes the key). Changes come after adds
+	// so their state enums exist first.
+	for _, smName := range d.StateMachinesAdded {
+		m.DDLOps = append(m.DDLOps, smTypeOp("create_sm_type", smName))
+	}
+	for _, smName := range d.StateMachinesChanged {
+		m.DDLOps = append(m.DDLOps, smTypeOp("create_sm_type", smName))
+	}
+	for _, smName := range d.StateMachinesRemoved {
+		m.DDLOps = append(m.DDLOps, smTypeOp("drop_sm_type", smName))
+	}
+
 	// Create composite types (before tables, after enums).
 	for _, ctName := range d.CompositeTypesAdded {
 		schema, name := splitQualifiedName(ctName)
@@ -1993,6 +2011,17 @@ func commentOnOp(object, schema, name, column, argSig, oldC, newC string) DDLOp 
 			Column: column, FuncArgSig: argSig, Comment: oldC, CommentOld: newC,
 		}}},
 	}
+}
+
+// smTypeOp builds a manifest-only state-machine TYPE op (roadmap 5.10 rider).
+// smName is the schema-qualified SM type name. The op carries no def or down: the
+// shim resolves the post-state form id from the desired model (create) or deletes
+// the key (drop), and rendering emits no DDL. The op is non-invertible at the
+// manifest layer (a drop's down would re-create the sm_type key, but the SM DDL
+// itself rides the enum/trigger ops' inverses); create is mechanically derivable.
+func smTypeOp(op, smName string) DDLOp {
+	schema, name := splitQualifiedName(smName)
+	return DDLOp{Op: op, Schema: schema, Name: name, Down: &DownOp{Irreversible: true}}
 }
 
 // appendTableCommentOps lowers a table's own comment change and its columns'

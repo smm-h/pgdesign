@@ -131,10 +131,16 @@ func categoryForKind(kind string) (simCategory, bool) {
 	case "create_table", "create_partition", "create_view",
 		"create_or_replace_view", "create_materialized_view", "create_sequence",
 		"alter_sequence", "create_composite_type", "create_domain",
-		"create_function", "create_or_replace_function", "create_enum":
+		"create_function", "create_or_replace_function", "create_enum",
+		// create_sm_type is a whole-object create at the manifest layer (roadmap
+		// 5.10 rider): it sets the KindSMType key to the post-state form id and
+		// renders no DDL (the SM DDL rides the enum/trigger ops).
+		"create_sm_type":
 		return catWholeCreate, true
 	case "drop_table", "drop_view", "drop_materialized_view", "drop_sequence",
-		"drop_composite_type", "drop_domain", "drop_function", "drop_enum":
+		"drop_composite_type", "drop_domain", "drop_function", "drop_enum",
+		// drop_sm_type deletes the KindSMType key; renders no DDL.
+		"drop_sm_type":
 		return catWholeDrop, true
 	case "rename_table":
 		return catRenameTable, true
@@ -254,6 +260,10 @@ func wholeObjectKey(op DDLOp) enc.Key {
 		return enc.Key{Kind: enc.KindFunction, Schema: schema, Name: op.Name, ArgSig: sig}
 	case "create_enum", "drop_enum":
 		return enc.Key{Kind: enc.KindEnum, Schema: enumSchemaName(op), Name: enumName(op)}
+	case "create_sm_type", "drop_sm_type":
+		// The schema is used VERBATIM (never defaulted to public) to match
+		// enc.KeyForStateMachine, which keys on sm.Schema directly.
+		return enc.Key{Kind: enc.KindSMType, Schema: op.Schema, Name: op.Name}
 	default:
 		return enc.Key{}
 	}
@@ -351,6 +361,13 @@ func encodeObjectByKey(s *model.Schema, k enc.Key) ([]byte, bool, error) {
 		for _, c := range s.CompositeTypes {
 			if c.Schema == k.Schema && c.Name == k.Name {
 				b, err := enc.EncodeCompositeType(c)
+				return b, true, err
+			}
+		}
+	case enc.KindSMType:
+		for _, sm := range s.StateMachines {
+			if sm.Schema == k.Schema && sm.Name == k.Name {
+				b, err := enc.EncodeStateMachine(sm)
 				return b, true, err
 			}
 		}
