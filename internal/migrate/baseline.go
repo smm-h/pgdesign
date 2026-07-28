@@ -43,11 +43,12 @@ type BaselineReport struct {
 //     is reachable only from genesis, so re-baselining is admitted only from the
 //     genesis floor; a database already advanced on the chain is refused.
 //
-// FLAG (reported to the caller): the baseline edge is REGISTRY-ABSENT class while
-// a TOML-generated chain is REGISTRY-PRESENT. A project that already has a
-// registry-present chain will therefore see two heads of different classes after a
-// baseline; reconciling them is the operator's follow-up (regenerate the chain
-// from the adopted state) — cross-class rebase is not supported.
+// TWO-HEADS GUARD (hard error): the baseline edge is REGISTRY-ABSENT class and is
+// genesis-parented, so appending it to a chain that ALREADY has a live head would
+// create a second, cross-class head — an unresolvable fork (cross-class rebase is
+// not supported). Baseline is for adopting a FOREIGN database into an EMPTY chain,
+// so a pre-existing live head is refused outright: the remediation is to regenerate
+// the chain from the adopted state, not to rebase the two heads.
 func BaselineChain(ctx context.Context, conn *pgx.Conn, p *ChainProject, actual *model.Schema, description string) (*BaselineReport, error) {
 	target, err := rev.Compute(actual, rev.RegistryAbsent)
 	if err != nil {
@@ -81,6 +82,13 @@ func BaselineChain(ctx context.Context, conn *pgx.Conn, p *ChainProject, actual 
 				return nil, err
 			}
 		}
+	}
+
+	// Two-heads guard: refuse if the on-disk chain already carries a live head
+	// (a pre-existing chain). Appending a genesis-parented, registry-absent
+	// baseline edge would fork it into two cross-class heads.
+	if err := checkBaselineEmptyChain(p, target); err != nil {
+		return nil, err
 	}
 
 	// Build the genesis baseline edge FROM THE INTROSPECTED MODEL (registry-absent),
@@ -134,6 +142,33 @@ func writeBaselineEdge(p *ChainProject, actual *model.Schema) (string, error) {
 		return "", fmt.Errorf("migrate baseline: write baseline edge: %w", err)
 	}
 	return name, nil
+}
+
+// checkBaselineEmptyChain refuses baseline when the on-disk chain already has a
+// live head other than the baseline target itself. Loading only LIVE edges (head
+// finding is live-only), it errors on any pre-existing head — the sole tolerated
+// head is the baseline target (an idempotent re-run whose edge was already
+// written but whose stamp did not complete).
+func checkBaselineEmptyChain(p *ChainProject, target rev.Revision) error {
+	live, err := p.LoadLiveEdges()
+	if err != nil {
+		return err
+	}
+	remap, err := p.LoadRemap()
+	if err != nil {
+		return err
+	}
+	heads, err := findLiveHeads(live, remap)
+	if err != nil {
+		return err
+	}
+	targetCanon := canon(target.String(), remap)
+	for _, h := range heads {
+		if h != targetCanon {
+			return fmt.Errorf("migrate baseline: this project already has a chain (live head %s); baseline adopts FOREIGN databases into EMPTY chains — regenerate the chain from the adopted state instead", h)
+		}
+	}
+	return nil
 }
 
 // checkBaselineReachability enforces the two re-expressed guards for a database
