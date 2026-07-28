@@ -1,6 +1,6 @@
 ---
 title: "Validation Rules"
-description: "Complete reference for all pgdesign validation rules including error codes, warning codes, normal form audit diagnostics, and coverage checks."
+description: "Complete reference for all pgdesign diagnostics: validation errors and warnings, import diagnostics, info and seed codes, normal form audit warnings, coverage checks, and project integrity checks."
 ---
 
 # Validation Rules

@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Get started with pgdesign in five minutes: install the tool, define a TOML schema, generate PostgreSQL DDL, validate rules, and audit normal forms."
+description: "Get started with pgdesign: install the tool, define a TOML schema, generate PostgreSQL DDL, validate rules, audit normal forms, and adopt the one-command revise workflow over the content-addressed migration chain."
 ---
 
 # Quickstart

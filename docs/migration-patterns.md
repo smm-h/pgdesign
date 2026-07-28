@@ -1,5 +1,5 @@
 ---
-description: "How pgdesign generates safe, phased migrations with risk classification, NOT VALID auto-split, batched DML, and squash consolidation."
+description: "Common pgdesign migration patterns over the content-addressed chain: safe phased edges, risk classification, NOT VALID auto-split, batched DML, and squash consolidation."
 ---
 
 # Migration Intelligence

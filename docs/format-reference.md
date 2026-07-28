@@ -1,6 +1,6 @@
 ---
 title: "Format Reference"
-description: "Complete reference for the pgdesign TOML schema format covering types, tables, constraints, indexes, views, partitioning, maintenance, and configuration."
+description: "Complete reference for the pgdesign TOML schema format covering types, tables, constraints, indexes, views, partitioning, maintenance, imports, renames, D2 diagram options, and project configuration."
 ---
 
 # Format Reference

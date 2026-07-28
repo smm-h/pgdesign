@@ -1,6 +1,6 @@
 ---
 title: "Migration Guide"
-description: "Guide to pgdesign's migration system covering generation, planning, application, rollback, squash consolidation, safety linting, and risk classification."
+description: "Guide to pgdesign's content-addressed migration chain: generating edges, the path-finder apply, journal-driven rollback, squash, rebase, upgrade, baseline, safety linting, and risk classification."
 ---
 
 # Migration Guide
