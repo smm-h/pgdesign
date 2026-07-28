@@ -69,6 +69,37 @@ nulable = true
 	}
 }
 
+// TestGate_CompactColumnsForm: the compact `[tables.X.columns]` form, where a
+// column maps directly to a type string (e.g. `id = "bigint"`) instead of a
+// nested `[tables.X.columns.id]` record with a `type` key, was silently ignored
+// by the old lenient parser. The strictspec shape gate now rejects it: a column
+// position must be a record, so a bare string there is STRICTSPEC_TYPE_NOT_RECORD
+// with the offending table/column named.
+func TestGate_CompactColumnsForm(t *testing.T) {
+	content := `format_version = 1
+
+[tables.users]
+comment = "Users."
+
+[tables.users.columns]
+id = "bigint"
+`
+	schema, diags := Bytes([]byte(content))
+	d, ok := hasCode(diags, "STRICTSPEC_TYPE_NOT_RECORD")
+	if !ok {
+		t.Fatalf("expected STRICTSPEC_TYPE_NOT_RECORD, got diags: %v", diags)
+	}
+	if !strings.Contains(d.Message, "record") {
+		t.Errorf("expected a record-shape message, got: %q", d.Message)
+	}
+	if d.Table != "users" || d.Column != "id" {
+		t.Errorf("expected Table=users Column=id from path, got Table=%q Column=%q", d.Table, d.Column)
+	}
+	if schema != nil {
+		t.Errorf("expected nil schema (walk skipped) on gate failure, got non-nil")
+	}
+}
+
 // TestGate_BadIdentifierLexeme: a value in an identifier-typed position that is
 // not a valid identifier (leading digit) fails the identifier custom scalar's
 // lexeme rule.
