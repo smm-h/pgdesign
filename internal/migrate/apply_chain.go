@@ -177,7 +177,11 @@ func findApplyPath(p *ChainProject, pos string) ([]Edge, error) {
 	if err != nil {
 		return nil, err
 	}
-	return FindPath(pos, RemapTable{}, live, all)
+	remap, err := p.LoadRemap()
+	if err != nil {
+		return nil, err
+	}
+	return FindPath(pos, remap, live, all)
 }
 
 // ensureChainStructures creates the three managed structures and seeds
