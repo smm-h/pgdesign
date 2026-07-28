@@ -1,6 +1,6 @@
 ---
 title: API Reference
-description: "API reference index for pgdesign covering 29 modules"
+description: "API reference index for pgdesign covering 42 modules"
 generated: true
 seeded: true
 nav_group: "API Reference"
@@ -12,31 +12,44 @@ order: 90
 # API Reference
 
 - [internal/audit](internal-audit.html)
+- [internal/catalog](internal-catalog.html)
+- [internal/chain](internal-chain.html)
 - [internal/codegen](internal-codegen.html)
 - [internal/config](internal-config.html)
 - [internal/dbutil](internal-dbutil.html)
 - [internal/diagnostic](internal-diagnostic.html)
 - [internal/diff](internal-diff.html)
 - [internal/discover](internal-discover.html)
+- [internal/enc](internal-enc.html)
 - [internal/extregistry](internal-extregistry.html)
 - [internal/fd](internal-fd.html)
 - [internal/format](internal-format.html)
 - [internal/generate](internal-generate.html)
 - [internal/graph](internal-graph.html)
+- [internal/imports](internal-imports.html)
 - [internal/introspect](internal-introspect.html)
+- [internal/livenorm](internal-livenorm.html)
+- [internal/livestats](internal-livestats.html)
 - [internal/migrate](internal-migrate.html)
 - [internal/migrate/design](internal-migrate-design.html)
 - [internal/model](internal-model.html)
+- [internal/modelgen](internal-modelgen.html)
+- [internal/objstore](internal-objstore.html)
 - [internal/parse](internal-parse.html)
 - [internal/parse/pgschema](internal-parse-pgschema.html)
+- [internal/predicate](internal-predicate.html)
+- [internal/project](internal-project.html)
+- [internal/rev](internal-rev.html)
 - [internal/risk](internal-risk.html)
 - [internal/seed](internal-seed.html)
 - [internal/semtype](internal-semtype.html)
 - [internal/serve](internal-serve.html)
+- [internal/splitfmt](internal-splitfmt.html)
 - [internal/sql](internal-sql.html)
 - [internal/sqlexpr](internal-sqlexpr.html)
 - [internal/sqlparse](internal-sqlparse.html)
 - [internal/sqlutil](internal-sqlutil.html)
 - [internal/testdb](internal-testdb.html)
+- [internal/typeinfo](internal-typeinfo.html)
 - [internal/validate](internal-validate.html)
 - [internal/workload](internal-workload.html)

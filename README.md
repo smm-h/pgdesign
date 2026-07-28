@@ -2,7 +2,9 @@
 
 # pgdesign
 
-A PostgreSQL schema compiler. Declarative schema definitions in TOML, compiled to SQL DDL with strict enforcement of database design principles. Includes migration generation, normal form auditing, codegen for 6 languages, ephemeral test databases, and schema visualization.
+A PostgreSQL schema compiler. You write your schema declaratively in TOML; pgdesign compiles it to SQL DDL, migrations, diagrams, documentation, and type-safe client code — with strict enforcement of database design principles.
+
+What makes pgdesign more than a DDL generator is that every schema has a **content-addressed identity**. The fully-resolved schema hashes to a single **revision**; every artifact pgdesign produces is stamped with the revision that produced it; and migrations form a **git-like chain of content-addressed edges** with recorded inverses, apply-time preconditions, a durable journal, and a post-apply reconcile. The result: generated artifacts cannot silently diverge from each other or from the schema, a migration that lies about what it does is not representable, and a database that has drifted from its schema is caught loudly instead of corrupted quietly.
 
 ## Installation
 
@@ -24,31 +26,55 @@ npm install pgdesign
 pip install pgdesign
 ```
 
+## What you get
+
+- **Declarative TOML → everything.** One schema definition compiles to SQL DDL, D2/SVG diagrams, JSON snapshots, human-readable docs, GraphQL SDL, and client code in six languages.
+- **A migration chain with integrity guarantees.** Migrations are content-addressed edges between schema revisions. Identity is derived from content, so regenerating an unchanged schema never churns git and two divergent branches produce distinct edges (a fork, resolved with `migrate rebase`). Apply is preconditioned (the database must be where the edge says it is), journaled (rollback replays recorded inverses, never re-reads files), and reconciled (the database is verified to have arrived at the target revision).
+- **A rename data-loss gate.** A column or table drop+add that looks like a rename is refused unless you declare it in `[renames]` — turning a silent data-loss trap into an explicit, mechanically-invertible rename.
+- **Cross-repository imports.** Reference another pgdesign project's tables across a git pin; `import lock` vendors the referenced surface plus its type closure for reproducible offline builds, and `check --tag imports` catches column-level semantic drift.
+- **Branded, type-safe codegen.** Generated Go/TypeScript/Java/Kotlin/Python/Zig carries the schema's revision and uses validating branded types, verified by per-language compile checks in CI.
+- **Normal-form auditing.** 1NF through BCNF from declared functional dependencies, with BCNF decomposition and Armstrong-relation counterexamples.
+- **Design intelligence, workload analysis, and type-aware seed data.**
+- **A DB-free HTTP API and web UI** (`serve`) that returns the same canonical schema payload the `json` output produces.
+
+## The one-command workflow
+
+Edit your schema, then run:
+
+```
+pgdesign revise
+```
+
+`revise` regenerates every configured output, chains the resulting migration, and commits — the pure tier (outputs + migration + blocking normal-form/structural checks) first, then the non-retroactive database tier (live FD discovery, `pg_stat` workload analysis, live import verification) when a database is reachable. One command, one revision everywhere.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `generate` | Generate SQL from schema file(s) or directory |
-| `check` | Run project checks (`--tag validation`, `--tag nf`, `--tag coverage`) |
-| `fmt` | Format schema file(s) or directory |
-| `introspect` | Introspect a live PostgreSQL database |
-| `diff` | Diff schema against a live database, another TOML, or a git ref |
+| `revise` | Regenerate all outputs, chain the migration, and commit — the one-command project revision |
+| `generate` | Generate SQL DDL (or JSON, D2, SVG, doc, GraphQL) from schema file(s) |
+| `build` | Generate all outputs configured in `pgdesign.toml` |
+| `check` | Run project checks (`validation`, `nf`, `coverage`, `design`, `structural`, `workload`, `build`, `revision`, `imports`) |
+| `fmt` | Format schema file(s) in place |
+| `codegen` | Generate type-safe application code (Go, TS, Java, Kotlin, Python, Zig) |
+| `introspect` | Introspect a live PostgreSQL database into TOML |
+| `diff` | Diff a schema against a live database, another TOML, or a git ref |
 | `seed` | Generate type-aware test data |
-| `codegen` | Generate application code (Go, TS, Java, Kotlin, Python, Zig) |
-| `build` | Generate all configured outputs from pgdesign.toml |
-| `stats` | Database statistics and health analysis |
-| `serve` | Start the pgdesign HTTP API server |
-| `migrate plan` | Preview migration operations |
-| `migrate generate` | Generate migration files from schema changes |
-| `migrate apply` | Apply pending migrations |
-| `migrate rollback` | Roll back the last migration |
-| `migrate status` | Show migration status |
-| `migrate squash` | Squash a range of migrations into one |
-| `migrate test` | Test migrations against a staging database |
-| `testdb setup` | Create an ephemeral test database and apply DDL |
-| `testdb teardown` | Drop an ephemeral test database |
-| `testdb gc` | Clean up orphaned test databases |
-| `testdb init` | Generate test database wrappers for consumer projects |
+| `stats` | Analyze live database health (sizes, index usage, bloat) |
+| `serve` | Start the HTTP API server and web UI (runs without a database) |
+| `migrate generate` | Generate a chain edge from schema changes (pure — no database) |
+| `migrate plan` | Preview the pending chain edges |
+| `migrate apply` | Apply pending edges via the path-finder |
+| `migrate rollback` | Roll back applied edges from the journal |
+| `migrate status` | Show a database's chain position and pending edges |
+| `migrate squash` | Consolidate a range of edges into one consolidation edge |
+| `migrate rebase` | Resolve a two-head fork by re-parenting a tail |
+| `migrate upgrade` | One-time adoption of a legacy (pre-chain) database onto the chain |
+| `migrate baseline` | Adopt an existing or intentionally-drifted database without running SQL |
+| `migrate test` | Apply-then-rollback (or `--shadow` replay) against a staging database |
+| `import lock` | Resolve and vendor imported schema surfaces; write the lockfile |
+| `import update` | Re-pin and re-vendor imported surfaces |
+| `testdb setup` / `teardown` / `gc` / `init` | Manage ephemeral test databases |
 
 ## Documentation
 

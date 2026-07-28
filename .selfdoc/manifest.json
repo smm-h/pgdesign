@@ -88,8 +88,23 @@
       "type": "doc"
     },
     {
+      "path": "imports.md",
+      "title": "Cross-Repository Imports",
+      "type": "doc"
+    },
+    {
       "path": "internal-audit.md",
       "title": "internal/audit",
+      "type": "doc"
+    },
+    {
+      "path": "internal-catalog.md",
+      "title": "internal/catalog",
+      "type": "doc"
+    },
+    {
+      "path": "internal-chain.md",
+      "title": "internal/chain",
       "type": "doc"
     },
     {
@@ -123,6 +138,11 @@
       "type": "doc"
     },
     {
+      "path": "internal-enc.md",
+      "title": "internal/enc",
+      "type": "doc"
+    },
+    {
       "path": "internal-extregistry.md",
       "title": "internal/extregistry",
       "type": "doc"
@@ -148,8 +168,23 @@
       "type": "doc"
     },
     {
+      "path": "internal-imports.md",
+      "title": "internal/imports",
+      "type": "doc"
+    },
+    {
       "path": "internal-introspect.md",
       "title": "internal/introspect",
+      "type": "doc"
+    },
+    {
+      "path": "internal-livenorm.md",
+      "title": "internal/livenorm",
+      "type": "doc"
+    },
+    {
+      "path": "internal-livestats.md",
+      "title": "internal/livestats",
       "type": "doc"
     },
     {
@@ -168,6 +203,16 @@
       "type": "doc"
     },
     {
+      "path": "internal-modelgen.md",
+      "title": "internal/modelgen",
+      "type": "doc"
+    },
+    {
+      "path": "internal-objstore.md",
+      "title": "internal/objstore",
+      "type": "doc"
+    },
+    {
       "path": "internal-parse-pgschema.md",
       "title": "internal/parse/pgschema",
       "type": "doc"
@@ -175,6 +220,21 @@
     {
       "path": "internal-parse.md",
       "title": "internal/parse",
+      "type": "doc"
+    },
+    {
+      "path": "internal-predicate.md",
+      "title": "internal/predicate",
+      "type": "doc"
+    },
+    {
+      "path": "internal-project.md",
+      "title": "internal/project",
+      "type": "doc"
+    },
+    {
+      "path": "internal-rev.md",
+      "title": "internal/rev",
       "type": "doc"
     },
     {
@@ -195,6 +255,11 @@
     {
       "path": "internal-serve.md",
       "title": "internal/serve",
+      "type": "doc"
+    },
+    {
+      "path": "internal-splitfmt.md",
+      "title": "internal/splitfmt",
       "type": "doc"
     },
     {
@@ -223,6 +288,11 @@
       "type": "doc"
     },
     {
+      "path": "internal-typeinfo.md",
+      "title": "internal/typeinfo",
+      "type": "doc"
+    },
+    {
       "path": "internal-validate.md",
       "title": "internal/validate",
       "type": "doc"
@@ -230,6 +300,11 @@
     {
       "path": "internal-workload.md",
       "title": "internal/workload",
+      "type": "doc"
+    },
+    {
+      "path": "migration-chain.md",
+      "title": "The Migration Chain",
       "type": "doc"
     },
     {
@@ -298,6 +373,20 @@
       "type": "doc"
     }
   ],
-  "posts": [],
-  "last_gen": "2026-07-28T01:53:36.325580+00:00"
+  "posts": [
+    {
+      "path": "2026-07-28-content-addressed-schemas-making-schema-drift-unrepresentable.md",
+      "title": "Content-Addressed Schemas: Making Schema Drift Unrepresentable",
+      "date": "2026-07-28",
+      "slug": "content-addressed-schemas-making-schema-drift-unrepresentable",
+      "tags": [
+        "\"postgresql\"",
+        "\"schema\"",
+        "\"migrations\"",
+        "\"content-addressing\"",
+        "\"database\""
+      ]
+    }
+  ],
+  "last_gen": "2026-07-28T08:42:48.177052+00:00"
 }
