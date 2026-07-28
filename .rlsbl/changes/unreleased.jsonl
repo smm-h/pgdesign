@@ -220,3 +220,4 @@
 {"format_version":1,"id":"18c6602ef70f84bd696fce08d488486d8a58dc32fcad712b","commits":["86be1340c765663af785b800feb56d421c82a96c"],"user_facing":false}
 {"format_version":1,"id":"18c66058dacec534962b78f11f09489299b73decf36a2eda","commits":["a12e4b7ae91fabe95ff7862842291047b60fe997"],"user_facing":false}
 {"format_version":1,"id":"18c66142a044f033cdca10b89bf84a6f9d53dbf6d17a7678","commits":["28a50decfe6dd49a913382266d1c0fadbbe99191"],"user_facing":false}
+{"format_version":1,"id":"18c66148d72b9225b572a858eab847dab959065cbf969f1f","commits":["9386cc7abb6a475b14e60013823d70bf9e5ec24f"],"user_facing":true,"description":"**Live D2 stats.** `serve`'s d2/svg endpoints accept `live_stats=true` and `build` honors `[output.*.d2] live_stats=true` to annotate diagrams with live row counts from a database (opt-in; requires `--db`/`PGDESIGN_DB`).","type":"feature"}
