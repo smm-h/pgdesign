@@ -11,6 +11,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
+	"github.com/smm-h/pgdesign/internal/imports"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -352,6 +353,30 @@ func parseAndBuild(configOverride *string, paths []string) (*model.Schema, *semt
 	var buildDiags diagnostic.Diagnostics
 
 	buildOpts := []model.BuildOption{model.WithImports(importAliasSchemas(cfg))}
+
+	// Load the vendored import surface (imports/<alias>/) as REFERENCE tables so
+	// imported-FK targets resolve through the union (roadmap 7.3). Aliases without
+	// a committed lockfile are skipped — the unresolved FK then surfaces as a normal
+	// diagnostic rather than being silently satisfied. A corrupt/undecodable
+	// vendored surface is a hard error.
+	if cfg != nil && len(cfg.Imports) > 0 {
+		if configPath, found, _ := resolveConfigPath(configOverride, filepath.Dir(resolvedPaths[0])); found {
+			projectRoot := filepath.Dir(configPath)
+			declared := make([]string, 0, len(cfg.Imports))
+			for a := range cfg.Imports {
+				declared = append(declared, a)
+			}
+			surface, err := imports.LoadAllSurfaces(projectRoot, declared)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return nil, nil, 1
+			}
+			if len(surface.Tables) > 0 {
+				buildOpts = append(buildOpts, model.WithImportedTables(surface.Tables))
+			}
+		}
+	}
+
 	if len(raws) == 1 {
 		schema, buildDiags = model.Build(raws[0], reg, buildOpts...)
 	} else {
