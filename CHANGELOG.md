@@ -2,6 +2,33 @@
 
 # Changelog
 
+## 0.25.1
+
+Fix the CI/publish-blocking dependency on developer-machine tools: migrate squash now archives originals with a built-in file move, and the safegit-missing build error is actionable.
+
+<details>
+<summary>Context</summary>
+
+v0.25.0's publish gate refused to publish because CI failed on the release
+commit: the legacy `migrate squash` flow shelled out to a developer-machine
+file-archival utility (absent on CI runners and consumer machines), and the
+revise/build auto-commit tests required a developer-machine safegit that CI
+lacks. 0.25.1 carries the identical feature set as 0.25.0 plus these fixes, so
+0.25.1 is the first artifact actually published to npm and PyPI.
+
+</details>
+
+### Fixes
+
+- **`migrate squash` no longer requires an external file-archival tool.** The legacy squash flow shelled out to a developer-machine utility absent on CI and consumer machines, which failed the operation; originals are now archived with a built-in file move into a sibling `migrations/archive/` directory.
+- **Actionable error when `safegit` is missing during `build` auto-commit.** `pgdesign build` auto-commits generated outputs with safegit; when it is not installed the failure now names the tool, links where to get it, and points at `--no-auto-commit` instead of surfacing a cryptic exec error.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.25.0
 
 The kernel rewrite. pgdesign gains a content-addressed schema identity: every object and whole-model revision is a hash of its canonical form, and migrations become content-derived edges in a Merkle-DAG chain with integrity guarantees (path-finder, journal-driven rollback, precondition/reconcile checks, store consistency checking). Existing projects convert with a one-time `migrate upgrade`. Alongside it: a single canonical serializer and JSON envelope, cross-repo schema imports, branded type-safe codegen across all six languages with compile checks, the one-command `pgdesign revise`, a DB-free `serve` project mode, and a richer D2 diagram suite.
@@ -148,12 +175,6 @@ RAISE-on-mismatch semantics for `generate --idempotent` stand.
 - **Imported/owned table-name collisions are now a hard error.** When a vendored imported reference table shares its (schema, name) with one of your own tables, `pgdesign` fails the build and names both sources, instead of silently letting your table shadow the import.
 - **Clearer CLI help.** `build --auto-commit`, `codegen --split-mode`, the `import lock`/`import update` alias argument, and `migrate baseline --description` now have fuller help text explaining their behavior and options.
 - Onboarding docs now show the required `format_version = 1` top-level key, so schemas copied from the quickstart no longer produce documents the shape gate rejects.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.24.4
 
