@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -44,6 +45,27 @@ type Server struct {
 	schemas       []string
 	migrationsDir string
 	mux           *http.ServeMux
+	// requestTimeout enforces a per-request deadline (0 disables). It wraps the mux
+	// in an http.TimeoutHandler, which cancels the request context on expiry so
+	// well-behaved handlers stop early and the client gets an explicit 503.
+	requestTimeout time.Duration
+	// auditJobs manages asynchronous audit jobs (job-start/poll, cancellable and
+	// bounded) so a slow TANE run can never block a request goroutine indefinitely.
+	auditJobs *auditJobManager
+}
+
+// SetRequestTimeout sets the per-request deadline enforced by the server. A
+// non-positive duration disables enforcement. It must be called before serving.
+func (s *Server) SetRequestTimeout(d time.Duration) { s.requestTimeout = d }
+
+// withTimeout wraps h with the per-request timeout, if one is configured. It is
+// the single place ServeHTTP and ListenAndServe apply the deadline, so both the
+// httptest and network paths enforce it identically.
+func (s *Server) withTimeout(h http.Handler) http.Handler {
+	if s.requestTimeout <= 0 {
+		return h
+	}
+	return http.TimeoutHandler(h, s.requestTimeout, `{"error":"request timeout exceeded"}`)
 }
 
 // New creates a new database-mode Server with a pgxpool connection and sets up
@@ -142,8 +164,10 @@ func (s *Server) requireDB(w http.ResponseWriter) bool {
 	return true
 }
 
-// routes registers all API endpoints on the mux.
+// routes registers all API endpoints on the mux and initializes the audit job
+// manager.
 func (s *Server) routes() {
+	s.auditJobs = newAuditJobManager()
 	s.mux.HandleFunc("GET /api/schema", s.handleSchema)
 	s.mux.HandleFunc("GET /api/schema/d2", s.handleSchemaD2)
 	s.mux.HandleFunc("GET /api/schema/svg", s.handleSchemaSVG)
@@ -156,17 +180,21 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/extensions", s.handleExtensions)
 	s.mux.HandleFunc("POST /api/validate", s.handleValidate)
 	s.mux.HandleFunc("POST /api/diff", s.handleDiff)
-	s.mux.HandleFunc("GET /api/audit", s.handleAudit)
+	// Audit is asynchronous (job-start/poll): the synchronous GET /api/audit was a
+	// self-DoS button (unbounded TANE per request). Start a job, then poll it.
+	s.mux.HandleFunc("POST /api/audit/jobs", s.handleAuditStart)
+	s.mux.HandleFunc("GET /api/audit/jobs/{id}", s.handleAuditPoll)
+	s.mux.HandleFunc("DELETE /api/audit/jobs/{id}", s.handleAuditCancel)
 }
 
 // ListenAndServe starts the HTTP server on the given address.
 func (s *Server) ListenAndServe(addr string) error {
-	return http.ListenAndServe(addr, s.mux)
+	return http.ListenAndServe(addr, s.withTimeout(s.mux))
 }
 
 // ServeHTTP implements http.Handler so the server can be used with httptest.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	s.withTimeout(s.mux).ServeHTTP(w, r)
 }
 
 // Close shuts down the connection pool. It is a no-op in project mode.

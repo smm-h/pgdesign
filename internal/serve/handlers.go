@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -617,26 +618,66 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
-// handleAudit introspects the live DB, runs discover (TANE) + audit, returns diagnostics.
-func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
+// handleAuditStart launches an asynchronous audit job (introspect + TANE FD
+// discovery + audit) and returns 202 with the job id. TANE is unbounded work, so
+// running it synchronously per request was a self-DoS button; the job is
+// cancellable and the manager bounds concurrency. Poll GET /api/audit/jobs/{id}.
+func (s *Server) handleAuditStart(w http.ResponseWriter, r *http.Request) {
 	if !s.requireDB(w) {
 		return
 	}
-	schema, _, err := introspect.Introspect(r.Context(), s.connStr(), s.schemas)
+	job, err := s.auditJobs.start(s.runAudit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("introspect: %v", err))
+		writeError(w, http.StatusTooManyRequests, "audit job manager at capacity; retry after a running job completes")
 		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"id":     job.ID,
+		"status": job.Status,
+	})
+}
+
+// handleAuditPoll returns the current state of an audit job. A finished job
+// (status done) carries its diagnostics.
+func (s *Server) handleAuditPoll(w http.ResponseWriter, r *http.Request) {
+	snap, ok := s.auditJobs.snapshot(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("audit job %q not found", r.PathValue("id")))
+		return
+	}
+	writeJSON(w, http.StatusOK, snap)
+}
+
+// handleAuditCancel requests cancellation of a running audit job. The job
+// transitions to cancelled once its worker observes the cancelled context.
+func (s *Server) handleAuditCancel(w http.ResponseWriter, r *http.Request) {
+	if !s.auditJobs.cancel(r.PathValue("id")) {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("audit job %q not found", r.PathValue("id")))
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"status": "cancelling"})
+}
+
+// runAudit is the audit job body: introspect the live DB, discover FDs from live
+// data (TANE) for tables without declared FDs, then audit. It honors ctx
+// cancellation at every DB step so a cancelled or timed-out job stops promptly.
+func (s *Server) runAudit(ctx context.Context) ([]diagnostic.Diagnostic, error) {
+	schema, _, err := introspect.Introspect(ctx, s.connStr(), s.schemas)
+	if err != nil {
+		return nil, fmt.Errorf("introspect: %w", err)
 	}
 
 	var allDiags []diagnostic.Diagnostic
 
-	// Discover FDs from live data for tables without declared FDs.
-	ctx := r.Context()
 	conn, err := s.pool.Acquire(ctx)
 	if err == nil {
 		pgxConn := conn.Conn()
 		opts := discover.Options{}
 		for i := range schema.Tables {
+			if ctx.Err() != nil {
+				conn.Release()
+				return nil, ctx.Err()
+			}
 			tbl := &schema.Tables[i]
 			if len(tbl.Dependencies) > 0 {
 				continue
@@ -667,10 +708,11 @@ func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
 		conn.Release()
 	}
 
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	allDiags = append(allDiags, audit.Audit(schema)...)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"diagnostics": diagsToJSON(allDiags),
-	})
+	return allDiags, nil
 }
 
 // parseAndBuild parses TOML bytes and builds a resolved schema.

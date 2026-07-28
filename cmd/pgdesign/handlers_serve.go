@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/smm-h/pgdesign/internal/serve"
 	"github.com/smm-h/strictcli/go/strictcli"
@@ -22,6 +23,7 @@ func registerServeCmd(app *strictcli.App) {
 
 			port := kwargs["port"].(int)
 			bind := kwargs["bind"].(string)
+			timeoutSecs := kwargs["timeout"].(int)
 
 			// Namespaces come from the explicit --schema flag; absent, default to
 			// public. (The config lists schema FILE paths, not PG namespace names,
@@ -64,6 +66,12 @@ func registerServeCmd(app *strictcli.App) {
 				srv = serve.NewProject(schema, reg, nil, schemaNames, migrationsDir)
 			}
 			defer srv.Close()
+
+			// --timeout is now enforced: it wraps every request in a deadline that
+			// cancels the request context on expiry (0 or negative disables).
+			if timeoutSecs > 0 {
+				srv.SetRequestTimeout(time.Duration(timeoutSecs) * time.Second)
+			}
 
 			addr := fmt.Sprintf("%s:%d", bind, port)
 			if !quiet {
