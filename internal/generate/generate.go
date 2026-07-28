@@ -27,6 +27,18 @@ type Options struct {
 	// every other format. Build/generate paths pass rev.RegistryPresent;
 	// introspected models would pass rev.RegistryAbsent.
 	ModelClass rev.ModelClass
+	// D2 controls diagram presentation for the "d2" and "svg" formats. When nil,
+	// DefaultD2Options applies. Ignored for every other format.
+	D2 *D2Options
+}
+
+// d2Options returns the effective D2 options: the caller's when set, else the
+// intended defaults.
+func (opts Options) d2Options() D2Options {
+	if opts.D2 != nil {
+		return *opts.D2
+	}
+	return DefaultD2Options()
 }
 
 // Generate produces DDL output for the given schema according to opts.
@@ -36,13 +48,14 @@ func Generate(schema *model.Schema, opts Options) (string, []diagnostic.Diagnost
 		out, diags := generateSQL(schema, opts)
 		return out, diags, nil
 	case "d2":
-		return GenerateD2(schema, opts.TypeRegistry), nil, nil
+		return GenerateD2(schema, opts.TypeRegistry, opts.d2Options()), nil, nil
 	case "json":
 		out, err := generateJSON(schema, opts.ModelClass)
 		return out, nil, err
 	case "svg":
-		d2Source := GenerateD2(schema, opts.TypeRegistry)
-		svg, err := RenderSVG(d2Source)
+		d2opts := opts.d2Options()
+		d2Source := GenerateD2(schema, opts.TypeRegistry, d2opts)
+		svg, err := RenderSVG(d2Source, d2opts)
 		if err != nil {
 			return "", nil, fmt.Errorf("svg render: %w", err)
 		}

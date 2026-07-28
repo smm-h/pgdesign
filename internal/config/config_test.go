@@ -418,6 +418,133 @@ pool_min_conns = 10
 	}
 }
 
+func TestLoadOutputD2Subsection(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.diagram]
+format = "d2"
+path = "schema/schema.d2"
+
+[output.diagram.d2]
+layout = "elk"
+theme = 200
+direction = "right"
+nullable = false
+checks = false
+include = ["users", "post*"]
+exclude = ["audit_*"]
+include_dependencies = 2
+summary = true
+heat_map = "fan-in"
+
+[output.plain]
+format = "d2"
+path = "schema/plain.d2"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	d := cfg.Output["diagram"].D2
+	if d == nil {
+		t.Fatal("diagram.d2 subsection is nil")
+	}
+	if d.Layout != "elk" {
+		t.Errorf("layout = %q, want elk", d.Layout)
+	}
+	if d.Theme != 200 {
+		t.Errorf("theme = %d, want 200", d.Theme)
+	}
+	if d.Direction != "right" {
+		t.Errorf("direction = %q, want right", d.Direction)
+	}
+	if d.Nullable == nil || *d.Nullable != false {
+		t.Errorf("nullable = %v, want explicit false", d.Nullable)
+	}
+	if d.Checks == nil || *d.Checks != false {
+		t.Errorf("checks = %v, want explicit false", d.Checks)
+	}
+	// Unset opt-out layers stay nil (default-on).
+	if d.IndexMarkers != nil {
+		t.Errorf("index_markers = %v, want nil (unset)", d.IndexMarkers)
+	}
+	if len(d.Include) != 2 || d.Include[0] != "users" || d.Include[1] != "post*" {
+		t.Errorf("include = %v, want [users post*]", d.Include)
+	}
+	if len(d.Exclude) != 1 || d.Exclude[0] != "audit_*" {
+		t.Errorf("exclude = %v, want [audit_*]", d.Exclude)
+	}
+	if d.IncludeDependencies != 2 {
+		t.Errorf("include_dependencies = %d, want 2", d.IncludeDependencies)
+	}
+	if !d.Summary {
+		t.Error("summary = false, want true")
+	}
+	if d.HeatMap != "fan-in" {
+		t.Errorf("heat_map = %q, want fan-in", d.HeatMap)
+	}
+
+	// A d2 output without a [d2] subsection leaves D2 nil.
+	if cfg.Output["plain"].D2 != nil {
+		t.Errorf("plain.d2 = %v, want nil", cfg.Output["plain"].D2)
+	}
+}
+
+func TestLoadOutputD2InvalidLayout(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.diagram]
+format = "d2"
+path = "schema/schema.d2"
+
+[output.diagram.d2]
+layout = "tala"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for tala layout, got nil")
+	}
+	if !strings.Contains(err.Error(), "OSS") {
+		t.Errorf("expected TALA/OSS message, got: %v", err)
+	}
+}
+
+func TestLoadOutputD2WrongFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	content := `[project]
+schemas = ["schema.toml"]
+
+[output.ddl]
+format = "sql"
+path = "schema/generated.sql"
+
+[output.ddl.d2]
+layout = "elk"
+`
+	path := filepath.Join(tmpDir, "pgdesign.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for [d2] on sql format, got nil")
+	}
+}
+
 func TestLoadOutputSection(t *testing.T) {
 	tmpDir := t.TempDir()
 	content := `[project]

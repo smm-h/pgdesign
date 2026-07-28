@@ -47,7 +47,7 @@ func TestGenerateD2TwoTables(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 
 	// Both table shapes must be present.
 	if !strings.Contains(out, "users: {") {
@@ -78,7 +78,7 @@ func TestGenerateD2SQLTableShape(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 
 	if !strings.Contains(out, "shape: sql_table") {
 		t.Errorf("expected sql_table shape, got:\n%s", out)
@@ -119,7 +119,7 @@ func TestGenerateD2FKEdgeLabelOnDelete(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 
 	// The edge label must include the ON DELETE action.
 	if !strings.Contains(out, "children.parent_id -> parents.id: SET NULL") {
@@ -161,7 +161,7 @@ func TestGenerateD2DefaultOnDelete(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 
 	// When OnDelete is empty, should default to "NO ACTION".
 	if !strings.Contains(out, "b.a_id -> a.id: NO ACTION") {
@@ -185,7 +185,7 @@ func TestGenerateD2PrimaryKeyConstraint(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 
 	if !strings.Contains(out, "id: uuid {constraint: primary_key}") {
 		t.Errorf("expected primary_key constraint on id, got:\n%s", out)
@@ -230,7 +230,7 @@ func TestGenerateD2ForeignKeyConstraint(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 
 	if !strings.Contains(out, "user_id: uuid {constraint: foreign_key}") {
 		t.Errorf("expected foreign_key constraint on user_id, got:\n%s", out)
@@ -276,7 +276,7 @@ posts: {
 posts.author_id -> users.id: CASCADE
 `
 
-	svg, err := RenderSVG(d2Source)
+	svg, err := RenderSVG(d2Source, DefaultD2Options())
 	if err != nil {
 		t.Fatalf("RenderSVG failed: %v", err)
 	}
@@ -317,7 +317,7 @@ func TestGenerateD2_Views(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 
 	// View shape must be a rectangle, not sql_table.
 	if !strings.Contains(out, "active_users: {") {
@@ -400,7 +400,7 @@ func TestGenerateD2_StateMachine(t *testing.T) {
 		},
 	}
 
-	out := GenerateD2(schema, reg)
+	out := GenerateD2(schema, reg, DefaultD2Options())
 
 	// Check the SM container.
 	if !strings.Contains(out, "order_status: {") {
@@ -453,7 +453,7 @@ func TestGenerateD2_NilRegistry(t *testing.T) {
 	}
 
 	// Should not panic with nil registry.
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 	if !strings.Contains(out, "items: {") {
 		t.Errorf("expected items table, got:\n%s", out)
 	}
@@ -492,7 +492,7 @@ func TestGenerateD2ImportedRef(t *testing.T) {
 	}
 	schema.Canonicalize()
 
-	out := GenerateD2(schema, nil)
+	out := GenerateD2(schema, nil, DefaultD2Options())
 
 	// Minimal reference shape, schema-qualified.
 	if !strings.Contains(out, "framework.users: {") {
@@ -511,7 +511,7 @@ func TestGenerateD2ImportedRef(t *testing.T) {
 	}
 
 	// The whole diagram compiles.
-	if _, err := RenderSVG(out); err != nil {
+	if _, err := RenderSVG(out, DefaultD2Options()); err != nil {
 		t.Fatalf("D2 with imported reference shape failed to compile: %v\nsource:\n%s", err, out)
 	}
 }

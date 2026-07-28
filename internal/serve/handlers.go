@@ -115,7 +115,13 @@ func (s *Server) handleSchemaD2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d2 := generate.GenerateD2(schema, s.registry())
+	opts, err := d2OptionsFromQuery(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	d2 := generate.GenerateD2(schema, s.registry(), opts)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(d2))
@@ -130,8 +136,14 @@ func (s *Server) handleSchemaSVG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d2Source := generate.GenerateD2(schema, s.registry())
-	svg, err := generate.RenderSVG(d2Source)
+	opts, err := d2OptionsFromQuery(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	d2Source := generate.GenerateD2(schema, s.registry(), opts)
+	svg, err := generate.RenderSVG(d2Source, opts)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("render SVG: %v", err))
 		return

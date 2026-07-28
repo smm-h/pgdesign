@@ -216,7 +216,7 @@ func TestProjectMode_SMDiagramRenders(t *testing.T) {
 	}
 
 	// Byte-consistency of the SM D2 with generate's D2 (same registry).
-	want := generate.GenerateD2(schema, reg)
+	want := generate.GenerateD2(schema, reg, generate.DefaultD2Options())
 	if d2 != want {
 		t.Fatalf("project-mode D2 differs from generate D2 with the same registry")
 	}

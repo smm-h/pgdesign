@@ -91,6 +91,31 @@ type OutputConfig[P PathKind] struct {
 	Idempotent bool     `toml:"idempotent"` // for sql: add IF NOT EXISTS
 	Comments   *bool    `toml:"comments"`   // for sql: include COMMENT ON (default true)
 	SplitMode  string   `toml:"split_mode"` // for codegen ddl python: "faceted" or "self-contained"
+	D2         *D2Config `toml:"d2"`        // for d2/svg: diagram presentation ([output.<name>.d2])
+}
+
+// D2Config holds the [output.<name>.d2] subsection: diagram presentation for
+// the d2 and svg formats. It is a plain config struct with no dependency on the
+// generate package; cmd/pgdesign maps it onto generate.D2Options (starting from
+// generate.DefaultD2Options, so an absent subsection yields the intended
+// defaults). Opt-out enrichment layers use *bool so "unset" (default-on) is
+// distinguishable from an explicit "= false".
+type D2Config struct {
+	Layout              string   `toml:"layout"`               // dagre (default) or elk; tala is rejected
+	Theme               int      `toml:"theme"`                // d2 theme id; 0 = library default
+	Direction           string   `toml:"direction"`            // down (default), right, left, up
+	IndexMarkers        *bool    `toml:"index_markers"`        // default true
+	Nullable            *bool    `toml:"nullable"`             // default true
+	Comments            *bool    `toml:"comments"`             // default true (table comments as tooltips)
+	Checks              *bool    `toml:"checks"`               // default true (CHECKs as notes)
+	RLSMarkers          *bool    `toml:"rls_markers"`          // default true
+	Enums               *bool    `toml:"enums"`                // default true (enums as rectangles)
+	Cardinality         *bool    `toml:"cardinality"`          // default true (crow's-foot arrowheads)
+	Include             []string `toml:"include"`              // glob patterns; empty = all
+	Exclude             []string `toml:"exclude"`              // glob patterns
+	IncludeDependencies int      `toml:"include_dependencies"` // FK dependency depth (0 = off)
+	Summary             bool     `toml:"summary"`              // names + edges only
+	HeatMap             string   `toml:"heat_map"`             // "", fan-in, fan-out
 }
 
 // RenamesConfig holds the [renames] section: declared table and column renames
@@ -241,6 +266,12 @@ func (c *Config[P]) Check() error {
 					errs = append(errs, fmt.Errorf("output.%s: source[%d] must be a non-empty string", name, i))
 				}
 			}
+		}
+		if out.D2 != nil {
+			if out.Format != "d2" && out.Format != "svg" {
+				errs = append(errs, fmt.Errorf("output.%s: [d2] subsection is only supported for format = \"d2\" or \"svg\"", name))
+			}
+			errs = append(errs, out.D2.check(name)...)
 		}
 	}
 
@@ -408,9 +439,132 @@ func decodeOutput(raw map[string]any) (map[string]OutputConfig[RelativePath], er
 		if s, ok := m["split_mode"].(string); ok {
 			oc.SplitMode = s
 		}
+		if raw, ok := m["d2"].(map[string]any); ok {
+			d2, err := decodeD2(name, raw)
+			if err != nil {
+				return nil, err
+			}
+			oc.D2 = d2
+		}
 		out[name] = oc
 	}
 	return out, nil
+}
+
+// decodeD2 converts the raw [output.<name>.d2] map into a typed *D2Config.
+func decodeD2(name string, m map[string]any) (*D2Config, error) {
+	var d D2Config
+	getString := func(key string, target *string) {
+		if s, ok := m[key].(string); ok {
+			*target = s
+		}
+	}
+	getString("layout", &d.Layout)
+	getString("direction", &d.Direction)
+	getString("heat_map", &d.HeatMap)
+
+	getBoolPtr := func(key string) (*bool, error) {
+		v, present := m[key]
+		if !present {
+			return nil, nil
+		}
+		b, ok := v.(bool)
+		if !ok {
+			return nil, fmt.Errorf("output.%s.d2.%s: expected boolean, got %T", name, key, v)
+		}
+		return &b, nil
+	}
+	for _, bp := range []struct {
+		key    string
+		target **bool
+	}{
+		{"index_markers", &d.IndexMarkers},
+		{"nullable", &d.Nullable},
+		{"comments", &d.Comments},
+		{"checks", &d.Checks},
+		{"rls_markers", &d.RLSMarkers},
+		{"enums", &d.Enums},
+		{"cardinality", &d.Cardinality},
+	} {
+		b, err := getBoolPtr(bp.key)
+		if err != nil {
+			return nil, err
+		}
+		*bp.target = b
+	}
+
+	getInt := func(key string, target *int) error {
+		v, present := m[key]
+		if !present {
+			return nil
+		}
+		switch n := v.(type) {
+		case int64:
+			*target = int(n)
+		case int:
+			*target = n
+		default:
+			return fmt.Errorf("output.%s.d2.%s: expected integer, got %T", name, key, v)
+		}
+		return nil
+	}
+	if err := getInt("theme", &d.Theme); err != nil {
+		return nil, err
+	}
+	if err := getInt("include_dependencies", &d.IncludeDependencies); err != nil {
+		return nil, err
+	}
+
+	if b, ok := m["summary"].(bool); ok {
+		d.Summary = b
+	}
+
+	strSlice := func(key string) []string {
+		arr, ok := m[key].([]any)
+		if !ok {
+			return nil
+		}
+		var out []string
+		for _, item := range arr {
+			if s, ok := item.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	d.Include = strSlice("include")
+	d.Exclude = strSlice("exclude")
+
+	return &d, nil
+}
+
+// check validates the D2 subsection values. It mirrors
+// generate.D2Options.Validate but lives here so config load fails early without
+// coupling config to the generate package. TALA is rejected with a specific
+// message because it is a common request the OSS d2 library cannot satisfy.
+func (d *D2Config) check(name string) []error {
+	var errs []error
+	switch d.Layout {
+	case "", "dagre", "elk":
+	case "tala":
+		errs = append(errs, fmt.Errorf("output.%s.d2.layout: %q is not available in the OSS d2 library (use dagre or elk)", name, d.Layout))
+	default:
+		errs = append(errs, fmt.Errorf("output.%s.d2.layout: %q is invalid (must be dagre or elk)", name, d.Layout))
+	}
+	switch d.Direction {
+	case "", "down", "right", "left", "up":
+	default:
+		errs = append(errs, fmt.Errorf("output.%s.d2.direction: %q is invalid (must be down, right, left, or up)", name, d.Direction))
+	}
+	switch d.HeatMap {
+	case "", "fan-in", "fan-out":
+	default:
+		errs = append(errs, fmt.Errorf("output.%s.d2.heat_map: %q is invalid (must be fan-in or fan-out)", name, d.HeatMap))
+	}
+	if d.IncludeDependencies < 0 {
+		errs = append(errs, fmt.Errorf("output.%s.d2.include_dependencies: must be >= 0, got %d", name, d.IncludeDependencies))
+	}
+	return errs
 }
 
 // Load reads and parses a pgdesign.toml file at the given path.
@@ -531,6 +685,7 @@ func Resolve(raw *RawConfig, projectRoot string) (*ResolvedConfig, error) {
 				Idempotent: out.Idempotent,
 				Comments:   out.Comments,
 				SplitMode:  out.SplitMode,
+				D2:         out.D2,
 			}
 		}
 	}

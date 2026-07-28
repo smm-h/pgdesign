@@ -12,6 +12,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
+	"oss.terrastruct.com/d2/d2layouts/d2elklayout"
 	"oss.terrastruct.com/d2/d2lib"
 	"oss.terrastruct.com/d2/d2renderers/d2svg"
 	"oss.terrastruct.com/d2/lib/log"
@@ -22,8 +23,16 @@ import (
 // Each table is rendered as a sql_table shape with columns listed,
 // and FK relationships appear as labeled edges with the ON DELETE action.
 // When reg is non-nil, state machine types are rendered as state diagrams.
-func GenerateD2(schema *model.Schema, reg *semtype.Registry) string {
+// opts controls layout direction, enrichment layers, filtering, cardinality,
+// and heat maps; pass DefaultD2Options for the intended defaults.
+func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) string {
 	var sections []string
+
+	// Top-level layout direction (9.1). d2's own default is "down"; emitting it
+	// explicitly keeps the diagram source self-describing.
+	if opts.Direction != "" {
+		sections = append(sections, fmt.Sprintf("direction: %s", opts.Direction))
+	}
 
 	tables := schema.TableOrder()
 
@@ -227,25 +236,45 @@ func renderD2MaterializedView(mv *model.MaterializedView) string {
 	return b.String()
 }
 
-// RenderSVG compiles D2 source text and renders it to SVG bytes.
-func RenderSVG(d2Source string) ([]byte, error) {
+// RenderSVG compiles D2 source text and renders it to SVG bytes. opts selects
+// the layout engine (dagre or elk — TALA is not in the OSS library) and the
+// SVG theme id; direction is a source-level concern already emitted by
+// GenerateD2, so it is not re-applied here.
+func RenderSVG(d2Source string, opts D2Options) ([]byte, error) {
 	ruler, err := textmeasure.NewRuler()
 	if err != nil {
 		return nil, fmt.Errorf("d2: create text ruler: %w", err)
 	}
 
-	layoutName := "dagre"
+	layoutName := opts.Layout
+	if layoutName == "" {
+		layoutName = "dagre"
+	}
+	var layoutFn func(context.Context, *d2graph.Graph) error
+	switch layoutName {
+	case "elk":
+		layoutFn = func(ctx context.Context, g *d2graph.Graph) error {
+			return d2elklayout.Layout(ctx, g, nil)
+		}
+	default: // dagre
+		layoutName = "dagre"
+		layoutFn = func(ctx context.Context, g *d2graph.Graph) error {
+			return d2dagrelayout.Layout(ctx, g, nil)
+		}
+	}
 	compileOpts := &d2lib.CompileOptions{
 		Layout: &layoutName,
 		LayoutResolver: func(engine string) (d2graph.LayoutGraph, error) {
-			return func(ctx context.Context, g *d2graph.Graph) error {
-				return d2dagrelayout.Layout(ctx, g, nil)
-			}, nil
+			return layoutFn, nil
 		},
 		Ruler: ruler,
 	}
 
 	renderOpts := &d2svg.RenderOpts{}
+	if opts.Theme != 0 {
+		themeID := int64(opts.Theme)
+		renderOpts.ThemeID = &themeID
+	}
 
 	// Provide a silent logger to suppress D2's noisy warnings about missing slog.Logger.
 	ctx := log.With(context.Background(), slog.New(slog.NewTextHandler(io.Discard, nil)))

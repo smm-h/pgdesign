@@ -310,6 +310,10 @@ func planGenerate(name string, schema *model.Schema, format string, out config.O
 		// Ignored for every format except json.
 		ModelClass: rev.RegistryPresent,
 	}
+	if format == "d2" || format == "svg" {
+		d2opts := d2OptionsFromConfig(out.D2)
+		opts.D2 = &d2opts
+	}
 
 	content, genDiags, err := generate.Generate(schema, opts)
 	if err != nil {
@@ -317,6 +321,44 @@ func planGenerate(name string, schema *model.Schema, format string, out config.O
 	}
 	result.Diagnostics = append(result.Diagnostics, genDiags...)
 	return []byte(content), nil
+}
+
+// d2OptionsFromConfig maps the [output.<name>.d2] config subsection onto
+// generate.D2Options. It starts from the intended defaults so an absent
+// subsection (nil) yields DefaultD2Options, and each opt-out layer overrides
+// only when explicitly set in TOML.
+func d2OptionsFromConfig(c *config.D2Config) generate.D2Options {
+	opts := generate.DefaultD2Options()
+	if c == nil {
+		return opts
+	}
+	if c.Layout != "" {
+		opts.Layout = c.Layout
+	}
+	if c.Theme != 0 {
+		opts.Theme = c.Theme
+	}
+	if c.Direction != "" {
+		opts.Direction = c.Direction
+	}
+	setBool := func(p *bool, target *bool) {
+		if p != nil {
+			*target = *p
+		}
+	}
+	setBool(c.IndexMarkers, &opts.IndexMarkers)
+	setBool(c.Nullable, &opts.Nullable)
+	setBool(c.Comments, &opts.Comments)
+	setBool(c.Checks, &opts.Checks)
+	setBool(c.RLSMarkers, &opts.RLSMarkers)
+	setBool(c.Enums, &opts.Enums)
+	setBool(c.Cardinality, &opts.Cardinality)
+	opts.Include = c.Include
+	opts.Exclude = c.Exclude
+	opts.IncludeDependencies = c.IncludeDependencies
+	opts.Summary = c.Summary
+	opts.HeatMap = c.HeatMap
+	return opts
 }
 
 // planSQL generates the SQL output plus its .sqlsplit companion file.
