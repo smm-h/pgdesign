@@ -9,7 +9,6 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/semtype"
-	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"oss.terrastruct.com/d2/d2graph"
 	"oss.terrastruct.com/d2/d2layouts/d2dagrelayout"
 	"oss.terrastruct.com/d2/d2layouts/d2elklayout"
@@ -36,9 +35,19 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) str
 
 	tables := schema.TableOrder()
 
+	// Render enum types as rectangles with their value lists (9.2 enrichment).
+	if opts.Enums {
+		for i := range schema.Enums {
+			sections = append(sections, renderD2Enum(&schema.Enums[i]))
+		}
+	}
+
 	// Render each table as a D2 sql_table shape.
-	for _, t := range tables {
-		sections = append(sections, renderD2Table(&t))
+	for i := range tables {
+		sections = append(sections, renderD2Table(&tables[i], opts))
+		if note := renderD2CheckNote(&tables[i], opts); note != "" {
+			sections = append(sections, note)
+		}
 	}
 
 	// Render imported tables as minimal REFERENCE shapes (roadmap 7.3/7.4, union
@@ -126,50 +135,135 @@ func renderD2StateMachine(td *semtype.TypeDef) string {
 	return b.String()
 }
 
-// renderD2Table produces a D2 sql_table block for a single table.
-func renderD2Table(t *model.Table) string {
+// renderD2Table produces a D2 sql_table block for a single table. The
+// enrichment layers in opts (index/unique markers, nullable indicator, comment
+// tooltip, RLS/append-only markers) are conditionally applied; all default on.
+// In summary mode the columns are omitted entirely (names + edges only).
+func renderD2Table(t *model.Table, opts D2Options) string {
 	var b strings.Builder
 	b.WriteString(t.Name)
 	b.WriteString(": {\n")
 	b.WriteString("  shape: sql_table\n")
 
-	for _, col := range t.Columns {
-		b.WriteString("  ")
-		b.WriteString(col.Name)
-		b.WriteString(": ")
-		b.WriteString(typeinfo.Reconstruct(col.PGType))
-
-		constraint := columnConstraint(t, col.Name)
-		if constraint != "" {
-			b.WriteString(" {constraint: ")
-			b.WriteString(constraint)
-			b.WriteString("}")
+	// RLS / append-only markers ride on the header label so the id stays the
+	// bare table name (FK edges reference the id). Only emitted when the marker
+	// layer is on and the table actually carries such a property, so plain
+	// tables keep their default header.
+	if opts.RLSMarkers {
+		var marks []string
+		if t.EnableRLS {
+			if t.ForceRLS {
+				marks = append(marks, "RLS forced")
+			} else {
+				marks = append(marks, "RLS")
+			}
 		}
+		if t.AppendOnly {
+			marks = append(marks, "append-only")
+		}
+		if len(marks) > 0 {
+			fmt.Fprintf(&b, "  label: %q\n", t.Name+" ["+strings.Join(marks, ", ")+"]")
+		}
+	}
 
-		b.WriteString("\n")
+	// Table comment as a tooltip.
+	if opts.Comments && t.Comment != "" {
+		fmt.Fprintf(&b, "  tooltip: %q\n", oneLine(t.Comment))
+	}
+
+	if !opts.Summary {
+		for _, cp := range deriveColumnPresentations(t) {
+			b.WriteString("  ")
+			b.WriteString(cp.Name)
+			b.WriteString(": ")
+			b.WriteString(cp.Type)
+
+			if cs := columnConstraints(cp, opts); len(cs) > 0 {
+				if len(cs) == 1 {
+					fmt.Fprintf(&b, " {constraint: %s}", cs[0])
+				} else {
+					fmt.Fprintf(&b, " {constraint: [%s]}", strings.Join(cs, "; "))
+				}
+			}
+			b.WriteString("\n")
+		}
 	}
 
 	b.WriteString("}")
 	return b.String()
 }
 
-// columnConstraint returns the D2 constraint annotation for a column.
-// Primary key columns get "primary_key", FK columns get "foreign_key".
-// If a column is both PK and FK, "primary_key" takes precedence.
-func columnConstraint(t *model.Table, colName string) string {
-	for _, pk := range t.PK {
-		if pk == colName {
-			return "primary_key"
+// columnConstraints returns the ordered D2 constraint annotations for a column.
+// primary_key/foreign_key/unique are d2-native (rendered PK/FK/UNQ); "idx" and
+// "nullable" are plain-string markers (rendered verbatim) gated by their layer
+// toggles. PK takes precedence over unique/idx (a PK column is not also tagged).
+func columnConstraints(cp columnPresentation, opts D2Options) []string {
+	var cs []string
+	if cp.IsPK {
+		cs = append(cs, "primary_key")
+	}
+	if cp.IsFK {
+		cs = append(cs, "foreign_key")
+	}
+	if opts.IndexMarkers && !cp.IsPK {
+		if cp.IsUnique {
+			cs = append(cs, "unique")
+		} else if cp.Indexed {
+			cs = append(cs, "idx")
 		}
 	}
-	for _, fk := range t.FKs {
-		for _, c := range fk.Columns {
-			if c == colName {
-				return "foreign_key"
-			}
+	if opts.Nullable && cp.Nullable {
+		cs = append(cs, "nullable")
+	}
+	return cs
+}
+
+// renderD2CheckNote produces a companion "note" shape listing a table's CHECK
+// constraints, attached by a dashed undirected connection. Returns "" when the
+// checks layer is off or the table has no checks. d2 sql_table columns cannot
+// carry children, so checks live in an adjacent page shape rather than inline.
+func renderD2CheckNote(t *model.Table, opts D2Options) string {
+	if !opts.Checks || len(t.Checks) == 0 {
+		return ""
+	}
+	var lines []string
+	for _, ck := range t.Checks {
+		if ck.Name != "" {
+			lines = append(lines, ck.Name+": "+oneLine(ck.Expr))
+		} else {
+			lines = append(lines, oneLine(ck.Expr))
 		}
 	}
-	return ""
+	noteID := t.Name + "_checks"
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s: {\n", noteID)
+	b.WriteString("  shape: page\n")
+	fmt.Fprintf(&b, "  label: %q\n", "CHECK\n"+strings.Join(lines, "\n"))
+	b.WriteString("  style.fill: \"#fff8dc\"\n")
+	b.WriteString("  style.stroke-dash: 3\n")
+	b.WriteString("}\n")
+	fmt.Fprintf(&b, "%s -- %s: {style.stroke-dash: 3}", t.Name, noteID)
+	return b.String()
+}
+
+// renderD2Enum produces a D2 rectangle block for an enum type, listing its
+// values (9.2 enrichment).
+func renderD2Enum(e *model.Enum) string {
+	var b strings.Builder
+	b.WriteString(e.Name)
+	b.WriteString(": {\n")
+	b.WriteString("  shape: rectangle\n")
+	fmt.Fprintf(&b, "  label: %q\n", "<<enum>>\n"+e.Name+"\n"+strings.Join(e.Values, "\n"))
+	b.WriteString("  style.fill: \"#f3e8fd\"\n")
+	b.WriteString("}")
+	return b.String()
+}
+
+// oneLine collapses newlines and escapes nothing else; d2 %q-quoted strings
+// handle quote/backslash escaping, but literal newlines would break a
+// single-line label, so they are replaced with spaces.
+func oneLine(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", " "), "\n", " ")
 }
 
 // renderD2Edge produces a D2 edge line for a foreign key relationship.

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/smm-h/pgdesign/internal/model"
-	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 // generateDoc produces a Markdown data dictionary from the resolved schema.
@@ -44,22 +43,16 @@ func generateDoc(schema *model.Schema) string {
 			fmt.Fprintf(&b, "\n%s\n", t.Comment)
 		}
 
-		// Column table
+		// Column table. Column facts (type, nullability, default, comment) come
+		// from the shared presentation derivation so doc and d2 never diverge.
 		b.WriteString("\n| Column | Type | Nullable | Default | Comment |\n")
 		b.WriteString("|--------|------|----------|---------|--------|\n")
-		for _, col := range t.Columns {
+		for _, cp := range deriveColumnPresentations(&t) {
 			nullable := "NOT NULL"
-			if !col.NotNull {
+			if cp.Nullable {
 				nullable = "nullable"
 			}
-			def := ""
-			if col.DefaultExpr != "" {
-				def = col.DefaultExpr
-			} else if col.Default != nil {
-				def = *col.Default
-			}
-			comment := col.Comment
-			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", col.Name, typeinfo.Reconstruct(col.PGType), nullable, def, comment)
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", cp.Name, cp.Type, nullable, cp.Default, cp.Comment)
 		}
 
 		// Primary Key
