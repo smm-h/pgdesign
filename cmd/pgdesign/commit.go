@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,6 +27,9 @@ func safegitCommit(message string, paths []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("safegit not found on PATH: pgdesign auto-commits generated outputs with safegit. Install it (https://github.com/smm-h/safegit), or re-run `pgdesign build` with --no-auto-commit to leave the generated files uncommitted in the working tree: %w", err)
+		}
 		return fmt.Errorf("safegit commit failed: %w", err)
 	}
 	return nil
