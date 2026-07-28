@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -1061,12 +1060,12 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			args := []string{"delete", "--description", fmt.Sprintf("Squashed into %s (from %s to %s)", to, from, to)}
-			args = append(args, result.OriginalPaths...)
-			cmd := exec.Command("saferm", args...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
+			// Retire the originals INTACT to migrations/archive/ via a pure-Go
+			// file move — the same don't-destroy-originals contract chain-mode
+			// squash keeps, but with no external tool: consumer machines and CI
+			// runners have no developer-only file-archival utility on PATH.
+			archived, err := migrate.ArchiveLegacyOriginals(dir, result.OriginalPaths)
+			if err != nil {
 				os.Remove(tmpPath)
 				fmt.Fprintf(os.Stderr, "error: archive originals: %v\n", err)
 				return strictcli.Exit(1)
@@ -1082,6 +1081,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 				fmt.Printf("  Description: %s\n", result.Squashed.Description)
 				fmt.Printf("  DDL ops: %d\n", len(result.Squashed.DDLOps))
 				fmt.Printf("  DML ops: %d\n", len(result.Squashed.DMLOps))
+				fmt.Printf("  Archived %d originals to %s\n", len(archived), filepath.Join(dir, migrate.LegacyArchiveDir))
 			}
 
 			return strictcli.Exit(0)

@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -271,6 +272,48 @@ func TestOutputPath(t *testing.T) {
 	want := filepath.Join("/migrations", "0.3.0.toml")
 	if got != want {
 		t.Errorf("OutputPath = %q, want %q", got, want)
+	}
+}
+
+// TestArchiveLegacyOriginals is the regression test for the v0.25.0 CI/publish
+// blocker: the legacy squash flow used to shell out to a developer-machine
+// file-archival tool ("saferm") to retire squash originals, which is absent on CI
+// runners and consumer machines, so the operation failed there. Originals are now
+// archived with a pure-Go file move into a sibling migrations/archive/ directory.
+// This test exercises that move with NO external tool involved — it passes even
+// with an empty PATH.
+func TestArchiveLegacyOriginals(t *testing.T) {
+	t.Setenv("PATH", "") // prove the archive shells out to nothing.
+
+	dir := t.TempDir()
+	names := []string{"0.1.0.toml", "0.2.0.toml"}
+	var paths []string
+	for _, n := range names {
+		p := filepath.Join(dir, n)
+		if err := os.WriteFile(p, []byte("version = \""+strings.TrimSuffix(n, ".toml")+"\"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, p)
+	}
+
+	archived, err := ArchiveLegacyOriginals(dir, paths)
+	if err != nil {
+		t.Fatalf("ArchiveLegacyOriginals: %v", err)
+	}
+	if len(archived) != len(names) {
+		t.Fatalf("archived %d files, want %d", len(archived), len(names))
+	}
+
+	archiveDir := filepath.Join(dir, LegacyArchiveDir)
+	for _, n := range names {
+		// Original moved out of the source dir.
+		if _, err := os.Stat(filepath.Join(dir, n)); !os.IsNotExist(err) {
+			t.Errorf("original %s still present in source dir (should have moved)", n)
+		}
+		// Original present INTACT in the archive dir.
+		if _, err := os.Stat(filepath.Join(archiveDir, n)); err != nil {
+			t.Errorf("archived original %s missing from archive dir: %v", n, err)
+		}
 	}
 }
 

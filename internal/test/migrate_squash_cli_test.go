@@ -46,6 +46,19 @@ type = "text"
 	cmd := exec.Command("go", "run", "./cmd/pgdesign/", "migrate", "squash",
 		"--from", "0.1.0", "--to", "0.2.0", "--dir", dir)
 	cmd.Dir = root
+	// The --db flag has a PGDESIGN_DB env fallback (ConnectionURLFlag). This
+	// test asserts the WITHOUT-a-database behavior, so the env var must be
+	// stripped from the subprocess — otherwise CI (which sets PGDESIGN_DB)
+	// would supply a connection and the command would proceed past the guard.
+	env := os.Environ()
+	filtered := env[:0]
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "PGDESIGN_DB=") {
+			continue
+		}
+		filtered = append(filtered, kv)
+	}
+	cmd.Env = filtered
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatalf("expected non-zero exit when --db is omitted, got success:\n%s", out)

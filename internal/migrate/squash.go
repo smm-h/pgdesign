@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/jackc/pgx/v5"
@@ -196,4 +197,32 @@ func buildSquashedDown(ddlOps []DDLOp, dmlOps []DMLOp) []*DownOp {
 // OutputPath returns the path for the squashed migration file.
 func OutputPath(dir, toVersion string) string {
 	return filepath.Join(dir, toVersion+".toml")
+}
+
+// LegacyArchiveDir is the sibling directory under a legacy (semver-TOML)
+// migrations dir into which squash-superseded originals retire. It mirrors
+// chain mode's migrations/archive/ (chainArchiveDir).
+const LegacyArchiveDir = "archive"
+
+// ArchiveLegacyOriginals retires the given legacy (semver-TOML) migration files
+// INTACT into a sibling migrations/archive/ directory via a pure-Go file move.
+// This honors the same "retire originals, never destroy" contract chain-mode
+// squash keeps (moveEdgeToArchive), but shells out to NOTHING: it must run on CI
+// runners and consumer machines that have no developer-only file-archival tool on
+// PATH. Returns the destination paths in the order given.
+func ArchiveLegacyOriginals(dir string, paths []string) ([]string, error) {
+	archiveDir := filepath.Join(dir, LegacyArchiveDir)
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		return nil, err
+	}
+	archived := make([]string, 0, len(paths))
+	for _, p := range paths {
+		name := filepath.Base(p)
+		dst := filepath.Join(archiveDir, name)
+		if err := os.Rename(p, dst); err != nil {
+			return nil, fmt.Errorf("archive %s: %w", name, err)
+		}
+		archived = append(archived, dst)
+	}
+	return archived, nil
 }
