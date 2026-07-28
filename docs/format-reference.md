@@ -310,20 +310,26 @@ pg_partman requires a background process to run `partman.run_maintenance_proc()`
 
 The pg_partman extension is installed into a dedicated `partman` schema. The generated DDL emits `CREATE SCHEMA IF NOT EXISTS partman` followed by `CREATE EXTENSION pg_partman SCHEMA partman` to keep partman functions isolated from the application schema.
 
+Both `interval` and `premake` are **required** for a partman-managed table. `premake` has no default: a missing value would silently disable partition premaking, so the operator must state it explicitly. `maintenance` also requires RANGE partitioning on the same table.
+
+The optional `schedule` key emits the pg_cron scheduling call directly into the generated DDL, so partition maintenance is set up as part of the schema rather than by hand. When `schedule` is omitted from a partman-managed table, pgdesign warns (W029) that maintenance has no schedule — you must acknowledge it (by adding a schedule) or arrange maintenance out of band.
+
 ```toml
 [tables.events.maintenance]
 interval = "1 month"
 premake = 3
 retention = "6 months"
 retention_keep_table = false
+schedule = "*/30 * * * *"
 ```
 
 | Key | Type | Description |
 |-----|------|-------------|
 | `interval` | string | Partition width (e.g., `"1 month"`, `"1 week"`). **Required.** |
-| `premake` | integer | Number of future partitions to pre-create |
+| `premake` | integer | Number of future partitions to pre-create. **Required.** |
 | `retention` | string | Retention period (e.g., `"90 days"`, `"6 months"`) |
 | `retention_keep_table` | boolean | Keep expired partition tables instead of dropping |
+| `schedule` | string | pg_cron schedule expression for `partman.run_maintenance_proc()`; when set, the `cron.schedule(...)` call is emitted in the DDL. Omitting it triggers W029 |
 
 ## [views.*]
 
@@ -439,6 +445,45 @@ Suppress specific diagnostics on individual tables or columns when the default r
 
 Suppressed diagnostics are excluded from check output. Suppression applies during `pgdesign check --tag validation`.
 
+### [imports]
+
+Declare pinned dependencies on tables owned by other pgdesign projects. Each entry maps a local alias to a git URL, a git ref, and the PostgreSQL schema the imported tables live in. An imported table is referenced as `alias:table` — valid only in a foreign key's `ref_table`. Both the inline-table and expanded forms are accepted.
+
+```toml
+[imports]
+platform = { git = "https://github.com/acme/platform-schema.git", ref = "v2.4.0", schema = "platform" }
+
+[imports.billing]
+git    = "https://github.com/acme/billing.git"
+ref    = "v1.0.0"
+schema = "billing"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `git` | string | Fetch URL of the upstream pgdesign project |
+| `ref` | string | Git ref to pin (resolved to an exact commit at lock time) |
+| `schema` | string | The PostgreSQL namespace an `alias:table` reference resolves into |
+
+Run `pgdesign import lock` to resolve the pins and vendor the referenced surface into `imports/<alias>/`, and `pgdesign check --tag imports` to detect drift. See [Cross-Repository Imports](imports.html) for the full workflow.
+
+### [renames]
+
+Declare table and column renames so the migration diff emits data-preserving `ALTER ... RENAME` operations instead of a drop+create that would lose data. When pgdesign detects a plausible rename (a drop and an add whose definitions are content-equal except the name) that is **not** declared here, migration generation is refused — the rename gate. Declaring it turns the change into a mechanically-invertible rename. `[renames]` is a pure, committed, CI-safe directive; it is never part of any schema's identity.
+
+```toml
+[renames]
+tables  = [ { from = "old_accounts", to = "accounts" } ]
+columns = [ { table = "users", from = "email_addr", to = "email" } ]
+```
+
+| Section | Fields | Description |
+|---------|--------|-------------|
+| `tables` | `from`, `to` | Rename a table |
+| `columns` | `table`, `from`, `to` | Rename a column within a table |
+
+A declared rename whose old name is not actually being dropped (or that also changes the definition) is a validation error. An ambiguous detection — one dropped column matching several added columns with identical definitions — is a hard error listing all candidates; disambiguate by making the intended definitions differ (a comment suffices) or by declaring the rename explicitly.
+
 ## [output.*]
 
 Build output targets define what `pgdesign build` generates from the compiled schema. Each output is a named section under `[output]` specifying a format (sql, d2, json, svg, doc, or codegen), a file path, and format-specific options. For codegen outputs, the target language and generation mode must be specified. Multiple outputs can be configured to generate SQL DDL, D2 diagrams, JSON snapshots, documentation, and application-layer code from a single build command.
@@ -499,6 +544,46 @@ When `idempotent = true`, the generated SQL includes guards that make re-running
 **Not covered:**
 - Column type changes (altering an existing column's type)
 - Column drops (removing columns that no longer appear in the schema)
+
+#### D2 diagram options
+
+A `d2` or `svg` output accepts a nested `[output.<name>.d2]` subsection controlling layout, enrichment, filtering, cardinality, and heat/live annotations. Every key has a sensible default, so an absent subsection produces a fully-enriched diagram.
+
+```toml
+[output.diagram]
+format = "d2"
+path = "out/schema.d2"
+
+[output.diagram.d2]
+layout = "elk"
+direction = "right"
+enums = true
+include = ["public.*"]
+exclude = ["*.audit_log"]
+include_dependencies = 1
+cardinality = true
+heat_map = "fan-in"
+live_stats = false
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `layout` | string | Layout engine: `dagre` (default) or `elk`. `tala` is rejected (not in the OSS library) |
+| `theme` | integer | D2 theme id; `0` = library default |
+| `direction` | string | `down` (default), `right`, `left`, or `up` |
+| `index_markers` | boolean | Mark indexed and unique columns (default true) |
+| `nullable` | boolean | Show a nullable indicator (default true) |
+| `comments` | boolean | Render table comments as tooltips (default true) |
+| `checks` | boolean | Render CHECK constraints as notes (default true) |
+| `rls_markers` | boolean | Mark RLS-enabled and append-only tables (default true) |
+| `enums` | boolean | Render enum types as rectangles with values (default true) |
+| `cardinality` | boolean | Native crow's-foot arrowheads with 1:1 / 1:N / M:N inference (default true) |
+| `include` | array of strings | Glob patterns of tables to include; empty = all |
+| `exclude` | array of strings | Glob patterns of tables to exclude |
+| `include_dependencies` | integer | FK-dependency depth to pull in around included tables (`0` = off) |
+| `summary` | boolean | Names and edges only (omit columns) |
+| `heat_map` | string | `""`, `fan-in`, or `fan-out` — color tables on a colorblind-safe stroke scale |
+| `live_stats` | boolean | Annotate with live row counts / scan ratios (opt-in; requires `--db` / `PGDESIGN_DB`). `generate` itself stays DB-free — the stats are fetched by `build`/`serve` and passed in |
 
 Running `pgdesign build` generates all configured outputs. Use `--dry-run` to preview what would be generated without writing files.
 

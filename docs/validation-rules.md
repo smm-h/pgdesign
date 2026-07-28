@@ -260,6 +260,77 @@ Fix: declare the extension:
 name = "pgvector"
 ```
 
+### Additional validation errors
+
+These validate-phase errors round out the `E2xx` range. Like all `E`-codes they block generation and cannot be suppressed or disabled — attempting to target one via `[suppress]` or `validate.disable` is itself an error (E229).
+
+| Code | Meaning |
+|------|---------|
+| E205 | Column default contains embedded SQL quotes |
+| E218 | VIRTUAL generated column requires PostgreSQL 18+ |
+| E220 | `depends_on` references a non-existent entity |
+| E221 | A functional dependency references an unknown column name |
+| E222 | RESTRICTIVE RLS policy requires PostgreSQL 10+ |
+| E223 | A state machine transition requires a column missing from the table |
+| E224 | A column default does not match the state machine's initial state |
+| E225 | FK `on_delete` value is not a valid PostgreSQL action |
+| E226 | Trigger name uses the reserved `_pgdesign_sm_` prefix |
+| E227 | `[groups]` references an unknown table |
+| E228 | Append-only table FK `on_delete` (CASCADE/SET NULL/SET DEFAULT) would let a DELETE elsewhere write into it, which the append-only trigger blocks |
+| E229 | `[suppress]` key or `[validate] disable` targets an E-code (errors can be neither suppressed nor disabled) |
+
+### Type system, model, and trigger errors
+
+These come from the semantic type system (`E1xx`), the model builder (`E12x`), and trigger validation. They block generation.
+
+| Code | Meaning |
+|------|---------|
+| E100–E108 | Type-definition errors: empty name, enum with no values, scalar without a base type, unknown kind, duplicate name, unknown base type, circular scalar base, CHECK missing the `VALUE` placeholder |
+| E109 | Enum default is not a declared value (documented above) |
+| E110 | Default value contains embedded SQL quotes (documented above) |
+| E111 | State machine type must have at least one state |
+| E112 | State machine initial state is not a declared state |
+| E113 | State machine transition references an unknown from-state |
+| E114 | `extends` or builtin shadowing changed a sealed field (Kind or base type) |
+| E115 | Circular `extends` chain |
+| E116 | Unknown `extends` target type |
+| E117 | Enum `extends` adds no new values or overrides |
+| E118 | Composite `extends`: field name collision |
+| E119 | State machine `extends`: state name collision |
+| E120 | Table missing a primary key (model build) |
+| E121 | Cannot resolve a column's type |
+| E122 | RLS policy missing or invalid `for` field |
+| E123 | RLS policy must have `using` or `with_check` |
+| E125 | Trigger missing a required field |
+| E126 | Constraint trigger must use timing AFTER |
+| E127 | Trigger uses REFERENCING but timing is not AFTER / for_each is not ROW |
+
+### E300: Migration safety error
+
+`ADD CONSTRAINT` without `NOT VALID` on a large table. Migration generation always emits the large-table-safe two-step form (`ADD CONSTRAINT ... NOT VALID` then `VALIDATE CONSTRAINT`); this error guards against a hand-authored operation that would take a blocking lock.
+
+## Imports
+
+Cross-repository import diagnostics (`E230`–`E244`) are raised while resolving, verifying, and validating `[imports]`. See [Cross-Repository Imports](imports.html) for the workflow.
+
+| Code | Meaning |
+|------|---------|
+| E230 | An FK references an unknown import alias — declare it under `[imports]` |
+| E231 | An import alias reference appears somewhere other than an FK `ref_table` |
+| E232 | A malformed `alias:table` reference (expected `alias:table`) |
+| E233 | An import has no vendored surface — run `pgdesign import lock` |
+| E234 | A vendored surface hash does not match the lockfile (altered out of band) |
+| E235 | A vendored surface semantically drifted from the lockfile — run `import update` if the framework legitimately changed |
+| E236 | An FK references an imported table not present in the vendored surface — run `import update` |
+| E237 | Junction-type drift: a local FK column's type disagrees with the imported column it references |
+| E238 | An imported table is not present in the live database (live verification) |
+| E239 | An imported column referenced by an FK failed live verification |
+| E240 | Probing an imported table against the live database failed |
+| E241 | Cannot read an import lockfile to enforce its requirements |
+| E242 | An import requires a higher PostgreSQL version than the project targets |
+| E243 | An imported type collides with a local type of the same name |
+| E244 | An imported table collides with a local table of the same name |
+
 ## Warning rules
 
 Warnings highlight potential design issues in the schema that may indicate anti-patterns, performance problems, or modeling errors, but they do not block DDL generation. Each warning has a unique code starting with W and can be individually disabled via the `validate.disable` setting in pgdesign.toml when the flagged pattern is intentional. Warnings can also be suppressed on specific tables or columns using the `[suppress]` section with a mandatory reason string explaining why the suppression is justified.
@@ -334,6 +405,61 @@ default_expr = "now()"  # W010: mutable default on append-only table
 
 **Suggestion:** Remove mutable-default columns from append-only tables, or remove `append_only = true` if the table needs to support updates.
 
+### RLS, design-intelligence, and workload warnings
+
+These warnings come from `check --tag validation` (RLS coverage), `check --tag design` (design intelligence, built on the FK graph and constraint analysis), and `check --tag workload` (structural index recommendations). All are individually disableable and suppressible.
+
+| Code | Check | Meaning |
+|------|-------|---------|
+| W011 | validation | RLS enabled on a table but no policies defined |
+| W012 | validation | RLS operation gap — a policy is missing for some operations (SELECT/INSERT/UPDATE/DELETE) |
+| W013 | design | Cascade depth exceeds threshold (a DELETE chains through too many levels) |
+| W014 | design | Cascade breadth — a single DELETE cascades to too many tables |
+| W015 | design | Mixed ON DELETE actions among a table's incoming FKs |
+| W016 | design | PK columns duplicated in a UNIQUE constraint (redundant) |
+| W017 | design | NOT NULL column also has a `CHECK (col IS NOT NULL)` (redundant) |
+| W018 | design | A domain CHECK and an identical column CHECK (redundant) |
+| W019 | design | A range CHECK subsumed by a wider range CHECK |
+| W021 | design | Estimated row size exceeds the page size (8192 bytes) |
+| W022 | workload | JSONB column without a GIN index |
+| W023 | workload | Array column without a GIN index |
+| W024 | workload | tsvector column without a GIN index |
+| W025 | workload | Potential N+1 query pattern (live: call ratio ≥ 100×) |
+| W026 | workload | Sequential-scan-heavy table (live: seq_scan > 10× idx_scan) |
+| W027 | validation | State machine state unreachable from the initial state |
+| W028 | validation | State machine non-terminal state has no outgoing transitions (dead end) |
+| W029 | validation | A partman-managed table has no maintenance schedule (see `[tables.*.maintenance] schedule`) |
+
+## Info diagnostics
+
+Info diagnostics (`I`-codes) surface opportunities and observations. They never block generation.
+
+| Code | Meaning |
+|------|---------|
+| I001 | Natural key candidate detected (from FD-derived candidate keys) |
+| I002 | Dead column — not referenced by any constraint, index, policy, or generated column (schema-only heuristic) |
+| I003 | Estimated row size exceeds the TOAST threshold (2048 bytes) |
+| I004 | Column reordering could reduce alignment padding |
+| I005 | Timestamp on an append-only table without a BRIN index candidate (workload) |
+| I006 | Boolean column with a dedicated index (low selectivity) (workload) |
+| I007 | Table with 10 or more indexes (write overhead) (workload) |
+| I100 | Minimal-cover visualization — declared FDs contain redundancy (NF audit) |
+| I101 | A user type shadows a builtin (type system, informational) |
+| I200 | Live introspection could not read expected catalog state; the corresponding model detail was left unpopulated |
+| I201 | Live introspection filtered a database object matching a pgdesign-managed reserved name pattern |
+
+## Seed diagnostics
+
+Seed diagnostics (`S`-codes) are raised by `pgdesign seed` when test data cannot be generated soundly, especially around FK cycles and imported foreign keys. They are hard errors — seed never fabricates silently-wrong data.
+
+| Code | Meaning |
+|------|---------|
+| S001 | An FK cycle column is NOT NULL, so the two-pass NULL-then-UPDATE strategy cannot break the cycle |
+| S002 | Cannot seed offline: a UNIQUE constraint is distinguished solely by imported FK column(s) — supply `--db` or add an offline-distinct local column |
+| S003 | Cannot seed an imported FK offline with `--format copy` and a NOT NULL column — use `--format insert` or supply `--db` |
+| S004 | An imported FK on a NOT NULL column cannot be seeded — the live imported table has no rows to reference |
+| S005 | Cannot generate enough unique rows — the unique/PK domain is too small (exhausted dedup attempts) |
+
 ## Normal form audit warnings
 
 Normal form audit warnings are emitted by `pgdesign check --tag nf`, not by `pgdesign check --tag validation`, and they require functional dependencies to be explicitly declared on the table using the `[[dependencies]]` syntax. Without declared dependencies, the audit cannot determine whether a table violates normal forms because it has no information about which columns functionally determine which others. The audit checks 1NF through 3NF violations and suggests decompositions using Bernstein's synthesis algorithm when violations are found.
@@ -365,6 +491,10 @@ dependent = ["student_name"]
 A non-prime attribute is functionally determined by a column set that is not a superkey, indicating a transitive dependency that should be extracted into a separate table. In a transitive dependency, column A determines B, and B determines C, creating update anomalies because changing B's value inconsistently leads to contradictory C values. When detected, pgdesign suggests a decomposition using Bernstein's synthesis algorithm.
 
 When a 3NF violation is detected, pgdesign suggests a decomposition using Bernstein's synthesis algorithm.
+
+### W103: BCNF violation
+
+A functional dependency's determinant is not a superkey, violating Boyce-Codd normal form (the strengthening of 3NF that permits no exceptions for prime attributes). pgdesign computes a lossless-join, dependency-preservation-checked BCNF decomposition and includes an Armstrong-relation counterexample — a small concrete instance exhibiting the anomaly — in the diagnostic. BCNF is treated as a normal-form violation like the others: `generate --strict-nf` and the `nf` check reject it, and `revise`'s pure tier blocks on it.
 
 ## Disabling rules
 
@@ -410,3 +540,11 @@ A table with more than 2 columns has no foreign key relationships at all -- it n
 ### C104: Missing index for FK join pattern
 
 Suggests composite indexes for common join-and-filter patterns. When a foreign key references a table that has filter-like columns (`status`, `type`, `kind`, `category`, or columns ending in `_at` or `_date`), a composite index on `(fk_columns, filter_column)` can improve join performance. This is an informational suggestion (Info severity), not a warning.
+
+## Project integrity checks
+
+Beyond the schema-level diagnostics above, three checks verify project-level integrity rather than individual codes. They are error-severity and hard-fail CI.
+
+- `check --tag build` — freshness. Every configured `[output]` is regenerated in memory and byte-compared against what is on disk; a stale or hand-edited artifact fails. See [Format Reference](format-reference.html) for details.
+- `check --tag revision` — provenance. Every regenerable artifact must carry the current full-project revision stamp; a missing, old-format, or mismatched stamp is stale (run `pgdesign build`). JSON envelopes additionally have their revision recomputed and their model class verified.
+- `check --tag imports` — import surface integrity and drift (see [Imports](#imports) above and [Cross-Repository Imports](imports.html)).
