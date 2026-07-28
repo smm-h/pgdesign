@@ -341,25 +341,40 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 	)
 }
 
-// handleMigrateGenerateChain generates a chain edge for a chain-mode project. It
-// is PURE (no database): the head model is reconstructed from the on-disk manifest
-// + object store (prev), diffed against the built schema (desired), lowered to
-// ops, and written as a content-addressed edge (plus its objects and to-revision
-// manifest) via GenerateEdge. A genesis edge is produced for an empty chain.
-func handleMigrateGenerateChain(schema *model.Schema, dir string, cfg *config.RawConfig, quiet bool) int {
+// chainGenResult reports the outcome of pure chain-mode generation.
+type chainGenResult struct {
+	// EdgeName is the written edge filename (empty when NoChanges).
+	EdgeName string
+	// Migration is the generated migration (nil when NoChanges), retained for
+	// callers that print op counts / descriptions.
+	Migration *migrate.Migration
+	// Diags are the migration-generation diagnostics (safety lints etc.).
+	Diags []diagnostic.Diagnostic
+	// NoChanges is true when the diff (post rename-gate / op-lowering) was empty,
+	// so no edge was written.
+	NoChanges bool
+}
+
+// generateChainEdge is the PURE (no database) chain-mode generation core shared
+// by `migrate generate` and `revise`. It reconstructs the head model from the
+// on-disk manifest + object store (prev), diffs it against the built schema
+// (desired), applies the 5.9 rename gate, lowers to ops, and writes a
+// content-addressed edge (plus its objects and to-revision manifest) via
+// GenerateEdge. A genesis edge is produced for an empty chain. It writes files
+// but never commits and never prints — the caller owns both.
+func generateChainEdge(schema *model.Schema, dir string, renameSpec diff.RenameSpec) (chainGenResult, error) {
 	if _, pgErr := requireSchemaPGVersion(schema); pgErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", pgErr)
-		return 1
+		return chainGenResult{}, pgErr
 	}
 	p, err := migrate.OpenChainProject(dir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
+		return chainGenResult{}, err
 	}
 	head, prev, err := migrate.ChainHead(p)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
+		// *migrate.ForkError already names both heads and points at `migrate
+		// rebase`; propagate it verbatim.
+		return chainGenResult{}, err
 	}
 
 	// Diff baseline: the reconstructed head model, or an empty model at genesis
@@ -369,54 +384,63 @@ func handleMigrateGenerateChain(schema *model.Schema, dir string, cfg *config.Ra
 		base = &model.Schema{Name: schema.Name, PGVersion: schema.PGVersion}
 	}
 	if collErr := diff.CheckTruncationCollisions(schema); collErr != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", collErr)
-		return 1
+		return chainGenResult{}, collErr
 	}
 	d := diff.Diff(schema, base)
 	if d.IsEmpty() {
-		fmt.Println("No changes detected. Nothing to generate.")
-		return 0
+		return chainGenResult{NoChanges: true}, nil
 	}
 
 	// Rename gate (5.9): resolve declared renames into data-preserving RENAME
 	// ops and HARD-ERROR on any undeclared/ambiguous plausible rename before the
 	// diff is lowered to a drop+create. prev (nil at genesis) is the true base.
-	if err := diff.ResolveRenames(d, schema, prev, configRenameSpec(cfg), false); err != nil {
-		fmt.Fprintf(os.Stderr, "error: rename gate: %v\n", err)
-		return 1
+	if err := diff.ResolveRenames(d, schema, prev, renameSpec, false); err != nil {
+		return chainGenResult{}, fmt.Errorf("rename gate: %w", err)
 	}
 	if d.IsEmpty() {
-		fmt.Println("No changes detected. Nothing to generate.")
-		return 0
+		return chainGenResult{NoChanges: true}, nil
 	}
 
 	m, migDiags := migrate.GenerateMigration(d, schema, "", extregistry.NewBuiltinRegistry())
-	if len(migDiags) > 0 {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
-	}
 	if len(m.DDLOps) == 0 && len(m.DMLOps) == 0 {
-		fmt.Println("No operations generated. Nothing to write.")
-		return 0
+		return chainGenResult{Diags: migDiags, NoChanges: true}, nil
 	}
 
 	slug := slugifyDescription(m.Description)
 	name, err := migrate.GenerateEdge(p, m, schema, prev, head, rev.RegistryPresent, slug)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: generate edge: %v\n", err)
+		return chainGenResult{Diags: migDiags}, fmt.Errorf("generate edge: %w", err)
+	}
+	return chainGenResult{EdgeName: name, Migration: m, Diags: migDiags}, nil
+}
+
+// handleMigrateGenerateChain generates a chain edge for a chain-mode project via
+// the shared pure core, printing the result. See generateChainEdge.
+func handleMigrateGenerateChain(schema *model.Schema, dir string, cfg *config.RawConfig, quiet bool) int {
+	res, err := generateChainEdge(schema, dir, configRenameSpec(cfg))
+	if len(res.Diags) > 0 {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(res.Diags, true))
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
+	if res.NoChanges {
+		fmt.Println("No changes detected. Nothing to generate.")
+		return 0
+	}
 	if !quiet {
-		fmt.Printf("Generated edge: %s\n", name)
-		fmt.Printf("  Description: %s\n", m.Description)
-		fmt.Printf("  DDL ops: %d\n", len(m.DDLOps))
-		fmt.Printf("  DML ops: %d\n", len(m.DMLOps))
+		fmt.Printf("Generated edge: %s\n", res.EdgeName)
+		fmt.Printf("  Description: %s\n", res.Migration.Description)
+		fmt.Printf("  DDL ops: %d\n", len(res.Migration.DDLOps))
+		fmt.Printf("  DML ops: %d\n", len(res.Migration.DMLOps))
 	}
 	return 0
 }
 
 // configRenameSpec converts the project config's [renames] directive into the
 // diff package's RenameSpec, consumed by the rename gate at diff time.
-func configRenameSpec(cfg *config.RawConfig) diff.RenameSpec {
+func configRenameSpec[P config.PathKind](cfg *config.Config[P]) diff.RenameSpec {
 	if cfg == nil {
 		return diff.RenameSpec{}
 	}

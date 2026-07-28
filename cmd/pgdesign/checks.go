@@ -145,6 +145,73 @@ func resolveCheckDBURL[P config.PathKind](ctx strictcli.CheckContext, cfg *confi
 	return "", false
 }
 
+// nfAuditPure runs the normal-form audit over the schema's DECLARED functional
+// dependencies only — no live FD discovery, no database. It is the PURE blocking
+// core (roadmap 6.1): the split of the old checkNF that both revise's pure tier
+// (via pureNFGate) and the `nf` check framework wrapper (checkNF) share. It
+// returns only the NF-violation diagnostics (codes in nfViolationCodes), so a
+// caller can surface them or promote+block on them uniformly.
+//
+// This preserves generate's --strict-nf gate behavior exactly (audit.Audit over
+// the built model, then promote NF violations), extracted so revise reuses the
+// identical rule rather than reimplementing it.
+func nfAuditPure(schema *model.Schema) []diagnostic.Diagnostic {
+	diags := audit.Audit(schema)
+	var nfDiags []diagnostic.Diagnostic
+	for _, d := range diags {
+		if nfViolationCodes[d.Code] {
+			nfDiags = append(nfDiags, d)
+		}
+	}
+	return nfDiags
+}
+
+// pureNFGate runs the pure NF audit and reports whether it BLOCKS. Per roadmap
+// 6.1's [%%] policy ("pure analyses BLOCK in revise's pure tier"), every
+// normal-form violation (1NF..BCNF) is promoted to Error severity and blocks;
+// the returned diagnostics carry that promotion so the caller renders them as
+// errors. It is DB-free and used by revise's pure tier.
+func pureNFGate(schema *model.Schema) (diags []diagnostic.Diagnostic, blocks bool) {
+	promoted := promoteNFViolations(nfAuditPure(schema))
+	return promoted, diagnostic.Diagnostics(promoted).HasErrors()
+}
+
+// discoverFDsInto fills in discovered functional dependencies for tables that
+// have no declared dependencies, mutating schema in place. It is the DB-tier
+// half of the checkNF split: live FD discovery over a connected database. A
+// per-table discovery failure is skipped (non-fatal) — discovery augments, it
+// never blocks. Shared by the `nf` check wrapper and revise's DB tier.
+func discoverFDsInto(ctx context.Context, conn *pgx.Conn, schema *model.Schema) {
+	for i := range schema.Tables {
+		tbl := &schema.Tables[i]
+		if len(tbl.Dependencies) > 0 {
+			continue
+		}
+		schemaName := tbl.Schema
+		if schemaName == "" {
+			schemaName = "public"
+		}
+		fds, _, discErr := discover.Discover(conn, schemaName, tbl.Name, discover.Options{})
+		if discErr != nil {
+			// Discovery failure for one table is not fatal; skip it.
+			continue
+		}
+		if len(fds) > 0 {
+			for j := range fds {
+				fds[j].Source = "discovered"
+			}
+			schema.Tables[i].Dependencies = fds
+		}
+	}
+}
+
+// checkNF is the DB-tier FD-discovery WRAPPER around the pure NF core
+// (nfAuditPure) for the check framework. When a database URL resolves it
+// discovers FDs for undeclared tables first, then runs the same pure audit;
+// under --hermetic (or with no URL) it runs the pure audit alone — no connection
+// is attempted. The check never blocks (warn reporter): it surfaces NF
+// violations as warnings. revise's pure tier calls pureNFGate directly instead,
+// where the same violations BLOCK.
 func checkNF(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 
@@ -173,40 +240,10 @@ func checkNF(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.Ch
 			return r.Skipped(fmt.Sprintf("cannot connect to database: %v", connErr))
 		}
 		defer conn.Close(bgCtx)
-
-		for i := range schema.Tables {
-			tbl := &schema.Tables[i]
-			if len(tbl.Dependencies) > 0 {
-				continue
-			}
-			schemaName := tbl.Schema
-			if schemaName == "" {
-				schemaName = "public"
-			}
-			fds, _, discErr := discover.Discover(conn, schemaName, tbl.Name, discover.Options{})
-			if discErr != nil {
-				// Discovery failure for one table is not fatal; skip it.
-				continue
-			}
-			if len(fds) > 0 {
-				for j := range fds {
-					fds[j].Source = "discovered"
-				}
-				schema.Tables[i].Dependencies = fds
-			}
-		}
+		discoverFDsInto(bgCtx, conn, schema)
 	}
 
-	diags := audit.Audit(schema)
-
-	// Filter to NF violation diagnostics only.
-	var nfDiags []diagnostic.Diagnostic
-	for _, d := range diags {
-		if nfViolationCodes[d.Code] {
-			nfDiags = append(nfDiags, d)
-		}
-	}
-
+	nfDiags := nfAuditPure(schema)
 	if len(nfDiags) > 0 {
 		for _, d := range nfDiags {
 			r.Warn(diagDetail(d))
@@ -417,6 +454,18 @@ func checkCoverage(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strict
 	return r.Passed("all coverage checks passed")
 }
 
+// pureStructuralChecks runs the schema-only (DB-free) workload tier: structural
+// index recommendations plus low-selectivity and excessive-index detection. It
+// is the pure core shared by the `structural` check and revise's pure tier. All
+// findings are Warning/Info severity — advisory, never blocking.
+func pureStructuralChecks(schema *model.Schema) []diagnostic.Diagnostic {
+	var allDiags []diagnostic.Diagnostic
+	allDiags = append(allDiags, workload.StructuralRecommendations(schema)...)
+	allDiags = append(allDiags, workload.DetectLowSelectivityIndexes(schema)...)
+	allDiags = append(allDiags, workload.DetectExcessiveIndexes(schema)...)
+	return allDiags
+}
+
 func checkStructural(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strictcli.CheckOutcome {
 	root := ctx.ProjectRoot()
 	paths, err := loadSchemaForCheck(root)
@@ -428,10 +477,7 @@ func checkStructural(ctx strictcli.CheckContext, r *strictcli.WarnReporter) stri
 		return r.Skipped("schema parse/build failed")
 	}
 
-	var allDiags []diagnostic.Diagnostic
-	allDiags = append(allDiags, workload.StructuralRecommendations(schema)...)
-	allDiags = append(allDiags, workload.DetectLowSelectivityIndexes(schema)...)
-	allDiags = append(allDiags, workload.DetectExcessiveIndexes(schema)...)
+	allDiags := pureStructuralChecks(schema)
 
 	if len(allDiags) == 0 {
 		return r.Passed("no structural issues found")

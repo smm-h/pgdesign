@@ -81,6 +81,7 @@ func buildApp() *strictcli.App {
 	registerServeCmd(app)
 	registerCodegenCmd(app)
 	registerBuildCmd(app)
+	registerReviseCmd(app)
 	registerStatsCmd(app)
 
 	tdb := app.Group("testdb", "Manage ephemeral test databases for schema testing")
@@ -373,10 +374,15 @@ func parseAndBuild(configOverride *string, paths []string) (*model.Schema, *semt
 }
 
 // nfViolationCodes are the audit diagnostic codes for normal form violations.
+// These are the codes the --strict-nf gate (and revise's pure NF core) promote to
+// error severity and BLOCK on. BCNF (W103) is included: it is a normal-form
+// violation like the others, so "strict normal form" must reject it too — and
+// roadmap 6.1 requires a BCNF violation to block revise's pure tier.
 var nfViolationCodes = map[string]bool{
 	"W100": true, // 1NF
 	"W101": true, // 2NF
 	"W102": true, // 3NF
+	"W103": true, // BCNF
 }
 
 // promoteNFViolations returns a copy of diags where NF violation warnings

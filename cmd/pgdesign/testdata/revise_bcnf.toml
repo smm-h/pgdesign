@@ -1,0 +1,28 @@
+format_version = 1
+# Fixture for revise's pure-tier BCNF gate. Composite PK (a, b) with a declared
+# FD c -> b: c is not a superkey, so this violates BCNF (W103) while passing 3NF
+# (b is prime). The a,b -> c dependency covers the PK-inferred FD (A100), so the
+# only NF finding is the BCNF violation revise's pure tier must block on.
+[meta]
+schema = "bcnf"
+
+[tables.bcnf_test]
+comment = "BCNF violation fixture"
+pk = ["a", "b"]
+
+[tables.bcnf_test.columns.a]
+type = "counter"
+
+[tables.bcnf_test.columns.b]
+type = "counter"
+
+[tables.bcnf_test.columns.c]
+type = "counter"
+
+[[tables.bcnf_test.dependencies]]
+determinant = ["a", "b"]
+dependent = ["c"]
+
+[[tables.bcnf_test.dependencies]]
+determinant = ["c"]
+dependent = ["b"]
