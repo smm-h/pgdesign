@@ -327,6 +327,8 @@ Adding a `json_schema` attribute to a JSONB column generates CHECK constraints b
 
 When the `json_schema` reference changes (pointing to a different schema file or the schema file is updated), pgdesign generates updated CHECK constraints -- dropping the old constraint and adding the new one.
 
+The `json_schema` attribute is a pgdesign-only authoring construct: it lowers to CHECK constraints, and PostgreSQL has no notion of the originating schema reference. It therefore does **not** round-trip from a live database — introspection recovers the emitted CHECKs but not the `json_schema` attribute, and post-apply reconcile excludes it from comparison (the same documented exclusion as the state-machine kind). This is deliberate, not a limitation to be fixed.
+
 ## View migrations
 
 pgdesign generates view migrations when the diff engine detects changes to view definitions between the TOML schema and the live database. Views support three migration operations: creation, removal, and replacement. PostgreSQL's CREATE OR REPLACE VIEW can update a view definition in place without dropping dependent objects as long as the output column list remains compatible, which makes view changes generally safer than table modifications. Views are ordered after table operations in the migration file.

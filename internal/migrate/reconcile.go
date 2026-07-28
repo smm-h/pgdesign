@@ -45,6 +45,15 @@ package migrate
 // type reconciles clean on its enum/constraint projection. Reconcile therefore
 // certifies that projection, NOT the SM kind. The L10 property test's manifest
 // oracle (not the re-introspection oracle) is what covers the SM kind.
+//
+// json_schema NON-ROUND-TRIPPABILITY (documented, roadmap 5.10 hardening item c):
+// a column's `json_schema` attribute is a pgdesign-only authoring construct — it
+// lowers to CHECK constraints on the JSONB column, and pg_catalog has no notion of
+// the originating schema reference. Introspection recovers the emitted CHECKs but
+// NOT the json_schema attribute itself, so it is excluded from the reconcile
+// comparison the same way the SM kind is: reconcile certifies the emitted-CHECK
+// projection, never the json_schema attribute. This is an explicit exclusion, not
+// a fix — the attribute is not designed to round-trip from a live database.
 
 import (
 	"context"
