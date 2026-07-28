@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +83,22 @@ func TestBuildLiveStatsPopulatesD2(t *testing.T) {
 		t.Fatalf("analyze: %v", err)
 	}
 
+	// n_live_tup is an ESTIMATE, and its post-INSERT+ANALYZE value is
+	// PostgreSQL-version-dependent (PG < 18 double-counts ANALYZE-after-INSERT,
+	// reporting 6 for 3 inserted rows; PG 18+ reports 3). The feature under test
+	// is "whatever pg_stat_user_tables reports is what gets rendered", so read the
+	// count the build will read and assert the diagram carries exactly that — a
+	// deterministic, version-independent check.
+	var wantRows int64
+	if err := conn.QueryRow(ctx,
+		`SELECT n_live_tup FROM pg_stat_user_tables WHERE schemaname = 'public' AND relname = 'widgets'`,
+	).Scan(&wantRows); err != nil {
+		t.Fatalf("read n_live_tup: %v", err)
+	}
+	if wantRows < 3 {
+		t.Fatalf("expected pg_stat_user_tables to report at least the 3 seeded rows, got %d", wantRows)
+	}
+
 	cfgPath := writeLiveStatsProject(t)
 	if code := runBuild(&cfgPath, true, false, false, ephDB.URL); code != 0 {
 		t.Fatalf("build with live_stats failed: exit %d", code)
@@ -91,8 +108,9 @@ func TestBuildLiveStatsPopulatesD2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read diagram output: %v", err)
 	}
-	if !strings.Contains(string(out), "rows: 3") {
-		t.Fatalf("expected live row-count annotation (rows: 3) in d2 output, got:\n%s", out)
+	wantAnnotation := fmt.Sprintf("rows: %d", wantRows)
+	if !strings.Contains(string(out), wantAnnotation) {
+		t.Fatalf("expected live row-count annotation (%q) in d2 output, got:\n%s", wantAnnotation, out)
 	}
 }
 
