@@ -185,6 +185,38 @@ func TestColumnTypeChangedNarrowing(t *testing.T) {
 	if cc.Risk.RiskLevel != risk.Dangerous {
 		t.Errorf("expected Dangerous risk for bigint->integer narrowing, got %s", cc.Risk.RiskLevel)
 	}
+	// 5.9: narrowing is flagged purely from the diff — no database, no row
+	// counts — so downstream generation can emit the always-fire advisory.
+	if !cc.TypeNarrowing {
+		t.Error("expected TypeNarrowing to be set for bigint->integer narrowing")
+	}
+}
+
+// TestColumnTypeChangedWideningNotFlagged confirms a safe widening does NOT set
+// the narrowing advisory flag (5.9).
+func TestColumnTypeChangedWideningNotFlagged(t *testing.T) {
+	desired := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			}},
+		},
+	}
+	actual := &model.Schema{
+		Tables: []model.Table{
+			{Name: "users", Schema: "public", Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("int4"), NotNull: true},
+			}},
+		},
+	}
+	d := Diff(desired, actual)
+	cc := d.TablesChanged[0].ColumnsChanged[0]
+	if cc.TypeChanged == nil {
+		t.Fatal("expected a type change for int4->int8 widening")
+	}
+	if cc.TypeNarrowing {
+		t.Error("widening int4->int8 must not set TypeNarrowing")
+	}
 }
 
 func TestNullableChanged(t *testing.T) {

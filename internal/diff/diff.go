@@ -125,7 +125,13 @@ type ColumnChange struct {
 	// encoded) yet produce different codegen — reporting it satisfies the reverse
 	// conformance direction (diff-empty implies revision-equal).
 	SemanticTypeNameChanged *[2]string          `json:"semantic_type_name_changed,omitempty"`
-	Risk                    risk.Classification `json:"risk"`
+	// TypeNarrowing flags a type change that is NOT a safe widening (e.g.
+	// bigint -> integer). It is set purely from the diff — there are no row
+	// counts here — so downstream generation emits the EXPAND_CONTRACT_TYPE_NARROW
+	// advisory on EVERY narrowing, not only on large tables (the 5.9 behavior
+	// change: a manifest cannot gate on row count).
+	TypeNarrowing bool                `json:"type_narrowing,omitempty"`
+	Risk          risk.Classification `json:"risk"`
 }
 
 // EnumDiff describes changes to an enum type.
@@ -780,6 +786,10 @@ func classifyColumnChange(cc *ColumnChange, desired *model.Column) risk.Classifi
 
 	if cc.TypeChanged != nil {
 		widening := IsWidening(cc.TypeChanged[0], cc.TypeChanged[1])
+		// Narrowing-always advisory (5.9): flagged from the diff alone, no row
+		// count. Downstream generation renders EXPAND_CONTRACT_TYPE_NARROW from
+		// this flag.
+		cc.TypeNarrowing = !widening
 		c := risk.Classify(risk.OpAlterColumnType, risk.OpContext{
 			IsWidening: widening,
 		})
