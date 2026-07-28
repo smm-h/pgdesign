@@ -1072,6 +1072,56 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 	)
 }
 
+func registerMigrateRebaseCmd(g *strictcli.Group) {
+	g.Command("rebase", "Resolve a two-head fork (chain mode). Re-parents the tail of the head NOT named by --head onto the head that IS named, re-simulating each re-parented edge's ops to recompute its revision and content-derived edge file. The rebased-away originals retire INTACT to migrations/archive/ (never rewritten or deleted), and the rebase revision-remap table (migrations/remap.json) is written so a database stamped at a rebased-away revision is served forward to the live head, never orphaned. A pure file operation: no database is required.",
+		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := kwargsQuiet(kwargs)
+			cfgOverride := kwargsConfigOverride(kwargs)
+
+			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
+				return strictcli.Exit(1)
+			}
+			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
+
+			head := kwargs["head"].(string)
+			if head == "" {
+				fmt.Fprintln(os.Stderr, "error: --head is required (the head to keep and re-parent the fork's tail onto)")
+				return strictcli.Exit(1)
+			}
+
+			if !migrate.IsChainMode(dir) {
+				fmt.Fprintln(os.Stderr, "error: migrate rebase is a chain-format operation; this project has no migrations/chain/ directory")
+				return strictcli.Exit(1)
+			}
+
+			p, err := migrate.OpenChainProject(dir)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			res, err := migrate.RebaseChain(p, head)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
+			if !quiet {
+				fmt.Printf("Rebased %d edge(s) onto %s\n", len(res.ReparentedFrom), displayRevString(res.KeptHead))
+				fmt.Printf("  Rebased-away head: %s\n", res.RebasedHead)
+				fmt.Printf("  New head:          %s\n", res.NewHead)
+				fmt.Printf("  Archived %d original(s) to %s\n", len(res.ArchivedFiles), filepath.Join(dir, "archive"))
+				fmt.Printf("  Wrote %d remap entr(ies) to %s\n", len(res.Remap), filepath.Join(dir, "remap.json"))
+			}
+			return strictcli.Exit(0)
+		},
+		strictcli.WithFlags(
+			strictcli.StringFlag("head", "The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it"),
+			strictcli.StringFlag("dir", "Directory containing the chain project (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+		),
+	)
+}
+
 func registerMigrateTestCmd(g *strictcli.Group) {
 	g.Command("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.",
 		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {

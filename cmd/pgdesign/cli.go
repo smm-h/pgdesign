@@ -72,6 +72,7 @@ func buildApp() *strictcli.App {
 	registerMigrateRollbackCmd(mig)
 	registerMigrateStatusCmd(mig)
 	registerMigrateSquashCmd(mig)
+	registerMigrateRebaseCmd(mig)
 	registerMigrateTestCmd(mig)
 	registerMigrateBaselineCmd(mig)
 	registerMigrateUpgradeCmd(mig)
