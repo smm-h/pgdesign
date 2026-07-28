@@ -5,14 +5,80 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/seed"
 	"github.com/smm-h/pgdesign/pkg/genkit"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
+
+// schemaHasImportedFK reports whether any owned table declares an imported FK
+// (resolved through an import alias). Used to decide whether the seed command
+// needs to load tier-1 real-key pools.
+func schemaHasImportedFK(schema *model.Schema) bool {
+	for _, t := range schema.Tables {
+		for _, fk := range t.FKs {
+			if fk.RefAlias != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// loadImportedFKPools reads the deterministic, sorted real-key pools for every
+// imported FK target from the live database (roadmap 7.4 tier 1). Keys are cast to
+// text and quoted as SQL literals — PostgreSQL coerces the unknown-typed literal to
+// the local FK column's type on insertion, so one formatting rule covers every
+// referenced type. Pools are keyed by "<schema>.<table>.<column>" to match
+// seed.SeedConfig.ImportedFKPools.
+func loadImportedFKPools(ctx context.Context, conn *pgx.Conn, schema *model.Schema) (map[string][]string, error) {
+	pools := map[string][]string{}
+	seen := map[string]bool{}
+	for _, t := range schema.Tables {
+		for _, fk := range t.FKs {
+			if fk.RefAlias == "" {
+				continue
+			}
+			for i := range fk.Columns {
+				refCol := ""
+				if i < len(fk.RefColumns) {
+					refCol = fk.RefColumns[i]
+				}
+				key := fk.RefSchema + "." + fk.RefTable + "." + refCol
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				colIdent := pgx.Identifier{refCol}.Sanitize()
+				tblIdent := pgx.Identifier{fk.RefSchema, fk.RefTable}.Sanitize()
+				q := fmt.Sprintf("SELECT DISTINCT %s::text FROM %s WHERE %s IS NOT NULL ORDER BY %s::text",
+					colIdent, tblIdent, colIdent, colIdent)
+				rows, err := conn.Query(ctx, q)
+				if err != nil {
+					return nil, fmt.Errorf("querying imported pool %s: %w", key, err)
+				}
+				for rows.Next() {
+					var v string
+					if err := rows.Scan(&v); err != nil {
+						rows.Close()
+						return nil, fmt.Errorf("scanning imported pool %s: %w", key, err)
+					}
+					pools[key] = append(pools[key], "'"+strings.ReplaceAll(v, "'", "''")+"'")
+				}
+				rows.Close()
+				if err := rows.Err(); err != nil {
+					return nil, fmt.Errorf("reading imported pool %s: %w", key, err)
+				}
+			}
+		}
+	}
+	return pools, nil
+}
 
 func registerSeedCmd(app *strictcli.App) {
 	app.Command("seed", "Generate type-aware test data for all schema tables",
@@ -60,6 +126,27 @@ func registerSeedCmd(app *strictcli.App) {
 				Clean:  clean,
 				Mode:   mode,
 				Apply:  apply,
+			}
+
+			// Imported-FK seed tiers (roadmap 7.4): when a database is supplied, load
+			// real-key pools from the live imported tables (tier 1). Without --db, seed
+			// runs offline (tier 2/3) — the tier selection is an explicit mode choice
+			// (the presence of --db IS the choice), never a runtime fallback.
+			if dbURL != "" && schemaHasImportedFK(schema) {
+				bgCtx := context.Background()
+				conn, err := pgx.Connect(bgCtx, dbURL)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: connect for imported-FK pools: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				pools, err := loadImportedFKPools(bgCtx, conn, schema)
+				conn.Close(bgCtx)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: load imported-FK pools: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				cfg.DBAvailable = true
+				cfg.ImportedFKPools = pools
 			}
 			// Thread the full-project revision so seed's provenance banner names
 			// the producing revision (roadmap 4.2). schema is the TOML-built
