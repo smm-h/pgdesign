@@ -117,7 +117,7 @@
         },
         {
           "default": true,
-          "help": "Automatically git commit generated output files",
+          "help": "Automatically git commit the generated output files after a successful build; pass --no-auto-commit to leave them in the working tree",
           "name": "auto-commit",
           "negatable": true,
           "type": "bool"
@@ -243,7 +243,7 @@
             "faceted",
             "self-contained"
           ],
-          "help": "Split Python DDL output mode",
+          "help": "How to split multi-file Python DDL output: 'faceted' writes one file per object kind, 'self-contained' emits a single importable module",
           "name": "split-mode",
           "type": "str"
         },
@@ -663,7 +663,7 @@
         "lock": {
           "args": [
             {
-              "help": "Alias to lock (default: all declared aliases)",
+              "help": "Name of the single [imports] alias to lock; omit to lock every alias declared in pgdesign.toml",
               "name": "alias",
               "required": false
             }
@@ -674,7 +674,7 @@
         "update": {
           "args": [
             {
-              "help": "Alias to update (default: all declared aliases)",
+              "help": "Name of the single [imports] alias to re-resolve and update; omit to update every declared alias",
               "name": "alias",
               "required": false
             }
@@ -741,7 +741,7 @@
             },
             {
               "default": "Initial baseline",
-              "help": "Human-readable description",
+              "help": "Human-readable note recorded with the baseline, shown in migrate status and history output",
               "name": "description",
               "type": "str"
             }
