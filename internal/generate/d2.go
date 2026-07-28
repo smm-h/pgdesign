@@ -35,6 +35,28 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) str
 
 	tables := schema.TableOrder()
 
+	// Compute the filtered table set (9.3). nil means "all included". Rendering
+	// iterates the canonical TableOrder, so a filtered subset stays canonical
+	// (0.2) without a separate FilterBy* pass.
+	included := opts.includedTableKeys(schema)
+	keep := func(schemaName, name string) bool {
+		return included == nil || included[model.TableKey(schemaName, name)]
+	}
+	// keepDep decides whether a view/matview dependency edge survives: it is cut
+	// only when the dependency resolves to an owned table that was filtered out,
+	// so the excluded table is not resurrected as an auto-vivified empty node.
+	keepDep := func(dep string) bool {
+		if included == nil {
+			return true
+		}
+		for i := range schema.Tables {
+			if schema.Tables[i].Name == dep {
+				return keep(schema.Tables[i].Schema, dep)
+			}
+		}
+		return true
+	}
+
 	// Render enum types as rectangles with their value lists (9.2 enrichment).
 	if opts.Enums {
 		for i := range schema.Enums {
@@ -42,39 +64,74 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) str
 		}
 	}
 
-	// Render each table as a D2 sql_table shape.
+	// Render each surviving table as a D2 sql_table shape.
 	for i := range tables {
+		if !keep(tables[i].Schema, tables[i].Name) {
+			continue
+		}
 		sections = append(sections, renderD2Table(&tables[i], opts))
 		if note := renderD2CheckNote(&tables[i], opts); note != "" {
 			sections = append(sections, note)
 		}
 	}
 
+	// Build FK edges for surviving tables, tracking which imported reference
+	// shapes are actually referenced so filtering never leaves a dangling edge
+	// or an orphaned reference shape. Self-FKs survive naturally: both endpoints
+	// are the same (kept) table.
+	var edgeSections []string
+	referencedImports := make(map[string]bool)
+	for i := range tables {
+		t := &tables[i]
+		if !keep(t.Schema, t.Name) {
+			continue
+		}
+		for j := range t.FKs {
+			fk := &t.FKs[j]
+			if fk.RefAlias != "" {
+				// Imported target: an external dependency, always kept.
+				referencedImports[model.TableKey(fk.RefSchema, fk.RefTable)] = true
+				edgeSections = append(edgeSections, renderD2Edge(t, fk, opts))
+				continue
+			}
+			refSchema := fk.RefSchema
+			if refSchema == "" {
+				refSchema = t.Schema
+			}
+			if !keep(refSchema, fk.RefTable) {
+				continue // edge to an excluded table — skipped, no dangling
+			}
+			edgeSections = append(edgeSections, renderD2Edge(t, fk, opts))
+		}
+	}
+
 	// Render imported tables as minimal REFERENCE shapes (roadmap 7.3/7.4, union
 	// site 4). They are owned by another project, so they get a distinct,
 	// schema-qualified reference shape rather than a full sql_table — this is the
-	// first-class reference shape class phase 9 preserves. They are nested under a
-	// container named for their target schema, so the shape id is schema-qualified
-	// and FK edges can point at it unambiguously.
+	// first-class reference shape class phase 9 preserves. When filtering is
+	// active, only reference shapes reached by a surviving edge are rendered.
 	for i := range schema.ImportedTables {
-		sections = append(sections, renderD2ImportedRef(&schema.ImportedTables[i]))
+		imp := &schema.ImportedTables[i]
+		if included != nil && !referencedImports[model.TableKey(imp.Schema, imp.Name)] {
+			continue
+		}
+		sections = append(sections, renderD2ImportedRef(imp))
 	}
 
-	// Render FK edges after all tables.
-	for _, t := range tables {
-		for _, fk := range t.FKs {
-			sections = append(sections, renderD2Edge(&t, &fk))
-		}
-	}
+	// Render FK edges after all tables and reference shapes.
+	sections = append(sections, edgeSections...)
 
 	// Render views as rectangle shapes.
 	for _, v := range schema.Views {
 		sections = append(sections, renderD2View(&v))
 	}
 
-	// Render view dependency edges.
+	// Render view dependency edges (cut when the dependency is a filtered-out table).
 	for _, v := range schema.Views {
 		for _, dep := range v.DependsOn {
+			if !keepDep(dep) {
+				continue
+			}
 			sections = append(sections, fmt.Sprintf("%s -> %s", v.Name, dep))
 		}
 	}
@@ -84,9 +141,12 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) str
 		sections = append(sections, renderD2MaterializedView(&mv))
 	}
 
-	// Render materialized view dependency edges.
+	// Render materialized view dependency edges (cut when the dependency is a filtered-out table).
 	for _, mv := range schema.MaterializedViews {
 		for _, dep := range mv.DependsOn {
+			if !keepDep(dep) {
+				continue
+			}
 			sections = append(sections, fmt.Sprintf("%s -> %s", mv.Name, dep))
 		}
 	}
@@ -268,7 +328,8 @@ func oneLine(s string) string {
 
 // renderD2Edge produces a D2 edge line for a foreign key relationship.
 // Format: source_table.source_col -> ref_table.ref_col: ON_DELETE_ACTION
-func renderD2Edge(t *model.Table, fk *model.FK) string {
+// opts.Cardinality (9.4) appends crow's-foot arrowhead blocks.
+func renderD2Edge(t *model.Table, fk *model.FK, opts D2Options) string {
 	// For composite FKs, join column names. Single-column FKs are the common case.
 	srcCols := strings.Join(fk.Columns, "_")
 	refCols := strings.Join(fk.RefColumns, "_")
