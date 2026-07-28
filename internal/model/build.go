@@ -27,12 +27,27 @@ type buildOptions struct {
 	// resolves to (imports[alias], table). A reference to an undeclared alias is
 	// a hard build error.
 	imports map[string]string
+	// importedTables are the REFERENCE tables decoded from the vendored import
+	// surface (imports/<alias>/), already stamped into their target schema. They
+	// are placed on Schema.ImportedTables and folded into the derived resolution
+	// structures (TablesByName, FKGraph) so imported-FK targets resolve, but are
+	// never added to Schema.Tables (fail-closed — roadmap 7.3).
+	importedTables []Table
 }
 
 // WithImports supplies the project's declared import aliases (alias -> target PG
 // schema) so `alias:table` FK references resolve at build time (roadmap 7.1).
 func WithImports(imports map[string]string) BuildOption {
 	return func(o *buildOptions) { o.imports = imports }
+}
+
+// WithImportedTables supplies the REFERENCE tables decoded from the vendored
+// import surface (roadmap 7.3). They populate Schema.ImportedTables and are
+// unioned into TablesByName and the FKGraph so imported-FK targets resolve, but
+// are kept out of Schema.Tables so every Tables-iterating consumer is fail-closed
+// by omission.
+func WithImportedTables(tables []Table) BuildOption {
+	return func(o *buildOptions) { o.importedTables = tables }
 }
 
 func applyBuildOptions(opts []BuildOption) buildOptions {
@@ -65,6 +80,7 @@ func Build(raw *parse.RawSchema, reg *semtype.Registry, opts ...BuildOption) (*S
 	schema.MaterializedViews = resolveMaterializedViews(raw)
 	schema.Functions = resolveFunctions(raw)
 	schema.Tables = tables
+	schema.ImportedTables = o.importedTables
 
 	// Phase 1b: resolve sequences (needs schema.Tables for owned_by validation).
 	seqs, seqDiags := resolveSequences(raw, schema)
@@ -189,6 +205,7 @@ func BuildMulti(raws []*parse.RawSchema, reg *semtype.Registry, opts ...BuildOpt
 	schema.Enums = deduplicateEnums(schema.Enums)
 
 	schema.Tables = allTables
+	schema.ImportedTables = o.importedTables
 
 	// Resolve sequences across all schemas (needs merged tables for owned_by validation).
 	for _, raw := range raws {
@@ -248,12 +265,27 @@ func mergeGroups(raws []*parse.RawSchema) map[string][]string {
 	return merged
 }
 
-// buildTablesByName populates the TablesByName lookup map from the Tables slice.
+// buildTablesByName populates the TablesByName lookup map from the owned Tables
+// slice AND the ImportedTables reference slice (roadmap 7.3, union site 1). This
+// is the resolution funnel for FK validation (E204), migrate FK qualification,
+// and the coverage check C104 — all of which look up FK targets by
+// TableByName. Without the imported entries an `alias:table` FK would resolve to
+// nil and trip a spurious E204 (and C104 would silently skip). Imported entries
+// are added only to this lookup map, never to Tables, so DDL/audit/codegen stay
+// fail-closed.
 func (s *Schema) buildTablesByName() {
-	s.TablesByName = make(map[string]*Table, len(s.Tables))
+	s.TablesByName = make(map[string]*Table, len(s.Tables)+len(s.ImportedTables))
 	for i := range s.Tables {
 		key := TableKey(s.Tables[i].Schema, s.Tables[i].Name)
 		s.TablesByName[key] = &s.Tables[i]
+	}
+	for i := range s.ImportedTables {
+		key := TableKey(s.ImportedTables[i].Schema, s.ImportedTables[i].Name)
+		// Owned tables win on collision: a same-keyed local table shadows an
+		// imported reference (the local object is the one this project generates).
+		if _, exists := s.TablesByName[key]; !exists {
+			s.TablesByName[key] = &s.ImportedTables[i]
+		}
 	}
 }
 

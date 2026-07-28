@@ -1050,18 +1050,15 @@ func checkGodTable(schema *model.Schema, config *Config) []diagnostic.Diagnostic
 func checkOrphanTable(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 	var diags []diagnostic.Diagnostic
 
-	// Build set of tables that are referenced by other tables' FKs.
-	referenced := make(map[string]bool)
-	for _, t := range schema.Tables {
-		for _, fk := range t.FKs {
-			key := fk.RefSchema + "." + fk.RefTable
-			referenced[key] = true
-		}
-	}
+	// Build set of tables referenced by any FK, resolved through the import union
+	// (roadmap 7.3, union site 6). Uses the ONE shared helper — keyed by TableKey
+	// and union-aware — so an imported-FK target keys correctly and never causes a
+	// local table to be flagged as a spurious orphan.
+	referenced := schema.ReferencedTableKeys()
 
 	for _, t := range schema.Tables {
 		hasOutgoing := len(t.FKs) > 0
-		key := t.Schema + "." + t.Name
+		key := model.TableKey(t.Schema, t.Name)
 		hasIncoming := referenced[key]
 		if !hasOutgoing && !hasIncoming {
 			diags = append(diags, diagnostic.Diagnostic{
@@ -2200,10 +2197,18 @@ func checkDeadColumn(schema *model.Schema, _ *Config) []diagnostic.Diagnostic {
 			}
 		}
 
-		// FK references from other tables.
+		// FK references from other tables (roadmap 7.3, union site 7). Match on the
+		// full (schema, name) identity, not bare RefTable: the previous bare match
+		// ignored RefSchema, so an imported FK targeting app.users could spuriously
+		// mark a local users table's columns as referenced. Only owned tables are
+		// scanned as `other`; imported tables never reference local ones.
 		for _, other := range schema.Tables {
 			for _, fk := range other.FKs {
-				if fk.RefTable == t.Name {
+				refSchema := fk.RefSchema
+				if refSchema == "" {
+					refSchema = other.Schema
+				}
+				if fk.RefTable == t.Name && refSchema == t.Schema {
 					for _, col := range fk.RefColumns {
 						referenced[col] = true
 					}

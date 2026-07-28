@@ -100,6 +100,18 @@ type Schema struct {
 	PGVersion         int                 `json:"pg_version"`
 	TablesByName      map[string]*Table   `json:"-"`
 	FKGraph           *FKGraph            `json:"-"`
+	// ImportedTables are REFERENCE tables owned by another pgdesign project and
+	// pulled in via an [imports.<alias>] declaration (roadmap 7.3). They are
+	// decoded from the vendored surface (imports/<alias>/) and supplied to Build
+	// via WithImportedTables. They are deliberately kept OUT of Tables so that
+	// every consumer iterating Tables is correct BY OMISSION (fail-closed): DDL,
+	// audit, codegen, diff/migrate, and orphan/design checks never touch them.
+	// The union is wired ONLY at the enumerated name-resolution sites
+	// (buildTablesByName, BuildFKGraph, seed pools, D2/GraphQL emitters, the
+	// orphan-detection helper, the dead-column referenced-set). Excluded from
+	// canonical identity — these are facts owned elsewhere, not this project's
+	// objects.
+	ImportedTables []Table `json:"-"`
 	// StateMachineTransitions maps type names to their transition maps.
 	// Populated during Build() from the semtype registry for KindStateMachine types.
 	// This is a DERIVED codegen convenience (from->to adjacency, sorted target

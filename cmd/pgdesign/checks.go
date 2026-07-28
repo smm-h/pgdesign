@@ -333,27 +333,17 @@ func analyzeCoverage(schema *model.Schema) []diagnostic.Diagnostic {
 		}
 	}
 
-	// C103: Orphan table
+	// C103: Orphan table. Uses the ONE shared union-aware orphan helper (roadmap
+	// 7.3, union site 6) — the same referenced-set W002 consumes — so imported-FK
+	// targets key correctly and a table referenced only by an imported schema is
+	// never spuriously flagged.
+	referenced := schema.ReferencedTableKeys()
 	for _, table := range schema.Tables {
 		if len(table.Columns) <= 2 {
 			continue
 		}
 		hasOutgoingFK := len(table.FKs) > 0
-		referencedByOther := false
-		for _, other := range schema.Tables {
-			if other.Name == table.Name && other.Schema == table.Schema {
-				continue
-			}
-			for _, fk := range other.FKs {
-				if fk.RefTable == table.Name && fk.RefSchema == table.Schema {
-					referencedByOther = true
-					break
-				}
-			}
-			if referencedByOther {
-				break
-			}
-		}
+		referencedByOther := referenced[model.TableKey(table.Schema, table.Name)]
 		if !hasOutgoingFK && !referencedByOther {
 			diags = append(diags, diagnostic.Diagnostic{
 				Severity: diagnostic.Warning,

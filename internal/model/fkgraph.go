@@ -156,6 +156,35 @@ func (g *FKGraph) CascadeChain(table string) []string {
 	return result
 }
 
+// ReferencedTableKeys returns the set of TableKey(schema, name) keys that are the
+// target of at least one FK declared by an owned table. This is THE single
+// union-aware orphan-detection helper (roadmap 7.3) consumed by both W002
+// (internal/validate) and C103 (cmd/pgdesign) — replacing the two divergent
+// raw-string scans that keyed on fk.RefSchema+"."+fk.RefTable and so could
+// mismatch the TableKey convention (leading-dot vs bare for empty schemas) and
+// bypassed the import union. Each FK target is resolved through TableByName (the
+// union of owned and imported tables) so an imported-FK target keys correctly and
+// never causes a spuriously-orphaned local table; unresolved targets fall back to
+// the raw (schema, name) key so a dangling FK is still counted as an incoming
+// reference (E204 reports the dangling ref separately).
+func (s *Schema) ReferencedTableKeys() map[string]bool {
+	referenced := make(map[string]bool)
+	for _, t := range s.Tables {
+		for _, fk := range t.FKs {
+			refSchema := fk.RefSchema
+			if refSchema == "" {
+				refSchema = t.Schema
+			}
+			if resolved := s.TableByName(refSchema, fk.RefTable); resolved != nil {
+				referenced[TableKey(resolved.Schema, resolved.Name)] = true
+			} else {
+				referenced[TableKey(refSchema, fk.RefTable)] = true
+			}
+		}
+	}
+	return referenced
+}
+
 // BuildFKGraph constructs the FK graph from all tables. Safe to call multiple
 // times; rebuilds each time. Called automatically by Build() and BuildMulti().
 func (s *Schema) BuildFKGraph() {
@@ -192,6 +221,14 @@ func (s *Schema) BuildFKGraph() {
 					ToColumn:   toCol,
 					OnDelete:   fk.OnDelete,
 					FKName:     fk.Name,
+					// An FK whose ref_table resolved through an import alias points
+					// at a table owned by another project (roadmap 7.3, union site
+					// 2). RefAlias is the provenance signal set during resolveFK; it
+					// is the ONE writer of this flag, which 0.3 introduced but left
+					// unset. Marking the edge keeps the imported endpoint keyed in
+					// the graph (as a Reverse/Forward target) while telling the graph
+					// projection and cascade walkers the node is externally owned.
+					Imported: fk.RefAlias != "",
 				}
 				g.Forward[fromKey] = append(g.Forward[fromKey], edge)
 				g.Reverse[toKey] = append(g.Reverse[toKey], edge)

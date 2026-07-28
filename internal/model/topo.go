@@ -21,6 +21,14 @@ func topoSort(tables []Table) (sorted []Table, cycles [][]string) {
 		}
 		return deps
 	}
+	// FAIL-SAFE BY ACCIDENT (roadmap 7.3): an imported-FK dep names a table that
+	// lives in ImportedTables, never in `tables`. TopoSortStable IGNORES deps that
+	// reference names outside the item set (documented on graph.TopoSort), so an
+	// imported dependency is silently dropped from the ordering — which is exactly
+	// correct: imported tables are not ordered or emitted here, they already exist
+	// in the framework's schema. This site needs no union wiring; the drop is the
+	// right behavior, pinned so a future "resolve all deps" refactor does not
+	// accidentally start requiring imported tables to be present.
 	sorted, cycleParts := graph.TopoSortStable(tables, getName, getDeps)
 	// Convert cycle groups from [][]Table to [][]string (just names).
 	for _, group := range cycleParts {

@@ -4008,3 +4008,53 @@ func filterSeverity(diags []diagnostic.Diagnostic, sev diagnostic.Severity) []di
 	}
 	return result
 }
+
+// TestImportedFK_NoSpuriousE204_W002 verifies the fail-closed import union
+// (roadmap 7.3): a local FK targeting an imported reference table must resolve
+// (no E204) and must not cause a spurious orphan warning (W002) for either the
+// local or the imported table.
+func TestImportedFK_NoSpuriousE204_W002(t *testing.T) {
+	schema := &model.Schema{
+		Tables: []model.Table{{
+			Name:    "orders",
+			Schema:  "public",
+			Comment: "Orders table",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "user_id", PGType: typeinfo.T("uuid")},
+				{Name: "total", PGType: typeinfo.T("numeric")},
+			},
+			FKs: []model.FK{{
+				Name:       "fk_orders_user",
+				Columns:    []string{"user_id"},
+				RefSchema:  "app",
+				RefTable:   "users",
+				RefColumns: []string{"id"},
+				OnDelete:   "CASCADE",
+				RefAlias:   "framework",
+			}},
+		}},
+		ImportedTables: []model.Table{{
+			Name:    "users",
+			Schema:  "app",
+			Comment: "imported users",
+			PK:      []string{"id"},
+			Columns: []model.Column{
+				{Name: "id", PGType: typeinfo.T("uuid")},
+				{Name: "email", PGType: typeinfo.T("text")},
+			},
+		}},
+	}
+	schema.Canonicalize() // rebuilds TablesByName incl. imported, and the FK graph
+
+	diags, _ := Validate(schema, nil)
+	if e204 := findByCode(diags, "E204"); len(e204) != 0 {
+		t.Errorf("spurious E204 on imported FK: %+v", e204)
+	}
+	for _, d := range findByCode(diags, "W002") {
+		if d.Table == "orders" {
+			t.Errorf("spurious W002 orphan on local table with imported FK: %+v", d)
+		}
+	}
+}

@@ -85,6 +85,13 @@ func topoSortTables(tables []parse.RawTable) []string {
 		func(t parse.RawTable) []string {
 			var deps []string
 			for _, fk := range t.FKs {
+				// FAIL-SAFE BY ACCIDENT (roadmap 7.3): this is a PRE-Build topo over
+				// RAW tables, so an import reference is still the unresolved
+				// "alias:table" string. No raw table is named "alias:table", so
+				// TopoSortStable (which ignores deps outside the item set) drops it —
+				// the correct behavior, since imported tables are not part of this
+				// project's fmt ordering. Pinned so a future resolver here does not
+				// start treating the alias form as a real dependency.
 				deps = append(deps, fk.RefTable)
 			}
 			return deps
