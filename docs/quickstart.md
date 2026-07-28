@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Get started with pgdesign: install the tool, define a TOML schema, generate PostgreSQL DDL, validate rules, audit normal forms, and adopt the one-command revise workflow over the content-addressed migration chain."
+description: "Get started with pgdesign: install it, write a format_version TOML schema, generate PostgreSQL DDL, validate rules, audit normal forms, and use the revise workflow."
 ---
 
 # Quickstart
@@ -32,6 +32,8 @@ pip install pgdesign
 Create a file called `schema.toml` in your project directory. This TOML file defines your database schema using pgdesign's declarative format, including table definitions with typed columns, foreign key relationships, indexes, and constraints. pgdesign compiles this into PostgreSQL DDL with strict enforcement of naming conventions, NOT NULL defaults, and required ON DELETE clauses on foreign keys.
 
 ```toml
+format_version = 1
+
 [meta]
 version = 16
 schema = "public"
@@ -84,6 +86,7 @@ columns = ["author_id"]
 
 Key design decisions enforced by pgdesign:
 
+- Every schema document must declare `format_version = 1` at the top level (see [Format Reference](format-reference.html#format_version)).
 - Every table requires a `comment`.
 - Columns use semantic types (`id`, `email`, `timestamp`) instead of raw PG types.
 - Every FK must declare `on_delete`.

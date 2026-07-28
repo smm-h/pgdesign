@@ -1,11 +1,34 @@
 ---
 title: "Format Reference"
-description: "Complete reference for the pgdesign TOML schema format covering types, tables, constraints, indexes, views, partitioning, maintenance, imports, renames, D2 diagram options, and project configuration."
+description: "Complete reference for the pgdesign TOML schema format: format_version, types, tables, constraints, indexes, views, partitioning, imports, renames, D2 options, and project config."
 ---
 
 # Format Reference
 
 pgdesign schemas are written in TOML. A schema file defines metadata, custom types, and table definitions.
+
+## format_version
+
+Every schema document must declare a top-level `format_version` key as its first setting:
+
+```toml
+format_version = 1
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `format_version` | integer | Document format version. Currently must be `1`. **Required.** |
+
+`format_version` is validated by the strictspec document-shape gate that runs before pgdesign parses a schema. The gate checks the whole document's shape: unknown keys are rejected as hard errors (previously they produced only a W001 unknown-key warning), field types must match, and `identifier`/`pgtype`/`sql-expression` lexemes are lexically validated. A document without `format_version` is rejected. Pinning the version this way lets the format evolve without silently misreading older documents.
+
+To stamp the key onto existing schema files that predate the gate, run the one-time remediation script from the project root:
+
+```sh
+scripts/stamp_format_version.sh schemas/          # a directory of schemas
+scripts/stamp_format_version.sh schema.toml       # a single file
+```
+
+The script is idempotent — a document that already declares `format_version` is left untouched — and it skips `pgdesign.toml` (project config, which is not a schema document).
 
 ## [meta]
 
