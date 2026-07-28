@@ -175,3 +175,4 @@
 {"format_version":1,"id":"18c64e2e33ed95c75f5a6c7f59a24f0bb6b26713ebee2f75","commits":["09e88d45d33eec7822a6e155add4054e397b1468"],"user_facing":false}
 {"format_version":1,"id":"18c64e3e951c38d40011b10eabbf48f2b558549aa3785adf","commits":["12c4cd94f1ce767bc0c41de912eaed82731efedb"],"user_facing":false}
 {"format_version":1,"id":"18c64f6a70d08bb0accd35ae87144f28b14e904a43a8c140","commits":["161fb6c9e061be936f0538575bbd8260c1c107ea"],"user_facing":false}
+{"format_version":1,"id":"18c64f6a7a6611eea8aca59773c941e185c8532d405000a4","commits":["99d7744b5a9f6042cfd458d0f63fdc3c6f3d2f5a"],"user_facing":true,"description":"**Schema diff detects state-machine type changes.** `diff` and migration generation now recognize added, removed, or modified state-machine type definitions (states, transitions, initial state, comment), so chained migrations correctly carry state-machine type identity.","type":"fix"}
