@@ -1,11 +1,52 @@
 # strictspec document version gate (do not remove)
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "The kernel rewrite. pgdesign gains a content-addressed schema identity: every object and whole-model revision is a hash of its canonical form, and migrations become content-derived edges in a Merkle-DAG chain with integrity guarantees (path-finder, journal-driven rollback, precondition/reconcile checks, store consistency checking). Existing projects convert with a one-time `migrate upgrade`. Alongside it: a single canonical serializer and JSON envelope, cross-repo schema imports, branded type-safe codegen across all six languages with compile checks, the one-command `pgdesign revise`, a DB-free `serve` project mode, and a richer D2 diagram suite."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+This release implements the roadmap kernel: a small algebra (content-addressed
+object store, a category of schema migrations, one syntactic equivalence
+relation) whose laws eliminate whole defect classes by construction rather than
+case-by-case. Silent divergence classes are closed structurally -- one
+normalizer computes equivalence everywhere (differ, predicates, reconcile), so
+diff no longer reports false or missed drift on equivalent SQL; identity is
+hash(canonical bytes), so equivalent schemas produce byte-identical output and
+revisions; provenance is total, so every generated artifact carries the
+revision that produced it and freshness is extensional equality; and apply is a
+verified functor -- preconditions check the world is where expected, reconcile
+checks it arrived where intended, and drift is always a loud error, never
+absorbed.
+
+Consumer adaptation is required and is a one-time, one-release break:
+
+- Regenerate ALL codegen output (run `pgdesign codegen` / `pgdesign build`).
+  Generated code is version-coupled to the binary that produced it. Two forces
+  make regeneration mandatory: the unified provenance header wording (scripts
+  that grep the old header text must update) and per-language enum branding
+  (Go opaque validating types + branded GORM fields and constraints validators;
+  TS parse() at boundaries; Python parse()/members replacing raw-string enum
+  construction; SQLAlchemy sa.Enum(PyEnumClass); Java/Kotlin fromValue() + JPA
+  AttributeConverter; Zig wrapper struct; Java one-public-type-per-file layout).
+  Note from rehearsals: regeneration diffs are dominated by canonical reordering
+  and expression normalization, NOT the header alone -- treat every consumer as
+  a full regenerate-and-review, never a header-only edit.
+
+- Databases already tracked by pgdesign migrations must run `migrate upgrade`
+  once to fold the legacy semver files into the content-addressed chain; until
+  then every `migrate` subcommand hard-errors against a pre-upgrade database,
+  naming the command.
+
+- JSON/API consumers: `generate json` and `serve`'s `/api/schema` are now a
+  revision-stamped envelope; the schema body lives under the `model` key
+  (`serve` previously returned `{schema, diagnostics}`).
+
+Adaptation was rehearsed against real consumers at four checkpoints (throwaway
+DB copies and working trees, no release, no commits to consumer repos); the
+rehearsals validated the regenerate-and-review guidance above and confirmed the
+RAISE-on-mismatch semantics for `generate --idempotent` stand.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
