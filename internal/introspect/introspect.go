@@ -130,6 +130,7 @@ func Introspect(ctx context.Context, connStr string, schemaNames []string) (*mod
 	}
 
 	applyEnumTypeKinds(schema)
+	applyDomainTypes(schema)
 
 	// Annotate partman-managed partition children so the diff can exclude
 	// them from existence drift, and read each managed parent's maintenance
@@ -357,6 +358,48 @@ func applyEnumTypeKinds(schema *model.Schema) {
 			if enumNames[cols[ci].PGType.Base] {
 				cols[ci].TypeKind = "enum"
 			}
+		}
+	}
+}
+
+// applyDomainTypes resolves domain-backed columns to the same representation the
+// TOML build produces (roadmap 5.10 hardening item c). A domain column's
+// format_type is the DOMAIN's own name — bare when the domain is in the search
+// path, SCHEMA-QUALIFIED otherwise — so typeinfo.Parse leaves it in the column's
+// Base with no DomainName. The desired (built) side instead carries Base = the
+// domain's underlying base type and DomainName = the BARE domain name. Without
+// this pass a domain column always false-drifts (Base "email" vs "text"), and a
+// domain in a non-search-path schema drifts even harder ("otherschema.email").
+//
+// For each column whose Base matches a known domain (bare OR schema-qualified —
+// the empty-schema rule: the qualifier is dropped to the bare name), rewrite the
+// column's type to the domain's base type and set DomainName to the bare name,
+// preserving the array flag.
+func applyDomainTypes(schema *model.Schema) {
+	if len(schema.Domains) == 0 {
+		return
+	}
+	byName := make(map[string]*model.Domain, len(schema.Domains)*2)
+	for i := range schema.Domains {
+		d := &schema.Domains[i]
+		byName[d.Name] = d
+		if d.Schema != "" {
+			// format_type schema-qualifies types outside the search path.
+			byName[d.Schema+"."+d.Name] = d
+		}
+	}
+	for ti := range schema.Tables {
+		cols := schema.Tables[ti].Columns
+		for ci := range cols {
+			d, ok := byName[cols[ci].PGType.Base]
+			if !ok {
+				continue
+			}
+			// The column's Array flag lives on model.Column, not typeinfo.Type, so
+			// replacing PGType wholesale preserves it untouched.
+			cols[ci].PGType = d.BaseType        // underlying base type (matches the built side)
+			cols[ci].PGType.DomainName = d.Name // bare domain name (empty-schema rule)
+			cols[ci].TypeKind = "scalar"        // domains are scalar semantic types
 		}
 	}
 }

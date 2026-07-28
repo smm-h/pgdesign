@@ -1423,7 +1423,11 @@ func diffPolicy(desired, actual *model.Policy) *PolicyDiff {
 	pd := PolicyDiff{Name: desired.Name}
 	changed := false
 
-	if desired.Type != actual.Type {
+	// PERMISSIVE is the default policy type: an omitted type (desired TOML, before
+	// Build defaults it) and an introspected PERMISSIVE policy (which introspect
+	// leaves empty) are the SAME policy. Normalize both to PERMISSIVE so a
+	// default-permissive policy never false-drifts (roadmap 5.10 hardening item c).
+	if normPolicyType(desired.Type) != normPolicyType(actual.Type) {
 		pd.TypeChanged = &[2]string{actual.Type, desired.Type}
 		changed = true
 	}
@@ -1452,6 +1456,50 @@ func diffPolicy(desired, actual *model.Policy) *PolicyDiff {
 		return nil
 	}
 	return &pd
+}
+
+// intervalUnitCanon maps PostgreSQL interval unit spellings (plurals and
+// abbreviations) to a canonical singular form, so '1 month', '1 mon', and
+// '1 mons' compare equal (roadmap 5.10 hardening item c).
+var intervalUnitCanon = map[string]string{
+	"y": "year", "yr": "year", "yrs": "year", "year": "year", "years": "year",
+	"mon": "month", "mons": "month", "month": "month", "months": "month",
+	"w": "week", "week": "week", "weeks": "week",
+	"d": "day", "day": "day", "days": "day",
+	"h": "hour", "hr": "hour", "hrs": "hour", "hour": "hour", "hours": "hour",
+	"min": "minute", "mins": "minute", "minute": "minute", "minutes": "minute",
+	"s": "second", "sec": "second", "secs": "second", "second": "second", "seconds": "second",
+}
+
+var intervalWordRe = regexp.MustCompile(`[a-z]+`)
+
+// normalizeInterval canonicalizes a PostgreSQL interval string for comparison:
+// it lowercases, collapses whitespace, and rewrites each unit word to its
+// canonical singular form (month/mon/mons -> month). Numeric time components
+// (HH:MM:SS) and counts pass through unchanged. It is a best-effort textual
+// normalizer scoped to the partman config comparison, not a full interval parser.
+func normalizeInterval(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" {
+		return ""
+	}
+	s = intervalWordRe.ReplaceAllStringFunc(s, func(w string) string {
+		if canon, ok := intervalUnitCanon[w]; ok {
+			return canon
+		}
+		return w
+	})
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// normPolicyType maps an omitted policy type to PostgreSQL's default, PERMISSIVE
+// (roadmap 5.10 hardening item c). Introspection leaves a permissive policy's
+// type empty; desired TOML may too (Build defaults it). Both mean PERMISSIVE.
+func normPolicyType(t string) string {
+	if t == "" {
+		return "PERMISSIVE"
+	}
+	return t
 }
 
 // diffPartitioning compares partitioning configuration between two tables.
@@ -1573,7 +1621,12 @@ func diffMaintenance(desired, actual *model.MaintenanceConfig) *MaintenanceDiff 
 		return md
 	}
 
-	if dInterval != aInterval {
+	// Interval and retention are PostgreSQL interval strings whose unit words have
+	// several equivalent spellings ('1 month' vs the PG-normalized '1 mon'). The
+	// desired TOML side and the partman-introspected side may spell the same
+	// interval differently, so compare their normalized forms to avoid a spurious
+	// repartitioning diff (roadmap 5.10 hardening item c).
+	if normalizeInterval(dInterval) != normalizeInterval(aInterval) {
 		md.IntervalChanged = &[2]string{aInterval, dInterval}
 		changed = true
 	}
@@ -1583,7 +1636,7 @@ func diffMaintenance(desired, actual *model.MaintenanceConfig) *MaintenanceDiff 
 		changed = true
 	}
 
-	if dRetention != aRetention {
+	if normalizeInterval(dRetention) != normalizeInterval(aRetention) {
 		md.RetentionChanged = &[2]string{aRetention, dRetention}
 		changed = true
 	}
