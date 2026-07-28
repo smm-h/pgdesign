@@ -172,7 +172,8 @@ func checkBaselineEmptyChain(p *ChainProject, target rev.Revision) error {
 }
 
 // checkBaselineReachability enforces the two re-expressed guards for a database
-// that already carries a chain position.
+// that already carries a chain position. It loads the chain and delegates the
+// pure graph reasoning to baselineReachability.
 func checkBaselineReachability(p *ChainProject, currentRev string, target rev.Revision) error {
 	all, err := p.LoadAllEdges()
 	if err != nil {
@@ -182,6 +183,13 @@ func checkBaselineReachability(p *ChainProject, currentRev string, target rev.Re
 	if err != nil {
 		return err
 	}
+	return baselineReachability(all, remap, currentRev, target)
+}
+
+// baselineReachability is the pure divergence + out-of-order check over an already
+// loaded chain (edges + remap). Separated from checkBaselineReachability so the
+// graph reasoning is testable without an on-disk project.
+func baselineReachability(all []Edge, remap RemapTable, currentRev string, target rev.Revision) error {
 	start := canon(currentRev, remap)
 
 	// DIVERGENCE: the stamped position must be a known chain node (an endpoint of
