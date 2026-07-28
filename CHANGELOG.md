@@ -2,6 +2,33 @@
 
 # Changelog
 
+## 0.25.2
+
+Make a PostgreSQL-version-dependent live-stats test deterministic so CI passes and the release can publish.
+
+<details>
+<summary>Context</summary>
+
+0.25.0 and 0.25.1 were tagged but never reached npm/PyPI: the publish gate
+refused because CI failed. 0.25.1 fixed the earlier saferm/safegit tool
+dependencies, but CI still failed on TestBuildLiveStatsPopulatesD2, which
+hardcoded an n_live_tup estimate that PostgreSQL 17 double-counts (6 vs 3). This
+infra release carries only that test-determinism fix; it is the first artifact
+to actually publish, delivering the user-facing 0.25.1 fixes (see the 0.25.1
+CHANGELOG section) to registries. No user-facing delta over 0.25.1.
+
+</details>
+
+### Infrastructure
+
+- Make a PostgreSQL-version-dependent live-stats test deterministic so CI passes and the release can publish.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.25.1
 
 Fix the CI/publish-blocking dependency on developer-machine tools: migrate squash now archives originals with a built-in file move, and the safegit-missing build error is actionable.
@@ -22,12 +49,6 @@ lacks. 0.25.1 carries the identical feature set as 0.25.0 plus these fixes, so
 
 - **`migrate squash` no longer requires an external file-archival tool.** The legacy squash flow shelled out to a developer-machine utility absent on CI and consumer machines, which failed the operation; originals are now archived with a built-in file move into a sibling `migrations/archive/` directory.
 - **Actionable error when `safegit` is missing during `build` auto-commit.** `pgdesign build` auto-commits generated outputs with safegit; when it is not installed the failure now names the tool, links where to get it, and points at `--no-auto-commit` instead of surfacing a cryptic exec error.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.25.0
 
