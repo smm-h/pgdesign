@@ -71,8 +71,8 @@
     "description": "1494c5c0a5e0f7ac731655e8b7f0ae1fa166221d1ab8e4a71fdfce362550a2ba"
   },
   "en/format-reference.md": {
-    "content": "9ddff865db0261e0e5339a24c36ebdb49c09662e0d6326dff07b061acd04ff6f",
-    "description": "ad7e9ce28b4b72e3468efcf799c416e1071903d3f21962d4d4e577bd5f799bcb"
+    "content": "d71f34fafb8100c0044c1c82d62ee2acc910d5f6aac7b4e576632935d81dc906",
+    "description": "1361f41baaf083f194017b5ffa69454abcbc8b34c6b7195a36d7d4b87bd171ef"
   },
   "en/gen-index.md": {
     "content": "d7aed187ea6a497e1a0a1df3464e3205a124a1376471877cbaaea950083544b9",
@@ -313,20 +313,20 @@
     "description": "ec6f9b520cc13e11c2da34d139bc2e0fec098dd33899c76f51beb1d67087a0b2"
   },
   "en/migration-guide.md": {
-    "content": "4b1eca3f753dd4a7bbcd5e7e089720a8d11cd3327a2b5c2815e0b1132a3365ed",
-    "description": "d14b7be8c8b2179564e96443f065a1b9d05ce021d8ea7ee2cafdcad392118c53"
+    "content": "6a0834085ceac72566c1ff10ab7f9aa15c6bf7ef418a7fbb284f21c9539682af",
+    "description": "fdca141c5d86ccd0893c23fab0d8ff0f8c20741402091108dfc5227a707410bb"
   },
   "en/migration-patterns.md": {
-    "content": "896b5dc112276a4d1dc49607e21ec613f338db2b522ef17072975e791812cdb4",
-    "description": "0d2fd00c41058bd673bd194b662231b0f55096d8a6c16b21145559365a5cb24f"
+    "content": "175c227fda1be2c47f4b9723105cd8228082c5bb1e66b68aac721f64e7cbf704",
+    "description": "60053de9b01b73f3276da001f8c4b9a21f1e59c69a6fd56af8ce7fe5abebb53d"
   },
   "en/query-layer.md": {
     "content": "1ea9271f13e07419705c8078337f682a126817b8b8bbbaf79ba13d5d24c5ec76",
     "description": "aacf79125fb67337c7071872391a6a9bf079c6021b456737bc4bdde04f36bc91"
   },
   "en/quickstart.md": {
-    "content": "6e1afb18bd7f8ddb63b20a289c8e95643d9dd6d1b76adcc25c476ff353a8e978",
-    "description": "accadcc3b205224cb0cee9f61920cefbabd47739608fa0c5a0cf4924312001d5"
+    "content": "7980e82781790176fe4e47b9b67bdf4f677f987871d0a4916595da17f5090a33",
+    "description": "794413bd6a34124fac1439ac9974f0155f24f0fbda81933636b126dacecea420"
   },
   "en/rlsbl-integration.md": {
     "content": "02a891687f5d82a8313c88d2ce23217a560c211ce7697b63de823b11b690e55f",
@@ -357,8 +357,8 @@
     "description": "b6a1e8f171de6dffde4a133a45441e6206a5f89358dfac7e44245c4f9ac3a4e5"
   },
   "en/validation-rules.md": {
-    "content": "f6870763dd7400c4204a183b8861818568679d3df5c960955452294c9c3a2f3f",
-    "description": "e7e5fa896c72ffd1aad56daaa2644dde452ac003876d0e26021a5a9c56ddf02e"
+    "content": "9d395eabab4f9b696df882e6cdef6e2af2fe25cb654c82e167e9c8f4a4ebe45a",
+    "description": "b5d700e24f9b26b1d7e31cee9e0c31e2228b236a01224657b646ce1df0ef6b4a"
   },
   "en/workload-analysis.md": {
     "content": "391a4f109ce70fba4d0f292f1b2ba3a20e1fa2c42486f3f08917adacaa37adff",
