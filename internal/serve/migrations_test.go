@@ -117,6 +117,9 @@ func TestGetMigrationsViewPrecedence(t *testing.T) {
 // TestGetMigrationVersionChainEdge verifies the version endpoint serves the raw
 // chain edge artifact by its content-hash prefix for a chain-mode project.
 func TestGetMigrationVersionChainEdge(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no database configured (set PGDESIGN_DB); skipping database-backed test")
+	}
 	ctx := context.Background()
 	pool, err := testDB.Pool(ctx)
 	if err != nil {
