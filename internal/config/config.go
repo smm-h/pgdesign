@@ -33,6 +33,7 @@ type Config[P PathKind] struct {
 	Extensions []ExtensionConfig          `toml:"extensions"`
 	Suppress   map[string]string          `toml:"suppress"`
 	Renames    RenamesConfig              `toml:"renames"`
+	Imports    map[string]ImportDecl      `toml:"-"`
 	Output     map[string]OutputConfig[P] `toml:"-"`
 
 	// SourcePath is the absolute path to the pgdesign.toml file that was loaded.
@@ -116,6 +117,26 @@ type ColumnRename struct {
 	Table string `toml:"table"`
 	From  string `toml:"from"`
 	To    string `toml:"to"`
+}
+
+// ImportDecl is one [imports.<alias>] declaration: a pinned dependency on
+// another pgdesign project's schema (roadmap 7.1). The alias is the map key.
+// Git is the fetch URL, Ref is the git ref pinned at lock time, and Schema is
+// the target PostgreSQL namespace an `alias:table` reference resolves into.
+//
+// TOML shape (both syntaxes accepted):
+//
+//	[imports]
+//	framework = { git = "https://example/repo.git", ref = "v1.2.3", schema = "app" }
+//
+//	[imports.framework]
+//	git    = "https://example/repo.git"
+//	ref    = "v1.2.3"
+//	schema = "app"
+type ImportDecl struct {
+	Git    string `toml:"git"`
+	Ref    string `toml:"ref"`
+	Schema string `toml:"schema"`
 }
 
 // ExtensionConfig holds [[extensions]] array-of-tables entries.
@@ -238,7 +259,97 @@ func (c *Config[P]) Check() error {
 		}
 	}
 
+	// Validate [imports]. Aliases are sorted so error output is deterministic.
+	aliases := make([]string, 0, len(c.Imports))
+	for a := range c.Imports {
+		aliases = append(aliases, a)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		if !isValidImportAlias(alias) {
+			errs = append(errs, fmt.Errorf("imports.%s: invalid alias (must be a bare identifier: letters, digits, underscore; not starting with a digit; no ':' or '.')", alias))
+		}
+		d := c.Imports[alias]
+		if d.Git == "" {
+			errs = append(errs, fmt.Errorf("imports.%s: git is required", alias))
+		}
+		if d.Ref == "" {
+			errs = append(errs, fmt.Errorf("imports.%s: ref is required (the git ref to pin at lock time)", alias))
+		}
+		if d.Schema == "" {
+			errs = append(errs, fmt.Errorf("imports.%s: schema is required (the target PostgreSQL namespace alias references resolve into)", alias))
+		}
+	}
+
 	return errors.Join(errs...)
+}
+
+// isValidImportAlias reports whether s is a bare identifier usable as an import
+// alias: a non-empty string of letters, digits, and underscores that does not
+// start with a digit. This forbids ':' (the alias-reference separator) and '.'
+// (the schema qualifier), which would otherwise make `alias:table` and
+// dot-splitting ambiguous at FK resolution time.
+func isValidImportAlias(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		isLetter := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_'
+		isDigit := r >= '0' && r <= '9'
+		if i == 0 {
+			if !isLetter {
+				return false
+			}
+			continue
+		}
+		if !isLetter && !isDigit {
+			return false
+		}
+	}
+	return true
+}
+
+// decodeImports converts the raw [imports] section (map[string]any from TOML
+// decoding) into a typed map[string]ImportDecl. Like decodeOutput, this second
+// pass exists because go-toml-edit cannot decode map[string]Struct from nested
+// table syntax directly. Unknown keys within an alias are a hard error so a
+// typo'd field is never silently ignored.
+func decodeImports(raw map[string]any) (map[string]ImportDecl, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]ImportDecl, len(raw))
+	for alias, v := range raw {
+		m, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("imports.%s: expected table, got %T", alias, v)
+		}
+		var d ImportDecl
+		for key, val := range m {
+			s, isStr := val.(string)
+			switch key {
+			case "git":
+				if !isStr {
+					return nil, fmt.Errorf("imports.%s.git: expected string, got %T", alias, val)
+				}
+				d.Git = s
+			case "ref":
+				if !isStr {
+					return nil, fmt.Errorf("imports.%s.ref: expected string, got %T", alias, val)
+				}
+				d.Ref = s
+			case "schema":
+				if !isStr {
+					return nil, fmt.Errorf("imports.%s.schema: expected string, got %T", alias, val)
+				}
+				d.Schema = s
+			default:
+				return nil, fmt.Errorf("imports.%s: unknown key %q (allowed: git, ref, schema)", alias, key)
+			}
+		}
+		out[alias] = d
+	}
+	return out, nil
 }
 
 // decodeOutput converts a raw map[string]any (from TOML decoding) into a typed
@@ -335,6 +446,16 @@ func LoadBytes(data []byte) (*RawConfig, error) {
 		}
 	}
 
+	if rawImports, ok := raw["imports"]; ok {
+		if importsMap, ok := rawImports.(map[string]any); ok {
+			imports, err := decodeImports(importsMap)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse config: %w", err)
+			}
+			cfg.Imports = imports
+		}
+	}
+
 	if err := cfg.Check(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
@@ -382,6 +503,8 @@ func Resolve(raw *RawConfig, projectRoot string) (*ResolvedConfig, error) {
 		Migrate:    raw.Migrate,
 		Extensions: raw.Extensions,
 		Suppress:   raw.Suppress,
+		Renames:    raw.Renames,
+		Imports:    raw.Imports,
 	}
 
 	// Resolve Project.Schemas

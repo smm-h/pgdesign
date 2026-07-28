@@ -985,3 +985,86 @@ func TestResolveNonPathFieldsPreserved(t *testing.T) {
 		t.Errorf("Suppress not preserved: %v", resolved.Suppress)
 	}
 }
+
+func TestLoadImportsSection(t *testing.T) {
+	// Both inline-table and nested-table syntaxes must decode identically.
+	content := `[project]
+schemas = ["schema.toml"]
+
+[imports]
+framework = { git = "https://example.com/fw.git", ref = "v1.2.3", schema = "app" }
+
+[imports.billing]
+git = "git@example.com:billing.git"
+ref = "main"
+schema = "billing"
+`
+	cfg, err := LoadBytes([]byte(content))
+	if err != nil {
+		t.Fatalf("LoadBytes failed: %v", err)
+	}
+	if len(cfg.Imports) != 2 {
+		t.Fatalf("expected 2 imports, got %d", len(cfg.Imports))
+	}
+	fw := cfg.Imports["framework"]
+	if fw.Git != "https://example.com/fw.git" || fw.Ref != "v1.2.3" || fw.Schema != "app" {
+		t.Errorf("framework import mis-decoded: %+v", fw)
+	}
+	b := cfg.Imports["billing"]
+	if b.Git != "git@example.com:billing.git" || b.Ref != "main" || b.Schema != "billing" {
+		t.Errorf("billing import mis-decoded: %+v", b)
+	}
+}
+
+func TestLoadImports_UnknownKey(t *testing.T) {
+	content := `[imports.fw]
+git = "https://example.com/fw.git"
+ref = "v1"
+schema = "app"
+branch = "oops"
+`
+	if _, err := LoadBytes([]byte(content)); err == nil {
+		t.Fatal("expected error for unknown import key, got nil")
+	}
+}
+
+func TestLoadImports_MissingRequired(t *testing.T) {
+	for _, tc := range []struct{ name, toml string }{
+		{"no-git", "[imports.fw]\nref=\"v1\"\nschema=\"app\"\n"},
+		{"no-ref", "[imports.fw]\ngit=\"u\"\nschema=\"app\"\n"},
+		{"no-schema", "[imports.fw]\ngit=\"u\"\nref=\"v1\"\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := LoadBytes([]byte(tc.toml)); err == nil {
+				t.Fatalf("expected error for %s, got nil", tc.name)
+			}
+		})
+	}
+}
+
+func TestLoadImports_InvalidAlias(t *testing.T) {
+	// A digit-leading alias is rejected.
+	content := "[imports.\"1bad\"]\ngit=\"u\"\nref=\"v1\"\nschema=\"app\"\n"
+	if _, err := LoadBytes([]byte(content)); err == nil {
+		t.Fatal("expected error for invalid alias, got nil")
+	}
+}
+
+func TestResolvePreservesImports(t *testing.T) {
+	content := `[imports.fw]
+git = "https://example.com/fw.git"
+ref = "v1"
+schema = "app"
+`
+	raw, err := LoadBytes([]byte(content))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := Resolve(raw, "/tmp/proj")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Imports["fw"].Schema != "app" {
+		t.Errorf("Imports not preserved through Resolve: %+v", resolved.Imports)
+	}
+}
