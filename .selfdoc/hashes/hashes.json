@@ -1,20 +1,24 @@
 {
   "_hash_version": 3,
   "en/cli-build.md": {
-    "content": "7d4f8dd7f8e39b26ffb5f35cefadbaa8918123a78cc50317840f908bbe1ff64e",
-    "description": "0133c2b98efb5e8f65c3e8b2bef097d1d0b4db29c70ea6c468cab465c3fb4e9c"
+    "content": "3570f03d7657ceacbdec3b8540a8fa493efbf8a1a990509250f32fc75a8bd436",
+    "description": "0133c2b98efb5e8f65c3e8b2bef097d1d0b4db29c70ea6c468cab465c3fb4e9c",
+    "schema_hash": "61df55cec4f1ddf0e4ab75d7fc235ea6f5d533cb599ec02190ef6b4b6b10c664"
   },
   "en/cli-check.md": {
-    "content": "1c768feed034497d039d3db8050adc921840d2b1134f5f5d83ce7ffe782247cd",
-    "description": "7c143825d7237386d808148d73eff604ed5ccd56be6fc4eaf43a600624b0b570"
+    "content": "f850783e621141a87393f8ce1ee0adafcd950a810fcf16c988f1f514f27cd4d0",
+    "description": "7c143825d7237386d808148d73eff604ed5ccd56be6fc4eaf43a600624b0b570",
+    "schema_hash": "97b1fb0e560cabf0e06e4555dacf0bc0c65bf4345796982bb799ffbc6c355935"
   },
   "en/cli-codegen.md": {
-    "content": "75d98e08b78e03205b5df8f962324c6dbf13d69a60555a4fab8da97bf734999f",
-    "description": "ccf4a4dcb0bdf0b46fe7643fd4a233bf3d166c3aeba746379ddd18cbe7098d35"
+    "content": "5afed815978280315458566bd3aa65ff55c5b099984a0edeb8357a1278544e37",
+    "description": "ccf4a4dcb0bdf0b46fe7643fd4a233bf3d166c3aeba746379ddd18cbe7098d35",
+    "schema_hash": "9423774eb4b3219791ad7179cd97e348481e0c794e9f2d84b04bbe188f69ad89"
   },
   "en/cli-diff.md": {
-    "content": "52ead5bc87403be970d7c369bd5d818f712744476e0b614cdf08d29426850935",
-    "description": "3aecb4b5e2f48bcafa2b7604bcf419b6fef4fd1a18b51a17d1424e1d30d125ba"
+    "content": "5ee3f2487133527e6ef56e1aa73c4d937b40c0793443ca4668d8333e4b903ef7",
+    "description": "3aecb4b5e2f48bcafa2b7604bcf419b6fef4fd1a18b51a17d1424e1d30d125ba",
+    "schema_hash": "e269570dd1408f16523a168cf20dbcf9de74e2d40f2502ab9ba667a531d3dd67"
   },
   "en/cli-fmt.md": {
     "content": "304c05cd21f539d72b0552a85387f18399c2af8ef6df844fb61649994871678b",
@@ -33,16 +37,18 @@
     "seed_hash": "5eb88e6a891d619ad9420de08c7668ca50fcda6c01455163f5a479848910b174"
   },
   "en/cli-index.md": {
-    "content": "72d52f5edc6200107b05faa6d73f1c4875ab2f3313acc7578b01e9ab84f7c642",
+    "content": "7e3d8f5b97a0357107d6aaf4509726c3225d2e24e02960586e324445851f461f",
     "description": "9cad7754013b69219b0722945a040382b6fdca4ca878bfdad54760604ef7ac5a"
   },
   "en/cli-introspect.md": {
-    "content": "d667af4fb538def434de8c223c8e28fed9d85c0af1597625bbaf0680c4c3c072",
-    "description": "1a99db90102a65a1567c98b6eeba97192156325e57b3434abb2be322416ab779"
+    "content": "603942d571634e1569fcb8196c66f80bc21b504ac0cf2e3dd2d5175d3a35eff4",
+    "description": "1a99db90102a65a1567c98b6eeba97192156325e57b3434abb2be322416ab779",
+    "schema_hash": "cf2eb2074dc3d9a408e24cc557959a1c63243d2ac5279cd67c2dcdadb2b52f63"
   },
   "en/cli-migrate.md": {
-    "content": "9f821aad671f4658893c82dcf459f153d7d9ba69e21242ad013650ce4f9bfb01",
-    "description": "dbb04d64166ce34f6848729e6605119ca287c842991af2d2fc8250d9c5301863"
+    "content": "2444d354648c921bb1e2d9855ae3d103e9119613e645dd88abcd5b04a75ef0d6",
+    "description": "dbb04d64166ce34f6848729e6605119ca287c842991af2d2fc8250d9c5301863",
+    "schema_hash": "3b276e49300411058f3556d4faf3321ebdf27640fa168418e403dcabb09cb6e5"
   },
   "en/cli-revise.md": {
     "content": "ab45f9d8f7c513a6fbce8d2c245d2848e4695637252595998f05513c73eee94f",
@@ -51,20 +57,24 @@
     "seed_hash": "9ceee281d26376c7df27648a175b901cf952865d677014bf7437a582f6f95d6d"
   },
   "en/cli-seed.md": {
-    "content": "9011e99fdf231b2b02fa06f2a3a6c0bb1be48d7d33ff34b0f15e39ef78e8fd0a",
-    "description": "4936f84bc75be5be3f5ccdd8bebbd4e9db29f7a8c827e60219a6c1a8a0824917"
+    "content": "501f77f373b0195ac8c3ac8212e4380d63bdaaaf4d02f47d5c8db7a3f9833c4a",
+    "description": "4936f84bc75be5be3f5ccdd8bebbd4e9db29f7a8c827e60219a6c1a8a0824917",
+    "schema_hash": "449647b8560ac4fe48941a6d1980acc4e91a120edbf63b5082fc3989ba27a64e"
   },
   "en/cli-serve.md": {
-    "content": "4076d8953cca14d6621bd7758faecdbe93181046cf15e257b0d299a2df6be2e0",
-    "description": "007685a9cd505c33e46fbbeab176ef640dc2960afc324a10f3aab514f3663cc3"
+    "content": "1c983c9285c79a49976b5b802f166af4f66d820e032c9ef3d59d543338c2d3ef",
+    "description": "007685a9cd505c33e46fbbeab176ef640dc2960afc324a10f3aab514f3663cc3",
+    "schema_hash": "910e34047d26b0801d498b5c2c510f36a09e49a8d2ec3f080b377bbc9f0dd451"
   },
   "en/cli-stats.md": {
-    "content": "9f21ca5993a9f5760f1cb106c601d31a9dc279b7854cb3a94a7f7f8dbeaf2299",
-    "description": "83a3ccfe151098c7422a467282ed1543f4e1f7657b55644c74661159e94c1750"
+    "content": "33a7ef98d8c54d81cae625f5edfad4a01a7b096ad47e7649be6d01e32a811952",
+    "description": "83a3ccfe151098c7422a467282ed1543f4e1f7657b55644c74661159e94c1750",
+    "schema_hash": "caf70ba29e8fcf2a7d22f25c22fdefd3dd068886af4fa6eaa85e0cf986ae1c8c"
   },
   "en/cli-testdb.md": {
-    "content": "6be64c8433443f7eec183b8baddaaba5a0f6fe54f3e7a5f57737d347ed19c891",
-    "description": "6e49ee105e0d738ece24b970097e50082017bf68e1a545de487c7d437c8bfacc"
+    "content": "07fa5792ecb1350db554c74f27ec33b0d3803c5b916467ae1cf040afacda1350",
+    "description": "6e49ee105e0d738ece24b970097e50082017bf68e1a545de487c7d437c8bfacc",
+    "schema_hash": "c7fd7a0b6b1b0c106cb7fac6f174129de9d51c52e8fe446272698b0abe940b60"
   },
   "en/design-intelligence.md": {
     "content": "3f0f3e41942e94e3c10e320bdc0a8ceca97475c20eaa4771e8206d57b06443b3",
