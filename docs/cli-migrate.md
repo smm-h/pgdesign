@@ -34,7 +34,7 @@ Adopt an existing database onto the migration chain without executing any migrat
 | `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
 | `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
 | `--version` |  | str |  |  | Version label for the baseline record (legacy semver-TOML mode only) |
-| `--description` |  | str | Initial baseline |  | Human-readable description |
+| `--description` |  | str | Initial baseline |  | Human-readable note recorded with the baseline, shown in migrate status and history output |
 
 ### Arguments
 

@@ -20,7 +20,7 @@ Resolve each [imports] alias's git pin, vendor the referenced surface (tables + 
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `alias` | no | Alias to lock (default: all declared aliases) |
+| `alias` | no | Name of the single [imports] alias to lock; omit to lock every alias declared in pgdesign.toml |
 
 ## import update
 
@@ -30,4 +30,4 @@ Re-resolve each [imports] alias's git ref and re-vendor its surface, updating th
 
 | Name | Required | Description |
 | --- | --- | --- |
-| `alias` | no | Alias to update (default: all declared aliases) |
+| `alias` | no | Name of the single [imports] alias to re-resolve and update; omit to update every declared alias |
