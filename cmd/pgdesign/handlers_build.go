@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 
@@ -158,13 +157,12 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 	writtenFiles = append(writtenFiles, svgFiles...)
 
 	if autoCommit && len(writtenFiles) > 0 {
-		args := []string{"commit", "-m", "pgdesign build: regenerate outputs", "--"}
-		args = append(args, writtenFiles...)
-		cmd := exec.Command("safegit", args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: safegit commit failed: %v\n", err)
+		// Commit failure is a HARD ERROR (roadmap 6.1): warn-and-continue would
+		// leave regenerated outputs on disk but uncommitted, silently diverging
+		// the repo from the revision they claim.
+		if err := safegitCommit("pgdesign build: regenerate outputs", writtenFiles); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
 		}
 	}
 
