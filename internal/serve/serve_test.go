@@ -236,6 +236,9 @@ pk = ["id"]
 }
 
 func TestPoolConfigApplied(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no database configured (set PGDESIGN_DB); skipping database-backed test")
+	}
 	// Verify that PoolConfig values are applied to pgxpool.Config when non-zero,
 	// and pgxpool defaults are preserved when zero.
 	connStr := testDB.URL
