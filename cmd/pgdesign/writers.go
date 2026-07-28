@@ -102,6 +102,14 @@ var writersRegistry = map[string]WriterClass{
 	"migrate.upgrade":  ClassAppendOnlyStore,
 	"migrate.baseline": ClassAppendOnlyStore,
 
+	// APPEND-ONLY store writers (import surface): import lock/update vendor the
+	// referenced surface into the content-addressed store at imports/<alias>/ and
+	// write the committed lockfile. Content-addressed and immutable; covered by
+	// the offline `check --tag imports` drift/integrity checker, NOT by the
+	// full-project-stamp agreement rule.
+	"import.lock":   ClassAppendOnlyStore,
+	"import.update": ClassAppendOnlyStore,
+
 	// NON-WRITERS (stdout / database only).
 	"generate":         ClassNonWriter,
 	"diff":             ClassNonWriter,

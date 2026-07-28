@@ -63,3 +63,11 @@ fast = true
 pure = true
 needs_network = false
 depends_on = ["validation"]
+
+[checks.imports]
+tags = ["imports"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["validation"]

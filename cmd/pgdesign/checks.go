@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/discover"
+	"github.com/smm-h/pgdesign/internal/imports"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/workload"
@@ -539,6 +541,62 @@ func checkWorkload(ctx strictcli.CheckContext, r *strictcli.WarnReporter) strict
 		r.Warn(diagDetail(d))
 	}
 	return r.Found(fmt.Sprintf("%d workload issue(s) found", len(allDiags)))
+}
+
+// checkImports is the OFFLINE import drift check (roadmap 7.2). For every
+// declared alias that has a committed lockfile it re-derives the vendored surface
+// and reports, at error severity: vendor/lockfile integrity, semantic drift
+// (column level, via N), and reference drift (FKs naming imported columns the
+// surface lacks or whose junction type drifted). It never touches the remote.
+func checkImports(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
+	root := ctx.ProjectRoot()
+
+	configPath, found := config.FindConfig(root)
+	if !found {
+		return r.Skipped("no pgdesign.toml found")
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		r.Error(fmt.Sprintf("cannot load config: %v", err))
+		return r.Found("config loading failed")
+	}
+	if len(cfg.Imports) == 0 {
+		return r.Skipped("no [imports] declared")
+	}
+	projectRoot := filepath.Dir(configPath)
+
+	declared := make([]string, 0, len(cfg.Imports))
+	for a := range cfg.Imports {
+		declared = append(declared, a)
+	}
+	aliases := imports.ImportAliases(projectRoot, declared)
+	if len(aliases) == 0 {
+		return r.Skipped("no locked imports (run `pgdesign import lock`)")
+	}
+
+	paths, err := loadSchemaForCheck(root)
+	if err != nil {
+		r.Error(fmt.Sprintf("cannot resolve schema paths: %v", err))
+		return r.Found("schema resolution failed")
+	}
+	consumer, _, exitCode := parseAndBuild(nil, paths)
+	if exitCode != 0 {
+		r.Error("schema parse/build failed")
+		return r.Found("schema parse/build failed")
+	}
+
+	total := 0
+	for _, alias := range aliases {
+		diags := imports.Check(projectRoot, alias, consumer)
+		for _, d := range diags {
+			r.Error(diagDetail(d))
+			total++
+		}
+	}
+	if total > 0 {
+		return r.Found(fmt.Sprintf("%d import drift issue(s) across %d locked alias(es)", total, len(aliases)))
+	}
+	return r.Passed(fmt.Sprintf("all %d locked import(s) match the vendored surface", len(aliases)))
 }
 
 func checkBuild(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) strictcli.CheckOutcome {

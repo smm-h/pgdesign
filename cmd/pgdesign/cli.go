@@ -58,6 +58,7 @@ func buildApp() *strictcli.App {
 	app.RegisterWarnCheck("workload", checkWorkload)
 	app.RegisterErrorCheck("build", checkBuild)
 	app.RegisterErrorCheck("revision", checkRevision)
+	app.RegisterErrorCheck("imports", checkImports)
 
 	registerGlobals(app)
 
@@ -77,6 +78,8 @@ func buildApp() *strictcli.App {
 	registerMigrateTestCmd(mig)
 	registerMigrateBaselineCmd(mig)
 	registerMigrateUpgradeCmd(mig)
+
+	registerImportCmds(app)
 
 	registerSeedCmd(app)
 	registerServeCmd(app)
