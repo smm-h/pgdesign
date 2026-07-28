@@ -1432,7 +1432,23 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 	}
 
 	lockTimeout := cfg.Migrate.LockTimeout
-	applied, err := migrate.Apply(ctx, shadowConn, dir, lockTimeout)
+	// Chain-mode projects replay EDGES (the on-disk chain) via ApplyChain; legacy
+	// (semver-TOML) projects replay the migration files via Apply. The subsequent
+	// introspect+diff against the TOML schema is the shadow check for both, so
+	// ApplyChain's internal post-apply reconcile is skipped (dbURL="") to keep a
+	// single, clear failure surface (roadmap 5.10).
+	var applied []string
+	if migrate.IsChainMode(dir) {
+		p, perr := migrate.OpenChainProject(dir)
+		if perr != nil {
+			shadowConn.Close(ctx)
+			fmt.Fprintf(os.Stderr, "error: open chain project: %v\n", perr)
+			return 1
+		}
+		applied, err = migrate.ApplyChain(ctx, shadowConn, p, "", lockTimeout, nil)
+	} else {
+		applied, err = migrate.Apply(ctx, shadowConn, dir, lockTimeout)
+	}
 	shadowConn.Close(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: replay migrations: %v\n", err)
