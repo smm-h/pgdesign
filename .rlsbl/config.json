@@ -36,17 +36,7 @@
   "publish_mode": "ci",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "non-user-facing batch",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 77
-          }
-        ]
-      }
-    ]
+    "exclusions": []
   },
   "coverage_unit": "commit",
   "services": {
