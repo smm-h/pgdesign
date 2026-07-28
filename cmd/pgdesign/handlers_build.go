@@ -2,15 +2,18 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/generate"
+	"github.com/smm-h/pgdesign/internal/livestats"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -21,11 +24,12 @@ import (
 func registerBuildCmd(app *strictcli.App) {
 	app.Command("build", "Generate all configured outputs from pgdesign.toml",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			return strictcli.Exit(runBuild(kwargsConfigOverride(kwargs), kwargsQuiet(kwargs), kwargs["dry_run"].(bool), kwargs["auto_commit"].(bool)))
+			return strictcli.Exit(runBuild(kwargsConfigOverride(kwargs), kwargsQuiet(kwargs), kwargs["dry_run"].(bool), kwargs["auto_commit"].(bool), kwargsDBURL(kwargs)))
 		},
 		strictcli.WithFlags(
 			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files", strictcli.Default(false)),
 			strictcli.BoolFlag("auto-commit", "Automatically git commit generated output files", strictcli.Default(true)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL; required only when a [output.<name>.d2] sets live_stats=true", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),
 	)
 }
@@ -34,7 +38,7 @@ func registerBuildCmd(app *strictcli.App) {
 // directly to exercise the build flow without a CLI parse. configOverride is
 // the --project-config global flag: when set, it names the exact pgdesign.toml to use
 // instead of the walk-up search.
-func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
+func runBuild(configOverride *string, quiet, dryRun, autoCommit bool, dbURL string) int {
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -59,6 +63,16 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 
 	if len(cfg.Output) == 0 {
 		fmt.Fprintln(os.Stderr, "error: no [output] section in pgdesign.toml")
+		return 1
+	}
+
+	// live_stats is an explicit opt-in with no implicit DB dependency: build only
+	// touches a database when some [output.<name>.d2] sets live_stats=true. When
+	// it does, a database is mandatory — an absent --db/PGDESIGN_DB is a hard
+	// error naming the requirement, never a silent fallback to no stats.
+	needLive := configNeedsLiveStats(cfg)
+	if needLive && dbURL == "" {
+		fmt.Fprintln(os.Stderr, "error: an [output.*.d2] sets live_stats=true, which requires a live database; pass --db or set PGDESIGN_DB")
 		return 1
 	}
 
@@ -140,10 +154,23 @@ func runBuild(configOverride *string, quiet, dryRun, autoCommit bool) int {
 		return 1
 	}
 
-	// Handle SVG outputs that were excluded from Plan (non-deterministic rendering).
+	// Fetch live table statistics once when any output opts in via live_stats.
+	// The DB requirement was already enforced above, so needLive implies dbURL.
+	var liveStats map[string]generate.TableStats
+	if needLive {
+		ls, code := fetchBuildLiveStats(dbURL, schema)
+		if code != 0 {
+			return code
+		}
+		liveStats = ls
+	}
+
+	// Handle non-deterministic outputs excluded from Plan: SVG (unstable layout)
+	// and any live_stats d2 (time-varying row counts). Both are generated and
+	// written here, carrying the fetched live stats when configured.
 	extReg := extregistry.NewBuiltinRegistry()
 	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
-	svgFiles, svgExit := handleBuildSVG(cfg, schema, typeReg, extReg, pgVersion, quiet)
+	svgFiles, svgExit := handleBuildLiveOutputs(cfg, schema, typeReg, extReg, liveStats, quiet)
 	if svgExit != 0 {
 		return svgExit
 	}
@@ -232,24 +259,90 @@ func handleBuildDryRun(paths []string, plan *PlanResult, orphans []string, quiet
 	return 0
 }
 
-// handleBuildSVG generates SVG outputs that are excluded from Plan due to
-// non-deterministic d2 rendering. These are still written during non-dry-run builds.
-func handleBuildSVG(cfg *config.ResolvedConfig, schema *model.Schema, typeReg *semtype.Registry, extReg *extregistry.Registry, pgVersion int, quiet bool) ([]string, int) {
+// configNeedsLiveStats reports whether any [output.<name>.d2] subsection opts
+// into live statistics. It is the single predicate that decides whether build
+// touches a database at all — no database is opened unless this returns true.
+func configNeedsLiveStats(cfg *config.ResolvedConfig) bool {
+	for _, out := range cfg.Output {
+		if out.D2 != nil && out.D2.LiveStats {
+			return true
+		}
+	}
+	return false
+}
+
+// schemaNamesOf returns the distinct PostgreSQL schema names the model's tables
+// live in, defaulting to "public" when none are present. It scopes the
+// pg_stat_user_tables query to exactly the served schemas.
+func schemaNamesOf(schema *model.Schema) []string {
+	seen := map[string]bool{}
+	var names []string
+	for _, t := range schema.Tables {
+		s := t.Schema
+		if s == "" {
+			s = "public"
+		}
+		if !seen[s] {
+			seen[s] = true
+			names = append(names, s)
+		}
+	}
+	if len(names) == 0 {
+		names = []string{"public"}
+	}
+	return names
+}
+
+// fetchBuildLiveStats opens a short-lived connection and reads live table
+// statistics for the model's schemas. It is only ever called when some output
+// opted into live_stats and a database URL was supplied.
+func fetchBuildLiveStats(dbURL string, schema *model.Schema) (map[string]generate.TableStats, int) {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, dbURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: build: connect for live_stats: %v\n", err)
+		return nil, 1
+	}
+	defer conn.Close(ctx)
+	stats, err := livestats.Fetch(ctx, conn, schemaNamesOf(schema))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: build: fetch live_stats: %v\n", err)
+		return nil, 1
+	}
+	return stats, 0
+}
+
+// handleBuildLiveOutputs generates the non-deterministic outputs excluded from
+// Plan: SVG (unstable layout coordinates) and any d2 output with live_stats=true
+// (time-varying row counts). Both are written during non-dry-run builds. When an
+// output opts into live_stats, the caller-fetched liveStats map is injected so
+// the diagram carries the live annotations.
+func handleBuildLiveOutputs(cfg *config.ResolvedConfig, schema *model.Schema, typeReg *semtype.Registry, extReg *extregistry.Registry, liveStats map[string]generate.TableStats, quiet bool) ([]string, int) {
+	// Stamp the provenance banner (d2 outputs carry it, matching Plan's d2 path).
+	// Reset after so no later generator call inherits it.
+	if projectRev, err := rev.Compute(schema, rev.RegistryPresent); err == nil {
+		if serr := genkit.SetRevision(projectRev.String()); serr == nil {
+			defer genkit.SetRevision("")
+		}
+	}
+
 	var written []string
 	for name, out := range cfg.Output {
-		if out.Format != "svg" {
+		isSVG := out.Format == "svg"
+		isLiveD2 := out.Format == "d2" && out.D2 != nil && out.D2.LiveStats
+		if !isSVG && !isLiveD2 {
 			continue
 		}
 
-		outputSchema := schema
-		if len(out.Groups) > 0 {
-			outputSchema = schema.FilterByGroups(out.Groups)
-		}
+		outputSchema := applyOutputFilters(schema, out.Groups, out.Source)
 
+		d2opts := d2OptionsFromConfig(out.D2, liveStats)
 		result, genDiags, err := generate.Generate(outputSchema, generate.Options{
-			Format:       "svg",
+			Format:       out.Format,
 			TypeRegistry: typeReg,
 			ExtRegistry:  extReg,
+			ModelClass:   rev.RegistryPresent,
+			D2:           &d2opts,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "build: output %q: %v\n", name, err)
@@ -259,17 +352,24 @@ func handleBuildSVG(cfg *config.ResolvedConfig, schema *model.Schema, typeReg *s
 			fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(genDiags, true))
 		}
 
+		// d2 text carries the hash-comment provenance banner (as Plan does);
+		// svg is raw XML written verbatim.
+		content := []byte(result)
+		if out.Format == "d2" {
+			content = []byte(genkit.Header(genkit.CommentHash) + "\n" + result)
+		}
+
 		outPath := string(out.Path)
 		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 			fmt.Fprintf(os.Stderr, "build: output %q: %v\n", name, err)
 			return nil, 1
 		}
-		if err := os.WriteFile(outPath, []byte(result), 0o644); err != nil {
+		if err := os.WriteFile(outPath, content, 0o644); err != nil {
 			fmt.Fprintf(os.Stderr, "build: output %q: %v\n", name, err)
 			return nil, 1
 		}
 		if !quiet {
-			fmt.Fprintf(os.Stderr, "wrote %s (%d bytes)\n", outPath, len(result))
+			fmt.Fprintf(os.Stderr, "wrote %s (%d bytes)\n", outPath, len(content))
 		}
 		written = append(written, outPath)
 	}

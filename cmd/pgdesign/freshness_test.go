@@ -71,7 +71,7 @@ split_mode = %q
 // testBuild runs the build flow quietly with auto-commit off (temp dirs are
 // not git repos).
 func testBuild(dryRun bool) int {
-	return runBuild(nil, true, dryRun, false)
+	return runBuild(nil, true, dryRun, false, "")
 }
 
 // facetedOnlyFile generates both split modes for the project's schema and

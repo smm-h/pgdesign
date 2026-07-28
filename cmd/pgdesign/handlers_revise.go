@@ -205,7 +205,10 @@ func runRevise(configOverride *string, quiet bool, dirFlag *string, dbURL string
 		return reviseExitPureFailure
 	}
 
-	// Write build outputs, plus SVGs (excluded from Plan for non-determinism).
+	// Write build outputs, plus the non-deterministic outputs excluded from Plan
+	// (SVG, live_stats d2). revise does not fetch live stats — those are a
+	// build-time enrichment (`build --db`) — so live_stats d2 outputs are written
+	// without annotations here (nil stats).
 	extReg := extregistry.NewBuiltinRegistry()
 	extReg.LoadUserExtensions(configToUserExtensions(cfg.Extensions))
 	writtenFiles, err := writePlanFiles(paths, plan.Files, quiet)
@@ -213,7 +216,7 @@ func runRevise(configOverride *string, quiet bool, dirFlag *string, dbURL string
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return reviseExitPureFailure
 	}
-	svgFiles, svgExit := handleBuildSVG(cfg, schema, typeReg, extReg, pgVersion, quiet)
+	svgFiles, svgExit := handleBuildLiveOutputs(cfg, schema, typeReg, extReg, nil, quiet)
 	if svgExit != 0 {
 		return reviseExitPureFailure
 	}

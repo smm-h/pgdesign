@@ -21,6 +21,9 @@ import (
 //   - include, exclude = comma-separated glob patterns
 //   - include_dependencies = <int depth>
 //   - heat_map = fan-in|fan-out
+//
+// live_stats=true is handled separately (Server.applyLiveStats) because it
+// requires a database; this pure function never touches one.
 func d2OptionsFromQuery(r *http.Request) (generate.D2Options, error) {
 	q := r.URL.Query()
 	opts := generate.DefaultD2Options()

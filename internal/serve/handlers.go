@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/generate"
 	"github.com/smm-h/pgdesign/internal/introspect"
+	"github.com/smm-h/pgdesign/internal/livestats"
 	"github.com/smm-h/pgdesign/internal/migrate"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
@@ -120,6 +122,10 @@ func (s *Server) handleSchemaD2(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := s.applyLiveStats(r, &opts); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	d2 := generate.GenerateD2(schema, s.registry(), opts)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -141,6 +147,10 @@ func (s *Server) handleSchemaSVG(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := s.applyLiveStats(r, &opts); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	d2Source := generate.GenerateD2(schema, s.registry(), opts)
 	svg, err := generate.RenderSVG(d2Source, opts)
@@ -152,6 +162,34 @@ func (s *Server) handleSchemaSVG(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.WriteHeader(http.StatusOK)
 	w.Write(svg)
+}
+
+// applyLiveStats populates opts.Stats from pg_stat_user_tables when the request
+// opts in via live_stats=true. Opt-in is explicit and never implicit: without
+// the parameter no database is touched. When live_stats=true is requested but
+// the server has no database (project mode), it is a hard error naming the
+// requirement — never a silent no-op (no-implicit-defaults).
+func (s *Server) applyLiveStats(r *http.Request, opts *generate.D2Options) error {
+	v := r.URL.Query().Get("live_stats")
+	if v == "" {
+		return nil
+	}
+	on, err := strconv.ParseBool(v)
+	if err != nil {
+		return &badParamError{param: "live_stats", value: v}
+	}
+	if !on {
+		return nil
+	}
+	if s.pool == nil {
+		return fmt.Errorf("live_stats=true requires a database, but this server is in project mode (started without --db); restart with --db to enable live statistics")
+	}
+	stats, err := livestats.Fetch(r.Context(), s.pool, s.schemas)
+	if err != nil {
+		return fmt.Errorf("fetch live stats: %w", err)
+	}
+	opts.Stats = stats
+	return nil
 }
 
 // handleSchemaDoc returns human-readable schema documentation (the `generate doc`

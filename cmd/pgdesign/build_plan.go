@@ -86,6 +86,13 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 		if out.Format == "svg" {
 			continue
 		}
+		// d2 outputs with live_stats are excluded for the same reason: baked-in
+		// live row counts change over time, so they cannot be freshness-checked
+		// deterministically. The build live-outputs pass generates and writes
+		// them with the fetched stats; freshness (`check`) skips them.
+		if out.Format == "d2" && out.D2 != nil && out.D2.LiveStats {
+			continue
+		}
 
 		// Filter schema tables by groups and/or source files when configured.
 		outputSchema := applyOutputFilters(schema, out.Groups, out.Source)
@@ -311,7 +318,10 @@ func planGenerate(name string, schema *model.Schema, format string, out config.O
 		ModelClass: rev.RegistryPresent,
 	}
 	if format == "d2" || format == "svg" {
-		d2opts := d2OptionsFromConfig(out.D2)
+		// The deterministic Plan path never carries live stats: live_stats
+		// outputs are non-deterministic and handled by the build live-outputs
+		// pass instead (see Plan's skip below).
+		d2opts := d2OptionsFromConfig(out.D2, nil)
 		opts.D2 = &d2opts
 	}
 
@@ -326,8 +336,11 @@ func planGenerate(name string, schema *model.Schema, format string, out config.O
 // d2OptionsFromConfig maps the [output.<name>.d2] config subsection onto
 // generate.D2Options. It starts from the intended defaults so an absent
 // subsection (nil) yields DefaultD2Options, and each opt-out layer overrides
-// only when explicitly set in TOML.
-func d2OptionsFromConfig(c *config.D2Config) generate.D2Options {
+// only when explicitly set in TOML. liveStats is the caller-fetched live table
+// statistics map (nil in the deterministic Plan path, populated in the build
+// live-outputs pass); it is only assigned when the output opts in via
+// live_stats=true.
+func d2OptionsFromConfig(c *config.D2Config, liveStats map[string]generate.TableStats) generate.D2Options {
 	opts := generate.DefaultD2Options()
 	if c == nil {
 		return opts
@@ -358,6 +371,9 @@ func d2OptionsFromConfig(c *config.D2Config) generate.D2Options {
 	opts.IncludeDependencies = c.IncludeDependencies
 	opts.Summary = c.Summary
 	opts.HeatMap = c.HeatMap
+	if c.LiveStats {
+		opts.Stats = liveStats
+	}
 	return opts
 }
 

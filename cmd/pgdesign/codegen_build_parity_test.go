@@ -78,7 +78,7 @@ func TestCodegenBuildParity_GroupFilter(t *testing.T) {
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
 
 	// Build (canonical): writes the group-filtered constants file.
-	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+	if code := runBuild(&cfgPath, true, false, false, ""); code != 0 {
 		t.Fatalf("runBuild exited %d", code)
 	}
 	buildContent, err := os.ReadFile(buildOut)
@@ -181,7 +181,7 @@ mode = "constraints"
 	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
 		t.Fatalf("write pgdesign.toml: %v", err)
 	}
-	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+	if code := runBuild(&cfgPath, true, false, false, ""); code != 0 {
 		t.Fatalf("runBuild exited %d", code)
 	}
 	typesContent, err := os.ReadFile(typesOut)
@@ -293,7 +293,7 @@ func TestCodegenBuildParity_SourceFilter(t *testing.T) {
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
 
 	// Build (canonical): writes the source-filtered constants file.
-	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+	if code := runBuild(&cfgPath, true, false, false, ""); code != 0 {
 		t.Fatalf("runBuild exited %d", code)
 	}
 	buildContent, err := os.ReadFile(buildOut)

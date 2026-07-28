@@ -116,6 +116,7 @@ type D2Config struct {
 	IncludeDependencies int      `toml:"include_dependencies"` // FK dependency depth (0 = off)
 	Summary             bool     `toml:"summary"`              // names + edges only
 	HeatMap             string   `toml:"heat_map"`             // "", fan-in, fan-out
+	LiveStats           bool     `toml:"live_stats"`           // fetch live row counts / scan ratios from a database (opt-in; requires --db/PGDESIGN_DB)
 }
 
 // RenamesConfig holds the [renames] section: declared table and column renames
@@ -517,6 +518,9 @@ func decodeD2(name string, m map[string]any) (*D2Config, error) {
 
 	if b, ok := m["summary"].(bool); ok {
 		d.Summary = b
+	}
+	if b, ok := m["live_stats"].(bool); ok {
+		d.LiveStats = b
 	}
 
 	strSlice := func(key string) []string {

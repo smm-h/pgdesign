@@ -190,12 +190,12 @@ path = "out.sql"
 	t.Chdir(t.TempDir())
 
 	// Without the override, build must fail: no config is discoverable.
-	if code := runBuild(nil, true, true, false); code == 0 {
+	if code := runBuild(nil, true, true, false, ""); code == 0 {
 		t.Fatal("sanity: expected build without override to fail from a config-less cwd")
 	}
 
 	// With the override, build must succeed (dry-run exits 0 on missing files).
-	if code := runBuild(&cfgPath, true, true, false); code != 0 {
+	if code := runBuild(&cfgPath, true, true, false, ""); code != 0 {
 		t.Errorf("expected build with --project-config override to succeed, got exit code %d", code)
 	}
 }
@@ -205,7 +205,7 @@ func TestRunBuild_MissingConfigOverrideIsHardError(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "does-not-exist.toml")
 	t.Chdir(t.TempDir())
 
-	if code := runBuild(&missing, true, true, false); code == 0 {
+	if code := runBuild(&missing, true, true, false, ""); code == 0 {
 		t.Error("expected build with missing --project-config override to fail")
 	}
 }

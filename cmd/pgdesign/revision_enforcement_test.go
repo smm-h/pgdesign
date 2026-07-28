@@ -113,7 +113,7 @@ func TestRevision_EditThenBuildSucceedsThenPartialWriteRefuses(t *testing.T) {
 	schemaPath := filepath.Join(dir, "schema.toml")
 
 	// Build all outputs; the whole planner set lands at one revision.
-	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+	if code := runBuild(&cfgPath, true, false, false, ""); code != 0 {
 		t.Fatalf("initial build exited %d", code)
 	}
 	if status, out := runCheckRevision(&pgdesignCheckContext{root: dir}); status != "pass" {
@@ -157,7 +157,7 @@ type = "short_text"
 	}
 
 	// The full build restores the fixed point and clears the refusal.
-	if bc := runBuild(&cfgPath, true, false, false); bc != 0 {
+	if bc := runBuild(&cfgPath, true, false, false, ""); bc != 0 {
 		t.Fatalf("rebuild exited %d", bc)
 	}
 	if code2 := runCodegenCapturingStderr(t, &cfgPath, kwargs); code2.exit != 0 {
@@ -224,7 +224,7 @@ path = "schema.md"
 	}
 	t.Chdir(dir)
 
-	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+	if code := runBuild(&cfgPath, true, false, false, ""); code != 0 {
 		t.Fatalf("build exited %d", code)
 	}
 	if status, out := runCheckRevision(&pgdesignCheckContext{root: dir}); status != "pass" {
@@ -260,7 +260,7 @@ func TestRevision_TamperedHeaderDistinguishesSignals(t *testing.T) {
 	t.Chdir(dir)
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
 
-	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+	if code := runBuild(&cfgPath, true, false, false, ""); code != 0 {
 		t.Fatalf("build exited %d", code)
 	}
 
@@ -320,7 +320,7 @@ func TestRevision_ScaffoldingAndSeedNeverFlagged(t *testing.T) {
 	dir := writeMultiOutputProject(t)
 	t.Chdir(dir)
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
-	if code := runBuild(&cfgPath, true, false, false); code != 0 {
+	if code := runBuild(&cfgPath, true, false, false, ""); code != 0 {
 		t.Fatalf("build exited %d", code)
 	}
 
