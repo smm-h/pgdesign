@@ -48,12 +48,6 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 				return strictcli.Exit(exitCode)
 			}
 
-			cfg, cfgErr := loadProjectConfig(cfgOverride, paths[0])
-			if cfgErr != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
-				return strictcli.Exit(1)
-			}
-
 			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required for migrate plan")
@@ -100,29 +94,7 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			var tableStats migrate.TableStats
-			statsConn, err := pgx.Connect(ctx, dbURL)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "warning: cannot connect for table stats: %v\n", err)
-			} else {
-				for _, sn := range schemaNames {
-					stats, err := migrate.QueryTableStats(ctx, statsConn, sn)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "warning: cannot query table stats for %s: %v\n", sn, err)
-					} else {
-						if tableStats == nil {
-							tableStats = stats
-						} else {
-							for k, v := range stats {
-								tableStats[k] = v
-							}
-						}
-					}
-				}
-				statsConn.Close(ctx)
-			}
-
-			m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
+			m, migDiags := migrate.GenerateMigration(d, schema, "0.0.0", extregistry.NewBuiltinRegistry())
 
 			fmt.Println("Migration plan:")
 			fmt.Printf("  Description: %s\n", m.Description)
@@ -297,29 +269,7 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			var tableStats migrate.TableStats
-			statsConn, err := pgx.Connect(ctx, dbURL)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "warning: cannot connect for table stats: %v\n", err)
-			} else {
-				for _, sn := range schemaNames {
-					stats, err := migrate.QueryTableStats(ctx, statsConn, sn)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "warning: cannot query table stats for %s: %v\n", sn, err)
-					} else {
-						if tableStats == nil {
-							tableStats = stats
-						} else {
-							for k, v := range stats {
-								tableStats[k] = v
-							}
-						}
-					}
-				}
-				statsConn.Close(ctx)
-			}
-
-			m, migDiags := migrate.GenerateMigration(d, schema, version, tableStats, cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold, extregistry.NewBuiltinRegistry())
+			m, migDiags := migrate.GenerateMigration(d, schema, version, extregistry.NewBuiltinRegistry())
 
 			if len(migDiags) > 0 {
 				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
@@ -401,9 +351,7 @@ func handleMigrateGenerateChain(schema *model.Schema, dir string, cfg *config.Ra
 		return 0
 	}
 
-	m, migDiags := migrate.GenerateMigration(d, schema, "", nil,
-		cfg.Migrate.AutoConcurrentThreshold, cfg.Migrate.ExpandContractThreshold,
-		extregistry.NewBuiltinRegistry())
+	m, migDiags := migrate.GenerateMigration(d, schema, "", extregistry.NewBuiltinRegistry())
 	if len(migDiags) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(migDiags, true))
 	}

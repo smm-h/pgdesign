@@ -21,32 +21,27 @@ import (
 
 // GenerateMigration converts a SchemaDiff into a Migration with DDL/DML ops
 // and safety diagnostics. The desired schema is used to look up full table
-// definitions for create_table ops. tableStats provides estimated row counts
-// from pg_stat_user_tables (nil when --db is not available or stats are
-// unavailable). largeFKThreshold is the row count above which E300 is emitted
-// for ADD CONSTRAINT without NOT VALID; pass 0 to use the default of 10000.
-// expandContractThreshold is the row count above which set_not_null ops are
-// decomposed into a DML backfill step followed by set_not_null; pass 0 to use
-// the default of 10_000_000.
-func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string, tableStats TableStats, largeFKThreshold int64, expandContractThreshold int64, extReg *extregistry.Registry) (*Migration, []diagnostic.Diagnostic) {
-	if largeFKThreshold <= 0 {
-		largeFKThreshold = 10_000
-	}
-	if expandContractThreshold <= 0 {
-		expandContractThreshold = 10_000_000
-	}
+// definitions for create_table ops.
+//
+// Generation is PURE (L5): it never reads the world. It has no row counts, so
+// it ALWAYS emits the large-table-safe forms — FK adds split into NOT VALID +
+// VALIDATE, columns becoming NOT NULL get a backfill-then-set_not_null pair,
+// and expand/contract phasing is applied unconditionally. The same TOML edit
+// yields the same migration regardless of any database's state.
+func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string, extReg *extregistry.Registry) (*Migration, []diagnostic.Diagnostic) {
 	m := &Migration{
 		Version:     version,
 		Description: generateDescription(d),
 	}
 	var diags []diagnostic.Diagnostic
 
-	// tableCtx builds an OpContext with EstimatedRows and PGVersion populated
-	// from tableStats and the desired schema's PGVersion.
+	// tableCtx builds an OpContext with only the desired schema's PGVersion.
+	// Generation is pure: there are no row-count estimates, so EstimatedRows is
+	// left zero and table-size risk escalation never fires here.
 	tableCtx := func(tableName string) risk.OpContext {
+		_ = tableName
 		return risk.OpContext{
-			EstimatedRows: lookupRows(tableStats, tableName),
-			PGVersion:     desired.PGVersion,
+			PGVersion: desired.PGVersion,
 		}
 	}
 
@@ -369,20 +364,13 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		if table != nil {
 			for _, fk := range table.FKs {
 				fkOp := makeFKOp(tableName, fk)
-				splitOps, splitDiags := splitLargeFKOp(fkOp, ctx, largeFKThreshold)
-				if splitOps != nil {
-					for _, sop := range splitOps {
-						m.DDLOps = append(m.DDLOps, sop)
-						opType := risk.OpAddFKNotValid
-						if sop.Op == "validate_constraint" {
-							opType = risk.OpValidateConstraint
-						}
-						diags = append(diags, classifyOp(sop, opType, ctx)...)
+				for _, sop := range splitFKOp(fkOp) {
+					m.DDLOps = append(m.DDLOps, sop)
+					opType := risk.OpAddFKNotValid
+					if sop.Op == "validate_constraint" {
+						opType = risk.OpValidateConstraint
 					}
-					diags = append(diags, splitDiags...)
-				} else {
-					m.DDLOps = append(m.DDLOps, fkOp)
-					diags = append(diags, classifyOp(fkOp, risk.OpAddFK, ctx)...)
+					diags = append(diags, classifyOp(sop, opType, ctx)...)
 				}
 			}
 			for _, idx := range table.Indexes {
@@ -585,31 +573,34 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				m.DDLOps = append(m.DDLOps, op)
 				diags = append(diags, classifyOp(op, risk.OpAlterColumnType, ctx)...)
 
-				// Type narrowing warning for large tables.
-				if ctx.EstimatedRows > expandContractThreshold && !diff.IsWidening(cc.TypeChanged[0], cc.TypeChanged[1]) {
+				// EXPAND_CONTRACT_TYPE_NARROW advisory. The narrowing decision is
+				// made by the diff (cc.TypeNarrowing) — pure, no row counts — so it
+				// fires on EVERY narrowing rather than only on large tables (5.9
+				// behavior change).
+				if cc.TypeNarrowing {
 					diags = append(diags, diagnostic.Diagnostic{
 						Severity:   diagnostic.Warning,
 						Code:       "EXPAND_CONTRACT_TYPE_NARROW",
 						Table:      td.Name,
 						Column:     cc.Name,
-						Message:    fmt.Sprintf("Type narrowing on %s.%s (%s -> %s) on table with %d rows may require expand-contract migration", td.Name, cc.Name, cc.TypeChanged[0], cc.TypeChanged[1], ctx.EstimatedRows),
+						Message:    fmt.Sprintf("Type narrowing on %s.%s (%s -> %s) may require an expand-contract migration", td.Name, cc.Name, cc.TypeChanged[0], cc.TypeChanged[1]),
 						Suggestion: "Consider an expand-contract approach: add new column, backfill, swap, drop old column",
 					})
 				}
 			}
 			if cc.NullableChanged != nil {
 				if cc.NullableChanged[1] {
-					// Becoming NOT NULL.
-					if ctx.EstimatedRows > expandContractThreshold {
-						// Decompose into backfill DML + set_not_null for large tables.
-						backfillSQL := buildBackfillSQL(td.Name, cc.Name, desired)
-						dmlOp := DMLOp{
-							Op:   "backfill",
-							SQL:  backfillSQL,
-							Down: &DownOp{Irreversible: true},
-						}
-						m.DMLOps = append(m.DMLOps, dmlOp)
+					// Becoming NOT NULL. Generation is pure and always emits the
+					// always-safe expand/contract form: a backfill DML that fills
+					// existing NULLs precedes the set_not_null so the constraint
+					// validation cannot fail on live rows (5.9).
+					backfillSQL := buildBackfillSQL(td.Name, cc.Name, desired)
+					dmlOp := DMLOp{
+						Op:   "backfill",
+						SQL:  backfillSQL,
+						Down: &DownOp{Irreversible: true},
 					}
+					m.DMLOps = append(m.DMLOps, dmlOp)
 					op := DDLOp{
 						Op:     "set_not_null",
 						Table:  td.Name,
@@ -740,20 +731,13 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		// Added FKs.
 		for _, fk := range td.FKsAdded {
 			fkOp := makeFKOp(td.Name, fk)
-			splitOps, splitDiags := splitLargeFKOp(fkOp, ctx, largeFKThreshold)
-			if splitOps != nil {
-				for _, sop := range splitOps {
-					m.DDLOps = append(m.DDLOps, sop)
-					opType := risk.OpAddFKNotValid
-					if sop.Op == "validate_constraint" {
-						opType = risk.OpValidateConstraint
-					}
-					diags = append(diags, classifyOp(sop, opType, ctx)...)
+			for _, sop := range splitFKOp(fkOp) {
+				m.DDLOps = append(m.DDLOps, sop)
+				opType := risk.OpAddFKNotValid
+				if sop.Op == "validate_constraint" {
+					opType = risk.OpValidateConstraint
 				}
-				diags = append(diags, splitDiags...)
-			} else {
-				m.DDLOps = append(m.DDLOps, fkOp)
-				diags = append(diags, classifyOp(fkOp, risk.OpAddFK, ctx)...)
+				diags = append(diags, classifyOp(sop, opType, ctx)...)
 			}
 		}
 
@@ -778,20 +762,13 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			m.DDLOps = append(m.DDLOps, dropOp)
 
 			addOp := makeFKOp(td.Name, fc.New)
-			splitOps, splitDiags := splitLargeFKOp(addOp, ctx, largeFKThreshold)
-			if splitOps != nil {
-				for _, sop := range splitOps {
-					m.DDLOps = append(m.DDLOps, sop)
-					opType := risk.OpAddFKNotValid
-					if sop.Op == "validate_constraint" {
-						opType = risk.OpValidateConstraint
-					}
-					diags = append(diags, classifyOp(sop, opType, ctx)...)
+			for _, sop := range splitFKOp(addOp) {
+				m.DDLOps = append(m.DDLOps, sop)
+				opType := risk.OpAddFKNotValid
+				if sop.Op == "validate_constraint" {
+					opType = risk.OpValidateConstraint
 				}
-				diags = append(diags, splitDiags...)
-			} else {
-				m.DDLOps = append(m.DDLOps, addOp)
-				diags = append(diags, classifyOp(addOp, risk.OpAddFK, ctx)...)
+				diags = append(diags, classifyOp(sop, opType, ctx)...)
 			}
 		}
 
@@ -1763,12 +1740,14 @@ func makeExclusionOp(tableName string, exc model.ExclusionConstraint) DDLOp {
 	}
 }
 
-// splitLargeFKOp splits an add_fk op into add_fk_not_valid + validate_constraint
-// when the target table exceeds the row threshold. Returns nil, nil when no
-// split is needed.
-func splitLargeFKOp(op DDLOp, ctx risk.OpContext, threshold int64) ([]DDLOp, []diagnostic.Diagnostic) {
-	if op.Op != "add_fk" || ctx.EstimatedRows <= threshold {
-		return nil, nil
+// splitFKOp splits an add_fk op into add_fk_not_valid + validate_constraint.
+// Generation is pure (no row counts), so the always-safe two-step form is
+// emitted unconditionally: adding the constraint NOT VALID takes a weaker lock
+// and the separate VALIDATE scan does not block writes. Returns nil for a
+// non-add_fk op.
+func splitFKOp(op DDLOp) []DDLOp {
+	if op.Op != "add_fk" {
+		return nil
 	}
 	addNotValid := DDLOp{
 		Op:       "add_fk_not_valid",
@@ -1788,7 +1767,7 @@ func splitLargeFKOp(op DDLOp, ctx risk.OpContext, threshold int64) ([]DDLOp, []d
 		Name:  op.Name,
 		Down:  &DownOp{Irreversible: true},
 	}
-	return []DDLOp{addNotValid, validate}, nil
+	return []DDLOp{addNotValid, validate}
 }
 
 // nonImmutablePatterns lists PostgreSQL function calls whose defaults are not

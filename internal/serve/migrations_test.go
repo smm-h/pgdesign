@@ -29,7 +29,7 @@ func writeGenesisEdgeForServe(t *testing.T, p *migrate.ChainProject) error {
 	}
 	desired.Canonicalize()
 	d := diff.Diff(desired, &model.Schema{Name: "public", PGVersion: 16})
-	m, _ := migrate.GenerateMigration(d, desired, "", nil, 0, 0, extregistry.NewBuiltinRegistry())
+	m, _ := migrate.GenerateMigration(d, desired, "", extregistry.NewBuiltinRegistry())
 	_, err := migrate.GenerateEdge(p, m, desired, nil, rev.Revision{}, rev.RegistryPresent, "genesis")
 	return err
 }

@@ -208,7 +208,7 @@ func writeChainFiles(p *ChainProject, desired *model.Schema, extReg *extregistry
 	if d.IsEmpty() {
 		return "", rev.Revision{}, fmt.Errorf("migrate upgrade: the reconciled schema is empty; there is nothing to fold into a prefix edge")
 	}
-	m, _ := GenerateMigration(d, desired, "", nil, 0, 0, extReg)
+	m, _ := GenerateMigration(d, desired, "", extReg)
 	if len(m.DDLOps) == 0 && len(m.DMLOps) == 0 {
 		return "", rev.Revision{}, fmt.Errorf("migrate upgrade: the reconciled schema produced no operations; there is nothing to fold into a prefix edge")
 	}
