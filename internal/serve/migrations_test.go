@@ -90,12 +90,19 @@ func TestGetMigrationsViewPrecedence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Roll back on any early t.Fatal between here and Commit — otherwise the tx's
+	// connection stays checked out and the deferred pool.Close() (in setupServer)
+	// blocks forever, turning a plain test failure into a whole-package hang.
+	// After a successful Commit this Rollback is a no-op (ErrTxClosed).
+	defer tx.Rollback(ctx)
 	if err := migrate.CreateTrackingStructures(ctx, tx); err != nil {
 		t.Fatal(err)
 	}
+	// down_op must be present for invertible ops (pgdesign_migration_ops_down_presence:
+	// (invertibility = 'non-invertible') = (down_op IS NULL)).
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO pgdesign_migration_ops (edge_id, seq, phase, op_kind, target, invertibility, status, confirmed_at, version_label, description, checksum)
-		 VALUES ('e1', 0, '', 'create_table', 'table:t', 'mechanically-invertible', 'confirmed', now(), 'chain-edge', 'from the view', 'xyz')`); err != nil {
+		`INSERT INTO pgdesign_migration_ops (edge_id, seq, phase, op_kind, target, invertibility, down_op, status, confirmed_at, version_label, description, checksum)
+		 VALUES ('e1', 0, '', 'create_table', 'table:t', 'mechanically-invertible', '{"kind":"drop_table","target":"table:t","invertibility":"mechanically-invertible","payload_id":null}'::jsonb, 'confirmed', now(), 'chain-edge', 'from the view', 'xyz')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
