@@ -29,6 +29,7 @@ import (
 	"github.com/smm-h/pgdesign/internal/enc"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/objstore"
+	pgsql "github.com/smm-h/pgdesign/internal/sql"
 )
 
 // renameEscapeHint is appended to every gate error: the two deliberate ways out.
@@ -207,17 +208,94 @@ func resolveColumnRenames(d *SchemaDiff, desired, actual *model.Schema, spec Ren
 	return nil
 }
 
-// maskedTableID returns the content id of a table with its NAME blanked, so two
-// tables identical except for their name share an id. Schema is retained (a
-// rename is within a schema). Returns "" if encoding fails (never pairs).
+// maskedTableID returns the content id of a table with its NAME blanked AND every
+// name field that is DERIVED FROM the table name neutralized, so two tables
+// identical except for their name share an id. Schema is retained (a rename is
+// within a schema). Returns "" if encoding fails (never pairs).
+//
+// Without this neutralization the gate is defeated by build-time artifacts that
+// embed the table name: enrich() adds auto-FK-coverage indexes named
+// idx_<table>_<cols> (IsAutoFK), and any constraint/index the user named with the
+// default convention (sql.ConstraintName: <kind>_<table>_<refs>) carries the old
+// table name. A renamed FK-bearing table would therefore mask to a DIFFERENT id,
+// so an undeclared rename would escape the gate (silent drop+create data loss) and
+// a declared rename would be rejected as "differ beyond their name".
+//
+// Neutralization is name-scheme aware, keyed on the table's OWN name:
+//   - IsAutoFK indexes are dropped entirely (a pure enrich derivation, not
+//     desired-model identity; their name always embeds the table name).
+//   - an index/FK/unique/check/exclusion whose Name equals the default auto-naming
+//     scheme for THIS table has its Name blanked (a convention-followed name is
+//     indistinguishable from a tool-generated one and must not defeat the gate).
+//   - a genuinely custom name (not matching the scheme) is preserved, so it
+//     legitimately differs and blocks pairing — the intended behavior.
 func maskedTableID(t *model.Table) string {
-	masked := *t
+	masked := neutralizeAutoNames(*t)
 	masked.Name = ""
 	b, err := enc.EncodeTable(masked)
 	if err != nil {
 		return ""
 	}
 	return objstore.ID(b)
+}
+
+// neutralizeAutoNames returns a copy of t with enrich-derived and
+// convention-named artifacts stripped/blanked (see maskedTableID). The scheme is
+// computed from t.Name (the table's current name), reproducing sql.ConstraintName
+// exactly so both the old-named removal and the new-named addition of a rename
+// mask identically.
+func neutralizeAutoNames(t model.Table) model.Table {
+	name := t.Name
+
+	idxs := make([]model.Index, 0, len(t.Indexes))
+	for _, ix := range t.Indexes {
+		if ix.IsAutoFK {
+			continue // pure enrich derivation; drop entirely
+		}
+		if ix.Name == pgsql.ConstraintName(name, "idx", ix.Columns...) {
+			ix.Name = ""
+		}
+		idxs = append(idxs, ix)
+	}
+	t.Indexes = idxs
+
+	fks := make([]model.FK, len(t.FKs))
+	copy(fks, t.FKs)
+	for i := range fks {
+		if fks[i].Name == pgsql.ConstraintName(name, "fk", fks[i].RefTable) {
+			fks[i].Name = ""
+		}
+	}
+	t.FKs = fks
+
+	uqs := make([]model.UniqueConstraint, len(t.Uniques))
+	copy(uqs, t.Uniques)
+	for i := range uqs {
+		if uqs[i].Name == pgsql.ConstraintName(name, "uq", uqs[i].Columns...) {
+			uqs[i].Name = ""
+		}
+	}
+	t.Uniques = uqs
+
+	cks := make([]model.CheckConstraint, len(t.Checks))
+	copy(cks, t.Checks)
+	for i := range cks {
+		if cks[i].Name == pgsql.ConstraintName(name, "ck") {
+			cks[i].Name = ""
+		}
+	}
+	t.Checks = cks
+
+	excls := make([]model.ExclusionConstraint, len(t.Exclusions))
+	copy(excls, t.Exclusions)
+	for i := range excls {
+		if len(excls[i].Elements) > 0 && excls[i].Name == pgsql.ConstraintName(name, "excl", excls[i].Elements[0].Column) {
+			excls[i].Name = ""
+		}
+	}
+	t.Exclusions = excls
+
+	return t
 }
 
 // resolveTableRenames resolves declared table renames and gates undeclared /

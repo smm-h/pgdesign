@@ -142,6 +142,95 @@ func TestRenameGate_DeclaredTable(t *testing.T) {
 	}
 }
 
+// fkBearingTable builds a table with a child_id column, an FK to `other` named by
+// the default convention (fk_<table>_other), and the enrich-derived auto-FK
+// coverage index (idx_<table>_child_id, IsAutoFK). Both the FK name and the auto
+// index name embed the table name — exactly the artifacts that defeat the masked
+// rename gate before neutralization.
+func fkBearingTable(name string) model.Table {
+	return model.Table{
+		Name:    name,
+		Schema:  "public",
+		Comment: "t",
+		PK:      []string{"id"},
+		Columns: []model.Column{
+			{Name: "id", PGType: typeinfo.T("int8"), NotNull: true},
+			{Name: "child_id", PGType: typeinfo.T("int8"), NotNull: true},
+		},
+		FKs: []model.FK{{
+			Name: "fk_" + name + "_other", Columns: []string{"child_id"},
+			RefSchema: "public", RefTable: "other", RefColumns: []string{"id"}, OnDelete: "cascade",
+		}},
+		Indexes: []model.Index{{
+			Name: "idx_" + name + "_child_id", Columns: []string{"child_id"},
+			Method: "btree", IsAutoFK: true,
+		}},
+	}
+}
+
+// TestRenameGate_UndeclaredFKTableBlocks: an undeclared rename of an FK-BEARING
+// table must fire the gate. Before the maskedTableID neutralization the auto-FK
+// index name and convention FK name embed the table name, so the masked ids
+// DIFFER and the rename silently escapes as a drop+create (the data-loss hazard
+// the gate exists to prevent).
+func TestRenameGate_UndeclaredFKTableBlocks(t *testing.T) {
+	oldT := fkBearingTable("old_t")
+	newT := fkBearingTable("new_t")
+	d := Diff(renameSchema(newT), renameSchema(oldT))
+
+	err := ResolveRenames(d, renameSchema(newT), renameSchema(oldT), RenameSpec{}, false)
+	if err == nil {
+		t.Fatal("undeclared rename of an FK-bearing table must be a hard error (gate must fire)")
+	}
+	if !strings.Contains(err.Error(), "old_t") || !strings.Contains(err.Error(), "new_t") {
+		t.Errorf("error should name both tables, got: %s", err.Error())
+	}
+}
+
+// TestRenameGate_DeclaredFKTableResolves: a DECLARED rename of the same FK-bearing
+// table must resolve to a TablesRenamed entry. Before neutralization the masked
+// ids differ and the declared rename is wrongly rejected as "differ beyond their
+// name".
+func TestRenameGate_DeclaredFKTableResolves(t *testing.T) {
+	oldT := fkBearingTable("old_t")
+	newT := fkBearingTable("new_t")
+	actual := renameSchema(oldT)
+	desired := renameSchema(newT)
+	d := Diff(desired, actual)
+
+	spec := RenameSpec{Tables: []RenamePair{{From: "old_t", To: "new_t"}}}
+	if err := ResolveRenames(d, desired, actual, spec, false); err != nil {
+		t.Fatalf("declared rename of an FK-bearing table should resolve, got: %v", err)
+	}
+	if len(d.TablesRenamed) != 1 || d.TablesRenamed[0].From != "old_t" || d.TablesRenamed[0].To != "new_t" {
+		t.Fatalf("expected TablesRenamed [old_t->new_t], got %+v", d.TablesRenamed)
+	}
+	if len(d.TablesRemoved) != 0 || len(d.TablesAdded) != 0 {
+		t.Errorf("expected add/remove emptied, got removed=%v added=%v", d.TablesRemoved, d.TablesAdded)
+	}
+}
+
+// TestRenameGate_CustomNamedIndexNotBlanked: neutralization must NOT blank custom
+// (non-scheme) index names. Two tables whose ONLY difference is a custom index
+// name must mask DIFFERENTLY, so no false rename pairing occurs (the drop+create
+// proceeds without a spurious gate error).
+func TestRenameGate_CustomNamedIndexNotBlanked(t *testing.T) {
+	oldT := model.Table{
+		Name: "old_t", Schema: "public", Comment: "t", PK: []string{"id"},
+		Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}, rcol("x", "")},
+		Indexes: []model.Index{{Name: "lookup_a", Columns: []string{"x"}, Method: "btree"}},
+	}
+	newT := model.Table{
+		Name: "new_t", Schema: "public", Comment: "t", PK: []string{"id"},
+		Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}, rcol("x", "")},
+		Indexes: []model.Index{{Name: "lookup_b", Columns: []string{"x"}, Method: "btree"}},
+	}
+	d := Diff(renameSchema(newT), renameSchema(oldT))
+	if err := ResolveRenames(d, renameSchema(newT), renameSchema(oldT), RenameSpec{}, false); err != nil {
+		t.Fatalf("distinct custom index names must mask differently (no false pairing), got: %v", err)
+	}
+}
+
 // TestRenameGate_UndeclaredTableBlocks: an undeclared plausible table rename
 // (equal masked content-id) is a hard error.
 func TestRenameGate_UndeclaredTableBlocks(t *testing.T) {
