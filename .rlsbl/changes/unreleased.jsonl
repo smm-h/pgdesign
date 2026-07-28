@@ -209,3 +209,4 @@
 {"format_version":1,"id":"18c65e3c4824d79116ac9042f6164a6dbe793f09b7ca3e92","commits":["d1e6b8cc4b745553566bc048768b6409a11f451e"],"user_facing":false}
 {"format_version":1,"id":"18c65e3c51b3fb0445f28b1987ee4d078528363bcb20c58e","commits":["e2424711a541246c26ffafd4dd709fab32f7ec40"],"user_facing":false}
 {"format_version":1,"id":"18c65e3c5b6bb247188236c3dcd74e48bd8d3f4d019db557","commits":["d8c0874f619c4ae034b202882df5253a47d2f231"],"user_facing":false}
+{"format_version":1,"id":"18c65e3dc775ff5a6e978b3e7d46417fb5bd85ededbae526","commits":["76382f9233f05629a1e87a9185afe4096963343b"],"user_facing":true,"description":"**Imported/owned table-name collisions are now a hard error.** When a vendored imported reference table shares its (schema, name) with one of your own tables, `pgdesign` fails the build and names both sources, instead of silently letting your table shadow the import.","type":"fix"}
