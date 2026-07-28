@@ -61,7 +61,9 @@ func Plan(schema *model.Schema, cfg *config.ResolvedConfig, registry *semtype.Re
 	if err != nil {
 		return nil, fmt.Errorf("build: compute project revision: %w", err)
 	}
-	genkit.SetRevision(projectRev.String())
+	if err := genkit.SetRevision(projectRev.String()); err != nil {
+		return nil, fmt.Errorf("build: %w", err)
+	}
 	defer genkit.SetRevision("")
 
 	extReg := extregistry.NewBuiltinRegistry()
@@ -261,7 +263,9 @@ func PlanStandaloneCodegen(schema *model.Schema, out config.OutputConfig[config.
 	if err != nil {
 		return nil, fmt.Errorf("codegen: compute project revision: %w", err)
 	}
-	genkit.SetRevision(projectRev.String())
+	if err := genkit.SetRevision(projectRev.String()); err != nil {
+		return nil, fmt.Errorf("codegen: %w", err)
+	}
 	defer genkit.SetRevision("")
 
 	outputSchema := applyOutputFilters(schema, out.Groups, out.Source)

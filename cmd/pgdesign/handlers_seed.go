@@ -69,7 +69,10 @@ func registerSeedCmd(app *strictcli.App) {
 				fmt.Fprintf(os.Stderr, "error: compute project revision: %v\n", revErr)
 				return strictcli.Exit(1)
 			}
-			genkit.SetRevision(projectRev.String())
+			if err := genkit.SetRevision(projectRev.String()); err != nil {
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				return strictcli.Exit(1)
+			}
 			defer genkit.SetRevision("")
 
 			sql, seedDiags := seed.Generate(schema, rows, rng, cfg)

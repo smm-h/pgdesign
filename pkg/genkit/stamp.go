@@ -1,6 +1,9 @@
 package genkit
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // This file is the single writer AND reader of the provenance header that every
 // pgdesign-generated artifact begins with. Nothing outside this file may emit
@@ -62,7 +65,24 @@ var stampRevision string
 // own Stamp). The build funnel calls SetRevision(r) before generating and
 // SetRevision("") — typically via defer — afterward. Passing "" disables the
 // revision line.
-func SetRevision(r string) { stampRevision = r }
+//
+// GUARD (roadmap 4.2 / 6.1 obligation): stampRevision is package-global mutable
+// state whose sole invariant is "no two generation funnels run concurrently in
+// one process". SetRevision MECHANICALLY ASSERTS it: setting a non-empty
+// revision while one is already set is a hard error (a nested/overlapping funnel
+// would otherwise silently stamp the wrong revision). Resetting to "" is always
+// allowed — it is the funnel exit. A funnel that ignores the returned error
+// re-enables the silent-corruption hazard the guard exists to prevent, so every
+// funnel MUST check it.
+func SetRevision(r string) error {
+	if r != "" && stampRevision != "" {
+		return fmt.Errorf("genkit: SetRevision(%q) called while revision %q is already set: "+
+			"two generation funnels must not run concurrently in one process (roadmap 4.2 obligation); "+
+			"reset with SetRevision(\"\") before starting another funnel", r, stampRevision)
+	}
+	stampRevision = r
+	return nil
+}
 
 // CurrentRevision returns the full-project revision Header currently stamps.
 // Writers that build a Stamp directly rather than through Header (seed, which

@@ -99,3 +99,40 @@ func TestParseStampToleratesLeadingWhitespace(t *testing.T) {
 		t.Errorf("HasStamp rejected stamp with leading whitespace")
 	}
 }
+
+// TestSetRevisionGuardRejectsReentry asserts the roadmap 4.2/6.1 obligation:
+// stampRevision is package-global mutable state whose invariant is "no two
+// generation funnels run concurrently in one process". SetRevision mechanically
+// enforces it — setting a non-empty revision while one is already set is a hard
+// error — so an accidental overlap can never silently stamp the wrong revision.
+func TestSetRevisionGuardRejectsReentry(t *testing.T) {
+	// Ensure a clean slate regardless of test ordering.
+	SetRevision("")
+	defer SetRevision("")
+
+	if err := SetRevision("rev-a"); err != nil {
+		t.Fatalf("first SetRevision must succeed, got %v", err)
+	}
+	if CurrentRevision() != "rev-a" {
+		t.Fatalf("expected current revision rev-a, got %q", CurrentRevision())
+	}
+
+	// A second non-empty SetRevision without a reset is the concurrency
+	// violation — it must be refused, and the original revision must stand.
+	err := SetRevision("rev-b")
+	if err == nil {
+		t.Fatal("re-entrant SetRevision must return an error")
+	}
+	if CurrentRevision() != "rev-a" {
+		t.Fatalf("refused SetRevision must not mutate state; got %q", CurrentRevision())
+	}
+
+	// Resetting to "" is always allowed (the funnel exit)...
+	if err := SetRevision(""); err != nil {
+		t.Fatalf("reset SetRevision(\"\") must succeed, got %v", err)
+	}
+	// ...after which a fresh funnel may set again.
+	if err := SetRevision("rev-c"); err != nil {
+		t.Fatalf("SetRevision after reset must succeed, got %v", err)
+	}
+}
