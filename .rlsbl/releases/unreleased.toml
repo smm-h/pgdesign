@@ -1,11 +1,19 @@
 # strictspec document version gate (do not remove)
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
-bump = ""
+bump = "infra"
 # Short description of this release (required)
-description = ""
+description = "Make a PostgreSQL-version-dependent live-stats test deterministic so CI passes and the release can publish."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+0.25.0 and 0.25.1 were tagged but never reached npm/PyPI: the publish gate
+refused because CI failed. 0.25.1 fixed the earlier saferm/safegit tool
+dependencies, but CI still failed on TestBuildLiveStatsPopulatesD2, which
+hardcoded an n_live_tup estimate that PostgreSQL 17 double-counts (6 vs 3). This
+infra release carries only that test-determinism fix; it is the first artifact
+to actually publish, delivering the user-facing 0.25.1 fixes (see the 0.25.1
+CHANGELOG section) to registries. No user-facing delta over 0.25.1.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
