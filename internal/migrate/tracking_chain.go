@@ -179,6 +179,22 @@ func insertChainPosition(ctx context.Context, tx pgx.Tx, p chainPosition) error 
 	return nil
 }
 
+// rebaselineChainPosition re-stamps the singleton position row at a baseline
+// target (roadmap 5.10): current == boundary == target, boundary_kind='baseline',
+// in-progress cleared. It is the chain-mode baseline's re-baseline write, routed
+// here to preserve the single-write-path invariant (tracking_write_path.md).
+func rebaselineChainPosition(ctx context.Context, exec sqlExecer, target string, codecEpoch int) error {
+	_, err := exec.Exec(ctx,
+		`UPDATE pgdesign_chain_position
+		   SET current_revision = $1, boundary_revision = $1, boundary_kind = 'baseline',
+		       in_progress_edge = NULL, codec_epoch = $2, updated_at = now()
+		 WHERE id = true`, target, codecEpoch)
+	if err != nil {
+		return fmt.Errorf("migrate baseline: re-stamp chain position: %w", err)
+	}
+	return nil
+}
+
 // setInProgressEdge marks (or clears, with edgeID nil) the mid-apply edge on the
 // position row.
 func setInProgressEdge(ctx context.Context, conn *pgx.Conn, edgeID *string) error {

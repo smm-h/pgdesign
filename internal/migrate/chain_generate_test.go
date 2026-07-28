@@ -98,15 +98,17 @@ func TestGenerateEdgeZeroOpGuard(t *testing.T) {
 
 // TestIsChainModeAndGuards: a project with a chain/ dir is chain-mode; the bridge
 // guard hard-errors naming the subphase. A legacy project (no chain/ dir) is not.
-// squash (5.3) and rollback (5.6) are reworked for chain mode and no longer
-// guarded off; the remaining bridge guard is baseline (5.10).
+// squash (5.3), rollback (5.6), and baseline (5.10) are all reworked for chain
+// mode and dispatched by the CLI; guardChainMode survives as a generic
+// defense-in-depth helper (squash's legacy path still calls it), exercised here
+// with a placeholder subcommand.
 func TestIsChainModeAndGuards(t *testing.T) {
 	// Legacy: a bare migrations dir with no chain/ subdir.
 	legacy := t.TempDir()
 	if IsChainMode(legacy) {
 		t.Error("bare dir should not be chain-mode")
 	}
-	if err := guardChainMode(legacy, "baseline", "5.10"); err != nil {
+	if err := guardChainMode(legacy, "squash", "5.3"); err != nil {
 		t.Errorf("legacy guard should pass, got %v", err)
 	}
 
@@ -119,7 +121,7 @@ func TestIsChainModeAndGuards(t *testing.T) {
 		t.Error("chain project dir should be chain-mode")
 	}
 	for _, tc := range []struct{ sub, phase string }{
-		{"baseline", "5.10"},
+		{"squash", "5.3"},
 	} {
 		err := guardChainMode(chainDir, tc.sub, tc.phase)
 		if err == nil {

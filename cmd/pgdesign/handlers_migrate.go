@@ -1720,7 +1720,7 @@ func registerMigrateUpgradeCmd(g *strictcli.Group) {
 }
 
 func registerMigrateBaselineCmd(g *strictcli.Group) {
-	g.Command("baseline", "Mark an existing database as being at a specific migration version without executing any migration SQL. Use this when adopting pgdesign migrations for a database whose schema was already created by other means. Idempotent: re-running with the same version succeeds; a different version errors.",
+	g.Command("baseline", "Adopt an existing database onto the migration chain without executing any migration SQL. Use this for a database whose schema was created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying the introspected manifest, and stamps this database's baseline boundary (rollback-frozen); pass the schema TOML path(s) so the correct schema search-path is introspected. In legacy (semver-TOML) mode it records a semver --version. Idempotent: re-baselining at the same state is a no-op.",
 		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
@@ -1731,12 +1731,6 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			version := kwargs["version"].(string)
-			if version == "" {
-				fmt.Fprintln(os.Stderr, "error: --version is required for migrate baseline")
-				return strictcli.Exit(1)
-			}
-
 			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
 			if cfgErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
@@ -1744,7 +1738,6 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			}
 
 			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
-
 			description := kwargs["description"].(string)
 
 			ctx := context.Background()
@@ -1755,16 +1748,65 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			}
 			defer conn.Close(ctx)
 
+			// Chain mode: introspect the live database and adopt its state as a
+			// genesis baseline edge, stamping the baseline boundary (roadmap 5.10).
+			if migrate.IsChainMode(dir) {
+				paths := kwargsStrSlice(kwargs["path"])
+				var schemaNames []string
+				if len(paths) > 0 {
+					desired, _, exitCode := parseAndBuild(cfgOverride, paths)
+					if exitCode != 0 {
+						return strictcli.Exit(exitCode)
+					}
+					schemaNames = modelSchemaNames(desired)
+				}
+				actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: introspect: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				if len(diags) > 0 {
+					fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
+				}
+				if diagnostic.Diagnostics(diags).HasErrors() {
+					return strictcli.Exit(1)
+				}
+				p, err := migrate.OpenChainProject(dir)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				report, err := migrate.BaselineChain(ctx, conn, p, actual, description)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+				if !quiet {
+					if report.AlreadyAtBaseline {
+						fmt.Printf("Already at baseline %s. Nothing to do.\n", report.Target)
+					} else {
+						fmt.Printf("Baselined the database from introspection.\n")
+						fmt.Printf("  Baseline revision: %s\n", report.Target)
+						fmt.Printf("  Baseline edge:     %s\n", report.EdgeFile)
+					}
+				}
+				return strictcli.Exit(0)
+			}
+
+			// Legacy (semver-TOML) mode: record a semver version.
+			version := kwargs["version"].(string)
+			if version == "" {
+				fmt.Fprintln(os.Stderr, "error: --version is required for migrate baseline in legacy (semver-TOML) mode")
+				return strictcli.Exit(1)
+			}
 			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
-
 			if err := migrate.Baseline(ctx, conn, dir, version, description); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
-
 			if !quiet {
 				fmt.Printf("Baseline recorded: %s (%s)\n", version, description)
 			}
@@ -1773,8 +1815,11 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
-			strictcli.StringFlag("version", "Version label for the baseline record"),
+			strictcli.StringFlag("version", "Version label for the baseline record (legacy semver-TOML mode only)", strictcli.Default("")),
 			strictcli.StringFlag("description", "Human-readable description", strictcli.Default("Initial baseline")),
+		),
+		strictcli.WithArgs(
+			strictcli.NewArg("path", "Schema TOML file(s) or directory (chain mode; selects the schema search-path to introspect)", strictcli.Variadic(), strictcli.ArgRequired(false)),
 		),
 	)
 }
