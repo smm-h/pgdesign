@@ -11,9 +11,9 @@ import (
 	"github.com/smm-h/pgdesign/internal/config"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/extregistry"
-	"github.com/smm-h/pgdesign/internal/imports"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/parse"
+	"github.com/smm-h/pgdesign/internal/project"
 	"github.com/smm-h/pgdesign/internal/semtype"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
@@ -325,89 +325,36 @@ func parseAndBuild(configOverride *string, paths []string) (*model.Schema, *semt
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(parseWarnings, true))
 	}
 
-	reg := semtype.NewBuiltinRegistry()
-
 	// Register extension-provided types so they pass the base type allowlist.
 	cfg, cfgErr := loadProjectConfig(configOverride, resolvedPaths[0])
 	if cfgErr != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
 		return nil, nil, 1
 	}
-	for _, ext := range cfg.Extensions {
-		reg.AddExtensionTypes(ext.Types)
-	}
 
-	// Load user-defined types from all schemas into the registry.
-	for _, raw := range raws {
-		userTypes := parse.CollectUserTypes(raw)
-		if len(userTypes) > 0 {
-			loadDiags := reg.LoadUserTypes(userTypes)
-			if loadDiags.HasErrors() {
-				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(loadDiags, true))
-				return nil, nil, 1
-			}
-		}
-	}
-
-	var schema *model.Schema
-	var buildDiags diagnostic.Diagnostics
-
-	buildOpts := []model.BuildOption{model.WithImports(importAliasSchemas(cfg))}
-
-	// Load the vendored import surface (imports/<alias>/) as REFERENCE tables so
-	// imported-FK targets resolve through the union (roadmap 7.3). Aliases without
-	// a committed lockfile are skipped — the unresolved FK then surfaces as a normal
-	// diagnostic rather than being silently satisfied. A corrupt/undecodable
-	// vendored surface is a hard error.
+	// projectRoot enables vendored import-surface loading (empty skips it — no
+	// pgdesign.toml root resolved). Only consulted when the config declares imports.
+	var projectRoot string
 	if cfg != nil && len(cfg.Imports) > 0 {
 		if configPath, found, _ := resolveConfigPath(configOverride, filepath.Dir(resolvedPaths[0])); found {
-			projectRoot := filepath.Dir(configPath)
-			declared := make([]string, 0, len(cfg.Imports))
-			for a := range cfg.Imports {
-				declared = append(declared, a)
-			}
-			surface, err := imports.LoadAllSurfaces(projectRoot, declared)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return nil, nil, 1
-			}
-			// Registry enforcement (roadmap 7.3): imported type names must not collide
-			// with local ones (hard error naming both), and imported enums are
-			// registered so local columns can reference them.
-			if regDiags := registerImportedTypes(reg, surface); regDiags.HasErrors() {
-				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(regDiags, true))
-				return nil, nil, 1
-			}
-			if len(surface.Tables) > 0 {
-				buildOpts = append(buildOpts, model.WithImportedTables(surface.Tables))
-			}
+			projectRoot = filepath.Dir(configPath)
 		}
 	}
 
-	if len(raws) == 1 {
-		schema, buildDiags = model.Build(raws[0], reg, buildOpts...)
-	} else {
-		schema, buildDiags = model.BuildMulti(raws, reg, buildOpts...)
-	}
-
-	if buildDiags.HasErrors() {
-		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(buildDiags, true))
+	// Reconcile registry + config extensions + user types + import surface +
+	// pg_version tiers through the shared project loader (used by build/codegen/
+	// revise/serve).
+	proj, diags := project.Build(raws, cfg, projectRoot)
+	if diags.HasErrors() {
+		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(diags, true))
 		return nil, nil, 1
 	}
-
-	warnings := buildDiags.Warnings()
+	warnings := diags.Warnings()
 	if len(warnings) > 0 {
 		fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(warnings, true))
 	}
 
-	// Resolve the config and toml PG-version tiers into schema.PGVersion here,
-	// at the shared build entry point. Build() sets the toml tier; the config
-	// tier (pgdesign.toml [database].pg_version) wins over it. The live tier is
-	// applied later, only where a database connection is available, via
-	// applyLivePGVersion.
-	schema.PGVersion = resolvePGVersion(0, cfg.Database.PGVersion, schema.PGVersion)
-
-	return schema, reg, 0
+	return proj.Schema, proj.Registry, 0
 }
 
 // nfViolationCodes are the audit diagnostic codes for normal form violations.
@@ -433,63 +380,6 @@ func promoteNFViolations(diags []diagnostic.Diagnostic) []diagnostic.Diagnostic 
 		}
 	}
 	return result
-}
-
-// registerImportedTypes enforces registry rules for the vendored import surface
-// (roadmap 7.3): an imported type name that collides with a local (non-builtin)
-// type is a hard error naming both sources, and imported enums are registered so
-// local columns can reference them. Collision detection covers every imported type
-// kind; only enums are registered (the roadmap's "imported enums usable in local
-// columns" — other imported types are referenced only through FK targets).
-func registerImportedTypes(reg *semtype.Registry, surface *model.Schema) diagnostic.Diagnostics {
-	var diags diagnostic.Diagnostics
-	type named struct{ name, schema string }
-	var all []named
-	for _, e := range surface.Enums {
-		all = append(all, named{e.Name, e.Schema})
-	}
-	for _, d := range surface.Domains {
-		all = append(all, named{d.Name, d.Schema})
-	}
-	for _, c := range surface.CompositeTypes {
-		all = append(all, named{c.Name, c.Schema})
-	}
-	for _, sm := range surface.StateMachines {
-		all = append(all, named{sm.Name, sm.Schema})
-	}
-	for _, n := range all {
-		if existing, err := reg.Resolve(n.name); err == nil && existing.Source != "builtin" {
-			diags = append(diags, diagnostic.Diagnostic{
-				Severity: diagnostic.Error, Code: "E243",
-				Message: fmt.Sprintf("imported type %q (from schema %q) collides with a local type of the same name; both cannot own %q — rename one", n.name, n.schema, n.name),
-			})
-		}
-	}
-	if diags.HasErrors() {
-		return diags
-	}
-	var defs []semtype.UserTypeDef
-	for _, e := range surface.Enums {
-		defs = append(defs, semtype.UserTypeDef{Name: e.Name, Kind: "enum", Values: e.Values, Comment: e.Comment})
-	}
-	if len(defs) > 0 {
-		diags = append(diags, reg.LoadUserTypes(defs)...)
-	}
-	return diags
-}
-
-// importAliasSchemas projects the project's [imports] declarations into the
-// alias -> target-PG-schema map model.WithImports consumes, so `alias:table` FK
-// references resolve at build time (roadmap 7.1). A nil config yields nil.
-func importAliasSchemas[P config.PathKind](cfg *config.Config[P]) map[string]string {
-	if cfg == nil || len(cfg.Imports) == 0 {
-		return nil
-	}
-	m := make(map[string]string, len(cfg.Imports))
-	for alias, d := range cfg.Imports {
-		m[alias] = d.Schema
-	}
-	return m
 }
 
 // configToUserExtensions converts config.ExtensionConfig entries to
