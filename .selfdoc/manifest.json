@@ -38,6 +38,11 @@
       "type": "doc"
     },
     {
+      "path": "cli-import.md",
+      "title": "pgdesign import",
+      "type": "doc"
+    },
+    {
       "path": "cli-index.md",
       "title": "pgdesign CLI Reference",
       "type": "doc"
@@ -50,6 +55,11 @@
     {
       "path": "cli-migrate.md",
       "title": "pgdesign migrate",
+      "type": "doc"
+    },
+    {
+      "path": "cli-revise.md",
+      "title": "pgdesign revise",
       "type": "doc"
     },
     {
@@ -388,5 +398,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-28T08:42:48.177052+00:00"
+  "last_gen": "2026-07-28T08:43:31.479835+00:00"
 }

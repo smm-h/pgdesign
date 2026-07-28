@@ -12,8 +12,6 @@ order: 91
 
 PostgreSQL schema compiler
 
-Version: 0.24.4
-
 ## Commands
 
 - [build](cli-build.html) -- Generate all configured outputs from pgdesign.toml
@@ -23,11 +21,13 @@ Version: 0.24.4
 - [fmt](cli-fmt.html) -- Format a pgdesign TOML schema file or directory in place
 - [generate](cli-generate.html) -- Generate SQL DDL from TOML schema file(s) or directory
 - [introspect](cli-introspect.html) -- Introspect a live PostgreSQL database into TOML schema
+- [revise](cli-revise.html) -- Regenerate all outputs, chain the migration, and commit — the one-command project revision. Runs the PURE tier (build outputs, chain-mode migration, blocking normal-form and structural checks) and commits it, then runs the non-retroactive DB tier (live FD discovery, pg_stat workload).
 - [seed](cli-seed.html) -- Generate type-aware test data for all schema tables
 - [serve](cli-serve.html) -- Start the pgdesign HTTP API server and web interface
 - [stats](cli-stats.html) -- Analyze database statistics, index usage, and health
 
 ## Command Groups
 
+- [import](cli-import.html) -- Pin and vendor imported schema surfaces from other pgdesign projects
 - [migrate](cli-migrate.html) -- Database migration planning, generation, and execution
 - [testdb](cli-testdb.html) -- Manage ephemeral test databases for schema testing

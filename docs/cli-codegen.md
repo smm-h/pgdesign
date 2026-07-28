@@ -15,11 +15,12 @@ Generate type-safe application code from schema definitions
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  |  | PostgreSQL connection URL for the target database server |
 | `--lang` |  | str |  |  | Target programming language for the generated code |
 | `--mode` |  | str | validators |  | Code generation mode determining what code to produce |
 | `--output` |  | str |  |  | Write output to a file at this path instead of stdout |
 | `--split-mode` |  | str |  |  | Split Python DDL output mode |
+| `--groups` |  | list[str] |  |  | Restrict generation to tables in these schema groups (matches build's per-output group filtering) |
+| `--source` |  | list[str] |  |  | Restrict generation to tables from these source file basenames (matches build's per-output source filtering) |
 | `--check` |  | bool |  |  | Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file |
 
 ## Arguments

@@ -21,5 +21,5 @@ Run project checks registered via the check framework and report results
 | `--list` |  | bool |  |  | List all registered checks with their tags and exit without running |
 | `--json` |  | bool |  |  | Output check results as machine-readable JSON instead of human text |
 | `--ignore-warnings` |  | bool |  |  | Treat warn-severity results as passing so they do not cause nonzero exit |
-| `--verbose` |  | bool |  |  | Show full details for passing checks in addition to failures and warnings |
+| `--verbose` |  | bool |  |  | Show per-check notes and durations (including on passing checks) plus a trailing pass/fail/warn/skip count summary |
 | `--dry-run` |  | bool |  |  | Show which checks would run based on current filters without executing them |

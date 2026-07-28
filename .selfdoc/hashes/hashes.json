@@ -24,6 +24,11 @@
     "content": "2ec5dc86d824ac0ddeadf38790d67e686dc0fc602546e4c3eff47877e8b1b54a",
     "description": "b30465bb7c233a09ba7403c9aa115660f78db3e181c8ab9ff658e021329aebd0"
   },
+  "en/cli-import.md": {
+    "content": "645ee0198f55ea9a24608fd581af169b148de0eb77b6451510370738fce7d87b",
+    "description": "5eb88e6a891d619ad9420de08c7668ca50fcda6c01455163f5a479848910b174",
+    "seed_hash": "5eb88e6a891d619ad9420de08c7668ca50fcda6c01455163f5a479848910b174"
+  },
   "en/cli-index.md": {
     "content": "72d52f5edc6200107b05faa6d73f1c4875ab2f3313acc7578b01e9ab84f7c642",
     "description": "9cad7754013b69219b0722945a040382b6fdca4ca878bfdad54760604ef7ac5a"
@@ -35,6 +40,11 @@
   "en/cli-migrate.md": {
     "content": "9f821aad671f4658893c82dcf459f153d7d9ba69e21242ad013650ce4f9bfb01",
     "description": "dbb04d64166ce34f6848729e6605119ca287c842991af2d2fc8250d9c5301863"
+  },
+  "en/cli-revise.md": {
+    "content": "ab45f9d8f7c513a6fbce8d2c245d2848e4695637252595998f05513c73eee94f",
+    "description": "9ceee281d26376c7df27648a175b901cf952865d677014bf7437a582f6f95d6d",
+    "seed_hash": "9ceee281d26376c7df27648a175b901cf952865d677014bf7437a582f6f95d6d"
   },
   "en/cli-seed.md": {
     "content": "9011e99fdf231b2b02fa06f2a3a6c0bb1be48d7d33ff34b0f15e39ef78e8fd0a",
