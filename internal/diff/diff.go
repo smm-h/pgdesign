@@ -51,6 +51,31 @@ type SchemaDiff struct {
 	// map differs.
 	PGVersionChanged *[2]int `json:"pg_version_changed,omitempty"`
 	GroupsChanged    bool    `json:"groups_changed,omitempty"`
+	// TablesRenamed carries table renames resolved by ResolveRenames from a
+	// declared [renames] directive. A rename replaces a drop+create pair with a
+	// single ALTER TABLE ... RENAME, preserving the data (5.9 rename gate).
+	TablesRenamed []RenamePair `json:"tables_renamed,omitempty"`
+}
+
+// RenamePair is a resolved from->to rename (table or column).
+type RenamePair struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// RenameSpec is the set of declared renames consumed at diff time (parsed from
+// the project config [renames] section). It is a pure, committed, CI-safe
+// migration directive — never part of the schema's canonical identity.
+type RenameSpec struct {
+	Tables  []RenamePair       `json:"tables,omitempty"`
+	Columns []ColumnRenameSpec `json:"columns,omitempty"`
+}
+
+// ColumnRenameSpec declares a single column rename within a table.
+type ColumnRenameSpec struct {
+	Table string `json:"table"`
+	From  string `json:"from"`
+	To    string `json:"to"`
 }
 
 // SMTransitionDiff describes changes to a state machine type's transitions.
@@ -93,6 +118,7 @@ type TableDiff struct {
 	PoliciesChanged     []PolicyDiff                `json:"policies_changed,omitempty"`
 	EnableRLSChanged    *[2]bool                    `json:"enable_rls_changed,omitempty"`
 	ForceRLSChanged     *[2]bool                    `json:"force_rls_changed,omitempty"`
+	ColumnsRenamed      []RenamePair                `json:"columns_renamed,omitempty"`
 	CommentChanged      *[2]string                  `json:"comment_changed"` // [old, new]
 	PKChanged           *[2][]string                `json:"pk_changed"`      // [old, new]
 	OwnerChanged        *[2]string                  `json:"owner_changed"`
@@ -311,6 +337,7 @@ func (d *SchemaDiff) IsEmpty() bool {
 		len(d.FunctionsChanged) == 0 &&
 		len(d.SMTransitionsChanged) == 0 &&
 		d.PGVersionChanged == nil &&
+		len(d.TablesRenamed) == 0 &&
 		!d.GroupsChanged
 }
 
@@ -634,6 +661,7 @@ func isTableDiffEmpty(td *TableDiff) bool {
 	return len(td.ColumnsAdded) == 0 &&
 		len(td.ColumnsRemoved) == 0 &&
 		len(td.ColumnsChanged) == 0 &&
+		len(td.ColumnsRenamed) == 0 &&
 		len(td.FKsAdded) == 0 &&
 		len(td.FKsRemoved) == 0 &&
 		len(td.FKsChanged) == 0 &&
