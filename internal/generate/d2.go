@@ -57,6 +57,37 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) str
 		return true
 	}
 
+	// Strict junction tables collapse into a single M:N edge (9.4). Only when
+	// cardinality is enabled, and only when both linked tables survive filtering;
+	// otherwise the junction renders as a normal table with two 1:N edges.
+	var junctions map[string]junctionEdge
+	if opts.Cardinality {
+		junctions = detectJunctions(schema)
+	}
+	junctionCollapsed := func(t *model.Table) (junctionEdge, bool) {
+		if junctions == nil {
+			return junctionEdge{}, false
+		}
+		je, ok := junctions[model.TableKey(t.Schema, t.Name)]
+		if !ok {
+			return junctionEdge{}, false
+		}
+		for j := range t.FKs {
+			fk := &t.FKs[j]
+			if fk.RefAlias != "" {
+				continue // imported target always present
+			}
+			rs := fk.RefSchema
+			if rs == "" {
+				rs = t.Schema
+			}
+			if !keep(rs, fk.RefTable) {
+				return junctionEdge{}, false
+			}
+		}
+		return je, true
+	}
+
 	// Render enum types as rectangles with their value lists (9.2 enrichment).
 	if opts.Enums {
 		for i := range schema.Enums {
@@ -64,9 +95,13 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) str
 		}
 	}
 
-	// Render each surviving table as a D2 sql_table shape.
+	// Render each surviving table as a D2 sql_table shape. Collapsed junction
+	// tables are omitted — they become an M:N edge instead.
 	for i := range tables {
 		if !keep(tables[i].Schema, tables[i].Name) {
+			continue
+		}
+		if _, collapsed := junctionCollapsed(&tables[i]); collapsed {
 			continue
 		}
 		sections = append(sections, renderD2Table(&tables[i], opts))
@@ -84,6 +119,16 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) str
 	for i := range tables {
 		t := &tables[i]
 		if !keep(t.Schema, t.Name) {
+			continue
+		}
+		// A collapsed junction's own FK edges are replaced by one M:N edge.
+		if je, collapsed := junctionCollapsed(t); collapsed {
+			for j := range t.FKs {
+				if t.FKs[j].RefAlias != "" {
+					referencedImports[model.TableKey(t.FKs[j].RefSchema, t.FKs[j].RefTable)] = true
+				}
+			}
+			edgeSections = append(edgeSections, renderMNEdge(je))
 			continue
 		}
 		for j := range t.FKs {
@@ -344,11 +389,26 @@ func renderD2Edge(t *model.Table, fk *model.FK, opts D2Options) string {
 	// The previous emitter dropped fk.RefSchema entirely, so a cross-project edge
 	// would dangle or collide with a same-named local table. The reference shape is
 	// minimal (no columns), so the edge connects to the shape itself.
+	var base string
 	if fk.RefAlias != "" {
-		return fmt.Sprintf("%s.%s -> %s.%s: %s", t.Name, srcCols, fk.RefSchema, fk.RefTable, label)
+		base = fmt.Sprintf("%s.%s -> %s.%s: %s", t.Name, srcCols, fk.RefSchema, fk.RefTable, label)
+	} else {
+		base = fmt.Sprintf("%s.%s -> %s.%s: %s", t.Name, srcCols, fk.RefTable, refCols, label)
 	}
 
-	return fmt.Sprintf("%s.%s -> %s.%s: %s", t.Name, srcCols, fk.RefTable, refCols, label)
+	if !opts.Cardinality {
+		return base
+	}
+
+	// Crow's-foot cardinality (9.4): the referencing (child) end carries the
+	// "many" foot by default, or "one" when the FK columns are themselves a
+	// superkey (unique/PK) — a 1:1 relationship. The referenced (parent) end is
+	// always "one" (each FK value points at exactly one parent row).
+	childArrow := "cf-many"
+	if fkColumnsUnique(t, fk.Columns) {
+		childArrow = "cf-one"
+	}
+	return base + fmt.Sprintf(" {\n  source-arrowhead: {shape: %s}\n  target-arrowhead: {shape: cf-one}\n}", childArrow)
 }
 
 // renderD2ImportedRef renders an imported table as a minimal, schema-qualified
