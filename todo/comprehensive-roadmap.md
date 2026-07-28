@@ -2157,6 +2157,16 @@ The interactive frontend on the phase-8 contract. Unplanned by design.
 
 ## Out of scope, pending their own design work
 
+RENAME-INDEX FOLLOW-UP (tail-audit deferral, 2026-07): after a declared
+table rename, auto-named indexes/constraints keep their old names live and
+the differ (name-keyed matching) emits cosmetic DROP+CREATE churn on the
+next diff — safe (FK-coverage index recreation), not data loss. The clean
+fix (the rename op family also emitting ALTER INDEX/CONSTRAINT RENAME)
+requires a new DDLOp field or op kind, which is CODEC-AFFECTING (DDLOp
+serializes untagged — any field addition re-keys every delta op in the
+store). Bundle with the next deliberate epoch event or a pre-release codec
+finalization pass.
+
 Test schema mode. N-project topology. Manifest + per-language linter
 ecosystem (evidence-gated). Recorded summit alternatives: declarative
 catalog reconciliation for migrate (the kernel's L5 machinery is its
