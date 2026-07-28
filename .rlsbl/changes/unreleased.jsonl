@@ -232,3 +232,4 @@
 {"format_version":1,"id":"18c66a8faba494a79bec8f19673044b69dd17f10b0aff271","commits":["008ab5b9a55eb40b5d6a4a8fb057e48abef688de"],"user_facing":true,"description":"Onboarding docs now show the required `format_version = 1` top-level key, so schemas copied from the quickstart no longer produce documents the shape gate rejects.","type":"fix"}
 {"format_version":1,"id":"18c66aa65e83621d009b89854a1d469f9939b53792a038bb","commits":["bc0463b390a11055f492d5e4af88b66fe239dbe9"],"user_facing":false}
 {"format_version":1,"id":"18c66ab26a94d525f33b95cda6ec4f50878b82f825924d9d","commits":["86d0d33364cad62ac81801b46ba727ad9961c82b"],"user_facing":false}
+{"format_version":1,"id":"18c66adf7bb2791a341d7a84ba374ee6b80895c02209c525","commits":["9104dba1b5f3a04b0d80dbd7744ecdaebcff8b71"],"user_facing":false}
