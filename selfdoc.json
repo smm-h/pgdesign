@@ -12,7 +12,19 @@
       "language": "go"
     },
     {
+      "path": "internal/catalog",
+      "language": "go"
+    },
+    {
+      "path": "internal/chain",
+      "language": "go"
+    },
+    {
       "path": "internal/codegen",
+      "language": "go"
+    },
+    {
+      "path": "internal/enc",
       "language": "go"
     },
     {
@@ -56,7 +68,19 @@
       "language": "go"
     },
     {
+      "path": "internal/imports",
+      "language": "go"
+    },
+    {
       "path": "internal/introspect",
+      "language": "go"
+    },
+    {
+      "path": "internal/livenorm",
+      "language": "go"
+    },
+    {
+      "path": "internal/livestats",
       "language": "go"
     },
     {
@@ -68,7 +92,27 @@
       "language": "go"
     },
     {
+      "path": "internal/modelgen",
+      "language": "go"
+    },
+    {
+      "path": "internal/objstore",
+      "language": "go"
+    },
+    {
       "path": "internal/parse",
+      "language": "go"
+    },
+    {
+      "path": "internal/predicate",
+      "language": "go"
+    },
+    {
+      "path": "internal/project",
+      "language": "go"
+    },
+    {
+      "path": "internal/rev",
       "language": "go"
     },
     {
@@ -104,7 +148,15 @@
       "language": "go"
     },
     {
+      "path": "internal/splitfmt",
+      "language": "go"
+    },
+    {
       "path": "internal/testdb",
+      "language": "go"
+    },
+    {
+      "path": "internal/typeinfo",
       "language": "go"
     },
     {
