@@ -115,7 +115,19 @@ func Build(raws []*parse.RawSchema, cfg *config.RawConfig, projectRoot string) (
 	if buildDiags.HasErrors() {
 		return nil, diags
 	}
-	_ = surface
+
+	// Owned/imported TABLE name-collision enforcement (roadmap phase-7 rider): a
+	// vendored imported table whose (schema, name) matches an owned table is a hard
+	// error naming BOTH sources — parity with the type-collision rule (E243). This
+	// replaces the earlier silent owned-wins shadowing in model.buildTablesByName,
+	// which would let a consumer clobber an imported reference without warning.
+	if surface != nil {
+		collDiags := checkTableCollisions(schema, surface)
+		diags = append(diags, collDiags...)
+		if collDiags.HasErrors() {
+			return nil, diags
+		}
+	}
 
 	// Resolve the config and toml PG-version tiers into schema.PGVersion here, at
 	// the shared build entry point. model.Build sets the toml tier ([meta].version);
@@ -182,6 +194,30 @@ func RegisterImportedTypes(reg *semtype.Registry, surface *model.Schema) diagnos
 	}
 	if len(defs) > 0 {
 		diags = append(diags, reg.LoadUserTypes(defs)...)
+	}
+	return diags
+}
+
+// checkTableCollisions reports a hard error for every imported reference table
+// whose (schema, name) key matches an owned table's — both sources are named so
+// the consumer knows exactly which local table to rename. Parity with E243's
+// type-collision rule; code E244.
+func checkTableCollisions(schema, surface *model.Schema) diagnostic.Diagnostics {
+	var diags diagnostic.Diagnostics
+	ownedSchema := make(map[string]string, len(schema.Tables))
+	for i := range schema.Tables {
+		key := model.TableKey(schema.Tables[i].Schema, schema.Tables[i].Name)
+		ownedSchema[key] = schema.Tables[i].Schema
+	}
+	for i := range surface.Tables {
+		it := &surface.Tables[i]
+		key := model.TableKey(it.Schema, it.Name)
+		if localSchema, ok := ownedSchema[key]; ok {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error, Code: "E244", Table: it.Name,
+				Message: fmt.Sprintf("imported table %q (from schema %q) collides with a local table of the same name (schema %q); both cannot own %q — rename one", it.Name, it.Schema, localSchema, it.Name),
+			})
+		}
 	}
 	return diags
 }
