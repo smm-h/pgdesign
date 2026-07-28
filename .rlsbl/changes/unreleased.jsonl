@@ -228,3 +228,4 @@
 {"format_version":1,"id":"18c667f40f9ac451e2505db9c56d4e30a17598813fdc1079","commits":["026da3a251108abce20a09ce4ef7d40989a28c46"],"user_facing":false}
 {"format_version":1,"id":"18c668e5018c492714c5aaebf77d4ee58a018238f0bf9df3","commits":["059c97f75e0ff767210cd1db554054e841d38003"],"user_facing":false}
 {"format_version":1,"id":"18c668fd0df71601cffceeabe17d47fcbba0f4a5650b4d72","commits":["09becad24dd077e1caa3e5b9cf32ab0689adb3bc"],"user_facing":true,"description":"**Clearer CLI help.** `build --auto-commit`, `codegen --split-mode`, the `import lock`/`import update` alias argument, and `migrate baseline --description` now have fuller help text explaining their behavior and options.","type":"fix"}
+{"format_version":1,"id":"18c6692b952eaa41288d7b6b15a74c9fb63a2de1d5574cd4","commits":["a82c92b48d0648fac8b8110e092d4314be031a09"],"user_facing":false}
