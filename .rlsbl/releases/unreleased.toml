@@ -1,11 +1,18 @@
 # strictspec document version gate (do not remove)
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "Fix the CI/publish-blocking dependency on developer-machine tools: migrate squash now archives originals with a built-in file move, and the safegit-missing build error is actionable."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+v0.25.0's publish gate refused to publish because CI failed on the release
+commit: the legacy `migrate squash` flow shelled out to a developer-machine
+file-archival utility (absent on CI runners and consumer machines), and the
+revise/build auto-commit tests required a developer-machine safegit that CI
+lacks. 0.25.1 carries the identical feature set as 0.25.0 plus these fixes, so
+0.25.1 is the first artifact actually published to npm and PyPI.
+"""
 # Pre-release identifier: alpha, beta, rc, or stable
 # preid = ""
 # Set to true to generate a blog post for this release
