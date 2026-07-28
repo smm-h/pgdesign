@@ -54,6 +54,7 @@ var modelFieldPolicy = map[string]structPolicy{
 			"TablesByName":            "derived lookup cache (json:\"-\"), rebuilt by Canonicalize",
 			"FKGraph":                 "derived FK adjacency cache (json:\"-\"), rebuilt by Canonicalize",
 			"StateMachineTransitions": "derived from->to adjacency for codegen (sorted target sets, no comments); a duplicate of StateMachines with less fidelity. SM identity flows through the first-class StateMachines collection (KindSMType objects), so this derived form is excluded per roadmap 1.5",
+			"ImportedTables":          "REFERENCE tables owned by another project, pulled in via [imports] (roadmap 7.3, json:\"-\"). They are facts owned elsewhere, not this project's objects, so they are excluded from this project's identity — the vendored import surface carries its own per-object ids in imports/<alias>/",
 		},
 	},
 	"Table": {
