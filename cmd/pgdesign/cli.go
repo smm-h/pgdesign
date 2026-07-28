@@ -371,6 +371,13 @@ func parseAndBuild(configOverride *string, paths []string) (*model.Schema, *semt
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return nil, nil, 1
 			}
+			// Registry enforcement (roadmap 7.3): imported type names must not collide
+			// with local ones (hard error naming both), and imported enums are
+			// registered so local columns can reference them.
+			if regDiags := registerImportedTypes(reg, surface); regDiags.HasErrors() {
+				fmt.Fprint(os.Stderr, diagnostic.RenderTerminal(regDiags, true))
+				return nil, nil, 1
+			}
 			if len(surface.Tables) > 0 {
 				buildOpts = append(buildOpts, model.WithImportedTables(surface.Tables))
 			}
@@ -426,6 +433,49 @@ func promoteNFViolations(diags []diagnostic.Diagnostic) []diagnostic.Diagnostic 
 		}
 	}
 	return result
+}
+
+// registerImportedTypes enforces registry rules for the vendored import surface
+// (roadmap 7.3): an imported type name that collides with a local (non-builtin)
+// type is a hard error naming both sources, and imported enums are registered so
+// local columns can reference them. Collision detection covers every imported type
+// kind; only enums are registered (the roadmap's "imported enums usable in local
+// columns" — other imported types are referenced only through FK targets).
+func registerImportedTypes(reg *semtype.Registry, surface *model.Schema) diagnostic.Diagnostics {
+	var diags diagnostic.Diagnostics
+	type named struct{ name, schema string }
+	var all []named
+	for _, e := range surface.Enums {
+		all = append(all, named{e.Name, e.Schema})
+	}
+	for _, d := range surface.Domains {
+		all = append(all, named{d.Name, d.Schema})
+	}
+	for _, c := range surface.CompositeTypes {
+		all = append(all, named{c.Name, c.Schema})
+	}
+	for _, sm := range surface.StateMachines {
+		all = append(all, named{sm.Name, sm.Schema})
+	}
+	for _, n := range all {
+		if existing, err := reg.Resolve(n.name); err == nil && existing.Source != "builtin" {
+			diags = append(diags, diagnostic.Diagnostic{
+				Severity: diagnostic.Error, Code: "E243",
+				Message: fmt.Sprintf("imported type %q (from schema %q) collides with a local type of the same name; both cannot own %q — rename one", n.name, n.schema, n.name),
+			})
+		}
+	}
+	if diags.HasErrors() {
+		return diags
+	}
+	var defs []semtype.UserTypeDef
+	for _, e := range surface.Enums {
+		defs = append(defs, semtype.UserTypeDef{Name: e.Name, Kind: "enum", Values: e.Values, Comment: e.Comment})
+	}
+	if len(defs) > 0 {
+		diags = append(diags, reg.LoadUserTypes(defs)...)
+	}
+	return diags
 }
 
 // importAliasSchemas projects the project's [imports] declarations into the

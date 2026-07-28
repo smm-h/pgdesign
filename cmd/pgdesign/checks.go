@@ -583,8 +583,15 @@ func checkImports(ctx strictcli.CheckContext, r *strictcli.ErrorReporter) strict
 			total++
 		}
 	}
+	// Extension/pg_version re-declaration enforcement (roadmap 7.3): the consumer
+	// must re-declare every extension the imported surface requires and target a
+	// pg_version >= the imported floor.
+	for _, d := range imports.CheckRequirements(projectRoot, declared, consumer) {
+		r.Error(diagDetail(d))
+		total++
+	}
 	if total > 0 {
-		return r.Found(fmt.Sprintf("%d import drift issue(s) across %d locked alias(es)", total, len(aliases)))
+		return r.Found(fmt.Sprintf("%d import issue(s) across %d locked alias(es)", total, len(aliases)))
 	}
 	return r.Passed(fmt.Sprintf("all %d locked import(s) match the vendored surface", len(aliases)))
 }
