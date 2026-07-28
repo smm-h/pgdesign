@@ -1936,6 +1936,14 @@ current applied reality).
   --output never flagged; tampered header caught; chain violation caught
   via the shared checker; seed/migrations/stdout never flagged.
 
+**PHASE-6 AS-BUILT DEVIATIONS (audit-accepted, for owner sign-off at
+release):** W103/BCNF joined nfViolationCodes, so `generate --strict-nf`
+and the nf check now also reject BCNF violations (more-correct extension);
+6.1's "all BLOCKING" resolved as errors-block/warnings-surface per the
+"analysis that CAN block must block" policy (structural workload
+advisories surface, never block); `build` outside a git repo now
+hard-errors under the default --auto-commit (escape: --no-auto-commit).
+
 ## Phase 7 — Cross-repository algebra (imports)
 
 ### 7.1 Declaration and reference syntax
