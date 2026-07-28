@@ -5,52 +5,25 @@ description: "Guide to pgdesign's migration system covering generation, planning
 
 # Migration Guide
 
-pgdesign generates migrations by diffing your TOML schema against a live database. Migrations are TOML files containing DDL and DML operations with rollback instructions and safety diagnostics.
+pgdesign generates migrations by diffing your TOML schema against the last recorded schema state. A migration is a content-addressed **chain edge** — a self-contained transition between two schema revisions whose operations and object payloads live in the on-disk store. Edges carry DDL and DML operations, per-operation inverses (for rollback), and safety diagnostics.
 
-## Migration file format
+## The migration chain
 
-Migration files are TOML documents containing `[[ddl]]` and `[[dml]]` operation arrays, where each operation specifies a schema change and its corresponding rollback instruction. The file starts with a description field summarizing the migration's purpose, followed by DDL operations (35 operation types covering tables, columns, indexes, constraints, enums, views, materialized views, functions, and triggers) and DML operations (2 types: backfill and transform) for data migrations. Each operation includes risk classification and safety metadata.
+A chain-format project keeps everything under `migrations/`:
 
-```toml
-description = "Add posts table, add status column to users"
+| Directory | Contents |
+|-----------|----------|
+| `migrations/chain/` | one file per LIVE edge (the current history) |
+| `migrations/archive/` | retired originals (superseded by squash, or rebased away) |
+| `migrations/objects/` | the content-addressed object store (every object and op payload) |
+| `migrations/revisions/` | one manifest per revision (a map of object key to content id) |
+| `migrations/remap.json` | the rebase revision-remap table (present only after a `migrate rebase`) |
 
-[[ddl]]
-op = "create_table"
-table = "public.posts"
-comment = "User-authored posts"
-pk = ["id"]
+Each edge file is named by its content hash and its parent/target revisions. Because identity is content-derived, regenerating the same schema change always produces the same edge — git never sees spurious churn, and two branches that make different changes produce distinct edges (a fork, resolved with `migrate rebase`).
 
-[[ddl]]
-op = "add_column"
-table = "public.users"
-column = "status"
-type = "text"
-not_null = true
-default = "'active'"
-down = { op = "drop_column", table = "public.users", column = "status" }
+Applied history is recorded in the database, not inferred from files: the `pgdesign_chain_position` row tracks which revision a database is at, and the `pgdesign_migration_ops` journal records each applied operation with its recorded inverse. `migrate rollback` reads that journal — it never trusts or re-reads the on-disk files.
 
-[[ddl]]
-op = "add_fk"
-table = "public.posts"
-name = "fk_posts_author"
-columns = ["author_id"]
-ref_table = "public.users"
-ref_cols = ["id"]
-on_delete = "CASCADE"
-down = { op = "drop_fk", table = "public.posts", name = "fk_posts_author" }
-
-[[ddl]]
-op = "create_index"
-table = "public.posts"
-name = "idx_posts_author_id"
-columns = ["author_id"]
-down = { op = "drop_index", table = "public.posts", name = "idx_posts_author_id" }
-
-[[dml]]
-op = "backfill"
-sql = "UPDATE public.users SET status = COALESCE(status, 'active') WHERE status IS NULL"
-down = { irreversible = true }
-```
+An edge's operations are drawn from the same DDL and DML op inventory used throughout the tool.
 
 ### DDL operations
 
@@ -127,18 +100,17 @@ column = "author_id"
 
 ### migrate generate
 
-Generate a versioned migration file by comparing your TOML schema definitions against a live PostgreSQL database. The command connects to the database, introspects its current schema, computes the structural diff, classifies each change by risk level, generates both forward and rollback operations, and writes the resulting TOML migration file to the migrations directory with safety linting annotations.
+Generate a new chain edge by comparing your TOML schema against the current chain head. Generation is **pure**: it reads only the on-disk chain (the head revision's reconstructed model), never a database, so the same schema edit always yields the same edge regardless of any database's state. It computes the structural diff, classifies each change by risk level, records each operation's inverse, and writes the edge, its object payloads, and its target manifest into the store. Large-table-safe forms (NOT VALID + VALIDATE, backfill-then-set-not-null, expand/contract phasing) are always emitted, since a manifest carries no row counts.
 
 ```
-pgdesign migrate generate schema.toml --db "postgres://user:pass@localhost/mydb" --version 0.2.0
+pgdesign migrate generate schema.toml
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--version` | Migration version (semver format) |
 | `--dir` | Migrations directory (default: `migrations/`) |
 
-The generated file is saved as `migrations/<version>.toml`.
+The edge is written under `migrations/chain/` with a content-derived filename. If a plausible rename is detected but not declared in a `[renames]` section, generation is refused, naming the pair.
 
 ### migrate plan
 
@@ -152,7 +124,7 @@ Shows the list of operations, risk classifications, and safety diagnostics.
 
 ### migrate apply
 
-Apply all pending migrations to the target database in semver order, running each migration inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY and ALTER TYPE ADD VALUE are automatically detected and executed outside transactions. Applied migrations are tracked in the `pgdesign_migrations` table, which is created automatically on first use.
+Apply the pending edges to bring the target database from its recorded chain position to the single live head. The order is determined by the **path-finder**, which walks the edge graph (live plus archive) from the database's `pgdesign_chain_position` to the head — not by any version string. Each edge runs inside its own transaction with advisory locking to prevent concurrent execution; non-transactional operations like CREATE INDEX CONCURRENTLY and ALTER TYPE ADD VALUE are detected and executed outside transactions. The chain tracking structures are created automatically on a fresh database. After applying, a reconcile step introspects the database and verifies it matches the target model.
 
 ```
 pgdesign migrate apply --db "postgres://user:pass@localhost/mydb"
@@ -163,13 +135,11 @@ pgdesign migrate apply --db "postgres://user:pass@localhost/mydb"
 | `--dir` | Migrations directory (default: `migrations/`) |
 | `--dry-run` | Show SQL without executing |
 
-Migrations are applied in semver order. Each migration runs in a transaction, except for non-transactional operations (like `CREATE INDEX CONCURRENTLY` or `ALTER TYPE ADD VALUE`) which are committed and re-started around.
-
-An advisory lock prevents concurrent migration execution. Applied migrations are tracked in the `pgdesign_migrations` table (created automatically).
+If the path-finder finds more than one reachable head, apply refuses with a fork error pointing at `migrate rebase`. A database at a rebased-away revision is served forward via `migrations/remap.json`, never orphaned. An advisory lock prevents concurrent execution.
 
 ### migrate rollback
 
-Roll back applied migrations to a specified target version by executing the down operations from each migration in reverse application order. The rollback acquires an advisory lock to prevent concurrent execution and verifies that all operations in the rollback path are reversible before starting. If any operation is marked `irreversible = true`, the rollback is refused with a clear error message identifying the blocking operation.
+Roll back applied edges by executing the recorded inverses from the **journal** (`pgdesign_migration_ops`) in reverse application order — rollback reads the database's own record of what was applied, never the on-disk edge files. It acquires an advisory lock and, before executing any step, verifies that every operation in the rollback range is reversible. If any operation is non-invertible, the rollback is refused with a clear error identifying the blocking operation. Rollback stops at the upgrade/baseline boundary: it cannot cross a frozen boundary revision.
 
 ```
 pgdesign migrate rollback --db "postgres://user:pass@localhost/mydb"
@@ -178,12 +148,13 @@ pgdesign migrate rollback --db "postgres://user:pass@localhost/mydb"
 | Flag | Description |
 |------|-------------|
 | `--dir` | Migrations directory (default: `migrations/`) |
+| `--to` | Target revision to roll back to (resolved via the journal and remap) |
 
-Rollback executes the `down` operations in reverse order. If any operation is marked `irreversible`, the rollback is refused.
+If any operation in the range is non-invertible, the rollback is refused.
 
 ### migrate status
 
-Show which migrations have been applied to the target database and which are still pending. The command reads the migration tracking table and compares it with the files in the migrations directory, displaying each migration's version, applied timestamp, and current status. This is useful for verifying the state of a database before applying new migrations or diagnosing issues with migration ordering.
+Show a database's chain position and the edges still pending to reach the live head. The command reads `pgdesign_chain_position` and asks the path-finder for the remaining edges, displaying the current revision, the head revision, and each pending edge. This is useful for verifying a database's state before applying new edges or diagnosing a fork.
 
 ```
 pgdesign migrate status --db "postgres://user:pass@localhost/mydb"
@@ -191,25 +162,48 @@ pgdesign migrate status --db "postgres://user:pass@localhost/mydb"
 
 ### migrate squash
 
-Squash a range of sequential migrations into a single consolidated migration file that produces the same final schema state. The squash command reads all migrations in the specified version range, merges their DDL and DML operations, eliminates redundant operations like columns added then dropped, merges sequential type changes, and folds column additions into CREATE TABLE statements where possible. Only squash migrations that have been applied to all target environments.
+Consolidate a range of sequential edges into a single **consolidation edge** whose op-list is the ordered concatenation of the range. Squash is never a rewrite: it mints an additional edge from the range's start revision to its end revision, and retires the superseded originals INTACT to `migrations/archive/`. A database mid-range resumes through the path-finder by walking the archived originals, so squashing is legal regardless of applied state. `--from`/`--to` are revision-or-edge references (`genesis`, a revision string, or a live edge-id prefix).
 
 ```
-pgdesign migrate squash --from 0.1.0 --to 0.5.0
+pgdesign migrate squash --from genesis --to <edge-id> --db "postgres://user:pass@localhost/mydb"
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--from` | Start version (inclusive) |
-| `--to` | End version (inclusive) |
+| `--from` | Start of the range (revision-or-edge reference) |
+| `--to` | End of the range (revision-or-edge reference) |
 | `--dir` | Migrations directory (default: `migrations/`) |
+| `--db` | Connection URL (the pre-upgrade guard runs against it) |
 
-The squash command reads all migrations in the specified range, merges their DDL and DML operations into a single migration file, eliminates redundant operations (e.g., a column added then dropped), and writes the result. The squashed migration replaces the individual files.
+The consolidation edge and its archived originals coexist; the path-finder prefers the consolidation edge as a shorter route to the head. Because originals are archived intact, squashing never invalidates a database that has already applied part of the range.
 
-Squashing is useful for reducing migration count in long-lived projects. Only squash migrations that have already been applied to all environments -- squashing unapplied migrations changes their checksums.
+### migrate rebase
+
+Resolve a two-head fork. When two branches each append an edge, the chain has two live heads; apply refuses until the fork is resolved. `migrate rebase --head <ref>` re-parents the tail of the OTHER head onto the head named by `--head`, re-simulating each re-parented edge's operations to recompute its revision and content-derived edge file. The rebased-away originals retire intact to `migrations/archive/`, and the rebase revision-remap table (`migrations/remap.json`) is written so a database stamped at a rebased-away revision is served forward to the new head. A pure file operation — no database required.
+
+```
+pgdesign migrate rebase --head <revision-or-edge-ref>
+```
+
+### migrate upgrade
+
+One-time adoption of a legacy database (the single legacy tracking table, no chain position) onto the on-disk chain. It verifies the schema matches the live database exactly (refusing to stamp over drift), folds the existing applied history into the chain journal, writes the content-addressed genesis prefix edge, and stamps this database's upgrade boundary in a single transaction. Run once per database; a fresh database uses `migrate apply` directly.
+
+```
+pgdesign migrate upgrade schema.toml --db "postgres://user:pass@localhost/mydb"
+```
+
+### migrate baseline
+
+Adopt an existing or intentionally-drifted database onto the chain without executing any migration SQL. In chain mode it introspects the live database, synthesizes a genesis edge carrying the introspected manifest, and stamps a baseline boundary (rollback-frozen). Use this for a database whose schema was created by other means, or one that has drifted from the schema — `migrate upgrade` refuses drift; `migrate baseline` adopts it.
+
+```
+pgdesign migrate baseline schema.toml --db "postgres://user:pass@localhost/mydb"
+```
 
 ### migrate test
 
-Test migrations against a staging database to verify they apply and roll back cleanly before deploying to production. The test command applies all pending migrations, then rolls them back, verifying that every migration applies without errors, all reversible migrations roll back cleanly, and the database returns to its original state after the full rollback cycle. With --shadow mode, the command replays all migrations into a fresh database and diffs the result against the TOML schema.
+Test migrations against a staging database to verify they apply and roll back cleanly before deploying to production. The test command applies the pending edges, then rolls them back, verifying that every edge applies without errors, all reversible edges roll back cleanly, and the database returns to its original state after the full rollback cycle. With --shadow mode, the command replays the chain EDGES into a fresh shadow database (chain-format projects) and diffs the result against the TOML schema.
 
 ```
 pgdesign migrate test --db "postgres://user:pass@localhost/staging"
@@ -413,13 +407,12 @@ pgdesign handles these by committing the current transaction before the non-tran
 
 ## Migration tracking
 
-Applied migrations are tracked in the `pgdesign_migrations` table, which pgdesign creates automatically on first use. Each row records the migration version, when it was applied, a SHA-256 checksum of the migration file for tampering detection, and an auto-generated description. An advisory lock using `pg_try_advisory_lock` prevents concurrent migration execution across multiple processes or application instances connecting to the same database.
+A chain-format database carries three managed structures, created automatically on first use:
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `version` | text (PK) | Semver version string |
-| `applied_at` | timestamptz | When the migration was applied |
-| `checksum` | text | SHA-256 of the migration file |
-| `description` | text | Auto-generated description |
+| Structure | Role |
+|-----------|------|
+| `pgdesign_chain_position` | this database's position: its current revision, the upgrade/baseline boundary, and any in-progress edge |
+| `pgdesign_migration_ops` | the per-operation journal: each applied operation with its recorded inverse and intent/confirm status |
+| `pgdesign_applied_migrations` | a view over the journal presenting fully-confirmed edges (version label, applied timestamp, description, checksum) |
 
-An advisory lock (`pg_try_advisory_lock`) prevents concurrent migration execution. If another migration process is running, the command fails immediately rather than waiting.
+Rollback reads the journal's recorded inverses; it never re-reads the on-disk edge files. An advisory lock using `pg_try_advisory_lock` prevents concurrent migration execution across processes connecting to the same database — if another migration is running, the command fails immediately rather than waiting.

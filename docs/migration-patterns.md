@@ -241,35 +241,35 @@ operations are preserved.
 
 ### Single rollback
 
-`Rollback` in `rollback.go` reverts the most recently applied migration by executing its down operations in reverse order within a transaction. The function acquires an advisory lock to prevent concurrent rollback or apply operations, loads the migration file from disk, verifies that all operations are reversible before executing any rollback steps, and removes the version from the tracking table on successful completion. Non-transactional operations are handled by committing and reopening the transaction as needed.
+Chain-mode rollback reverts the most recently applied edge by executing the recorded inverses from the **journal** (`pgdesign_migration_ops`) in reverse order within a transaction. It reads the database's own record of what was applied — never the on-disk edge files — so a rollback is faithful to what actually ran, even if the files later changed. The function acquires an advisory lock to prevent concurrent rollback or apply operations, verifies that all journalled operations are reversible before executing any step, and deletes the edge's journal rows on successful completion. Non-transactional operations are handled by committing and reopening the transaction as needed.
 
 1. Acquires advisory lock (prevents concurrent rollback/apply).
-2. Queries the `pgdesign_migrations` table for the latest applied version.
-3. Loads and parses the migration file from disk.
-4. Runs `checkReversibility` -- verifies no `DDLOp` or `DMLOp` has
-   `Down.Irreversible == true`. Aborts with a descriptive error if any
-   operation is irreversible.
-5. Sets `lock_timeout` (default: `5s`).
-6. Opens a transaction.
-7. Executes DML down operations in reverse order.
-8. Executes DDL down operations in reverse order (handling non-transactional
+2. Reads `pgdesign_chain_position` for the current revision.
+3. Loads the edge's recorded operations and inverses from the journal.
+4. Verifies no journalled operation is non-invertible. Aborts with a
+   descriptive error if any operation is irreversible.
+5. Refuses to cross the upgrade/baseline boundary revision (frozen).
+6. Sets `lock_timeout` (default: `5s`).
+7. Opens a transaction.
+8. Executes the recorded inverses in reverse order (handling non-transactional
    ops by committing and reopening the transaction as needed).
-9. Removes the version from `pgdesign_migrations`.
+9. Deletes the edge's journal rows and rewinds `pgdesign_chain_position` to the
+   edge's parent revision.
 10. Commits.
 
 ### Range rollback
 
-`RollbackTo` rolls back all migrations applied after a specified target version, reverting them in reverse application order. The critical design feature is the pre-check: before executing any rollback step, the function verifies that ALL migrations in the rollback range are fully reversible. Without this pre-check, a partial rollback could leave the database in an intermediate state when a later migration turns out to contain an irreversible operation. Each migration is rolled back in its own transaction for isolation.
+Range rollback reverts every edge applied after a target revision, in reverse application order. The critical design feature is the pre-check: before executing any step, it verifies that ALL edges in the range are fully reversible. Without this pre-check, a partial rollback could leave the database in an intermediate state when a later edge turns out to contain a non-invertible operation. Each edge is rolled back in its own transaction for isolation, and the range never crosses the frozen upgrade/baseline boundary.
 
 1. Acquires advisory lock.
-2. Validates that the target version is currently applied.
-3. **Pre-checks ALL migrations for reversibility** before executing any
+2. Resolves the target revision (via the journal and the rebase remap).
+3. **Pre-checks ALL edges in the range for reversibility** before executing any
    rollback. This is critical -- without the pre-check, a partial rollback
-   could leave the database in an intermediate state when a later migration
-   turns out to be irreversible.
-4. Rolls back each migration in reverse order, each in its own transaction.
+   could leave the database in an intermediate state when a later edge turns
+   out to be irreversible.
+4. Rolls back each edge in reverse order, each in its own transaction.
 5. On partial failure, returns both the list of successfully rolled-back
-   versions and the error, so the caller knows the exact state.
+   edges and the error, so the caller knows the exact state.
 
 ### Reversibility
 
