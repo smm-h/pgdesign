@@ -1,8 +1,7 @@
 ---
 title: internal/sqlexpr
-description: "Package sqlexpr is a recursive descent parser for a subset of PostgreSQL SQL expressions."
+description: "Package sqlexpr is a recursive-descent parser for a subset of PostgreSQL expressions, producing an AST for analysis, validation, and code generation."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 36
 ---

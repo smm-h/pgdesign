@@ -1,8 +1,7 @@
 ---
 title: internal/seed
-description: "API reference for the internal/seed module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Package seed generates type-aware test data for schema tables, honoring FK order, semantic types, and CHECK/UNIQUE constraints across all PG types."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 31
 ---

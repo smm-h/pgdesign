@@ -1,8 +1,7 @@
 ---
 title: internal/chain
-description: "Package chain is the pure kernel of pgdesign's migration algebra: revision manifests, the parent-linked edge graph (the free category on edges), and three-way typed invertibility (roadmap kernel 1.4, laws L3 + L4 + L7)."
+description: "Package chain is the pure kernel of pgdesign's migration algebra: revision manifests, the parent-linked edge graph, and three-way typed invertibility."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 3
 ---

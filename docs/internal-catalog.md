@@ -1,8 +1,7 @@
 ---
 title: internal/catalog
-description: "Package catalog is the shared, SCOPED pg_catalog query layer (roadmap 5.5+5.7)."
+description: "Package catalog is the shared, scoped pg_catalog query layer answering per-object existence and attribute questions at migration-precondition granularity."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 2
 ---

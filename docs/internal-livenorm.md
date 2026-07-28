@@ -1,8 +1,7 @@
 ---
 title: internal/livenorm
-description: "Package livenorm implements LIVE ROUND-TRIP NORMALIZATION (roadmap 1.2, boundary item 4): the concrete diff.LiveNormalizer that resolves the ≈_pg RESIDUE — catalog-dependent cast materialization — that no pure normalizer can reach."
+description: "Package livenorm resolves catalog-dependent normalization residue by round-tripping expressions through a live PostgreSQL server on the diff --live path."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 18
 ---

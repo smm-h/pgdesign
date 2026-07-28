@@ -1,8 +1,7 @@
 ---
 title: internal/modelgen
-description: "Package modelgen is a pure random generator of VALID pgdesign models, built on pgregory.net/rapid so shrinking is structural and comes for free with the combinators."
+description: "Package modelgen is a pure rapid-based random generator of valid pgdesign models, supplying structured inputs for the property tests of the kernel laws."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 23
 ---

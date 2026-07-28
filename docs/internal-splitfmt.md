@@ -1,8 +1,7 @@
 ---
 title: internal/splitfmt
-description: "Package splitfmt implements a sealed, terminal file format for carrying split SQL statements."
+description: "Package splitfmt implements a sealed, length-prefixed .sqlsplit file format for carrying pre-split SQL statements without embedded-delimiter ambiguity."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 34
 ---

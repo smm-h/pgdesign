@@ -1,8 +1,7 @@
 ---
 title: internal/workload
-description: "API reference for the internal/workload module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Package workload analyzes query patterns and schema shape to recommend indexes, using structural heuristics and live pg_stat_statements telemetry."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 42
 ---

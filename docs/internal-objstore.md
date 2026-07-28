@@ -1,8 +1,7 @@
 ---
 title: internal/objstore
-description: "Package objstore is the content-addressed object store: a hash-keyed put/get map with deduplication, an on-disk layout under a configurable root, and codec-epoch awareness."
+description: "Package objstore is the content-addressed object store: a hash-keyed, deduplicating, epoch-aware put/get map where an object id is the hash of its content."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 24
 ---

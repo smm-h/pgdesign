@@ -1,8 +1,7 @@
 ---
 title: internal/imports
-description: "Package imports implements cross-repository schema imports (roadmap 7.2): the surface snapshot, pinning, and offline drift check for another pgdesign project's schema referenced via an [imports.<alias>] declaration."
+description: "Package imports vendors another pgdesign project's table surface and type closure as pinned content-addressed forms, with an offline drift check."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 16
 ---

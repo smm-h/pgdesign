@@ -1,8 +1,7 @@
 ---
 title: internal/dbutil
-description: "API reference for the internal/dbutil module — auto-generated documentation covering public functions, classes, and type signatures."
+description: "Package dbutil rewrites PostgreSQL connection URLs to retarget the database, used when creating, dropping, or connecting to the maintenance database."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 6
 ---

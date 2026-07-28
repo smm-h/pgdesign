@@ -1,8 +1,7 @@
 ---
 title: internal/project
-description: "Package project is the shared project-loading core: it reconciles a parsed schema set, the project's pgdesign.toml config, and the vendored import surface into ONE resolved model — the semtype registry (builtin + config [[extensions]] + user types + imported enums), the vendored import reference tables, and the config/toml pg_version tiers folded into schema.PGVersion."
+description: "Package project is the shared project-loading core, reconciling parsed schemas, config, and vendored imports into one resolved model and semtype registry."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 28
 ---

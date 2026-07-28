@@ -1,8 +1,7 @@
 ---
 title: internal/predicate
-description: "Package predicate is the migration PRECONDITION IR (roadmap 5.5+5.7, law L5's domain check / L1's single ≈_syn / L8)."
+description: "Package predicate is the migration precondition IR, with a Go executor and a SQL renderer that must agree on object absence, presence, or match."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 27
 ---

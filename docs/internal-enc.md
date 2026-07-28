@@ -1,8 +1,7 @@
 ---
 title: internal/enc
-description: "Package enc is pgdesign's canonical per-object encoder: it maps each resolved model object to canonical JSON bytes, and decodes those bytes back to the object."
+description: "Package enc is pgdesign's canonical per-object encoder, mapping each resolved model object to canonical JSON bytes so that object identity equals its hash."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 10
 ---

@@ -1,8 +1,7 @@
 ---
 title: internal/livestats
-description: "Package livestats fetches live table statistics from a running PostgreSQL server and shapes them into the generate.D2Options.Stats contract (a map keyed by model.TableKey)."
+description: "Package livestats fetches live table statistics from PostgreSQL and shapes them into the generate D2 stats contract, keeping generate database-free."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 19
 ---

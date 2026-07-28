@@ -1,8 +1,7 @@
 ---
 title: internal/typeinfo
-description: "Package typeinfo provides structured PostgreSQL type representation."
+description: "Package typeinfo provides a structured PostgreSQL type representation, parsing raw type strings into base plus parameters and rebuilding SQL type strings."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 40
 ---

@@ -1,8 +1,7 @@
 ---
 title: internal/rev
-description: "Package rev is pgdesign's whole-model canonical form, revision identity, and the single JSON envelope serializer (roadmap kernel 1.5, laws L1 + L7)."
+description: "Package rev computes pgdesign's whole-model canonical form and class-tagged revision identity, and the single JSON envelope serializer for schema output."
 generated: true
-seeded: true
 nav_group: "API Reference"
 nav_order: 29
 ---
