@@ -14,12 +14,6 @@ func registerServeCmd(app *strictcli.App) {
 			quiet := kwargsQuiet(kwargs)
 			cfgOverride := kwargsConfigOverride(kwargs)
 
-			dbURL := kwargsDBURL(kwargs)
-			if dbURL == "" {
-				fmt.Fprintln(os.Stderr, "error: --db is required for serve")
-				return strictcli.Exit(1)
-			}
-
 			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
 			if cfgErr != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", cfgErr)
@@ -27,6 +21,7 @@ func registerServeCmd(app *strictcli.App) {
 			}
 
 			port := kwargs["port"].(int)
+			bind := kwargs["bind"].(string)
 
 			// Namespaces come from the explicit --schema flag; absent, default to
 			// public. (The config lists schema FILE paths, not PG namespace names,
@@ -40,20 +35,43 @@ func registerServeCmd(app *strictcli.App) {
 			// "migrations" default) applies via the shared resolver.
 			migrationsDir := resolveMigrationsDir(nil, string(cfg.Project.MigrationsDir))
 
-			poolCfg := serve.PoolConfig{
-				MaxConns: cfg.Database.PoolMaxConns,
-				MinConns: cfg.Database.PoolMinConns,
-			}
-			srv, err := serve.New(dbURL, schemaNames, migrationsDir, poolCfg)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
-				return strictcli.Exit(1)
+			// Mode is an EXPLICIT choice (never a silent runtime fallback): --db
+			// present selects database mode (introspect + stats/migrations/diff/
+			// audit); --db absent selects DB-free project mode, which compiles the
+			// project from disk and serves it. In project mode the database-backed
+			// endpoints degrade with an explicit 503.
+			var srv *serve.Server
+			dbURL := kwargsDBURL(kwargs)
+			if dbURL != "" {
+				poolCfg := serve.PoolConfig{
+					MaxConns: cfg.Database.PoolMaxConns,
+					MinConns: cfg.Database.PoolMinConns,
+				}
+				var err error
+				srv, err = serve.New(dbURL, schemaNames, migrationsDir, poolCfg)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return strictcli.Exit(1)
+				}
+			} else {
+				// Project mode: compile the project from the current directory through
+				// the shared loader (registry + config extensions + imports +
+				// pg_version), the same path build/codegen/revise use.
+				schema, reg, exitCode := parseAndBuild(cfgOverride, []string{"."})
+				if exitCode != 0 {
+					return strictcli.Exit(exitCode)
+				}
+				srv = serve.NewProject(schema, reg, nil, schemaNames, migrationsDir)
 			}
 			defer srv.Close()
 
-			addr := fmt.Sprintf(":%d", port)
+			addr := fmt.Sprintf("%s:%d", bind, port)
 			if !quiet {
-				fmt.Printf("pgdesign serving on http://localhost:%d\n", port)
+				mode := "project (DB-free)"
+				if dbURL != "" {
+					mode = "database"
+				}
+				fmt.Printf("pgdesign serving on http://%s (%s mode)\n", addr, mode)
 			}
 			if err := srv.ListenAndServe(addr); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -62,8 +80,9 @@ func registerServeCmd(app *strictcli.App) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server (omit for DB-free project mode)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.IntFlag("port", "TCP port number for the HTTP API server to listen on", strictcli.Default(8080)),
+			strictcli.StringFlag("bind", "Network interface address to bind the HTTP server to. Defaults to 127.0.0.1 (loopback only). WARNING: the server has NO AUTHENTICATION; binding to a non-loopback address (e.g. 0.0.0.0) exposes the schema, database statistics, and diff endpoints to anyone who can reach that address.", strictcli.Default("127.0.0.1")),
 			strictcli.StringFlag("schema", "PostgreSQL schema name to serve via the API (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.IntFlag("timeout", "Maximum time in seconds for each HTTP request to complete", strictcli.Default(30)),
 		),

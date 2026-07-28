@@ -7,6 +7,9 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/smm-h/pgdesign/internal/diagnostic"
+	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 // PoolConfig holds connection pool tuning parameters.
@@ -16,16 +19,35 @@ type PoolConfig struct {
 	MinConns int32
 }
 
-// Server is the HTTP API server for pgdesign.
+// projectState is the in-memory project a DB-free server serves: the resolved
+// model, the semtype registry that produced it (registry-present type information,
+// so state-machine D2 diagrams render), and the build diagnostics wrapped into the
+// /schema envelope. It is nil in database (introspect) mode.
+type projectState struct {
+	schema   *model.Schema
+	registry *semtype.Registry
+	diags    []diagnostic.Diagnostic
+}
+
+// Server is the HTTP API server for pgdesign. It runs in one of two explicit
+// modes, chosen at construction (never a silent runtime fallback):
+//
+//   - database mode: pool is non-nil, project is nil. /schema introspects the
+//     live database (registry-absent class); the stats/migrations/extensions/
+//     diff/audit endpoints read the database.
+//   - project mode: project is non-nil, pool is nil. /schema serves the compiled
+//     project model (registry-present class) with no database; database-only
+//     endpoints degrade with an explicit 503, never a nil-pool panic.
 type Server struct {
 	pool          *pgxpool.Pool
+	project       *projectState
 	schemas       []string
 	migrationsDir string
 	mux           *http.ServeMux
 }
 
-// New creates a new Server with a pgxpool connection and sets up routes.
-// Pool parameters in poolCfg override pgxpool defaults when non-zero.
+// New creates a new database-mode Server with a pgxpool connection and sets up
+// routes. Pool parameters in poolCfg override pgxpool defaults when non-zero.
 func New(connStr string, schemas []string, migrationsDir string, poolCfg PoolConfig) (*Server, error) {
 	ctx := context.Background()
 
@@ -65,7 +87,7 @@ func New(connStr string, schemas []string, migrationsDir string, poolCfg PoolCon
 	return s, nil
 }
 
-// NewFromPool creates a Server from an existing pgxpool.Pool (useful for tests).
+// NewFromPool creates a database-mode Server from an existing pgxpool.Pool (useful for tests).
 func NewFromPool(pool *pgxpool.Pool, schemas []string, migrationsDir string) *Server {
 	if len(schemas) == 0 {
 		schemas = []string{"public"}
@@ -80,11 +102,53 @@ func NewFromPool(pool *pgxpool.Pool, schemas []string, migrationsDir string) *Se
 	return s
 }
 
+// NewProject creates a DB-free project-mode Server that serves a pre-compiled
+// model. schema is the resolved model, registry is the semtype registry that
+// produced it (enables state-machine D2 diagrams), and diags are the build
+// diagnostics wrapped into the /schema envelope. There is no database: the
+// stats/migrations/extensions/diff/audit endpoints return an explicit 503.
+func NewProject(schema *model.Schema, registry *semtype.Registry, diags []diagnostic.Diagnostic, schemas []string, migrationsDir string) *Server {
+	if len(schemas) == 0 {
+		schemas = []string{"public"}
+	}
+	s := &Server{
+		project: &projectState{
+			schema:   schema,
+			registry: registry,
+			diags:    diags,
+		},
+		schemas:       schemas,
+		migrationsDir: migrationsDir,
+		mux:           http.NewServeMux(),
+	}
+	s.routes()
+	return s
+}
+
+// projectMode reports whether the server serves a compiled project without a
+// database.
+func (s *Server) projectMode() bool { return s.project != nil }
+
+// requireDB writes an explicit 503 and returns false when the server has no
+// database (project mode). It is the single guard every database-only endpoint
+// calls before touching s.pool, so a DB-free server degrades with a clear message
+// instead of a nil-pool panic.
+func (s *Server) requireDB(w http.ResponseWriter) bool {
+	if s.pool == nil {
+		writeError(w, http.StatusServiceUnavailable,
+			"endpoint unavailable in project mode: this server was started without --db; database-backed endpoints require a database connection")
+		return false
+	}
+	return true
+}
+
 // routes registers all API endpoints on the mux.
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/schema", s.handleSchema)
 	s.mux.HandleFunc("GET /api/schema/d2", s.handleSchemaD2)
 	s.mux.HandleFunc("GET /api/schema/svg", s.handleSchemaSVG)
+	s.mux.HandleFunc("GET /api/schema/graph", s.handleSchemaGraph)
+	s.mux.HandleFunc("GET /api/schema/doc", s.handleSchemaDoc)
 	s.mux.HandleFunc("GET /api/migrations", s.handleMigrations)
 	s.mux.HandleFunc("GET /api/migrations/{version}", s.handleMigrationVersion)
 	s.mux.HandleFunc("GET /api/stats", s.handleStats)
@@ -105,7 +169,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-// Close shuts down the connection pool.
+// Close shuts down the connection pool. It is a no-op in project mode.
 func (s *Server) Close() {
-	s.pool.Close()
+	if s.pool != nil {
+		s.pool.Close()
+	}
 }

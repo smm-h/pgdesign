@@ -55,6 +55,23 @@ func (s *Server) connStr() string {
 // under the envelope's diagnostics key; the payload-key change is
 // consumer-visible.
 func (s *Server) handleSchema(w http.ResponseWriter, r *http.Request) {
+	if s.projectMode() {
+		// Project mode: serve the compiled model verbatim through THE canonical
+		// envelope serializer with the registry-present class (L7). rev.Marshal is
+		// the exact function `generate json` calls, so this body is byte-identical to
+		// `generate json` for the same model (and diagnostics). Build diagnostics are
+		// wrapped under the envelope's diagnostics key.
+		body, err := rev.Marshal(s.project.schema, rev.RegistryPresent, s.project.diags)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("envelope: %v", err))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(body)
+		return
+	}
+
 	schema, diags, err := introspect.Introspect(r.Context(), s.connStr(), s.schemas)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("introspect: %v", err))
@@ -71,29 +88,48 @@ func (s *Server) handleSchema(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
-// handleSchemaD2 introspects the DB and returns D2 text.
-func (s *Server) handleSchemaD2(w http.ResponseWriter, r *http.Request) {
-	schema, _, err := introspect.Introspect(r.Context(), s.connStr(), s.schemas)
+// handleSchemaGraph returns the deterministic FK-graph projection (nodes with
+// fan-in/out, sorted edges) of the served model. The projection is derived and
+// excluded from schema identity, so it is served alongside the envelope rather
+// than inside it. Project mode uses the compiled model; database mode introspects.
+func (s *Server) handleSchemaGraph(w http.ResponseWriter, r *http.Request) {
+	schema, err := s.resolveSchema(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("introspect: %v", err))
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("resolve schema: %v", err))
+		return
+	}
+	if schema.FKGraph == nil {
+		schema.BuildFKGraph()
+	}
+	writeJSON(w, http.StatusOK, schema.FKGraph.Project())
+}
+
+// handleSchemaD2 returns D2 diagram text for the served model. In project mode the
+// real semtype registry is passed so state-machine state diagrams render (the
+// database path has no registry — registry-absent — and cannot draw them).
+func (s *Server) handleSchemaD2(w http.ResponseWriter, r *http.Request) {
+	schema, err := s.resolveSchema(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("resolve schema: %v", err))
 		return
 	}
 
-	d2 := generate.GenerateD2(schema, nil)
+	d2 := generate.GenerateD2(schema, s.registry())
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(d2))
 }
 
-// handleSchemaSVG introspects the DB, generates D2, and renders SVG.
+// handleSchemaSVG renders the D2 diagram of the served model to SVG. Project mode
+// passes the real registry so state-machine diagrams render.
 func (s *Server) handleSchemaSVG(w http.ResponseWriter, r *http.Request) {
-	schema, _, err := introspect.Introspect(r.Context(), s.connStr(), s.schemas)
+	schema, err := s.resolveSchema(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("introspect: %v", err))
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("resolve schema: %v", err))
 		return
 	}
 
-	d2Source := generate.GenerateD2(schema, nil)
+	d2Source := generate.GenerateD2(schema, s.registry())
 	svg, err := generate.RenderSVG(d2Source)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("render SVG: %v", err))
@@ -105,6 +141,48 @@ func (s *Server) handleSchemaSVG(w http.ResponseWriter, r *http.Request) {
 	w.Write(svg)
 }
 
+// handleSchemaDoc returns human-readable schema documentation (the `generate doc`
+// format) for the served model.
+func (s *Server) handleSchemaDoc(w http.ResponseWriter, r *http.Request) {
+	schema, err := s.resolveSchema(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("resolve schema: %v", err))
+		return
+	}
+	out, _, genErr := generate.Generate(schema, generate.Options{Format: "doc"})
+	if genErr != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("generate doc: %v", genErr))
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(out))
+}
+
+// resolveSchema returns the model to serve for a read-only schema endpoint: the
+// compiled project model in project mode, or a fresh introspection in database
+// mode. It is the shared entry point for the d2/svg/graph/doc endpoints.
+func (s *Server) resolveSchema(r *http.Request) (*model.Schema, error) {
+	if s.projectMode() {
+		return s.project.schema, nil
+	}
+	schema, _, err := introspect.Introspect(r.Context(), s.connStr(), s.schemas)
+	if err != nil {
+		return nil, err
+	}
+	return schema, nil
+}
+
+// registry returns the semtype registry to pass to D2 generation: the project's
+// registry in project mode (so state-machine diagrams render), nil in database
+// mode (an introspected model is registry-absent).
+func (s *Server) registry() *semtype.Registry {
+	if s.projectMode() {
+		return s.project.registry
+	}
+	return nil
+}
+
 // handleMigrations returns applied migrations. PRECEDENCE (serve is read-only, so
 // it serves whichever tracking surface a database presents): the chain-era
 // pgdesign_applied_migrations VIEW when it exists (post-upgrade databases); else
@@ -113,6 +191,9 @@ func (s *Server) handleSchemaSVG(w http.ResponseWriter, r *http.Request) {
 // keeps reading); else 200 [] when neither exists. Both surfaces expose the same
 // (version, applied_at, description, checksum) shape.
 func (s *Server) handleMigrations(w http.ResponseWriter, r *http.Request) {
+	if !s.requireDB(w) {
+		return
+	}
 	ctx := r.Context()
 
 	type migration struct {
@@ -276,6 +357,9 @@ func (s *Server) serveChainEdge(w http.ResponseWriter, ref string) {
 
 // handleStats returns database statistics for all tables in the configured schemas.
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	if !s.requireDB(w) {
+		return
+	}
 	ctx := r.Context()
 
 	type tableStat struct {
@@ -344,6 +428,9 @@ type indexStat struct {
 
 // handleTableStats returns per-table stats including column info and index usage.
 func (s *Server) handleTableStats(w http.ResponseWriter, r *http.Request) {
+	if !s.requireDB(w) {
+		return
+	}
 	ctx := r.Context()
 	table := r.PathValue("table")
 
@@ -422,6 +509,9 @@ func (s *Server) handleTableStats(w http.ResponseWriter, r *http.Request) {
 
 // handleExtensions returns installed PostgreSQL extensions.
 func (s *Server) handleExtensions(w http.ResponseWriter, r *http.Request) {
+	if !s.requireDB(w) {
+		return
+	}
 	ctx := r.Context()
 
 	type extension struct {
@@ -493,6 +583,9 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 // handleDiff accepts a TOML body, parses+builds, introspects live DB, diffs,
 // and returns the SchemaDiff as JSON.
 func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
+	if !s.requireDB(w) {
+		return
+	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("read body: %v", err))
@@ -526,6 +619,9 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 
 // handleAudit introspects the live DB, runs discover (TANE) + audit, returns diagnostics.
 func (s *Server) handleAudit(w http.ResponseWriter, r *http.Request) {
+	if !s.requireDB(w) {
+		return
+	}
 	schema, _, err := introspect.Introspect(r.Context(), s.connStr(), s.schemas)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("introspect: %v", err))

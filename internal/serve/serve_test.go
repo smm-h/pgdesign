@@ -21,9 +21,17 @@ var (
 	testDB  *testdb.EphemeralDB
 )
 
-// setupServer creates a Server backed by a real pgxpool for integration tests.
+// setupServer creates a Server backed by a real pgxpool for integration tests. It
+// SKIPS the test when no database is configured (testDB == nil), so the DB-backed
+// tests are skipped rather than aborting the whole package — the DB-free
+// project-mode tests still run. (Previously TestMain hard-exited when no database
+// was reachable, which prevented every test in the package from running without a
+// database.)
 func setupServer(t *testing.T) *Server {
 	t.Helper()
+	if testDB == nil {
+		t.Skip("no database configured (set PGDESIGN_DB); skipping database-backed test")
+	}
 	ctx := context.Background()
 	pool, err := testDB.Pool(ctx)
 	if err != nil {
@@ -39,21 +47,22 @@ func TestMain(m *testing.M) {
 		dbURL = "postgres://localhost:5432/pgdesign?sslmode=disable"
 	}
 
-	var err error
-	testMgr, err = testdb.NewManager(dbURL)
-	if err != nil {
-		os.Exit(0)
-	}
-
 	ctx := context.Background()
-	testDB, err = testMgr.Create(ctx, testdb.CreateOptions{})
-	if err != nil {
-		os.Exit(0)
+	// Best-effort database setup: on any failure, testDB stays nil and DB-backed
+	// tests skip themselves via setupServer, but the DB-free project-mode tests
+	// still run under m.Run().
+	if mgr, err := testdb.NewManager(dbURL); err == nil {
+		testMgr = mgr
+		if db, err := testMgr.Create(ctx, testdb.CreateOptions{}); err == nil {
+			testDB = db
+		}
 	}
 
 	code := m.Run()
 
-	_ = testMgr.Drop(ctx, testDB)
+	if testMgr != nil && testDB != nil {
+		_ = testMgr.Drop(ctx, testDB)
+	}
 	os.Exit(code)
 }
 
