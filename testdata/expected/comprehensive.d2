@@ -1,49 +1,88 @@
+direction: down
+priority: {
+  shape: rectangle
+  label: "<<enum>>\npriority\nlow\nmedium\nhigh\ncritical"
+  style.fill: "#f3e8fd"
+}
 projects: {
   shape: sql_table
+  label: "projects [RLS]"
+  tooltip: "Top-level projects with row-level security."
   id: uuid {constraint: primary_key}
   owner_id: uuid
   name: short_text
-  description: short_text
+  description: short_text {constraint: nullable}
   created_at: timestamptz
 }
 audit_log: {
   shape: sql_table
+  label: "audit_log [append-only]"
+  tooltip: "Immutable audit trail of project actions."
   id: uuid {constraint: primary_key}
-  project_id: uuid {constraint: foreign_key}
+  project_id: uuid {constraint: [foreign_key; idx]}
   actor_id: uuid
   action: short_text
   metadata: jsonb
-  created_at: timestamptz
+  created_at: timestamptz {constraint: idx}
 }
+audit_log_checks: {
+  shape: page
+  label: "CHECK\nck_metadata_title_type: metadata ? 'title' AND jsonb_typeof(metadata -> 'title') = 'string'\nck_metadata_value_type: metadata ? 'value' AND jsonb_typeof(metadata -> 'value') = 'number'"
+  style.fill: "#fff8dc"
+  style.stroke-dash: 3
+}
+audit_log -- audit_log_checks: {style.stroke-dash: 3}
 events: {
   shape: sql_table
+  tooltip: "Time-series project events, partitioned by quarter."
   id: uuid {constraint: primary_key}
-  project_id: uuid {constraint: foreign_key}
+  project_id: uuid {constraint: [foreign_key; idx]}
   event_type: short_text
   payload: jsonb
   occurred_at: timestamptz {constraint: primary_key}
 }
 tasks: {
   shape: sql_table
+  tooltip: "Individual tasks within a project."
   id: uuid {constraint: primary_key}
-  project_id: uuid {constraint: foreign_key}
-  title: short_text
+  project_id: uuid {constraint: [foreign_key; unique]}
+  title: short_text {constraint: unique}
   priority: priority
   estimated_hours: int8
   hourly_rate: int8
   estimated_cost: int8
   created_at: timestamptz
 }
+tasks_checks: {
+  shape: page
+  label: "CHECK\nck_tasks_positive_hours: estimated_hours >= 0"
+  style.fill: "#fff8dc"
+  style.stroke-dash: 3
+}
+tasks -- tasks_checks: {style.stroke-dash: 3}
 comments: {
   shape: sql_table
+  tooltip: "Comments on tasks with tagging support."
   id: uuid {constraint: primary_key}
-  task_id: uuid {constraint: foreign_key}
+  task_id: uuid {constraint: [foreign_key; idx]}
   author_id: uuid
   body: short_text
   tags: short_text
-  created_at: timestamptz
+  created_at: timestamptz {constraint: idx}
 }
-audit_log.project_id -> projects.id: CASCADE
-events.project_id -> projects.id: CASCADE
-tasks.project_id -> projects.id: CASCADE
-comments.task_id -> tasks.id: CASCADE
+audit_log.project_id -> projects.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
+events.project_id -> projects.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
+tasks.project_id -> projects.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
+comments.task_id -> tasks.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}

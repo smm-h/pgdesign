@@ -1,7 +1,9 @@
+direction: down
 messages: {
   shape: sql_table
+  tooltip: "Chat messages"
   id: uuid {constraint: primary_key}
-  channel: short_text
-  sent_at: timestamptz
-  score: int8
+  channel: short_text {constraint: idx}
+  sent_at: timestamptz {constraint: idx}
+  score: int8 {constraint: idx}
 }

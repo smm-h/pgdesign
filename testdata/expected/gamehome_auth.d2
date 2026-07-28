@@ -1,90 +1,125 @@
+direction: down
 magic_links: {
   shape: sql_table
+  tooltip: "Passwordless login tokens sent via email."
   token: text {constraint: primary_key}
-  email: text
+  email: text {constraint: idx}
   expires_at: float8
   used: bool
 }
 users: {
   shape: sql_table
+  tooltip: "Core user accounts. All authentication methods link back here."
   id: text {constraint: primary_key}
-  username: text
+  username: text {constraint: [unique; nullable]}
   display_name: text
-  email: text
+  email: text {constraint: [idx; nullable]}
   email_verified: bool
   created_at: float8
   updated_at: float8
 }
 credentials: {
   shape: sql_table
-  user_id: text {constraint: primary_key}
+  tooltip: "Password credentials. One row per user with a password."
+  user_id: text {constraint: [primary_key; foreign_key]}
   password_hash: text
   created_at: float8
   updated_at: float8
 }
 email_verifications: {
   shape: sql_table
+  tooltip: "Pending email verification tokens with expiry."
   token: text {constraint: primary_key}
-  user_id: text {constraint: foreign_key}
+  user_id: text {constraint: [foreign_key; idx]}
   email: text
   expires_at: float8
   used: bool
 }
 password_resets: {
   shape: sql_table
+  tooltip: "Password reset tokens with expiry."
   token: text {constraint: primary_key}
-  user_id: text {constraint: foreign_key}
+  user_id: text {constraint: [foreign_key; idx]}
   expires_at: float8
   used: bool
 }
 provider_links: {
   shape: sql_table
-  user_id: text {constraint: foreign_key}
+  tooltip: "OAuth/OIDC provider links. Composite PK on (provider, provider_sub) to prevent duplicates."
+  user_id: text {constraint: [foreign_key; idx]}
   provider: text {constraint: primary_key}
   provider_sub: text {constraint: primary_key}
-  provider_email: text
+  provider_email: text {constraint: nullable}
   linked_at: float8
 }
 recovery_codes: {
   shape: sql_table
+  tooltip: "One-time-use backup codes for MFA recovery."
   id: int8 {constraint: primary_key}
-  user_id: text {constraint: foreign_key}
+  user_id: text {constraint: [foreign_key; idx]}
   code_hash: text
   used: bool
 }
 sessions: {
   shape: sql_table
+  tooltip: "Active login sessions with expiry and device metadata."
   id: text {constraint: primary_key}
-  user_id: text {constraint: foreign_key}
+  user_id: text {constraint: [foreign_key; idx]}
   created_at: float8
   last_active: float8
-  expires_at: float8
-  ip: text
-  user_agent: text
+  expires_at: float8 {constraint: idx}
+  ip: text {constraint: nullable}
+  user_agent: text {constraint: nullable}
 }
 totp_secrets: {
   shape: sql_table
-  user_id: text {constraint: primary_key}
+  tooltip: "TOTP (authenticator app) secrets for two-factor authentication."
+  user_id: text {constraint: [primary_key; foreign_key]}
   secret: text
   verified: bool
   created_at: float8
 }
 webauthn_credentials: {
   shape: sql_table
+  tooltip: "FIDO2/WebAuthn passkey credentials."
   id: text {constraint: primary_key}
-  user_id: text {constraint: foreign_key}
+  user_id: text {constraint: [foreign_key; idx]}
   public_key: bytea
   attestation_type: text
-  transport: text
+  transport: text {constraint: nullable}
   sign_count: int4
   created_at: float8
-  last_used: float8
+  last_used: float8 {constraint: nullable}
 }
-credentials.user_id -> users.id: CASCADE
-email_verifications.user_id -> users.id: CASCADE
-password_resets.user_id -> users.id: CASCADE
-provider_links.user_id -> users.id: CASCADE
-recovery_codes.user_id -> users.id: CASCADE
-sessions.user_id -> users.id: CASCADE
-totp_secrets.user_id -> users.id: CASCADE
-webauthn_credentials.user_id -> users.id: CASCADE
+credentials.user_id -> users.id: CASCADE {
+  source-arrowhead: {shape: cf-one}
+  target-arrowhead: {shape: cf-one}
+}
+email_verifications.user_id -> users.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
+password_resets.user_id -> users.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
+provider_links.user_id -> users.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
+recovery_codes.user_id -> users.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
+sessions.user_id -> users.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
+totp_secrets.user_id -> users.id: CASCADE {
+  source-arrowhead: {shape: cf-one}
+  target-arrowhead: {shape: cf-one}
+}
+webauthn_credentials.user_id -> users.id: CASCADE {
+  source-arrowhead: {shape: cf-many}
+  target-arrowhead: {shape: cf-one}
+}
