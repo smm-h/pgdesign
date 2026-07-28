@@ -1,5 +1,9 @@
 {
   "_hash_version": 3,
+  "en/architecture-laws.md": {
+    "content": "9ceb56fd327b462a8186cbfb02c25b43bbca06de3580ddebc379a5c20ba5ff3f",
+    "description": "11fc0c4e8c7a3f025386bd9e9c08922e4dc3eb1dca42b5d89f083c1968c73d26"
+  },
   "en/cli-build.md": {
     "content": "3570f03d7657ceacbdec3b8540a8fa493efbf8a1a990509250f32fc75a8bd436",
     "description": "0133c2b98efb5e8f65c3e8b2bef097d1d0b4db29c70ea6c468cab465c3fb4e9c",

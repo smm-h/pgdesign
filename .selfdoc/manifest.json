@@ -2,11 +2,16 @@
   "schema_version": 1,
   "name": "pgdesign",
   "slug": "pgdesign",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "description": "",
   "language": "go",
   "base_url": "https://pgdesign.smmh.dev",
   "pages": [
+    {
+      "path": "architecture-laws.md",
+      "title": "Architecture: The Laws",
+      "type": "doc"
+    },
     {
       "path": "cli-build.md",
       "title": "pgdesign build",
@@ -398,5 +403,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-28T11:25:24.900262+00:00"
+  "last_gen": "2026-07-28T11:49:16.131232+00:00"
 }
