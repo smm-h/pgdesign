@@ -90,7 +90,13 @@ func TestSelfContainedCreateTableMixed(t *testing.T) {
 	store := newTestStore(t)
 	tbl, enums, domains, schema, pgVersion := mixedTable()
 
-	wantUp := pgsql.CreateTable(&tbl, schema, false, pgVersion, enums, domains)
+	// Premise updated for roadmap 5.8(a): the chain create_table render now folds
+	// COMMENT ON emission (table + column comments) into its output, so a
+	// chain-created table carries its mandatory comment live. The fixture table has
+	// a table comment ("app users") and no column comments, so exactly one
+	// COMMENT ON TABLE statement is appended after the CREATE TABLE.
+	wantUp := pgsql.CreateTable(&tbl, schema, false, pgVersion, enums, domains) +
+		"\n" + pgsql.CommentOn("TABLE", pgsql.QualifiedName(schema, tbl.Name), tbl.Comment)
 	wantDown := "DROP TABLE " + pgsql.QualifiedName(schema, tbl.Name) + ";"
 
 	op, err := BuildCreateTable(store, tbl, schema, pgVersion, enums, domains)

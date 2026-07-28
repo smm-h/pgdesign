@@ -10,6 +10,7 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/diff"
+	"github.com/smm-h/pgdesign/internal/enc"
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/model"
 	"github.com/smm-h/pgdesign/internal/risk"
@@ -131,6 +132,12 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 		m.DDLOps = append(m.DDLOps, createOp)
 		diags = append(diags, classifyOp(createOp, risk.OpCreateCompositeType, risk.OpContext{PGVersion: desired.PGVersion})...)
+
+		// Composite type comment change (roadmap 5.8a): the recreate above does not
+		// emit COMMENT ON, so restore the comment explicitly.
+		if ctDiff.CommentChanged != nil && ct != nil {
+			m.DDLOps = append(m.DDLOps, commentOnOp("TYPE", ct.Schema, ct.Name, "", "", ctDiff.CommentChanged[0], ctDiff.CommentChanged[1]))
+		}
 	}
 
 	// Create domains (after enums and composite types, before tables).
@@ -177,6 +184,10 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			}
 			m.DDLOps = append(m.DDLOps, createOp)
 			diags = append(diags, classifyOp(createOp, risk.OpCreateDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			// The recreate loses the comment; restore it (roadmap 5.8a).
+			if dd.CommentChanged != nil && dom != nil {
+				m.DDLOps = append(m.DDLOps, commentOnOp("DOMAIN", dom.Schema, dom.Name, "", "", dd.CommentChanged[0], dd.CommentChanged[1]))
+			}
 			continue // Skip other changes since we're recreating the domain.
 		}
 
@@ -289,6 +300,13 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				}
 				m.DDLOps = append(m.DDLOps, op)
 				diags = append(diags, classifyOp(op, risk.OpAlterDomain, risk.OpContext{PGVersion: desired.PGVersion})...)
+			}
+		}
+
+		// Domain comment change (roadmap 5.8a): COMMENT ON DOMAIN.
+		if dd.CommentChanged != nil {
+			if dom := findDomain(desired, dd.Name); dom != nil {
+				m.DDLOps = append(m.DDLOps, commentOnOp("DOMAIN", dom.Schema, dom.Name, "", "", dd.CommentChanged[0], dd.CommentChanged[1]))
 			}
 		}
 	}
@@ -1272,6 +1290,10 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			m.DDLOps = append(m.DDLOps, createOp)
 			diags = append(diags, classifyOp(createOp, risk.OpCreatePolicy, ctx)...)
 		}
+
+		// Table and column comment changes (roadmap 5.8a): emit COMMENT ON ops so a
+		// comment-only change lands in the database (and no longer trips ErrNoEdgeOps).
+		appendTableCommentOps(m, td, desired)
 	}
 
 	// View changes.
@@ -1299,9 +1321,12 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			m.DDLOps = append(m.DDLOps, op)
 			diags = append(diags, classifyOp(op, risk.OpCreateOrReplaceView, risk.OpContext{})...)
 		}
-		// Comment changes on views don't need separate migration ops in PostgreSQL;
-		// COMMENT ON VIEW would require separate handling. For now, comment changes
-		// are tracked in the diff but don't generate DDL.
+		// View comment change (roadmap 5.8a): COMMENT ON VIEW.
+		if vd.CommentChanged != nil {
+			if v := findView(desired, vd.Name); v != nil {
+				m.DDLOps = append(m.DDLOps, commentOnOp("VIEW", v.Schema, v.Name, "", "", vd.CommentChanged[0], vd.CommentChanged[1]))
+			}
+		}
 	}
 
 	// Materialized view changes.
@@ -1386,6 +1411,12 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 				m.DDLOps = append(m.DDLOps, idxOp)
 			}
 		}
+		// Materialized view comment change (roadmap 5.8a).
+		if mvd.CommentChanged != nil {
+			if mv := findMaterializedView(desired, mvd.Name); mv != nil {
+				m.DDLOps = append(m.DDLOps, commentOnOp("MATERIALIZED VIEW", mv.Schema, mv.Name, "", "", mvd.CommentChanged[0], mvd.CommentChanged[1]))
+			}
+		}
 	}
 
 	// Sequence changes.
@@ -1401,6 +1432,11 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 		}
 		m.DDLOps = append(m.DDLOps, op)
 		diags = append(diags, classifyOp(op, risk.OpAlterSequence, risk.OpContext{PGVersion: desired.PGVersion})...)
+
+		// Sequence comment change (roadmap 5.8a).
+		if sd.CommentChanged != nil && seq != nil {
+			m.DDLOps = append(m.DDLOps, commentOnOp("SEQUENCE", seq.Schema, seq.Name, "", "", sd.CommentChanged[0], sd.CommentChanged[1]))
+		}
 	}
 
 	// Function changes.
@@ -1449,6 +1485,16 @@ func GenerateMigration(d *diff.SchemaDiff, desired *model.Schema, version string
 			}
 			m.DDLOps = append(m.DDLOps, op)
 			diags = append(diags, classifyOp(op, risk.OpCreateOrReplaceFunction, risk.OpContext{PGVersion: desired.PGVersion})...)
+		}
+
+		// Function comment change (roadmap 5.8a). The arg signature is carried so the
+		// comment_on targets the exact (overload-aware) function manifest key.
+		if fd.CommentChanged != nil && fn != nil {
+			kind := "FUNCTION"
+			if fn.IsProc {
+				kind = "PROCEDURE"
+			}
+			m.DDLOps = append(m.DDLOps, commentOnOp(kind, fn.Schema, fn.Name, "", enc.FunctionArgSig(fn.Args), fd.CommentChanged[0], fd.CommentChanged[1]))
 		}
 	}
 
@@ -1900,6 +1946,48 @@ func tableComment(t *model.Table) string {
 		return ""
 	}
 	return t.Comment
+}
+
+// commentOnOp builds a comment_on DDLOp (roadmap 5.8a) for an object whose
+// comment changed from oldC to newC. object is the COMMENT ON keyword; schema and
+// name are the owning object's RAW schema/name (matching enc.KeyForX exactly, so
+// endpoint simulation maps the post-state onto the right manifest key); column is
+// set only for a COLUMN comment; argSig only for a FUNCTION. It is mechanically
+// invertible — the chain shim derives the down by swapping the comments — but the
+// explicit Down is recorded too so the legacy migration path can invert it.
+func commentOnOp(object, schema, name, column, argSig, oldC, newC string) DDLOp {
+	return DDLOp{
+		Op:            "comment_on",
+		CommentObject: object,
+		Schema:        schema,
+		Name:          name,
+		Column:        column,
+		FuncArgSig:    argSig,
+		Comment:       newC,
+		CommentOld:    oldC,
+		Down: &DownOp{Ops: []DDLOp{{
+			Op: "comment_on", CommentObject: object, Schema: schema, Name: name,
+			Column: column, FuncArgSig: argSig, Comment: oldC, CommentOld: newC,
+		}}},
+	}
+}
+
+// appendTableCommentOps lowers a table's own comment change and its columns'
+// comment changes to comment_on ops (roadmap 5.8a). The owning object for both is
+// the table, so both map to the table's manifest key.
+func appendTableCommentOps(m *Migration, td diff.TableDiff, desired *model.Schema) {
+	t := findTable(desired, td.Name)
+	if t == nil {
+		return
+	}
+	if td.CommentChanged != nil {
+		m.DDLOps = append(m.DDLOps, commentOnOp("TABLE", t.Schema, t.Name, "", "", td.CommentChanged[0], td.CommentChanged[1]))
+	}
+	for _, cc := range td.ColumnsChanged {
+		if cc.CommentChanged != nil {
+			m.DDLOps = append(m.DDLOps, commentOnOp("COLUMN", t.Schema, t.Name, cc.Name, "", cc.CommentChanged[0], cc.CommentChanged[1]))
+		}
+	}
 }
 
 func tablePK(t *model.Table) []string {

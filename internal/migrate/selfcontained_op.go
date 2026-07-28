@@ -155,7 +155,10 @@ func invClassForKind(kind string) chain.InvertibilityClass {
 		"create_sequence", "create_composite_type", "create_domain",
 		"create_function", "create_trigger", "create_policy",
 		"create_partition", "create_enum",
-		"rename_column", "rename_table":
+		"rename_column", "rename_table",
+		// comment_on inverts by restoring the prior comment carried in the delta
+		// (a pure structural swap, like renames) — mechanically invertible.
+		"comment_on":
 		return chain.MechanicallyInvertible
 	case "create_or_replace_view", "create_or_replace_function",
 		"alter_sequence", "schema_meta",

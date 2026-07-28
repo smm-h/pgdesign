@@ -29,16 +29,14 @@ package migrate
 // introspects only the schemas the target model spans, so a foreign schema is out
 // of scope.
 //
-// COMMENTS ARE NOT CERTIFIED (documented limitation, flagged 5.8): the migrate
-// generator does NOT emit COMMENT ON — only internal/generate (the full-DDL path)
-// does — so a chain-applied database never carries table/column/object comments.
-// Comments are documentation metadata, not schema structure; reconcile certifies
-// structure, so it strips comments from both sides before comparison rather than
-// false-erroring on every commented model (which would be every real schema). If
-// migrate gains comment emission, this alignment should be removed so reconcile
-// certifies comments too. The same holds for a policy's PUBLIC role, which PG
-// stores as the empty role set (a `to = "public"` model spelling would otherwise
-// false-drift) — but that lives in the differ/introspect layer, not here.
+// COMMENTS ARE CERTIFIED (roadmap 5.8a): the chain apply path now emits COMMENT
+// ON — create_table folds its table/column comments into the rendered DDL, and a
+// comment_change lowers to a comment_on op for every diff-reported object kind —
+// so a chain-applied database carries its comments live. Reconcile therefore
+// compares comments too (the old stripComments alignment is gone). A policy's
+// PUBLIC role still normalizes as the empty role set (a `to = "public"` model
+// spelling would otherwise false-drift), but that lives in the differ/introspect
+// layer, not here.
 //
 // SM-vs-ENUM LOSSINESS (documented, L10 injective caveat): a state_machine type
 // introspects as a plain enum plus a CHECK and a trigger — the SM *kind* is not
@@ -86,11 +84,6 @@ func ReconcileAfterApply(ctx context.Context, dbURL string, p *ChainProject) err
 	target.PGVersion = actual.PGVersion
 	target.Groups = actual.Groups
 
-	// Comments are not part of the apply codomain (migrate does not emit COMMENT
-	// ON). Strip them from both sides so documentation metadata never false-drifts.
-	stripComments(target)
-	stripComments(actual)
-
 	// The live round-trip normalizer resolves the ≈_pg cast residue on expressions
 	// (CHECKs, partial-index predicates, policy clauses). It opens its own session
 	// (temp objects), independent of the apply connection.
@@ -105,39 +98,6 @@ func ReconcileAfterApply(ctx context.Context, dbURL string, p *ChainProject) err
 		return fmt.Errorf("reconcile: the applied database does not match the target model at revision %s — divergent objects:\n%s", head, diff.FormatTerminal(d))
 	}
 	return nil
-}
-
-// stripComments zeros every comment field reconcile's DiffLive would compare, so
-// documentation metadata (which migrate does not emit) is excluded from the
-// structural codomain check. See the package-level note on the comments limitation.
-func stripComments(m *model.Schema) {
-	for i := range m.Tables {
-		m.Tables[i].Comment = ""
-		for j := range m.Tables[i].Columns {
-			m.Tables[i].Columns[j].Comment = ""
-		}
-	}
-	for i := range m.Views {
-		m.Views[i].Comment = ""
-	}
-	for i := range m.MaterializedViews {
-		m.MaterializedViews[i].Comment = ""
-	}
-	for i := range m.Sequences {
-		m.Sequences[i].Comment = ""
-	}
-	for i := range m.Domains {
-		m.Domains[i].Comment = ""
-	}
-	for i := range m.CompositeTypes {
-		m.CompositeTypes[i].Comment = ""
-	}
-	for i := range m.Functions {
-		m.Functions[i].Comment = ""
-	}
-	for i := range m.Enums {
-		m.Enums[i].Comment = ""
-	}
 }
 
 // reconcileSchemaNames collects the distinct, non-empty schema names the target

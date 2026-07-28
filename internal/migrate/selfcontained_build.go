@@ -90,6 +90,21 @@ func deriveDown(store *objstore.Store, up SelfContainedOp, body opBody) (*SelfCo
 			}
 			return &SelfContainedOp{kind: up.kind, target: up.target, inv: chain.NonInvertible, payload: id}, nil
 		}
+		// comment_on inverts by restoring the prior comment (roadmap 5.8a): the down
+		// is the same op with old/new swapped — a pure structural function of the up
+		// delta, which carries both comments. Same shape as the rename swap.
+		if up.kind == "comment_on" {
+			if body.Delta == nil {
+				return nil, fmt.Errorf("migrate: comment_on op carries no delta to invert")
+			}
+			swapped := swapComment(*body.Delta)
+			down := opBody{Kind: up.kind, Delta: &swapped}
+			id, err := putBody(store, down)
+			if err != nil {
+				return nil, err
+			}
+			return &SelfContainedOp{kind: up.kind, target: up.target, inv: chain.NonInvertible, payload: id}, nil
+		}
 		dk := dropKindFor(up.kind)
 		if dk == "" {
 			return nil, fmt.Errorf("migrate: no structural inverse for mechanically-invertible kind %q", up.kind)

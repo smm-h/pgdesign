@@ -56,7 +56,15 @@ func renderBody(store *objstore.Store, b opBody) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return sql.CreateTable(&tbl, b.Schema, false, b.PGVersion, enums, domains), nil
+		// Fold COMMENT ON emission into the create_table render: the decoded table
+		// def carries the table and column comments, and the chain apply path has no
+		// separate comment section (unlike internal/generate's full-DDL path), so a
+		// chain-created table would otherwise land WITHOUT its mandatory comment.
+		ddl := sql.CreateTable(&tbl, b.Schema, false, b.PGVersion, enums, domains)
+		if comments := sql.CommentsOnTable(b.Schema, &tbl); len(comments) > 0 {
+			ddl += "\n" + strings.Join(comments, "\n")
+		}
+		return ddl, nil
 
 	case "create_view", "create_or_replace_view":
 		v, err := decodeViewDef(store, b.DefID)

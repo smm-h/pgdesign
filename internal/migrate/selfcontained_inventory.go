@@ -165,7 +165,10 @@ func categoryForKind(kind string) (simCategory, bool) {
 		"alter_domain_set_not_null", "alter_domain_drop_not_null",
 		// table-owned trigger / policy / rls
 		"create_trigger", "drop_trigger", "create_policy", "drop_policy",
-		"enable_rls", "disable_rls", "force_rls", "no_force_rls":
+		"enable_rls", "disable_rls", "force_rls", "no_force_rls",
+		// comment metadata (roadmap 5.8a): maps the OWNING object's key to its
+		// post-state (a comment change re-encodes the owning object).
+		"comment_on":
 		return catNestedModifier, true
 	default:
 		return 0, false
@@ -176,6 +179,8 @@ func categoryForKind(kind string) (simCategory, bool) {
 // owning enum/domain for the type-modifier families, else the owning table.
 func owningKeyForDelta(op DDLOp) enc.Key {
 	switch op.Op {
+	case "comment_on":
+		return commentOwningKey(op)
 	case "alter_enum_add_value":
 		return enc.Key{Kind: enc.KindEnum, Schema: op.Schema, Name: op.Name}
 	case "alter_domain_add_constraint", "alter_domain_drop_constraint",
@@ -185,6 +190,36 @@ func owningKeyForDelta(op DDLOp) enc.Key {
 	default:
 		schema, name := splitQualifiedName(op.Table)
 		return enc.Key{Kind: enc.KindTable, Schema: schema, Name: name}
+	}
+}
+
+// commentOwningKey returns the manifest key a comment_on op's OWNING object
+// occupies (roadmap 5.8a). It mirrors enc.KeyForX EXACTLY — raw op.Schema/op.Name
+// (never normalized to "public"), and the function arg signature for overload
+// distinctness — because the op's post-state def id is assigned to this key during
+// endpoint simulation, and it must equal the key BuildManifestInto minted for the
+// same object. A TABLE and a COLUMN comment both re-encode the OWNING TABLE, so
+// both map to the table key.
+func commentOwningKey(op DDLOp) enc.Key {
+	switch op.CommentObject {
+	case "TABLE", "COLUMN":
+		return enc.Key{Kind: enc.KindTable, Schema: op.Schema, Name: op.Name}
+	case "VIEW":
+		return enc.Key{Kind: enc.KindView, Schema: op.Schema, Name: op.Name}
+	case "MATERIALIZED VIEW":
+		return enc.Key{Kind: enc.KindMatView, Schema: op.Schema, Name: op.Name}
+	case "SEQUENCE":
+		return enc.Key{Kind: enc.KindSequence, Schema: op.Schema, Name: op.Name}
+	case "DOMAIN":
+		return enc.Key{Kind: enc.KindDomain, Schema: op.Schema, Name: op.Name}
+	case "TYPE":
+		return enc.Key{Kind: enc.KindComposite, Schema: op.Schema, Name: op.Name}
+	case "FUNCTION", "PROCEDURE":
+		// Procedures share the function manifest kind; only the COMMENT ON SQL
+		// keyword differs (handled at render time).
+		return enc.Key{Kind: enc.KindFunction, Schema: op.Schema, Name: op.Name, ArgSig: op.FuncArgSig}
+	default:
+		return enc.Key{}
 	}
 }
 
@@ -358,6 +393,16 @@ func deltaOf(op DDLOp) *DDLOp {
 	d.PolicyDef = nil
 	d.RawSQL = ""
 	return &d
+}
+
+// swapComment produces the structural inverse of a comment_on delta (roadmap
+// 5.8a): the down carries the SAME locator fields with Comment and CommentOld
+// swapped, so applying it restores the prior comment.
+func swapComment(up DDLOp) DDLOp {
+	down := up
+	down.Comment = up.CommentOld
+	down.CommentOld = up.Comment
+	return down
 }
 
 // swapRename produces the structural inverse of a rename delta (roadmap 5.1b):

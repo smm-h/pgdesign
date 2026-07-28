@@ -49,6 +49,9 @@ type tomlDDL struct {
 	Operators         []string          `toml:"operators,omitempty"`
 	Deferrable        bool              `toml:"deferrable,omitempty"`
 	InitiallyDeferred bool              `toml:"initially_deferred,omitempty"`
+	CommentObject     string            `toml:"comment_object,omitempty"`
+	CommentOld        string            `toml:"comment_old,omitempty"`
+	FuncArgSig        string            `toml:"func_arg_sig,omitempty"`
 	Consolidated      []tomlDDL         `toml:"consolidated,omitempty"`
 	Down              *tomlDown         `toml:"down,omitempty"`
 }
@@ -150,6 +153,9 @@ func convertTomlDDL(td tomlDDL) (DDLOp, error) {
 		Operators:         td.Operators,
 		Deferrable:        td.Deferrable,
 		InitiallyDeferred: td.InitiallyDeferred,
+		CommentObject:     td.CommentObject,
+		CommentOld:        td.CommentOld,
+		FuncArgSig:        td.FuncArgSig,
 	}
 	// Convert opclass: string becomes a map applied to all columns,
 	// map is copied directly.
@@ -416,6 +422,15 @@ func writeDDLOp(b *strings.Builder, op *DDLOp) {
 	}
 	if op.InitiallyDeferred {
 		b.WriteString("initially_deferred = true\n")
+	}
+	if op.CommentObject != "" {
+		b.WriteString(fmt.Sprintf("comment_object = %q\n", op.CommentObject))
+	}
+	if op.CommentOld != "" {
+		b.WriteString(fmt.Sprintf("comment_old = %q\n", op.CommentOld))
+	}
+	if op.FuncArgSig != "" {
+		b.WriteString(fmt.Sprintf("func_arg_sig = %q\n", op.FuncArgSig))
 	}
 
 	// Down must be written before consolidated: [[ddl.consolidated]] changes

@@ -688,6 +688,27 @@ func CommentOn(objectType, qualifiedName, comment string) string {
 		strings.ToUpper(objectType), qualifiedName, escaped)
 }
 
+// CommentsOnTable returns the COMMENT ON statements for a table and its columns
+// (table comment first, then per-column comments in column order). It is empty
+// when the table and all its columns are commentless. Callers that render a
+// table's DDL standalone — the migrate chain create_table render path — append
+// these so a chain-created table carries its mandatory comment (and any column
+// comments) live, instead of relying on the full-DDL generate path that emits
+// comments in a separate section.
+func CommentsOnTable(schemaName string, t *model.Table) []string {
+	var out []string
+	qualified := QualifiedName(schemaName, t.Name)
+	if t.Comment != "" {
+		out = append(out, CommentOn("TABLE", qualified, t.Comment))
+	}
+	for _, col := range t.Columns {
+		if col.Comment != "" {
+			out = append(out, CommentOn("COLUMN", qualified+"."+QuoteIdent(col.Name), col.Comment))
+		}
+	}
+	return out
+}
+
 // CreatePartitionOf generates a CREATE TABLE ... PARTITION OF statement for a
 // child partition. The bound expression is emitted verbatim (e.g.
 // "FROM ('2024-01-01') TO ('2024-02-01')").

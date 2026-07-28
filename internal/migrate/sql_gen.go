@@ -76,6 +76,8 @@ func OpToSQL(op DDLOp) string {
 		return opDropEnum(op)
 	case "set_owner":
 		return opSetOwner(op)
+	case "comment_on":
+		return opCommentOn(op)
 	case "create_function":
 		return opCreateFunction(op)
 	case "drop_function":
@@ -174,7 +176,7 @@ func opCreateTable(op DDLOp) string {
 		// PGVersion is honored uniformly (never hardcoded 0), so version-gated
 		// DDL (e.g. STORED vs VIRTUAL generated columns) renders under the op's
 		// recorded target version.
-		return sql.CreateTable(op.TableDef, schema, false, op.PGVersion, nil, nil)
+		return withTableComments(sql.CreateTable(op.TableDef, schema, false, op.PGVersion, nil, nil), schema, op.TableDef)
 	}
 
 	// Consolidation path: build a table from the create_table op's fields
@@ -185,6 +187,17 @@ func opCreateTable(op DDLOp) string {
 
 	// Fallback: generate from op fields (no full table def available).
 	return fmt.Sprintf("CREATE TABLE %s ();", quoteQualified(op.Table))
+}
+
+// withTableComments appends the table's COMMENT ON statements (table + columns)
+// to a rendered CREATE TABLE (roadmap 5.8a), so both apply paths — legacy OpToSQL
+// and the chain renderer — carry a table's mandatory comment live and stay
+// byte-identical to each other.
+func withTableComments(ddl, schema string, t *model.Table) string {
+	if comments := sql.CommentsOnTable(schema, t); len(comments) > 0 {
+		return ddl + "\n" + strings.Join(comments, "\n")
+	}
+	return ddl
 }
 
 // opCreateTableConsolidated builds a model.Table from a create_table op and
@@ -286,7 +299,7 @@ func opCreateTableConsolidated(op DDLOp) string {
 		}
 	}
 
-	return sql.CreateTable(tbl, schema, false, op.PGVersion, nil, nil)
+	return withTableComments(sql.CreateTable(tbl, schema, false, op.PGVersion, nil, nil), schema, tbl)
 }
 
 func opCreatePartition(op DDLOp) string {
@@ -580,6 +593,31 @@ func opDropEnum(op DDLOp) string {
 func opSetOwner(op DDLOp) string {
 	return fmt.Sprintf("ALTER TABLE %s OWNER TO %s;",
 		quoteQualified(op.Table), sql.QuoteIdent(op.Name))
+}
+
+// opCommentOn renders a comment_on op (roadmap 5.8a): COMMENT ON <object> ... IS
+// <comment>. The qualified name is built from the op's structured locator fields
+// per CommentObject (a COLUMN qualifies down to schema.table.column; every other
+// object kind is schema.name). An empty new comment renders IS NULL (removing the
+// comment) rather than an empty-string comment, which matches how PostgreSQL and
+// introspection represent an absent comment.
+func opCommentOn(op DDLOp) string {
+	target := commentTarget(op)
+	if op.Comment == "" {
+		return fmt.Sprintf("COMMENT ON %s %s IS NULL;", strings.ToUpper(op.CommentObject), target)
+	}
+	return sql.CommentOn(op.CommentObject, target, op.Comment)
+}
+
+// commentTarget builds the qualified object name a comment_on op targets. Every
+// comment_on op carries the OWNING object's raw schema in op.Schema and name in
+// op.Name (so the manifest key matches enc.KeyForX exactly); a COLUMN op also
+// carries the column name in op.Column and qualifies down to schema.table.column.
+func commentTarget(op DDLOp) string {
+	if op.CommentObject == "COLUMN" {
+		return sql.QualifiedName(op.Schema, op.Name) + "." + sql.QuoteIdent(op.Column)
+	}
+	return sql.QualifiedName(op.Schema, op.Name)
 }
 
 func opCreateFunction(op DDLOp) string {

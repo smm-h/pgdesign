@@ -62,6 +62,16 @@ type DDLOp struct {
 	Deferrable        bool              // for exclusion and unique constraints
 	InitiallyDeferred bool              // for exclusion and unique constraints
 
+	// comment_on op (roadmap 5.8a). CommentObject is the COMMENT ON object-type
+	// keyword (TABLE/COLUMN/VIEW/MATERIALIZED VIEW/SEQUENCE/DOMAIN/TYPE/FUNCTION);
+	// Comment holds the new comment; CommentOld holds the prior comment so the
+	// down is a pure structural swap (mechanically invertible). FuncArgSig carries
+	// a function's argument signature so a function comment_on targets the exact
+	// manifest key (overload-aware).
+	CommentObject string
+	CommentOld    string
+	FuncArgSig    string
+
 	TableDef            *model.Table            // full table def for create_table (not serialized)
 	PartitionChildSpec  *model.PartitionSpec    // child spec for create_partition (not serialized)
 	ParentTable         string                  // parent table for create_partition
