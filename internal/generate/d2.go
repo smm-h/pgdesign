@@ -104,7 +104,8 @@ func GenerateD2(schema *model.Schema, reg *semtype.Registry, opts D2Options) str
 		if _, collapsed := junctionCollapsed(&tables[i]); collapsed {
 			continue
 		}
-		sections = append(sections, renderD2Table(&tables[i], opts))
+		sections = append(sections, renderD2Table(&tables[i], opts,
+			tableHeatColor(schema, &tables[i], opts), tableStats(&tables[i], opts)))
 		if note := renderD2CheckNote(&tables[i], opts); note != "" {
 			sections = append(sections, note)
 		}
@@ -244,11 +245,19 @@ func renderD2StateMachine(td *semtype.TypeDef) string {
 // enrichment layers in opts (index/unique markers, nullable indicator, comment
 // tooltip, RLS/append-only markers) are conditionally applied; all default on.
 // In summary mode the columns are omitted entirely (names + edges only).
-func renderD2Table(t *model.Table, opts D2Options) string {
+func renderD2Table(t *model.Table, opts D2Options, heatColor string, stats *TableStats) string {
 	var b strings.Builder
 	b.WriteString(t.Name)
 	b.WriteString(": {\n")
 	b.WriteString("  shape: sql_table\n")
+
+	// Heat-map stroke (9.5): a fixed colorblind-safe border color by graph
+	// degree. Applied to the border because a sql_table's fill only tints the
+	// header.
+	if heatColor != "" {
+		fmt.Fprintf(&b, "  style.stroke: %q\n", heatColor)
+		b.WriteString("  style.stroke-width: 2\n")
+	}
 
 	// RLS / append-only markers ride on the header label so the id stays the
 	// bare table name (FK edges reference the id). Only emitted when the marker
@@ -271,9 +280,21 @@ func renderD2Table(t *model.Table, opts D2Options) string {
 		}
 	}
 
-	// Table comment as a tooltip.
+	// Table comment and caller-provided live stats (9.5) share the tooltip.
+	var tips []string
 	if opts.Comments && t.Comment != "" {
-		fmt.Fprintf(&b, "  tooltip: %q\n", oneLine(t.Comment))
+		tips = append(tips, oneLine(t.Comment))
+	}
+	if stats != nil {
+		if stats.RowCount >= 0 {
+			tips = append(tips, fmt.Sprintf("rows: %d", stats.RowCount))
+		}
+		if stats.SeqScanRatio >= 0 {
+			tips = append(tips, fmt.Sprintf("seq scan ratio: %.2f", stats.SeqScanRatio))
+		}
+	}
+	if len(tips) > 0 {
+		fmt.Fprintf(&b, "  tooltip: %q\n", strings.Join(tips, " | "))
 	}
 
 	if !opts.Summary {
