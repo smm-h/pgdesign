@@ -75,9 +75,7 @@ type ValidateConfig struct {
 
 // MigrateConfig holds [migrate] section values.
 type MigrateConfig struct {
-	LockTimeout             string `toml:"lock_timeout"`
-	AutoConcurrentThreshold int64  `toml:"auto_concurrent_threshold"`
-	ExpandContractThreshold int64  `toml:"expand_contract_threshold"`
+	LockTimeout string `toml:"lock_timeout"`
 }
 
 // OutputConfig holds an [output.<name>] section describing a build output target.

@@ -169,8 +169,6 @@ schemas = ["schema.toml"]
 
 [migrate]
 lock_timeout = "5s"
-auto_concurrent_threshold = 100000
-expand_contract_threshold = 1000000
 `
 	path := filepath.Join(tmpDir, "pgdesign.toml")
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
@@ -183,12 +181,6 @@ expand_contract_threshold = 1000000
 	}
 	if cfg.Migrate.LockTimeout != "5s" {
 		t.Errorf("lock_timeout = %q, want %q", cfg.Migrate.LockTimeout, "5s")
-	}
-	if cfg.Migrate.AutoConcurrentThreshold != 100000 {
-		t.Errorf("auto_concurrent_threshold = %d, want %d", cfg.Migrate.AutoConcurrentThreshold, 100000)
-	}
-	if cfg.Migrate.ExpandContractThreshold != 1000000 {
-		t.Errorf("expand_contract_threshold = %d, want %d", cfg.Migrate.ExpandContractThreshold, 1000000)
 	}
 }
 
