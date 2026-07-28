@@ -14,7 +14,9 @@ import (
 	"github.com/smm-h/pgdesign/internal/extregistry"
 	"github.com/smm-h/pgdesign/internal/migrate"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/predicate"
 	"github.com/smm-h/pgdesign/internal/rev"
+	"github.com/smm-h/pgdesign/internal/typeinfo"
 	"github.com/smm-h/pgdesign/internal/workload"
 	"github.com/smm-h/strictcli/go/strictcli"
 )
@@ -344,11 +346,102 @@ func runReviseDBTier(schema *model.Schema, dbURL string, quiet bool) int {
 	return reviseExitOK
 }
 
-// verifyLiveImports is the roadmap-7.4 seam for live import verification. Imports
-// are a phase-7 feature; until 7.4 wires the 5.7 predicate executor here to check
-// imported-surface facts against the live database, it returns no diagnostics.
-// The slot exists so 6.1's DB tier already names the boundary and 7.4 fills one
-// function rather than re-threading the tier.
-func verifyLiveImports(_ context.Context, _ *pgx.Conn, _ *model.Schema) []diagnostic.Diagnostic {
-	return nil
+// verifyLiveImports checks, via the 5.7 predicate executor, that every imported
+// table and referenced column the consumer's FKs depend on is present in the live
+// database and its column type matches the vendored surface (roadmap 7.4). It is a
+// DB-tier check: its findings are the DB tier's loud NON-RETROACTIVE errors — they
+// surface for the next revise and never retroactively block the committed
+// migration.
+//
+// The matching strategy is the executor's: table existence is a catalog read;
+// column existence + type is a to_regtype OID probe (alias-robust) via the
+// vendored surface's reconstructed type as the expectation. A missing table
+// (E238), missing column (E238), or type mismatch (E239) is reported with the
+// executor's precise object/expected/found rendering. A probe/query failure is a
+// hard error (E240) — the DB tier never silently degrades.
+func verifyLiveImports(ctx context.Context, conn *pgx.Conn, schema *model.Schema) []diagnostic.Diagnostic {
+	if len(schema.ImportedTables) == 0 {
+		return nil
+	}
+	surfaceByKey := make(map[string]*model.Table, len(schema.ImportedTables))
+	for i := range schema.ImportedTables {
+		it := &schema.ImportedTables[i]
+		surfaceByKey[model.TableKey(it.Schema, it.Name)] = it
+	}
+
+	var diags []diagnostic.Diagnostic
+	tableChecked := make(map[string]bool)
+	for _, t := range schema.Tables {
+		for _, fk := range t.FKs {
+			if fk.RefAlias == "" {
+				continue
+			}
+			key := model.TableKey(fk.RefSchema, fk.RefTable)
+
+			if !tableChecked[key] {
+				tableChecked[key] = true
+				res, err := predicate.Check(ctx, conn, predicate.Precondition{
+					Existence: predicate.MustBePresent, Class: predicate.ClassTable,
+					Schema: fk.RefSchema, Name: fk.RefTable,
+				})
+				if err != nil {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity: diagnostic.Error, Code: "E240", Table: t.Name,
+						Message: fmt.Sprintf("live import verification: probing imported table %s failed: %v", key, err),
+					})
+					continue
+				}
+				if !res.OK {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity: diagnostic.Error, Code: "E238", Table: t.Name,
+						Message: fmt.Sprintf("imported table %s (alias %q) is not present in the live database: %v", key, fk.RefAlias, res.Err()),
+					})
+					continue
+				}
+			}
+
+			surface := surfaceByKey[key]
+			for i, refCol := range fk.RefColumns {
+				var match *predicate.Match
+				if surface != nil {
+					for j := range surface.Columns {
+						if surface.Columns[j].Name == refCol {
+							match = &predicate.Match{ColumnType: typeinfo.Reconstruct(surface.Columns[j].PGType)}
+							break
+						}
+					}
+				}
+				res, err := predicate.Check(ctx, conn, predicate.Precondition{
+					Existence: predicate.MustBePresent, Class: predicate.ClassColumn,
+					Schema: fk.RefSchema, Table: fk.RefTable, Name: refCol, Match: match,
+				})
+				if err != nil {
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity: diagnostic.Error, Code: "E240", Table: t.Name, Column: fkLocalCol(fk, i),
+						Message: fmt.Sprintf("live import verification: probing imported column %s.%s failed: %v", key, refCol, err),
+					})
+					continue
+				}
+				if !res.OK {
+					code := "E238" // missing column
+					if match != nil && res.Found != "absent" {
+						code = "E239" // present but type mismatch
+					}
+					diags = append(diags, diagnostic.Diagnostic{
+						Severity: diagnostic.Error, Code: code, Table: t.Name, Column: fkLocalCol(fk, i),
+						Message: fmt.Sprintf("imported column %s.%s (FK %q): %v", key, refCol, fk.Name, res.Err()),
+					})
+				}
+			}
+		}
+	}
+	return diags
+}
+
+// fkLocalCol returns the local FK column at position i, or "" if out of range.
+func fkLocalCol(fk model.FK, i int) string {
+	if i < len(fk.Columns) {
+		return fk.Columns[i]
+	}
+	return ""
 }
