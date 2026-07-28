@@ -54,6 +54,75 @@ type SeedConfig struct {
 	Clean     bool           // emit TRUNCATE before data
 	Mode      string         // "normal" (default) or "edge-cases"
 	Apply     bool           // true when --apply mode (skip BEGIN/COMMIT wrapping)
+
+	// DBAvailable reports whether a live database connection was supplied. It
+	// selects the imported-FK value-resolution TIER (roadmap 7.4): true enables
+	// tier 1 (real-key pools read from the live imported tables), false is the
+	// offline tier 2/3 path. It is an explicit MODE selection (the presence of the
+	// connection IS the choice), never a runtime fallback.
+	DBAvailable bool
+	// ImportedFKPools holds the deterministic, sorted real-key pools for tier 1,
+	// keyed by "<schema>.<table>.<column>" (the imported ref target). Populated by
+	// the caller from the live imported tables when DBAvailable is true. Empty
+	// otherwise.
+	ImportedFKPools map[string][]string
+}
+
+// importedFKRef describes an imported foreign-key reference a local column must
+// resolve through (roadmap 7.4). Imported FKs (fk.RefAlias != "") never have a
+// seeded parent pool in generatedValues, so they route EXCLUSIVELY through the
+// tiers — the silent-UUID pool-empty fallback is unreachable for them.
+type importedFKRef struct {
+	refFQN string // "<schema>.<table>" of the imported target
+	refCol string // referenced column in the imported target
+	fkName string // FK constraint name (for diagnostics)
+}
+
+// poolKey is the ImportedFKPools lookup key for this reference.
+func (r importedFKRef) poolKey() string { return r.refFQN + "." + r.refCol }
+
+// isApplyTimeValue reports whether a generated value's real content is decided by
+// the database at apply time rather than at generation time: DEFAULT (serial /
+// identity), NULL, or an imported-FK ordered-offset subquery. Such values cannot
+// participate in generation-time uniqueness dedup.
+func isApplyTimeValue(v string) bool {
+	return v == "NULL" || v == "DEFAULT" || strings.HasPrefix(v, "(SELECT ")
+}
+
+// resolveImportedFKValue produces the value expression for a local column bound to
+// an imported FK, selecting the tier from cfg (roadmap 7.4). The impossible and
+// silently-wrong cases (offline+COPY+NOT-NULL; UNIQUE sole-distinguished by an
+// imported FK offline; live-empty NOT-NULL) are pre-checked and hard-errored by
+// the caller, so this function only produces values for the reachable cases.
+func resolveImportedFKValue(ref importedFKRef, col model.Column, rowIdx int, rng *rand.Rand, cfg *SeedConfig) string {
+	if cfg.DBAvailable {
+		pool := cfg.ImportedFKPools[ref.poolKey()]
+		if len(pool) > 0 {
+			// Tier 1: deterministic Zipf pick from the sorted real-key pool. Zipf +
+			// COPY unchanged — the pool values are literals, valid in both formats.
+			if len(pool) == 1 {
+				return pool[0]
+			}
+			z := rand.NewZipf(rng, 1.5, 1, uint64(len(pool)-1))
+			return pool[z.Uint64()]
+		}
+		// DB available but the imported table is empty. A NOT-NULL column here was
+		// hard-errored by the caller; a nullable one gets NULL.
+		return "NULL"
+	}
+	if cfg.Format == "copy" {
+		// Offline COPY cannot carry a subquery; a NOT-NULL column here was
+		// hard-errored (tier 3). A nullable one gets NULL.
+		return "NULL"
+	}
+	// Tier 2 (offline INSERT): a count-wrapped ordered-offset subquery. The offset
+	// wraps deterministically over the live row count, so it resolves at apply time
+	// without reading the DB now; GREATEST(count,1) avoids a modulo-by-zero when the
+	// imported table is empty (the LIMIT 1 then yields no row — an empty nullable
+	// FK, which the UNIQUE/NOT-NULL pre-checks have already deemed acceptable). Zipf
+	// is dropped for tier 2 (stated): the distribution is a deterministic offset.
+	return fmt.Sprintf("(SELECT %s FROM %s ORDER BY %s OFFSET (%d %% GREATEST((SELECT count(*) FROM %s), 1)) LIMIT 1)",
+		ref.refCol, ref.refFQN, ref.refCol, rowIdx, ref.refFQN)
 }
 
 // checkHint holds a parsed CHECK constraint that affects a specific column.
@@ -299,33 +368,140 @@ func Generate(schema *model.Schema, rowsPerTable int, rng *rand.Rand, cfg *SeedC
 			}
 		}
 
+		// Imported-FK value resolution routes EXCLUSIVELY through tiers (roadmap
+		// 7.4). Precompute which local columns bind to an imported FK (fk.RefAlias
+		// set) so the row loop never falls through to the silent-UUID path for them.
+		importedFKByCol := map[string]importedFKRef{}
+		for _, fk := range table.FKs {
+			if fk.RefAlias == "" {
+				continue
+			}
+			for i, c := range fk.Columns {
+				refCol := ""
+				if i < len(fk.RefColumns) {
+					refCol = fk.RefColumns[i]
+				}
+				importedFKByCol[c] = importedFKRef{
+					refFQN: fk.RefSchema + "." + fk.RefTable,
+					refCol: refCol,
+					fkName: fk.Name,
+				}
+			}
+		}
+
+		// Tier hard-error pre-checks: ban exactly the impossible and the
+		// silently-wrong (roadmap 7.4). Emitted once per table, before any rows.
+		if len(importedFKByCol) > 0 {
+			tierErr := false
+			if cfg.DBAvailable {
+				// Tier 1: a NOT-NULL imported FK cannot be satisfied when the live
+				// imported table has no rows.
+				for _, col := range cols {
+					ref, ok := importedFKByCol[col.Name]
+					if ok && col.NotNull && len(cfg.ImportedFKPools[ref.poolKey()]) == 0 {
+						tierErr = true
+						diags = append(diags, diagnostic.Diagnostic{
+							Severity: diagnostic.Error, Code: "S004", Table: table.Name, Column: col.Name,
+							Message: fmt.Sprintf("imported FK %q on NOT NULL column %q cannot be seeded: the live imported table %s has no rows to reference", ref.fkName, col.Name, ref.refFQN),
+						})
+					}
+				}
+			} else if cfg.Format == "copy" {
+				// Tier 3: offline + COPY + NOT NULL. COPY cannot carry the
+				// ordered-offset subquery tier 2 uses, and NOT NULL forbids NULL.
+				for _, col := range cols {
+					ref, ok := importedFKByCol[col.Name]
+					if ok && col.NotNull {
+						tierErr = true
+						diags = append(diags, diagnostic.Diagnostic{
+							Severity: diagnostic.Error, Code: "S003", Table: table.Name, Column: col.Name,
+							Message: fmt.Sprintf("cannot seed imported FK %q offline: --format copy + NOT NULL column %q + no database. COPY cannot carry a subquery and NOT NULL forbids NULL; use --format insert or supply --db", ref.fkName, col.Name),
+						})
+					}
+				}
+			} else {
+				// Tier 2: an offline ordered-offset subquery cannot guarantee UNIQUE
+				// distinctness when the imported FK is the SOLE distinguishing column.
+				// A composite UNIQUE with an offline-distinct local column is fine.
+				for _, us := range uniqueSpecs {
+					if len(us.colIdxs) == 0 {
+						continue
+					}
+					allImported := true
+					var importedNames []string
+					for _, idx := range us.colIdxs {
+						ref, ok := importedFKByCol[cols[idx].Name]
+						if !ok {
+							allImported = false
+							break
+						}
+						importedNames = append(importedNames, ref.fkName)
+					}
+					if allImported {
+						tierErr = true
+						diags = append(diags, diagnostic.Diagnostic{
+							Severity: diagnostic.Error, Code: "S002", Table: table.Name,
+							Message: fmt.Sprintf("cannot seed offline: unique constraint %q is distinguished solely by imported FK column(s) %s. An offline ordered-offset subquery cannot guarantee distinct values; supply --db for real-key pools, or add an offline-distinct local column", us.name, strings.Join(importedNames, ", ")),
+						})
+					}
+				}
+			}
+			if tierErr {
+				continue // skip emitting this table; the caller aborts on error
+			}
+		}
+
 		// Track integer type counters for edge-cases mode (first=0, rest=max).
 		intTypeCounter := make(map[string]int) // PGType -> count of columns seen
 
 		// Generate rows.
 		var allVals [][]string // allVals[rowIdx][colIdx] = INSERT-format value
+		genFailed := false
 		for rowIdx := 0; rowIdx < rows; rowIdx++ {
 			var vals []string
 			ok := false
 			for attempt := 0; attempt < 100; attempt++ {
 				vals = vals[:0]
+				// Vary the generation index on retry so the dedup retry actually
+				// explores NEW values (the old retry re-used the fixed rowIdx, so a
+				// deterministic generator produced the same colliding value 100 times
+				// — a useless retry that then silently emitted a duplicate). Attempt 0
+				// uses rowIdx unchanged, keeping non-colliding output byte-stable.
+				genIdx := rowIdx
+				if attempt > 0 {
+					genIdx = rowIdx + attempt*rows
+				}
 				for _, col := range cols {
 					if cycleFKCols[col.Name] {
 						vals = append(vals, "NULL")
+					} else if ref, isImported := importedFKByCol[col.Name]; isImported {
+						vals = append(vals, resolveImportedFKValue(ref, col, genIdx, rng, cfg))
 					} else if cfg.Mode == "edge-cases" {
 						val := generateEdgeCaseValue(col, table, rng, enumValues, generatedValues, intTypeCounter)
 						vals = append(vals, val)
 					} else {
-						val := generateValue(col, table, rowIdx, rng, enumValues, generatedValues, hints)
+						val := generateValue(col, table, genIdx, rng, enumValues, generatedValues, hints)
 						vals = append(vals, val)
 					}
 				}
-				// Check uniqueness.
+				// Check uniqueness. Constraints containing an APPLY-TIME value (DEFAULT
+				// from a serial/identity column, NULL, or an imported-FK ordered-offset
+				// subquery) cannot be dedup-checked now — their real value is decided by
+				// the database — so those constraints are skipped rather than tripping a
+				// false collision (which would spuriously exhaust the retry budget).
 				unique := true
 				for _, us := range uniqueSpecs {
 					var parts []string
+					deferToDB := false
 					for _, idx := range us.colIdxs {
+						if isApplyTimeValue(vals[idx]) {
+							deferToDB = true
+							break
+						}
 						parts = append(parts, vals[idx])
+					}
+					if deferToDB {
+						continue
 					}
 					combo := strings.Join(parts, "\x00")
 					if !ut.check(us.name, combo) {
@@ -339,12 +515,23 @@ func Generate(schema *model.Schema, rowsPerTable int, rng *rand.Rand, cfg *SeedC
 				}
 			}
 			if !ok {
-				// Exhausted retries; use the last generated values anyway.
+				// Genuinely exhausted: the unique domain is too small to yield the
+				// requested row count. Ban the silently-wrong duplicate emission with
+				// a hard error naming the table (roadmap 7.4 dedup fix).
+				diags = append(diags, diagnostic.Diagnostic{
+					Severity: diagnostic.Error, Code: "S005", Table: table.Name,
+					Message: fmt.Sprintf("cannot generate %d unique rows for table %q: the unique/primary-key domain is too small (exhausted 100 dedup attempts). Reduce --counts %s or widen the constrained columns", rows, table.Name, table.Name),
+				})
+				genFailed = true
+				break
 			}
 			for i, col := range cols {
 				tableVals[col.Name] = append(tableVals[col.Name], vals[i])
 			}
 			allVals = append(allVals, vals)
+		}
+		if genFailed {
+			continue // skip emitting this table; the caller aborts on error
 		}
 
 		generatedValues[tableFQN] = tableVals
