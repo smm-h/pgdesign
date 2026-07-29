@@ -88,8 +88,18 @@
       "type": "doc"
     },
     {
+      "path": "codegen-guide.md",
+      "title": "Code Generation Guide",
+      "type": "doc"
+    },
+    {
       "path": "design-intelligence.md",
       "title": "Design Intelligence",
+      "type": "doc"
+    },
+    {
+      "path": "diff-guide.md",
+      "title": "Diff Guide",
       "type": "doc"
     },
     {
@@ -318,6 +328,11 @@
       "type": "doc"
     },
     {
+      "path": "introspect-guide.md",
+      "title": "Introspect Guide",
+      "type": "doc"
+    },
+    {
       "path": "migration-chain.md",
       "title": "The Migration Chain",
       "type": "doc"
@@ -403,5 +418,5 @@
       ]
     }
   ],
-  "last_gen": "2026-07-28T11:49:16.131232+00:00"
+  "last_gen": "2026-07-29T17:14:39.424948+00:00"
 }
