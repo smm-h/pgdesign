@@ -80,9 +80,18 @@
     "description": "6e49ee105e0d738ece24b970097e50082017bf68e1a545de487c7d437c8bfacc",
     "schema_hash": "c7fd7a0b6b1b0c106cb7fac6f174129de9d51c52e8fe446272698b0abe940b60"
   },
+  "en/codegen-guide.md": {
+    "content": "41317928bba1e2b938047657b4d28c90a1c3e4d4a557c03349afa335d83d9dda",
+    "description": "70cdc4a3eca348d41373a533e33c4c91bc4455e0df531948f819abac041f3398"
+  },
   "en/design-intelligence.md": {
     "content": "3f0f3e41942e94e3c10e320bdc0a8ceca97475c20eaa4771e8206d57b06443b3",
     "description": "1494c5c0a5e0f7ac731655e8b7f0ae1fa166221d1ab8e4a71fdfce362550a2ba"
+  },
+  "en/diff-guide.md": {
+    "content": "77a0170e0987af9d04a4b296a08a6a6f65f41f168e797e3e2bdbf8d97186d354",
+    "description": "4a37229860c3b7c6abe52c0ea57d7ac57eda9d4752489ed2f206abe3e2bd6c04",
+    "source_docstring": "2de58aabe50d8d26c1a5c6bcf3588f1c2bc4bd4667cb88c739222a6d5bc6ca72"
   },
   "en/format-reference.md": {
     "content": "22df19f2e5850cc39d821c47066bd936c5cd8fa71cce19ad2fd98aedeba286c0",
@@ -303,6 +312,11 @@
   "en/internal-workload.md": {
     "content": "246a45b725376147ca897ee6467c98812d9648f1a25c5b241ef979f5b87500a9",
     "description": "fc002968b95742f8f62fc96a787d1289011ac50358dcc35ca22fade9116af78d"
+  },
+  "en/introspect-guide.md": {
+    "content": "6c8cbd228c5c6a1e632ffdf32d32c9bf170f0b2abf5764f4c3f5de7ae386f8a3",
+    "description": "510212f95fc2bcdf904a3b50b34745f6c2bac317003d3096a3d8164e2fd16456",
+    "source_docstring": "c3ae968a040f235b893613040acec8b0e4dff972744550b626b13a5a17b74db4"
   },
   "en/migration-chain.md": {
     "content": "dd4ccf560b8dd99fe5c39410eeb8a6f1cf5eb0c0a551f7351e5043ef6bc842bf",
