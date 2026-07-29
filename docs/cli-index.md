@@ -12,8 +12,6 @@ order: 91
 
 PostgreSQL schema compiler
 
-Version: 0.25.3
-
 ## Commands
 
 - [build](cli-build.html) -- Generate all configured outputs from pgdesign.toml
