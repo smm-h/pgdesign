@@ -19,21 +19,7 @@ When you write `type = "email"`, every email column in your schema gets the same
 
 ## Built-in types
 
-| Type | PG Type | NOT NULL | Default | Check | Notes |
-|------|---------|----------|---------|-------|-------|
-| `id` | `uuid` | yes | `gen_random_uuid()` | -- | Primary key type |
-| `ref` | `uuid` | yes | -- | -- | Foreign key type |
-| `timestamp` | `timestamptz` | yes | `now()` | -- | Creation/event timestamps |
-| `timestamp_optional` | `timestamptz` | no | -- | -- | Nullable timestamps (deleted_at, completed_at) |
-| `money` | `bigint` | yes | `0` | -- | Monetary amounts in minor units (cents) |
-| `slug` | `text` | yes | -- | `VALUE ~ '^[a-z0-9-]+$'` | URL-safe identifiers |
-| `email` | `text` | yes | -- | `VALUE ~ '^[^@]+@[^@]+\.[^@]+$'` | Email addresses |
-| `short_text` | `text` | yes | -- | `LENGTH(VALUE) <= 255` | Short text fields |
-| `json` | `jsonb` | yes | `'{}'::jsonb` | -- | JSON objects |
-| `json_array` | `jsonb` | yes | `'[]'::jsonb` | -- | JSON arrays |
-| `counter` | `bigint` | yes | `0` | -- | Incrementing counters |
-| `flag` | `boolean` | yes | `false` | -- | Boolean flags |
-| `auto_id` | `bigint` | yes | -- | -- | Identity column (GENERATED ALWAYS AS IDENTITY) |
+:-: table-semantic-types
 
 ## Defining custom types
 

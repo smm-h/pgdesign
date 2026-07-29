@@ -5,6 +5,8 @@ description: "Complete reference for all pgdesign diagnostics: validation errors
 
 # Validation Rules
 
+:-: diagnostic-count
+
 pgdesign's validator checks schemas for errors and warnings. Errors block DDL generation; warnings are advisory. Rules can be disabled individually via `pgdesign.toml`.
 
 ## Error rules
