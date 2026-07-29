@@ -1,6 +1,6 @@
 ---
 title: "Format Reference"
-description: "Complete reference for the pgdesign TOML schema format: format_version, types, tables, constraints, indexes, views, partitioning, imports, renames, D2 options, and project config."
+description: "Complete reference for the pgdesign TOML schema format covering types, tables, constraints, indexes, views, partitioning, imports, renames, and config."
 ---
 
 # Format Reference
@@ -9,7 +9,7 @@ pgdesign schemas are written in TOML. A schema file defines metadata, custom typ
 
 ## format_version
 
-Every schema document must declare a top-level `format_version` key as its first setting:
+Every schema document must declare a top-level `format_version` key as its first setting. This required field gates the strictspec document-shape validation that checks the entire document structure -- unknown keys, field types, and lexeme formats -- and prevents silent misreading when the format evolves. Currently the only valid value is `1`.
 
 ```toml
 format_version = 1
@@ -545,7 +545,7 @@ depends_on = ["orders", "line_items"]
 
 ### Function arguments
 
-Arguments are declared as `[[functions.<name>.args]]` array-of-tables entries. Argument order is semantic (it becomes the PostgreSQL function signature order).
+Arguments are declared as `[[functions.<name>.args]]` array-of-tables entries. Argument order is semantic -- it becomes the PostgreSQL function signature order, and changing it produces a DROP + CREATE migration because PostgreSQL identifies functions by their name and argument type list.
 
 | Key | Type | Description |
 |-----|------|-------------|
@@ -726,7 +726,7 @@ path = "out/schema.json"
 
 ### Idempotent mode coverage
 
-When `idempotent = true`, the generated SQL includes guards that make re-running the DDL safe against an existing database:
+When `idempotent = true`, the generated SQL includes guards that make re-running the DDL safe against an existing database. This covers 12 object types via `IF NOT EXISTS`, `CREATE OR REPLACE`, and `DO $$` catalog-check blocks:
 
 **Covered:**
 - Table creation (`CREATE TABLE IF NOT EXISTS`)
@@ -790,7 +790,9 @@ Running `pgdesign build` generates all configured outputs. Use `--dry-run` to pr
 
 ### Freshness checking: `check --tag build` as a CI drift guard
 
-Once outputs are configured under `[output]`, `pgdesign check --tag build` verifies that the working tree is a fixed point of `pgdesign build`: it regenerates every configured output in memory and compares each file byte-for-byte against disk. Any `[missing]` or `[stale]` file fails the check, making it a zero-configuration CI drift guard — commit the generated outputs, run the check in CI, and a schema change that was not followed by a `pgdesign build` (or a hand-edited generated file) fails the pipeline. SVG outputs are excluded from the comparison because d2 rendering is not deterministic across runs; all other formats participate.
+Once outputs are configured under `[output]`, `pgdesign check --tag build` verifies that the working tree is a fixed point of `pgdesign build`. It regenerates every configured output in memory and compares each file byte-for-byte against disk. Any `[missing]` or `[stale]` file fails the check.
+
+This makes it a zero-configuration CI drift guard -- commit the generated outputs, run the check in CI, and a schema change that was not followed by a `pgdesign build` (or a hand-edited generated file) fails the pipeline. SVG outputs are excluded from the comparison because d2 rendering is not deterministic across runs; all other formats participate.
 
 Byte-for-byte comparison is only sound because generator determinism is a tested contract: every codegen (mode, language) combination is covered by a determinism test asserting that repeated generation of the same schema produces byte-identical output. A generated file is either exactly what `build` would write, or it is stale — there is no "close enough".
 
@@ -810,7 +812,9 @@ Orphan handling rules:
 
 ### `codegen --check` for imperative workflows
 
-Projects that invoke `pgdesign codegen` directly instead of configuring `[output]` sections get the same guarantee from `pgdesign codegen --check`. It requires `--output`, generates in memory, and compares each generated file byte-exactly against the file on disk instead of writing. For multi-file modes it additionally orphan-scans the output directory with the same ownership and ignore rules as `pgdesign build`. Each file is reported as `[missing]`, `[stale]`, `[orphan]`, or `[fresh]` with a summary line; the command writes nothing and exits 1 on any mismatch, 0 when everything is clean.
+Projects that invoke `pgdesign codegen` directly instead of configuring `[output]` sections get the same freshness guarantee from `pgdesign codegen --check`. It requires `--output`, generates in memory, and compares each generated file byte-exactly against disk instead of writing.
+
+For multi-file modes it additionally orphan-scans the output directory with the same ownership and ignore rules as `pgdesign build`. Each file is reported as `[missing]`, `[stale]`, `[orphan]`, or `[fresh]` with a summary line; the command writes nothing and exits 1 on any mismatch, 0 when everything is clean.
 
 ```sh
 # CI drift guard, config-driven projects

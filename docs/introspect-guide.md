@@ -1,6 +1,6 @@
 ---
 title: "Introspect Guide"
-description: "Guide to pgdesign's introspect command: reverse-engineering a running PostgreSQL database into pgdesign.toml format, extension discovery, and the introspect-review-diff adoption workflow."
+description: "Reverse-engineer a running PostgreSQL database into pgdesign.toml format with extension discovery and the introspect-review-diff adoption workflow."
 ---
 
 # Introspect Guide
@@ -27,7 +27,7 @@ The introspected schema includes:
 
 ### What introspect filters out
 
-pgdesign's own managed objects are excluded from introspection output so they do not appear as user schema:
+pgdesign's own managed objects are excluded from introspection output so they do not appear as user schema. Three naming-pattern filters automatically remove migration tracking infrastructure (the `pgdesign_` prefix on tables, views, and materialized views) and state machine enforcement triggers (the `_pgdesign_sm_` prefix on functions):
 
 - Tables, views, and materialized views with a `pgdesign_` prefix (migration tracking infrastructure)
 - Functions with a `_pgdesign_sm_` prefix (state machine enforcement triggers) or named `pgdesign_deny_mutation` (append-only trigger function)
@@ -47,7 +47,7 @@ Other situations where introspect is useful:
 
 ## Connection setup
 
-Introspect requires a PostgreSQL connection URL passed via the `--db` flag or the `PGDESIGN_DB` environment variable.
+Introspect requires a PostgreSQL connection URL, which can be passed via the `--db` flag or the `PGDESIGN_DB` environment variable. The connection URL follows standard PostgreSQL `libpq` format with support for SSL and search_path parameters.
 
 ```
 pgdesign introspect --db "postgres://user:password@localhost:5432/mydb"
@@ -64,7 +64,7 @@ The connection URL follows standard PostgreSQL `libpq` format. Query parameters 
 
 ### Schema selection
 
-By default, introspect reads the `public` schema. Use the `--schema` flag (repeatable) to introspect other schemas or multiple schemas at once:
+By default, introspect reads the `public` schema. Use the `--schema` flag (repeatable) to introspect other schemas or multiple schemas at once. When multiple schemas are specified, all objects from all schemas appear in a single TOML output.
 
 ```
 # Introspect only the "core" schema
@@ -78,7 +78,7 @@ When a single schema is specified, it becomes the `meta.schema` value in the out
 
 ### Writing output to a file
 
-By default, introspect prints TOML to stdout. Use `--output` to write to a file:
+By default, introspect prints TOML to stdout. Use `--output` to write directly to a file, which is the typical workflow when adopting an existing database into pgdesign. When `--output` is used, introspect also prints an adoption note to stderr explaining that the file is a candidate schema source:
 
 ```
 pgdesign introspect --db "..." --output pgdesign.toml
@@ -111,7 +111,7 @@ This output can be merged into your `pgdesign.toml` under the `[[extensions]]` s
 
 ## How introspected output maps to pgdesign.toml
 
-The export produces a complete pgdesign TOML document. Here is how database objects map to TOML sections:
+The export produces a complete pgdesign TOML document covering 10 object categories. Each PostgreSQL catalog object maps to a specific TOML section with field-level fidelity. Here is how database objects map to TOML sections:
 
 | Database object | TOML section | Notes |
 |---|---|---|
@@ -136,7 +136,7 @@ The export produces a complete pgdesign TOML document. Here is how database obje
 
 ### Column type handling
 
-Introspect uses `format_type()` to read column types and normalizes them through pgdesign's type system:
+Introspect uses PostgreSQL's `format_type()` to read column types from the catalog and normalizes them through pgdesign's type system. The normalization ensures round-trip fidelity between introspected output and pgdesign's own build process, handling 5 special cases -- arrays, domains, enums, defaults, and identity columns:
 
 - **Array columns**: `text[]` becomes `type = "text"` with `array = true`
 - **Domain-backed columns**: a column whose type is a domain gets its `type` set to the domain's underlying base type and a `DomainName` reference to the domain (matching what the TOML build produces)
@@ -146,7 +146,7 @@ Introspect uses `format_type()` to read column types and normalizes them through
 
 ### What introspect cannot recover
 
-Some pgdesign concepts do not exist in `pg_catalog` and therefore cannot be round-tripped from a live database:
+Five categories of pgdesign concepts do not exist in `pg_catalog` and therefore cannot be round-tripped from a live database. These are pgdesign-specific abstractions that PostgreSQL has no catalog representation for. They must be added manually to the introspected TOML during the review-and-refine step:
 
 - **State machine type kind**: PostgreSQL stores state machines as plain enums (`typtype = 'e'`). Introspect recovers them as enums; the `kind = "state_machine"` distinction must be re-added manually
 - **`json_schema` references**: pgdesign lowers these to CHECK constraints. Introspect recovers the CHECK but not the originating JSON Schema file reference
@@ -166,7 +166,7 @@ This gives you a TOML file reflecting the current database state, plus extension
 
 ### 2. Review and refine
 
-The introspected TOML is syntactically valid but may need refinement:
+The introspected TOML is syntactically valid and reflects the live database state, but it may need refinement to add pgdesign-specific concepts that the catalog cannot recover. Most databases require at least 2-3 of the following changes before the TOML passes validation:
 
 - Add table comments where they are missing (pgdesign requires comments on all tables)
 - Add `[[extensions]]` declarations for any extensions discovered with `--extensions`
@@ -178,7 +178,7 @@ The introspected TOML is syntactically valid but may need refinement:
 
 ### 3. Diff against the database
 
-Use `pgdesign diff --live` to compare your refined TOML against the running database:
+After refining, use `pgdesign diff --live` to compare your refined TOML against the running database and verify that your changes did not introduce drift. The goal is a clean diff with zero differences -- any reported change means the TOML does not yet match the live schema:
 
 ```
 pgdesign diff --live --db "postgres://..."
@@ -188,7 +188,7 @@ This shows any differences between your TOML and the live schema. The goal is ze
 
 ### 4. Iterate until clean
 
-Fix differences found by diff, re-run, and repeat until the diff is clean. Common adjustments:
+Fix differences found by diff, re-run, and repeat until the diff reports zero changes. Most databases converge within 2-4 iterations. The majority of adjustments involve expression normalization differences or default value formatting, not structural schema mismatches. Common adjustments include:
 
 - Expression normalization differences (PostgreSQL's `pg_get_expr` returns a canonical form that may differ from what you wrote)
 - Default value formatting (e.g., `'2024-01-01'::date` vs `'2024-01-01'`)
@@ -196,7 +196,7 @@ Fix differences found by diff, re-run, and repeat until the diff is clean. Commo
 
 ### 5. Adopt onto the migration chain
 
-Once the diff is clean, use `migrate baseline` to stamp the database's current state as the chain's starting point:
+Once the diff is clean (zero differences between your TOML and the live database), use `migrate baseline` to stamp the database's current state as the migration chain's starting revision. This creates a rollback-frozen boundary -- all future schema changes go through pgdesign's TOML-first workflow from this point forward:
 
 ```
 pgdesign migrate baseline schema.toml --db "postgres://..."

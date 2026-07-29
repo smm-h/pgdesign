@@ -1,6 +1,6 @@
 ---
 title: "The Migration Chain"
-description: "How pgdesign's content-addressed migration chain works: revisions, edges, the object store, the journal, the path-finder, and the integrity guarantees they provide."
+description: "How pgdesign's content-addressed migration chain works: revisions, edges, the object store, the journal, and the path-finder."
 ---
 
 # The Migration Chain
@@ -35,7 +35,7 @@ A revision is an opaque value tagged with its **model class**. A schema built fr
 
 ## Edges and the store
 
-Everything a chain-format project needs lives under `migrations/`:
+Chain edges, revision manifests, operation payloads, and archived history all live under `migrations/` in 5 subdirectories. The content-addressed store ensures that regenerating the same schema change always produces the same files, and squashing or rebasing preserves archived originals for databases mid-range. Everything a chain-format project needs lives under `migrations/`:
 
 | Directory | Contents |
 |-----------|----------|
@@ -55,7 +55,7 @@ A composite range is invertible only when *every* operation in it is. pgdesign n
 
 ## Applied history lives in the database
 
-The on-disk chain is the *repository* of possible history. What a *particular database* has actually applied is recorded in the database itself, in three managed objects:
+The on-disk chain is the repository of possible history, but what a particular database has actually applied is recorded in the database itself, in 3 managed objects that form the journal and position tracking system:
 
 - `pgdesign_chain_position` — which revision this database is at, and whether an edge is mid-application.
 - `pgdesign_migration_ops` — the **journal**: every applied operation, with its serialized inverse.
@@ -74,7 +74,7 @@ This is why a database stranded mid-way through a squashed range still works: th
 
 ## Preconditions and reconcile: catching drift by construction
 
-Apply is bracketed by two checks that make schema drift a loud error instead of silent corruption:
+Apply is bracketed by 2 checks -- preconditions before each operation and reconcile after the full apply -- that make schema drift a loud error instead of silent corruption. Together they guarantee that the database both starts and ends in the expected state:
 
 - **Preconditions** run *before* each operation. They assert the database is in the state the edge expects — the object to be altered exists and matches, the object to be created is absent. A mismatch is a hard error naming the object, what was **expected**, and what was **found**. This is where a database that someone changed out-of-band gets caught, precisely and immediately.
 - **Reconcile** runs *after* apply. It re-introspects the database and verifies it arrived at the target revision, listing every residual mismatch. Apply does not merely run SQL and hope; it certifies the result.
@@ -95,7 +95,7 @@ If two branches each append an edge to the same parent, the chain has two live h
 
 ## Adopting an existing database
 
-Two commands bring a database that predates the chain (or was created by other means) under management:
+Two commands bring a database that predates the chain (or was created by other means) under pgdesign's migration management. Each handles a different adoption scenario -- legacy pgdesign databases versus databases created by other tools or manual DDL. Both create a rollback-frozen boundary:
 
 - `migrate upgrade` — one-time adoption of a legacy pgdesign database (the old single tracking table, no chain position). It refuses to proceed if the schema and database have drifted, folds the existing applied history into the chain journal, and stamps an upgrade boundary. Run once per database.
 - `migrate baseline` — adoption of a database whose schema was created by other means, or one that has *intentionally* drifted. It synthesizes a revision manifest from introspection and stamps a baseline boundary without executing any migration SQL.
@@ -104,7 +104,7 @@ Both boundaries are **rollback-frozen**: rollback is guaranteed only from the ad
 
 ## Why this matters
 
-Every guarantee above is structural, not a matter of discipline:
+Every guarantee above is structural -- enforced by the content-addressed algebra itself, not by convention, documentation, or developer discipline. The chain's properties (identity, invertibility, path-finding, preconditions, reconcile) fall out of the algebra rather than being bolted on as runtime checks. Four invariants hold unconditionally:
 
 - You cannot ship a migration whose contents disagree with its name.
 - You cannot silently roll back over an operation that would lose data.

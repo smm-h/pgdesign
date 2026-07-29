@@ -1,6 +1,6 @@
 ---
 title: "Cross-Repository Imports"
-description: "Reference another pgdesign project's tables across a git pin: declaring imports, locking and vendoring the surface, referencing imported tables in foreign keys, and detecting semantic drift."
+description: "Reference another pgdesign project's tables via git pins with locking, vendoring, foreign key references, and column-level semantic drift detection."
 ---
 
 # Cross-Repository Imports
@@ -58,7 +58,7 @@ Using an alias anywhere other than a foreign key `ref_table` — in `depends_on`
 
 ## Locking and vendoring: `import lock`
 
-Declaring an import is not enough to build. Run `import lock` to resolve each pin and vendor its surface:
+Declaring an import is not enough to build -- the upstream schema must be resolved, fetched, and vendored locally. Run `import lock` to resolve each pin and vendor its surface into the `imports/` directory:
 
 ```
 pgdesign import lock
@@ -69,7 +69,7 @@ This resolves each alias's git ref to an exact commit, fetches and parses the up
 - every table you reference, plus
 - the transitive closure of the type definitions those tables depend on (enums, domains, composite types), each stored by its per-object content id,
 
-along with a **lockfile** entry recording the URL, the pinned ref, the resolved commit, and a hash of the vendored surface. The vendored surface is committed to your repository, so builds are reproducible and work offline — pgdesign never reaches out to the network during a normal build.
+along with a **lockfile** entry recording 4 fields: the URL, the pinned ref, the resolved commit, and a hash of the vendored surface. The vendored surface is committed to your repository, so builds are reproducible and work offline -- pgdesign never reaches out to the network during a normal build.
 
 `import lock` refuses to overwrite an existing lockfile. To re-pin an import (for example, to adopt a new upstream release), use `import update`:
 
@@ -99,7 +99,7 @@ The import diagnostics are `E230`–`E244`; see the [Validation Rules](validatio
 
 ## How imported tables behave
 
-Imported tables are facts owned elsewhere — never regenerated, audited, migrated, or fabricated by your project:
+Imported tables are facts owned elsewhere -- your project references them but never generates DDL, audits, migrates, or fabricates data for them. This ownership boundary is enforced across all 6 major subsystems:
 
 - **DDL, audit, and codegen emit zero imported artifacts.** Your generated schema does not `CREATE` an imported table; it only references it in foreign keys, schema-qualified.
 - **Diff and migrate exclude imported tables.** Your migration chain never tries to alter something another project owns. Reconcile does not auto-add imported schemas.

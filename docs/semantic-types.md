@@ -19,6 +19,8 @@ When you write `type = "email"`, every email column in your schema gets the same
 
 ## Built-in types
 
+pgdesign ships with built-in semantic types for common patterns like email addresses, monetary values, URLs, and timestamps. Each type maps to a specific PostgreSQL base type with appropriate constraints and defaults.
+
 :-: table-semantic-types
 
 ## Defining custom types

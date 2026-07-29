@@ -78,7 +78,7 @@ carries the design; that file carries the history.
 
 ### The laws (L1-L10)
 
-The law numbering is stable and referenced from code comments — do not renumber.
+The law numbering is stable and referenced from code comments — do not renumber. Each law defines a verifiable property of the system, tested via property-based suites and conformance matrices. Violations are implementation bugs, not design trade-offs. The laws cover canonical forms, identity, invertibility, purity, provenance, preconditions, composition, testing, and round-trip stability.
 
 - **L1 (One canonical form — with honest status tags).** N is the normalizer;
   ≈_syn is its kernel, an equivalence by construction. (a) enc encodes N-normal
@@ -212,7 +212,7 @@ The law numbering is stable and referenced from code comments — do not renumbe
 
 ## Part II — The boundary doctrine
 
-The system is a THREE-WAY partition, and defects are triaged accordingly:
+The system is a THREE-WAY partition of kernel, boundary, and plain engineering. Each partition has distinct defect classes, distinct remediation strategies, and distinct testing obligations. Defects are triaged according to which partition they fall in, which determines whether they are property violations, boundary conformance failures, or ordinary bugs.
 
 1. **The kernel** — law-governed. Every law names its property tests (L9), so
    "a law was implemented wrong" is a CHECKABLE claim against a stated property,
@@ -300,8 +300,7 @@ ordinary bug.
 
 ## Part III — Decision provenance
 
-Every design decision in pgdesign has a provenance tag, so a future maintainer
-can tell what is negotiable from what is not:
+Every design decision in pgdesign has a provenance tag that records how and why the decision was made. This lets a future maintainer tell what is negotiable from what is not, and prevents free choices from being mistaken for load-bearing axioms or vice versa. The three tags are:
 
 - **`[deliberate]`** — the owner's own axioms. Fixed.
 - **`[law]`** — a consequence of Part I. Reversing one requires rejecting a law,
@@ -312,13 +311,7 @@ can tell what is negotiable from what is not:
 
 ### On the `%%` convention
 
-`[%%]` marks a decision adopted under the owner's `%%` convention: when a
-recommendation was accepted with a bare "`%%`", it meant "go with the
-recommendation because I trust it," not "I deliberately decided this." Such a
-decision is freely reversible — if evidence later goes against it, walk it back
-without ceremony; it was never a deliberate commitment. A `[%%]` tag on a rule
-below is therefore an invitation to reconsider it on the merits, never a citation
-of settled intent.
+`[%%]` marks a decision adopted under the owner's `%%` convention: the recommendation was accepted on trust, not deliberate judgment. Such decisions are freely reversible when evidence goes against them. A `[%%]` tag is an invitation to reconsider on the merits, never a citation of settled intent.
 
 ### Owner axioms `[deliberate]`
 

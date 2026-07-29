@@ -1,6 +1,6 @@
 ---
 title: "Migration Guide"
-description: "Guide to pgdesign's content-addressed migration chain: generating edges, the path-finder apply, journal-driven rollback, squash, rebase, upgrade, baseline, safety linting, and risk classification."
+description: "Guide to pgdesign's content-addressed migration chain: generating edges, path-finder apply, journal-driven rollback, squash, rebase, and baseline."
 ---
 
 # Migration Guide
@@ -9,7 +9,7 @@ pgdesign generates migrations by diffing your TOML schema against the last recor
 
 ## The migration chain
 
-A chain-format project keeps everything under `migrations/`:
+A chain-format project keeps all migration state under `migrations/` in 5 subdirectories, separating live edges, archived history, content-addressed objects, revision manifests, and rebase mappings. These files are committed to the repository and fully self-contained -- no external state is required to reconstruct the migration graph:
 
 | Directory | Contents |
 |-----------|----------|
@@ -100,7 +100,9 @@ column = "author_id"
 
 ### migrate generate
 
-Generate a new chain edge by comparing your TOML schema against the current chain head. Generation is **pure**: it reads only the on-disk chain (the head revision's reconstructed model), never a database, so the same schema edit always yields the same edge regardless of any database's state. It computes the structural diff, classifies each change by risk level, records each operation's inverse, and writes the edge, its object payloads, and its target manifest into the store. Large-table-safe forms (NOT VALID + VALIDATE, backfill-then-set-not-null, expand/contract phasing) are always emitted, since a manifest carries no row counts.
+Generate a new chain edge by comparing your TOML schema against the current chain head. Generation is pure: it reads only the on-disk chain (the head revision's reconstructed model), never a database, so the same schema edit always yields the same edge regardless of any database's state.
+
+It computes the structural diff, classifies each change by risk level, records each operation's inverse, and writes the edge, its object payloads, and its target manifest into the store. Large-table-safe forms (NOT VALID + VALIDATE, backfill-then-set-not-null, expand/contract phasing) are always emitted, since a manifest carries no row counts.
 
 ```
 pgdesign migrate generate schema.toml
@@ -124,7 +126,9 @@ Shows the list of operations, risk classifications, and safety diagnostics.
 
 ### migrate apply
 
-Apply the pending edges to bring the target database from its recorded chain position to the single live head. The order is determined by the **path-finder**, which walks the edge graph (live plus archive) from the database's `pgdesign_chain_position` to the head — not by any version string. Each edge runs inside its own transaction with advisory locking to prevent concurrent execution; non-transactional operations like CREATE INDEX CONCURRENTLY and ALTER TYPE ADD VALUE are detected and executed outside transactions. The chain tracking structures are created automatically on a fresh database. After applying, a reconcile step introspects the database and verifies it matches the target model.
+Apply pending edges to bring the target database from its recorded chain position to the single live head. The path-finder walks the edge graph (live plus archive) from the database's `pgdesign_chain_position` to the head -- order is determined by graph topology, not version strings.
+
+Each edge runs inside its own transaction with advisory locking to prevent concurrent execution; non-transactional operations like CREATE INDEX CONCURRENTLY and ALTER TYPE ADD VALUE are detected and executed outside transactions. The chain tracking structures are created automatically on a fresh database. After applying, a reconcile step introspects the database and verifies it matches the target model.
 
 ```
 pgdesign migrate apply --db "postgres://user:pass@localhost/mydb"
@@ -139,7 +143,9 @@ If the path-finder finds more than one reachable head, apply refuses with a fork
 
 ### migrate rollback
 
-Roll back applied edges by executing the recorded inverses from the **journal** (`pgdesign_migration_ops`) in reverse application order — rollback reads the database's own record of what was applied, never the on-disk edge files. It acquires an advisory lock and, before executing any step, verifies that every operation in the rollback range is reversible. If any operation is non-invertible, the rollback is refused with a clear error identifying the blocking operation. Rollback stops at the upgrade/baseline boundary: it cannot cross a frozen boundary revision.
+Roll back applied edges by executing the recorded inverses from the journal (`pgdesign_migration_ops`) in reverse application order. Rollback reads the database's own record of what was applied, never the on-disk edge files, ensuring edited files cannot mislead a rollback.
+
+It acquires an advisory lock and, before executing any step, verifies that every operation in the rollback range is reversible. If any operation is non-invertible, the rollback is refused with a clear error identifying the blocking operation. Rollback stops at the upgrade/baseline boundary: it cannot cross a frozen boundary revision.
 
 ```
 pgdesign migrate rollback --db "postgres://user:pass@localhost/mydb"
@@ -179,7 +185,9 @@ The consolidation edge and its archived originals coexist; the path-finder prefe
 
 ### migrate rebase
 
-Resolve a two-head fork. When two branches each append an edge, the chain has two live heads; apply refuses until the fork is resolved. `migrate rebase --head <ref>` re-parents the tail of the OTHER head onto the head named by `--head`, re-simulating each re-parented edge's operations to recompute its revision and content-derived edge file. The rebased-away originals retire intact to `migrations/archive/`, and the rebase revision-remap table (`migrations/remap.json`) is written so a database stamped at a rebased-away revision is served forward to the new head. A pure file operation — no database required.
+Resolve a two-head fork. When two branches each append an edge to the same parent, the chain has 2 live heads and apply refuses until the fork is resolved. `migrate rebase --head <ref>` re-parents the tail of the other head onto the named head.
+
+It re-simulates each re-parented edge's operations to recompute its revision and content-derived edge file. The rebased-away originals retire intact to `migrations/archive/`, and the rebase revision-remap table (`migrations/remap.json`) is written so a database stamped at a rebased-away revision is served forward to the new head. A pure file operation -- no database required.
 
 ```
 pgdesign migrate rebase --head <revision-or-edge-ref>
@@ -409,7 +417,7 @@ pgdesign handles these by committing the current transaction before the non-tran
 
 ## Migration tracking
 
-A chain-format database carries three managed structures, created automatically on first use:
+A chain-format database carries 3 managed structures (1 position table, 1 journal table, 1 convenience view), created automatically on first `migrate apply`. These structures record what the database has applied, enabling rollback and status queries without trusting on-disk files:
 
 | Structure | Role |
 |-----------|------|

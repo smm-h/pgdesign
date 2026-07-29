@@ -24,7 +24,7 @@ Common scenarios:
 
 ## The three modes
 
-The diff command has exactly three modes, specified by mutually exclusive flags. You must pass exactly one.
+The diff command has exactly three modes, specified by mutually exclusive flags: `--live` compares against a running database, `--against` compares two TOML files, and `--base` compares against a git ref. You must pass exactly one flag per invocation.
 
 ### `--live` -- compare against a running database
 
@@ -84,7 +84,7 @@ Use this mode to:
 
 ### Terminal output (default)
 
-The default output is a colored terminal format. The first line is a summary count of changes, followed by per-object details.
+The default output is a colored terminal format showing additions, removals, and modifications across all schema object types. The first line is a summary count of changes (e.g., "3 additions, 2 removals, 1 change"), followed by per-object details with risk classification.
 
 **Symbols:**
 
@@ -141,14 +141,14 @@ The JSON output is useful for CI pipelines, automated drift detection, or feedin
 
 ### Empty diff
 
-When the schema matches the target exactly:
+An empty diff means the schema and target are semantically identical after normalization -- every object type (tables, columns, constraints, indexes, views, functions, sequences, policies, triggers) matches between the two sides. When the schema matches the target exactly, the output format determines the representation:
 
 - Terminal: prints `Schema is up to date.`
 - JSON: all arrays are empty, all optional fields are null
 
 ## Normalization
 
-The diff engine normalizes expressions before comparing to avoid false positives from cosmetic differences:
+The diff engine applies 4 categories of normalization before comparing to avoid false positives from cosmetic differences that do not represent real schema changes. Without normalization, differences in whitespace, keyword casing, default precision values, and type aliases would surface as spurious schema drift:
 
 - **SQL expressions** (CHECK constraints, index WHERE clauses, policy expressions, generated column expressions, trigger WHEN conditions) are compared via the `sqlparse.ExprEqual` normalizer, which handles whitespace, case folding of keywords, and cast alias normalization
 - **Default values** are normalized: expression defaults go through the SQL normalizer; literal defaults are compared exactly (case-sensitive, since `'Active'` and `'active'` are distinct values)

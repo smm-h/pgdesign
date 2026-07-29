@@ -1,5 +1,5 @@
 ---
-description: "Common pgdesign migration patterns over the content-addressed chain: safe phased edges, risk classification, NOT VALID auto-split, batched DML, and squash consolidation."
+description: "Common pgdesign migration patterns: safe phased edges, risk classification, NOT VALID auto-split, batched DML, and squash consolidation."
 ---
 
 # Migration Intelligence
@@ -241,7 +241,9 @@ operations are preserved.
 
 ### Single rollback
 
-Chain-mode rollback reverts the most recently applied edge by executing the recorded inverses from the **journal** (`pgdesign_migration_ops`) in reverse order within a transaction. It reads the database's own record of what was applied — never the on-disk edge files — so a rollback is faithful to what actually ran, even if the files later changed. The function acquires an advisory lock to prevent concurrent rollback or apply operations, verifies that all journalled operations are reversible before executing any step, and deletes the edge's journal rows on successful completion. Non-transactional operations are handled by committing and reopening the transaction as needed.
+Chain-mode rollback reverts the most recently applied edge by executing the recorded inverses from the journal (`pgdesign_migration_ops`) in reverse order within a transaction. It reads the database's own record of what was applied -- never the on-disk edge files -- so a rollback is faithful to what actually ran.
+
+The function acquires an advisory lock to prevent concurrent rollback or apply operations, verifies that all journalled operations are reversible before executing any step, and deletes the edge's journal rows on successful completion. Non-transactional operations are handled by committing and reopening the transaction as needed. The 10-step process is:
 
 1. Acquires advisory lock (prevents concurrent rollback/apply).
 2. Reads `pgdesign_chain_position` for the current revision.
@@ -259,7 +261,9 @@ Chain-mode rollback reverts the most recently applied edge by executing the reco
 
 ### Range rollback
 
-Range rollback reverts every edge applied after a target revision, in reverse application order. The critical design feature is the pre-check: before executing any step, it verifies that ALL edges in the range are fully reversible. Without this pre-check, a partial rollback could leave the database in an intermediate state when a later edge turns out to contain a non-invertible operation. Each edge is rolled back in its own transaction for isolation, and the range never crosses the frozen upgrade/baseline boundary.
+Range rollback reverts every edge applied after a target revision, in reverse application order. The critical design feature is the pre-check: before executing any SQL, it verifies that all edges in the range are fully reversible to prevent partial rollbacks.
+
+Without this pre-check, a partial rollback could leave the database in an intermediate state when a later edge turns out to contain a non-invertible operation. Each edge is rolled back in its own transaction for isolation, and the range never crosses the frozen upgrade/baseline boundary.
 
 1. Acquires advisory lock.
 2. Resolves the target revision (via the journal and the rebase remap).

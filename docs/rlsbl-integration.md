@@ -1,6 +1,6 @@
 ---
 title: "rlsbl Release Integration"
-description: "How to wire pgdesign's build freshness check into rlsbl's release pipeline via the external check provider mechanism."
+description: "How to wire pgdesign's build freshness check into rlsbl's release pipeline via the external check provider mechanism for drift detection."
 ---
 
 # rlsbl Release Integration
@@ -15,7 +15,7 @@ When `rlsbl check` or `rlsbl release run` reaches the preflight phase, it invoke
 
 ## Configuration
 
-Add an `external_checks` entry to the consumer project's `.rlsbl/config.json`:
+Add an `external_checks` entry to the consumer project's `.rlsbl/config.json`. The check requires 3 fields -- name, command, and tag -- plus 2 optional fields for dependency ordering and working directory:
 
 ```json
 {
@@ -42,7 +42,7 @@ Optional fields:
 
 ## What the Check Verifies
 
-`pgdesign check --tag build` compares every configured output against what `pgdesign build` would produce:
+`pgdesign check --tag build` regenerates every configured output in memory and compares each file byte-for-byte against what exists on disk. Any of 3 failure conditions causes a non-zero exit code, which rlsbl treats as a hard release failure:
 
 - **Missing files**: An output file that should exist but does not.
 - **Stale files**: An output file whose content differs from what the current schema would generate (byte-exact comparison).
@@ -56,7 +56,7 @@ pgdesign's checks have internal dependencies declared in `checks.toml`. The `bui
 
 ## Monorepo Projects
 
-For monorepo projects where pgdesign.toml is in a subdirectory, use the `cwd` field:
+For monorepo projects where pgdesign.toml is in a subdirectory rather than the repository root, use the `cwd` field to set the working directory for the check command. Without `cwd`, pgdesign looks for the configuration file in the project root and fails if no pgdesign.toml exists there:
 
 ```json
 {
@@ -73,7 +73,7 @@ For monorepo projects where pgdesign.toml is in a subdirectory, use the `cwd` fi
 
 ## Alternative: Pre-checks Hook
 
-Projects not yet using rlsbl's external check mechanism can use the pre-checks hook instead. Add to `.rlsbl/hooks/pre-checks.sh`:
+Projects not yet using rlsbl's external check mechanism can use the pre-checks hook instead, which runs before the built-in test suite and provides the same blocking behavior. Add to `.rlsbl/hooks/pre-checks.sh`:
 
 ```bash
 #!/usr/bin/env bash

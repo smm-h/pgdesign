@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Get started with pgdesign: install it, write a format_version TOML schema, generate PostgreSQL DDL, validate rules, audit normal forms, and use the revise workflow."
+description: "Get started with pgdesign: install it, write a TOML schema, generate PostgreSQL DDL, validate rules, audit normal forms, and run the revise workflow."
 ---
 
 # Quickstart
@@ -165,7 +165,7 @@ pgdesign generate --strict-nf schema.toml
 
 ## The one-command workflow
 
-Once you have a `pgdesign.toml` with `[output]` targets, the day-to-day loop is a single command:
+Once you have a `pgdesign.toml` with `[output]` targets configured, the day-to-day development loop is a single command that regenerates all outputs (SQL, D2, codegen, JSON), chains the migration edge for your schema change, runs blocking normal-form and structural checks, and commits:
 
 ```
 pgdesign revise

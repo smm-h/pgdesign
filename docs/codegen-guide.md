@@ -1,6 +1,6 @@
 ---
 title: "Code Generation Guide"
-description: "How pgdesign generates type-safe application code from TOML schemas across six languages and eleven modes, with CI freshness checking and build integration."
+description: "How pgdesign generates type-safe application code from TOML schemas across six languages and eleven modes, with CI freshness checking."
 ---
 
 # Code Generation Guide
@@ -11,7 +11,7 @@ Source: `internal/codegen/`, `cmd/pgdesign/handlers_codegen.go`, `cmd/pgdesign/c
 
 ## Supported Languages and Modes
 
-Six target languages and eleven generation modes. Not every mode is available for every language -- the table below shows which combinations are supported.
+pgdesign supports 6 target languages (Go, TypeScript, Python, Java, Kotlin, Zig) and 11 generation modes. Not every mode is available for every language -- the table below shows which of the 66 possible combinations are supported, ranging from universal modes like validators and constants to language-specific ORM integrations.
 
 | Mode | Go | TypeScript | Python | Java | Kotlin | Zig | Description |
 |------|:--:|:----------:|:------:|:----:|:------:|:---:|-------------|
@@ -29,7 +29,7 @@ Six target languages and eleven generation modes. Not every mode is available fo
 
 ## Basic Usage
 
-Generate to stdout:
+The `pgdesign codegen` command reads your TOML schema, resolves types and dependencies, and emits generated source code. Output goes to stdout by default, or to a file with `--output`. You specify the target language with `--lang` and the generation mode with `--mode`. Generate to stdout:
 
 ```bash
 pgdesign codegen --lang go --mode types schema/
@@ -99,13 +99,13 @@ The `money` semantic type maps to integer cents (`int64` in Go, `int` in Python,
 
 ### enums
 
-Generates standalone enum type definitions without the struct/class definitions that the `types` mode includes. Useful when you need enum types in a separate file or package.
+Generates standalone enum type definitions without the struct/class definitions that the `types` mode includes. This mode is useful when you need enum types in a separate file or package, or when your application only uses the enum values without the full table struct definitions.
 
 Go enums are branded string types with `String()`, `IsValid()`, `MarshalJSON()`/`UnmarshalJSON()`, and `Scan()`/`Value()` methods for database interop. Python enums extend `StrEnum`. TypeScript enums use string literal union types. Java and Kotlin use standard enum classes. Zig enums are tagged unions.
 
 ### constraints
 
-Generates client-side validation code derived from CHECK constraints, NOT NULL columns, and enum-typed columns. The constraint generator parses CHECK expressions and classifies them into patterns:
+Generates client-side validation code derived from CHECK constraints, NOT NULL columns, and enum-typed columns. This mode lets you enforce the same rules in your application layer that the database enforces at the SQL level, catching invalid data before it reaches the database. The constraint generator parses CHECK expressions and classifies them into 4 patterns:
 
 - **Range**: `column >= 0 AND column <= 100` -- generates a bounds check
 - **Comparison**: `column >= 18` -- generates a comparison check
@@ -128,7 +128,7 @@ Generates SQLAlchemy 2.0 declarative models using `mapped_column()` definitions.
 
 ### jpa (Java only)
 
-Generates JPA entity classes with `@Entity`, `@Table`, `@Id`, `@Column`, `@ManyToOne`, `@OneToMany`, and `@JoinColumn` annotations. One class per table with fields derived from columns and relationships derived from FK metadata.
+Generates JPA entity classes with `@Entity`, `@Table`, `@Id`, `@Column`, `@ManyToOne`, `@OneToMany`, and `@JoinColumn` annotations. Each table produces one entity class with fields derived from columns and relationships derived from FK metadata. Enum columns map to `@Enumerated(EnumType.STRING)` with generated Java enum classes.
 
 ### ddl (Python only)
 
@@ -148,7 +148,7 @@ Generates a complete async query layer with Protocol definitions, Row dataclasse
 
 ## Configuring Codegen in pgdesign.toml
 
-The `build` command reads `[output]` sections from `pgdesign.toml` and generates all configured outputs in one pass. Codegen outputs use `format = "codegen"` with `lang` and `mode` fields.
+Instead of running `pgdesign codegen` manually for each language and mode combination, you can declare all codegen outputs in `pgdesign.toml`. The `build` command then reads these `[output]` sections and generates all configured outputs in one pass. Codegen outputs use `format = "codegen"` with `lang` and `mode` fields.
 
 ```toml
 [project]
@@ -214,7 +214,7 @@ This generates all outputs, stamps each file with a provenance header and full-p
 
 ### Filtering with groups and source
 
-You can restrict which tables appear in the generated output using `groups` (schema-defined table groups) or `source` (source file basenames).
+You can restrict which tables appear in the generated output using two filtering mechanisms: `groups` filters by schema-defined table groups declared in `[groups]`, while `source` filters by source file basenames for multi-file schemas. Both filters accept arrays and can be combined.
 
 ```toml
 # Schema defines groups
@@ -239,7 +239,7 @@ groups = ["orders"]
 
 ### Go codegen co-location rules
 
-Go codegen outputs emit `package schema` code. Two rules prevent compilation errors:
+Go codegen outputs emit `package schema` code. Because Go requires unique type definitions within a package, two co-location rules prevent compilation errors when configuring multiple codegen outputs in the same project:
 
 1. **At most one struct provider per directory.** The `types` and `gorm` modes both define row struct types. Putting both in the same directory produces duplicate type definitions. Configure them in separate directories.
 
@@ -249,7 +249,7 @@ Go codegen outputs emit `package schema` code. Two rules prevent compilation err
 
 ### Single-file modes
 
-Most modes produce a single output file. When using `--output`, the file is written to that path. When using `build`, the file is written to the configured `path`.
+Most of the 11 codegen modes produce a single output file containing all generated definitions. When using `--output`, the file is written to that path. When using `build`, the file is written to the configured `path`. Single-file modes include validators, constants, types, enums, constraints, gorm, drizzle, sqlalchemy, and graphql.
 
 Every generated file begins with a provenance header:
 
@@ -262,7 +262,7 @@ The comment prefix matches the target language (`//` for Go/TS/Java/Kotlin/Zig, 
 
 ### Multi-file modes
 
-The `ddl`, `query-layer`, and `jpa` modes produce multiple files. The `--output` path (or `path` in config) specifies a directory, and the generator writes files inside it.
+Three modes -- `ddl`, `query-layer`, and `jpa` -- produce multiple files via the MultiFileGenerator interface. The `--output` path (or `path` in config) specifies a directory, and the generator writes files inside it. Each mode has its own directory structure.
 
 For `query-layer`, the output directory contains:
 
@@ -284,7 +284,7 @@ Orphans appear when output configuration changes (e.g., renaming a schema source
 
 ## Using --check in CI
 
-The `--check` flag verifies that generated code on disk matches what would be generated from the current schema, without writing anything. It requires `--output` (the path to verify against).
+The `--check` flag verifies that generated code on disk matches what would be generated from the current schema, without writing anything. This prevents stale generated code from reaching production -- a common issue when schema changes are committed without regenerating codegen outputs. It requires `--output` (the path to verify against).
 
 ```bash
 pgdesign codegen --lang go --mode types --output gen/schema/types.go --check schema/
