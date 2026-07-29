@@ -140,6 +140,8 @@ default = "0"
 | `stored` | boolean | Whether the generated column is stored (default: false) |
 | `array` | boolean | Marks the column as a PostgreSQL array type. DDL appends `[]` to the base type (e.g., `array = true` on a `text` column produces `text[]`) |
 | `json_schema` | string | Path to a JSON Schema file (relative to the schema file). Generates CHECK constraints for top-level property validation (e.g., `json_schema = "schemas/address.json"`) |
+| `collation` | string | PostgreSQL collation for the column (emits `COLLATE "..."` in DDL) |
+| `statistics` | integer | Per-column statistics target (emits `ALTER COLUMN ... SET STATISTICS` in DDL) |
 | `comment` | string | Column description |
 
 When both the type and the column define a default, the column-level value wins. Setting `nullable = true` on a column overrides the type's `not_null = true`.
@@ -239,11 +241,18 @@ Valid WITH parameters depend on the index method. E216 is raised when a paramete
 ```toml
 [tables.users.uniques.uq_users_email]
 columns = ["email"]
+
+[tables.bookings.uniques.uq_no_overlap]
+columns = ["room_id", "slot"]
+deferrable = true
+initially_deferred = true
 ```
 
 | Key | Type | Description |
 |-----|------|-------------|
 | `columns` | array of strings | Columns in the unique constraint |
+| `deferrable` | boolean | Mark the constraint as DEFERRABLE |
+| `initially_deferred` | boolean | Mark the constraint as INITIALLY DEFERRED (requires `deferrable = true`) |
 
 ## Check constraints
 
@@ -255,6 +264,66 @@ expr = "price >= 0"
 | Key | Type | Description |
 |-----|------|-------------|
 | `expr` | string | SQL check expression |
+
+## Exclusion constraints
+
+Exclusion constraints are defined under `[tables.<table>.exclusions.<exclusion_name>]` and use GiST (or another method) to enforce that no two rows have overlapping values. Each exclusion specifies columns and corresponding operators, and the `columns` and `operators` arrays must have the same length. Exclusion constraints typically require the `btree_gist` extension for non-GiST-native types.
+
+```toml
+[tables.bookings.exclusions.excl_no_overlap]
+columns = ["room_id", "time_range"]
+operators = ["=", "&&"]
+method = "gist"
+where = "cancelled_at IS NULL"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `columns` | array of strings | Columns in the exclusion constraint (required) |
+| `operators` | array of strings | Operators per column (required, same length as `columns`) |
+| `method` | string | Index method: `gist` (default), `spgist` |
+| `where` | string | Partial exclusion predicate |
+| `deferrable` | boolean | Mark the constraint as DEFERRABLE |
+| `initially_deferred` | boolean | Mark the constraint as INITIALLY DEFERRED (requires `deferrable = true`) |
+
+Using an exclusion constraint with non-GiST-native types (e.g., `integer` with `=`) requires the `btree_gist` extension to be declared via `[[extensions]]` in pgdesign.toml.
+
+## Triggers
+
+Triggers are defined under `[tables.<table>.triggers.<trigger_name>]` and bind a trigger function to one or more table events. Each trigger specifies the function to call, the events that fire it, and whether it runs BEFORE or AFTER the event. Constraint triggers and transition tables (PG 10+) are also supported.
+
+```toml
+[tables.audit_log.triggers.trg_audit_insert]
+function = "log_changes"
+events = ["INSERT", "UPDATE"]
+timing = "AFTER"
+for_each = "ROW"
+when = "OLD.* IS DISTINCT FROM NEW.*"
+
+[tables.orders.triggers.trg_validate_transition]
+function = "validate_status"
+events = ["UPDATE"]
+timing = "BEFORE"
+for_each = "ROW"
+referencing_old = "old_table"
+referencing_new = "new_table"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `function` | string | Name of the trigger function to call (required) |
+| `events` | array of strings | Events: `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` (required, at least one) |
+| `timing` | string | When to fire: `BEFORE`, `AFTER`, or `INSTEAD OF` (required) |
+| `for_each` | string | Granularity: `ROW` or `STATEMENT` (default: `STATEMENT`) |
+| `when` | string | SQL condition restricting when the trigger fires |
+| `constraint` | boolean | Create a CONSTRAINT TRIGGER |
+| `deferrable` | boolean | Mark the constraint trigger as DEFERRABLE (requires `constraint = true`) |
+| `initially_deferred` | boolean | Mark as INITIALLY DEFERRED (requires `deferrable = true`) |
+| `referencing_old` | string | Transition table alias for old rows (PG 10+, AFTER triggers only) |
+| `referencing_new` | string | Transition table alias for new rows (PG 10+, AFTER triggers only) |
+| `comment` | string | Trigger description |
+
+Trigger functions must be defined in a `[functions.*]` section. The trigger's `function` value must match a defined function name.
 
 ## Row-level security policies
 
@@ -407,6 +476,114 @@ unique = true
 
 Materialized views support nested index definitions using the same syntax as table indexes. Indexes on materialized views are required for `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
 
+## [functions.*]
+
+Functions and procedures are defined under `[functions.<function_name>]` with the function body provided either inline via `body` or referenced from an external file via `file`. Arguments are declared as `[[functions.<name>.args]]` array-of-tables entries. DDL uses `CREATE OR REPLACE FUNCTION` with `$pgdesign$` dollar-quoting. For SQL-language functions, table dependencies are auto-detected via AST walking; PL/pgSQL functions require explicit `depends_on`.
+
+```toml
+[functions.update_modified_at]
+language = "plpgsql"
+returns = "trigger"
+body = """
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+"""
+volatility = "volatile"
+comment = "Sets updated_at to current timestamp on row update"
+
+[[functions.update_modified_at.args]]
+name = "ignored"
+type = "text"
+default = "'none'"
+```
+
+```toml
+[functions.calculate_total]
+language = "sql"
+returns = "numeric"
+body = "SELECT sum(amount) FROM line_items WHERE order_id = p_order_id"
+volatility = "stable"
+parallel = "safe"
+cost = 100
+
+[[functions.calculate_total.args]]
+name = "p_order_id"
+type = "bigint"
+```
+
+```toml
+[functions.process_batch]
+language = "plpgsql"
+procedure = true
+body = """
+BEGIN
+  -- batch processing logic
+END;
+"""
+security_definer = true
+depends_on = ["orders", "line_items"]
+```
+
+### Function properties
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `language` | string | Function language: `sql`, `plpgsql`, etc. (required) |
+| `returns` | string | Return type (required for functions, omit for procedures) |
+| `body` | string | Inline function body (mutually exclusive with `file`) |
+| `file` | string | Path to an external SQL file containing the body (relative to the schema file, mutually exclusive with `body`) |
+| `procedure` | boolean | Define a PROCEDURE instead of a FUNCTION (omit `returns` when true) |
+| `volatility` | string | `volatile` (default), `stable`, or `immutable` |
+| `parallel` | string | `unsafe` (default), `restricted`, or `safe` |
+| `security_definer` | boolean | Run with the privileges of the function owner |
+| `cost` | number | Estimated execution cost in cpu_operator_cost units |
+| `rows` | number | Estimated number of rows returned (for set-returning functions) |
+| `depends_on` | array of strings | Tables or functions this function depends on (required for PL/pgSQL; auto-detected for SQL) |
+| `comment` | string | Function description |
+
+### Function arguments
+
+Arguments are declared as `[[functions.<name>.args]]` array-of-tables entries. Argument order is semantic (it becomes the PostgreSQL function signature order).
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `name` | string | Argument name (required) |
+| `type` | string | PostgreSQL type (required) |
+| `default` | string | Default value expression |
+
+Signature changes (argument types or return type) produce a DROP + CREATE in migrations rather than CREATE OR REPLACE, because PostgreSQL identifies functions by name and argument types.
+
+## [sequences.*]
+
+Standalone sequences are defined under `[sequences.<sequence_name>]` for cases where a sequence is shared across multiple tables or requires specific configuration beyond what identity columns provide. Identity-backed sequences (created implicitly by `GENERATED ALWAYS AS IDENTITY` columns) are filtered during introspection and do not need explicit declarations.
+
+```toml
+[sequences.invoice_number_seq]
+start = 1000
+increment = 1
+min_value = 1000
+max_value = 9999999
+cache = 10
+cycle = false
+owned_by = "invoices.invoice_number"
+comment = "Invoice number sequence starting at 1000"
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `start` | integer | Start value |
+| `increment` | integer | Increment step |
+| `min_value` | integer | Minimum value |
+| `max_value` | integer | Maximum value |
+| `cache` | integer | Number of values to pre-allocate |
+| `cycle` | boolean | Wrap around when min/max is reached |
+| `owned_by` | string | Owner column in `table.column` format (sequence is dropped when the column is dropped) |
+| `comment` | string | Sequence description |
+
+All fields are optional. When omitted, PostgreSQL defaults apply (start = 1, increment = 1, no cycle, etc.).
+
 ## Project configuration (pgdesign.toml)
 
 Project-level settings live in `pgdesign.toml`, which is separate from the TOML schema files that define tables and types. This configuration file controls which schema files to load, the migrations directory path, formatting preferences, validation rule overrides, migration behavior thresholds, extension declarations with their provided types and operator classes, database connection pool settings, and build output targets for generating SQL, diagrams, documentation, and application code.
@@ -446,6 +623,7 @@ index_methods = ["hnsw", "ivfflat"]
 | `name` | string | Extension name (required) |
 | `types` | array of strings | Types provided by the extension (become valid base types for scalars) |
 | `opclasses` | array of strings | Operator classes provided by the extension |
+| `functions` | array of strings | Functions provided by the extension |
 | `index_methods` | array of strings | Index methods provided by the extension (e.g., hnsw, ivfflat) |
 
 ### [database]
@@ -546,7 +724,7 @@ path = "out/schema.json"
 | `idempotent` | boolean | For `sql` format: add idempotent guards (see below) |
 | `comments` | boolean | For `sql` format: include `COMMENT ON` statements (default: true) |
 
-#### Idempotent mode coverage
+### Idempotent mode coverage
 
 When `idempotent = true`, the generated SQL includes guards that make re-running the DDL safe against an existing database:
 
@@ -568,7 +746,7 @@ When `idempotent = true`, the generated SQL includes guards that make re-running
 - Column type changes (altering an existing column's type)
 - Column drops (removing columns that no longer appear in the schema)
 
-#### D2 diagram options
+### D2 diagram options
 
 A `d2` or `svg` output accepts a nested `[output.<name>.d2]` subsection controlling layout, enrichment, filtering, cardinality, and heat/live annotations. Every key has a sensible default, so an absent subsection produces a fully-enriched diagram.
 
