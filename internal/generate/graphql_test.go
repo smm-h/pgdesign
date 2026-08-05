@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 )
 
 func TestGraphQLBasicTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -53,6 +55,7 @@ func TestGraphQLBasicTable(t *testing.T) {
 }
 
 func TestGraphQLEnums(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Enums: []model.Enum{
@@ -88,6 +91,7 @@ func TestGraphQLEnums(t *testing.T) {
 }
 
 func TestGraphQLStateMachine(t *testing.T) {
+	testenv.Isolate(t)
 	// State machine types appear in schema.Enums (build.go appends them) and
 	// their columns carry TypeKind "state_machine". They render like enums.
 	schema := &model.Schema{
@@ -125,6 +129,7 @@ func TestGraphQLStateMachine(t *testing.T) {
 }
 
 func TestGraphQLEnumWithoutTypeKind(t *testing.T) {
+	testenv.Isolate(t)
 	// A column of a custom type without TypeKind (e.g., hand-constructed
 	// schemas) falls back to String, even if an enum with that name exists.
 	schema := &model.Schema{
@@ -153,6 +158,7 @@ func TestGraphQLEnumWithoutTypeKind(t *testing.T) {
 }
 
 func TestGraphQLForeignKeys(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -198,6 +204,7 @@ func TestGraphQLForeignKeys(t *testing.T) {
 // same-named tables across two schemas and still emits per-schema FK reverse
 // relations (the FKGraph lookup is scoped by TableKey).
 func TestGraphQLTwoSchemasSameName(t *testing.T) {
+	testenv.Isolate(t)
 	build := func(sch string) []model.Table {
 		return []model.Table{
 			{Name: "account", Schema: sch, Columns: []model.Column{
@@ -232,6 +239,7 @@ func TestGraphQLTwoSchemasSameName(t *testing.T) {
 // keyed a column lookup by bare table name (last-write-wins), so both Entry
 // blocks inherited whichever schema was processed last.
 func TestGraphQLTwoSchemasSameNameDifferingNullability(t *testing.T) {
+	testenv.Isolate(t)
 	build := func(sch string, fkNotNull bool) []model.Table {
 		return []model.Table{
 			{Name: "account", Schema: sch, Columns: []model.Column{
@@ -265,6 +273,7 @@ func TestGraphQLTwoSchemasSameNameDifferingNullability(t *testing.T) {
 }
 
 func TestGraphQLNullableFK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -300,6 +309,7 @@ func TestGraphQLNullableFK(t *testing.T) {
 }
 
 func TestGraphQLArrayColumns(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -330,6 +340,7 @@ func TestGraphQLArrayColumns(t *testing.T) {
 }
 
 func TestGraphQLAllTypes(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -383,6 +394,7 @@ func TestGraphQLAllTypes(t *testing.T) {
 }
 
 func TestGraphQLGoldenFile(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Enums: []model.Enum{
@@ -461,6 +473,7 @@ func TestGraphQLGoldenFile(t *testing.T) {
 // an FK to an imported table gets a schema-qualified relation field pointing at a
 // minimal reference type, and that reference type is emitted so the SDL compiles.
 func TestGraphQLImportedFK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{

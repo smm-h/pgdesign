@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"sort"
 	"strings"
 	"testing"
@@ -39,6 +40,7 @@ func collectCommandPaths(app *strictcli.App) map[string]bool {
 // (or a stale registry entry) turns this test red — forcing every file-writing
 // command to declare its class before it can ship.
 func TestWritersRegistry_Totality(t *testing.T) {
+	testenv.Isolate(t)
 	app := buildApp()
 	live := collectCommandPaths(app)
 
@@ -70,6 +72,7 @@ func TestWritersRegistry_Totality(t *testing.T) {
 // TestWritersRegistry_ClassInvariants pins the class of the commands the roadmap
 // names explicitly, so a reclassification is a deliberate, reviewed edit.
 func TestWritersRegistry_ClassInvariants(t *testing.T) {
+	testenv.Isolate(t)
 	want := map[string]WriterClass{
 		"build":            ClassFullRegenerator,
 		"revise":           ClassFullRegenerator,

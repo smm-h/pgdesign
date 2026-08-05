@@ -1,12 +1,14 @@
 package genkit
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
 func TestCompareFreshness_AllStates(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 	freshPath := filepath.Join(dir, "fresh.go")
 	stalePath := filepath.Join(dir, "stale.go")
@@ -45,6 +47,7 @@ func TestCompareFreshness_AllStates(t *testing.T) {
 }
 
 func TestCompareFreshness_AllFresh(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 	p := filepath.Join(dir, "ok.go")
 	data := []byte("// ok\n")
@@ -62,6 +65,7 @@ func TestCompareFreshness_AllFresh(t *testing.T) {
 }
 
 func TestOrphanIgnored(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		rel  string
 		want bool
@@ -81,6 +85,7 @@ func TestOrphanIgnored(t *testing.T) {
 }
 
 func TestScanOrphans(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 	mustWrite := func(rel string, data string) {
 		t.Helper()
@@ -107,6 +112,7 @@ func TestScanOrphans(t *testing.T) {
 }
 
 func TestScanOrphans_MissingDirectory(t *testing.T) {
+	testenv.Isolate(t)
 	orphans, err := ScanOrphans(filepath.Join(t.TempDir(), "nonexistent"), nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -117,6 +123,7 @@ func TestScanOrphans_MissingDirectory(t *testing.T) {
 }
 
 func TestScanAllOrphans(t *testing.T) {
+	testenv.Isolate(t)
 	dir1 := t.TempDir()
 	dir2 := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir1, "owned.py"), []byte("ok"), 0o644); err != nil {

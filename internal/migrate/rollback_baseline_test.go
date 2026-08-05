@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,6 +17,7 @@ import (
 // file's down would DROP a table that exists out-of-band; a correct rollback must
 // REFUSE the baseline row and leave the table intact.
 func TestLegacyRollbackRefusesBaselineRow(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -72,6 +74,7 @@ down = { op = "drop_table", table = "public.pgdesign_keepme" }
 // TestLegacyRollbackToRefusesBaselineRow: the multi-step RollbackTo path must also
 // refuse when a baseline row is in the rollback range, before executing anything.
 func TestLegacyRollbackToRefusesBaselineRow(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 

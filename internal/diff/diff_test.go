@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 )
 
 func TestEmptyDiff(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -29,6 +31,7 @@ func TestEmptyDiff(t *testing.T) {
 }
 
 func TestTableAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public"},
@@ -53,6 +56,7 @@ func TestTableAdded(t *testing.T) {
 }
 
 func TestTableRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public"},
@@ -74,6 +78,7 @@ func TestTableRemoved(t *testing.T) {
 }
 
 func TestColumnAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -100,6 +105,7 @@ func TestColumnAdded(t *testing.T) {
 }
 
 func TestColumnRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -126,6 +132,7 @@ func TestColumnRemoved(t *testing.T) {
 }
 
 func TestColumnTypeChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -165,6 +172,7 @@ func TestColumnTypeChanged(t *testing.T) {
 }
 
 func TestColumnTypeChangedNarrowing(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -195,6 +203,7 @@ func TestColumnTypeChangedNarrowing(t *testing.T) {
 // TestColumnTypeChangedWideningNotFlagged confirms a safe widening does NOT set
 // the narrowing advisory flag (5.9).
 func TestColumnTypeChangedWideningNotFlagged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -220,6 +229,7 @@ func TestColumnTypeChangedWideningNotFlagged(t *testing.T) {
 }
 
 func TestNullableChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -249,6 +259,7 @@ func TestNullableChanged(t *testing.T) {
 }
 
 func TestNullableChangedDropNotNull(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -272,6 +283,7 @@ func TestNullableChangedDropNotNull(t *testing.T) {
 }
 
 func TestFKAdded(t *testing.T) {
+	testenv.Isolate(t)
 	fk := model.FK{
 		Name:       "fk_user_id",
 		Columns:    []string{"user_id"},
@@ -300,6 +312,7 @@ func TestFKAdded(t *testing.T) {
 }
 
 func TestFKRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	fk := model.FK{
 		Name:       "fk_user_id",
 		Columns:    []string{"user_id"},
@@ -324,6 +337,7 @@ func TestFKRemoved(t *testing.T) {
 }
 
 func TestEnumValuesAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"active", "inactive", "suspended"}},
@@ -348,6 +362,7 @@ func TestEnumValuesAdded(t *testing.T) {
 }
 
 func TestEnumValuesRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"active"}},
@@ -369,6 +384,7 @@ func TestEnumValuesRemoved(t *testing.T) {
 }
 
 func TestSummaryOutput(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -414,6 +430,7 @@ func TestSummaryOutput(t *testing.T) {
 }
 
 func TestExtensionsAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Extensions: []string{"uuid-ossp", "pgcrypto"},
 	}
@@ -427,6 +444,7 @@ func TestExtensionsAdded(t *testing.T) {
 }
 
 func TestExtensionsRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Extensions: []string{"uuid-ossp"},
 	}
@@ -440,6 +458,7 @@ func TestExtensionsRemoved(t *testing.T) {
 }
 
 func TestDefaultChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -474,6 +493,7 @@ func TestDefaultChanged(t *testing.T) {
 // stored '{}'::jsonb to the literal {} via parseSimpleDefault). The
 // expression-vs-literal comparison must not report DefaultChanged.
 func TestDefaultCastWrappedLiteralNoDrift(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Columns: []model.Column{
@@ -502,6 +522,7 @@ func TestDefaultCastWrappedLiteralNoDrift(t *testing.T) {
 }
 
 func TestCommentChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Comment: "new comment"},
@@ -526,6 +547,7 @@ func TestCommentChanged(t *testing.T) {
 }
 
 func TestPKChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", PK: []string{"id", "tenant_id"}},
@@ -547,6 +569,7 @@ func TestPKChanged(t *testing.T) {
 }
 
 func TestIsWidening(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		old, new string
 		want     bool
@@ -575,6 +598,7 @@ func TestIsWidening(t *testing.T) {
 }
 
 func TestIndexAdded(t *testing.T) {
+	testenv.Isolate(t)
 	idx := model.Index{
 		Name:    "idx_users_email",
 		Columns: []string{"email"},
@@ -598,6 +622,7 @@ func TestIndexAdded(t *testing.T) {
 }
 
 func TestIndexRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	idx := model.Index{
 		Name:    "idx_users_email",
 		Columns: []string{"email"},
@@ -621,6 +646,7 @@ func TestIndexRemoved(t *testing.T) {
 }
 
 func TestSchemaQualifiedTableKey(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "auth"},
@@ -634,6 +660,7 @@ func TestSchemaQualifiedTableKey(t *testing.T) {
 }
 
 func TestEnumAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"active", "inactive"}},
@@ -647,6 +674,7 @@ func TestEnumAdded(t *testing.T) {
 }
 
 func TestEnumRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{}
 	actual := &model.Schema{
 		Enums: []model.Enum{
@@ -660,6 +688,7 @@ func TestEnumRemoved(t *testing.T) {
 }
 
 func TestFKChanged(t *testing.T) {
+	testenv.Isolate(t)
 	oldFK := model.FK{
 		Name:       "fk_user_id",
 		Columns:    []string{"user_id"},
@@ -696,6 +725,7 @@ func TestFKChanged(t *testing.T) {
 }
 
 func TestIndexChanged(t *testing.T) {
+	testenv.Isolate(t)
 	oldIdx := model.Index{
 		Name:    "idx_users_email",
 		Columns: []string{"email"},
@@ -733,6 +763,7 @@ func TestIndexChanged(t *testing.T) {
 // is the materialized "btree". PostgreSQL defaults an index's access method to
 // btree, so "" and "btree" name the same index.
 func TestIndexUnspecifiedMethodNoDrift(t *testing.T) {
+	testenv.Isolate(t)
 	desiredIdx := model.Index{
 		Name:    "idx_events_active",
 		Columns: []string{"status"},
@@ -772,6 +803,7 @@ func TestIndexUnspecifiedMethodNoDrift(t *testing.T) {
 // TOML column with TypeKind "state_machine" compared against the introspected
 // "enum" column must not report a spurious type change.
 func TestColumnTypeKindIgnored(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "orders", Schema: "public", Columns: []model.Column{
@@ -794,6 +826,7 @@ func TestColumnTypeKindIgnored(t *testing.T) {
 }
 
 func TestColumnCommentChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -819,6 +852,7 @@ func TestColumnCommentChanged(t *testing.T) {
 }
 
 func TestVarcharWidening(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -842,6 +876,7 @@ func TestVarcharWidening(t *testing.T) {
 }
 
 func TestMultipleChangesHighestRisk(t *testing.T) {
+	testenv.Isolate(t)
 	// Both type narrowing (Dangerous) and nullable change (Caution).
 	// Should report Dangerous (highest).
 	desired := &model.Schema{
@@ -866,6 +901,7 @@ func TestMultipleChangesHighestRisk(t *testing.T) {
 }
 
 func TestOwnerChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Owner: "app_user"},
@@ -887,6 +923,7 @@ func TestOwnerChanged(t *testing.T) {
 }
 
 func TestGeneratedChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "orders", Schema: "public", Columns: []model.Column{
@@ -915,6 +952,7 @@ func TestGeneratedChanged(t *testing.T) {
 }
 
 func TestIdentityChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -943,6 +981,7 @@ func TestIdentityChanged(t *testing.T) {
 }
 
 func TestGeneratedAndIdentityUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Columns: []model.Column{
@@ -964,6 +1003,7 @@ func TestGeneratedAndIdentityUnchanged(t *testing.T) {
 }
 
 func TestEnumValueAppendedAtEnd(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"active", "inactive", "suspended"}},
@@ -998,6 +1038,7 @@ func TestEnumValueAppendedAtEnd(t *testing.T) {
 }
 
 func TestEnumValueInsertedInMiddle(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"active", "pending", "inactive"}},
@@ -1039,6 +1080,7 @@ func TestEnumValueInsertedInMiddle(t *testing.T) {
 }
 
 func TestEnumValueInsertedBeforeFirst(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"draft", "active", "inactive"}},
@@ -1065,6 +1107,7 @@ func TestEnumValueInsertedBeforeFirst(t *testing.T) {
 }
 
 func TestEnumValuesReordered(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"inactive", "active"}},
@@ -1094,6 +1137,7 @@ func TestEnumValuesReordered(t *testing.T) {
 }
 
 func TestEnumValueRemovedStillPopulated(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"active"}},
@@ -1122,6 +1166,7 @@ func TestEnumValueRemovedStillPopulated(t *testing.T) {
 }
 
 func TestEnumMixedInsertAndAppend(t *testing.T) {
+	testenv.Isolate(t)
 	// Old: [a, c]
 	// New: [a, b, c, d]
 	// "b" is inserted (after "a"), "d" is appended at end.
@@ -1153,6 +1198,7 @@ func TestEnumMixedInsertAndAppend(t *testing.T) {
 }
 
 func TestEnumReorderedWithAdditions(t *testing.T) {
+	testenv.Isolate(t)
 	// Old: [a, b, c]
 	// New: [c, b, a, d]
 	// Reordered (a,b,c -> c,b,a) and d appended.
@@ -1178,6 +1224,7 @@ func TestEnumReorderedWithAdditions(t *testing.T) {
 }
 
 func TestEnumFormatTerminalAppended(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		EnumsChanged: []EnumDiff{
 			{
@@ -1194,6 +1241,7 @@ func TestEnumFormatTerminalAppended(t *testing.T) {
 }
 
 func TestEnumFormatTerminalInserted(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		EnumsChanged: []EnumDiff{
 			{
@@ -1215,6 +1263,7 @@ func TestEnumFormatTerminalInserted(t *testing.T) {
 }
 
 func TestEnumFormatTerminalReordered(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		EnumsChanged: []EnumDiff{
 			{
@@ -1230,6 +1279,7 @@ func TestEnumFormatTerminalReordered(t *testing.T) {
 }
 
 func TestPartitioningGained(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
@@ -1267,6 +1317,7 @@ func TestPartitioningGained(t *testing.T) {
 }
 
 func TestPartitioningLost(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "events", Schema: "public"},
@@ -1297,6 +1348,7 @@ func TestPartitioningLost(t *testing.T) {
 }
 
 func TestPartitioningStrategyChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
@@ -1334,6 +1386,7 @@ func TestPartitioningStrategyChanged(t *testing.T) {
 }
 
 func TestPartitionChildrenAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "events", Schema: "public", Partitioning: &model.PartitionSpec{
@@ -1381,6 +1434,7 @@ func TestPartitionChildrenAdded(t *testing.T) {
 }
 
 func TestPartitioningUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	spec := &model.PartitionSpec{
 		Strategy: "range",
 		Columns:  []string{"created_at"},
@@ -1405,6 +1459,7 @@ func TestPartitioningUnchanged(t *testing.T) {
 }
 
 func TestPartitioningFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -1434,6 +1489,7 @@ func TestPartitioningFormatTerminal(t *testing.T) {
 }
 
 func TestArrayChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "posts", Schema: "public", Columns: []model.Column{
@@ -1462,6 +1518,7 @@ func TestArrayChanged(t *testing.T) {
 }
 
 func TestArrayUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "posts", Schema: "public", Columns: []model.Column{
@@ -1483,6 +1540,7 @@ func TestArrayUnchanged(t *testing.T) {
 }
 
 func TestArrayChangedFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -1504,6 +1562,7 @@ func TestArrayChangedFormatTerminal(t *testing.T) {
 }
 
 func TestStoredChangedFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -1525,6 +1584,7 @@ func TestStoredChangedFormatTerminal(t *testing.T) {
 }
 
 func TestAppendOnlyChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -1561,6 +1621,7 @@ func TestAppendOnlyChanged(t *testing.T) {
 }
 
 func TestBoolSliceEqual(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name string
 		a, b []bool
@@ -1615,6 +1676,7 @@ func TestBoolSliceEqual(t *testing.T) {
 }
 
 func TestDiffColumnJSONSchema(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1666,6 +1728,7 @@ func TestDiffColumnJSONSchema(t *testing.T) {
 }
 
 func TestDiffColumnJSONSchemaAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1712,6 +1775,7 @@ func TestDiffColumnJSONSchemaAdded(t *testing.T) {
 }
 
 func TestDiffColumnJSONSchemaUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1735,6 +1799,7 @@ func TestDiffColumnJSONSchemaUnchanged(t *testing.T) {
 }
 
 func TestIndexWithChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "t",
@@ -1777,6 +1842,7 @@ func TestIndexWithChanged(t *testing.T) {
 }
 
 func TestIndexWithEqual(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "t",
@@ -1808,6 +1874,7 @@ func TestIndexWithEqual(t *testing.T) {
 }
 
 func TestDiff_ViewAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Views: []model.View{
 			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true"},
@@ -1824,6 +1891,7 @@ func TestDiff_ViewAdded(t *testing.T) {
 }
 
 func TestDiff_ViewRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{}
 	actual := &model.Schema{
 		Views: []model.View{
@@ -1840,6 +1908,7 @@ func TestDiff_ViewRemoved(t *testing.T) {
 }
 
 func TestDiff_ViewChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Views: []model.View{
 			{Name: "active_users", Schema: "public", Query: "SELECT id, name FROM users WHERE active = true"},
@@ -1873,6 +1942,7 @@ func TestDiff_ViewChanged(t *testing.T) {
 }
 
 func TestDiff_ViewCommentChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Views: []model.View{
 			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true", Comment: "New comment"},
@@ -1901,6 +1971,7 @@ func TestDiff_ViewCommentChanged(t *testing.T) {
 }
 
 func TestDiff_ViewUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Views: []model.View{
 			{Name: "active_users", Schema: "public", Query: "SELECT * FROM users WHERE active = true", Comment: "Active users view"},
@@ -1913,6 +1984,7 @@ func TestDiff_ViewUnchanged(t *testing.T) {
 }
 
 func TestDiff_MaterializedViewAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		MaterializedViews: []model.MaterializedView{
 			{
@@ -1934,6 +2006,7 @@ func TestDiff_MaterializedViewAdded(t *testing.T) {
 }
 
 func TestDiff_MaterializedViewRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{}
 	actual := &model.Schema{
 		MaterializedViews: []model.MaterializedView{
@@ -1955,6 +2028,7 @@ func TestDiff_MaterializedViewRemoved(t *testing.T) {
 }
 
 func TestDiff_MaterializedViewQueryChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		MaterializedViews: []model.MaterializedView{
 			{
@@ -1998,6 +2072,7 @@ func TestDiff_MaterializedViewQueryChanged(t *testing.T) {
 }
 
 func TestDiff_MaterializedViewWithDataChanged(t *testing.T) {
+	testenv.Isolate(t)
 	query := "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1"
 	desired := &model.Schema{
 		MaterializedViews: []model.MaterializedView{
@@ -2042,6 +2117,7 @@ func TestDiff_MaterializedViewWithDataChanged(t *testing.T) {
 }
 
 func TestDiff_MaterializedViewIndexAdded(t *testing.T) {
+	testenv.Isolate(t)
 	query := "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1"
 	desired := &model.Schema{
 		MaterializedViews: []model.MaterializedView{
@@ -2086,6 +2162,7 @@ func TestDiff_MaterializedViewIndexAdded(t *testing.T) {
 }
 
 func TestDiff_MaterializedViewNoChange(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		MaterializedViews: []model.MaterializedView{
 			{
@@ -2103,6 +2180,7 @@ func TestDiff_MaterializedViewNoChange(t *testing.T) {
 }
 
 func TestDiff_StoredToVirtualTransition(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2159,6 +2237,7 @@ func TestDiff_StoredToVirtualTransition(t *testing.T) {
 }
 
 func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
+	testenv.Isolate(t)
 	// If columns are not generated, StoredChanged should not fire
 	// even if Stored differs (it's meaningless for non-generated columns).
 	desired := &model.Schema{
@@ -2193,6 +2272,7 @@ func TestDiff_StoredToVirtualTransition_NonGenerated(t *testing.T) {
 }
 
 func TestColumnCollationChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2242,6 +2322,7 @@ func TestColumnCollationChanged(t *testing.T) {
 }
 
 func TestColumnCollationUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2262,6 +2343,7 @@ func TestColumnCollationUnchanged(t *testing.T) {
 }
 
 func TestColumnStatisticsChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2311,6 +2393,7 @@ func TestColumnStatisticsChanged(t *testing.T) {
 }
 
 func TestColumnStatisticsReset(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2360,6 +2443,7 @@ func TestColumnStatisticsReset(t *testing.T) {
 }
 
 func TestColumnStatisticsUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2380,6 +2464,7 @@ func TestColumnStatisticsUnchanged(t *testing.T) {
 }
 
 func TestIndexCollationChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2429,6 +2514,7 @@ func TestIndexCollationChanged(t *testing.T) {
 }
 
 func TestIndexCollationUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2452,6 +2538,7 @@ func TestIndexCollationUnchanged(t *testing.T) {
 }
 
 func TestDiff_ExclusionAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "bookings",
@@ -2499,6 +2586,7 @@ func TestDiff_ExclusionAdded(t *testing.T) {
 }
 
 func TestDiff_ExclusionRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "bookings",
@@ -2543,6 +2631,7 @@ func TestDiff_ExclusionRemoved(t *testing.T) {
 }
 
 func TestDiff_ExclusionChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "bookings",
@@ -2595,6 +2684,7 @@ func TestDiff_ExclusionChanged(t *testing.T) {
 }
 
 func TestDiff_UniqueChangedDeferrable(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -2650,6 +2740,7 @@ func TestDiff_UniqueChangedDeferrable(t *testing.T) {
 }
 
 func TestDiff_SequenceAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Sequences: []model.Sequence{{
@@ -2675,6 +2766,7 @@ func TestDiff_SequenceAdded(t *testing.T) {
 }
 
 func TestDiff_SequenceRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 	}
@@ -2700,6 +2792,7 @@ func TestDiff_SequenceRemoved(t *testing.T) {
 }
 
 func TestDiff_SequenceChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Sequences: []model.Sequence{{
@@ -2753,6 +2846,7 @@ func TestDiff_SequenceChanged(t *testing.T) {
 }
 
 func TestDiff_SequenceUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Sequences: []model.Sequence{{
@@ -2770,6 +2864,7 @@ func TestDiff_SequenceUnchanged(t *testing.T) {
 }
 
 func TestCompositeTypeAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
@@ -2792,6 +2887,7 @@ func TestCompositeTypeAdded(t *testing.T) {
 }
 
 func TestCompositeTypeRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{}
 	actual := &model.Schema{
 		CompositeTypes: []model.CompositeType{
@@ -2810,6 +2906,7 @@ func TestCompositeTypeRemoved(t *testing.T) {
 }
 
 func TestCompositeTypeFieldAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
@@ -2844,6 +2941,7 @@ func TestCompositeTypeFieldAdded(t *testing.T) {
 }
 
 func TestCompositeTypeFieldRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
@@ -2870,6 +2968,7 @@ func TestCompositeTypeFieldRemoved(t *testing.T) {
 }
 
 func TestCompositeTypeFieldTypeChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
@@ -2905,6 +3004,7 @@ func TestCompositeTypeFieldTypeChanged(t *testing.T) {
 }
 
 func TestCompositeTypeUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
@@ -2920,6 +3020,7 @@ func TestCompositeTypeUnchanged(t *testing.T) {
 }
 
 func TestCompositeTypeCommentChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Fields: []model.CompositeField{
@@ -2948,6 +3049,7 @@ func TestCompositeTypeCommentChanged(t *testing.T) {
 }
 
 func TestCompositeTypeSchemaQualified(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		CompositeTypes: []model.CompositeType{
 			{Name: "address", Schema: "custom", Fields: []model.CompositeField{
@@ -2963,6 +3065,7 @@ func TestCompositeTypeSchemaQualified(t *testing.T) {
 }
 
 func TestFunctionAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric", Body: "BEGIN RETURN amount * 0.1; END;"},
@@ -2979,6 +3082,7 @@ func TestFunctionAdded(t *testing.T) {
 }
 
 func TestFunctionRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{}
 	actual := &model.Schema{
 		Functions: []model.Function{
@@ -2995,6 +3099,7 @@ func TestFunctionRemoved(t *testing.T) {
 }
 
 func TestFunctionBodyChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
@@ -3023,6 +3128,7 @@ func TestFunctionBodyChanged(t *testing.T) {
 }
 
 func TestFunctionSignatureChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{Name: "calculate_tax", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
@@ -3051,6 +3157,7 @@ func TestFunctionSignatureChanged(t *testing.T) {
 }
 
 func TestFunctionReturnTypeChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{Name: "get_name", Schema: "public", Language: "sql", ReturnType: "text",
@@ -3077,6 +3184,7 @@ func TestFunctionReturnTypeChanged(t *testing.T) {
 }
 
 func TestFunctionArgDefaultOnly(t *testing.T) {
+	testenv.Isolate(t)
 	// Changing only arg defaults should set ArgsChanged but NOT SignatureChanged.
 	desired := &model.Schema{
 		Functions: []model.Function{
@@ -3106,6 +3214,7 @@ func TestFunctionArgDefaultOnly(t *testing.T) {
 }
 
 func TestFunctionIdenticalNoDiff(t *testing.T) {
+	testenv.Isolate(t)
 	fn := model.Function{
 		Name: "calc", Schema: "public", Language: "plpgsql", ReturnType: "numeric",
 		Args: []model.FunctionArg{{Name: "a", Type: typeinfo.T("numeric")}},
@@ -3119,6 +3228,7 @@ func TestFunctionIdenticalNoDiff(t *testing.T) {
 }
 
 func TestFunctionSummary(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		FunctionsAdded:   []string{"fn1"},
 		FunctionsRemoved: []string{"fn2"},
@@ -3137,6 +3247,7 @@ func TestFunctionSummary(t *testing.T) {
 }
 
 func TestDomainAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Domains: []model.Domain{
 			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9-]+$'"},
@@ -3153,6 +3264,7 @@ func TestDomainAdded(t *testing.T) {
 }
 
 func TestDomainRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{}
 	actual := &model.Schema{
 		Domains: []model.Domain{
@@ -3169,6 +3281,7 @@ func TestDomainRemoved(t *testing.T) {
 }
 
 func TestDomainCheckChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Domains: []model.Domain{
 			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9_-]+$'"},
@@ -3199,6 +3312,7 @@ func TestDomainCheckChanged(t *testing.T) {
 }
 
 func TestDomainDefaultChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Domains: []model.Domain{
 			{Name: "counter", Schema: "public", BaseType: typeinfo.T("int8"), Default: "1"},
@@ -3226,6 +3340,7 @@ func TestDomainDefaultChanged(t *testing.T) {
 }
 
 func TestDomainNotNullChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Domains: []model.Domain{
 			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), NotNull: true},
@@ -3253,6 +3368,7 @@ func TestDomainNotNullChanged(t *testing.T) {
 }
 
 func TestDomainUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Domains: []model.Domain{
 			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Check: "VALUE ~ '^[a-z0-9-]+$'"},
@@ -3265,6 +3381,7 @@ func TestDomainUnchanged(t *testing.T) {
 }
 
 func TestDomainSchemaQualified(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Domains: []model.Domain{
 			{Name: "slug", Schema: "custom", BaseType: typeinfo.T("text")},
@@ -3278,6 +3395,7 @@ func TestDomainSchemaQualified(t *testing.T) {
 }
 
 func TestDomainCommentChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Domains: []model.Domain{
 			{Name: "slug", Schema: "public", BaseType: typeinfo.T("text"), Comment: "URL-safe identifier"},
@@ -3302,6 +3420,7 @@ func TestDomainCommentChanged(t *testing.T) {
 }
 
 func TestDomainBaseTypeChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Domains: []model.Domain{
 			{Name: "counter", Schema: "public", BaseType: typeinfo.T("int8")},
@@ -3329,6 +3448,7 @@ func TestDomainBaseTypeChanged(t *testing.T) {
 }
 
 func TestTriggerAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "orders", Schema: "public", Triggers: []model.Trigger{
@@ -3358,6 +3478,7 @@ func TestTriggerAdded(t *testing.T) {
 }
 
 func TestTriggerRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "orders", Schema: "public"},
@@ -3381,6 +3502,7 @@ func TestTriggerRemoved(t *testing.T) {
 }
 
 func TestTriggerChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "orders", Schema: "public", Triggers: []model.Trigger{
@@ -3416,6 +3538,7 @@ func TestTriggerChanged(t *testing.T) {
 }
 
 func TestTriggerUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name: "audit_insert", Function: "audit_fn", Events: []string{"INSERT"},
 		Timing: "AFTER", ForEach: "ROW",
@@ -3439,6 +3562,7 @@ func TestTriggerUnchanged(t *testing.T) {
 func int64Ptr(v int64) *int64 { return &v }
 
 func TestSequenceFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		SequencesAdded:   []string{"order_seq"},
 		SequencesRemoved: []string{"old_seq"},
@@ -3469,6 +3593,7 @@ func TestSequenceFormatTerminal(t *testing.T) {
 }
 
 func TestFunctionFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		FunctionsAdded:   []string{"new_fn"},
 		FunctionsRemoved: []string{"old_fn"},
@@ -3499,6 +3624,7 @@ func TestFunctionFormatTerminal(t *testing.T) {
 }
 
 func TestExclusionFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -3520,6 +3646,7 @@ func TestExclusionFormatTerminal(t *testing.T) {
 }
 
 func TestTriggerFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -3553,6 +3680,7 @@ func TestTriggerFormatTerminal(t *testing.T) {
 }
 
 func TestCollationFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -3574,6 +3702,7 @@ func TestCollationFormatTerminal(t *testing.T) {
 }
 
 func TestStatisticsFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -3595,6 +3724,7 @@ func TestStatisticsFormatTerminal(t *testing.T) {
 }
 
 func TestPolicyAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Policies: []model.Policy{
@@ -3624,6 +3754,7 @@ func TestPolicyAdded(t *testing.T) {
 }
 
 func TestPolicyRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public"},
@@ -3647,6 +3778,7 @@ func TestPolicyRemoved(t *testing.T) {
 }
 
 func TestPolicyChanged_UsingChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Policies: []model.Policy{
@@ -3682,6 +3814,7 @@ func TestPolicyChanged_UsingChanged(t *testing.T) {
 }
 
 func TestPolicyChanged_TypeChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Policies: []model.Policy{
@@ -3710,6 +3843,7 @@ func TestPolicyChanged_TypeChanged(t *testing.T) {
 }
 
 func TestPolicyChanged_RoleChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Policies: []model.Policy{
@@ -3738,6 +3872,7 @@ func TestPolicyChanged_RoleChanged(t *testing.T) {
 }
 
 func TestPolicyChanged_WithCheckChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Policies: []model.Policy{
@@ -3766,6 +3901,7 @@ func TestPolicyChanged_WithCheckChanged(t *testing.T) {
 }
 
 func TestPolicyChanged_MultipleFields(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", Policies: []model.Policy{
@@ -3807,6 +3943,7 @@ func TestPolicyChanged_MultipleFields(t *testing.T) {
 }
 
 func TestPolicyUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	pol := model.Policy{
 		Name: "users_select", Type: "PERMISSIVE", Operation: "SELECT",
 		Role: "app", Using: "id = current_user_id()",
@@ -3828,6 +3965,7 @@ func TestPolicyUnchanged(t *testing.T) {
 }
 
 func TestEnableRLSChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", EnableRLS: true},
@@ -3852,6 +3990,7 @@ func TestEnableRLSChanged(t *testing.T) {
 }
 
 func TestForceRLSChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", ForceRLS: true},
@@ -3876,6 +4015,7 @@ func TestForceRLSChanged(t *testing.T) {
 }
 
 func TestEnableRLSUnchanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "users", Schema: "public", EnableRLS: true},
@@ -3893,6 +4033,7 @@ func TestEnableRLSUnchanged(t *testing.T) {
 }
 
 func TestPolicyFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -3930,6 +4071,7 @@ func TestPolicyFormatTerminal(t *testing.T) {
 }
 
 func TestRLSFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -3949,6 +4091,7 @@ func TestRLSFormatTerminal(t *testing.T) {
 }
 
 func TestPolicySummary(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		TablesChanged: []TableDiff{
 			{
@@ -3972,6 +4115,7 @@ func TestPolicySummary(t *testing.T) {
 // --- State machine transition diff tests ---
 
 func TestSMTransitionAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		StateMachineTransitions: []model.SMTransitionMap{
 			{
@@ -4018,6 +4162,7 @@ func TestSMTransitionAdded(t *testing.T) {
 }
 
 func TestSMTransitionRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		StateMachineTransitions: []model.SMTransitionMap{
 			{
@@ -4058,6 +4203,7 @@ func TestSMTransitionRemoved(t *testing.T) {
 }
 
 func TestSMStateAddedShowsInEnumDiff(t *testing.T) {
+	testenv.Isolate(t)
 	// When a state is added, it shows up in the enum diff path as a new value.
 	// The SM transition diff only tracks transition edge changes.
 	desired := &model.Schema{
@@ -4114,6 +4260,7 @@ func TestSMStateAddedShowsInEnumDiff(t *testing.T) {
 }
 
 func TestSMNoChange(t *testing.T) {
+	testenv.Isolate(t)
 	smt := model.SMTransitionMap{
 		TypeName: "order_status",
 		Transitions: map[string][]string{
@@ -4138,6 +4285,7 @@ func TestSMNoChange(t *testing.T) {
 }
 
 func TestSMTransitionDiffSummary(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		SMTransitionsChanged: []SMTransitionDiff{
 			{TypeName: "order_status"},
@@ -4150,6 +4298,7 @@ func TestSMTransitionDiffSummary(t *testing.T) {
 }
 
 func TestSMTransitionFormatTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	d := &SchemaDiff{
 		SMTransitionsChanged: []SMTransitionDiff{
 			{
@@ -4176,6 +4325,7 @@ func TestSMTransitionFormatTerminal(t *testing.T) {
 }
 
 func TestPhantomDiffPrevention_SMTriggerFiltered(t *testing.T) {
+	testenv.Isolate(t)
 	// If a table has an _pgdesign_sm_ trigger in both desired and actual
 	// with different contents, it should NOT appear in the trigger diff
 	// because SM triggers are managed by the SM diff path.
@@ -4252,6 +4402,7 @@ func TestPhantomDiffPrevention_SMTriggerFiltered(t *testing.T) {
 }
 
 func TestPhantomDiffPrevention_SMTriggerOnlyInActual(t *testing.T) {
+	testenv.Isolate(t)
 	// An _pgdesign_sm_ trigger only in actual should not appear as removed.
 	desired := &model.Schema{
 		Tables: []model.Table{
@@ -4288,6 +4439,7 @@ func TestPhantomDiffPrevention_SMTriggerOnlyInActual(t *testing.T) {
 }
 
 func TestDefaultPrecisionNoDiff(t *testing.T) {
+	testenv.Isolate(t)
 	// timestamp without explicit precision is equivalent to timestamp(6).
 	// This should produce NO diff.
 	desired := &model.Schema{
@@ -4311,6 +4463,7 @@ func TestDefaultPrecisionNoDiff(t *testing.T) {
 }
 
 func TestNonDefaultPrecisionDiff(t *testing.T) {
+	testenv.Isolate(t)
 	// timestamp vs timestamp(3) is a real diff (3 is not the default).
 	desired := &model.Schema{
 		Tables: []model.Table{
@@ -4337,6 +4490,7 @@ func TestNonDefaultPrecisionDiff(t *testing.T) {
 }
 
 func TestNumericArbitraryVsSpecificDiff(t *testing.T) {
+	testenv.Isolate(t)
 	// numeric (no params) vs numeric(10,2) is a real diff.
 	// Arbitrary precision is NOT the same as specific precision.
 	desired := &model.Schema{
@@ -4364,6 +4518,7 @@ func TestNumericArbitraryVsSpecificDiff(t *testing.T) {
 }
 
 func TestBitDefaultLengthNoDiff(t *testing.T) {
+	testenv.Isolate(t)
 	// bit without explicit length is equivalent to bit(1).
 	// This should produce NO diff.
 	desired := &model.Schema{
@@ -4387,6 +4542,7 @@ func TestBitDefaultLengthNoDiff(t *testing.T) {
 }
 
 func TestVarcharUnlimitedVsLimitedDiff(t *testing.T) {
+	testenv.Isolate(t)
 	// varchar (no length) vs varchar(255) is a real diff.
 	// Unlimited length is NOT the same as 255.
 	desired := &model.Schema{
@@ -4414,6 +4570,7 @@ func TestVarcharUnlimitedVsLimitedDiff(t *testing.T) {
 }
 
 func TestPartmanChildrenExcludedFromDrift(t *testing.T) {
+	testenv.Isolate(t)
 	// When a table in the actual schema is a partman-managed child, it should
 	// not appear in TablesRemoved even though it's absent from desired.
 	desired := &model.Schema{
@@ -4443,6 +4600,7 @@ func TestPartmanChildrenExcludedFromDrift(t *testing.T) {
 }
 
 func TestNonPartmanChildrenStillFlagged(t *testing.T) {
+	testenv.Isolate(t)
 	// Non-partman tables that exist in actual but not desired should still be flagged.
 	desired := &model.Schema{
 		Tables: []model.Table{
@@ -4468,6 +4626,7 @@ func TestNonPartmanChildrenStillFlagged(t *testing.T) {
 }
 
 func TestMaintenanceDiff_RetentionChange(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name: "events", Schema: "public",
@@ -4509,6 +4668,7 @@ func TestMaintenanceDiff_RetentionChange(t *testing.T) {
 }
 
 func TestMaintenanceDiff_IntervalChange(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name: "events", Schema: "public",
@@ -4544,6 +4704,7 @@ func TestMaintenanceDiff_IntervalChange(t *testing.T) {
 }
 
 func TestMaintenanceDiff_PremakeChange(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name: "events", Schema: "public",
@@ -4579,18 +4740,19 @@ func TestMaintenanceDiff_PremakeChange(t *testing.T) {
 }
 
 func TestMaintenanceDiff_NoChange(t *testing.T) {
+	testenv.Isolate(t)
 	mc := &model.MaintenanceConfig{Interval: "1 month", Premake: 4, Retention: "6 months"}
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name: "events", Schema: "public",
-			Columns:    []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Columns:     []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
 			Maintenance: mc,
 		}},
 	}
 	actual := &model.Schema{
 		Tables: []model.Table{{
 			Name: "events", Schema: "public",
-			Columns:    []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
+			Columns:     []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}},
 			Maintenance: &model.MaintenanceConfig{Interval: "1 month", Premake: 4, Retention: "6 months"},
 		}},
 	}
@@ -4605,6 +4767,7 @@ func TestMaintenanceDiff_NoChange(t *testing.T) {
 // setup, NOT as an interval change. Initial setup emits create_parent; only a
 // change between two existing configs can be an interval change (hard error).
 func TestMaintenanceDiff_InitialSetup(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name: "events", Schema: "public",

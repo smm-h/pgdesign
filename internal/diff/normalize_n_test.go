@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -18,6 +19,7 @@ func schemaWith(t model.Table) *model.Schema {
 // 'active' as equal — silently MISSING real drift. Under N, literal defaults
 // compare case-sensitively, so the drift is reported.
 func TestMissedDriftDefaultCaseSensitive(t *testing.T) {
+	testenv.Isolate(t)
 	desired := schemaWith(model.Table{
 		Name: "users", Schema: "public",
 		Columns: []model.Column{
@@ -47,6 +49,7 @@ func TestMissedDriftDefaultCaseSensitive(t *testing.T) {
 // parens, whitespace, != vs <>). Under N these converge and no drift is
 // reported.
 func TestFalseDriftCheckExpr(t *testing.T) {
+	testenv.Isolate(t)
 	desired := schemaWith(model.Table{
 		Name: "products", Schema: "public",
 		Columns: []model.Column{{Name: "price", PGType: typeinfo.T("int4"), NotNull: true}},
@@ -66,6 +69,7 @@ func TestFalseDriftCheckExpr(t *testing.T) {
 // TestFalseDriftPolicyExpr covers the policy USING/WITH CHECK false-drift class
 // (!= vs <> is catalog-independent and N-convergent).
 func TestFalseDriftPolicyExpr(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func(using string) model.Table {
 		return model.Table{
 			Name: "docs", Schema: "public",
@@ -86,6 +90,7 @@ func TestFalseDriftPolicyExpr(t *testing.T) {
 // TestFalseDriftIndexPredicate covers the partial-index predicate false-drift
 // class (IN vs = ANY(ARRAY[...]) is catalog-independent and N-convergent).
 func TestFalseDriftIndexPredicate(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func(where string) model.Table {
 		return model.Table{
 			Name: "events", Schema: "public",
@@ -109,6 +114,7 @@ func TestFalseDriftIndexPredicate(t *testing.T) {
 // comes back NAMEDATALEN-truncated (63 bytes). Exact name matching sees them as
 // distinct (a false drop+add); truncation-aware matching pairs them.
 func TestNamedatalenTruncationMatch(t *testing.T) {
+	testenv.Isolate(t)
 	longName := "products_price_must_be_strictly_positive_and_within_reasonable_bounds_check" // > 63 bytes
 	if len(longName) <= 63 {
 		t.Fatalf("test fixture name must exceed 63 bytes, got %d", len(longName))
@@ -149,6 +155,7 @@ func (f *fakeLiveNormalizer) NormalizeExprForTable(schema, table, expr string) s
 // that plain Diff (no normalizer) is unaffected (identity never consumes
 // round-trip output).
 func TestDiffLiveNormalizesDesiredSide(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func(expr string) *model.Schema {
 		return schemaWith(model.Table{
 			Name: "t", Schema: "public",
@@ -156,8 +163,8 @@ func TestDiffLiveNormalizesDesiredSide(t *testing.T) {
 			Checks:  []model.CheckConstraint{{Name: "c", Expr: expr}},
 		})
 	}
-	desired := mk("state = 'x'")           // TOML form
-	actual := mk("state = 'x'::text")      // PG-introspected form
+	desired := mk("state = 'x'")      // TOML form
+	actual := mk("state = 'x'::text") // PG-introspected form
 
 	// Pure diff: N alone cannot reach the ::text residue, so drift is reported.
 	if Diff(desired, actual).IsEmpty() {

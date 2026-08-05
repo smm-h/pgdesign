@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 // TestSyntheticPrefixEdgeID: distinct per version, deterministic across calls.
 func TestSyntheticPrefixEdgeID(t *testing.T) {
+	testenv.Isolate(t)
 	a1 := syntheticPrefixEdgeID("0.1.0")
 	a2 := syntheticPrefixEdgeID("0.1.0")
 	b := syntheticPrefixEdgeID("0.2.0")
@@ -26,6 +28,7 @@ func TestSyntheticPrefixEdgeID(t *testing.T) {
 // its objects, and its to-revision manifest, and the consistency checker passes
 // over the written store (no database needed).
 func TestWriteChainFilesConsistencyGreen(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -66,6 +69,7 @@ func TestWriteChainFilesConsistencyGreen(t *testing.T) {
 // clean, a modified file is dirty (refusal), and a non-repo path is a caveat
 // (proceeds).
 func TestCheckCleanSchemaFiles(t *testing.T) {
+	testenv.Isolate(t)
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

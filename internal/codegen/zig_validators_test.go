@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestZigValidatorGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -97,6 +99,7 @@ func TestZigValidatorGenerator_Generate(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_NoPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 		Tables: []model.Table{
@@ -120,6 +123,7 @@ func TestZigValidatorGenerator_NoPolicies(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_OwnershipPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -166,6 +170,7 @@ func TestZigValidatorGenerator_OwnershipPattern(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_DualPrivacyPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -206,6 +211,7 @@ func TestZigValidatorGenerator_DualPrivacyPattern(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_DualPrivacyDifferentTables(t *testing.T) {
+	testenv.Isolate(t)
 	// RED test: dual EXISTS referencing DIFFERENT tables exposes the bug where
 	// the second query reuses the first lookup's tableParts instead of its own.
 	schema := &model.Schema{
@@ -262,6 +268,7 @@ func TestZigValidatorGenerator_DualPrivacyDifferentTables(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_NonGamehomeNaming(t *testing.T) {
+	testenv.Isolate(t)
 	// RED test: uses non-gamehome naming to expose the hardcoded "player_id" bug.
 	// The generators should use the joinColumn from the AST ("user_id"), not
 	// a hardcoded "player_id".
@@ -312,6 +319,7 @@ func TestZigValidatorGenerator_NonGamehomeNaming(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_OrCompound_OwnershipOrExists(t *testing.T) {
+	testenv.Isolate(t)
 	// OR-compound policy: ownership OR exists-lookup.
 	// "Show message if you own it OR the author's profile is public."
 	schema := &model.Schema{
@@ -382,6 +390,7 @@ func TestZigValidatorGenerator_OrCompound_OwnershipOrExists(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_LeftSideCurrentSetting(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -425,6 +434,7 @@ func TestZigValidatorGenerator_LeftSideCurrentSetting(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_UnparsableExpression(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -468,6 +478,7 @@ func TestZigValidatorGenerator_UnparsableExpression(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_NotExistsPattern(t *testing.T) {
+	testenv.Isolate(t)
 	// RED test: NOT EXISTS should invert the privacy check logic.
 	// Currently, detectAllExistsLookups finds the ExistsExpr inside the
 	// UnaryOp{Op:"NOT"} wrapper but does not propagate the negation.
@@ -534,6 +545,7 @@ func TestZigValidatorGenerator_NotExistsPattern(t *testing.T) {
 }
 
 func TestZigValidatorGenerator_MultipleFlagColumns(t *testing.T) {
+	testenv.Isolate(t)
 	// RED test: EXISTS subquery with two flag conditions should check both flags.
 	// Currently, analyzeExistsWhere uses a single `var flagCol string` that gets
 	// overwritten by the loop, so only the last flag column is retained.

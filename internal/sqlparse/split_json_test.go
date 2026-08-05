@@ -2,6 +2,7 @@ package sqlparse
 
 import (
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
@@ -15,6 +16,7 @@ type splitJSONPayload struct {
 // TestSplitStatementsToJSON verifies that SplitStatements output can be
 // marshaled to the versioned .split.json format used by the build handler.
 func TestSplitStatementsToJSON(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("multi-statement DDL", func(t *testing.T) {
 		ddl := "CREATE TABLE t (id int);\nCREATE INDEX idx ON t (id);"
 		stmts, err := SplitStatements(ddl)

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"sort"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 // order the tables, and rebuild the derived structures — the exact postcondition
 // introspected schemas rely on (Introspect calls Canonicalize before returning).
 func TestCanonicalize_SortsUnsortedSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &Schema{
 		Name:       "shop",
 		Extensions: []string{"pgcrypto", "btree_gist"},
@@ -114,6 +116,7 @@ func twoTableRawWithGroups() *parse.RawSchema {
 // verbatim, so a filtered schema carried stale edges pointing at (or from)
 // tables that were filtered out.
 func TestFilterByGroups_RebuildsFKGraph(t *testing.T) {
+	testenv.Isolate(t)
 	schema, diags := Build(twoTableRawWithGroups(), testRegistry())
 	if diags.HasErrors() {
 		t.Fatalf("unexpected errors: %v", diags)
@@ -142,6 +145,7 @@ func TestFilterByGroups_RebuildsFKGraph(t *testing.T) {
 // schema (public.entry and archive.entry), and the filtered graph carries both
 // per-schema FK edges without collision.
 func TestFilterByGroups_TwoSchemasBareToQualified(t *testing.T) {
+	testenv.Isolate(t)
 	s := &Schema{
 		Tables: []Table{
 			{Name: "account", Schema: "public", Comment: "a", PK: []string{"id"},
@@ -191,6 +195,7 @@ func tableKeys(tables []Table) []string {
 // source-file filter path. Each table lives in its own source file so the
 // filter can isolate one.
 func TestFilterBySource_RebuildsFKGraph(t *testing.T) {
+	testenv.Isolate(t)
 	usersRaw := &parse.RawSchema{
 		Meta:       parse.RawMeta{Schema: "public"},
 		SourceFile: "users.toml",
@@ -237,6 +242,7 @@ func TestFilterBySource_RebuildsFKGraph(t *testing.T) {
 // order regardless of input order. We Canonicalize two schemas whose transition
 // slices are reverse-permuted and assert the canonical orders coincide.
 func TestCanonicalize_SMTransitionTieBreakDeterministic(t *testing.T) {
+	testenv.Isolate(t)
 	// Two transitions identical except in Requires, plus two identical except in
 	// Comment. Without Requires/Comment in the sort key these tie and sort
 	// nondeterministically.

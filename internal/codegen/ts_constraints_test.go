@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestTSConstraintsGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Enums: []model.Enum{
@@ -112,6 +114,7 @@ func TestTSConstraintsGenerator_Generate(t *testing.T) {
 }
 
 func TestTSConstraintsGenerator_ILIKEPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -147,6 +150,7 @@ func TestTSConstraintsGenerator_ILIKEPattern(t *testing.T) {
 }
 
 func TestTSConstraintsGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 	}
@@ -167,6 +171,7 @@ func TestTSConstraintsGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestTSConstraintsGenerator_NoConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

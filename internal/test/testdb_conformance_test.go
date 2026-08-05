@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -66,6 +67,7 @@ func conformanceManager(t *testing.T) *testdb.Manager {
 // TestConformanceGo verifies the Go engine creates an ephemeral database with
 // the conformance fixture DDL, proves the table exists, and cleans up on drop.
 func TestConformanceGo(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := conformanceManager(t)
@@ -113,6 +115,7 @@ func TestConformanceGo(t *testing.T) {
 // TestConformanceIsolation proves that two ephemeral databases created from the
 // same fixture do not share state.
 func TestConformanceIsolation(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := conformanceManager(t)
@@ -166,6 +169,7 @@ func TestConformanceIsolation(t *testing.T) {
 // TestConformanceGoCleanup verifies that SetupForTest's cleanup actually drops
 // the ephemeral database after the subtest exits.
 func TestConformanceGoCleanup(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := conformanceManager(t)
@@ -236,6 +240,7 @@ func swapToMaintenance(connURL string) string {
 // TestConformancePython renders the Python wrapper template, writes a pytest
 // test file, and runs it against a real Postgres instance.
 func TestConformancePython(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 
 	if _, err := exec.LookPath("python3"); err != nil {
@@ -312,6 +317,7 @@ def test_column_count(pgdesign_db):
 // TestConformanceTypeScript renders the TypeScript wrapper template, writes a
 // test script, and runs it against a real Postgres instance.
 func TestConformanceTypeScript(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 
 	if _, err := exec.LookPath("node"); err != nil {
@@ -435,6 +441,7 @@ main().catch(e => { console.error(e); process.exit(1); });
 // TestConformanceJava renders the Java wrapper template, writes a Gradle
 // project with a JUnit 5 test, and runs it against a real Postgres instance.
 func TestConformanceJava(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 
 	if _, err := exec.LookPath("java"); err != nil {
@@ -551,6 +558,7 @@ tasks.test { useJUnitPlatform() }
 // TestConformanceKotlin renders the Kotlin wrapper template, writes a Gradle
 // project with a JUnit 5 test, and runs it against a real Postgres instance.
 func TestConformanceKotlin(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 
 	if _, err := exec.LookPath("java"); err != nil {
@@ -665,6 +673,7 @@ tasks.test { useJUnitPlatform() }
 // rendered without error. Full build+run conformance requires zig and the
 // pg.zig dependency to be available, which is not typical in CI.
 func TestConformanceZig(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 
 	if _, err := exec.LookPath("zig"); err != nil {

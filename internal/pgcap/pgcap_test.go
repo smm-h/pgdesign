@@ -1,6 +1,9 @@
 package pgcap
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 // allCapabilities enumerates every Capability constant so tests stay
 // exhaustive when new capabilities are added.
@@ -18,6 +21,7 @@ var allCapabilities = []Capability{
 }
 
 func TestRegistryCompleteness(t *testing.T) {
+	testenv.Isolate(t)
 	for _, cap := range allCapabilities {
 		info, ok := registry[cap]
 		if !ok {
@@ -37,6 +41,7 @@ func TestRegistryCompleteness(t *testing.T) {
 }
 
 func TestNoDuplicateCapabilities(t *testing.T) {
+	testenv.Isolate(t)
 	seen := make(map[Capability]bool)
 	for _, cap := range allCapabilities {
 		if seen[cap] {
@@ -51,6 +56,7 @@ func TestNoDuplicateCapabilities(t *testing.T) {
 }
 
 func TestHasBoundary(t *testing.T) {
+	testenv.Isolate(t)
 	for _, cap := range allCapabilities {
 		info := registry[cap]
 		min := info.MinVersion
@@ -71,6 +77,7 @@ func TestHasBoundary(t *testing.T) {
 }
 
 func TestHasVersionZero(t *testing.T) {
+	testenv.Isolate(t)
 	for _, cap := range allCapabilities {
 		if Has(0, cap) {
 			info := registry[cap]
@@ -81,6 +88,7 @@ func TestHasVersionZero(t *testing.T) {
 }
 
 func TestMinVersion(t *testing.T) {
+	testenv.Isolate(t)
 	expected := map[Capability]int{
 		IdentityColumns:        10,
 		RestrictiveRLS:         10,
@@ -102,6 +110,7 @@ func TestMinVersion(t *testing.T) {
 }
 
 func TestAllSortedByMinVersion(t *testing.T) {
+	testenv.Isolate(t)
 	all := All()
 	if len(all) != len(registry) {
 		t.Fatalf("All() returned %d items, want %d", len(all), len(registry))

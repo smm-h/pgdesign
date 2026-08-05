@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -14,6 +15,7 @@ import (
 // synthesizing a genesis edge from introspection and stamping a baseline boundary
 // (roadmap 5.10). Re-running is an idempotent no-op.
 func TestBaselineChainAdoptsForeignDatabase(t *testing.T) {
+	testenv.Isolate(t)
 	edb := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, edb.URL)

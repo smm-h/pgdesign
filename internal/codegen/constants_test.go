@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -45,6 +46,7 @@ func testSchema() *model.Schema {
 }
 
 func TestPythonConstantsGenerator(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	gen := &PythonConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -127,6 +129,7 @@ func TestPythonConstantsGenerator(t *testing.T) {
 }
 
 func TestZigConstantsGenerator(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	gen := &ZigConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -209,6 +212,7 @@ func TestZigConstantsGenerator(t *testing.T) {
 }
 
 func TestGoConstantsGenerator(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	gen := &GoConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -291,6 +295,7 @@ func TestGoConstantsGenerator(t *testing.T) {
 }
 
 func TestGoConstantsGenerator_NoSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -322,6 +327,7 @@ func TestGoConstantsGenerator_NoSchema(t *testing.T) {
 }
 
 func TestPythonConstantsGenerator_NoSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -356,6 +362,7 @@ func TestPythonConstantsGenerator_NoSchema(t *testing.T) {
 }
 
 func TestTSConstantsGenerator(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	gen := &TSConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -438,6 +445,7 @@ func TestTSConstantsGenerator(t *testing.T) {
 }
 
 func TestTSConstantsGenerator_NoSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -472,6 +480,7 @@ func TestTSConstantsGenerator_NoSchema(t *testing.T) {
 }
 
 func TestJavaConstantsGenerator(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	gen := &JavaConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -554,6 +563,7 @@ func TestJavaConstantsGenerator(t *testing.T) {
 }
 
 func TestJavaConstantsGenerator_NoSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -588,6 +598,7 @@ func TestJavaConstantsGenerator_NoSchema(t *testing.T) {
 }
 
 func TestKotlinConstantsGenerator(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	gen := &KotlinConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -675,6 +686,7 @@ func TestKotlinConstantsGenerator(t *testing.T) {
 }
 
 func TestKotlinConstantsGenerator_NoSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -709,6 +721,7 @@ func TestKotlinConstantsGenerator_NoSchema(t *testing.T) {
 }
 
 func TestZigConstantsGenerator_NoSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

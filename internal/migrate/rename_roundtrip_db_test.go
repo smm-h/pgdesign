@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -62,6 +63,7 @@ func usersEmail() *model.Schema {
 // renames email_addr -> email preserving the table; a single-step rollback
 // reverses the rename, restoring email_addr. No data-loss drop+create anywhere.
 func TestChainRenameColumnRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -135,4 +137,3 @@ func TestChainRenameColumnRoundTrip(t *testing.T) {
 		t.Error("after rollback, users.email must be gone")
 	}
 }
-

@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -81,6 +82,7 @@ func threeEdgeChain(t *testing.T) (*ChainProject, *model.Schema, *model.Schema, 
 // edge, retires the originals INTACT to archive/, keeps the chain consistent, and
 // the path-finder resolves genesis -> head through the consolidation.
 func TestSquashChainConsolidation(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, _, _, r1, _, r3 := threeEdgeChain(t)
 
 	res, err := SquashChain(p, r1.String(), r3.String(), "")
@@ -152,6 +154,7 @@ func TestSquashChainConsolidation(t *testing.T) {
 // lands — definitional under concatenation. Assert equal rendered SQL sets and
 // (via the endpoint checker) equal final manifests, on the comprehensive fixture.
 func TestSquashChainCommutationSmoke(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, _, _, r1, _, r3 := threeEdgeChain(t)
 
 	// Rendered SQL of the sequence being squashed (the ordered range e2 ; e3),
@@ -211,6 +214,7 @@ func TestSquashChainCommutationSmoke(t *testing.T) {
 // down on the to-manifest reproduces the from-manifest (structural rollback
 // equivalence — L5's codomain is schema states, not data).
 func TestSquashChainRollbackEquivalenceStructural(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, _, _, r1, _, r3 := threeEdgeChain(t)
 
 	// Gather the range ops (e2 ; e3) before squashing to classify the down form.
@@ -256,6 +260,7 @@ func TestSquashChainRollbackEquivalenceStructural(t *testing.T) {
 // composed-recorded-downs form BY TYPE, and the DML op is preserved verbatim in
 // the consolidation edge (concatenation never drops or folds).
 func TestSquashChainDMLComposedDowns(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -312,6 +317,7 @@ func TestSquashChainDMLComposedDowns(t *testing.T) {
 // TestCheckConsolidationDisjoint: an overlapping superseded set is a hard error
 // naming the overlap (A6, enforced at creation).
 func TestCheckConsolidationDisjoint(t *testing.T) {
+	testenv.Isolate(t)
 	existing := Edge{
 		Slug: "c1", Consolidation: true,
 		SupersededEdgeIDs: []string{"aaaaaaaaaaaa1111", "bbbbbbbbbbbb2222"},
@@ -332,6 +338,7 @@ func TestCheckConsolidationDisjoint(t *testing.T) {
 
 // TestResolveSquashEndpoint covers the rev-or-edge reference forms.
 func TestResolveSquashEndpoint(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, _, _, r1, _, r3 := threeEdgeChain(t)
 	live, _ := p.LoadLiveEdges()
 
@@ -383,6 +390,7 @@ func TestResolveSquashEndpoint(t *testing.T) {
 // deletion): the consolidation carries the FULL op sequence, and the endpoint
 // checker confirms it reproduces the range's to-manifest.
 func TestSquashChainAddIndexDropReplay(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -444,6 +452,7 @@ func tableModelWithTmpIndex() *model.Schema {
 // TestSquashChainRejectsSingleEdge: a range spanning a single edge has nothing to
 // consolidate.
 func TestSquashChainRejectsSingleEdge(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, _, _, r1, r2, _ := threeEdgeChain(t)
 	_, err := SquashChain(p, r1.String(), r2.String(), "")
 	if err == nil {

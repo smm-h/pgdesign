@@ -2,6 +2,7 @@ package enc
 
 import (
 	"bytes"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/fd"
@@ -123,6 +124,7 @@ func intptr(i int) *int { return &i }
 // populates fields far beyond the increment-A generator. It also confirms every
 // object kind gets a manifest key.
 func TestRichRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 	objs1, err := EncodeObjects(s)
 	if err != nil {
@@ -167,6 +169,7 @@ func TestRichRoundTrip(t *testing.T) {
 // TestExclusionElementsAreSemantic: the exclusion element order is preserved
 // (SEMANTIC), never sorted. Reversing the elements yields different bytes.
 func TestExclusionElementsAreSemantic(t *testing.T) {
+	testenv.Isolate(t)
 	base := model.Table{Name: "t", Schema: "public", Comment: "c",
 		Columns: []model.Column{{Name: "id", PGType: typeinfo.Type{Base: "int4"}, NotNull: true}},
 		PK:      []string{"id"},
@@ -191,6 +194,7 @@ func TestExclusionElementsAreSemantic(t *testing.T) {
 // TestTriggerEventsAreCanonical: trigger events are a SET, so the encoder sorts
 // them — two event orderings converge to the same bytes.
 func TestTriggerEventsAreCanonical(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func(events []string) model.Trigger {
 		return model.Trigger{Name: "tr", Function: "f", Events: events, Timing: "BEFORE", ForEach: "ROW"}
 	}

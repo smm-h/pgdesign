@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"math/rand"
 	"regexp"
 	"strconv"
@@ -52,6 +53,7 @@ func testSchema() *model.Schema {
 }
 
 func TestGenerate_OrderAndStructure(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	out, _ := Generate(schema, 3, rng, nil)
@@ -90,6 +92,7 @@ func TestGenerate_OrderAndStructure(t *testing.T) {
 }
 
 func TestGenerate_SkipsGeneratedColumns(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	out, _ := Generate(schema, 3, rng, nil)
@@ -112,6 +115,7 @@ func TestGenerate_SkipsGeneratedColumns(t *testing.T) {
 }
 
 func TestGenerate_EnumValues(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	out, _ := Generate(schema, 10, rng, nil)
@@ -153,6 +157,7 @@ func TestGenerate_EnumValues(t *testing.T) {
 }
 
 func TestGenerate_FKReferences(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	out, _ := Generate(schema, 5, rng, nil)
@@ -206,6 +211,7 @@ func TestGenerate_FKReferences(t *testing.T) {
 }
 
 func TestGenerate_Deterministic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 
 	rng1 := rand.New(rand.NewSource(42))
@@ -220,6 +226,7 @@ func TestGenerate_Deterministic(t *testing.T) {
 }
 
 func TestGenerate_AllPGTypes(t *testing.T) {
+	testenv.Isolate(t)
 	// Every PG type the seed generator handles, each as a separate column.
 	// All are NOT NULL so NULL injection does not interfere.
 	pgTypes := []string{
@@ -455,6 +462,7 @@ func splitRow(row string) []string {
 }
 
 func TestGenerate_NullInjection(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -512,6 +520,7 @@ func TestGenerate_NullInjection(t *testing.T) {
 }
 
 func TestGenerate_NullNeverForNotNull(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -551,6 +560,7 @@ func TestGenerate_NullNeverForNotNull(t *testing.T) {
 }
 
 func TestGenerate_CheckRange(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -606,6 +616,7 @@ func TestGenerate_CheckRange(t *testing.T) {
 }
 
 func TestGenerate_CheckLength(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -657,6 +668,7 @@ func TestGenerate_CheckLength(t *testing.T) {
 }
 
 func TestGenerate_CheckRegex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -714,6 +726,7 @@ func TestGenerate_CheckRegex(t *testing.T) {
 }
 
 func TestGenerate_UniqueConstraint(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -763,6 +776,7 @@ func TestGenerate_UniqueConstraint(t *testing.T) {
 }
 
 func TestGenerate_ZipfFKDistribution(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -850,6 +864,7 @@ func TestGenerate_ZipfFKDistribution(t *testing.T) {
 }
 
 func TestGenerate_LogNormalMoney(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -917,6 +932,7 @@ func TestGenerate_LogNormalMoney(t *testing.T) {
 }
 
 func TestGenerate_ArrayPopulation(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -963,6 +979,7 @@ func TestGenerate_ArrayPopulation(t *testing.T) {
 }
 
 func TestGenerate_PerTableRowCount(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	cfg := &SeedConfig{
@@ -994,6 +1011,7 @@ func TestGenerate_PerTableRowCount(t *testing.T) {
 }
 
 func TestGenerate_FKCycleHandling(t *testing.T) {
+	testenv.Isolate(t)
 	// Two tables that reference each other (cycle).
 	schema := &model.Schema{
 		Name:        "public",
@@ -1055,6 +1073,7 @@ func TestGenerate_FKCycleHandling(t *testing.T) {
 }
 
 func TestGenerate_FKCycleNotNull(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:        "public",
 		CycleGroups: [][]string{{"alpha", "beta"}},
@@ -1103,6 +1122,7 @@ func TestGenerate_FKCycleNotNull(t *testing.T) {
 }
 
 func TestGenerate_JSONBWithSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -1140,6 +1160,7 @@ func TestGenerate_JSONBWithSchema(t *testing.T) {
 }
 
 func TestRegenFromPattern(t *testing.T) {
+	testenv.Isolate(t)
 	rng := rand.New(rand.NewSource(42))
 
 	tests := []struct {
@@ -1169,6 +1190,7 @@ func TestRegenFromPattern(t *testing.T) {
 }
 
 func TestGenerate_CopyFormat(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	cfg := &SeedConfig{Format: "copy"}
@@ -1254,6 +1276,7 @@ func TestGenerate_CopyFormat(t *testing.T) {
 }
 
 func TestGenerate_CopyFormat_SkipsSerialColumns(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -1292,6 +1315,7 @@ func TestGenerate_CopyFormat_SkipsSerialColumns(t *testing.T) {
 }
 
 func TestGenerate_BatchInsert(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -1318,6 +1342,7 @@ func TestGenerate_BatchInsert(t *testing.T) {
 }
 
 func TestGenerate_CleanFlag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	cfg := &SeedConfig{Clean: true}
@@ -1358,6 +1383,7 @@ func TestGenerate_CleanFlag(t *testing.T) {
 }
 
 func TestGenerate_EdgeCasesMode(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	cfg := &SeedConfig{Mode: "edge-cases"}
@@ -1434,6 +1460,7 @@ func TestGenerate_EdgeCasesMode(t *testing.T) {
 }
 
 func TestGenerate_TransactionWrapping(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	out, _ := Generate(schema, 3, rng, nil)
@@ -1466,6 +1493,7 @@ func TestGenerate_TransactionWrapping(t *testing.T) {
 }
 
 func TestGenerate_NoTransactionInApplyMode(t *testing.T) {
+	testenv.Isolate(t)
 	schema := testSchema()
 	rng := rand.New(rand.NewSource(42))
 	cfg := &SeedConfig{Apply: true}
@@ -1480,6 +1508,7 @@ func TestGenerate_NoTransactionInApplyMode(t *testing.T) {
 }
 
 func TestGenerate_CopyFormat_NullValues(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{

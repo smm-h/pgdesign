@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/rev"
@@ -13,6 +14,7 @@ import (
 // are orphaned (applied history keeps referencing archived edge_ids, which stay
 // resolvable).
 func TestSquashChainAppliedRangeResumeDB(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -119,6 +121,7 @@ func TestSquashChainAppliedRangeResumeDB(t *testing.T) {
 // post-squash chain, using the consolidation edge directly (genesis -> head is
 // shortest through it), and lands at the same head a sequential apply would.
 func TestSquashChainApplyFromGenesisViaConsolidationDB(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

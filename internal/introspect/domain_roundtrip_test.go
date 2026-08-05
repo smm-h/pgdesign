@@ -1,6 +1,7 @@
 package introspect
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -13,6 +14,7 @@ import (
 // domain's base type with the BARE domain name in DomainName, matching what the
 // TOML build produces.
 func TestApplyDomainTypes(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "public",
 		Domains: []model.Domain{

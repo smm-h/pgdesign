@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,6 +48,7 @@ func fixtureProject(t *testing.T) (*ChainProject, Edge, *model.Schema) {
 // TestEdgeWriteLoadRoundTrip: an edge writes to a content-derived filename and
 // loads back with a matching content id.
 func TestEdgeWriteLoadRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	name, err := p.WriteEdge(e)
 	if err != nil {
@@ -79,6 +81,7 @@ func TestEdgeWriteLoadRoundTrip(t *testing.T) {
 // TestEdgeFilenameTamperDetected: renaming an edge file to a wrong hash prefix
 // is a hard error at load (content-hash prefix mismatch).
 func TestEdgeFilenameTamperDetected(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	name, err := p.WriteEdge(e)
 	if err != nil {
@@ -97,6 +100,7 @@ func TestEdgeFilenameTamperDetected(t *testing.T) {
 // TestEdgeDownTamperDetected: corrupting an op's down cache is caught at load by
 // VerifyDown (amendment A3).
 func TestEdgeDownTamperDetected(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	name, err := p.WriteEdge(e)
 	if err != nil {
@@ -125,6 +129,7 @@ func TestEdgeDownTamperDetected(t *testing.T) {
 // TestRevisionManifestRoundTrip: a manifest writes and reads back key-for-key,
 // class-checked.
 func TestRevisionManifestRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, s := fixtureProject(t)
 	m, err := chain.BuildManifestInto(s, p.Store())
 	if err != nil {

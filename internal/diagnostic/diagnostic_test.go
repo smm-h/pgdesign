@@ -2,11 +2,13 @@ package diagnostic
 
 import (
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
 
 func TestHasErrors_WithErrors(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Warning, Code: "W001", Message: "a warning"},
 		{Severity: Error, Code: "E001", Message: "an error"},
@@ -17,6 +19,7 @@ func TestHasErrors_WithErrors(t *testing.T) {
 }
 
 func TestHasErrors_WithoutErrors(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Warning, Code: "W001", Message: "a warning"},
 		{Severity: Info, Code: "I001", Message: "info"},
@@ -28,6 +31,7 @@ func TestHasErrors_WithoutErrors(t *testing.T) {
 }
 
 func TestHasErrors_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	var diags Diagnostics
 	if diags.HasErrors() {
 		t.Fatal("expected HasErrors() to return false for empty diagnostics")
@@ -35,6 +39,7 @@ func TestHasErrors_Empty(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Error, Code: "E001", Message: "first error"},
 		{Severity: Warning, Code: "W001", Message: "a warning"},
@@ -54,6 +59,7 @@ func TestErrors(t *testing.T) {
 }
 
 func TestWarnings(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Error, Code: "E001", Message: "an error"},
 		{Severity: Warning, Code: "W001", Message: "first warning"},
@@ -73,6 +79,7 @@ func TestWarnings(t *testing.T) {
 }
 
 func TestRenderTerminal_NoColor(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{
 			Severity:   Error,
@@ -112,6 +119,7 @@ func TestRenderTerminal_NoColor(t *testing.T) {
 }
 
 func TestRenderTerminal_WithColor(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Error, Code: "E001", Message: "bad"},
 	}
@@ -128,6 +136,7 @@ func TestRenderTerminal_WithColor(t *testing.T) {
 }
 
 func TestRenderTerminal_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	output := RenderTerminal(Diagnostics{}, false)
 	if output != "" {
 		t.Errorf("expected empty string for empty diagnostics, got: %q", output)
@@ -135,6 +144,7 @@ func TestRenderTerminal_Empty(t *testing.T) {
 }
 
 func TestRenderTerminal_GroupedBySeverityAndFile(t *testing.T) {
+	testenv.Isolate(t)
 	// Diagnostics in deliberately scrambled order: mixed files and severities.
 	diags := Diagnostics{
 		{Severity: Warning, Code: "W001", File: "schema.toml", Table: "orders", Message: "missing index on orders"},
@@ -208,6 +218,7 @@ func TestRenderTerminal_GroupedBySeverityAndFile(t *testing.T) {
 }
 
 func TestRenderTerminal_DoesNotMutateInput(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Warning, File: "b.toml", Message: "second"},
 		{Severity: Error, File: "a.toml", Message: "first"},
@@ -223,6 +234,7 @@ func TestRenderTerminal_DoesNotMutateInput(t *testing.T) {
 }
 
 func TestRenderJSON(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{
 			Severity:   Error,
@@ -288,6 +300,7 @@ func TestRenderJSON(t *testing.T) {
 }
 
 func TestRenderJSON_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	output := RenderJSON(Diagnostics{})
 
 	var parsed []map[string]interface{}

@@ -1,6 +1,7 @@
 package sqlparse
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
@@ -9,6 +10,7 @@ import (
 // survey reports as normalizing FOR FREE (no explicit fold needed): quoting,
 // != <-> <>, whitespace/parens, function case, IS NULL forms.
 func TestNormalizeExpr_DeparseFreeFoldings(t *testing.T) {
+	testenv.Isolate(t)
 	pairs := [][2]string{
 		{"x != 5", "x <> 5"},
 		{"price > 0", "( price  >  0 )"},
@@ -26,6 +28,7 @@ func TestNormalizeExpr_DeparseFreeFoldings(t *testing.T) {
 // TestNormalizeExpr_CastAliasFolding pins the cast-type-name alias folding:
 // x::integer and x::int4 must converge (they diverge under raw deparse).
 func TestNormalizeExpr_CastAliasFolding(t *testing.T) {
+	testenv.Isolate(t)
 	cases := [][2]string{
 		{"x::integer", "x::int4"},
 		{"x::bigint", "x::int8"},
@@ -50,6 +53,7 @@ func TestNormalizeExpr_CastAliasFolding(t *testing.T) {
 // and equality holds FROM EITHER SIDE (the fold is symmetric by construction
 // because both sides run through N).
 func TestNormalizeExpr_FoldingSymmetry(t *testing.T) {
+	testenv.Isolate(t)
 	cases := [][2]string{
 		{"x IN (1, 2, 3)", "x = ANY(ARRAY[1, 2, 3])"},
 		{"status IN ('a', 'b')", "status = ANY(ARRAY['a', 'b'])"},
@@ -71,6 +75,7 @@ func TestNormalizeExpr_FoldingSymmetry(t *testing.T) {
 // corpus. (The model-side generated-corpus idempotence test lives in
 // golden_test.go; this one guards the primitive directly.)
 func TestNormalizeExpr_Idempotence(t *testing.T) {
+	testenv.Isolate(t)
 	corpus := []string{
 		"price > 0",
 		"x <> 5",
@@ -100,6 +105,7 @@ func TestNormalizeExpr_Idempotence(t *testing.T) {
 // TestNormalizeExpr_ParseFailureVerbatim pins the opaque-leaf behavior: an
 // unparseable expression is returned trimmed and unchanged, never an error.
 func TestNormalizeExpr_ParseFailureVerbatim(t *testing.T) {
+	testenv.Isolate(t)
 	cases := map[string]string{
 		"  garbage )( not sql  ": "garbage )( not sql",
 		"":                       "",

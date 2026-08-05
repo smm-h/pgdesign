@@ -1,6 +1,7 @@
 package sqlexpr
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
@@ -139,6 +140,7 @@ func assertCaseExpr(t *testing.T, node Node, whenCount int) *CaseExpr {
 }
 
 func TestParseLiterals(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("true", func(t *testing.T) {
 		node, err := Parse("true")
 		if err != nil {
@@ -173,6 +175,7 @@ func TestParseLiterals(t *testing.T) {
 }
 
 func TestParseColumnRefs(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("bare", func(t *testing.T) {
 		node, err := Parse("owner_id")
 		if err != nil {
@@ -199,6 +202,7 @@ func TestParseColumnRefs(t *testing.T) {
 }
 
 func TestParseComparisons(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("equals", func(t *testing.T) {
 		node, err := Parse("a = b")
 		if err != nil {
@@ -231,6 +235,7 @@ func TestParseComparisons(t *testing.T) {
 }
 
 func TestParseLogicalOps(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("NOT", func(t *testing.T) {
 		node, err := Parse("NOT x")
 		if err != nil {
@@ -289,6 +294,7 @@ func TestParseLogicalOps(t *testing.T) {
 }
 
 func TestParseCast(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("text", func(t *testing.T) {
 		node, err := Parse("x::text")
 		if err != nil {
@@ -361,6 +367,7 @@ func TestParseCast(t *testing.T) {
 }
 
 func TestParseFuncCall(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("current_setting", func(t *testing.T) {
 		node, err := Parse("current_setting('app.player_id')")
 		if err != nil {
@@ -381,6 +388,7 @@ func TestParseFuncCall(t *testing.T) {
 }
 
 func TestParseRLSExpressions(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("owner_check", func(t *testing.T) {
 		// owner_id = current_setting('app.player_id')::uuid
 		node, err := Parse("owner_id = current_setting('app.player_id')::uuid")
@@ -464,6 +472,7 @@ func TestParseRLSExpressions(t *testing.T) {
 }
 
 func TestCollectColumnRefs(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("owner_check", func(t *testing.T) {
 		node, err := Parse("owner_id = current_setting('app.player_id')::uuid")
 		if err != nil {
@@ -506,6 +515,7 @@ func TestCollectColumnRefs(t *testing.T) {
 }
 
 func TestParseErrors(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("empty_string", func(t *testing.T) {
 		_, err := Parse("")
 		if err == nil {
@@ -536,6 +546,7 @@ func TestParseErrors(t *testing.T) {
 }
 
 func TestParseConcat(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("double_pipe", func(t *testing.T) {
 		// first_name || ' ' || last_name => ||( ||(first_name, ' '), last_name )
 		node, err := Parse("first_name || ' ' || last_name")
@@ -562,6 +573,7 @@ func TestParseConcat(t *testing.T) {
 }
 
 func TestParseArithmetic(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("multiply", func(t *testing.T) {
 		node, err := Parse("price * quantity")
 		if err != nil {
@@ -605,6 +617,7 @@ func TestParseArithmetic(t *testing.T) {
 }
 
 func TestParseCaseExpr(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("simple_case", func(t *testing.T) {
 		node, err := Parse("CASE WHEN status = 'active' THEN 1 ELSE 0 END")
 		if err != nil {
@@ -628,6 +641,7 @@ func TestParseCaseExpr(t *testing.T) {
 }
 
 func TestParseCoalesce(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("coalesce", func(t *testing.T) {
 		node, err := Parse("COALESCE(nickname, first_name)")
 		if err != nil {
@@ -670,6 +684,7 @@ func assertNullLiteral(t *testing.T, node Node) {
 }
 
 func TestParseNullLiteral(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("bare_null", func(t *testing.T) {
 		node, err := Parse("NULL")
 		if err != nil {
@@ -709,6 +724,7 @@ func TestParseNullLiteral(t *testing.T) {
 }
 
 func TestParseFloatLiteral(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("simple_float", func(t *testing.T) {
 		node, err := Parse("3.14")
 		if err != nil {
@@ -729,6 +745,7 @@ func TestParseFloatLiteral(t *testing.T) {
 }
 
 func TestParseComparisonOperators(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("less_than", func(t *testing.T) {
 		node, err := Parse("a < b")
 		if err != nil {
@@ -771,6 +788,7 @@ func TestParseComparisonOperators(t *testing.T) {
 }
 
 func TestParseDivisionModulo(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("division", func(t *testing.T) {
 		node, err := Parse("a / b")
 		if err != nil {
@@ -808,6 +826,7 @@ func TestParseDivisionModulo(t *testing.T) {
 }
 
 func TestParseIsNull(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("is_null", func(t *testing.T) {
 		node, err := Parse("x IS NULL")
 		if err != nil {
@@ -848,6 +867,7 @@ func TestParseIsNull(t *testing.T) {
 }
 
 func TestParseIn(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("in_list", func(t *testing.T) {
 		node, err := Parse("x IN (1, 2, 3)")
 		if err != nil {
@@ -892,6 +912,7 @@ func TestParseIn(t *testing.T) {
 }
 
 func TestParseBetween(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("simple_between", func(t *testing.T) {
 		node, err := Parse("x BETWEEN 1 AND 10")
 		if err != nil {
@@ -936,6 +957,7 @@ func TestParseBetween(t *testing.T) {
 }
 
 func TestParseLike(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("like", func(t *testing.T) {
 		node, err := Parse("name LIKE '%foo%'")
 		if err != nil {
@@ -993,6 +1015,7 @@ func TestParseLike(t *testing.T) {
 }
 
 func TestParseIsDistinctFrom(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("is_distinct_from", func(t *testing.T) {
 		node, err := Parse("a IS DISTINCT FROM b")
 		if err != nil {
@@ -1005,6 +1028,7 @@ func TestParseIsDistinctFrom(t *testing.T) {
 }
 
 func TestParseRegex(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("regex match", func(t *testing.T) {
 		node, err := Parse("name ~ '^[A-Z]'")
 		if err != nil {

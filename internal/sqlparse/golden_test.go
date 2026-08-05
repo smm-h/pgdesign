@@ -2,6 +2,7 @@ package sqlparse
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"math/rand"
 	"os"
 	"strings"
@@ -17,6 +18,7 @@ const goldenCorpusPath = "testdata/golden_corpus.tsv"
 
 // TestGoldenCorpus pins N against every committed input -> normalized pair.
 func TestGoldenCorpus(t *testing.T) {
+	testenv.Isolate(t)
 	data, err := os.ReadFile(goldenCorpusPath)
 	if err != nil {
 		t.Fatalf("read golden corpus: %v", err)
@@ -81,6 +83,7 @@ var nFoldingBacklog = []backlogEntry{
 // here means a folding started converging — investigate: either N gained the
 // fold (graduate the entry, epoch event) or a dependency shifted behavior.
 func TestNFoldingBacklog(t *testing.T) {
+	testenv.Isolate(t)
 	for _, e := range nFoldingBacklog {
 		if ExprEqual(e.a, e.b) {
 			t.Errorf("BACKLOG FOLDING GRADUATED [%s]: %q and %q now converge to %q — this is an epoch event; graduate the entry and rebuild the golden corpus deliberately",
@@ -152,6 +155,7 @@ func genPred(rng *rand.Rand, depth int) string {
 // TestNIdempotenceGenerated is L9's N∘N = N property over a generated
 // expression corpus.
 func TestNIdempotenceGenerated(t *testing.T) {
+	testenv.Isolate(t)
 	rng := rand.New(rand.NewSource(1))
 	for i := 0; i < 2000; i++ {
 		e := genPred(rng, 4)

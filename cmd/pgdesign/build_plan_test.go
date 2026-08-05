@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -29,6 +30,7 @@ func minimalSchema() *model.Schema {
 }
 
 func TestPlan_SQLOutput(t *testing.T) {
+	testenv.Isolate(t)
 	if testing.Short() {
 		t.Skip("Plan() generates .sqlsplit via WASM parser")
 	}
@@ -81,6 +83,7 @@ func TestPlan_SQLOutput(t *testing.T) {
 }
 
 func TestPlan_IdempotentSQL(t *testing.T) {
+	testenv.Isolate(t)
 	if testing.Short() {
 		t.Skip("Plan() generates .sqlsplit via WASM parser")
 	}
@@ -112,6 +115,7 @@ func TestPlan_IdempotentSQL(t *testing.T) {
 }
 
 func TestPlan_CodegenConstants(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -142,6 +146,7 @@ func TestPlan_CodegenConstants(t *testing.T) {
 }
 
 func TestPlan_SVGExcluded(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -164,6 +169,7 @@ func TestPlan_SVGExcluded(t *testing.T) {
 }
 
 func TestPlan_GroupFiltering(t *testing.T) {
+	testenv.Isolate(t)
 	if testing.Short() {
 		t.Skip("Plan() generates .sqlsplit via WASM parser")
 	}

@@ -2,6 +2,7 @@ package test
 
 import (
 	"flag"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,6 +53,7 @@ func normalize(s string) string {
 }
 
 func TestGolden(t *testing.T) {
+	testenv.Isolate(t)
 	root := projectRoot(t)
 	schemasDir := filepath.Join(root, "testdata", "schemas")
 	expectedDir := filepath.Join(root, "testdata", "expected")

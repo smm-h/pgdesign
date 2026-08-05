@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -24,6 +25,7 @@ func containsGormField(s, fieldName, goType, gormTagSubstr string) bool {
 }
 
 func TestGoGormGenerator_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -119,6 +121,7 @@ func TestGoGormGenerator_Basic(t *testing.T) {
 }
 
 func TestGoGormGenerator_Defaults(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "configs",
@@ -149,6 +152,7 @@ func TestGoGormGenerator_Defaults(t *testing.T) {
 }
 
 func TestGoGormGenerator_Relationships(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -196,6 +200,7 @@ func TestGoGormGenerator_Relationships(t *testing.T) {
 }
 
 func TestGoGormGenerator_NullableAndArray(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "items",
@@ -243,6 +248,7 @@ func TestGoGormGenerator_NullableAndArray(t *testing.T) {
 }
 
 func TestGoGormGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 
 	gen := &GoGormGenerator{}
@@ -265,6 +271,7 @@ func TestGoGormGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestGoGormGenerator_Enums(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Enums: []model.Enum{{Name: "status", Values: []string{"active", "inactive"}}},
 		Tables: []model.Table{{
@@ -301,6 +308,7 @@ func TestGoGormGenerator_Enums(t *testing.T) {
 }
 
 func TestGoGormGenerator_NonUniqueIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "events",
@@ -339,6 +347,7 @@ func TestGoGormGenerator_NonUniqueIndex(t *testing.T) {
 }
 
 func TestGoGormGenerator_DefaultExpr(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "items",

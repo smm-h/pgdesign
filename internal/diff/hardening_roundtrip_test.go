@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -28,6 +29,7 @@ func hardeningTable(policies []model.Policy, maint *model.MaintenanceConfig) mod
 // and an introspected one with an empty type (introspect leaves permissive empty)
 // are the same policy.
 func TestPermissiveDefaultDoesNotDrift(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "public", PGVersion: 16, Tables: []model.Table{
 		hardeningTable([]model.Policy{{Name: "p", Type: "PERMISSIVE", Operation: "SELECT", Using: "true"}}, nil),
 	}}
@@ -43,6 +45,7 @@ func TestPermissiveDefaultDoesNotDrift(t *testing.T) {
 // TestPartmanIntervalSpellingDoesNotDrift: '1 month' vs the PG-normalized
 // '1 mon' are the same interval.
 func TestPartmanIntervalSpellingDoesNotDrift(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "public", PGVersion: 16, Tables: []model.Table{
 		hardeningTable(nil, &model.MaintenanceConfig{Interval: "1 month", Retention: "3 months"}),
 	}}
@@ -58,6 +61,7 @@ func TestPartmanIntervalSpellingDoesNotDrift(t *testing.T) {
 // TestPartmanChildExcludedNotRemoved: a partman-managed child present in the
 // introspected schema but absent from desired is excluded, not reported removed.
 func TestPartmanChildExcludedNotRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "public", PGVersion: 16, Tables: []model.Table{
 		hardeningTable(nil, nil),
 	}}
@@ -76,6 +80,7 @@ func TestPartmanChildExcludedNotRemoved(t *testing.T) {
 
 // TestNormalizeInterval pins the unit-spelling canonicalization directly.
 func TestNormalizeInterval(t *testing.T) {
+	testenv.Isolate(t)
 	cases := [][2]string{
 		{"1 month", "1 mon"},
 		{"2 months", "2 mons"},

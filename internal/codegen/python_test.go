@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 )
 
 func TestDetectExistsLookup(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name     string
 		expr     string
@@ -74,6 +76,7 @@ func TestDetectExistsLookup(t *testing.T) {
 }
 
 func TestPythonGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -162,6 +165,7 @@ func TestPythonGenerator_Generate(t *testing.T) {
 }
 
 func TestPythonGenerator_NoPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 		Tables: []model.Table{
@@ -185,6 +189,7 @@ func TestPythonGenerator_NoPolicies(t *testing.T) {
 }
 
 func TestDetectOwnership(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name    string
 		expr    string
@@ -237,6 +242,7 @@ func TestDetectOwnership(t *testing.T) {
 }
 
 func TestDetectDualExistsLookup(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name       string
 		expr       string
@@ -298,6 +304,7 @@ func TestDetectDualExistsLookup(t *testing.T) {
 }
 
 func TestPythonGenerator_OwnershipPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -341,6 +348,7 @@ func TestPythonGenerator_OwnershipPattern(t *testing.T) {
 }
 
 func TestPythonGenerator_DualPrivacyPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -381,6 +389,7 @@ func TestPythonGenerator_DualPrivacyPattern(t *testing.T) {
 }
 
 func TestPythonGenerator_DualPrivacyDifferentTables(t *testing.T) {
+	testenv.Isolate(t)
 	// RED test: dual EXISTS referencing DIFFERENT tables exposes the bug where
 	// the second query reuses the first lookup's tableParts instead of its own.
 	schema := &model.Schema{
@@ -437,6 +446,7 @@ func TestPythonGenerator_DualPrivacyDifferentTables(t *testing.T) {
 }
 
 func TestPythonGenerator_NonGamehomeNaming(t *testing.T) {
+	testenv.Isolate(t)
 	// RED test: uses non-gamehome naming to expose the hardcoded "player_id" bug.
 	// The generators should use the joinColumn from the AST ("user_id"), not
 	// a hardcoded "player_id".
@@ -487,6 +497,7 @@ func TestPythonGenerator_NonGamehomeNaming(t *testing.T) {
 }
 
 func TestPythonGenerator_OrCompound_OwnershipOrExists(t *testing.T) {
+	testenv.Isolate(t)
 	// OR-compound policy: ownership OR exists-lookup.
 	// "Show message if you own it OR the author's profile is public."
 	schema := &model.Schema{
@@ -555,6 +566,7 @@ func TestPythonGenerator_OrCompound_OwnershipOrExists(t *testing.T) {
 }
 
 func TestPythonGenerator_UnparsableExpression(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -598,6 +610,7 @@ func TestPythonGenerator_UnparsableExpression(t *testing.T) {
 }
 
 func TestPythonGenerator_LeftSideCurrentSetting(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -641,6 +654,7 @@ func TestPythonGenerator_LeftSideCurrentSetting(t *testing.T) {
 }
 
 func TestPythonGenerator_NotExistsPattern(t *testing.T) {
+	testenv.Isolate(t)
 	// RED test: NOT EXISTS should invert the privacy check logic.
 	// Currently, detectAllExistsLookups finds the ExistsExpr inside the
 	// UnaryOp{Op:"NOT"} wrapper but does not propagate the negation.
@@ -707,6 +721,7 @@ func TestPythonGenerator_NotExistsPattern(t *testing.T) {
 }
 
 func TestPythonGenerator_MultipleFlagColumns(t *testing.T) {
+	testenv.Isolate(t)
 	// RED test: EXISTS subquery with two flag conditions should check both flags.
 	// Currently, analyzeExistsWhere uses a single `var flagCol string` that gets
 	// overwritten by the loop, so only the last flag column is retained.

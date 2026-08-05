@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -100,6 +101,7 @@ func currentRevision(t *testing.T, ctx context.Context, conn *pgx.Conn) string {
 // out-of-band table pgdesign never created is NEVER dropped. The applied view
 // stays coherent (an edge fully rolled back disappears from applied).
 func TestChainRollbackSingleStep(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -168,6 +170,7 @@ func TestChainRollbackSingleStep(t *testing.T) {
 // TestChainRollbackToRevision: `rollback --to <revision>` reverses every edge down
 // to (not including) the target revision in one call.
 func TestChainRollbackToRevision(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -211,6 +214,7 @@ func TestChainRollbackToRevision(t *testing.T) {
 // is EMPTY. Rollback still fully works (topology via the archive-inclusive load,
 // down-ops via the journal, payloads via the object store).
 func TestChainRollbackFileIndependent(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -266,6 +270,7 @@ func TestChainRollbackFileIndependent(t *testing.T) {
 // boundary_revision (the upgrade/baseline floor), naming the boundary. Here the
 // boundary is set at r1 (an upgrade floor); rolling back below it is frozen.
 func TestChainRollbackBoundaryRefuses(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -308,6 +313,7 @@ func TestChainRollbackBoundaryRefuses(t *testing.T) {
 // JOURNALED ops — an op whose recorded down_op is NULL (non-invertible, e.g. a
 // DROP TABLE) is a refusal naming the op, BEFORE anything executes.
 func TestChainRollbackNonInvertibleRefuses(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -371,6 +377,7 @@ func TestChainRollbackNonInvertibleRefuses(t *testing.T) {
 // live invalid index; the rollback drops the index and the table and clears the
 // in-progress marker.
 func TestChainRollbackMidEdgeCIC(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

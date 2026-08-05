@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -37,6 +38,7 @@ func inSyncSchemas() (desired, actual *model.Schema) {
 // spurious PGVersionChanged (plan lost "No changes detected"; generate wrote a
 // zero-op migration file).
 func TestMigrationDiff_UnpinnedPGVersionNoSpuriousDrift(t *testing.T) {
+	testenv.Isolate(t)
 	// RED: diffing before applying the live version reports spurious drift.
 	desired, actual := inSyncSchemas()
 	if d := diff.DiffLive(desired, actual, nil); d.IsEmpty() {
@@ -56,6 +58,7 @@ func TestMigrationDiff_UnpinnedPGVersionNoSpuriousDrift(t *testing.T) {
 // project with an unpinned/stale [meta].version surfaced a spurious
 // "pg_version changed".
 func TestLiveReportDiff_UnpinnedPGVersionNoSpuriousDrift(t *testing.T) {
+	testenv.Isolate(t)
 	// RED: diffing before applying the live version reports spurious drift.
 	desired, actual := inSyncSchemas()
 	if d := diff.DiffLive(desired, actual, nil); d.IsEmpty() {
@@ -74,6 +77,7 @@ func TestLiveReportDiff_UnpinnedPGVersionNoSpuriousDrift(t *testing.T) {
 // introspected, carries none). This is the reverse of the model-to-model case
 // tested in the diff package.
 func TestMigrationDiff_SuppressesSemanticTypeName(t *testing.T) {
+	testenv.Isolate(t)
 	desired, actual := inSyncSchemas() // desired id has semantic name "int", actual ""
 	if d := migrationDiff(desired, actual); !d.IsEmpty() {
 		t.Fatalf("introspected diff false-drifted on semantic type name: %s", d.Summary())

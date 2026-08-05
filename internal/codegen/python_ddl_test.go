@@ -3,6 +3,7 @@ package codegen
 import (
 	"flag"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"sort"
@@ -45,6 +46,7 @@ func loadTestSchema(t *testing.T) *model.Schema {
 var updateGolden = flag.Bool("update", false, "update golden files")
 
 func TestPythonDDL_GoldenFile(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	out, diags := gen.Generate(schema)
@@ -72,6 +74,7 @@ func TestPythonDDL_GoldenFile(t *testing.T) {
 }
 
 func TestPythonDDL_TupleCount(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	out, _ := gen.Generate(schema)
@@ -104,6 +107,7 @@ func TestPythonDDL_TupleCount(t *testing.T) {
 }
 
 func TestPythonDDL_PhaseOrdering(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	out, _ := gen.Generate(schema)
@@ -170,6 +174,7 @@ func TestPythonDDL_PhaseOrdering(t *testing.T) {
 }
 
 func TestPythonDDL_TableNames(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	out, _ := gen.Generate(schema)
@@ -214,6 +219,7 @@ func TestPythonDDL_TableNames(t *testing.T) {
 }
 
 func TestPythonDDL_AllKindsPresent(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	out, _ := gen.Generate(schema)
@@ -236,6 +242,7 @@ func TestPythonDDL_AllKindsPresent(t *testing.T) {
 }
 
 func TestPythonDDL_StatementCountMatchesSQL(t *testing.T) {
+	testenv.Isolate(t)
 	if testing.Short() {
 		t.Skip("requires WASM parser")
 	}
@@ -285,6 +292,7 @@ func TestPythonDDL_StatementCountMatchesSQL(t *testing.T) {
 }
 
 func TestPythonDDL_Header(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "test",
 	}
@@ -307,6 +315,7 @@ func TestPythonDDL_Header(t *testing.T) {
 }
 
 func TestPythonDDL_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{}
 	gen := &PythonDDLGenerator{}
 	out, diags := gen.Generate(schema)
@@ -324,6 +333,7 @@ func TestPythonDDL_EmptySchema(t *testing.T) {
 }
 
 func TestPythonDDL_SingleTable(t *testing.T) {
+	testenv.Isolate(t)
 	// Single-element tuple needs trailing comma in Python.
 	schema := &model.Schema{
 		Name: "test",
@@ -352,6 +362,7 @@ func TestPythonDDL_SingleTable(t *testing.T) {
 // the Retention value. This mirrors the already-fixed generate path; python_ddl
 // previously passed Retention as p_interval, silently misconfiguring partman.
 func TestPythonDDL_PartmanUsesInterval(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:       "app",
 		Extensions: []string{"pg_partman"},
@@ -408,6 +419,7 @@ func TestPythonDDL_PartmanUsesInterval(t *testing.T) {
 // -- Phase 11: MultiFileGenerator and executor tests --
 
 func TestPythonDDL_GenerateFiles_TwoFiles(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -427,6 +439,7 @@ func TestPythonDDL_GenerateFiles_TwoFiles(t *testing.T) {
 }
 
 func TestPythonDDL_GenerateFiles_DDLMatchesGenerate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 
@@ -444,6 +457,7 @@ func TestPythonDDL_GenerateFiles_DDLMatchesGenerate(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_SectionCount(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -462,6 +476,7 @@ func TestPythonDDL_Executor_SectionCount(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_HasExecuteFunction(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -473,6 +488,7 @@ func TestPythonDDL_Executor_HasExecuteFunction(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_HasAsyncConnectionProtocol(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -484,6 +500,7 @@ func TestPythonDDL_Executor_HasAsyncConnectionProtocol(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_HasDDLOpNamedtuple(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -495,6 +512,7 @@ func TestPythonDDL_Executor_HasDDLOpNamedtuple(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_HasConvenienceFunctions(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -509,6 +527,7 @@ func TestPythonDDL_Executor_HasConvenienceFunctions(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_HasVerifyFunction(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -520,6 +539,7 @@ func TestPythonDDL_Executor_HasVerifyFunction(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_HasExistsMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -531,6 +551,7 @@ func TestPythonDDL_Executor_HasExistsMethod(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_TransactionalSections(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -544,6 +565,7 @@ func TestPythonDDL_Executor_TransactionalSections(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{}
 	gen := &PythonDDLGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -571,6 +593,7 @@ func TestPythonDDL_Executor_EmptySchema(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_IdempotentSQL(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -599,6 +622,7 @@ func TestPythonDDL_Executor_IdempotentSQL(t *testing.T) {
 // default two-file output is the valid DO-block form with a pg_type catalog
 // check, never the invalid CREATE TYPE IF NOT EXISTS syntax.
 func TestPythonDDL_EnumIdempotentDOBlock(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t) // has the trace_status enum
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -618,6 +642,7 @@ func TestPythonDDL_EnumIdempotentDOBlock(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_SectionKinds(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -636,6 +661,7 @@ func TestPythonDDL_Executor_SectionKinds(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_ExistenceChecks(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -659,6 +685,7 @@ func TestPythonDDL_Executor_ExistenceChecks(t *testing.T) {
 }
 
 func TestPythonDDL_MultiFileGenerator_Interface(t *testing.T) {
+	testenv.Isolate(t)
 	// Verify PythonDDLGenerator satisfies MultiFileGenerator at compile time.
 	var _ genkit.MultiFileGenerator = &PythonDDLGenerator{}
 }
@@ -698,6 +725,7 @@ func loadSplitTestSchema(t *testing.T) *model.Schema {
 }
 
 func TestPythonDDL_FacetedOutput(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, diags := gen.GenerateFiles(schema)
@@ -716,6 +744,7 @@ func TestPythonDDL_FacetedOutput(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedTypes(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -730,6 +759,7 @@ func TestPythonDDL_FacetedTypes(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedTableSeparation(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -760,6 +790,7 @@ func TestPythonDDL_FacetedTableSeparation(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedEmptyPostTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -770,6 +801,7 @@ func TestPythonDDL_FacetedEmptyPostTables(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedExecutor(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -820,6 +852,7 @@ func TestPythonDDL_FacetedExecutor(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedDDLStmt(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -843,6 +876,7 @@ func TestPythonDDL_FacetedDDLStmt(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedInitPy(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -860,6 +894,7 @@ func TestPythonDDL_FacetedInitPy(t *testing.T) {
 }
 
 func TestPythonDDL_ExecutorTypeAnnotations(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -893,6 +928,7 @@ func TestPythonDDL_ExecutorTypeAnnotations(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedExecutorTypeAnnotations(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -911,6 +947,7 @@ func TestPythonDDL_FacetedExecutorTypeAnnotations(t *testing.T) {
 }
 
 func TestPythonDDL_NonFacetedDDLStmt(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	out, _ := gen.Generate(schema)
@@ -948,6 +985,7 @@ func TestPythonDDL_NonFacetedDDLStmt(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedTableNames(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -971,6 +1009,7 @@ func TestPythonDDL_FacetedTableNames(t *testing.T) {
 // -- 5.1: exclude_sections, SECTION_KINDS, name validation tests --
 
 func TestPythonDDL_Executor_SectionKindsConstant(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -982,6 +1021,7 @@ func TestPythonDDL_Executor_SectionKindsConstant(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedExecutor_SectionKindsConstant(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -993,6 +1033,7 @@ func TestPythonDDL_FacetedExecutor_SectionKindsConstant(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_ExcludeSectionsParam(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -1004,6 +1045,7 @@ func TestPythonDDL_Executor_ExcludeSectionsParam(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_ExcludeSectionsValidation(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -1026,6 +1068,7 @@ func TestPythonDDL_Executor_ExcludeSectionsValidation(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_VerifyExcludeSections(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -1056,6 +1099,7 @@ func TestPythonDDL_Executor_VerifyExcludeSections(t *testing.T) {
 // -- 5.2: extension_stubs tests --
 
 func TestPythonDDL_Executor_ExtensionStubsParam(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -1067,6 +1111,7 @@ func TestPythonDDL_Executor_ExtensionStubsParam(t *testing.T) {
 }
 
 func TestPythonDDL_Executor_ExtensionStubsLogic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -1082,6 +1127,7 @@ func TestPythonDDL_Executor_ExtensionStubsLogic(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedExecutor_ExtensionStubsParam(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -1093,6 +1139,7 @@ func TestPythonDDL_FacetedExecutor_ExtensionStubsParam(t *testing.T) {
 }
 
 func TestPythonDDL_FacetedExecutor_FinalImport(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeFaceted}
 	files, _ := gen.GenerateFiles(schema)
@@ -1109,6 +1156,7 @@ func TestPythonDDL_FacetedExecutor_FinalImport(t *testing.T) {
 // -- 5.3: Self-contained split mode tests --
 
 func TestPythonDDL_SelfContainedOutput(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
 	files, diags := gen.GenerateFiles(schema)
@@ -1131,6 +1179,7 @@ func TestPythonDDL_SelfContainedOutput(t *testing.T) {
 }
 
 func TestPythonDDL_SelfContainedPreamble(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
 	files, _ := gen.GenerateFiles(schema)
@@ -1153,6 +1202,7 @@ func TestPythonDDL_SelfContainedPreamble(t *testing.T) {
 }
 
 func TestPythonDDL_SelfContainedPreambleIdempotent(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
 	files, _ := gen.GenerateFiles(schema)
@@ -1179,6 +1229,7 @@ func TestPythonDDL_SelfContainedPreambleIdempotent(t *testing.T) {
 }
 
 func TestPythonDDL_SelfContainedTableSeparation(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
 	files, _ := gen.GenerateFiles(schema)
@@ -1214,6 +1265,7 @@ func TestPythonDDL_SelfContainedTableSeparation(t *testing.T) {
 }
 
 func TestPythonDDL_SelfContainedTableNames(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
 	files, _ := gen.GenerateFiles(schema)
@@ -1231,6 +1283,7 @@ func TestPythonDDL_SelfContainedTableNames(t *testing.T) {
 }
 
 func TestPythonDDL_SelfContainedNoExecutor(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
 	files, _ := gen.GenerateFiles(schema)
@@ -1248,6 +1301,7 @@ func TestPythonDDL_SelfContainedNoExecutor(t *testing.T) {
 }
 
 func TestPythonDDL_SelfContainedDDLStmt(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadSplitTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
 	files, _ := gen.GenerateFiles(schema)
@@ -1265,6 +1319,7 @@ func TestPythonDDL_SelfContainedDDLStmt(t *testing.T) {
 }
 
 func TestPythonDDL_SelfContainedSingleSource(t *testing.T) {
+	testenv.Isolate(t)
 	// Test with a schema from a single source file (ddl_input.toml).
 	schema := loadTestSchema(t)
 	gen := &PythonDDLGenerator{SplitMode: SplitModeSelfContained}
@@ -1307,6 +1362,7 @@ func fileNames(files map[string][]byte) []string {
 // sequence tuples used to set only SQL, leaving IdempotentSQL empty even though
 // sql.CreateSequence supports an idempotent form.
 func TestPythonDDL_SequenceIdempotentSQL(t *testing.T) {
+	testenv.Isolate(t)
 	start := int64(100)
 	schema := &model.Schema{
 		Name: "test",

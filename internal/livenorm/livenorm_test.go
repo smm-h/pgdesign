@@ -2,6 +2,7 @@ package livenorm
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"strings"
 	"testing"
@@ -60,6 +61,7 @@ func setupTable(t *testing.T) (*Normalizer, func()) {
 // round-tripped; the introspected form is what PG stores; both must normalize
 // to the same string.
 func TestRoundTripConvergence(t *testing.T) {
+	testenv.Isolate(t)
 	n, cleanup := setupTable(t)
 	defer cleanup()
 
@@ -87,6 +89,7 @@ func TestRoundTripConvergence(t *testing.T) {
 // TestTempObjectCleanup verifies the throwaway temp table is always dropped —
 // no _pgd_rt_% relation survives a normalization call.
 func TestTempObjectCleanup(t *testing.T) {
+	testenv.Isolate(t)
 	n, cleanup := setupTable(t)
 	defer cleanup()
 
@@ -112,6 +115,7 @@ func TestTempObjectCleanup(t *testing.T) {
 // round-trip cannot reach (an absent table), normalization falls to N, the
 // forward-simulation rule set — deterministically, by reachability.
 func TestForwardSimulationFallback(t *testing.T) {
+	testenv.Isolate(t)
 	n, cleanup := setupTable(t)
 	defer cleanup()
 
@@ -137,6 +141,7 @@ func TestForwardSimulationFallback(t *testing.T) {
 // temp object. This test proves the collision exists (unscoped count == 2) and
 // that the scoped lookup returns each session's OWN constraint.
 func TestRoundTripNamespaceScoped(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	ctx := context.Background()
 	url := testDBURL()

@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,7 @@ import (
 // --- Unit tests (no DB required) ---
 
 func TestGenerateMigration_AddTable(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -78,6 +80,7 @@ func TestGenerateMigration_AddTable(t *testing.T) {
 }
 
 func TestGenerateMigration_AddColumn(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -129,6 +132,7 @@ func TestGenerateMigration_AddColumn(t *testing.T) {
 }
 
 func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
+	testenv.Isolate(t)
 	// When desired schema has PGVersion=11, add_column with NOT NULL + default
 	// should be safe (metadata-only on PG11+), so no risk diagnostic.
 	desired := &model.Schema{
@@ -168,6 +172,7 @@ func TestGenerateMigration_AddColumnPGVersionRisk(t *testing.T) {
 }
 
 func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
+	testenv.Isolate(t)
 	// When desired schema has PGVersion=9, add_column with NOT NULL + default
 	// should be dangerous (table rewrite on pre-PG11).
 	desired := &model.Schema{
@@ -212,6 +217,7 @@ func TestGenerateMigration_AddColumnPrePG11Risk(t *testing.T) {
 }
 
 func TestGenerateMigration_DropTable(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "game"}
 	d := &diff.SchemaDiff{
 		TablesRemoved: []string{"game.old_table"},
@@ -250,6 +256,7 @@ func TestGenerateMigration_DropTable(t *testing.T) {
 }
 
 func TestGenerateMigration_PartitionChildAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -322,6 +329,7 @@ func TestGenerateMigration_PartitionChildAdded(t *testing.T) {
 }
 
 func TestGenerateMigration_PartitionChildRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -389,6 +397,7 @@ func TestGenerateMigration_PartitionChildRemoved(t *testing.T) {
 }
 
 func TestGenerateMigration_PartitionStrategyChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -436,6 +445,7 @@ func TestGenerateMigration_PartitionStrategyChanged(t *testing.T) {
 }
 
 func TestGenerateMigration_MaintenanceRetentionChange(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name:       "public",
 		Extensions: []string{"pg_partman"},
@@ -482,6 +492,7 @@ func TestGenerateMigration_MaintenanceRetentionChange(t *testing.T) {
 }
 
 func TestGenerateMigration_MaintenancePremakeChange(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name:       "public",
 		Extensions: []string{"pg_partman"},
@@ -527,6 +538,7 @@ func TestGenerateMigration_MaintenancePremakeChange(t *testing.T) {
 }
 
 func TestGenerateMigration_MaintenanceIntervalChangeError(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name:       "public",
 		Extensions: []string{"pg_partman"},
@@ -572,6 +584,7 @@ func TestGenerateMigration_MaintenanceIntervalChangeError(t *testing.T) {
 }
 
 func TestGenerateMigration_MaintenanceRequiresPartmanExtension(t *testing.T) {
+	testenv.Isolate(t)
 	// A maintenance change whose desired schema does not declare pg_partman is
 	// a hard error: the emitted partman ops would fail at apply time.
 	desired := &model.Schema{
@@ -612,6 +625,7 @@ func TestGenerateMigration_MaintenanceRequiresPartmanExtension(t *testing.T) {
 }
 
 func TestGenerateMigration_MaintenanceInitialSetup(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name:       "public",
 		Extensions: []string{"pg_partman"},
@@ -666,6 +680,7 @@ func TestGenerateMigration_MaintenanceInitialSetup(t *testing.T) {
 }
 
 func TestOpToSQL_CreatePartition(t *testing.T) {
+	testenv.Isolate(t)
 	childSpec := &model.PartitionSpec{
 		Name:  "events_2025",
 		Bound: "FROM ('2025-01-01') TO ('2026-01-01')",
@@ -697,6 +712,7 @@ func TestOpToSQL_CreatePartition(t *testing.T) {
 // These ops are emitted by migrate generate but OpToSQL had no case for them,
 // so they silently rendered as comment stubs at apply time -- a live no-op.
 func TestOpToSQL_PartmanConfigOps(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		op   string
 		want string
@@ -739,6 +755,7 @@ func opsDebug(ops []DDLOp) string {
 }
 
 func TestParseMigrationRoundtrip(t *testing.T) {
+	testenv.Isolate(t)
 	original := &Migration{
 		Description: "Add game_like table and player level",
 		DDLOps: []DDLOp{
@@ -820,6 +837,7 @@ func TestParseMigrationRoundtrip(t *testing.T) {
 }
 
 func TestMigrationRoundTrip_Desc(t *testing.T) {
+	testenv.Isolate(t)
 	original := &Migration{
 		Description: "Add index with desc columns",
 		DDLOps: []DDLOp{
@@ -863,6 +881,7 @@ func TestMigrationRoundTrip_Desc(t *testing.T) {
 }
 
 func TestMigrationRoundTrip_Operators(t *testing.T) {
+	testenv.Isolate(t)
 	original := &Migration{
 		Description: "Add exclusion constraint",
 		DDLOps: []DDLOp{
@@ -908,6 +927,7 @@ func TestMigrationRoundTrip_Operators(t *testing.T) {
 }
 
 func TestMigrationRoundTrip_DownInline_Columns(t *testing.T) {
+	testenv.Isolate(t)
 	original := &Migration{
 		Description: "Drop exclusion with inline down",
 		DDLOps: []DDLOp{
@@ -964,6 +984,7 @@ func TestMigrationRoundTrip_DownInline_Columns(t *testing.T) {
 }
 
 func TestOpToSQL_CreateTable(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "players",
 		Schema: "game",
@@ -992,6 +1013,7 @@ func TestOpToSQL_CreateTable(t *testing.T) {
 }
 
 func TestOpToSQL_AddColumn(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:      "add_column",
 		Table:   "game.players",
@@ -1017,6 +1039,7 @@ func TestOpToSQL_AddColumn(t *testing.T) {
 }
 
 func TestOpToSQL_AddFK(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:       "add_fk",
 		Table:    "game.scores",
@@ -1040,6 +1063,7 @@ func TestOpToSQL_AddFK(t *testing.T) {
 }
 
 func TestOpToSQL_AddFKNotValid(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:       "add_fk_not_valid",
 		Table:    "public.orders",
@@ -1057,6 +1081,7 @@ func TestOpToSQL_AddFKNotValid(t *testing.T) {
 }
 
 func TestOpToSQL_ValidateConstraint(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:    "validate_constraint",
 		Table: "public.orders",
@@ -1070,6 +1095,7 @@ func TestOpToSQL_ValidateConstraint(t *testing.T) {
 }
 
 func TestOpToSQL_DropTable(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:    "drop_table",
 		Table: "game.old_table",
@@ -1081,6 +1107,7 @@ func TestOpToSQL_DropTable(t *testing.T) {
 }
 
 func TestOpToSQL_CreateIndex(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:      "create_index",
 		Table:   "game.players",
@@ -1097,6 +1124,7 @@ func TestOpToSQL_CreateIndex(t *testing.T) {
 }
 
 func TestOpToSQL_AlterEnumAddValue(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "alter_enum_add_value",
 		Schema: "game",
@@ -1114,6 +1142,7 @@ func TestOpToSQL_AlterEnumAddValue(t *testing.T) {
 }
 
 func TestOpToSQL_CreateIndexConcurrently(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:      "create_index_concurrently",
 		Table:   "game.players",
@@ -1127,6 +1156,7 @@ func TestOpToSQL_CreateIndexConcurrently(t *testing.T) {
 }
 
 func TestIsNonTransactional(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name      string
 		op        string
@@ -1156,6 +1186,7 @@ func TestIsNonTransactional(t *testing.T) {
 }
 
 func TestSemverCompare(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		a, b string
 		want int
@@ -1176,6 +1207,7 @@ func TestSemverCompare(t *testing.T) {
 }
 
 func TestInSemverRange(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		version, from, to string
 		want              bool
@@ -1202,6 +1234,7 @@ func TestInSemverRange(t *testing.T) {
 }
 
 func TestSplitQualifiedName(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input      string
 		wantSchema string
@@ -1221,6 +1254,7 @@ func TestSplitQualifiedName(t *testing.T) {
 }
 
 func TestCheckReversibility(t *testing.T) {
+	testenv.Isolate(t)
 	// Reversible migration.
 	m := &Migration{
 		DDLOps: []DDLOp{
@@ -1247,6 +1281,7 @@ func TestCheckReversibility(t *testing.T) {
 }
 
 func TestDiscoverMigrations(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	// Create some migration files.
@@ -1282,6 +1317,7 @@ func TestDiscoverMigrations(t *testing.T) {
 }
 
 func TestParseMigrationFromDesignExample(t *testing.T) {
+	testenv.Isolate(t)
 	// Parse the example from DESIGN.md.
 	input := `description = "Add game_like table and player level"
 
@@ -1368,6 +1404,7 @@ down = { irreversible = true }
 }
 
 func TestGenerateMigration_ViewAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		Views: []model.View{
@@ -1413,6 +1450,7 @@ func TestGenerateMigration_ViewAdded(t *testing.T) {
 }
 
 func TestGenerateMigration_ViewRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "app"}
 	d := &diff.SchemaDiff{
 		ViewsRemoved: []string{"app.old_view"},
@@ -1439,6 +1477,7 @@ func TestGenerateMigration_ViewRemoved(t *testing.T) {
 }
 
 func TestGenerateMigration_ViewQueryChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		Views: []model.View{
@@ -1516,6 +1555,7 @@ func setupEphemeralDB(t *testing.T) *testdb.EphemeralDB {
 }
 
 func TestIntegration_StateTracking(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -1560,6 +1600,7 @@ func TestIntegration_StateTracking(t *testing.T) {
 }
 
 func TestIntegration_AdvisoryLock(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -1583,6 +1624,7 @@ func TestIntegration_AdvisoryLock(t *testing.T) {
 }
 
 func TestIntegration_ApplyAndRollback(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -1646,6 +1688,7 @@ down = { op = "drop_table", table = "public.pgdesign_test_table" }
 }
 
 func TestIntegration_ApplyIdempotent(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -1685,6 +1728,7 @@ down = { op = "drop_table", table = "public.pgdesign_test_table2" }
 }
 
 func TestAppendOnlyMigration(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -1740,6 +1784,7 @@ func TestAppendOnlyMigration(t *testing.T) {
 }
 
 func TestGenerateMigration_PureSetNotNull_NoRowCountEscalation(t *testing.T) {
+	testenv.Isolate(t)
 	// Premise change (5.9): generation is pure and has no row counts, so the
 	// table-size escalation (Caution -> Dangerous on >1M rows) never fires here.
 	// set_not_null stays Caution and always gets an always-safe backfill DML.
@@ -1807,6 +1852,7 @@ func TestGenerateMigration_PureSetNotNull_NoRowCountEscalation(t *testing.T) {
 }
 
 func TestGenerateMigration_LargeTableFK_Split(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name:      "game",
 		PGVersion: 17,
@@ -1884,6 +1930,7 @@ func TestGenerateMigration_LargeTableFK_Split(t *testing.T) {
 }
 
 func TestGenerateMigration_FK_AlwaysSplits_NoDB(t *testing.T) {
+	testenv.Isolate(t)
 	// Premise change (5.9): generation is pure — no row counts — so an FK add
 	// ALWAYS splits into NOT VALID + VALIDATE, even for what used to be a "small"
 	// table. There is no no-split case anymore.
@@ -1939,6 +1986,7 @@ func TestGenerateMigration_FK_AlwaysSplits_NoDB(t *testing.T) {
 }
 
 func TestGenerateMigration_Pure_NoEscalation_NoE300(t *testing.T) {
+	testenv.Isolate(t)
 	// Premise change (5.9): with no database, generation never emits the legacy
 	// E300 large-table warning (the FK is always split instead) and never
 	// escalates risk by row count.
@@ -1990,6 +2038,7 @@ func TestGenerateMigration_Pure_NoEscalation_NoE300(t *testing.T) {
 }
 
 func TestGenerateMigration_ExpandContract_SetNotNull_Backfill(t *testing.T) {
+	testenv.Isolate(t)
 	// Premise change (5.9): set_not_null ALWAYS produces a DML backfill op
 	// followed by the set_not_null DDL op — pure generation has no row counts,
 	// so the always-safe form is unconditional.
@@ -2052,6 +2101,7 @@ func TestGenerateMigration_ExpandContract_SetNotNull_Backfill(t *testing.T) {
 }
 
 func TestGenerateMigration_ExpandContract_SetNotNull_BackfillNoDB(t *testing.T) {
+	testenv.Isolate(t)
 	// Premise change (5.9): there is no longer a "small table" no-backfill case.
 	// Without any database, set_not_null still emits the backfill DML.
 	desired := &model.Schema{
@@ -2101,6 +2151,7 @@ func TestGenerateMigration_ExpandContract_SetNotNull_BackfillNoDB(t *testing.T) 
 }
 
 func TestGenerateMigration_ExpandContract_TypeNarrow_NoDB(t *testing.T) {
+	testenv.Isolate(t)
 	// Premise change (5.9): the EXPAND_CONTRACT_TYPE_NARROW advisory is now
 	// narrowing-always — the diff flags narrowing (no row count) and generation
 	// emits the advisory for every narrowing type change, with no database.
@@ -2154,6 +2205,7 @@ func TestGenerateMigration_ExpandContract_TypeNarrow_NoDB(t *testing.T) {
 }
 
 func TestGenerateMigration_ArrayChanged_ScalarToArray(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name:      "app",
 		PGVersion: 17,
@@ -2201,6 +2253,7 @@ func TestGenerateMigration_ArrayChanged_ScalarToArray(t *testing.T) {
 }
 
 func TestGenerateMigration_ArrayChanged_ArrayToScalar(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name:      "app",
 		PGVersion: 17,
@@ -2248,6 +2301,7 @@ func TestGenerateMigration_ArrayChanged_ArrayToScalar(t *testing.T) {
 }
 
 func TestGenerateMigration_IndexWithChange(t *testing.T) {
+	testenv.Isolate(t)
 	// Btree with-only change should produce a single alter_index_set, not DROP+CREATE.
 	d := &diff.SchemaDiff{
 		TablesChanged: []diff.TableDiff{{
@@ -2308,6 +2362,7 @@ func TestGenerateMigration_IndexWithChange(t *testing.T) {
 }
 
 func TestGenerateMigration_IndexWithChange_ExtensionMethod(t *testing.T) {
+	testenv.Isolate(t)
 	// Extension methods (hnsw) require DROP+CREATE even for with-only changes,
 	// because ALTER INDEX SET does not work for extension-defined parameters.
 	d := &diff.SchemaDiff{
@@ -2362,6 +2417,7 @@ func TestGenerateMigration_IndexWithChange_ExtensionMethod(t *testing.T) {
 }
 
 func TestGenerateMigration_IndexWithChange_ColumnsAlsoChanged(t *testing.T) {
+	testenv.Isolate(t)
 	// When columns change alongside With, DROP+CREATE is required even for builtin methods.
 	d := &diff.SchemaDiff{
 		TablesChanged: []diff.TableDiff{{
@@ -2418,6 +2474,7 @@ func TestGenerateMigration_IndexWithChange_ColumnsAlsoChanged(t *testing.T) {
 }
 
 func TestOpToSQL_CreateIndexWithParams(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:      "create_index",
 		Table:   "public.t",
@@ -2433,6 +2490,7 @@ func TestOpToSQL_CreateIndexWithParams(t *testing.T) {
 }
 
 func TestOpToSQL_AlterIndexSet(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:    "alter_index_set",
 		Table: "public.t",
@@ -2446,6 +2504,7 @@ func TestOpToSQL_AlterIndexSet(t *testing.T) {
 }
 
 func TestParseMigration_WithParams(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "test with params",
 		DDLOps: []DDLOp{{
@@ -2472,6 +2531,7 @@ func TestParseMigration_WithParams(t *testing.T) {
 }
 
 func TestGenerateMigration_MaterializedViewAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		MaterializedViews: []model.MaterializedView{
@@ -2515,6 +2575,7 @@ func TestGenerateMigration_MaterializedViewAdded(t *testing.T) {
 }
 
 func TestGenerateMigration_MaterializedViewQueryChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		MaterializedViews: []model.MaterializedView{
@@ -2576,6 +2637,7 @@ func TestGenerateMigration_MaterializedViewQueryChanged(t *testing.T) {
 }
 
 func TestGenerateMigration_MaterializedViewRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 	}
@@ -2604,6 +2666,7 @@ func TestGenerateMigration_MaterializedViewRemoved(t *testing.T) {
 }
 
 func TestOpToSQL_AddColumnGenerated(t *testing.T) {
+	testenv.Isolate(t)
 	// PG 18 + stored=true -> STORED
 	op := DDLOp{
 		Op:        "add_column",
@@ -2646,6 +2709,7 @@ func TestOpToSQL_AddColumnGenerated(t *testing.T) {
 }
 
 func TestMigrationRoundTrip_GeneratedColumn(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "add generated column",
 		DDLOps: []DDLOp{
@@ -2698,6 +2762,7 @@ func TestMigrationRoundTrip_GeneratedColumn(t *testing.T) {
 }
 
 func TestMigrationRoundTrip_VirtualGeneratedColumn(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "add virtual generated column",
 		DDLOps: []DDLOp{
@@ -2747,6 +2812,7 @@ func TestMigrationRoundTrip_VirtualGeneratedColumn(t *testing.T) {
 }
 
 func TestGeneratedStorageKeyword(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		stored    bool
 		pgVersion int
@@ -2774,6 +2840,7 @@ func TestGeneratedStorageKeyword(t *testing.T) {
 func intPtr(v int) *int { return &v }
 
 func TestGenerateMigration_CollationChange(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Tables: []model.Table{
@@ -2820,6 +2887,7 @@ func TestGenerateMigration_CollationChange(t *testing.T) {
 }
 
 func TestGenerateMigration_StatisticsChange(t *testing.T) {
+	testenv.Isolate(t)
 	v := 1000
 	desired := &model.Schema{
 		Name: "public",
@@ -2864,6 +2932,7 @@ func TestGenerateMigration_StatisticsChange(t *testing.T) {
 }
 
 func TestGenerateMigration_StatisticsReset(t *testing.T) {
+	testenv.Isolate(t)
 	v := 500
 	desired := &model.Schema{
 		Name: "public",
@@ -2908,6 +2977,7 @@ func TestGenerateMigration_StatisticsReset(t *testing.T) {
 }
 
 func TestOpSetStatistics(t *testing.T) {
+	testenv.Isolate(t)
 	v := 1000
 	op := DDLOp{
 		Op:         "set_statistics",
@@ -2923,6 +2993,7 @@ func TestOpSetStatistics(t *testing.T) {
 }
 
 func TestOpSetStatisticsReset(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "set_statistics",
 		Table:  "users",
@@ -2936,6 +3007,7 @@ func TestOpSetStatisticsReset(t *testing.T) {
 }
 
 func TestOpAlterColumnTypeWithCollation(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:        "alter_column_type",
 		Table:     "messages",
@@ -2951,6 +3023,7 @@ func TestOpAlterColumnTypeWithCollation(t *testing.T) {
 }
 
 func TestOpCreateIndexWithCollation(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:         "create_index",
 		Table:      "messages",
@@ -2965,6 +3038,7 @@ func TestOpCreateIndexWithCollation(t *testing.T) {
 }
 
 func TestOpToSQL_AddExclusion(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:        "add_exclusion",
 		Table:     "bookings",
@@ -2981,6 +3055,7 @@ func TestOpToSQL_AddExclusion(t *testing.T) {
 }
 
 func TestOpToSQL_AddExclusionWithWhere(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:                "add_exclusion",
 		Table:             "bookings",
@@ -3000,6 +3075,7 @@ func TestOpToSQL_AddExclusionWithWhere(t *testing.T) {
 }
 
 func TestOpToSQL_DropExclusion(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:    "drop_exclusion",
 		Table: "bookings",
@@ -3013,6 +3089,7 @@ func TestOpToSQL_DropExclusion(t *testing.T) {
 }
 
 func TestOpToSQL_AddUnique(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:      "add_unique",
 		Table:   "users",
@@ -3027,6 +3104,7 @@ func TestOpToSQL_AddUnique(t *testing.T) {
 }
 
 func TestOpToSQL_AddUniqueDeferrable(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:                "add_unique",
 		Table:             "users",
@@ -3043,6 +3121,7 @@ func TestOpToSQL_AddUniqueDeferrable(t *testing.T) {
 }
 
 func TestOpToSQL_DropUnique(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:    "drop_unique",
 		Table: "users",
@@ -3056,6 +3135,7 @@ func TestOpToSQL_DropUnique(t *testing.T) {
 }
 
 func TestGenerateMigration_SequenceAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Sequences: []model.Sequence{{
@@ -3099,6 +3179,7 @@ func TestGenerateMigration_SequenceAdded(t *testing.T) {
 }
 
 func TestGenerateMigration_SequenceRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "public"}
 	d := &diff.SchemaDiff{
 		SequencesRemoved: []string{"order_seq"},
@@ -3125,6 +3206,7 @@ func TestGenerateMigration_SequenceRemoved(t *testing.T) {
 }
 
 func TestGenerateMigration_SequenceChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "public",
 		Sequences: []model.Sequence{{
@@ -3174,6 +3256,7 @@ func TestGenerateMigration_SequenceChanged(t *testing.T) {
 }
 
 func TestMigrate_SequenceSQL(t *testing.T) {
+	testenv.Isolate(t)
 	// create_sequence
 	createOp := DDLOp{
 		Op:     "create_sequence",
@@ -3233,6 +3316,7 @@ func TestMigrate_SequenceSQL(t *testing.T) {
 }
 
 func TestGenerateMigration_AddFunction(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{
@@ -3282,6 +3366,7 @@ func TestGenerateMigration_AddFunction(t *testing.T) {
 }
 
 func TestGenerateMigration_DropFunction(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{}
 	d := &diff.SchemaDiff{
 		FunctionsRemoved: []string{"old_func"},
@@ -3320,6 +3405,7 @@ func TestGenerateMigration_DropFunction(t *testing.T) {
 }
 
 func TestGenerateMigration_FunctionBodyChange(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{
@@ -3363,6 +3449,7 @@ func TestGenerateMigration_FunctionBodyChange(t *testing.T) {
 }
 
 func TestGenerateMigration_FunctionSignatureChange(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Functions: []model.Function{
 			{
@@ -3425,6 +3512,7 @@ func TestGenerateMigration_FunctionSignatureChange(t *testing.T) {
 }
 
 func TestGenerateMigration_DomainAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		Domains: []model.Domain{
@@ -3461,6 +3549,7 @@ func TestGenerateMigration_DomainAdded(t *testing.T) {
 }
 
 func TestGenerateMigration_DomainRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "app"}
 	d := &diff.SchemaDiff{
 		DomainsRemoved: []string{"slug"},
@@ -3498,6 +3587,7 @@ func TestGenerateMigration_DomainRemoved(t *testing.T) {
 }
 
 func TestGenerateMigration_DomainCheckChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "app"}
 	d := &diff.SchemaDiff{
 		DomainsChanged: []diff.DomainDiff{
@@ -3534,6 +3624,7 @@ func TestGenerateMigration_DomainCheckChanged(t *testing.T) {
 }
 
 func TestOpToSQL_CreateDomain(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "create_domain",
 		Name:   "slug",
@@ -3561,6 +3652,7 @@ func TestOpToSQL_CreateDomain(t *testing.T) {
 }
 
 func TestOpToSQL_DropDomain(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "drop_domain",
 		Name:   "slug",
@@ -3576,6 +3668,7 @@ func TestOpToSQL_DropDomain(t *testing.T) {
 }
 
 func TestOpToSQL_AlterDomainAddConstraint(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "alter_domain_add_constraint",
 		Name:   "slug",
@@ -3596,6 +3689,7 @@ func TestOpToSQL_AlterDomainAddConstraint(t *testing.T) {
 }
 
 func TestOpToSQL_AlterDomainDropConstraint(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "alter_domain_drop_constraint",
 		Name:   "slug",
@@ -3615,6 +3709,7 @@ func TestOpToSQL_AlterDomainDropConstraint(t *testing.T) {
 }
 
 func TestGenerateMigration_DomainBaseTypeChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		Domains: []model.Domain{
@@ -3668,6 +3763,7 @@ func TestGenerateMigration_DomainBaseTypeChanged(t *testing.T) {
 }
 
 func TestGenerateMigration_DomainDefaultChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "app"}
 	d := &diff.SchemaDiff{
 		DomainsChanged: []diff.DomainDiff{
@@ -3696,6 +3792,7 @@ func TestGenerateMigration_DomainDefaultChanged(t *testing.T) {
 }
 
 func TestGenerateMigration_DomainDefaultRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "app"}
 	d := &diff.SchemaDiff{
 		DomainsChanged: []diff.DomainDiff{
@@ -3724,6 +3821,7 @@ func TestGenerateMigration_DomainDefaultRemoved(t *testing.T) {
 }
 
 func TestGenerateMigration_DomainNotNullChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{Name: "app"}
 	d := &diff.SchemaDiff{
 		DomainsChanged: []diff.DomainDiff{
@@ -3752,6 +3850,7 @@ func TestGenerateMigration_DomainNotNullChanged(t *testing.T) {
 }
 
 func TestOpToSQL_AlterDomainSetDefault(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:      "alter_domain_set_default",
 		Name:    "counter",
@@ -3769,6 +3868,7 @@ func TestOpToSQL_AlterDomainSetDefault(t *testing.T) {
 }
 
 func TestOpToSQL_AlterDomainDropDefault(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "alter_domain_drop_default",
 		Name:   "counter",
@@ -3784,6 +3884,7 @@ func TestOpToSQL_AlterDomainDropDefault(t *testing.T) {
 }
 
 func TestOpToSQL_AlterDomainSetNotNull(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "alter_domain_set_not_null",
 		Name:   "slug",
@@ -3799,6 +3900,7 @@ func TestOpToSQL_AlterDomainSetNotNull(t *testing.T) {
 }
 
 func TestOpToSQL_AlterDomainDropNotNull(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "alter_domain_drop_not_null",
 		Name:   "slug",
@@ -3814,6 +3916,7 @@ func TestOpToSQL_AlterDomainDropNotNull(t *testing.T) {
 }
 
 func TestGenerateMigration_TriggerOnNewTable(t *testing.T) {
+	testenv.Isolate(t)
 	d := &diff.SchemaDiff{
 		TablesAdded: []string{"orders"},
 	}
@@ -3855,6 +3958,7 @@ func TestGenerateMigration_TriggerOnNewTable(t *testing.T) {
 }
 
 func TestGenerateMigration_TriggerAdded(t *testing.T) {
+	testenv.Isolate(t)
 	d := &diff.SchemaDiff{
 		TablesChanged: []diff.TableDiff{
 			{
@@ -3882,6 +3986,7 @@ func TestGenerateMigration_TriggerAdded(t *testing.T) {
 }
 
 func TestGenerateMigration_TriggerRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	d := &diff.SchemaDiff{
 		TablesChanged: []diff.TableDiff{
 			{
@@ -3907,6 +4012,7 @@ func TestGenerateMigration_TriggerRemoved(t *testing.T) {
 }
 
 func TestGenerateMigration_TriggerChanged(t *testing.T) {
+	testenv.Isolate(t)
 	d := &diff.SchemaDiff{
 		TablesChanged: []diff.TableDiff{
 			{
@@ -3948,6 +4054,7 @@ func TestGenerateMigration_TriggerChanged(t *testing.T) {
 }
 
 func TestOpToSQL_CreateTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:     "audit_insert",
 		Function: "audit_fn",
@@ -3983,6 +4090,7 @@ func TestOpToSQL_CreateTrigger(t *testing.T) {
 }
 
 func TestGenerateMigration_FKChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name:      "game",
 		PGVersion: 17,
@@ -4050,6 +4158,7 @@ func TestGenerateMigration_FKChanged(t *testing.T) {
 // --- RLS policy migration tests ---
 
 func TestGenerateMigration_NewTableWithRLS(t *testing.T) {
+	testenv.Isolate(t)
 	pol := model.Policy{
 		Name:      "users_select",
 		Type:      "PERMISSIVE",
@@ -4121,6 +4230,7 @@ func TestGenerateMigration_NewTableWithRLS(t *testing.T) {
 }
 
 func TestGenerateMigration_EnableRLSChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:      "documents",
@@ -4157,6 +4267,7 @@ func TestGenerateMigration_EnableRLSChanged(t *testing.T) {
 }
 
 func TestGenerateMigration_DisableRLS(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:      "documents",
@@ -4193,6 +4304,7 @@ func TestGenerateMigration_DisableRLS(t *testing.T) {
 }
 
 func TestGenerateMigration_ForceRLSChanged(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:     "documents",
@@ -4229,6 +4341,7 @@ func TestGenerateMigration_ForceRLSChanged(t *testing.T) {
 }
 
 func TestGenerateMigration_NoForceRLS(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:     "documents",
@@ -4265,6 +4378,7 @@ func TestGenerateMigration_NoForceRLS(t *testing.T) {
 }
 
 func TestGenerateMigration_PolicyAdded(t *testing.T) {
+	testenv.Isolate(t)
 	pol := model.Policy{
 		Name:      "users_select",
 		Type:      "PERMISSIVE",
@@ -4315,6 +4429,7 @@ func TestGenerateMigration_PolicyAdded(t *testing.T) {
 }
 
 func TestGenerateMigration_PolicyRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "documents",
@@ -4354,6 +4469,7 @@ func TestGenerateMigration_PolicyRemoved(t *testing.T) {
 }
 
 func TestGenerateMigration_PolicyChanged(t *testing.T) {
+	testenv.Isolate(t)
 	newPol := model.Policy{
 		Name:      "users_select",
 		Type:      "PERMISSIVE",
@@ -4407,6 +4523,7 @@ func TestGenerateMigration_PolicyChanged(t *testing.T) {
 }
 
 func TestOpToSQL_CreatePolicy(t *testing.T) {
+	testenv.Isolate(t)
 	pol := model.Policy{
 		Name:      "users_select",
 		Type:      "PERMISSIVE",
@@ -4434,6 +4551,7 @@ func TestOpToSQL_CreatePolicy(t *testing.T) {
 }
 
 func TestOpToSQL_DropPolicy(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "drop_policy",
 		Table:  "public.documents",
@@ -4450,6 +4568,7 @@ func TestOpToSQL_DropPolicy(t *testing.T) {
 }
 
 func TestOpToSQL_EnableRLS(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "enable_rls",
 		Table:  "public.documents",
@@ -4462,6 +4581,7 @@ func TestOpToSQL_EnableRLS(t *testing.T) {
 }
 
 func TestOpToSQL_DisableRLS(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "disable_rls",
 		Table:  "public.documents",
@@ -4474,6 +4594,7 @@ func TestOpToSQL_DisableRLS(t *testing.T) {
 }
 
 func TestOpToSQL_ForceRLS(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "force_rls",
 		Table:  "public.documents",
@@ -4486,6 +4607,7 @@ func TestOpToSQL_ForceRLS(t *testing.T) {
 }
 
 func TestOpToSQL_NoForceRLS(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:     "no_force_rls",
 		Table:  "public.documents",
@@ -4506,6 +4628,7 @@ func opsString(ops []DDLOp) string {
 }
 
 func TestOpToSQL_CreateTableConsolidated(t *testing.T) {
+	testenv.Isolate(t)
 	op := DDLOp{
 		Op:      "create_table",
 		Table:   "public.users",
@@ -4544,6 +4667,7 @@ func TestOpToSQL_CreateTableConsolidated(t *testing.T) {
 }
 
 func TestBatchSize_TOMLRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "Test batched DML",
 		DMLOps: []DMLOp{
@@ -4578,6 +4702,7 @@ func TestBatchSize_TOMLRoundTrip(t *testing.T) {
 }
 
 func TestBatchSize_ZeroNotSerialized(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "No batching",
 		DMLOps: []DMLOp{
@@ -4595,6 +4720,7 @@ func TestBatchSize_ZeroNotSerialized(t *testing.T) {
 }
 
 func TestGenerateMigration_NonImmutableDefault(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name       string
 		defaultVal string
@@ -4662,6 +4788,7 @@ func TestGenerateMigration_NonImmutableDefault(t *testing.T) {
 }
 
 func TestIsNonImmutableDefault(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		val    interface{}
 		expect bool
@@ -4693,6 +4820,7 @@ func TestIsNonImmutableDefault(t *testing.T) {
 }
 
 func TestGenerateMigration_SMTransitionChangeRegeneratesTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -4782,6 +4910,7 @@ func TestGenerateMigration_SMTransitionChangeRegeneratesTrigger(t *testing.T) {
 }
 
 func TestGenerateMigration_SMTransitionChangeNoEnforceTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	// When EnforceTrigger is false, no trigger ops should be generated.
 	desired := &model.Schema{
 		Name: "app",
@@ -4834,6 +4963,7 @@ func TestGenerateMigration_SMTransitionChangeNoEnforceTrigger(t *testing.T) {
 }
 
 func TestGenerateMigration_SMTransitionChangeOpToSQL(t *testing.T) {
+	testenv.Isolate(t)
 	// Verify OpToSQL correctly renders SM trigger ops.
 	funcOp := DDLOp{
 		Op:     "create_sm_trigger_function",
@@ -4884,6 +5014,7 @@ func createMigrationDir(t *testing.T, versions ...string) string {
 }
 
 func TestIntegration_Baseline(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -4910,6 +5041,7 @@ func TestIntegration_Baseline(t *testing.T) {
 }
 
 func TestIntegration_BaselineIdempotent(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -4942,6 +5074,7 @@ func TestIntegration_BaselineIdempotent(t *testing.T) {
 // the history-coverage bug: baseline must record ALL discovered versions <=
 // target so that a subsequent Apply finds zero pending migrations.
 func TestIntegration_BaselineRecordsAllVersions(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -4982,6 +5115,7 @@ func TestIntegration_BaselineRecordsAllVersions(t *testing.T) {
 // TestIntegration_BaselineAdditiveRerun tests additive idempotency: re-running
 // baseline after new migration files are added records the missing versions.
 func TestIntegration_BaselineAdditiveRerun(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -5027,6 +5161,7 @@ func TestIntegration_BaselineAdditiveRerun(t *testing.T) {
 // migration file with version < max-applied was added after later versions
 // were applied.
 func TestIntegration_BaselineOutOfOrderGuard(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -5060,6 +5195,7 @@ func TestIntegration_BaselineOutOfOrderGuard(t *testing.T) {
 // TestIntegration_BaselineDivergence tests that baseline detects when a
 // previously recorded version has no corresponding migration file (deleted).
 func TestIntegration_BaselineDivergence(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := setupEphemeralDB(t)
 	ctx := context.Background()
 
@@ -5088,6 +5224,7 @@ func TestIntegration_BaselineDivergence(t *testing.T) {
 }
 
 func TestGenerateMigration_CreateTableRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	// RED-GREEN: create_table ops generated by GenerateMigration must survive
 	// the WriteMigrationFile -> ParseMigrationFile round trip with all column
 	// definitions intact. Before the fix, ConsolidatedOps was never populated

@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -77,6 +78,7 @@ func forkChain(t *testing.T) (p *ChainProject, r1, r2, r3, r4 rev.Revision) {
 // originals, write the remap, leave a single consistent live head, and serve a
 // database at a rebased-away revision forward (never NoPathError).
 func TestRebaseResolvesForkAndServesForward(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, r2, r3, r4 := forkChain(t)
 
 	// Two heads before rebase.

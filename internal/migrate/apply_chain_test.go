@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -53,6 +54,7 @@ func twoTableDesired() *model.Schema {
 // renders columns + PK only, and the self-contained create_table carries an empty
 // enum/domain closure).
 func TestChainApplyRenderMatchesLegacy(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -110,6 +112,7 @@ func TestChainApplyRenderMatchesLegacy(t *testing.T) {
 // manifest + object store yields a model whose revision equals the recorded head
 // (decode∘enc = id on canonicalized models). It also exercises the ChainHead seam.
 func TestReconstructModelRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

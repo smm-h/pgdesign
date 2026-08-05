@@ -1,6 +1,7 @@
 package chain_test
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -97,6 +98,7 @@ func mustSame(t *testing.T, what string, a, b rev.Revision) {
 // type / pg_version / extension / GROUPS changes flip revisions; no-op rebuilds
 // don't).
 func TestRevisionSensitivity(t *testing.T) {
+	testenv.Isolate(t)
 	base := mustRev(t, sensitivityBase())
 
 	// Comment change.
@@ -164,6 +166,7 @@ func TestRevisionSensitivity(t *testing.T) {
 // semantic does NOT flip the revision: recanonicalizing, and permuting a
 // canonical-only collection (table declaration order), both preserve identity.
 func TestRevisionStableOnNoOpRebuild(t *testing.T) {
+	testenv.Isolate(t)
 	base := mustRev(t, sensitivityBase())
 
 	// Recanonicalize the same model.

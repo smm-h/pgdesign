@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -60,6 +61,7 @@ func richSchema() *model.Schema {
 }
 
 func TestD2EnrichmentLayerIndexMarkers(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 
 	on := GenerateD2(s, nil, DefaultD2Options())
@@ -79,6 +81,7 @@ func TestD2EnrichmentLayerIndexMarkers(t *testing.T) {
 }
 
 func TestD2EnrichmentLayerNullable(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 
 	on := GenerateD2(s, nil, DefaultD2Options())
@@ -95,6 +98,7 @@ func TestD2EnrichmentLayerNullable(t *testing.T) {
 }
 
 func TestD2EnrichmentLayerComments(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 
 	on := GenerateD2(s, nil, DefaultD2Options())
@@ -111,6 +115,7 @@ func TestD2EnrichmentLayerComments(t *testing.T) {
 }
 
 func TestD2EnrichmentLayerChecks(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 
 	on := GenerateD2(s, nil, DefaultD2Options())
@@ -130,6 +135,7 @@ func TestD2EnrichmentLayerChecks(t *testing.T) {
 }
 
 func TestD2EnrichmentLayerRLSMarkers(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 
 	on := GenerateD2(s, nil, DefaultD2Options())
@@ -146,6 +152,7 @@ func TestD2EnrichmentLayerRLSMarkers(t *testing.T) {
 }
 
 func TestD2EnrichmentLayerEnums(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 
 	on := GenerateD2(s, nil, DefaultD2Options())
@@ -165,6 +172,7 @@ func TestD2EnrichmentLayerEnums(t *testing.T) {
 // shape (roadmap 7.4) is preserved across every combination of enrichment
 // layers, and that every combination compiles through the d2 library.
 func TestD2ReferenceShapeSurvivesAllLayerCombos(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 
 	type layer struct {
@@ -206,6 +214,7 @@ func TestD2ReferenceShapeSurvivesAllLayerCombos(t *testing.T) {
 }
 
 func TestD2SummaryModeOmitsColumns(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 	opts := DefaultD2Options()
 	opts.Summary = true
@@ -230,6 +239,7 @@ func TestD2SummaryModeOmitsColumns(t *testing.T) {
 // column defaults/nullability through the same shared helper as d2 — the
 // derivation lives in exactly one place.
 func TestSharedPresentationHelperUsedByDoc(t *testing.T) {
+	testenv.Isolate(t)
 	s := richSchema()
 	cps := deriveColumnPresentations(&s.Tables[0])
 

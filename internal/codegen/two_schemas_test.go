@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -57,6 +58,7 @@ func hasError(diags []diagnostic.Diagnostic) *diagnostic.Diagnostic {
 // two-schema same-named fixture and asserts each produces output with no error
 // diagnostics. This is the "full codegen must pass every generator" check.
 func TestTwoSchemas_EveryGenerator(t *testing.T) {
+	testenv.Isolate(t)
 	schema := twoSchemaCodegenSchema()
 
 	langs := []Lang{LangGo, LangTS, LangPython, LangJava, LangKotlin, LangZig}
@@ -125,6 +127,7 @@ func TestTwoSchemas_EveryGenerator(t *testing.T) {
 // contribute two relations total — not four, which is what schema-blind bare
 // keying would have produced.
 func TestTwoSchemas_GormScoping(t *testing.T) {
+	testenv.Isolate(t)
 	schema := twoSchemaCodegenSchema()
 	g := schema.FKGraph
 	if got := len(g.Reverse[model.TableKey("public", "account")]); got != 1 {

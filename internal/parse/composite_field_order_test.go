@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -59,6 +60,7 @@ var declaredExtendedFieldOrder = []string{
 // preserves TOML declaration order for composite type fields, end to end
 // through CollectUserTypes and the semtype registry's resolved TypeDef.Fields.
 func TestCompositeFieldOrder_DeclarationOrder(t *testing.T) {
+	testenv.Isolate(t)
 	names, resolved := parseCompositeFieldOrder(t)
 	assertOrder(t, "CollectUserTypes fields", names, declaredFieldOrder)
 	assertOrder(t, "semtype TypeDef.Fields", resolved, declaredFieldOrder)
@@ -69,6 +71,7 @@ func TestCompositeFieldOrder_DeclarationOrder(t *testing.T) {
 // Map-backed parsing randomizes the order across builds, which flaps
 // freshness checks and silently reorders composite fields (a semantic change).
 func TestCompositeFieldOrder_RebuildDeterminism(t *testing.T) {
+	testenv.Isolate(t)
 	const runs = 20
 	for i := 0; i < runs; i++ {
 		names, resolved := parseCompositeFieldOrder(t)
@@ -84,6 +87,7 @@ func TestCompositeFieldOrder_RebuildDeterminism(t *testing.T) {
 // extending another lists parent fields first in parent declaration order,
 // followed by child additions in child declaration order.
 func TestCompositeFieldOrder_ExtendsMerge(t *testing.T) {
+	testenv.Isolate(t)
 	raw, diags := Bytes([]byte(compositeExtendsOrderTOML))
 	if raw == nil {
 		t.Fatalf("parse failed: %v", diags)

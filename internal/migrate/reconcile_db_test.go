@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -76,6 +77,7 @@ func genesisEdgeFor(t *testing.T, p *ChainProject, desired *model.Schema) {
 // invisible (the three pgdesign_* structures exist post-apply, yet reconcile is
 // clean because introspection's 0.4 filters exclude them).
 func TestReconcileCleanApplyReportsEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -110,6 +112,7 @@ func TestReconcileCleanApplyReportsEmpty(t *testing.T) {
 // (a column pgdesign never created) drifts the world off the target model.
 // ReconcileAfterApply must surface it as a hard error naming the divergent object.
 func TestReconcileOutOfBandAlterSurfaces(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

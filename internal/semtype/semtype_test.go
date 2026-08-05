@@ -1,12 +1,14 @@
 package semtype
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestBuiltinResolve(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	tests := []struct {
@@ -66,6 +68,7 @@ func TestBuiltinResolve(t *testing.T) {
 }
 
 func TestResolveUnknownType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	_, err := r.Resolve("nonexistent")
 	if err == nil {
@@ -74,6 +77,7 @@ func TestResolveUnknownType(t *testing.T) {
 }
 
 func TestRegisterDuplicate(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewRegistry()
 	td := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("text")}
 	if err := r.Register(td); err != nil {
@@ -94,6 +98,7 @@ func TestRegisterDuplicate(t *testing.T) {
 }
 
 func TestLoadUserEnumType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -125,6 +130,7 @@ func TestLoadUserEnumType(t *testing.T) {
 }
 
 func TestLoadUserScalarTypeWithCheck(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -157,6 +163,7 @@ func TestLoadUserScalarTypeWithCheck(t *testing.T) {
 }
 
 func TestLoadUserScalarTypeWithNotNull(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	notNull := false
@@ -184,6 +191,7 @@ func TestLoadUserScalarTypeWithNotNull(t *testing.T) {
 }
 
 func TestLoadUserTypeEnumNoValues(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -211,6 +219,7 @@ func TestLoadUserTypeEnumNoValues(t *testing.T) {
 }
 
 func TestLoadUserTypeUnknownBaseType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -239,6 +248,7 @@ func TestLoadUserTypeUnknownBaseType(t *testing.T) {
 }
 
 func TestLoadUserTypeCheckWithoutValuePlaceholder(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -268,6 +278,7 @@ func TestLoadUserTypeCheckWithoutValuePlaceholder(t *testing.T) {
 }
 
 func TestResolveColumnOverrideNullable(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// id type is NOT NULL by default
@@ -288,6 +299,7 @@ func TestResolveColumnOverrideNullable(t *testing.T) {
 }
 
 func TestResolveColumnOverrideDefault(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// money type has Default="0"
@@ -309,6 +321,7 @@ func TestResolveColumnOverrideDefault(t *testing.T) {
 }
 
 func TestResolveColumnOverrideDefaultExpr(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// counter type has Default="0", override with expression
@@ -326,6 +339,7 @@ func TestResolveColumnOverrideDefaultExpr(t *testing.T) {
 }
 
 func TestResolveColumnNoOverrides(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	rc, err := r.ResolveColumn("slug", nil, nil, nil, nil)
@@ -344,6 +358,7 @@ func TestResolveColumnNoOverrides(t *testing.T) {
 }
 
 func TestResolveColumnUnknownType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	_, err := r.ResolveColumn("nonexistent", nil, nil, nil, nil)
@@ -353,6 +368,7 @@ func TestResolveColumnUnknownType(t *testing.T) {
 }
 
 func TestResolveColumnIdentity(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	rc, err := r.ResolveColumn("auto_id", nil, nil, nil, nil)
@@ -368,6 +384,7 @@ func TestResolveColumnIdentity(t *testing.T) {
 }
 
 func TestLoadUserEnumType_ValidDefault(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -398,6 +415,7 @@ func TestLoadUserEnumType_ValidDefault(t *testing.T) {
 }
 
 func TestLoadUserEnumType_InvalidDefault_E109(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -427,6 +445,7 @@ func TestLoadUserEnumType_InvalidDefault_E109(t *testing.T) {
 }
 
 func TestLoadUserEnumType_EmbeddedQuotes_E110(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	userTypes := []UserTypeDef{
 		{
@@ -459,6 +478,7 @@ func TestLoadUserEnumType_EmbeddedQuotes_E110(t *testing.T) {
 }
 
 func TestLoadUserScalarType_EmbeddedQuotes_E110(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	userTypes := []UserTypeDef{
 		{
@@ -485,6 +505,7 @@ func TestLoadUserScalarType_EmbeddedQuotes_E110(t *testing.T) {
 }
 
 func TestLoadUserScalarType_NoQuotes_NoE110(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	userTypes := []UserTypeDef{
 		{
@@ -503,6 +524,7 @@ func TestLoadUserScalarType_NoQuotes_NoE110(t *testing.T) {
 }
 
 func TestLoadUserScalarType_NumericDefault_NoE110(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	userTypes := []UserTypeDef{
 		{
@@ -521,6 +543,7 @@ func TestLoadUserScalarType_NumericDefault_NoE110(t *testing.T) {
 }
 
 func TestExtensionType_Accepted(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	r.AddExtensionTypes([]string{"vector"})
 
@@ -547,6 +570,7 @@ func TestExtensionType_Accepted(t *testing.T) {
 }
 
 func TestExtensionType_MissingExtension_E106(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	// No AddExtensionTypes call -- "vector" is not registered.
 
@@ -576,6 +600,7 @@ func TestExtensionType_MissingExtension_E106(t *testing.T) {
 }
 
 func TestExtensionType_UnknownStillRejected(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	r.AddExtensionTypes([]string{"vector"})
 
@@ -605,6 +630,7 @@ func TestExtensionType_UnknownStillRejected(t *testing.T) {
 }
 
 func TestLoadUserScalarType_RangeTypes(t *testing.T) {
+	testenv.Isolate(t)
 	rangeTypes := []string{
 		"int4range", "int8range", "numrange", "tsrange", "tstzrange", "daterange",
 		"int4multirange", "int8multirange", "nummultirange", "tsmultirange", "tstzmultirange", "datemultirange",
@@ -636,6 +662,7 @@ func TestLoadUserScalarType_RangeTypes(t *testing.T) {
 }
 
 func TestLoadUserCompositeType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -686,6 +713,7 @@ func TestLoadUserCompositeType(t *testing.T) {
 }
 
 func TestLoadUserCompositeType_NoFields(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -714,6 +742,7 @@ func TestLoadUserCompositeType_NoFields(t *testing.T) {
 }
 
 func TestLoadUserCompositeType_NilFields(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -741,6 +770,7 @@ func TestLoadUserCompositeType_NilFields(t *testing.T) {
 }
 
 func TestLoadUserCompositeType_InvalidFieldType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -772,6 +802,7 @@ func TestLoadUserCompositeType_InvalidFieldType(t *testing.T) {
 }
 
 func TestCompositeTypeDefsEqual(t *testing.T) {
+	testenv.Isolate(t)
 	a := &TypeDef{
 		Name:     "address",
 		Kind:     KindComposite,
@@ -837,6 +868,7 @@ func TestCompositeTypeDefsEqual(t *testing.T) {
 }
 
 func TestLoadStateMachineType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	enforce := true
@@ -939,6 +971,7 @@ func TestLoadStateMachineType(t *testing.T) {
 }
 
 func TestLoadStateMachineType_MissingInitialState(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -970,6 +1003,7 @@ func TestLoadStateMachineType_MissingInitialState(t *testing.T) {
 }
 
 func TestLoadStateMachineType_InvalidInitialState(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1001,6 +1035,7 @@ func TestLoadStateMachineType_InvalidInitialState(t *testing.T) {
 }
 
 func TestLoadStateMachineType_InvalidTransitionTarget(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1035,6 +1070,7 @@ func TestLoadStateMachineType_InvalidTransitionTarget(t *testing.T) {
 }
 
 func TestLoadStateMachineType_InvalidTransitionFrom(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1069,6 +1105,7 @@ func TestLoadStateMachineType_InvalidTransitionFrom(t *testing.T) {
 }
 
 func TestLoadStateMachineType_DuplicateStates(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1101,6 +1138,7 @@ func TestLoadStateMachineType_DuplicateStates(t *testing.T) {
 }
 
 func TestLoadStateMachineType_EmptyStates(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1128,6 +1166,7 @@ func TestLoadStateMachineType_EmptyStates(t *testing.T) {
 }
 
 func TestStateMachineTypeDefsEqual(t *testing.T) {
+	testenv.Isolate(t)
 	a := &TypeDef{
 		Name:         "order_status",
 		Kind:         KindStateMachine,
@@ -1204,6 +1243,7 @@ func TestStateMachineTypeDefsEqual(t *testing.T) {
 }
 
 func TestLoadStateMachineType_TransitionMissingName(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1238,6 +1278,7 @@ func TestLoadStateMachineType_TransitionMissingName(t *testing.T) {
 }
 
 func TestShadowBuiltin_Success(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// The builtin "id" is KindScalar with BaseType "uuid" and DefaultExpr "gen_random_uuid()".
@@ -1287,6 +1328,7 @@ func TestShadowBuiltin_Success(t *testing.T) {
 }
 
 func TestShadowBuiltin_SealedViolation_Kind(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// Builtin "id" is KindScalar. Try to shadow with KindEnum.
@@ -1317,6 +1359,7 @@ func TestShadowBuiltin_SealedViolation_Kind(t *testing.T) {
 }
 
 func TestShadowBuiltin_SealedViolation_BaseType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// Builtin "id" has BaseType "uuid". Try to shadow with BaseType "text".
@@ -1345,6 +1388,7 @@ func TestShadowBuiltin_SealedViolation_BaseType(t *testing.T) {
 }
 
 func TestIsBuiltin(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// Before shadowing: "id" is builtin.
@@ -1378,6 +1422,7 @@ func TestIsBuiltin(t *testing.T) {
 }
 
 func TestIdempotentRegistration(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewRegistry()
 	td1 := &TypeDef{Name: "test", Kind: KindScalar, BaseType: typeinfo.T("text"), Source: "user"}
 	if err := r.Register(td1); err != nil {
@@ -1397,6 +1442,7 @@ func TestIdempotentRegistration(t *testing.T) {
 }
 
 func TestExtendsScalarBuiltin(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// Extend builtin "id" (uuid, NOT NULL, DefaultExpr gen_random_uuid())
@@ -1455,6 +1501,7 @@ func TestExtendsScalarBuiltin(t *testing.T) {
 }
 
 func TestExtendsScalarUserType(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// Type A is a user scalar, then B extends A.
@@ -1504,6 +1551,7 @@ func TestExtendsScalarUserType(t *testing.T) {
 }
 
 func TestExtendsSelfShadowing(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// [types.id] extends = "id" — same name. Should resolve against the
@@ -1555,6 +1603,7 @@ func TestExtendsSelfShadowing(t *testing.T) {
 }
 
 func TestExtendsCircular(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// A extends B, B extends A — circular.
@@ -1587,6 +1636,7 @@ func TestExtendsCircular(t *testing.T) {
 }
 
 func TestExtendsUnknownTarget(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1614,6 +1664,7 @@ func TestExtendsUnknownTarget(t *testing.T) {
 }
 
 func TestExtendsMultiLevel(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// C extends B extends A. Verify C has A's fields + B's overrides + C's overrides.
@@ -1688,6 +1739,7 @@ func TestExtendsMultiLevel(t *testing.T) {
 }
 
 func TestExtendsSealedFieldViolation(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// Extend builtin "id" (BaseType uuid) but try to set a different BaseType.
@@ -1719,6 +1771,7 @@ func TestExtendsSealedFieldViolation(t *testing.T) {
 // --- Enum extends tests ---
 
 func TestExtendsEnumBasic(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1765,6 +1818,7 @@ func TestExtendsEnumBasic(t *testing.T) {
 }
 
 func TestExtendsEnumDedup(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1802,6 +1856,7 @@ func TestExtendsEnumDedup(t *testing.T) {
 }
 
 func TestExtendsEnumNoNewValues_E117(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1832,6 +1887,7 @@ func TestExtendsEnumNoNewValues_E117(t *testing.T) {
 }
 
 func TestExtendsEnumOverrideComment(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1872,6 +1928,7 @@ func TestExtendsEnumOverrideComment(t *testing.T) {
 // --- Composite extends tests ---
 
 func TestExtendsCompositeBasic(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1926,6 +1983,7 @@ func TestExtendsCompositeBasic(t *testing.T) {
 }
 
 func TestExtendsCompositeFieldCollision_E118(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -1962,6 +2020,7 @@ func TestExtendsCompositeFieldCollision_E118(t *testing.T) {
 }
 
 func TestExtendsCompositeOverrideComment(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -2000,6 +2059,7 @@ func TestExtendsCompositeOverrideComment(t *testing.T) {
 // --- State machine extends tests ---
 
 func TestExtendsStateMachineBasic(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	enforceTrue := true
@@ -2082,6 +2142,7 @@ func TestExtendsStateMachineBasic(t *testing.T) {
 }
 
 func TestExtendsStateMachineEnforceTriggerOverride(t *testing.T) {
+	testenv.Isolate(t)
 	baseSM := func(enforce bool) UserTypeDef {
 		v := enforce
 		return UserTypeDef{
@@ -2169,6 +2230,7 @@ func TestExtendsStateMachineEnforceTriggerOverride(t *testing.T) {
 }
 
 func TestExtendsStateMachineStateCollision_E119(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -2210,6 +2272,7 @@ func TestExtendsStateMachineStateCollision_E119(t *testing.T) {
 }
 
 func TestExtendsStateMachineInitialOverride(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{
@@ -2261,6 +2324,7 @@ func TestExtendsStateMachineInitialOverride(t *testing.T) {
 }
 
 func TestExtendsStateMachineUnreachable_W027(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	userTypes := []UserTypeDef{

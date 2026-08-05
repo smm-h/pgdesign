@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"testing"
 
@@ -51,6 +52,7 @@ CREATE FUNCTION bump(x integer) RETURNS integer LANGUAGE sql AS $$ SELECT x + 1 
 }
 
 func TestExistenceChecks(t *testing.T) {
+	testenv.Isolate(t)
 	ctx, q := setupDB(t)
 
 	checks := []struct {
@@ -88,6 +90,7 @@ func TestExistenceChecks(t *testing.T) {
 }
 
 func TestColumn(t *testing.T) {
+	testenv.Isolate(t)
 	ctx, q := setupDB(t)
 	v, err := Version(ctx, q)
 	if err != nil {
@@ -127,6 +130,7 @@ func TestColumn(t *testing.T) {
 }
 
 func TestConstraintAndIndex(t *testing.T) {
+	testenv.Isolate(t)
 	ctx, q := setupDB(t)
 
 	def, ok, err := ConstraintDef(ctx, q, "public", "users", "users_age_chk")
@@ -153,6 +157,7 @@ func TestConstraintAndIndex(t *testing.T) {
 }
 
 func TestIndexInvalid(t *testing.T) {
+	testenv.Isolate(t)
 	ctx, c := setupDB(t)
 	if _, err := c.Exec(ctx, "CREATE TABLE dups (v integer NOT NULL)"); err != nil {
 		t.Fatal(err)

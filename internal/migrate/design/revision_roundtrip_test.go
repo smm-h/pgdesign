@@ -3,6 +3,7 @@ package design
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"sort"
@@ -31,6 +32,7 @@ type revisionFile struct {
 }
 
 func TestRevisionManifestRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	s := buildFixtureModel()
 	store, err := objstore.New(t.TempDir(), enc.CodecVersion)
 	if err != nil {

@@ -1,6 +1,7 @@
 package fd
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"reflect"
 	"sort"
 	"strings"
@@ -8,6 +9,7 @@ import (
 )
 
 func TestClosure_SingleChain(t *testing.T) {
+	testenv.Isolate(t)
 	// A→B, B→C, C→D: closure of {A} should be {A,B,C,D}
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B"}},
@@ -22,6 +24,7 @@ func TestClosure_SingleChain(t *testing.T) {
 }
 
 func TestClosure_CompositeKey(t *testing.T) {
+	testenv.Isolate(t)
 	// A→C, BC→D: closure of {A,B} should be {A,B,C,D}
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"C"}},
@@ -35,6 +38,7 @@ func TestClosure_CompositeKey(t *testing.T) {
 }
 
 func TestClosure_NoFDs(t *testing.T) {
+	testenv.Isolate(t)
 	got := Closure([]string{"A", "B"}, nil)
 	want := []string{"A", "B"}
 	if !reflect.DeepEqual(got, want) {
@@ -43,6 +47,7 @@ func TestClosure_NoFDs(t *testing.T) {
 }
 
 func TestClosure_MultipleDependents(t *testing.T) {
+	testenv.Isolate(t)
 	// A→{B,C}: closure of {A} should be {A,B,C}
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
@@ -55,6 +60,7 @@ func TestClosure_MultipleDependents(t *testing.T) {
 }
 
 func TestMinimalCover_RemovesRedundant(t *testing.T) {
+	testenv.Isolate(t)
 	// A→B, B→C, A→C: the FD A→C is redundant (derivable via A→B, B→C)
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B"}},
@@ -72,6 +78,7 @@ func TestMinimalCover_RemovesRedundant(t *testing.T) {
 }
 
 func TestMinimalCover_RemovesExtraneousLHS(t *testing.T) {
+	testenv.Isolate(t)
 	// A→B, AB→C should simplify to A→B, A→C (since A→B makes B extraneous in AB→C)
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B"}},
@@ -88,6 +95,7 @@ func TestMinimalCover_RemovesExtraneousLHS(t *testing.T) {
 }
 
 func TestMinimalCover_DecomposesRHS(t *testing.T) {
+	testenv.Isolate(t)
 	// A→{B,C} should decompose into A→B, A→C
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
@@ -103,6 +111,7 @@ func TestMinimalCover_DecomposesRHS(t *testing.T) {
 }
 
 func TestCandidateKeys_CompositeAndAlternate(t *testing.T) {
+	testenv.Isolate(t)
 	// R(A,B,C,D), FDs: AB→CD, C→A
 	// Keys should be {A,B} and {B,C}
 	allAttrs := []string{"A", "B", "C", "D"}
@@ -118,6 +127,7 @@ func TestCandidateKeys_CompositeAndAlternate(t *testing.T) {
 }
 
 func TestCandidateKeys_SingleKey(t *testing.T) {
+	testenv.Isolate(t)
 	// R(A,B,C), FDs: A→B, A→C — only key is {A}
 	allAttrs := []string{"A", "B", "C"}
 	fds := []FuncDep{
@@ -132,6 +142,7 @@ func TestCandidateKeys_SingleKey(t *testing.T) {
 }
 
 func TestCandidateKeys_AllAttrsAreKey(t *testing.T) {
+	testenv.Isolate(t)
 	// R(A,B,C) with no FDs — the only candidate key is {A,B,C}
 	allAttrs := []string{"A", "B", "C"}
 	got := CandidateKeys(allAttrs, nil)
@@ -142,6 +153,7 @@ func TestCandidateKeys_AllAttrsAreKey(t *testing.T) {
 }
 
 func TestIsSuperkey_True(t *testing.T) {
+	testenv.Isolate(t)
 	allAttrs := []string{"A", "B", "C", "D"}
 	fds := []FuncDep{
 		{Determinant: []string{"A", "B"}, Dependent: []string{"C", "D"}},
@@ -152,6 +164,7 @@ func TestIsSuperkey_True(t *testing.T) {
 }
 
 func TestIsSuperkey_False(t *testing.T) {
+	testenv.Isolate(t)
 	allAttrs := []string{"A", "B", "C", "D"}
 	fds := []FuncDep{
 		{Determinant: []string{"A", "B"}, Dependent: []string{"C", "D"}},
@@ -162,6 +175,7 @@ func TestIsSuperkey_False(t *testing.T) {
 }
 
 func TestIsSuperkey_SupersetOfKey(t *testing.T) {
+	testenv.Isolate(t)
 	allAttrs := []string{"A", "B", "C", "D"}
 	fds := []FuncDep{
 		{Determinant: []string{"A", "B"}, Dependent: []string{"C", "D"}},
@@ -172,6 +186,7 @@ func TestIsSuperkey_SupersetOfKey(t *testing.T) {
 }
 
 func TestIsPrime_True(t *testing.T) {
+	testenv.Isolate(t)
 	keys := [][]string{{"A", "B"}, {"B", "C"}}
 	if !IsPrime("A", keys) {
 		t.Error("expected A to be prime (in key {A,B})")
@@ -185,6 +200,7 @@ func TestIsPrime_True(t *testing.T) {
 }
 
 func TestIsPrime_False(t *testing.T) {
+	testenv.Isolate(t)
 	keys := [][]string{{"A", "B"}, {"B", "C"}}
 	if IsPrime("D", keys) {
 		t.Error("expected D to not be prime")
@@ -192,6 +208,7 @@ func TestIsPrime_False(t *testing.T) {
 }
 
 func TestIsSubset(t *testing.T) {
+	testenv.Isolate(t)
 	if !isSubset([]string{"A", "B"}, []string{"A", "B", "C"}) {
 		t.Error("{A,B} should be subset of {A,B,C}")
 	}
@@ -204,6 +221,7 @@ func TestIsSubset(t *testing.T) {
 }
 
 func TestSetUnion(t *testing.T) {
+	testenv.Isolate(t)
 	got := setUnion([]string{"A", "C"}, []string{"B", "C"})
 	want := []string{"A", "B", "C"}
 	if !reflect.DeepEqual(got, want) {
@@ -212,6 +230,7 @@ func TestSetUnion(t *testing.T) {
 }
 
 func TestSetEquals(t *testing.T) {
+	testenv.Isolate(t)
 	if !setEquals([]string{"A", "B"}, []string{"A", "B"}) {
 		t.Error("equal sets should be equal")
 	}
@@ -224,6 +243,7 @@ func TestSetEquals(t *testing.T) {
 }
 
 func TestClosure_IsDeterministic(t *testing.T) {
+	testenv.Isolate(t)
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"C", "B"}},
 		{Determinant: []string{"B"}, Dependent: []string{"D"}},
@@ -239,6 +259,7 @@ func TestClosure_IsDeterministic(t *testing.T) {
 // --- BCNFDecompose tests ---
 
 func TestBCNFDecompose_AlreadyBCNF(t *testing.T) {
+	testenv.Isolate(t)
 	allAttrs := []string{"A", "B", "C"}
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B", "C"}},
@@ -256,6 +277,7 @@ func TestBCNFDecompose_AlreadyBCNF(t *testing.T) {
 }
 
 func TestBCNFDecompose_SimpleViolation(t *testing.T) {
+	testenv.Isolate(t)
 	allAttrs := []string{"A", "B", "C"}
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B"}},
@@ -305,6 +327,7 @@ func TestBCNFDecompose_SimpleViolation(t *testing.T) {
 }
 
 func TestBCNFDecompose_LosesDependency(t *testing.T) {
+	testenv.Isolate(t)
 	allAttrs := []string{"A", "B", "C"}
 	fds := []FuncDep{
 		{Determinant: []string{"A", "B"}, Dependent: []string{"C"}},
@@ -339,6 +362,7 @@ func TestBCNFDecompose_LosesDependency(t *testing.T) {
 // --- IsLosslessJoin tests ---
 
 func TestIsLosslessJoin_Valid(t *testing.T) {
+	testenv.Isolate(t)
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B"}},
 		{Determinant: []string{"B"}, Dependent: []string{"C"}},
@@ -352,6 +376,7 @@ func TestIsLosslessJoin_Valid(t *testing.T) {
 }
 
 func TestIsLosslessJoin_Invalid(t *testing.T) {
+	testenv.Isolate(t)
 	fds := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B"}},
 	}
@@ -366,6 +391,7 @@ func TestIsLosslessJoin_Invalid(t *testing.T) {
 // --- PreservesDependencies tests ---
 
 func TestPreservesDependencies_AllPreserved(t *testing.T) {
+	testenv.Isolate(t)
 	original := []FuncDep{
 		{Determinant: []string{"A"}, Dependent: []string{"B"}},
 		{Determinant: []string{"B"}, Dependent: []string{"C"}},
@@ -381,6 +407,7 @@ func TestPreservesDependencies_AllPreserved(t *testing.T) {
 }
 
 func TestPreservesDependencies_LostFDs(t *testing.T) {
+	testenv.Isolate(t)
 	original := []FuncDep{
 		{Determinant: []string{"A", "B"}, Dependent: []string{"C"}},
 		{Determinant: []string{"C"}, Dependent: []string{"B"}},
@@ -414,6 +441,7 @@ func TestPreservesDependencies_LostFDs(t *testing.T) {
 // --- Unexported helper tests ---
 
 func TestSetDifference(t *testing.T) {
+	testenv.Isolate(t)
 	got := setDifference([]string{"A", "B", "C"}, []string{"B"})
 	want := []string{"A", "C"}
 	if !reflect.DeepEqual(got, want) {
@@ -422,6 +450,7 @@ func TestSetDifference(t *testing.T) {
 }
 
 func TestSetIntersection(t *testing.T) {
+	testenv.Isolate(t)
 	got := setIntersection([]string{"A", "B", "C"}, []string{"B", "C", "D"})
 	want := []string{"B", "C"}
 	if !reflect.DeepEqual(got, want) {
@@ -430,6 +459,7 @@ func TestSetIntersection(t *testing.T) {
 }
 
 func TestItoa(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input int
 		want  string
@@ -451,6 +481,7 @@ func TestItoa(t *testing.T) {
 // --- FuncDep.String tests ---
 
 func TestFuncDep_String(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name string
 		fd   FuncDep
@@ -485,6 +516,7 @@ func TestFuncDep_String(t *testing.T) {
 // --- ArmstrongRelation tests ---
 
 func TestArmstrongRelation_3NFViolation(t *testing.T) {
+	testenv.Isolate(t)
 	// Table(A, B, C) with A->B, B->C: B->C is a 3NF violation
 	allAttrs := []string{"A", "B", "C"}
 	fds := []FuncDep{
@@ -521,6 +553,7 @@ func TestArmstrongRelation_3NFViolation(t *testing.T) {
 }
 
 func TestArmstrongRelation_BCNFViolation(t *testing.T) {
+	testenv.Isolate(t)
 	// Table(A, B, C) PK={A,B} deps: AB->C, C->B
 	// C->B is a BCNF violation (C is not a superkey)
 	allAttrs := []string{"A", "B", "C"}
@@ -554,6 +587,7 @@ func TestArmstrongRelation_BCNFViolation(t *testing.T) {
 // --- FormatRelation tests ---
 
 func TestFormatRelation(t *testing.T) {
+	testenv.Isolate(t)
 	allAttrs := []string{"A", "B", "C"}
 	rows := []map[string]string{
 		{"A": "1", "B": "x", "C": "p"},
@@ -574,6 +608,7 @@ func TestFormatRelation(t *testing.T) {
 }
 
 func TestFormatRelation_Truncation(t *testing.T) {
+	testenv.Isolate(t)
 	allAttrs := []string{"A"}
 	var rows []map[string]string
 	for i := 0; i < 15; i++ {

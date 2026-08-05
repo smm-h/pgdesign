@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestMinimalSchema(t *testing.T) {
+	testenv.Isolate(t)
 	path := filepath.Join("testdata", "minimal.toml")
 	schema, diags := File(path)
 	if schema == nil {
@@ -76,6 +78,7 @@ func TestMinimalSchema(t *testing.T) {
 }
 
 func TestEnumAndUserTypes(t *testing.T) {
+	testenv.Isolate(t)
 	path := filepath.Join("testdata", "minimal.toml")
 	schema, diags := File(path)
 	if schema == nil {
@@ -105,6 +108,7 @@ func TestEnumAndUserTypes(t *testing.T) {
 }
 
 func TestColumnOrderPreservation(t *testing.T) {
+	testenv.Isolate(t)
 	path := filepath.Join("testdata", "minimal.toml")
 	schema, diags := File(path)
 	if schema == nil {
@@ -140,6 +144,7 @@ func TestColumnOrderPreservation(t *testing.T) {
 }
 
 func TestErrorRecovery(t *testing.T) {
+	testenv.Isolate(t)
 	// Create a TOML with unknown keys and a missing type field
 	content := `format_version = 1
 [meta]
@@ -185,6 +190,7 @@ weird_field = "what"
 }
 
 func TestMultiSection(t *testing.T) {
+	testenv.Isolate(t)
 	// Verify that meta, types, and tables are all parsed from the same file
 	path := filepath.Join("testdata", "minimal.toml")
 	schema, diags := File(path)
@@ -230,6 +236,7 @@ func TestMultiSection(t *testing.T) {
 }
 
 func TestFileNotFound(t *testing.T) {
+	testenv.Isolate(t)
 	schema, diags := File("nonexistent.toml")
 	if schema != nil {
 		t.Error("expected nil schema for missing file")
@@ -240,6 +247,7 @@ func TestFileNotFound(t *testing.T) {
 }
 
 func TestInvalidTOML(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "bad.toml")
 	if err := os.WriteFile(path, []byte("this is not valid [ toml"), 0644); err != nil {
@@ -256,6 +264,7 @@ func TestInvalidTOML(t *testing.T) {
 }
 
 func TestFiles(t *testing.T) {
+	testenv.Isolate(t)
 	paths := []string{
 		filepath.Join("testdata", "multi", "auth.toml"),
 		filepath.Join("testdata", "multi", "game.toml"),
@@ -299,6 +308,7 @@ func TestFiles(t *testing.T) {
 }
 
 func TestDir(t *testing.T) {
+	testenv.Isolate(t)
 	schemas, diags := Dir(filepath.Join("testdata", "multi"))
 	if hasFatalErrors(diags) {
 		t.Fatalf("unexpected errors: %v", diags)
@@ -318,6 +328,7 @@ func TestDir(t *testing.T) {
 }
 
 func TestDirExcludesPgdesignToml(t *testing.T) {
+	testenv.Isolate(t)
 	// Create a temp dir with pgdesign.toml and a schema file.
 	tmpDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmpDir, "pgdesign.toml"), []byte(`[project]
@@ -346,6 +357,7 @@ schema = "test"
 }
 
 func TestFilesWithMissingFile(t *testing.T) {
+	testenv.Isolate(t)
 	paths := []string{
 		filepath.Join("testdata", "multi", "auth.toml"),
 		filepath.Join("testdata", "multi", "nonexistent.toml"),
@@ -372,6 +384,7 @@ func TestFilesWithMissingFile(t *testing.T) {
 }
 
 func TestOpclassSingleString(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -409,6 +422,7 @@ opclass = "gin_trgm_ops"
 }
 
 func TestOpclassPerColumnMap(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -455,6 +469,7 @@ opclass = { title = "gin_trgm_ops", body = "gin_trgm_ops" }
 }
 
 func TestOpclassPerColumnMixed(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -497,6 +512,7 @@ opclass = { name = "varchar_pattern_ops", code = "text_ops" }
 }
 
 func TestPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -605,6 +621,7 @@ with_check = "channel_id = current_setting('app.channel_id')::uuid"
 }
 
 func TestPolicyType(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -658,6 +675,7 @@ with_check = "user_id = current_user()"
 }
 
 func TestForceRLS(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -704,6 +722,7 @@ type = "id"
 }
 
 func TestArrayColumn(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -771,6 +790,7 @@ type = "integer"
 }
 
 func TestAppendOnly(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -808,6 +828,7 @@ type = "text"
 }
 
 func TestJSONSchemaAttribute(t *testing.T) {
+	testenv.Isolate(t)
 	path := filepath.Join("testdata", "json_schema.toml")
 	schema, diags := File(path)
 	if schema == nil {
@@ -839,6 +860,7 @@ func TestJSONSchemaAttribute(t *testing.T) {
 }
 
 func TestJSONSchemaFileMissing(t *testing.T) {
+	testenv.Isolate(t)
 	schema, diags := Bytes([]byte(`
 format_version = 1
 [meta]
@@ -872,6 +894,7 @@ json_schema = "nonexistent.json"
 }
 
 func TestJSONSchemaFileNotFound(t *testing.T) {
+	testenv.Isolate(t)
 	// Create a temp TOML file that references a nonexistent JSON schema
 	dir := t.TempDir()
 	tomlPath := filepath.Join(dir, "test.toml")
@@ -906,6 +929,7 @@ json_schema = "nonexistent.json"
 }
 
 func TestJSONSchemaFileInvalidJSON(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 	// Write an invalid JSON file
 	os.WriteFile(filepath.Join(dir, "bad.json"), []byte(`{not valid json`), 0644)
@@ -941,6 +965,7 @@ json_schema = "bad.json"
 }
 
 func TestIndexWithParams(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -981,6 +1006,7 @@ with = { m = "16", ef_construction = "200" }
 }
 
 func TestViewParsing(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1029,6 +1055,7 @@ depends_on = ["users"]
 }
 
 func TestViewMissingQuery(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1049,6 +1076,7 @@ comment = "No query"
 }
 
 func TestViewUnknownKey(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1069,6 +1097,7 @@ unknown_field = "oops"
 }
 
 func TestParseMaterializedView_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1112,6 +1141,7 @@ comment = "Monthly order statistics"
 }
 
 func TestParseMaterializedView_WithDataFalse(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1140,6 +1170,7 @@ with_data = false
 }
 
 func TestParseMaterializedView_WithIndexes(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1181,6 +1212,7 @@ unique = true
 }
 
 func TestParseMaterializedView_MissingQuery(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1201,6 +1233,7 @@ comment = "no query"
 }
 
 func TestParseMaterializedView_DependsOn(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1229,6 +1262,7 @@ depends_on = ["orders"]
 }
 
 func TestPartitionSingleColumn(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1272,6 +1306,7 @@ column = "created_at"
 }
 
 func TestPartitionMultiColumn(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1321,6 +1356,7 @@ columns = ["year", "region"]
 }
 
 func TestPartitionBothColumnAndColumnsError(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1359,6 +1395,7 @@ columns = ["created_at"]
 }
 
 func TestParseColumnCollation(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1403,6 +1440,7 @@ collation = "de_DE"
 }
 
 func TestParseColumnStatistics(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1447,6 +1485,7 @@ statistics = 1000
 }
 
 func TestParseIndexCollation_String(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1487,6 +1526,7 @@ collation = "C"
 }
 
 func TestParseIndexCollation_Map(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1533,6 +1573,7 @@ collation = { first_name = "de_DE", last_name = "C" }
 }
 
 func TestParseColumnCollationAndStatistics(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1584,6 +1625,7 @@ statistics = 1000
 }
 
 func TestParseExclusion(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1667,6 +1709,7 @@ initially_deferred = true
 }
 
 func TestParseExclusionLengthMismatch(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1707,6 +1750,7 @@ operators = ["="]
 }
 
 func TestParseExclusionDefaults(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1756,6 +1800,7 @@ operators = ["=", "&&"]
 }
 
 func TestParseUniqueDeferrable(t *testing.T) {
+	testenv.Isolate(t)
 	input := `
 format_version = 1
 [tables.users]
@@ -1793,6 +1838,7 @@ initially_deferred = true
 }
 
 func TestParseUniqueDefaults(t *testing.T) {
+	testenv.Isolate(t)
 	input := `
 format_version = 1
 [tables.users]
@@ -1822,6 +1868,7 @@ columns = ["email"]
 }
 
 func TestSequenceParsing_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1880,6 +1927,7 @@ comment = "Order ID sequence"
 }
 
 func TestSequenceParsing_Minimal(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1930,6 +1978,7 @@ schema = "test"
 }
 
 func TestSequenceParsing_UnknownKey(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1950,6 +1999,7 @@ unknown_field = "bad"
 }
 
 func TestSequenceParsing_InvalidTypes(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -1969,6 +2019,7 @@ start = "not_a_number"
 }
 
 func TestSequenceParsing_Multiple(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -2007,6 +2058,7 @@ start = 100
 }
 
 func TestFunctionParsing_WithBody(t *testing.T) {
+	testenv.Isolate(t)
 	toml := `
 format_version = 1
 [meta]
@@ -2097,6 +2149,7 @@ default = "0.0"
 }
 
 func TestFunctionParsing_Procedure(t *testing.T) {
+	testenv.Isolate(t)
 	toml := `
 format_version = 1
 [meta]
@@ -2128,6 +2181,7 @@ body = "DELETE FROM logs WHERE created_at < now() - interval '30 days';"
 }
 
 func TestFunctionParsing_WithFile(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 	sqlContent := "SELECT 1;"
 	if err := os.WriteFile(filepath.Join(dir, "calc.sql"), []byte(sqlContent), 0644); err != nil {
@@ -2161,6 +2215,7 @@ file = "calc.sql"
 }
 
 func TestFunctionParsing_MissingLanguage(t *testing.T) {
+	testenv.Isolate(t)
 	toml := `
 format_version = 1
 [meta]
@@ -2179,6 +2234,7 @@ body = "SELECT 1;"
 }
 
 func TestFunctionParsing_MissingBody(t *testing.T) {
+	testenv.Isolate(t)
 	toml := `
 format_version = 1
 [meta]
@@ -2203,6 +2259,7 @@ returns = "integer"
 }
 
 func TestFunctionParsing_BothBodyAndFile(t *testing.T) {
+	testenv.Isolate(t)
 	toml := `
 format_version = 1
 [meta]
@@ -2229,6 +2286,7 @@ file = "calc.sql"
 }
 
 func TestFunctionParsing_MissingReturns(t *testing.T) {
+	testenv.Isolate(t)
 	toml := `
 format_version = 1
 [meta]
@@ -2253,6 +2311,7 @@ body = "SELECT 1;"
 }
 
 func TestFunctionParsing_ArgsWithDefaults(t *testing.T) {
+	testenv.Isolate(t)
 	toml := `
 format_version = 1
 [meta]
@@ -2301,6 +2360,7 @@ default = "true"
 }
 
 func TestStateMachineTypeParsing(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -2438,6 +2498,7 @@ comment = "Cancel the order"
 }
 
 func TestStateMachineTypeParsing_TransitionMissingRequired(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -2474,6 +2535,7 @@ func hasFatalErrors(diags []diagnostic.Diagnostic) bool {
 }
 
 func TestTriggerParsing(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 schema = "app"
@@ -2579,6 +2641,7 @@ referencing_new = "new_rows"
 }
 
 func TestTriggerParsing_MinimalTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 schema = "app"
@@ -2645,6 +2708,7 @@ timing = "BEFORE"
 }
 
 func TestTriggerParsing_MissingRequired(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 schema = "app"
@@ -2669,6 +2733,7 @@ comment = "missing required"
 }
 
 func TestTriggerParsing_UnknownKey(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 schema = "app"
@@ -2696,6 +2761,7 @@ unknown_key = "value"
 }
 
 func TestParseGroups(t *testing.T) {
+	testenv.Isolate(t)
 	content := `
 format_version = 1
 [meta]
@@ -2752,6 +2818,7 @@ catalog = ["products"]
 }
 
 func TestParseGroupsEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	content := `
 format_version = 1
 [meta]
@@ -2776,6 +2843,7 @@ type = "id"
 }
 
 func TestParseMaintenanceSchedule(t *testing.T) {
+	testenv.Isolate(t)
 	content := `
 format_version = 1
 [meta]

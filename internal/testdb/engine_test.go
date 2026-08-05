@@ -2,6 +2,7 @@ package testdb
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"strings"
 	"sync"
@@ -28,6 +29,7 @@ func testManager(t *testing.T) *Manager {
 }
 
 func TestCreateAndDrop(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := testManager(t)
@@ -91,6 +93,7 @@ func TestCreateAndDrop(t *testing.T) {
 }
 
 func TestApplyDDL(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := testManager(t)
@@ -126,6 +129,7 @@ func TestApplyDDL(t *testing.T) {
 }
 
 func TestApplyDDL_ExtensionError(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := testManager(t)
@@ -141,6 +145,7 @@ func TestApplyDDL_ExtensionError(t *testing.T) {
 }
 
 func TestDropIdempotent(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := testManager(t)
@@ -161,6 +166,7 @@ func TestDropIdempotent(t *testing.T) {
 }
 
 func TestDropWithActiveConnection(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := testManager(t)
@@ -188,6 +194,7 @@ func TestDropWithActiveConnection(t *testing.T) {
 }
 
 func TestSetupForTest(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	m := testManager(t)
 
@@ -237,6 +244,7 @@ func TestSetupForTest(t *testing.T) {
 }
 
 func TestConcurrentCreate(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := testManager(t)
@@ -283,6 +291,7 @@ func TestConcurrentCreate(t *testing.T) {
 }
 
 func TestListOrphans(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := testManager(t)
@@ -331,6 +340,7 @@ func TestListOrphans(t *testing.T) {
 }
 
 func TestConnAndPool(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	m := testManager(t)

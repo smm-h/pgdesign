@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 )
 
 func TestAudit_NoDepsSkipped(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "users",
@@ -39,6 +41,7 @@ func TestAudit_NoDepsSkipped(t *testing.T) {
 }
 
 func TestAudit_CleanTable_NoViolations(t *testing.T) {
+	testenv.Isolate(t)
 	// Table in 3NF: A→B, A→C with PK={A}
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -64,6 +67,7 @@ func TestAudit_CleanTable_NoViolations(t *testing.T) {
 }
 
 func TestAudit_1NF_JsonbRepeatingGroup(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "posts",
@@ -97,6 +101,7 @@ func TestAudit_1NF_JsonbRepeatingGroup(t *testing.T) {
 }
 
 func TestAudit_2NF_PartialDependency(t *testing.T) {
+	testenv.Isolate(t)
 	// Table(A, B, C, D) PK={A,B} deps: AB→CD, A→C
 	// C partially depends on {A} which is a subset of key {A,B}
 	schema := &model.Schema{
@@ -138,6 +143,7 @@ func TestAudit_2NF_PartialDependency(t *testing.T) {
 }
 
 func TestAudit_3NF_TransitiveDependency(t *testing.T) {
+	testenv.Isolate(t)
 	// Table(A, B, C) PK={A} deps: A→B, B→C
 	// B→C violates 3NF: B is not a superkey, C is not prime
 	schema := &model.Schema{
@@ -175,6 +181,7 @@ func TestAudit_3NF_TransitiveDependency(t *testing.T) {
 }
 
 func TestAudit_DecompositionSuggestion(t *testing.T) {
+	testenv.Isolate(t)
 	// Same 3NF violation setup: should produce decomposition suggestion
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -215,6 +222,7 @@ func TestAudit_DecompositionSuggestion(t *testing.T) {
 }
 
 func TestAudit_FDInference_PKNoDeps(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "users",
@@ -249,6 +257,7 @@ func TestAudit_FDInference_PKNoDeps(t *testing.T) {
 }
 
 func TestAudit_FDInference_PKDeclared(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "clean",
@@ -273,6 +282,7 @@ func TestAudit_FDInference_PKDeclared(t *testing.T) {
 }
 
 func TestAudit_FDInference_UniqueNotNull(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "items",
@@ -307,6 +317,7 @@ func TestAudit_FDInference_UniqueNotNull(t *testing.T) {
 }
 
 func TestAudit_FDInference_UniqueNullable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "items",
@@ -334,6 +345,7 @@ func TestAudit_FDInference_UniqueNullable(t *testing.T) {
 }
 
 func TestAudit_BCNF_Violation_3NF_Pass(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "bcnf_test",
@@ -378,6 +390,7 @@ func TestAudit_BCNF_Violation_3NF_Pass(t *testing.T) {
 }
 
 func TestAudit_BCNF_Pass(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "bcnf_clean",
@@ -402,6 +415,7 @@ func TestAudit_BCNF_Pass(t *testing.T) {
 }
 
 func TestAudit_BCNF_DecompositionSuggestion(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "bcnf_test",
@@ -445,6 +459,7 @@ func TestAudit_BCNF_DecompositionSuggestion(t *testing.T) {
 }
 
 func TestAudit_BCNF_NoDecomposition_WhenClean(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "bcnf_clean",
@@ -469,6 +484,7 @@ func TestAudit_BCNF_NoDecomposition_WhenClean(t *testing.T) {
 }
 
 func TestAudit_3NF_Counterexample(t *testing.T) {
+	testenv.Isolate(t)
 	// Table(A, B, C) PK={A} deps: A->B, B->C
 	// B->C is a 3NF violation; W102 should include a counterexample
 	schema := &model.Schema{
@@ -516,6 +532,7 @@ func TestAudit_3NF_Counterexample(t *testing.T) {
 }
 
 func TestAudit_BCNF_Counterexample(t *testing.T) {
+	testenv.Isolate(t)
 	// Table(A, B, C) PK={A,B} deps: AB->C, C->B
 	// C->B is a BCNF violation; W103 should include a counterexample
 	schema := &model.Schema{
@@ -557,6 +574,7 @@ func TestAudit_BCNF_Counterexample(t *testing.T) {
 }
 
 func TestAudit_MinimalCover_WithRedundancy(t *testing.T) {
+	testenv.Isolate(t)
 	// Table(A, B, C) PK={A} deps: A->B, B->C, A->C
 	// A->C is derivable from A->B, B->C -- minimal cover should detect this
 	schema := &model.Schema{
@@ -595,6 +613,7 @@ func TestAudit_MinimalCover_WithRedundancy(t *testing.T) {
 }
 
 func TestAudit_MinimalCover_NoRedundancy(t *testing.T) {
+	testenv.Isolate(t)
 	// Table(A, B, C) PK={A} deps: A->B, A->C -- already minimal
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -620,6 +639,7 @@ func TestAudit_MinimalCover_NoRedundancy(t *testing.T) {
 }
 
 func TestAudit_FDSource_Declared(t *testing.T) {
+	testenv.Isolate(t)
 	// When FDs are set directly with Source="declared", verify they work correctly in audit
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -646,6 +666,7 @@ func TestAudit_FDSource_Declared(t *testing.T) {
 }
 
 func TestAudit_FDInference_UpdatedMessage(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "users",

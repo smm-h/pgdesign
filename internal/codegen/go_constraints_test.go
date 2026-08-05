@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestGoConstraintsGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Enums: []model.Enum{
@@ -121,6 +123,7 @@ func TestGoConstraintsGenerator_Generate(t *testing.T) {
 // the deref it would not type-check against the pointer field. The check is a
 // LENGTH check so the emitted deref appears inside len(...).
 func TestGoConstraintsGenerator_NullableCheckNilGuard(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -156,6 +159,7 @@ func TestGoConstraintsGenerator_NullableCheckNilGuard(t *testing.T) {
 }
 
 func TestGoConstraintsGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 	}
@@ -176,6 +180,7 @@ func TestGoConstraintsGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestGoConstraintsGenerator_ILIKEPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -210,6 +215,7 @@ func TestGoConstraintsGenerator_ILIKEPattern(t *testing.T) {
 }
 
 func TestGoConstraintsGenerator_NoConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

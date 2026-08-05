@@ -1,12 +1,14 @@
 package model
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/parse"
 )
 
 func TestFKGraph_Construction(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{
@@ -90,6 +92,7 @@ func TestFKGraph_Construction(t *testing.T) {
 }
 
 func TestFKGraph_MultiColumnFK(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{
@@ -168,6 +171,7 @@ func cascadeSchema() *Schema {
 }
 
 func TestFKGraph_CascadeDepth(t *testing.T) {
+	testenv.Isolate(t)
 	s := cascadeSchema()
 	g := s.FKGraph
 
@@ -192,6 +196,7 @@ func TestFKGraph_CascadeDepth(t *testing.T) {
 }
 
 func TestFKGraph_CascadeBreadth(t *testing.T) {
+	testenv.Isolate(t)
 	s := cascadeSchema()
 	g := s.FKGraph
 
@@ -214,6 +219,7 @@ func TestFKGraph_CascadeBreadth(t *testing.T) {
 }
 
 func TestFKGraph_CascadeChain(t *testing.T) {
+	testenv.Isolate(t)
 	s := cascadeSchema()
 	g := s.FKGraph
 
@@ -245,6 +251,7 @@ func TestFKGraph_CascadeChain(t *testing.T) {
 // is deleted, so the walk must follow Reverse edges (referenced -> referencing),
 // never Forward edges (referencing -> referenced).
 func TestFKGraph_CascadeDirection(t *testing.T) {
+	testenv.Isolate(t)
 	s := &Schema{
 		Tables: []Table{
 			{Name: "parent", Schema: "public"},
@@ -273,6 +280,7 @@ func TestFKGraph_CascadeDirection(t *testing.T) {
 // TestFKGraph_WalkCascade exercises the generic walker directly: direction
 // selection, first-hop-sensitive edge filtering, and path tracking.
 func TestFKGraph_WalkCascade(t *testing.T) {
+	testenv.Isolate(t)
 	// x references y (SET NULL), y references z (CASCADE).
 	s := &Schema{
 		Tables: []Table{
@@ -321,6 +329,7 @@ func TestFKGraph_WalkCascade(t *testing.T) {
 }
 
 func TestFKGraph_CascadeHandlesCycles(t *testing.T) {
+	testenv.Isolate(t)
 	s := &Schema{
 		Tables: []Table{
 			{Name: "x", Schema: "public", FKs: []FK{{Name: "fk_x_y", Columns: []string{"y_id"}, RefTable: "y", RefColumns: []string{"id"}, OnDelete: "CASCADE"}}},
@@ -359,6 +368,7 @@ func TestFKGraph_CascadeHandlesCycles(t *testing.T) {
 // merge — each account sees exactly its own referencing entry, never the
 // other schema's.
 func TestFKGraph_TwoSchemasSameName(t *testing.T) {
+	testenv.Isolate(t)
 	s := &Schema{
 		Tables: []Table{
 			{Name: "account", Schema: "public"},
@@ -406,6 +416,7 @@ func TestFKGraph_TwoSchemasSameName(t *testing.T) {
 // TestWalkCascade_DepthBounded exercises the maxDepth parameter on the walker
 // against a linear cascade chain a -> b -> c -> d (deleting d cascades up to a).
 func TestWalkCascade_DepthBounded(t *testing.T) {
+	testenv.Isolate(t)
 	s := &Schema{
 		Tables: []Table{
 			{Name: "d", Schema: "public"},
@@ -447,6 +458,7 @@ func TestWalkCascade_DepthBounded(t *testing.T) {
 }
 
 func TestTablesByName_PopulatedByBuild(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{
@@ -509,6 +521,7 @@ func TestTablesByName_PopulatedByBuild(t *testing.T) {
 }
 
 func TestBuildFKGraph_CalledExplicitly(t *testing.T) {
+	testenv.Isolate(t)
 	s := &Schema{
 		Tables: []Table{
 			{Name: "alpha", Schema: "public"},

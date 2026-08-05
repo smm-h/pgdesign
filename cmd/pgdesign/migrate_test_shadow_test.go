@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,6 +52,7 @@ type = "short_text"
 // refused by the pre-upgrade guard BEFORE any shadow work — it previously
 // returned before the guard and proceeded to create a shadow database.
 func TestMigrateTestShadowGuardsPreUpgrade(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := cmdEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

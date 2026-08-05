@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,6 +55,7 @@ func trim(s string) string {
 }
 
 func TestCloneAt_ResolvesTagToCommit(t *testing.T) {
+	testenv.Isolate(t)
 	src, commit, tag := makeGitRepo(t)
 	dest := filepath.Join(t.TempDir(), "clone")
 	got, err := CloneAt(src, tag, dest)
@@ -69,6 +71,7 @@ func TestCloneAt_ResolvesTagToCommit(t *testing.T) {
 }
 
 func TestCloneAt_UnreachableRemote(t *testing.T) {
+	testenv.Isolate(t)
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -80,6 +83,7 @@ func TestCloneAt_UnreachableRemote(t *testing.T) {
 }
 
 func TestCloneAt_BadRef(t *testing.T) {
+	testenv.Isolate(t)
 	src, _, _ := makeGitRepo(t)
 	dest := filepath.Join(t.TempDir(), "clone")
 	_, err := CloneAt(src, "no-such-ref", dest)
@@ -89,6 +93,7 @@ func TestCloneAt_BadRef(t *testing.T) {
 }
 
 func TestResolveRemoteRef_TagReachable(t *testing.T) {
+	testenv.Isolate(t)
 	src, commit, tag := makeGitRepo(t)
 	got, err := ResolveRemoteRef(src, tag)
 	if err != nil {
@@ -101,6 +106,7 @@ func TestResolveRemoteRef_TagReachable(t *testing.T) {
 }
 
 func TestResolveRemoteRef_Unreachable(t *testing.T) {
+	testenv.Isolate(t)
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

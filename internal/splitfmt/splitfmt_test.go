@@ -1,12 +1,14 @@
 package splitfmt
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	stmts := []string{
 		"CREATE TABLE foo (id integer PRIMARY KEY);",
 		"ALTER TABLE foo ADD COLUMN name text NOT NULL;",
@@ -28,6 +30,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	data := Encode(nil)
 	got, err := Decode(data)
 	if err != nil {
@@ -39,6 +42,7 @@ func TestEmpty(t *testing.T) {
 }
 
 func TestSingle(t *testing.T) {
+	testenv.Isolate(t)
 	stmts := []string{"SELECT 1;"}
 	data := Encode(stmts)
 	got, err := Decode(data)
@@ -51,6 +55,7 @@ func TestSingle(t *testing.T) {
 }
 
 func TestDollarQuoting(t *testing.T) {
+	testenv.Isolate(t)
 	stmt := `CREATE FUNCTION foo() RETURNS void AS $pgdesign$
 BEGIN
   RAISE NOTICE 'hello';
@@ -67,6 +72,7 @@ $pgdesign$ LANGUAGE plpgsql;`
 }
 
 func TestMultilineStatements(t *testing.T) {
+	testenv.Isolate(t)
 	stmt := "CREATE TABLE bar (\n  id integer PRIMARY KEY,\n  name text NOT NULL\n);"
 	data := Encode([]string{stmt})
 	got, err := Decode(data)
@@ -79,6 +85,7 @@ func TestMultilineStatements(t *testing.T) {
 }
 
 func TestUnicode(t *testing.T) {
+	testenv.Isolate(t)
 	stmt := "INSERT INTO t (name) VALUES ('äöüß 世界 \U0001f600');"
 	data := Encode([]string{stmt})
 	got, err := Decode(data)
@@ -91,6 +98,7 @@ func TestUnicode(t *testing.T) {
 }
 
 func TestBackslashes(t *testing.T) {
+	testenv.Isolate(t)
 	stmt := `INSERT INTO t (path) VALUES (E'C:\\Users\\foo\\bar');`
 	data := Encode([]string{stmt})
 	got, err := Decode(data)
@@ -103,6 +111,7 @@ func TestBackslashes(t *testing.T) {
 }
 
 func TestLargeStatement(t *testing.T) {
+	testenv.Isolate(t)
 	// Simulate a realistic large DDL statement (~10KB).
 	var b strings.Builder
 	b.WriteString("CREATE TABLE big (\n")
@@ -130,6 +139,7 @@ func TestLargeStatement(t *testing.T) {
 }
 
 func TestDecodeErrorBadCount(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := Decode([]byte("abc\n"))
 	if err == nil {
 		t.Fatal("expected error for non-numeric count")
@@ -137,6 +147,7 @@ func TestDecodeErrorBadCount(t *testing.T) {
 }
 
 func TestDecodeErrorNegativeCount(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := Decode([]byte("-1\n"))
 	if err == nil {
 		t.Fatal("expected error for negative count")
@@ -144,6 +155,7 @@ func TestDecodeErrorNegativeCount(t *testing.T) {
 }
 
 func TestDecodeErrorMissingCountNewline(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := Decode([]byte("2"))
 	if err == nil {
 		t.Fatal("expected error for missing newline after count")
@@ -151,6 +163,7 @@ func TestDecodeErrorMissingCountNewline(t *testing.T) {
 }
 
 func TestDecodeErrorBadLength(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := Decode([]byte("1\nxyz\nhello\n"))
 	if err == nil {
 		t.Fatal("expected error for non-numeric length")
@@ -158,6 +171,7 @@ func TestDecodeErrorBadLength(t *testing.T) {
 }
 
 func TestDecodeErrorNegativeLength(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := Decode([]byte("1\n-5\nhello\n"))
 	if err == nil {
 		t.Fatal("expected error for negative length")
@@ -165,6 +179,7 @@ func TestDecodeErrorNegativeLength(t *testing.T) {
 }
 
 func TestDecodeErrorTruncatedPayload(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := Decode([]byte("1\n100\nshort\n"))
 	if err == nil {
 		t.Fatal("expected error for truncated payload")
@@ -172,6 +187,7 @@ func TestDecodeErrorTruncatedPayload(t *testing.T) {
 }
 
 func TestDecodeErrorMissingTrailingNewline(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := Decode([]byte("1\n5\nhello"))
 	if err == nil {
 		t.Fatal("expected error for missing trailing newline")
@@ -179,6 +195,7 @@ func TestDecodeErrorMissingTrailingNewline(t *testing.T) {
 }
 
 func TestDecodeErrorTruncatedSecondStatement(t *testing.T) {
+	testenv.Isolate(t)
 	// First statement is fine, second is truncated.
 	_, err := Decode([]byte("2\n5\nhello\n"))
 	if err == nil {
@@ -187,6 +204,7 @@ func TestDecodeErrorTruncatedSecondStatement(t *testing.T) {
 }
 
 func TestEncodedOutputIsHumanReadable(t *testing.T) {
+	testenv.Isolate(t)
 	stmts := []string{
 		"SELECT 1;",
 		"SELECT 2;",
@@ -219,6 +237,7 @@ func TestEncodedOutputIsHumanReadable(t *testing.T) {
 }
 
 func TestEmptyStatementContent(t *testing.T) {
+	testenv.Isolate(t)
 	// An empty string is a valid statement (0 bytes).
 	stmts := []string{""}
 	data := Encode(stmts)
@@ -232,6 +251,7 @@ func TestEmptyStatementContent(t *testing.T) {
 }
 
 func TestDecodeAdversarialCount(t *testing.T) {
+	testenv.Isolate(t)
 	// Count claims 999999999 statements but data only has one statement's worth.
 	// Must return an error (loop fails on second iteration) rather than OOMing.
 	input := []byte("999999999\n9\nSELECT 1;\n")
@@ -252,6 +272,7 @@ func TestDecodeAdversarialCount(t *testing.T) {
 }
 
 func TestDecodeTrailingData(t *testing.T) {
+	testenv.Isolate(t)
 	// Encode one valid statement, then append garbage bytes.
 	data := Encode([]string{"SELECT 1;"})
 	data = append(data, []byte("garbage")...)
@@ -265,6 +286,7 @@ func TestDecodeTrailingData(t *testing.T) {
 }
 
 func TestDecodeTrailingNewline(t *testing.T) {
+	testenv.Isolate(t)
 	// A trailing newline after valid content IS trailing data.
 	data := Encode([]string{"SELECT 1;"})
 	data = append(data, '\n')

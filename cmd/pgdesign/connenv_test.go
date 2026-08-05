@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,7 @@ import (
 // binding were missing (or the WithConnectionEnv declaration removed), buildApp
 // would panic here.
 func TestAppConstructsWithBoundDBFlags(t *testing.T) {
+	testenv.Isolate(t)
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("buildApp panicked (an unbound or misbound DB-URL flag): %v", r)
@@ -32,6 +34,7 @@ func TestAppConstructsWithBoundDBFlags(t *testing.T) {
 // for a ConnectionURLFlag). This is a second, output-level witness that the
 // bindings exist across the command surface.
 func TestDBFlagsAdvertiseConnectionEnv(t *testing.T) {
+	testenv.Isolate(t)
 	app := buildApp()
 	cmds := [][]string{
 		{"introspect", "--help"},
@@ -57,6 +60,7 @@ func TestDBFlagsAdvertiseConnectionEnv(t *testing.T) {
 // command must proceed to a CONNECTION failure, never the "--db is required"
 // handler error (which would mean the env fallback did not resolve).
 func TestEnvOnlyInvocation(t *testing.T) {
+	testenv.Isolate(t)
 	t.Setenv("PGDESIGN_DB", "postgres://u:p@127.0.0.1:1/envonly_db")
 	app := buildApp()
 	res := app.Test([]string{"stats"})
@@ -74,6 +78,7 @@ func TestEnvOnlyInvocation(t *testing.T) {
 // TestPrecedenceCLIOverEnv proves the CLI flag wins over the env value: with
 // both set to distinct unreachable URLs, the command must dial the CLI target.
 func TestPrecedenceCLIOverEnv(t *testing.T) {
+	testenv.Isolate(t)
 	t.Setenv("PGDESIGN_DB", "postgres://u:p@127.0.0.1:1/env_layer_db")
 	app := buildApp()
 	res := app.Test([]string{"stats", "--db", "postgres://u:p@127.0.0.1:1/cli_layer_db"})
@@ -108,6 +113,7 @@ func (f fakeConnReader) IsHermetic() bool { return f.hermetic }
 // TestResolveCheckDBURL pins the check-side resolution layering (env > config)
 // and the hermetic detection.
 func TestResolveCheckDBURL(t *testing.T) {
+	testenv.Isolate(t)
 	withCfg := &config.Config[config.AbsolutePath]{}
 	withCfg.Database.URL = "postgres://config/url"
 	empty := &config.Config[config.AbsolutePath]{}
@@ -171,6 +177,7 @@ func TestResolveCheckDBURL(t *testing.T) {
 // os.Getenv for the DB URL remains in cmd/ (the connection-env framework and
 // resolveCheckDBURL replace it). Test files and the testdb harness are excepted.
 func TestNoRawGetenvInCmd(t *testing.T) {
+	testenv.Isolate(t)
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
@@ -198,6 +205,7 @@ func TestNoRawGetenvInCmd(t *testing.T) {
 // outcome, instead of attempting to connect. PGDESIGN_DB is set to prove the
 // skip is due to hermetic suppression, not a missing URL.
 func TestHermeticCheckSkipsVisibly(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 	src, err := os.ReadFile(filepath.Join("testdata", "freshness_schema.toml"))
 	if err != nil {

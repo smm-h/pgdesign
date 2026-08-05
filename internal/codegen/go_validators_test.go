@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestGoValidatorGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -97,6 +99,7 @@ func TestGoValidatorGenerator_Generate(t *testing.T) {
 }
 
 func TestGoValidatorGenerator_NoPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 		Tables: []model.Table{
@@ -120,6 +123,7 @@ func TestGoValidatorGenerator_NoPolicies(t *testing.T) {
 }
 
 func TestGoValidatorGenerator_OwnershipPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -169,6 +173,7 @@ func TestGoValidatorGenerator_OwnershipPattern(t *testing.T) {
 }
 
 func TestGoValidatorGenerator_OrCompound(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -226,6 +231,7 @@ func TestGoValidatorGenerator_OrCompound(t *testing.T) {
 }
 
 func TestGoValidatorGenerator_NotExistsPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -277,6 +283,7 @@ func TestGoValidatorGenerator_NotExistsPattern(t *testing.T) {
 }
 
 func TestGoValidatorGenerator_UnparsableExpression(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{

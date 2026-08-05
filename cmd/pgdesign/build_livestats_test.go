@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -64,6 +65,7 @@ func writeLiveStatsProject(t *testing.T) string {
 // live row count is fetched from pg_stat_user_tables and rendered into the d2
 // output when the output opts in via live_stats=true.
 func TestBuildLiveStatsPopulatesD2(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := cmdEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -116,6 +118,7 @@ func TestBuildLiveStatsPopulatesD2(t *testing.T) {
 // --db/PGDESIGN_DB must fail loudly (no silent DB dependency, no implicit
 // fallback to no stats). It needs no database and always runs.
 func TestBuildLiveStatsRequiresDB(t *testing.T) {
+	testenv.Isolate(t)
 	cfgPath := writeLiveStatsProject(t)
 	if code := runBuild(&cfgPath, true, false, false, ""); code == 0 {
 		t.Fatal("expected build to fail when live_stats=true but no --db/PGDESIGN_DB supplied")

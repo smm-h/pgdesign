@@ -3,6 +3,7 @@ package migrate
 import (
 	"errors"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/rev"
@@ -32,6 +33,7 @@ func ids(edges []Edge) []string {
 }
 
 func TestFindPathLinear(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1, r2 := revAt(t, 0), revAt(t, 1), revAt(t, 2)
 	e1 := edgeOf(r0, r1, "e1")
 	e2 := edgeOf(r1, r2, "e2")
@@ -67,6 +69,7 @@ func TestFindPathLinear(t *testing.T) {
 }
 
 func TestFindPathGenesisStart(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1 := revAt(t, 0), revAt(t, 1)
 	e0 := edgeOf(rev.Revision{}, r0, "genesis") // null parent
 	e1 := edgeOf(r0, r1, "e1")
@@ -81,6 +84,7 @@ func TestFindPathGenesisStart(t *testing.T) {
 }
 
 func TestFindPathFork(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1, r2 := revAt(t, 0), revAt(t, 1), revAt(t, 2)
 	live := []Edge{edgeOf(r0, r1, "a"), edgeOf(r0, r2, "b")}
 	_, err := FindPath(r0.String(), nil, live, live)
@@ -96,6 +100,7 @@ func TestFindPathFork(t *testing.T) {
 // TestFindPathTieBreakLexicographic: two parallel length-1 paths to one head are
 // disambiguated by the lexicographically-least edge id (rule 4b, total order).
 func TestFindPathTieBreakLexicographic(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1 := revAt(t, 0), revAt(t, 1)
 	ea := edgeOf(r0, r1, "alpha")
 	eb := edgeOf(r0, r1, "beta")
@@ -119,6 +124,7 @@ func TestFindPathTieBreakLexicographic(t *testing.T) {
 // TestFindPathArchiveInclusive: a consolidation edge wins by shortest count from
 // its range start; a mid-range DB traverses the archived originals.
 func TestFindPathArchiveInclusive(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1, r2 := revAt(t, 0), revAt(t, 1), revAt(t, 2)
 	consol := edgeOf(r0, r2, "consolidated")
 	consol.Consolidation = true
@@ -149,6 +155,7 @@ func TestFindPathArchiveInclusive(t *testing.T) {
 // TestFindPathRebasedAwayServed: a database stamped at a rebased-away revision is
 // canonicalized through the remap to the live head and served (up to date).
 func TestFindPathRebasedAwayServed(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1, r2old, r3 := revAt(t, 0), revAt(t, 1), revAt(t, 2), revAt(t, 3)
 	e1 := edgeOf(r0, r1, "e1")
 	e2p := edgeOf(r1, r3, "e2prime") // re-parented tail (live)

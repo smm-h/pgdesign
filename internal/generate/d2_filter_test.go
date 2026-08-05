@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -54,6 +55,7 @@ func mustCompileD2(t *testing.T, src string) {
 }
 
 func TestD2FilterExclude(t *testing.T) {
+	testenv.Isolate(t)
 	s := filterSchema()
 	opts := DefaultD2Options()
 	opts.Exclude = []string{"audit_*"}
@@ -76,6 +78,7 @@ func TestD2FilterExclude(t *testing.T) {
 }
 
 func TestD2FilterIncludeAndSelfFK(t *testing.T) {
+	testenv.Isolate(t)
 	s := filterSchema()
 	opts := DefaultD2Options()
 	opts.Include = []string{"users"}
@@ -97,6 +100,7 @@ func TestD2FilterIncludeAndSelfFK(t *testing.T) {
 }
 
 func TestD2FilterIncludeDependenciesDepth(t *testing.T) {
+	testenv.Isolate(t)
 	s := filterSchema()
 
 	// Depth 1: a plus its direct dependency b (not c).
@@ -128,6 +132,7 @@ func TestD2FilterIncludeDependenciesDepth(t *testing.T) {
 }
 
 func TestD2FilterExcludeAuthoritativeOverDeps(t *testing.T) {
+	testenv.Isolate(t)
 	s := filterSchema()
 	// Include a with deps, but exclude b: the dependency must not resurface, and
 	// the transitive c behind it must also stay out.
@@ -149,6 +154,7 @@ func TestD2FilterExcludeAuthoritativeOverDeps(t *testing.T) {
 }
 
 func TestD2FilterPreservesCanonicalOrder(t *testing.T) {
+	testenv.Isolate(t)
 	s := filterSchema()
 	full := GenerateD2(s, nil, DefaultD2Options())
 

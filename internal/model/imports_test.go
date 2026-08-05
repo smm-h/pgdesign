@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -35,6 +36,7 @@ func diagHasCode(diags diagnostic.Diagnostics, code string) bool {
 }
 
 func TestResolveFK_AliasReference(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -66,6 +68,7 @@ func TestResolveFK_AliasReference(t *testing.T) {
 }
 
 func TestResolveFK_UnknownAlias(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -86,6 +89,7 @@ func TestResolveFK_UnknownAlias(t *testing.T) {
 }
 
 func TestResolveFK_MalformedAliasQualifiedTarget(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -106,6 +110,7 @@ func TestResolveFK_MalformedAliasQualifiedTarget(t *testing.T) {
 }
 
 func TestResolveFK_DotSplitStillWorks(t *testing.T) {
+	testenv.Isolate(t)
 	// With no ':' the classic schema.table dot-split must be unchanged.
 	reg := testRegistry()
 	raw := &parse.RawSchema{
@@ -145,6 +150,7 @@ func importedUsersTable() Table {
 }
 
 func TestImportedTables_TableByNameResolves(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -179,6 +185,7 @@ func TestImportedTables_TableByNameResolves(t *testing.T) {
 }
 
 func TestImportedTables_FKGraphEdgeFlaggedAndKeyed(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -221,6 +228,7 @@ func TestImportedTables_FKGraphEdgeFlaggedAndKeyed(t *testing.T) {
 }
 
 func TestImportedTables_OwnedShadowsImported(t *testing.T) {
+	testenv.Isolate(t)
 	// A local table with the same (schema,name) as an imported reference wins in
 	// the lookup map — the project generates the local one.
 	s := &Schema{
@@ -235,6 +243,7 @@ func TestImportedTables_OwnedShadowsImported(t *testing.T) {
 }
 
 func TestAliasScoping_ViewDependsOnRejected(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -252,6 +261,7 @@ func TestAliasScoping_ViewDependsOnRejected(t *testing.T) {
 }
 
 func TestAliasScoping_ViewQueryRejected(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -269,6 +279,7 @@ func TestAliasScoping_ViewQueryRejected(t *testing.T) {
 }
 
 func TestAliasScoping_NoImportsNoPolicing(t *testing.T) {
+	testenv.Isolate(t)
 	// With no declared imports, a colon in a query is not an alias reference.
 	reg := testRegistry()
 	raw := &parse.RawSchema{

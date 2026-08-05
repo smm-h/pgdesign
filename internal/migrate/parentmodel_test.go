@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"errors"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -25,6 +26,7 @@ func childEdgeAt(parentRev rev.Revision) Edge {
 // TestParentModelForEdge_GenesisHasNoParent: a genesis edge yields (nil, nil) —
 // existence-only checks, no recorded pre-state, no error.
 func TestParentModelForEdge_GenesisHasNoParent(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t) // e is genesis (Parent == zero revision)
 	from, err := parentModelForEdge(p, e)
 	if err != nil {
@@ -39,6 +41,7 @@ func TestParentModelForEdge_GenesisHasNoParent(t *testing.T) {
 // parent revision manifest was never written yields (nil, nil). Absence of the
 // recorded pre-state selects the existence-only mode; it is NOT an error.
 func TestParentModelForEdge_ManifestAbsentIsExistenceOnly(t *testing.T) {
+	testenv.Isolate(t)
 	p, genesis, _ := fixtureProject(t)
 	// A child edge parented at the genesis target, but that revision's manifest
 	// is never written to disk.
@@ -59,6 +62,7 @@ func TestParentModelForEdge_ManifestAbsentIsExistenceOnly(t *testing.T) {
 // This is the red half of rider 4: the pre-fix code swallowed every reconstruct
 // error into a nil return.
 func TestParentModelForEdge_BrokenManifestIsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	p, genesis, _ := fixtureProject(t)
 	parentRev := genesis.Target
 

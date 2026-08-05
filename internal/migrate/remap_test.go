@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 )
 
@@ -11,6 +12,7 @@ const (
 )
 
 func TestLoadRemapAbsentIsEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -25,6 +27,7 @@ func TestLoadRemapAbsentIsEmpty(t *testing.T) {
 }
 
 func TestWriteThenLoadRemapRoundTrips(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -42,6 +45,7 @@ func TestWriteThenLoadRemapRoundTrips(t *testing.T) {
 }
 
 func TestWriteRemapMergesAndDetectsCollision(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -69,6 +73,7 @@ func TestWriteRemapMergesAndDetectsCollision(t *testing.T) {
 // TestCanonFollowsRemapToFixpoint pins that canon chases a chain of remaps to a
 // fixpoint (a rebase over an already-rebased chain).
 func TestCanonFollowsRemapToFixpoint(t *testing.T) {
+	testenv.Isolate(t)
 	remap := RemapTable{remapRevA: remapRevB, remapRevB: remapRevC}
 	if got := canon(remapRevA, remap); got != remapRevC {
 		t.Fatalf("canon(%s) = %q, want %q (fixpoint)", remapRevA, got, remapRevC)

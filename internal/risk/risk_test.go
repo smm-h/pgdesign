@@ -1,8 +1,12 @@
 package risk
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 func TestCreateTable(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpCreateTable, OpContext{})
 	if c.RiskLevel != Safe {
 		t.Errorf("expected Safe, got %s", c.RiskLevel)
@@ -16,6 +20,7 @@ func TestCreateTable(t *testing.T) {
 }
 
 func TestDropTable(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpDropTable, OpContext{})
 	if c.RiskLevel != Dangerous {
 		t.Errorf("expected Dangerous, got %s", c.RiskLevel)
@@ -29,6 +34,7 @@ func TestDropTable(t *testing.T) {
 }
 
 func TestAddColumnNullable(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpAddColumn, OpContext{IsNullable: true})
 	if c.RiskLevel != Safe {
 		t.Errorf("expected Safe, got %s", c.RiskLevel)
@@ -39,6 +45,7 @@ func TestAddColumnNullable(t *testing.T) {
 }
 
 func TestAddColumnNotNullNoDefault(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpAddColumn, OpContext{IsNullable: false, HasDefault: false})
 	if c.RiskLevel != Dangerous {
 		t.Errorf("expected Dangerous, got %s", c.RiskLevel)
@@ -49,6 +56,7 @@ func TestAddColumnNotNullNoDefault(t *testing.T) {
 }
 
 func TestAddColumnNotNullWithDefaultPG11(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpAddColumn, OpContext{
 		IsNullable: false,
 		HasDefault: true,
@@ -60,6 +68,7 @@ func TestAddColumnNotNullWithDefaultPG11(t *testing.T) {
 }
 
 func TestAddColumnNotNullWithDefaultPrePG11(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpAddColumn, OpContext{
 		IsNullable: false,
 		HasDefault: true,
@@ -71,6 +80,7 @@ func TestAddColumnNotNullWithDefaultPrePG11(t *testing.T) {
 }
 
 func TestAddColumnRiskMatrix(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name       string
 		isNullable bool
@@ -104,6 +114,7 @@ func TestAddColumnRiskMatrix(t *testing.T) {
 }
 
 func TestCreateIndex(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpCreateIndex, OpContext{})
 	if c.RiskLevel != Caution {
 		t.Errorf("expected Caution, got %s", c.RiskLevel)
@@ -117,6 +128,7 @@ func TestCreateIndex(t *testing.T) {
 }
 
 func TestCreateIndexConcurrently(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpCreateIndexConcurrently, OpContext{})
 	if c.RiskLevel != Safe {
 		t.Errorf("expected Safe, got %s", c.RiskLevel)
@@ -127,6 +139,7 @@ func TestCreateIndexConcurrently(t *testing.T) {
 }
 
 func TestTableSizeEscalation(t *testing.T) {
+	testenv.Isolate(t)
 	// set_not_null is Caution with AccessExclusive; with >1M rows it should escalate.
 	c := Classify(OpSetNotNull, OpContext{EstimatedRows: 2_000_000})
 	if c.RiskLevel != Dangerous {
@@ -135,6 +148,7 @@ func TestTableSizeEscalation(t *testing.T) {
 }
 
 func TestTableSizeEscalationDoesNotAffectSafe(t *testing.T) {
+	testenv.Isolate(t)
 	// Safe operations should not escalate even with large tables.
 	c := Classify(OpDropNotNull, OpContext{EstimatedRows: 2_000_000})
 	if c.RiskLevel != Safe {
@@ -143,6 +157,7 @@ func TestTableSizeEscalationDoesNotAffectSafe(t *testing.T) {
 }
 
 func TestTableSizeLockTimeoutSuggestion(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpSetNotNull, OpContext{EstimatedRows: 15_000_000})
 	if c.RiskLevel != Dangerous {
 		t.Errorf("expected Dangerous, got %s", c.RiskLevel)
@@ -153,6 +168,7 @@ func TestTableSizeLockTimeoutSuggestion(t *testing.T) {
 }
 
 func TestRenameTable(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpRenameTable, OpContext{})
 	if c.RiskLevel != Caution {
 		t.Errorf("expected Caution, got %s", c.RiskLevel)
@@ -169,6 +185,7 @@ func TestRenameTable(t *testing.T) {
 }
 
 func TestRiskLevelString(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		level RiskLevel
 		want  string
@@ -185,6 +202,7 @@ func TestRiskLevelString(t *testing.T) {
 }
 
 func TestLockTypeString(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		lock LockType
 		want string
@@ -203,6 +221,7 @@ func TestLockTypeString(t *testing.T) {
 }
 
 func TestCreateView(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpCreateView, OpContext{})
 	if c.RiskLevel != Safe {
 		t.Errorf("expected Safe, got %s", c.RiskLevel)
@@ -210,6 +229,7 @@ func TestCreateView(t *testing.T) {
 }
 
 func TestDropView(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpDropView, OpContext{})
 	if c.RiskLevel != Caution {
 		t.Errorf("expected Caution, got %s", c.RiskLevel)
@@ -217,6 +237,7 @@ func TestDropView(t *testing.T) {
 }
 
 func TestCreateOrReplaceView(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpCreateOrReplaceView, OpContext{})
 	if c.RiskLevel != Safe {
 		t.Errorf("expected Safe, got %s", c.RiskLevel)
@@ -224,6 +245,7 @@ func TestCreateOrReplaceView(t *testing.T) {
 }
 
 func TestCreateMaterializedView(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpCreateMaterializedView, OpContext{})
 	if c.RiskLevel != Caution {
 		t.Errorf("expected Caution, got %s", c.RiskLevel)
@@ -231,6 +253,7 @@ func TestCreateMaterializedView(t *testing.T) {
 }
 
 func TestDropMaterializedView(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpDropMaterializedView, OpContext{})
 	if c.RiskLevel != Dangerous {
 		t.Errorf("expected Dangerous, got %s", c.RiskLevel)
@@ -241,6 +264,7 @@ func TestDropMaterializedView(t *testing.T) {
 }
 
 func TestRefreshMaterializedView(t *testing.T) {
+	testenv.Isolate(t)
 	c := Classify(OpRefreshMaterializedView, OpContext{})
 	if c.RiskLevel != Caution {
 		t.Errorf("expected Caution, got %s", c.RiskLevel)
@@ -248,6 +272,7 @@ func TestRefreshMaterializedView(t *testing.T) {
 }
 
 func TestCreateEnum(t *testing.T) {
+	testenv.Isolate(t)
 	// Creating a new enum type takes no lock on user data and is reversible; it
 	// must classify Safe (not fall through to the Dangerous "unknown op" default
 	// and emit error-severity MIGRATE_RISK noise).

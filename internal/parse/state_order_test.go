@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/semtype"
@@ -83,6 +84,7 @@ var declaredStateOrder = []string{
 // parse preserves TOML declaration order for state machine states, end to end
 // through CollectUserTypes and the semtype registry's EnumValues.
 func TestStateMachineStateOrder_DeclarationOrder(t *testing.T) {
+	testenv.Isolate(t)
 	names, enumValues := parseStateOrder(t)
 	assertOrder(t, "CollectUserTypes states", names, declaredStateOrder)
 	assertOrder(t, "semtype EnumValues", enumValues, declaredStateOrder)
@@ -95,6 +97,7 @@ func TestStateMachineStateOrder_DeclarationOrder(t *testing.T) {
 // parsing randomizes the order across builds, which flaps freshness checks and
 // silently reorders PostgreSQL enum values (a semantic change).
 func TestStateMachineStateOrder_RebuildDeterminism(t *testing.T) {
+	testenv.Isolate(t)
 	const runs = 20
 	for i := 0; i < runs; i++ {
 		names, enumValues := parseStateOrder(t)

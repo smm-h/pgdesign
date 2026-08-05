@@ -2,6 +2,7 @@ package codegen
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -106,6 +107,7 @@ func constraintTestSchema() *model.Schema {
 }
 
 func TestConstraints_FileProduced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -120,6 +122,7 @@ func TestConstraints_FileProduced(t *testing.T) {
 }
 
 func TestConstraints_EnumAndDataclass(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -162,6 +165,7 @@ func TestConstraints_EnumAndDataclass(t *testing.T) {
 }
 
 func TestConstraints_UsersTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -213,6 +217,7 @@ func TestConstraints_UsersTable(t *testing.T) {
 }
 
 func TestConstraints_OrdersTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -269,6 +274,7 @@ func TestConstraints_OrdersTable(t *testing.T) {
 }
 
 func TestConstraints_OrderItemsTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -298,6 +304,7 @@ func TestConstraints_OrderItemsTable(t *testing.T) {
 }
 
 func TestConstraints_ConstraintEngine(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -329,6 +336,7 @@ func TestConstraints_ConstraintEngine(t *testing.T) {
 }
 
 func TestConstraints_EngineInsertValidation(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -354,6 +362,7 @@ func TestConstraints_EngineInsertValidation(t *testing.T) {
 }
 
 func TestConstraints_EngineUpdateSMTransition(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -370,6 +379,7 @@ func TestConstraints_EngineUpdateSMTransition(t *testing.T) {
 }
 
 func TestConstraints_EngineDeleteProcessing(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -395,6 +405,7 @@ func TestConstraints_EngineDeleteProcessing(t *testing.T) {
 }
 
 func TestConstraints_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 	schema.BuildFKGraph()
 	gen := &PythonQueryLayerGenerator{}
@@ -418,6 +429,7 @@ func TestConstraints_EmptySchema(t *testing.T) {
 }
 
 func TestConstraints_CheckLengthPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "len_test",
 		Tables: []model.Table{
@@ -453,6 +465,7 @@ func TestConstraints_CheckLengthPattern(t *testing.T) {
 }
 
 func TestConstraints_CheckPatternLike(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "pattern_test",
 		Tables: []model.Table{
@@ -485,6 +498,7 @@ func TestConstraints_CheckPatternLike(t *testing.T) {
 }
 
 func TestConstraints_DomainCheck(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "domain_test",
 		Domains: []model.Domain{
@@ -514,6 +528,7 @@ func TestConstraints_DomainCheck(t *testing.T) {
 }
 
 func TestConstraints_SingleFileContainsBothFiles(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	out, diags := gen.Generate(schema)

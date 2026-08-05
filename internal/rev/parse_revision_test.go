@@ -1,6 +1,7 @@
 package rev
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 // TestParseRevisionRoundTrip pins ParseRevision as the string inverse of
 // String(), and the empty-string genesis case.
 func TestParseRevisionRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{Name: "shop", Tables: []model.Table{{Name: "users", Comment: "u"}}}
 	s.Canonicalize()
 	r, err := Compute(s, RegistryPresent)
@@ -43,6 +45,7 @@ func TestParseRevisionRoundTrip(t *testing.T) {
 
 // TestParseRevisionRejectsMalformed pins the hard-error paths.
 func TestParseRevisionRejectsMalformed(t *testing.T) {
+	testenv.Isolate(t)
 	bad := []string{
 		"no-colon-hex",
 		"bogus_class:" + strings.Repeat("a", 64),

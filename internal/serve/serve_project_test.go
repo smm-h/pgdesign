@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -71,6 +72,7 @@ on_delete = "CASCADE"
 // one canonical serializer everywhere). Both call rev.Marshal with the
 // registry-present class and no diagnostics.
 func TestProjectMode_SchemaByteConsistentWithGenerateJSON(t *testing.T) {
+	testenv.Isolate(t)
 	schema, reg := buildTestProject(t, projectTOML)
 	srv := NewProject(schema, reg, nil, []string{"public"}, "")
 	ts := httptest.NewServer(srv)
@@ -110,6 +112,7 @@ func TestProjectMode_SchemaByteConsistentWithGenerateJSON(t *testing.T) {
 // TestProjectMode_DBEndpointDegrades verifies database-backed endpoints return an
 // explicit 503 (not a nil-pool panic) when the server runs without a database.
 func TestProjectMode_DBEndpointDegrades(t *testing.T) {
+	testenv.Isolate(t)
 	schema, reg := buildTestProject(t, projectTOML)
 	srv := NewProject(schema, reg, nil, []string{"public"}, "")
 	ts := httptest.NewServer(srv)
@@ -134,6 +137,7 @@ func TestProjectMode_DBEndpointDegrades(t *testing.T) {
 // TestProjectMode_Graph verifies the FK-graph projection endpoint returns the
 // resolved edges/nodes of the compiled model.
 func TestProjectMode_Graph(t *testing.T) {
+	testenv.Isolate(t)
 	schema, reg := buildTestProject(t, projectTOML)
 	srv := NewProject(schema, reg, nil, []string{"public"}, "")
 	ts := httptest.NewServer(srv)
@@ -193,6 +197,7 @@ type = "order_state"
 // project mode because the real semtype registry is passed to D2 generation (the
 // registry-absent database path silently drops them).
 func TestProjectMode_SMDiagramRenders(t *testing.T) {
+	testenv.Isolate(t)
 	schema, reg := buildTestProject(t, smTOML)
 	srv := NewProject(schema, reg, nil, []string{"public"}, "")
 	ts := httptest.NewServer(srv)
@@ -225,6 +230,7 @@ func TestProjectMode_SMDiagramRenders(t *testing.T) {
 // TestProjectMode_D2QueryParams verifies the d2 endpoint maps query params onto
 // D2 options (roadmap 9.1: serve params) and rejects invalid values.
 func TestProjectMode_D2QueryParams(t *testing.T) {
+	testenv.Isolate(t)
 	schema, reg := buildTestProject(t, smTOML)
 	srv := NewProject(schema, reg, nil, []string{"public"}, "")
 	ts := httptest.NewServer(srv)

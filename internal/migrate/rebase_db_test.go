@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -19,6 +20,7 @@ import (
 // served-forward path via the remap (canon(r3) -> the re-parented revision) and
 // apply the remaining re-parented tail edge — not raise a NoPathError.
 func TestRebaseServedForwardApply(t *testing.T) {
+	testenv.Isolate(t)
 	edb := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, edb.URL)

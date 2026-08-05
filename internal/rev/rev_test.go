@@ -3,6 +3,7 @@ package rev
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -39,6 +40,7 @@ func sampleSchema() *model.Schema {
 }
 
 func TestComputeDeterministic(t *testing.T) {
+	testenv.Isolate(t)
 	s := sampleSchema()
 	r1, err := Compute(s, RegistryPresent)
 	if err != nil {
@@ -58,6 +60,7 @@ func TestComputeDeterministic(t *testing.T) {
 }
 
 func TestUnknownClassErrors(t *testing.T) {
+	testenv.Isolate(t)
 	if _, err := Compute(sampleSchema(), ModelClass("")); err == nil {
 		t.Fatal("expected error for empty model class")
 	}
@@ -69,6 +72,7 @@ func TestUnknownClassErrors(t *testing.T) {
 // TestCrossClassComparisonErrors is the L7 guarantee: comparing revisions of
 // different model classes is a type error, not a silent false.
 func TestCrossClassComparisonErrors(t *testing.T) {
+	testenv.Isolate(t)
 	s := sampleSchema()
 	present, err := Compute(s, RegistryPresent)
 	if err != nil {
@@ -90,6 +94,7 @@ func TestCrossClassComparisonErrors(t *testing.T) {
 
 // TestSameClassComparison confirms Equal works within a class.
 func TestSameClassComparison(t *testing.T) {
+	testenv.Isolate(t)
 	a, _ := Compute(sampleSchema(), RegistryPresent)
 	b, _ := Compute(sampleSchema(), RegistryPresent)
 	eq, err := a.Equal(b)
@@ -104,6 +109,7 @@ func TestSameClassComparison(t *testing.T) {
 // TestEnvelopeRevisionVerifiesAgainstEmbeddedBytes is the core 1.5 verify item:
 // the envelope's revision hashes the embedded model bytes exactly.
 func TestEnvelopeRevisionVerifiesAgainstEmbeddedBytes(t *testing.T) {
+	testenv.Isolate(t)
 	s := sampleSchema()
 	body, err := Marshal(s, RegistryPresent, nil)
 	if err != nil {
@@ -130,6 +136,7 @@ func TestEnvelopeRevisionVerifiesAgainstEmbeddedBytes(t *testing.T) {
 // TestEnvelopeTamperDetected confirms Parse rejects an envelope whose embedded
 // model bytes were altered after the revision was computed.
 func TestEnvelopeTamperDetected(t *testing.T) {
+	testenv.Isolate(t)
 	body, err := Marshal(sampleSchema(), RegistryPresent, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -156,6 +163,7 @@ func TestEnvelopeTamperDetected(t *testing.T) {
 // bytes of another must be rejected — otherwise the returned Revision would
 // carry a class tag its bytes do not, corrupting future cross-class Equal.
 func TestParseRejectsForgedClass(t *testing.T) {
+	testenv.Isolate(t)
 	body, err := Marshal(sampleSchema(), RegistryAbsent, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -187,6 +195,7 @@ func TestParseRejectsForgedClass(t *testing.T) {
 // audit): an envelope framed under a different serializer generation is
 // rejected before its bytes are trusted.
 func TestParseRejectsWrongFormatVersion(t *testing.T) {
+	testenv.Isolate(t)
 	body, err := Marshal(sampleSchema(), RegistryPresent, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -210,6 +219,7 @@ func TestParseRejectsWrongFormatVersion(t *testing.T) {
 // byte-identical bodies. Both paths ultimately call Marshal; here we assert
 // Marshal is a pure function of its inputs.
 func TestOneSerializerIdenticalBodies(t *testing.T) {
+	testenv.Isolate(t)
 	s := sampleSchema()
 	a, err := Marshal(s, RegistryPresent, nil)
 	if err != nil {
@@ -226,6 +236,7 @@ func TestOneSerializerIdenticalBodies(t *testing.T) {
 
 // TestDiagnosticsPreserved confirms diagnostics survive into the envelope.
 func TestDiagnosticsPreserved(t *testing.T) {
+	testenv.Isolate(t)
 	diags := []diagnostic.Diagnostic{
 		{Severity: diagnostic.Warning, Code: "W001", Message: "heads up", Table: "users"},
 	}
@@ -263,6 +274,7 @@ func TestDiagnosticsPreserved(t *testing.T) {
 // encoding a canonical model, decoding it, and re-encoding yields byte-identical
 // canonical bytes.
 func TestDecodeModelRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	s := sampleSchema()
 	canonical, err := CanonicalBytes(s, RegistryPresent)
 	if err != nil {
@@ -287,6 +299,7 @@ func TestDecodeModelRoundTrip(t *testing.T) {
 // TestClassMarkerInBytes confirms the model class is carried inside the
 // canonical bytes (the L7 marker), not only on the Revision wrapper.
 func TestClassMarkerInBytes(t *testing.T) {
+	testenv.Isolate(t)
 	present, err := CanonicalBytes(sampleSchema(), RegistryPresent)
 	if err != nil {
 		t.Fatal(err)

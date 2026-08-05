@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -16,6 +17,7 @@ import (
 // `migrate status` called EnsureMigrationsTable and scanned dir/*.toml,
 // recreating the legacy table on the upgraded database.
 func TestChainStatusOnUpgradedDB(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

@@ -2,6 +2,7 @@ package enc
 
 import (
 	"bytes"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -81,6 +82,7 @@ func encodeSMObject(t *testing.T, s *model.Schema) []byte {
 // first-class model.StateMachine object), not the registry snapshot. The verify
 // block requires this.
 func TestNestedTransitionCommentsFlipIdentity(t *testing.T) {
+	testenv.Isolate(t)
 	a := encodeSMObject(t, smSchema(t, "ship it", ""))
 	b := encodeSMObject(t, smSchema(t, "dispatch it", ""))
 	if bytes.Equal(a, b) {
@@ -92,6 +94,7 @@ func TestNestedTransitionCommentsFlipIdentity(t *testing.T) {
 // relabeling it cannot change the canonical bytes of the state-machine object.
 // The verify block requires this.
 func TestSourceRelabelingDoesNotFlipIdentity(t *testing.T) {
+	testenv.Isolate(t)
 	a := encodeSMObject(t, smSchema(t, "ship it", "user"))
 	b := encodeSMObject(t, smSchema(t, "ship it", "extended"))
 	if !bytes.Equal(a, b) {
@@ -106,6 +109,7 @@ func TestSourceRelabelingDoesNotFlipIdentity(t *testing.T) {
 // the snapshot, that state would be added to the model, not to identity via the
 // snapshot.
 func TestRegistrySnapshotEmptyForAllModels(t *testing.T) {
+	testenv.Isolate(t)
 	// Flat models over the generator.
 	rapid.Check(t, func(rt *rapid.T) {
 		raws := modelgen.Draw(rt, modelgen.DefaultConfig())
@@ -154,6 +158,7 @@ func TestRegistrySnapshotEmptyForAllModels(t *testing.T) {
 // SM-bearing schemas — the property that was broken when SM identity flowed
 // through the un-decodable registry snapshot.
 func TestStateMachineDecodeRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	s := smSchema(t, "ship it", "user")
 	objs1, err := EncodeObjects(s)
 	if err != nil {
@@ -200,6 +205,7 @@ func keysOf(objs map[Key][]byte) []string {
 // the builtin regex therefore flips the domain's canonical bytes — identity
 // tracks builtin changes through the MODEL collection, with no special case.
 func TestBuiltinRegexChangeFlipsIdentity(t *testing.T) {
+	testenv.Isolate(t)
 	comment := "a user"
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public", Version: 16},

@@ -2,6 +2,7 @@ package predicate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"testing"
 
@@ -67,6 +68,7 @@ func s(v string) *string { return &v }
 // definitional bodies (constraint def / column default), booleans for not-null and
 // index validity.
 func TestConformanceAndMatrix(t *testing.T) {
+	testenv.Isolate(t)
 	ctx, conn := setupDB(t)
 	v, err := catalog.Version(ctx, conn)
 	if err != nil {
@@ -154,6 +156,7 @@ func TestConformanceAndMatrix(t *testing.T) {
 // TestInvalidIndexPrecondition verifies a present-but-INVALID index (interrupted
 // CIC) is a MISMATCH under IndexMustBeValid — both backends agree.
 func TestInvalidIndexPrecondition(t *testing.T) {
+	testenv.Isolate(t)
 	ctx, conn := setupDB(t)
 	if _, err := conn.Exec(ctx, "CREATE TABLE dups (v integer NOT NULL)"); err != nil {
 		t.Fatal(err)
@@ -179,6 +182,7 @@ func TestInvalidIndexPrecondition(t *testing.T) {
 
 // TestPreciseError checks the structured object/expected/found diagnostic.
 func TestPreciseError(t *testing.T) {
+	testenv.Isolate(t)
 	ctx, conn := setupDB(t)
 	v, _ := catalog.Version(ctx, conn)
 	p := Precondition{Existence: MustBePresent, Class: ClassColumn, Schema: "public", Table: "users", Name: "age", PGVersion: v, Match: &Match{ColumnType: "text"}}
@@ -200,6 +204,7 @@ func TestPreciseError(t *testing.T) {
 // TestConstraintDefPreciseError checks the round-trip mismatch names the canonical
 // expected and found constraint bodies.
 func TestConstraintDefPreciseError(t *testing.T) {
+	testenv.Isolate(t)
 	ctx, conn := setupDB(t)
 	p := Precondition{Existence: MustBePresent, Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk", Match: &Match{ConstraintDef: "CHECK (age > 100)"}}
 	r, err := Check(ctx, conn, p)

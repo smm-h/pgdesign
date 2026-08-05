@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -36,6 +37,7 @@ var retiredVocabulary = []*regexp.Regexp{
 // the documented reality: no semver filenames, no file-trusting rollback, no
 // --version flag references in the hand-authored migration guides.
 func TestMigrateGuidesHaveNoRetiredVocabulary(t *testing.T) {
+	testenv.Isolate(t)
 	for _, doc := range migrateGuideDocs {
 		data, err := os.ReadFile(doc)
 		if err != nil {
@@ -54,6 +56,7 @@ func TestMigrateGuidesHaveNoRetiredVocabulary(t *testing.T) {
 // TestMigrateGuideCommandsAreRegistered asserts every `migrate <subcommand>` the
 // guides reference exists in the CLI registration (roadmap 5.10 doc greps).
 func TestMigrateGuideCommandsAreRegistered(t *testing.T) {
+	testenv.Isolate(t)
 	handlers, err := os.ReadFile("handlers_migrate.go")
 	if err != nil {
 		t.Fatalf("read handlers_migrate.go: %v", err)

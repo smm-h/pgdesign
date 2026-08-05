@@ -1,12 +1,14 @@
 package parse
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/semtype"
 )
 
 func TestCollectUserTypes_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	raw := &RawSchema{}
 	got := CollectUserTypes(raw)
 	if len(got) != 0 {
@@ -15,6 +17,7 @@ func TestCollectUserTypes_Empty(t *testing.T) {
 }
 
 func TestCollectUserTypes_Scalar(t *testing.T) {
+	testenv.Isolate(t)
 	notNull := true
 	defVal := "0"
 	defExpr := "now()"
@@ -77,6 +80,7 @@ func TestCollectUserTypes_Scalar(t *testing.T) {
 }
 
 func TestCollectUserTypes_Enum(t *testing.T) {
+	testenv.Isolate(t)
 	raw := &RawSchema{
 		Types: []RawType{{
 			Name:   "status",
@@ -106,6 +110,7 @@ func TestCollectUserTypes_Enum(t *testing.T) {
 }
 
 func TestCollectUserTypes_Composite(t *testing.T) {
+	testenv.Isolate(t)
 	raw := &RawSchema{
 		Types: []RawType{{
 			Name: "address",
@@ -143,6 +148,7 @@ func TestCollectUserTypes_Composite(t *testing.T) {
 }
 
 func TestCollectUserTypes_StateMachine(t *testing.T) {
+	testenv.Isolate(t)
 	terminal := true
 	nonTerminal := false
 	stateComment := "the final state"
@@ -236,6 +242,7 @@ func TestCollectUserTypes_StateMachine(t *testing.T) {
 }
 
 func TestCollectUserTypes_Multiple(t *testing.T) {
+	testenv.Isolate(t)
 	raw := &RawSchema{
 		Types: []RawType{
 			{Name: "a", Kind: "enum", Values: []string{"x"}},

@@ -1,6 +1,7 @@
 package sqlutil
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func TestParseExpr(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("successful parse returns node and nil diagnostic", func(t *testing.T) {
 		node, diag := ParseExpr("a + b", "test context")
 		if node == nil {

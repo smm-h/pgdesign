@@ -1,11 +1,13 @@
 package testdb
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
 
 func TestRenderTemplate(t *testing.T) {
+	testenv.Isolate(t)
 	for _, lang := range []string{"go", "python", "ts", "java", "kotlin", "zig"} {
 		t.Run(lang, func(t *testing.T) {
 			out, err := RenderTemplate(lang, "schema.sql.sqlsplit", "postgres://localhost/mydb", "mydb")
@@ -42,6 +44,7 @@ func TestRenderTemplate(t *testing.T) {
 }
 
 func TestRenderTemplateGoNameAssertion(t *testing.T) {
+	testenv.Isolate(t)
 	out, err := RenderTemplate("go", "schema.sql.sqlsplit", "postgres://localhost/mydb", "mydb")
 	if err != nil {
 		t.Fatalf("RenderTemplate(go): %v", err)
@@ -56,6 +59,7 @@ func TestRenderTemplateGoNameAssertion(t *testing.T) {
 }
 
 func TestRenderTemplateUnsupportedLang(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := RenderTemplate("ruby", "x.sql", "postgres://localhost/db", "db")
 	if err == nil {
 		t.Fatal("expected error for unsupported language")
@@ -66,6 +70,7 @@ func TestRenderTemplateUnsupportedLang(t *testing.T) {
 }
 
 func TestWrapperOutputPath(t *testing.T) {
+	testenv.Isolate(t)
 	tests := map[string]string{
 		"go":     "internal/testdb/pgdesign_testdb.go",
 		"python": "tests/pgdesign_testdb.py",
@@ -82,12 +87,14 @@ func TestWrapperOutputPath(t *testing.T) {
 }
 
 func TestWrapperOutputPathUnknown(t *testing.T) {
+	testenv.Isolate(t)
 	if got := WrapperOutputPath("ruby"); got != "" {
 		t.Errorf("WrapperOutputPath(%q) = %q, want empty", "ruby", got)
 	}
 }
 
 func TestRenderCITemplate(t *testing.T) {
+	testenv.Isolate(t)
 	out, err := RenderCITemplate("github-actions", "16", []string{"go", "python", "ts"}, CITemplateOptions{})
 	if err != nil {
 		t.Fatalf("RenderCITemplate: %v", err)
@@ -132,6 +139,7 @@ func TestRenderCITemplate(t *testing.T) {
 }
 
 func TestRenderCITemplateWithPartman(t *testing.T) {
+	testenv.Isolate(t)
 	out, err := RenderCITemplate("github-actions", "17", []string{"go"}, CITemplateOptions{Partman: true})
 	if err != nil {
 		t.Fatalf("RenderCITemplate with Partman: %v", err)
@@ -156,6 +164,7 @@ func TestRenderCITemplateWithPartman(t *testing.T) {
 }
 
 func TestRenderCITemplateUnsupportedProvider(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := RenderCITemplate("gitlab", "16", []string{"go"}, CITemplateOptions{})
 	if err == nil {
 		t.Fatal("expected error for unsupported CI provider")
@@ -166,6 +175,7 @@ func TestRenderCITemplateUnsupportedProvider(t *testing.T) {
 }
 
 func TestTemplateTruncationUTF8Safe(t *testing.T) {
+	testenv.Isolate(t)
 	// 36 'a' + 2 'é' (each 2 bytes in UTF-8) = 40 bytes total.
 	// maxBase is 38. Character-based truncation at position 38 takes all 38
 	// characters = 40 bytes (over limit). Byte-based truncation at 38 splits
@@ -202,6 +212,7 @@ func TestTemplateTruncationUTF8Safe(t *testing.T) {
 }
 
 func TestSupportedLanguages(t *testing.T) {
+	testenv.Isolate(t)
 	langs := SupportedLanguages()
 	if len(langs) != 6 {
 		t.Errorf("expected 6 supported languages, got %d", len(langs))

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,6 +42,7 @@ func writeConfigOverrideTree(t *testing.T) (string, string) {
 }
 
 func TestResolveConfigPath_OverrideWins(t *testing.T) {
+	testenv.Isolate(t)
 	walkup, overridePath := writeConfigOverrideTree(t)
 
 	got, found, err := resolveConfigPath(&overridePath, walkup)
@@ -56,6 +58,7 @@ func TestResolveConfigPath_OverrideWins(t *testing.T) {
 }
 
 func TestResolveConfigPath_WalkUpFallback(t *testing.T) {
+	testenv.Isolate(t)
 	walkup, _ := writeConfigOverrideTree(t)
 
 	got, found, err := resolveConfigPath(nil, walkup)
@@ -72,6 +75,7 @@ func TestResolveConfigPath_WalkUpFallback(t *testing.T) {
 }
 
 func TestResolveConfigPath_MissingOverrideIsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	// walkup contains a findable pgdesign.toml; a missing override must NOT
 	// silently fall back to it.
 	walkup, _ := writeConfigOverrideTree(t)
@@ -87,6 +91,7 @@ func TestResolveConfigPath_MissingOverrideIsHardError(t *testing.T) {
 }
 
 func TestResolveConfigPath_DirectoryOverrideIsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	walkup, _ := writeConfigOverrideTree(t)
 	dirOverride := t.TempDir()
 
@@ -97,6 +102,7 @@ func TestResolveConfigPath_DirectoryOverrideIsHardError(t *testing.T) {
 }
 
 func TestLoadProjectConfig_OverrideWins(t *testing.T) {
+	testenv.Isolate(t)
 	walkup, overridePath := writeConfigOverrideTree(t)
 
 	cfg, err := loadProjectConfig(&overridePath, walkup)
@@ -109,6 +115,7 @@ func TestLoadProjectConfig_OverrideWins(t *testing.T) {
 }
 
 func TestLoadProjectConfig_WalkUpFallback(t *testing.T) {
+	testenv.Isolate(t)
 	walkup, _ := writeConfigOverrideTree(t)
 
 	cfg, err := loadProjectConfig(nil, walkup)
@@ -121,6 +128,7 @@ func TestLoadProjectConfig_WalkUpFallback(t *testing.T) {
 }
 
 func TestLoadProjectConfig_MissingOverrideIsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	walkup, _ := writeConfigOverrideTree(t)
 	missing := filepath.Join(t.TempDir(), "does-not-exist.toml")
 
@@ -131,6 +139,7 @@ func TestLoadProjectConfig_MissingOverrideIsHardError(t *testing.T) {
 }
 
 func TestResolveSchemaPaths_OverrideAppliesToDirectorySearch(t *testing.T) {
+	testenv.Isolate(t)
 	// A directory positional arg normally triggers FindConfig; with an
 	// override, the override's schema list must be used instead.
 	base := t.TempDir()
@@ -160,6 +169,7 @@ func TestResolveSchemaPaths_OverrideAppliesToDirectorySearch(t *testing.T) {
 }
 
 func TestRunBuild_ConfigOverride(t *testing.T) {
+	testenv.Isolate(t)
 	config.CodegenModes = SupportedModes()
 
 	// Full project (schema + config) in one place...
@@ -201,6 +211,7 @@ path = "out.sql"
 }
 
 func TestRunBuild_MissingConfigOverrideIsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	config.CodegenModes = SupportedModes()
 	missing := filepath.Join(t.TempDir(), "does-not-exist.toml")
 	t.Chdir(t.TempDir())

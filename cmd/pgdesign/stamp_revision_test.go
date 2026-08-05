@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -60,6 +61,7 @@ func fullProjectRevision(t *testing.T, schema *model.Schema) string {
 // comment-stamped (roadmap 4.2 "doc stamped") and that the stamp is the
 // full-project revision.
 func TestStampRevision_DocStampedWithFullProjectRevision(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -86,6 +88,7 @@ func TestStampRevision_DocStampedWithFullProjectRevision(t *testing.T) {
 // TestStampRevision_EveryStampableOutputCarriesRevision verifies sql, d2,
 // graphql, doc, and codegen outputs each carry the full-project revision line.
 func TestStampRevision_EveryStampableOutputCarriesRevision(t *testing.T) {
+	testenv.Isolate(t)
 	if testing.Short() {
 		t.Skip("sql output generates .sqlsplit via WASM parser")
 	}
@@ -128,6 +131,7 @@ func TestStampRevision_EveryStampableOutputCarriesRevision(t *testing.T) {
 // deterministic: two Plans of the same schema produce byte-identical files, so
 // freshness/byte-compare is unaffected by an unchanged rebuild.
 func TestStampRevision_RebuildWithoutChangeStaysGreen(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -162,6 +166,7 @@ func TestStampRevision_RebuildWithoutChangeStaysGreen(t *testing.T) {
 // full-project revision, so every stamped output flips exactly once (the stamp
 // line changes even where filtered content would not).
 func TestStampRevision_SchemaEditFlipsStamp(t *testing.T) {
+	testenv.Isolate(t)
 	base := minimalSchema()
 	edited := minimalSchema()
 	edited.Tables[0].Columns = append(edited.Tables[0].Columns,
@@ -200,6 +205,7 @@ func TestStampRevision_SchemaEditFlipsStamp(t *testing.T) {
 // group-filtered output whose CONTENT excludes a table nonetheless carries the
 // FULL-PROJECT revision as its stamp (provenance, not content).
 func TestStampRevision_FilteredOutputCarriesFullProjectStamp(t *testing.T) {
+	testenv.Isolate(t)
 	schema := twoTableGroupedSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -237,6 +243,7 @@ func TestStampRevision_FilteredOutputCarriesFullProjectStamp(t *testing.T) {
 // carries no stamp (line 1 is the statement count) and stays byte-stable across
 // rebuilds, while its sibling .sql IS stamped.
 func TestStampRevision_SqlsplitStampFree(t *testing.T) {
+	testenv.Isolate(t)
 	if testing.Short() {
 		t.Skip("Plan() generates .sqlsplit via WASM parser")
 	}
@@ -276,6 +283,7 @@ func TestStampRevision_SqlsplitStampFree(t *testing.T) {
 // configuring both a Go types output and a Go constraints output in DIFFERENT
 // directories is a hard error naming both directories.
 func TestValidateGoCodegenColocation_MismatchIsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -297,6 +305,7 @@ func TestValidateGoCodegenColocation_MismatchIsHardError(t *testing.T) {
 // types+constraints outputs pass, and a lone constraints output (no types) is
 // not gated.
 func TestValidateGoCodegenColocation_SameDirOK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	same := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -323,6 +332,7 @@ func TestValidateGoCodegenColocation_SameDirOK(t *testing.T) {
 // that constraints references by bare name. A gorm+constraints pair in DIFFERENT
 // directories cannot compile and is a hard error naming both directories.
 func TestValidateGoCodegenColocation_GormConstraintsMismatchIsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -344,6 +354,7 @@ func TestValidateGoCodegenColocation_GormConstraintsMismatchIsHardError(t *testi
 // gorm+constraints outputs pass: gorm supplies the row structs and branded enums
 // the constraints file validates, so one directory compiles.
 func TestValidateGoCodegenColocation_GormConstraintsSameDirOK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -363,6 +374,7 @@ func TestValidateGoCodegenColocation_GormConstraintsSameDirOK(t *testing.T) {
 // compile (enum dedup never deduplicated row structs). This is a hard error
 // naming the directory.
 func TestValidateGoCodegenColocation_TypesGormSameDirIsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -388,6 +400,7 @@ func TestValidateGoCodegenColocation_TypesGormSameDirIsHardError(t *testing.T) {
 // self-contained package (each emits its own row structs and enum block), so
 // they form two valid, independent packages.
 func TestValidateGoCodegenColocation_TypesGormSeparateDirsOK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{

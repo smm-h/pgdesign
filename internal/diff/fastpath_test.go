@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/enc"
@@ -29,6 +30,7 @@ func fastPathSample() *model.Schema {
 // TestDiffAgainstItselfEmpty PINS diff(a,a) = empty (roadmap 1.4 / L10
 // corollary).
 func TestDiffAgainstItselfEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	s := fastPathSample()
 	if d := Diff(s, s); !d.IsEmpty() {
 		t.Fatalf("diff(a,a) not empty: %s", d.Summary())
@@ -38,6 +40,7 @@ func TestDiffAgainstItselfEmpty(t *testing.T) {
 // TestChangedObjectKeysFastPath: the fast path returns no changed keys for
 // identical models and names the changed object when one differs.
 func TestChangedObjectKeysFastPath(t *testing.T) {
+	testenv.Isolate(t)
 	a := fastPathSample()
 	ck, err := ChangedObjectKeys(a, a)
 	if err != nil {

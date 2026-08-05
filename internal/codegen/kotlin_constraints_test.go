@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestKotlinConstraintsGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Enums: []model.Enum{
@@ -111,6 +113,7 @@ func TestKotlinConstraintsGenerator_Generate(t *testing.T) {
 }
 
 func TestKotlinConstraintsGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 	}
@@ -131,6 +134,7 @@ func TestKotlinConstraintsGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestKotlinConstraintsGenerator_NoConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

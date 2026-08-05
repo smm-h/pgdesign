@@ -22,6 +22,7 @@ package codegen
 import (
 	"context"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"testing"
 
@@ -101,6 +102,7 @@ func execMatrixTuples(t *testing.T, schema *model.Schema) []ddlTuple {
 // either the fixture must exercise it or the exclusion list at the top of
 // this file must document why not.
 func TestExecMatrix_FixtureKindCoverage(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _ := loadExecMatrixSchema(t)
 	tuples := execMatrixTuples(t, schema)
 
@@ -143,6 +145,7 @@ func TestExecMatrix_FixtureKindCoverage(t *testing.T) {
 // other kind means the generated executor would silently re-run
 // non-idempotent SQL under idempotent=True -- a real bug.
 func TestBuildTuples_IdempotentSQLContract(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _ := loadExecMatrixSchema(t)
 	tuples := execMatrixTuples(t, schema)
 
@@ -238,6 +241,7 @@ func verifySchemaObjects(t *testing.T, ctx context.Context, conn *pgx.Conn, labe
 // non-idempotent DDL applies once on a fresh database; idempotent DDL
 // applies twice on another fresh database.
 func TestDDLExecutionMatrix_GenerateSQL(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	schema, reg := loadExecMatrixSchema(t)
 	ctx := context.Background()
@@ -311,6 +315,7 @@ func TestDDLExecutionMatrix_GenerateSQL(t *testing.T) {
 //     exactly as generated, via selfContainedTupleGroups (the same code path
 //     the file generator renders).
 func TestDDLExecutionMatrix_Tuples(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	schema, _ := loadExecMatrixSchema(t)
 	ctx := context.Background()

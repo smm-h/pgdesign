@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 )
 
@@ -12,6 +13,7 @@ type item struct {
 func itemKey(i item) string { return i.id }
 
 func TestMatchObjects_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	added, removed, matched := matchObjects([]item{}, []item{}, itemKey)
 	if len(added) != 0 {
 		t.Errorf("expected no added, got %d", len(added))
@@ -25,6 +27,7 @@ func TestMatchObjects_Empty(t *testing.T) {
 }
 
 func TestMatchObjects_AllAdded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := []item{{id: "A", data: 1}, {id: "B", data: 2}}
 	added, removed, matched := matchObjects(desired, []item{}, itemKey)
 	if len(added) != 2 {
@@ -42,6 +45,7 @@ func TestMatchObjects_AllAdded(t *testing.T) {
 }
 
 func TestMatchObjects_AllRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	actual := []item{{id: "A", data: 1}, {id: "B", data: 2}}
 	added, removed, matched := matchObjects([]item{}, actual, itemKey)
 	if len(added) != 0 {
@@ -59,6 +63,7 @@ func TestMatchObjects_AllRemoved(t *testing.T) {
 }
 
 func TestMatchObjects_AllMatched(t *testing.T) {
+	testenv.Isolate(t)
 	desired := []item{{id: "A", data: 1}, {id: "B", data: 2}}
 	actual := []item{{id: "A", data: 10}, {id: "B", data: 20}}
 	added, removed, matched := matchObjects(desired, actual, itemKey)
@@ -80,6 +85,7 @@ func TestMatchObjects_AllMatched(t *testing.T) {
 }
 
 func TestMatchObjects_Mixed(t *testing.T) {
+	testenv.Isolate(t)
 	desired := []item{{id: "A", data: 1}, {id: "B", data: 2}, {id: "C", data: 3}}
 	actual := []item{{id: "B", data: 20}, {id: "C", data: 30}, {id: "D", data: 40}}
 	added, removed, matched := matchObjects(desired, actual, itemKey)
@@ -98,6 +104,7 @@ func TestMatchObjects_Mixed(t *testing.T) {
 }
 
 func TestMatchObjects_PreservesDesiredOrder(t *testing.T) {
+	testenv.Isolate(t)
 	desired := []item{{id: "C"}, {id: "A"}, {id: "D"}}
 	actual := []item{{id: "Z"}}
 	added, _, _ := matchObjects(desired, actual, itemKey)
@@ -110,6 +117,7 @@ func TestMatchObjects_PreservesDesiredOrder(t *testing.T) {
 }
 
 func TestMatchObjects_PreservesActualOrderForRemoved(t *testing.T) {
+	testenv.Isolate(t)
 	actual := []item{{id: "C"}, {id: "A"}, {id: "D"}}
 	desired := []item{{id: "Z"}}
 	_, removed, _ := matchObjects(desired, actual, itemKey)
@@ -122,6 +130,7 @@ func TestMatchObjects_PreservesActualOrderForRemoved(t *testing.T) {
 }
 
 func TestMatchObjects_DuplicateKeys(t *testing.T) {
+	testenv.Isolate(t)
 	// If actual has duplicate keys, last one wins in map.
 	desired := []item{{id: "A", data: 1}}
 	actual := []item{{id: "A", data: 10}, {id: "A", data: 20}}

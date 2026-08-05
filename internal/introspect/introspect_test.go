@@ -3,6 +3,7 @@ package introspect
 import (
 	"context"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"strings"
 	"testing"
@@ -64,6 +65,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestIntrospectTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema, diags, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -100,6 +102,7 @@ func TestIntrospectTables(t *testing.T) {
 }
 
 func TestIntrospectColumns(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -163,6 +166,7 @@ func TestIntrospectColumns(t *testing.T) {
 }
 
 func TestIntrospectIdentityColumns(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -218,6 +222,7 @@ func TestIntrospectIdentityColumns(t *testing.T) {
 }
 
 func TestIntrospectPrimaryKey(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -234,6 +239,7 @@ func TestIntrospectPrimaryKey(t *testing.T) {
 }
 
 func TestIntrospectForeignKeys(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -270,6 +276,7 @@ func TestIntrospectForeignKeys(t *testing.T) {
 }
 
 func TestIntrospectIndexes(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -315,6 +322,7 @@ type indexInfo struct {
 // Uniques). A desired model declares only the unique constraint, so leaking the
 // backing index into Indexes reports a spurious removed index on diff --live.
 func TestIntrospectUniqueConstraintBackingIndexFiltered(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -341,6 +349,7 @@ func TestIntrospectUniqueConstraintBackingIndexFiltered(t *testing.T) {
 }
 
 func TestIntrospectUniqueConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -370,6 +379,7 @@ func TestIntrospectUniqueConstraints(t *testing.T) {
 // with AppendOnly = true, so a desired model with append_only = true reconciles
 // clean instead of false-drifting.
 func TestIntrospectAppendOnly(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -389,6 +399,7 @@ func TestIntrospectAppendOnly(t *testing.T) {
 }
 
 func TestIntrospectCheckConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -414,6 +425,7 @@ func TestIntrospectCheckConstraints(t *testing.T) {
 }
 
 func TestIntrospectEnums(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -439,6 +451,7 @@ func TestIntrospectEnums(t *testing.T) {
 }
 
 func TestIntrospectColumnTypeKind(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -470,6 +483,7 @@ func TestIntrospectColumnTypeKind(t *testing.T) {
 }
 
 func TestApplyEnumTypeKinds_SchemaQualified(t *testing.T) {
+	testenv.Isolate(t)
 	// format_type schema-qualifies enum types outside the search path;
 	// matching must handle both bare and qualified names.
 	schema := &model.Schema{
@@ -501,6 +515,7 @@ func TestApplyEnumTypeKinds_SchemaQualified(t *testing.T) {
 }
 
 func TestIntrospectTableComment(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -516,6 +531,7 @@ func TestIntrospectTableComment(t *testing.T) {
 }
 
 func TestExport(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -553,6 +569,7 @@ func TestExport(t *testing.T) {
 }
 
 func TestParseIndexDef(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name      string
 		def       string
@@ -675,6 +692,7 @@ func containsStr(s, substr string) bool {
 // --- Unit tests for partition pure logic (no DB required) ---
 
 func TestMapPartStrategy(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		code string
 		want string
@@ -694,6 +712,7 @@ func TestMapPartStrategy(t *testing.T) {
 }
 
 func TestResolvePartColumns(t *testing.T) {
+	testenv.Isolate(t)
 	columns := []model.Column{
 		{Name: "id"},
 		{Name: "created_at"},
@@ -729,6 +748,7 @@ func TestResolvePartColumns(t *testing.T) {
 // --- Integration tests for partition introspection ---
 
 func TestIntrospectRangePartitioning(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -767,6 +787,7 @@ func TestIntrospectRangePartitioning(t *testing.T) {
 }
 
 func TestIntrospectListPartitioning(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -794,6 +815,7 @@ func TestIntrospectListPartitioning(t *testing.T) {
 }
 
 func TestIntrospectRegularTableNoPartitioning(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -810,6 +832,7 @@ func TestIntrospectRegularTableNoPartitioning(t *testing.T) {
 }
 
 func TestParseReloptions(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input []string
 		want  map[string]string
@@ -833,6 +856,7 @@ func TestParseReloptions(t *testing.T) {
 }
 
 func TestParseSimpleDefault(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input    string
 		wantVal  string
@@ -884,6 +908,7 @@ func TestParseSimpleDefault(t *testing.T) {
 }
 
 func TestIntrospectViewDependsOn(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -929,6 +954,7 @@ func TestIntrospectViewDependsOn(t *testing.T) {
 }
 
 func TestIntrospectMaterializedViewDependsOn(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -954,6 +980,7 @@ func TestIntrospectMaterializedViewDependsOn(t *testing.T) {
 }
 
 func TestIntrospectViewDependsOn_CTE(t *testing.T) {
+	testenv.Isolate(t)
 	ctx := context.Background()
 	conn, err := ephemeralDB.Connect(ctx)
 	if err != nil {
@@ -1019,6 +1046,7 @@ func TestIntrospectViewDependsOn_CTE(t *testing.T) {
 }
 
 func TestIntrospectViewDependsOn_Subquery(t *testing.T) {
+	testenv.Isolate(t)
 	ctx := context.Background()
 	conn, err := ephemeralDB.Connect(ctx)
 	if err != nil {
@@ -1079,6 +1107,7 @@ func TestIntrospectViewDependsOn_Subquery(t *testing.T) {
 }
 
 func TestParseExclusionDef(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name          string
 		defInput      string
@@ -1159,6 +1188,7 @@ func TestParseExclusionDef(t *testing.T) {
 }
 
 func TestExportDomains(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "test",
 		Domains: []model.Domain{
@@ -1214,6 +1244,7 @@ func TestExportDomains(t *testing.T) {
 }
 
 func TestIntrospectRLSFlags(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -1245,6 +1276,7 @@ func TestIntrospectRLSFlags(t *testing.T) {
 }
 
 func TestIntrospectPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -1321,6 +1353,7 @@ func TestIntrospectPolicies(t *testing.T) {
 }
 
 func TestDecodeTriggerTiming(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		tgtype int16
 		want   string
@@ -1340,6 +1373,7 @@ func TestDecodeTriggerTiming(t *testing.T) {
 }
 
 func TestDecodeTriggerEvents(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		tgtype int16
 		want   []string
@@ -1367,6 +1401,7 @@ func TestDecodeTriggerEvents(t *testing.T) {
 }
 
 func TestDecodeTriggerForEach(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		tgtype int16
 		want   string
@@ -1385,6 +1420,7 @@ func TestDecodeTriggerForEach(t *testing.T) {
 }
 
 func TestExtractTriggerWhen(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		triggerdef string
 		want       string
@@ -1411,6 +1447,7 @@ func TestExtractTriggerWhen(t *testing.T) {
 }
 
 func TestMapPolCmd(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		cmd  string
 		want string
@@ -1431,6 +1468,7 @@ func TestMapPolCmd(t *testing.T) {
 }
 
 func TestExportRLSPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "test",
 		Tables: []model.Table{{
@@ -1535,6 +1573,7 @@ func TestExportRLSPolicies(t *testing.T) {
 }
 
 func TestIntrospectTriggerFilter_StateMachine(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -1588,6 +1627,7 @@ func TestIntrospectTriggerFilter_StateMachine(t *testing.T) {
 // never silent. The synthetic reserved-name table/view/matview stand in for the
 // real managed objects that arrive in phase 5.
 func TestIntrospectFiltersReservedNames(t *testing.T) {
+	testenv.Isolate(t)
 	schema, diags, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)
@@ -1637,6 +1677,7 @@ func TestIntrospectFiltersReservedNames(t *testing.T) {
 }
 
 func TestIntrospectFunctionVolatileParallel(t *testing.T) {
+	testenv.Isolate(t)
 	schema, _, err := Introspect(context.Background(), testConnStr, []string{testSchema})
 	if err != nil {
 		t.Fatalf("Introspect failed: %v", err)

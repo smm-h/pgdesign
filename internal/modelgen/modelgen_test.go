@@ -1,6 +1,7 @@
 package modelgen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"reflect"
 	"testing"
 
@@ -62,6 +63,7 @@ func buildAndValidate(raws []*parse.RawSchema) (buildErrs diagnostic.Diagnostics
 // at all sizes the default config produces. Runs in normal CI (-short safe,
 // bounded by rapid's default iteration count).
 func TestOracle_GeneratedModelsAreValid(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		raws := Draw(rt, DefaultConfig())
 
@@ -83,6 +85,7 @@ func TestOracle_GeneratedModelsAreValid(t *testing.T) {
 // L10's round-trip inputs are always valid on both endpoints (the derivation must
 // never mint an invalid post-state).
 func TestOracle_GeneratedPairsAreValid(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		a, b := DrawPair(rt, DefaultConfig())
 		for label, raws := range map[string][]*parse.RawSchema{"a": a, "b": b} {
@@ -104,6 +107,7 @@ func TestOracle_GeneratedPairsAreValid(t *testing.T) {
 // one table, no extra columns) to pin that the minimal shape — a bare
 // surrogate-PK table — is itself valid.
 func TestOracle_SingleColumnFragment(t *testing.T) {
+	testenv.Isolate(t)
 	cfg := Config{
 		MinSchemas: 1, MaxSchemas: 1,
 		MinTables: 1, MaxTables: 1,
@@ -131,6 +135,7 @@ func TestOracle_SingleColumnFragment(t *testing.T) {
 // TestFragmentRestrictionsHonored verifies the config bounds are respected: the
 // generator never exceeds the configured schema/table/column counts.
 func TestFragmentRestrictionsHonored(t *testing.T) {
+	testenv.Isolate(t)
 	cfg := Config{
 		MinSchemas: 2, MaxSchemas: 2,
 		MinTables: 1, MaxTables: 3,
@@ -164,6 +169,7 @@ func TestFragmentRestrictionsHonored(t *testing.T) {
 // table exists — so the model still Builds + validates cleanly (resolveGroups
 // rejects unknown table references with E227).
 func TestGroupsGeneratedAndValid(t *testing.T) {
+	testenv.Isolate(t)
 	cfg := Config{
 		MinSchemas: 1, MaxSchemas: 2,
 		MinTables: 1, MaxTables: 3,
@@ -211,8 +217,8 @@ func smConfig() Config {
 		MinSchemas: 1, MaxSchemas: 2,
 		MinTables: 1, MaxTables: 3,
 		MinExtraColumns: 0, MaxExtraColumns: 2,
-		PGVersion:            16,
-		MinGroups:            0, MaxGroups: 0,
+		PGVersion: 16,
+		MinGroups: 0, MaxGroups: 0,
 		ColumnTypes:          []string{"counter", "flag"},
 		IncludeStateMachines: true,
 	}
@@ -224,6 +230,7 @@ func smConfig() Config {
 // the E223/E224 and reachability paths on generated SM types (a linear reachable
 // chain, no requires, default = initial state).
 func TestOracle_StateMachineModelsAreValid(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		raws := Draw(rt, smConfig())
 
@@ -257,6 +264,7 @@ func TestOracle_StateMachineModelsAreValid(t *testing.T) {
 // so L10's SM round-trip inputs are always buildable on both endpoints (the SM
 // type and its column survive the pair derivation).
 func TestOracle_StateMachinePairsAreValid(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		a, b := DrawPair(rt, smConfig())
 		for label, raws := range map[string][]*parse.RawSchema{"a": a, "b": b} {
@@ -278,6 +286,7 @@ func TestOracle_StateMachinePairsAreValid(t *testing.T) {
 // rapid seed yields byte-identical models. rapid's integrated shrinking relies
 // on this, and it is a stated 1.6 verification obligation.
 func TestDeterministicUnderSeed(t *testing.T) {
+	testenv.Isolate(t)
 	gen := Generator(DefaultConfig())
 	for seed := 1; seed <= 5; seed++ {
 		a := gen.Example(seed)

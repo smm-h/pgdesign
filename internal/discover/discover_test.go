@@ -3,6 +3,7 @@ package discover
 import (
 	"context"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"sort"
 	"strings"
@@ -54,6 +55,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDiscoverBasicFDs(t *testing.T) {
+	testenv.Isolate(t)
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, ephemeralURL)
 	if err != nil {
@@ -96,6 +98,7 @@ func TestDiscoverBasicFDs(t *testing.T) {
 }
 
 func TestDiscoverMaxColumnsSkip(t *testing.T) {
+	testenv.Isolate(t)
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, ephemeralURL)
 	if err != nil {
@@ -126,6 +129,7 @@ func TestDiscoverMaxColumnsSkip(t *testing.T) {
 }
 
 func TestDiscoverEmptyTable(t *testing.T) {
+	testenv.Isolate(t)
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, ephemeralURL)
 	if err != nil {
@@ -156,6 +160,7 @@ func TestDiscoverEmptyTable(t *testing.T) {
 // --- Unit tests for TANE internals ---
 
 func TestTaneInMemory(t *testing.T) {
+	testenv.Isolate(t)
 	// In-memory data: A->B, B->C hold. D is independent.
 	columns := []string{"a", "b", "c", "d"}
 	data := [][]string{
@@ -183,6 +188,7 @@ func TestTaneInMemory(t *testing.T) {
 }
 
 func TestTaneSuperkey(t *testing.T) {
+	testenv.Isolate(t)
 	// All rows have unique values for column A, so A is a superkey.
 	columns := []string{"a", "b"}
 	data := [][]string{
@@ -199,6 +205,7 @@ func TestTaneSuperkey(t *testing.T) {
 }
 
 func TestTaneBidirectional(t *testing.T) {
+	testenv.Isolate(t)
 	// A and B have a 1:1 mapping: both A->B and B->A should be found.
 	columns := []string{"a", "b"}
 	data := [][]string{
@@ -218,6 +225,7 @@ func TestTaneBidirectional(t *testing.T) {
 }
 
 func TestPartitionProduct(t *testing.T) {
+	testenv.Isolate(t)
 	// p1: rows {0,1,2} in one class, {3,4} in another.
 	p1 := &partition{
 		classes: [][]int{{0, 1, 2}, {3, 4}},
@@ -251,6 +259,7 @@ func TestPartitionProduct(t *testing.T) {
 }
 
 func TestBuildPartition(t *testing.T) {
+	testenv.Isolate(t)
 	data := [][]string{
 		{"a", "x"},
 		{"b", "x"},
@@ -270,6 +279,7 @@ func TestBuildPartition(t *testing.T) {
 }
 
 func TestWideTableCreatedAndSkipped(t *testing.T) {
+	testenv.Isolate(t)
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, ephemeralURL)
 	if err != nil {

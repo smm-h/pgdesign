@@ -2,6 +2,7 @@ package validate
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 )
 
 func TestE201_FKMissingOnDelete(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -55,6 +57,7 @@ func TestE201_FKMissingOnDelete(t *testing.T) {
 }
 
 func TestW029_MaintenanceNoSchedule(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Extensions: []string{"pg_partman"},
 		Tables: []model.Table{{
@@ -79,6 +82,7 @@ func TestW029_MaintenanceNoSchedule(t *testing.T) {
 }
 
 func TestW029_MaintenanceWithScheduleNoWarn(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Extensions: []string{"pg_partman", "pg_cron"},
 		Tables: []model.Table{{
@@ -102,6 +106,7 @@ func TestW029_MaintenanceWithScheduleNoWarn(t *testing.T) {
 }
 
 func TestE202_TableMissingComment(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "users",
@@ -123,6 +128,7 @@ func TestE202_TableMissingComment(t *testing.T) {
 }
 
 func TestE203_TableMissingPK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "events",
@@ -144,6 +150,7 @@ func TestE203_TableMissingPK(t *testing.T) {
 }
 
 func TestE207_VarcharUsage(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -169,6 +176,7 @@ func TestE207_VarcharUsage(t *testing.T) {
 }
 
 func TestE211_NamingViolation(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "UserAccounts",
@@ -190,6 +198,7 @@ func TestE211_NamingViolation(t *testing.T) {
 }
 
 func TestW001_GodTable(t *testing.T) {
+	testenv.Isolate(t)
 	cols := make([]model.Column, 35)
 	for i := range cols {
 		cols[i] = model.Column{Name: "col_" + string(rune('a'+i/26)) + string(rune('a'+i%26)), PGType: typeinfo.T("text")}
@@ -214,6 +223,7 @@ func TestW001_GodTable(t *testing.T) {
 }
 
 func TestW008_CircularFK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		CycleGroups: [][]string{{"a", "b", "c"}},
 		Tables: []model.Table{
@@ -246,6 +256,7 @@ func TestW008_CircularFK(t *testing.T) {
 }
 
 func TestE204_CrossSchemaFK_Passes(t *testing.T) {
+	testenv.Isolate(t)
 	// When two schemas are merged, a cross-schema FK should resolve correctly.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -289,6 +300,7 @@ func TestE204_CrossSchemaFK_Passes(t *testing.T) {
 }
 
 func TestE204_CrossSchemaFK_FailsWhenMissing(t *testing.T) {
+	testenv.Isolate(t)
 	// A cross-schema FK to a table not in the schema should still error.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -322,6 +334,7 @@ func TestE204_CrossSchemaFK_FailsWhenMissing(t *testing.T) {
 }
 
 func TestCleanSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -369,6 +382,7 @@ func TestCleanSchema(t *testing.T) {
 }
 
 func TestE200_MissingColumnType(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "events",
@@ -394,6 +408,7 @@ func TestE200_MissingColumnType(t *testing.T) {
 }
 
 func TestE212_FKMissingIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -439,6 +454,7 @@ func TestE212_FKMissingIndex(t *testing.T) {
 }
 
 func TestE212_FKWithIndex_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -484,6 +500,7 @@ func TestE212_FKWithIndex_NoDiag(t *testing.T) {
 }
 
 func TestW003_BooleanStates(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -511,6 +528,7 @@ func TestW003_BooleanStates(t *testing.T) {
 }
 
 func TestW003_TwoBooleans_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -534,6 +552,7 @@ func TestW003_TwoBooleans_NoDiag(t *testing.T) {
 }
 
 func TestW004_JSONCouldBeTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -559,6 +578,7 @@ func TestW004_JSONCouldBeTable(t *testing.T) {
 }
 
 func TestW004_NonPlural_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -581,6 +601,7 @@ func TestW004_NonPlural_NoDiag(t *testing.T) {
 }
 
 func TestW007_RedundantIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -611,6 +632,7 @@ func TestW007_RedundantIndex(t *testing.T) {
 }
 
 func TestW007_DifferentMethod_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -638,6 +660,7 @@ func TestW007_DifferentMethod_NoDiag(t *testing.T) {
 }
 
 func TestDisabledRules(t *testing.T) {
+	testenv.Isolate(t)
 	// Only warning/info rules can be disabled; E-codes in the disable list
 	// are a hard error (see TestE229_DisableECode_HardError).
 	schema := &model.Schema{
@@ -668,6 +691,7 @@ func TestDisabledRules(t *testing.T) {
 }
 
 func TestE204_RefColumnNotFound(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -717,6 +741,7 @@ func TestE204_RefColumnNotFound(t *testing.T) {
 }
 
 func TestE204_RefColumnExists_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -763,6 +788,7 @@ func TestE204_RefColumnExists_NoDiag(t *testing.T) {
 }
 
 func TestE211_IndexNamingViolation(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -800,6 +826,7 @@ func TestE211_IndexNamingViolation(t *testing.T) {
 }
 
 func TestE213_GeneratedColRefsGenerated(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -828,6 +855,7 @@ func TestE213_GeneratedColRefsGenerated(t *testing.T) {
 }
 
 func TestE213_GeneratedColRefsRegular_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -852,6 +880,7 @@ func TestE213_GeneratedColRefsRegular_NoDiag(t *testing.T) {
 }
 
 func TestE213_GeneratedColWithFunctionCalls_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// Function names like "lower" should not be mistakenly treated as column references.
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -886,6 +915,7 @@ func TestE213_GeneratedColWithFunctionCalls_NoDiag(t *testing.T) {
 }
 
 func TestExtractColumnRefs(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		expr string
 		want []string
@@ -928,6 +958,7 @@ func TestExtractColumnRefs(t *testing.T) {
 }
 
 func TestE215_InsertPolicyWithUsingOnly(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:      "messages",
@@ -961,6 +992,7 @@ func TestE215_InsertPolicyWithUsingOnly(t *testing.T) {
 }
 
 func TestE215_SelectPolicyWithWithCheck(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:      "messages",
@@ -990,6 +1022,7 @@ func TestE215_SelectPolicyWithWithCheck(t *testing.T) {
 }
 
 func TestE215_UpdatePolicyBoth_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:      "messages",
@@ -1020,6 +1053,7 @@ func TestE215_UpdatePolicyBoth_NoDiag(t *testing.T) {
 }
 
 func TestW009_PolicyErrorCodeNotSnakeCase(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:      "messages",
@@ -1050,6 +1084,7 @@ func TestW009_PolicyErrorCodeNotSnakeCase(t *testing.T) {
 }
 
 func TestW009_PolicyErrorCodeSnakeCase_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:      "messages",
@@ -1080,6 +1115,7 @@ func TestW009_PolicyErrorCodeSnakeCase_NoDiag(t *testing.T) {
 }
 
 func TestSuppressW004_ColumnLevel(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -1122,6 +1158,7 @@ func TestSuppressW004_ColumnLevel(t *testing.T) {
 }
 
 func TestSuppressW004_TableLevel(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -1163,6 +1200,7 @@ func TestSuppressW004_TableLevel(t *testing.T) {
 }
 
 func TestSuppressW004_NoSuppression(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -1188,6 +1226,7 @@ func TestSuppressW004_NoSuppression(t *testing.T) {
 }
 
 func TestSuppressProgrammatic(t *testing.T) {
+	testenv.Isolate(t)
 	// The Suppressed field on diagnostic.Diagnostic is for future use
 	// (Phase 6.3 W004 auto-suppression for JSONB shapes). This test verifies
 	// the field exists and is usable in the SuppressedDiagnostic type.
@@ -1211,6 +1250,7 @@ func TestSuppressProgrammatic(t *testing.T) {
 }
 
 func TestW004_SuppressedWithJSONSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -1248,6 +1288,7 @@ func TestW004_SuppressedWithJSONSchema(t *testing.T) {
 }
 
 func TestW004_NotSuppressedWithoutJSONSchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -1269,6 +1310,7 @@ func TestW004_NotSuppressedWithoutJSONSchema(t *testing.T) {
 }
 
 func TestAppendOnlyUpdatedAtWarning(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1300,6 +1342,7 @@ func TestAppendOnlyUpdatedAtWarning(t *testing.T) {
 }
 
 func TestE205_ColumnDefaultEmbeddedQuotes(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -1339,6 +1382,7 @@ func TestE205_ColumnDefaultEmbeddedQuotes(t *testing.T) {
 }
 
 func TestSuppressionPipeline_Integration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -1409,6 +1453,7 @@ func TestSuppressionPipeline_Integration(t *testing.T) {
 }
 
 func TestE216_InvalidWithParam(t *testing.T) {
+	testenv.Isolate(t)
 	reg := extregistry.NewBuiltinRegistry()
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -1436,6 +1481,7 @@ func TestE216_InvalidWithParam(t *testing.T) {
 }
 
 func TestE216_ValidHnswParams_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	reg := extregistry.NewBuiltinRegistry()
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -1466,6 +1512,7 @@ func TestE216_ValidHnswParams_NoDiag(t *testing.T) {
 }
 
 func TestE218_VirtualRequiresPG18_Error(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		PGVersion: 17,
 		Tables: []model.Table{
@@ -1497,6 +1544,7 @@ func TestE218_VirtualRequiresPG18_Error(t *testing.T) {
 }
 
 func TestE218_VirtualRequiresPG18_UnknownVersion(t *testing.T) {
+	testenv.Isolate(t)
 	// PGVersion 0 (unknown): pgcap.Has returns false, so the check treats
 	// it as a version that lacks VirtualGeneratedCols support -> Error.
 	// PG version is mandatory in production, so this is a safety net.
@@ -1528,6 +1576,7 @@ func TestE218_VirtualRequiresPG18_UnknownVersion(t *testing.T) {
 }
 
 func TestE218_VirtualRequiresPG18_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// PG 18+ should not trigger E218.
 	schema := &model.Schema{
 		PGVersion: 18,
@@ -1554,6 +1603,7 @@ func TestE218_VirtualRequiresPG18_NoDiag(t *testing.T) {
 }
 
 func TestE218_StoredGenerated_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// Stored generated columns should never trigger E218, regardless of PG version.
 	schema := &model.Schema{
 		PGVersion: 12,
@@ -1580,6 +1630,7 @@ func TestE218_StoredGenerated_NoDiag(t *testing.T) {
 }
 
 func TestE217_HnswWithPgvectorDeclared_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	reg := extregistry.NewBuiltinRegistry()
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -1612,6 +1663,7 @@ func TestE217_HnswWithPgvectorDeclared_NoDiag(t *testing.T) {
 }
 
 func TestE219_HnswWithoutPgvectorDeclared(t *testing.T) {
+	testenv.Isolate(t)
 	reg := extregistry.NewBuiltinRegistry()
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -1647,6 +1699,7 @@ func TestE219_HnswWithoutPgvectorDeclared(t *testing.T) {
 }
 
 func TestE217_BtreeIndex_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	reg := extregistry.NewBuiltinRegistry()
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -1678,6 +1731,7 @@ func TestE217_BtreeIndex_NoDiag(t *testing.T) {
 }
 
 func TestE217_UnknownMethod(t *testing.T) {
+	testenv.Isolate(t)
 	reg := extregistry.NewBuiltinRegistry()
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -1712,6 +1766,7 @@ func TestE217_UnknownMethod(t *testing.T) {
 }
 
 func TestE221_ExclusionBtreeGistMissing(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "bookings",
@@ -1747,6 +1802,7 @@ func TestE221_ExclusionBtreeGistMissing(t *testing.T) {
 }
 
 func TestE221_ExclusionBtreeGistPresent(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Extensions: []string{"btree_gist"},
 		Tables: []model.Table{{
@@ -1780,6 +1836,7 @@ func TestE221_ExclusionBtreeGistPresent(t *testing.T) {
 }
 
 func TestE221_ExclusionRangeOperatorOnly(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "bookings",
@@ -1810,6 +1867,7 @@ func TestE221_ExclusionRangeOperatorOnly(t *testing.T) {
 }
 
 func TestE222_RestrictivePolicyPG9_Error(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		PGVersion: 9,
 		Tables: []model.Table{
@@ -1842,6 +1900,7 @@ func TestE222_RestrictivePolicyPG9_Error(t *testing.T) {
 }
 
 func TestE222_RestrictivePolicyPGUnknown_Error(t *testing.T) {
+	testenv.Isolate(t)
 	// PGVersion 0 (unknown): pgcap.Has returns false, so the check treats
 	// it as a version that lacks RestrictiveRLS support -> Error.
 	// PG version is mandatory in production, so this is a safety net.
@@ -1877,6 +1936,7 @@ func TestE222_RestrictivePolicyPGUnknown_Error(t *testing.T) {
 }
 
 func TestE222_RestrictivePolicyPG10_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		PGVersion: 10,
 		Tables: []model.Table{
@@ -1904,6 +1964,7 @@ func TestE222_RestrictivePolicyPG10_NoDiag(t *testing.T) {
 }
 
 func TestE222_PermissivePolicyPG9_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		PGVersion: 9,
 		Tables: []model.Table{
@@ -1931,6 +1992,7 @@ func TestE222_PermissivePolicyPG9_NoDiag(t *testing.T) {
 }
 
 func TestW011_RLSWithoutPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -1956,6 +2018,7 @@ func TestW011_RLSWithoutPolicies(t *testing.T) {
 }
 
 func TestW011_RLSWithPolicies_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -1982,6 +2045,7 @@ func TestW011_RLSWithPolicies_NoDiag(t *testing.T) {
 }
 
 func TestW012_RLSOperationGap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2014,6 +2078,7 @@ func TestW012_RLSOperationGap(t *testing.T) {
 }
 
 func TestW012_ALLCoversEverything_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2040,6 +2105,7 @@ func TestW012_ALLCoversEverything_NoDiag(t *testing.T) {
 }
 
 func TestW012_AllFourOperations_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2066,6 +2132,7 @@ func TestW012_AllFourOperations_NoDiag(t *testing.T) {
 }
 
 func TestW012_NoPolicies_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -2088,6 +2155,7 @@ func TestW012_NoPolicies_NoDiag(t *testing.T) {
 // --- W013: CASCADE depth exceeds threshold ---
 
 func TestW013_CascadeDepthExceedsThreshold(t *testing.T) {
+	testenv.Isolate(t)
 	// Chain: a references b references c references d references e, all
 	// CASCADE. Deleting from "e" cascades e -> d -> c -> b -> a, so
 	// CascadeDepth(e) = 4 > 3 and W013 must be attributed to "e" (the
@@ -2134,6 +2202,7 @@ func TestW013_CascadeDepthExceedsThreshold(t *testing.T) {
 }
 
 func TestW013_CascadeDepthAtThreshold_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// Chain: a references b references c references d, all CASCADE.
 	// Deleting from "d" cascades depth 3 = threshold. No trigger anywhere.
 	schema := &model.Schema{
@@ -2175,6 +2244,7 @@ func w014SpokeTable(name string) model.Table {
 }
 
 func TestW014_CascadeBreadthExceedsThreshold(t *testing.T) {
+	testenv.Isolate(t)
 	// Five spoke tables each reference "hub" with CASCADE. Deleting from hub
 	// cascades into all 5 spokes: CascadeBreadth(hub) = 5 >= 5. W014 must be
 	// attributed to "hub" (the delete origin), not to the spokes.
@@ -2209,6 +2279,7 @@ func TestW014_CascadeBreadthExceedsThreshold(t *testing.T) {
 }
 
 func TestW014_CascadeBreadthBelowThreshold_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// Three spoke tables reference "hub" with CASCADE. CascadeBreadth(hub) = 3 < 5. No trigger.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2243,6 +2314,7 @@ func e229Schema() *model.Schema {
 }
 
 func TestE229_SuppressKeyTargetingECode_HardError(t *testing.T) {
+	testenv.Isolate(t)
 	cfg := DefaultConfig()
 	cfg.Suppress = map[string]string{"users.E202": "comments are annoying"}
 	diags, suppressed := Validate(e229Schema(), cfg)
@@ -2260,6 +2332,7 @@ func TestE229_SuppressKeyTargetingECode_HardError(t *testing.T) {
 }
 
 func TestE229_SuppressColumnKeyTargetingECode_HardError(t *testing.T) {
+	testenv.Isolate(t)
 	// The table.column.CODE key shape must be rejected too.
 	cfg := DefaultConfig()
 	cfg.Suppress = map[string]string{"users.id.E200": "who needs types"}
@@ -2270,6 +2343,7 @@ func TestE229_SuppressColumnKeyTargetingECode_HardError(t *testing.T) {
 }
 
 func TestE229_SuppressWCode_StillWorks(t *testing.T) {
+	testenv.Isolate(t)
 	cfg := DefaultConfig()
 	cfg.Suppress = map[string]string{"users.W002": "orphan by design"}
 	diags, suppressed := Validate(e229Schema(), cfg)
@@ -2291,6 +2365,7 @@ func TestE229_SuppressWCode_StillWorks(t *testing.T) {
 }
 
 func TestE229_DisableECode_HardError(t *testing.T) {
+	testenv.Isolate(t)
 	cfg := DefaultConfig()
 	cfg.Disabled = []string{"E202"}
 	diags, _ := Validate(e229Schema(), cfg)
@@ -2303,6 +2378,7 @@ func TestE229_DisableECode_HardError(t *testing.T) {
 }
 
 func TestE229_DisableWCode_StillWorks(t *testing.T) {
+	testenv.Isolate(t)
 	cfg := DefaultConfig()
 	cfg.Disabled = []string{"W002"}
 	diags, _ := Validate(e229Schema(), cfg)
@@ -2334,6 +2410,7 @@ func e228Table(name string, appendOnly bool, ref, onDelete string) model.Table {
 }
 
 func TestE228_DirectHop_AllBlockedActions(t *testing.T) {
+	testenv.Isolate(t)
 	// All three write-into-child actions on an append-only table's FK must be
 	// flagged: the deny-mutation trigger blocks the write at runtime.
 	for _, action := range []string{"CASCADE", "SET NULL", "SET DEFAULT"} {
@@ -2372,6 +2449,7 @@ func TestE228_DirectHop_AllBlockedActions(t *testing.T) {
 }
 
 func TestE228_TransitiveChain(t *testing.T) {
+	testenv.Isolate(t)
 	// audit_log (append-only) references users with SET NULL; users references
 	// tenants with CASCADE. Deleting from tenants deletes users rows, whose
 	// deletion then tries to SET NULL into audit_log. Both users and tenants
@@ -2412,6 +2490,7 @@ func TestE228_TransitiveChain(t *testing.T) {
 }
 
 func TestE228_PropagationOnlyCascade(t *testing.T) {
+	testenv.Isolate(t)
 	// Propagation hops count only CASCADE: users references tenants with
 	// SET NULL, so deleting from tenants does NOT delete users rows and never
 	// reaches audit_log. Only users is a delete origin.
@@ -2432,6 +2511,7 @@ func TestE228_PropagationOnlyCascade(t *testing.T) {
 }
 
 func TestE228_RestrictNoAction_NotFlagged(t *testing.T) {
+	testenv.Isolate(t)
 	for _, action := range []string{"RESTRICT", "NO ACTION", ""} {
 		name := action
 		if name == "" {
@@ -2452,6 +2532,7 @@ func TestE228_RestrictNoAction_NotFlagged(t *testing.T) {
 }
 
 func TestE228_AppendOnlyToAppendOnly_Flagged(t *testing.T) {
+	testenv.Isolate(t)
 	// Even though the referenced table is itself append-only (so its rows can
 	// never be deleted and the cascade can never actually fire), the
 	// declaration is contradictory and must be flagged.
@@ -2471,6 +2552,7 @@ func TestE228_AppendOnlyToAppendOnly_Flagged(t *testing.T) {
 }
 
 func TestE228_NoAppendOnly_Clean(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{
 		e228Table("users", false, "", ""),
 		e228Table("orders", false, "users", "CASCADE"),
@@ -2486,6 +2568,7 @@ func TestE228_NoAppendOnly_Clean(t *testing.T) {
 // --- W015: Mixed ON DELETE actions ---
 
 func TestW015_MixedOnDeleteActions(t *testing.T) {
+	testenv.Isolate(t)
 	// Table "target" referenced by two FKs with different ON DELETE actions.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2514,6 +2597,7 @@ func TestW015_MixedOnDeleteActions(t *testing.T) {
 }
 
 func TestW015_ConsistentOnDelete_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// All incoming FKs to "target" use CASCADE. No W015.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2563,6 +2647,7 @@ func cascadeChainTables(sch string) []model.Table {
 // TestW013_TwoSchemasQualifiedChain pins the qualified chain text in W013 and
 // verifies the two same-named chains never merge across schemas.
 func TestW013_TwoSchemasQualifiedChain(t *testing.T) {
+	testenv.Isolate(t)
 	var tables []model.Table
 	tables = append(tables, cascadeChainTables("public")...)
 	tables = append(tables, cascadeChainTables("archive")...)
@@ -2596,6 +2681,7 @@ func TestW013_TwoSchemasQualifiedChain(t *testing.T) {
 // TestW014_TwoSchemasQualifiedBreadth pins the qualified target/chain text in
 // W014 and verifies per-schema breadth (each hub sees 5 spokes, not 10).
 func TestW014_TwoSchemasQualifiedBreadth(t *testing.T) {
+	testenv.Isolate(t)
 	spoke := func(sch, name string) model.Table {
 		return model.Table{Name: name, Schema: sch, Comment: name, PK: []string{"id"},
 			Columns: []model.Column{{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true}, {Name: "hub_id", PGType: typeinfo.T("uuid"), NotNull: true}},
@@ -2638,6 +2724,7 @@ func TestW014_TwoSchemasQualifiedBreadth(t *testing.T) {
 // TestW015_TwoSchemasQualifiedTarget pins the qualified target name in W015
 // across two same-named "target" tables.
 func TestW015_TwoSchemasQualifiedTarget(t *testing.T) {
+	testenv.Isolate(t)
 	build := func(sch string) []model.Table {
 		return []model.Table{
 			{Name: "target", Schema: sch, Comment: "Target", PK: []string{"id"},
@@ -2676,6 +2763,7 @@ func TestW015_TwoSchemasQualifiedTarget(t *testing.T) {
 // --- I001: Natural key candidate ---
 
 func TestI001_NaturalKeyCandidate(t *testing.T) {
+	testenv.Isolate(t)
 	// Table with PK [id] and FDs declaring [email] as a candidate key.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2707,6 +2795,7 @@ func TestI001_NaturalKeyCandidate(t *testing.T) {
 }
 
 func TestI001_OnlySurrogateKeys_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// All candidate keys contain surrogate columns (id/auto_id/ref). No I001.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2733,6 +2822,7 @@ func TestI001_OnlySurrogateKeys_NoDiag(t *testing.T) {
 }
 
 func TestI001_NoDependencies_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// Table has no declared functional dependencies. No I001.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2756,6 +2846,7 @@ func TestI001_NoDependencies_NoDiag(t *testing.T) {
 // --- W016: PK subsumes UNIQUE ---
 
 func TestW016_PKSubsumesUnique(t *testing.T) {
+	testenv.Isolate(t)
 	// UNIQUE constraint on [id] which is already the PK.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2785,6 +2876,7 @@ func TestW016_PKSubsumesUnique(t *testing.T) {
 }
 
 func TestW016_UniqueOnDifferentColumns_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// UNIQUE on [email] while PK is [id]. No W016.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2811,6 +2903,7 @@ func TestW016_UniqueOnDifferentColumns_NoDiag(t *testing.T) {
 // --- W017: Redundant IS NOT NULL CHECK ---
 
 func TestW017_RedundantIsNotNullCheck(t *testing.T) {
+	testenv.Isolate(t)
 	// Column "name" is NOT NULL with CHECK "name IS NOT NULL".
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2837,6 +2930,7 @@ func TestW017_RedundantIsNotNullCheck(t *testing.T) {
 }
 
 func TestW017_NullableColumn_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// Column "name" is nullable, so CHECK "name IS NOT NULL" is not redundant.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2863,6 +2957,7 @@ func TestW017_NullableColumn_NoDiag(t *testing.T) {
 // --- W018: Domain CHECK duplicate ---
 
 func TestW018_DomainCheckDuplicate(t *testing.T) {
+	testenv.Isolate(t)
 	// Domain "email_type" has CHECK "VALUE ~ '^.+@.+$'".
 	// Column of semantic type "email_type" has column-level CHECK with same expression.
 	schema := &model.Schema{
@@ -2896,6 +2991,7 @@ func TestW018_DomainCheckDuplicate(t *testing.T) {
 }
 
 func TestW018_DifferentCheck_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// Domain CHECK and column CHECK differ. No W018.
 	schema := &model.Schema{
 		Domains: []model.Domain{
@@ -2925,6 +3021,7 @@ func TestW018_DifferentCheck_NoDiag(t *testing.T) {
 // --- W019: Range CHECK subsumption ---
 
 func TestW019_RangeSubsumption(t *testing.T) {
+	testenv.Isolate(t)
 	// Two CHECKs on same column: [0,200] subsumes [1,50]. The narrower is reported redundant.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -2956,6 +3053,7 @@ func TestW019_RangeSubsumption(t *testing.T) {
 }
 
 func TestW019_OpenEndedRange(t *testing.T) {
+	testenv.Isolate(t)
 	// age >= 0 (open-ended high) subsumes age >= 0 AND age <= 200.
 	// The open-ended constraint is wider and should be flagged redundant.
 	schema := &model.Schema{
@@ -2984,6 +3082,7 @@ func TestW019_OpenEndedRange(t *testing.T) {
 }
 
 func TestW019_NonInclusiveBounds(t *testing.T) {
+	testenv.Isolate(t)
 	// age > 0 AND age < 100 is subsumed by age >= 0 AND age <= 100 (wider).
 	// The wider constraint should be flagged redundant.
 	schema := &model.Schema{
@@ -3012,6 +3111,7 @@ func TestW019_NonInclusiveBounds(t *testing.T) {
 }
 
 func TestW019_NegativeNumbers(t *testing.T) {
+	testenv.Isolate(t)
 	// balance >= -1000 AND balance <= 1000 subsumes balance >= -500 AND balance <= 500.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -3039,6 +3139,7 @@ func TestW019_NegativeNumbers(t *testing.T) {
 }
 
 func TestW019_EqualRanges_NoRedundancy(t *testing.T) {
+	testenv.Isolate(t)
 	// Two constraints with identical bounds are not redundant (neither is strictly wider).
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -3064,6 +3165,7 @@ func TestW019_EqualRanges_NoRedundancy(t *testing.T) {
 }
 
 func TestW019_NoOverlap_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	// CHECKs on different columns. No subsumption possible.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -3090,6 +3192,7 @@ func TestW019_NoOverlap_NoDiag(t *testing.T) {
 }
 
 func TestI002_DeadColumn(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -3117,6 +3220,7 @@ func TestI002_DeadColumn(t *testing.T) {
 }
 
 func TestI002_AllColumnsReferenced_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -3161,6 +3265,7 @@ func TestI002_AllColumnsReferenced_NoDiag(t *testing.T) {
 }
 
 func TestI002_FKRefColumnsReferenced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -3196,6 +3301,7 @@ func TestI002_FKRefColumnsReferenced(t *testing.T) {
 }
 
 func TestI002_ViewReferenceSuppresses(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -3219,6 +3325,7 @@ func TestI002_ViewReferenceSuppresses(t *testing.T) {
 }
 
 func TestI002_PolicyUsingSuppresses(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -3243,6 +3350,7 @@ func TestI002_PolicyUsingSuppresses(t *testing.T) {
 }
 
 func TestI003_RowSizeToastThreshold(t *testing.T) {
+	testenv.Isolate(t)
 	cols := []model.Column{
 		{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
 	}
@@ -3270,6 +3378,7 @@ func TestI003_RowSizeToastThreshold(t *testing.T) {
 }
 
 func TestW021_RowSizeExceedsPage(t *testing.T) {
+	testenv.Isolate(t)
 	cols := []model.Column{
 		{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
 	}
@@ -3302,6 +3411,7 @@ func TestW021_RowSizeExceedsPage(t *testing.T) {
 }
 
 func TestI003_SmallTable_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -3325,6 +3435,7 @@ func TestI003_SmallTable_NoDiag(t *testing.T) {
 }
 
 func TestI004_ColumnReordering(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -3350,6 +3461,7 @@ func TestI004_ColumnReordering(t *testing.T) {
 }
 
 func TestI004_OptimalOrder_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -3375,6 +3487,7 @@ func TestI004_OptimalOrder_NoDiag(t *testing.T) {
 }
 
 func TestEstimateRowSize_KnownSchema(t *testing.T) {
+	testenv.Isolate(t)
 	cols := []model.Column{
 		{Name: "id", PGType: typeinfo.T("uuid"), NotNull: true},
 		{Name: "count", PGType: typeinfo.T("int4"), NotNull: true},
@@ -3421,6 +3534,7 @@ func newSMRegistry(t *testing.T) *semtype.Registry {
 }
 
 func TestW027_SMUnreachableState(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	// SM with an unreachable state "orphan".
 	smType := semtype.UserTypeDef{
@@ -3470,6 +3584,7 @@ func TestW027_SMUnreachableState(t *testing.T) {
 }
 
 func TestW027_SMNoUnreachableState(t *testing.T) {
+	testenv.Isolate(t)
 	reg := newSMRegistry(t)
 
 	schema := &model.Schema{
@@ -3495,6 +3610,7 @@ func TestW027_SMNoUnreachableState(t *testing.T) {
 }
 
 func TestW028_SMDeadEndState(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	// SM with non-terminal "stuck" state that has no outgoing transitions.
 	smType := semtype.UserTypeDef{
@@ -3543,6 +3659,7 @@ func TestW028_SMDeadEndState(t *testing.T) {
 }
 
 func TestW028_SMNoDeadEnd(t *testing.T) {
+	testenv.Isolate(t)
 	reg := newSMRegistry(t)
 
 	schema := &model.Schema{
@@ -3568,6 +3685,7 @@ func TestW028_SMNoDeadEnd(t *testing.T) {
 }
 
 func TestE223_SMRequiresColumnMissing(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	smType := semtype.UserTypeDef{
 		Name: "payment_status",
@@ -3615,6 +3733,7 @@ func TestE223_SMRequiresColumnMissing(t *testing.T) {
 }
 
 func TestE223_SMRequiresColumnPresent(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	smType := semtype.UserTypeDef{
 		Name: "payment_status",
@@ -3659,6 +3778,7 @@ func TestE223_SMRequiresColumnPresent(t *testing.T) {
 }
 
 func TestE224_SMDefaultMismatch(t *testing.T) {
+	testenv.Isolate(t)
 	reg := newSMRegistry(t)
 
 	wrongDefault := "confirmed"
@@ -3691,6 +3811,7 @@ func TestE224_SMDefaultMismatch(t *testing.T) {
 }
 
 func TestE224_SMDefaultMatchesInitial(t *testing.T) {
+	testenv.Isolate(t)
 	reg := newSMRegistry(t)
 
 	correctDefault := "pending"
@@ -3717,6 +3838,7 @@ func TestE224_SMDefaultMatchesInitial(t *testing.T) {
 }
 
 func TestE224_SMNoDefault(t *testing.T) {
+	testenv.Isolate(t)
 	reg := newSMRegistry(t)
 
 	schema := &model.Schema{
@@ -3742,6 +3864,7 @@ func TestE224_SMNoDefault(t *testing.T) {
 }
 
 func TestE226_SMReservedTriggerPrefix(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -3775,6 +3898,7 @@ func TestE226_SMReservedTriggerPrefix(t *testing.T) {
 }
 
 func TestE226_SMNoReservedPrefix(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -3805,6 +3929,7 @@ func TestE226_SMNoReservedPrefix(t *testing.T) {
 }
 
 func TestSM_NilRegistrySkipsChecks(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -3830,6 +3955,7 @@ func TestSM_NilRegistrySkipsChecks(t *testing.T) {
 }
 
 func TestE225_FKInvalidOnDelete(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -3874,6 +4000,7 @@ func TestE225_FKInvalidOnDelete(t *testing.T) {
 }
 
 func TestE225_LowercaseRestrict_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -3912,6 +4039,7 @@ func TestE225_LowercaseRestrict_NoDiag(t *testing.T) {
 }
 
 func TestE225_SetNull_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -3950,6 +4078,7 @@ func TestE225_SetNull_NoDiag(t *testing.T) {
 }
 
 func TestE225_SetDefault_NoDiag(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",
@@ -4014,6 +4143,7 @@ func filterSeverity(diags []diagnostic.Diagnostic, sev diagnostic.Severity) []di
 // (no E204) and must not cause a spurious orphan warning (W002) for either the
 // local or the imported table.
 func TestImportedFK_NoSpuriousE204_W002(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "orders",

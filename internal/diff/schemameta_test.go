@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -11,6 +12,7 @@ import (
 // pg_version: it is part of a model's revision, so a change must produce a
 // non-empty diff. Historically the differ was blind to it (Part III).
 func TestDiffReportsPGVersionChange(t *testing.T) {
+	testenv.Isolate(t)
 	a := &model.Schema{Name: "s", PGVersion: 16}
 	b := &model.Schema{Name: "s", PGVersion: 17}
 	d := Diff(a, b)
@@ -29,6 +31,7 @@ func TestDiffReportsPGVersionChange(t *testing.T) {
 // TestDiffReportsGroupsChange pins the reverse-conformance obligation for the
 // table-group map.
 func TestDiffReportsGroupsChange(t *testing.T) {
+	testenv.Isolate(t)
 	a := &model.Schema{Name: "s", Groups: map[string][]string{"core": {"users"}}}
 	b := &model.Schema{Name: "s", Groups: map[string][]string{"core": {"users", "orders"}}}
 	d := Diff(a, b)
@@ -44,6 +47,7 @@ func TestDiffReportsGroupsChange(t *testing.T) {
 // (group table lists are a canonical-only collection): a mere reordering is not
 // a change.
 func TestDiffGroupsOrderInsensitive(t *testing.T) {
+	testenv.Isolate(t)
 	a := &model.Schema{Name: "s", Groups: map[string][]string{"core": {"users", "orders"}}}
 	b := &model.Schema{Name: "s", Groups: map[string][]string{"core": {"orders", "users"}}}
 	d := Diff(a, b)
@@ -55,6 +59,7 @@ func TestDiffGroupsOrderInsensitive(t *testing.T) {
 // TestDiffPGVersionAndGroupsEqualIsEmpty confirms identical schema-meta fields
 // produce no schema-meta diff (no spurious drift).
 func TestDiffPGVersionAndGroupsEqualIsEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	a := &model.Schema{Name: "s", PGVersion: 16, Groups: map[string][]string{"core": {"users"}}}
 	b := &model.Schema{Name: "s", PGVersion: 16, Groups: map[string][]string{"core": {"users"}}}
 	d := Diff(a, b)
@@ -89,6 +94,7 @@ func mkSemColumnSchema(semName string) *model.Schema {
 // DDL-identical but declare different semantic type names have distinct
 // revisions and must therefore produce a non-empty diff.
 func TestDiffModelToModelComparesSemanticTypeName(t *testing.T) {
+	testenv.Isolate(t)
 	a := mkSemColumnSchema("account_id") // desired
 	b := mkSemColumnSchema("int")        // actual
 	d := Diff(a, b)
@@ -111,6 +117,7 @@ func TestDiffModelToModelComparesSemanticTypeName(t *testing.T) {
 // (DiffLive) does NOT compare semantic type names: an introspected actual
 // carries none, so comparing would false-drift every migrate/diff --live run.
 func TestDiffLiveSuppressesSemanticTypeName(t *testing.T) {
+	testenv.Isolate(t)
 	desired := mkSemColumnSchema("account_id")
 	actual := mkSemColumnSchema("") // introspected: no semantic names
 	d := DiffLive(desired, actual, nil)

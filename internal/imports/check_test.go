@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -65,6 +66,7 @@ func consumerWithFK(localType string, refColumns []string) *model.Schema {
 }
 
 func TestCheck_CleanNoDrift(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := lockAlias(t, []string{"users"})
 	consumer := consumerWithFK("int8", []string{"id"})
 	diags := Check(projectDir, "framework", consumer)
@@ -74,6 +76,7 @@ func TestCheck_CleanNoDrift(t *testing.T) {
 }
 
 func TestCheck_DriftedColumnType(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := lockAlias(t, []string{"users"})
 	// Local user_id is int4 but the imported users.id is int8 -> junction drift.
 	consumer := consumerWithFK("int4", []string{"id"})
@@ -94,6 +97,7 @@ func TestCheck_DriftedColumnType(t *testing.T) {
 }
 
 func TestCheck_MissingReferencedColumn(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := lockAlias(t, []string{"users"})
 	consumer := consumerWithFK("int8", []string{"nonexistent"})
 	diags := Check(projectDir, "framework", consumer)
@@ -103,6 +107,7 @@ func TestCheck_MissingReferencedColumn(t *testing.T) {
 }
 
 func TestCheck_MissingReferencedTable(t *testing.T) {
+	testenv.Isolate(t)
 	// Lock a surface that does NOT include users, but the consumer references it.
 	projectDir := t.TempDir()
 	fw := frameworkModel()
@@ -124,6 +129,7 @@ func TestCheck_MissingReferencedTable(t *testing.T) {
 // framework table changes produces the identical surface (the unreferenced table
 // is never vendored), so a clean check still passes.
 func TestCheck_UnreferencedFrameworkChangeSilent(t *testing.T) {
+	testenv.Isolate(t)
 	dir1 := lockAlias(t, []string{"users"})
 	lf1, _ := ReadLockfile(dir1, "framework")
 
@@ -146,6 +152,7 @@ func TestCheck_UnreferencedFrameworkChangeSilent(t *testing.T) {
 // TestCheck_TamperedStoreDetected: deleting a vendored object makes an id
 // unresolvable -> integrity error.
 func TestCheck_TamperedStoreDetected(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := lockAlias(t, []string{"users"})
 	lf, _ := ReadLockfile(projectDir, "framework")
 	// Corrupt the lockfile: point an object at a nonexistent id.

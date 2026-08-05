@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
@@ -10,6 +11,7 @@ import (
 // baseline target (a pre-existing chain cannot be baselined — that would fork it
 // into two cross-class heads). The remediation names regenerating the chain.
 func TestBaselineTwoHeadsGuardRefusesPreExistingChain(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	if _, err := p.WriteEdge(e); err != nil {
 		t.Fatalf("write live edge: %v", err)
@@ -33,6 +35,7 @@ func TestBaselineTwoHeadsGuardRefusesPreExistingChain(t *testing.T) {
 // TestBaselineTwoHeadsGuardAllowsEmptyChain: an empty chain (no live edges) has no
 // head, so the guard passes.
 func TestBaselineTwoHeadsGuardAllowsEmptyChain(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	if err := checkBaselineEmptyChain(p, e.Target); err != nil {
 		t.Fatalf("empty chain must pass the two-heads guard, got: %v", err)
@@ -43,6 +46,7 @@ func TestBaselineTwoHeadsGuardAllowsEmptyChain(t *testing.T) {
 // baseline target (an idempotent re-run whose edge was written but whose stamp did
 // not complete), the guard passes.
 func TestBaselineTwoHeadsGuardAllowsTargetHead(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	if _, err := p.WriteEdge(e); err != nil {
 		t.Fatalf("write live edge: %v", err)

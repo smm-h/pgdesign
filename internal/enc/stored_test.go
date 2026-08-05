@@ -2,6 +2,7 @@ package enc
 
 import (
 	"bytes"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -15,6 +16,7 @@ import (
 // must normalize Stored out of identity when Generated is empty, so two
 // otherwise-identical columns encode to the same bytes regardless of Stored.
 func TestStoredNotEncodedForNonGeneratedColumn(t *testing.T) {
+	testenv.Isolate(t)
 	mkTable := func(stored bool) model.Table {
 		return model.Table{
 			Name:    "users",
@@ -46,6 +48,7 @@ func TestStoredNotEncodedForNonGeneratedColumn(t *testing.T) {
 // TestStoredEncodedForGeneratedColumn confirms the normalization is scoped: on a
 // GENERATED column, STORED vs VIRTUAL is semantic and MUST still be encoded.
 func TestStoredEncodedForGeneratedColumn(t *testing.T) {
+	testenv.Isolate(t)
 	mkTable := func(stored bool) model.Table {
 		return model.Table{
 			Name:    "users",

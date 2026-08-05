@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 // invoking squash without it hard-errors before touching any files. This
 // blocks offline squash even of never-applied ranges.
 func TestMigrateSquashCLI_RequiresDB(t *testing.T) {
+	testenv.Isolate(t)
 	root := projectRoot(t)
 
 	// Two minimal migration files so the range is non-trivial; the command

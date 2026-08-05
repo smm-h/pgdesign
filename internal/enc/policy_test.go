@@ -2,6 +2,7 @@ package enc
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"reflect"
 	"sort"
 	"testing"
@@ -112,6 +113,7 @@ func registryStructTypes() map[string]reflect.Type {
 // exclusion allowlist with a reason. It turns red when a new model field is
 // added without a deliberate encode-or-exclude decision.
 func TestModelEncoderTotality(t *testing.T) {
+	testenv.Isolate(t)
 	types := modelStructTypes()
 	assertKeySetsMatch(t, "modelFieldPolicy", modelFieldPolicy, types)
 	for name, typ := range types {
@@ -124,6 +126,7 @@ func TestModelEncoderTotality(t *testing.T) {
 // TestRegistrySnapshotTotality is the same coverage guard over the
 // registry-snapshot structs.
 func TestRegistrySnapshotTotality(t *testing.T) {
+	testenv.Isolate(t)
 	types := registryStructTypes()
 	assertKeySetsMatch(t, "registryFieldPolicy", registryFieldPolicy, types)
 	for name, typ := range types {
@@ -152,6 +155,7 @@ func assertKeySetsMatch(t *testing.T, label string, policy map[string]structPoli
 // violation. This is what guarantees the real guards above go red on a new
 // unencoded field.
 func TestTotalityGuardCatchesUnclassifiedField(t *testing.T) {
+	testenv.Isolate(t)
 	type synthetic struct {
 		Covered   string
 		Excluded  string
@@ -170,6 +174,7 @@ func TestTotalityGuardCatchesUnclassifiedField(t *testing.T) {
 // TestTotalityGuardCatchesEmptyReason proves an exclusion without a reason is a
 // violation: exclusions must always justify themselves.
 func TestTotalityGuardCatchesEmptyReason(t *testing.T) {
+	testenv.Isolate(t)
 	type synthetic struct {
 		X string
 	}

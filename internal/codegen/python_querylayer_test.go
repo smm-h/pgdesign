@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -89,6 +90,7 @@ func qlTestSchema() *model.Schema {
 }
 
 func TestPythonQueryLayer_ProtocolsFileProduced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -103,6 +105,7 @@ func TestPythonQueryLayer_ProtocolsFileProduced(t *testing.T) {
 }
 
 func TestPythonQueryLayer_Header(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -123,6 +126,7 @@ func TestPythonQueryLayer_Header(t *testing.T) {
 }
 
 func TestPythonQueryLayer_ContextTypes(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -146,6 +150,7 @@ func TestPythonQueryLayer_ContextTypes(t *testing.T) {
 }
 
 func TestPythonQueryLayer_RowDataclasses(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -180,6 +185,7 @@ func TestPythonQueryLayer_RowDataclasses(t *testing.T) {
 }
 
 func TestPythonQueryLayer_WriterProtocol(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -216,6 +222,7 @@ func TestPythonQueryLayer_WriterProtocol(t *testing.T) {
 }
 
 func TestPythonQueryLayer_AppendOnlySkipsUpdateDelete(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -238,6 +245,7 @@ func TestPythonQueryLayer_AppendOnlySkipsUpdateDelete(t *testing.T) {
 }
 
 func TestPythonQueryLayer_SMTransitionMethods(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -261,6 +269,7 @@ func TestPythonQueryLayer_SMTransitionMethods(t *testing.T) {
 }
 
 func TestPythonQueryLayer_ReaderProtocol(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -297,6 +306,7 @@ func TestPythonQueryLayer_ReaderProtocol(t *testing.T) {
 }
 
 func TestPythonQueryLayer_ReaderFKByMethods(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -310,6 +320,7 @@ func TestPythonQueryLayer_ReaderFKByMethods(t *testing.T) {
 }
 
 func TestPythonQueryLayer_ReaderMultiColumnUnique(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -323,6 +334,7 @@ func TestPythonQueryLayer_ReaderMultiColumnUnique(t *testing.T) {
 }
 
 func TestPythonQueryLayer_BackendProtocol(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -364,6 +376,7 @@ func TestPythonQueryLayer_BackendProtocol(t *testing.T) {
 }
 
 func TestPythonQueryLayer_GeneratedColumnExcluded(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -380,6 +393,7 @@ func TestPythonQueryLayer_GeneratedColumnExcluded(t *testing.T) {
 }
 
 func TestPythonQueryLayer_IdentityColumnExcluded(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -402,6 +416,7 @@ func TestPythonQueryLayer_IdentityColumnExcluded(t *testing.T) {
 }
 
 func TestPythonQueryLayer_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -424,6 +439,7 @@ func TestPythonQueryLayer_EmptySchema(t *testing.T) {
 }
 
 func TestPythonQueryLayer_SingleFileGenerate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	out, diags := gen.Generate(schema)
@@ -442,6 +458,7 @@ func TestPythonQueryLayer_SingleFileGenerate(t *testing.T) {
 }
 
 func TestPythonQueryLayer_CompositePK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

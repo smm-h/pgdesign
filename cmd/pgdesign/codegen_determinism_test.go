@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -68,6 +69,7 @@ func loadDeterminismSchema(t *testing.T) *model.Schema {
 // schema repeatedly must produce byte-identical output. New generators added
 // to SupportedModes are covered automatically.
 func TestCodegenDeterminismContract(t *testing.T) {
+	testenv.Isolate(t)
 	const runs = 5
 	schema := loadDeterminismSchema(t)
 

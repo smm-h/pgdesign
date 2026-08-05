@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/catalog"
@@ -15,6 +16,7 @@ import (
 // (an object a create op expects absent already exists), apply hard-errors naming
 // object/expected/found — drift is loud, never absorbed (L5).
 func TestChainApplyPreconditionDrift(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -62,6 +64,7 @@ func buildCICOp(t *testing.T) (*objstore.Store, SelfContainedOp) {
 // TestResumeCICRebuildsInvalidIndex: a lingering intent whose index is INVALID
 // (interrupted CIC) is DROP-rebuilt to VALID on resume (roadmap L8).
 func TestResumeCICRebuildsInvalidIndex(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -102,6 +105,7 @@ func TestResumeCICRebuildsInvalidIndex(t *testing.T) {
 // TestResumeCICValidLeftAsIs: a lingering intent whose index is already VALID
 // (crash after build before confirm) is left untouched — no needless rebuild.
 func TestResumeCICValidLeftAsIs(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -144,6 +148,7 @@ func TestResumeCICValidLeftAsIs(t *testing.T) {
 // clean no-op, not an error (roadmap L8: resume idempotent in Postgres's own
 // state model).
 func TestResumeDropCICIdempotent(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -190,6 +195,7 @@ func TestResumeDropCICIdempotent(t *testing.T) {
 // hard-errors with a precise object/expected/found message when the object is
 // absent — drift is loud (L5).
 func TestPreconditionDropDriftMissingObject(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -221,6 +227,7 @@ func TestPreconditionDropDriftMissingObject(t *testing.T) {
 // version-conditional enum-add (roadmap: the postgres:11 leg is out of scope, so
 // the non-transactional class is covered by this UNIT test, not a live run).
 func TestEnumAddPathSelection(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		pgVersion int
 		wantNonTx bool
@@ -228,7 +235,7 @@ func TestEnumAddPathSelection(t *testing.T) {
 		{11, true},  // pre-12: ALTER TYPE ADD VALUE cannot run in a transaction
 		{12, false}, // 12+: transactional
 		{18, false},
-		{0, true},   // unknown version: conservative (treat as non-transactional)
+		{0, true}, // unknown version: conservative (treat as non-transactional)
 	}
 	for _, c := range cases {
 		got := IsNonTransactional(DDLOp{Op: "alter_enum_add_value", PGVersion: c.pgVersion})

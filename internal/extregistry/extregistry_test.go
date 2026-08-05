@@ -1,8 +1,12 @@
 package extregistry
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 func TestRequiredExtension_GinTrgmOps(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	ext, ok := r.RequiredExtension("gin_trgm_ops")
 	if !ok {
@@ -14,6 +18,7 @@ func TestRequiredExtension_GinTrgmOps(t *testing.T) {
 }
 
 func TestRequiredExtensionForType_Geometry(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	ext, ok := r.RequiredExtensionForType("geometry")
 	if !ok {
@@ -25,6 +30,7 @@ func TestRequiredExtensionForType_Geometry(t *testing.T) {
 }
 
 func TestRequiredExtensionForFunction_GenRandomUUID(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	ext, ok := r.RequiredExtensionForFunction("gen_random_uuid")
 	if !ok {
@@ -36,6 +42,7 @@ func TestRequiredExtensionForFunction_GenRandomUUID(t *testing.T) {
 }
 
 func TestRequiredExtensionForFunction_UuidGenerateV7(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	ext, ok := r.RequiredExtensionForFunction("uuid_generate_v7")
 	if !ok {
@@ -47,6 +54,7 @@ func TestRequiredExtensionForFunction_UuidGenerateV7(t *testing.T) {
 }
 
 func TestRequiredExtension_Unknown(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	_, ok := r.RequiredExtension("nonexistent_ops")
 	if ok {
@@ -55,6 +63,7 @@ func TestRequiredExtension_Unknown(t *testing.T) {
 }
 
 func TestRequiredExtension_BtreeGinAllOpclasses(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	opclasses := []string{
 		"int2_ops", "int4_ops", "int8_ops",
@@ -79,6 +88,7 @@ func TestRequiredExtension_BtreeGinAllOpclasses(t *testing.T) {
 }
 
 func TestRequiredExtension_BtreeGistAllOpclasses(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	opclasses := []string{
 		"gist_int2_ops", "gist_int4_ops", "gist_int8_ops",
@@ -102,6 +112,7 @@ func TestRequiredExtension_BtreeGistAllOpclasses(t *testing.T) {
 }
 
 func TestRequiredExtensionForFunction_SchemaQualified(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// pg_partman functions are schema-qualified with partman.
@@ -130,6 +141,7 @@ func TestRequiredExtensionForFunction_SchemaQualified(t *testing.T) {
 }
 
 func TestLoadUserExtensions(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	r.LoadUserExtensions([]UserExtension{
 		{
@@ -166,6 +178,7 @@ func TestLoadUserExtensions(t *testing.T) {
 }
 
 func TestRequiredExtensionForMethod_Hnsw(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	ext, ok := r.RequiredExtensionForMethod("hnsw")
 	if !ok {
@@ -177,6 +190,7 @@ func TestRequiredExtensionForMethod_Hnsw(t *testing.T) {
 }
 
 func TestRequiredExtensionForMethod_Ivfflat(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	ext, ok := r.RequiredExtensionForMethod("ivfflat")
 	if !ok {
@@ -188,6 +202,7 @@ func TestRequiredExtensionForMethod_Ivfflat(t *testing.T) {
 }
 
 func TestRequiredExtensionForMethod_BuiltinBtree(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	_, ok := r.RequiredExtensionForMethod("btree")
 	if ok {
@@ -196,6 +211,7 @@ func TestRequiredExtensionForMethod_BuiltinBtree(t *testing.T) {
 }
 
 func TestRequiredExtensionForMethod_Unknown(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	_, ok := r.RequiredExtensionForMethod("unknown")
 	if ok {
@@ -204,6 +220,7 @@ func TestRequiredExtensionForMethod_Unknown(t *testing.T) {
 }
 
 func TestPgvectorBuiltin(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// Types
@@ -262,6 +279,7 @@ func TestPgvectorBuiltin(t *testing.T) {
 }
 
 func TestValidIndexParams_Btree(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	params, ok := r.ValidIndexParams("btree")
 	if !ok {
@@ -280,6 +298,7 @@ func TestValidIndexParams_Btree(t *testing.T) {
 }
 
 func TestValidIndexParams_Hnsw(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	params, ok := r.ValidIndexParams("hnsw")
 	if !ok {
@@ -301,6 +320,7 @@ func TestValidIndexParams_Hnsw(t *testing.T) {
 }
 
 func TestValidIndexParams_Unknown(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	_, ok := r.ValidIndexParams("nonexistent")
 	if ok {
@@ -309,6 +329,7 @@ func TestValidIndexParams_Unknown(t *testing.T) {
 }
 
 func TestLoadUserExtensions_IndexMethods(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 	r.LoadUserExtensions([]UserExtension{
 		{
@@ -326,6 +347,7 @@ func TestLoadUserExtensions_IndexMethods(t *testing.T) {
 }
 
 func TestResolveDDLName(t *testing.T) {
+	testenv.Isolate(t)
 	r := NewBuiltinRegistry()
 
 	// Tier 1: extension found with explicit DDLName (pgvector -> "vector")

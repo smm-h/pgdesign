@@ -2,6 +2,7 @@ package predicate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 // ships: re-applying idempotent DDL now fails loudly on definition drift instead of
 // silently skipping.
 func TestRenderIdempotentCreateConstraintDB(t *testing.T) {
+	testenv.Isolate(t)
 	base := Precondition{
 		Class: ClassConstraint, Schema: "public", Table: "users", Name: "users_age_chk",
 		Match: &Match{ConstraintDef: "CHECK (age >= 0)"},
@@ -78,6 +80,7 @@ func TestRenderIdempotentCreateConstraintDB(t *testing.T) {
 // idempotent-create primitive (not wired into generate — generate folds defaults
 // into ADD COLUMN IF NOT EXISTS — but consumed by the apply-loop executor path).
 func TestRenderIdempotentCreateDefaultDB(t *testing.T) {
+	testenv.Isolate(t)
 	// The fixture column users.note has DEFAULT 'hi'.
 	const noopSQL = `ALTER TABLE "public"."users" ALTER COLUMN "note" SET DEFAULT 'hi';`
 

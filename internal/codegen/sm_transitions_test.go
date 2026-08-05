@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -45,6 +46,7 @@ func smTestSchema() *model.Schema {
 // --- Types output tests ---
 
 func TestGoTypesGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &GoTypesGenerator{}
 	out, diags := gen.Generate(schema)
@@ -74,6 +76,7 @@ func TestGoTypesGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestTSTypesGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &TSTypesGenerator{}
 	out, diags := gen.Generate(schema)
@@ -103,6 +106,7 @@ func TestTSTypesGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestPythonTypesGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &PythonTypesGenerator{}
 	out, diags := gen.Generate(schema)
@@ -137,6 +141,7 @@ func TestPythonTypesGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestJavaTypesGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &JavaTypesGenerator{}
 	out, diags := gen.Generate(schema)
@@ -166,6 +171,7 @@ func TestJavaTypesGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestKotlinTypesGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &KotlinTypesGenerator{}
 	out, diags := gen.Generate(schema)
@@ -187,6 +193,7 @@ func TestKotlinTypesGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestZigTypesGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &ZigTypesGenerator{}
 	out, diags := gen.Generate(schema)
@@ -218,6 +225,7 @@ func TestZigTypesGenerator_TransitionMap(t *testing.T) {
 // --- Constants output tests ---
 
 func TestGoConstantsGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &GoConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -241,6 +249,7 @@ func TestGoConstantsGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestPythonConstantsGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &PythonConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -261,6 +270,7 @@ func TestPythonConstantsGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestTSConstantsGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &TSConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -280,6 +290,7 @@ func TestTSConstantsGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestJavaConstantsGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &JavaConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -295,6 +306,7 @@ func TestJavaConstantsGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestKotlinConstantsGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &KotlinConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -310,6 +322,7 @@ func TestKotlinConstantsGenerator_TransitionMap(t *testing.T) {
 }
 
 func TestZigConstantsGenerator_TransitionMap(t *testing.T) {
+	testenv.Isolate(t)
 	schema := smTestSchema()
 	gen := &ZigConstantsGenerator{}
 	out, diags := gen.Generate(schema)
@@ -327,6 +340,7 @@ func TestZigConstantsGenerator_TransitionMap(t *testing.T) {
 // --- Edge cases ---
 
 func TestTransitionMaps_NoStateMachines(t *testing.T) {
+	testenv.Isolate(t)
 	// Schema with no SM types should produce no transition maps.
 	schema := &model.Schema{
 		Tables: []model.Table{
@@ -352,6 +366,7 @@ func TestTransitionMaps_NoStateMachines(t *testing.T) {
 }
 
 func TestTransitionMaps_EmptyTransitions(t *testing.T) {
+	testenv.Isolate(t)
 	// SM type with states but no transitions should produce an empty map.
 	schema := &model.Schema{
 		Enums: []model.Enum{

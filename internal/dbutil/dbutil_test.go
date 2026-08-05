@@ -1,10 +1,12 @@
 package dbutil
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 )
 
 func TestSwapDatabase(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name    string
 		dbURL   string
@@ -53,6 +55,7 @@ func TestSwapDatabase(t *testing.T) {
 }
 
 func TestMaintenanceURL(t *testing.T) {
+	testenv.Isolate(t)
 	got, err := MaintenanceURL("postgres://user:pass@host:5432/mydb")
 	if err != nil {
 		t.Fatalf("MaintenanceURL() error = %v", err)

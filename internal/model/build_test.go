@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 )
 
 func TestJSONSchemaToChecks(t *testing.T) {
+	testenv.Isolate(t)
 	content := []byte(`{
 		"type": "object",
 		"required": ["title", "price"],
@@ -45,6 +47,7 @@ func TestJSONSchemaToChecks(t *testing.T) {
 }
 
 func TestJSONSchemaToChecks_RequiredNoType(t *testing.T) {
+	testenv.Isolate(t)
 	content := []byte(`{
 		"type": "object",
 		"required": ["name"],
@@ -65,6 +68,7 @@ func TestJSONSchemaToChecks_RequiredNoType(t *testing.T) {
 }
 
 func TestJSONSchemaToChecks_IntegerMapsToNumber(t *testing.T) {
+	testenv.Isolate(t)
 	content := []byte(`{
 		"type": "object",
 		"required": ["count"],
@@ -84,6 +88,7 @@ func TestJSONSchemaToChecks_IntegerMapsToNumber(t *testing.T) {
 }
 
 func TestJSONSchemaToChecks_NoRequired(t *testing.T) {
+	testenv.Isolate(t)
 	content := []byte(`{
 		"type": "object",
 		"properties": {
@@ -99,6 +104,7 @@ func TestJSONSchemaToChecks_NoRequired(t *testing.T) {
 }
 
 func TestJSONSchemaToChecks_InvalidJSON(t *testing.T) {
+	testenv.Isolate(t)
 	content := []byte(`not json`)
 	checks := jsonSchemaToChecks("data", content)
 	if checks != nil {
@@ -107,6 +113,7 @@ func TestJSONSchemaToChecks_InvalidJSON(t *testing.T) {
 }
 
 func TestBuild_ArrayPropagation(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	trueVal := true
 	raw := &parse.RawSchema{
@@ -143,6 +150,7 @@ func TestBuild_ArrayPropagation(t *testing.T) {
 }
 
 func TestBuild_AppendOnlyPropagation(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	trueVal := true
 	raw := &parse.RawSchema{
@@ -169,6 +177,7 @@ func TestBuild_AppendOnlyPropagation(t *testing.T) {
 }
 
 func TestBuild_ViewResolution(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	comment := "Active users only"
 	raw := &parse.RawSchema{
@@ -220,6 +229,7 @@ func TestBuild_ViewResolution(t *testing.T) {
 }
 
 func TestBuild_JSONSchemaPropagation(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	schemaFile := "schema.json"
 	raw := &parse.RawSchema{
@@ -256,6 +266,7 @@ func TestBuild_JSONSchemaPropagation(t *testing.T) {
 }
 
 func TestBuild_MaterializedViewResolution(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	comment := "Monthly order statistics"
 	raw := &parse.RawSchema{
@@ -310,6 +321,7 @@ func TestBuild_MaterializedViewResolution(t *testing.T) {
 }
 
 func TestBuild_MaterializedViewWithDataFalse(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	falseVal := false
 	raw := &parse.RawSchema{
@@ -339,6 +351,7 @@ func TestBuild_MaterializedViewWithDataFalse(t *testing.T) {
 }
 
 func TestBuild_GeneratedColumnDefaultStored(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	trueVal := true
 	falseVal := false
@@ -411,6 +424,7 @@ func TestBuild_GeneratedColumnDefaultStored(t *testing.T) {
 }
 
 func TestBuild_MaterializedViewIndexes(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	uniqueVal := true
 	raw := &parse.RawSchema{
@@ -456,6 +470,7 @@ func TestBuild_MaterializedViewIndexes(t *testing.T) {
 }
 
 func TestBuild_DomainResolution(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -587,6 +602,7 @@ func TestBuild_DomainResolution(t *testing.T) {
 }
 
 func TestBuild_DomainResolution_ExplicitChecksPreserved(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -650,6 +666,7 @@ func TestBuild_DomainResolution_ExplicitChecksPreserved(t *testing.T) {
 func int64Ptr(v int64) *int64 { return &v }
 
 func TestBuild_SequenceResolution(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	trueVal := true
 	comment := "Order ID sequence"
@@ -712,6 +729,7 @@ func TestBuild_SequenceResolution(t *testing.T) {
 }
 
 func TestBuild_SequenceOwnedByValid(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	ownedBy := "orders.total"
 	raw := &parse.RawSchema{
@@ -740,6 +758,7 @@ func TestBuild_SequenceOwnedByValid(t *testing.T) {
 }
 
 func TestBuild_SequenceOwnedByInvalidFormat(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	ownedBy := "no_dot"
 	raw := &parse.RawSchema{
@@ -770,6 +789,7 @@ func TestBuild_SequenceOwnedByInvalidFormat(t *testing.T) {
 }
 
 func TestBuild_SequenceOwnedByUnknownTable(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	ownedBy := "nonexistent.col"
 	raw := &parse.RawSchema{
@@ -800,6 +820,7 @@ func TestBuild_SequenceOwnedByUnknownTable(t *testing.T) {
 }
 
 func TestBuild_SequenceOwnedByUnknownColumn(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	ownedBy := "users.nonexistent"
 	raw := &parse.RawSchema{
@@ -839,6 +860,7 @@ func TestBuild_SequenceOwnedByUnknownColumn(t *testing.T) {
 }
 
 func TestBuild_SequenceOwnedByIdentityColumn(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	ownedBy := "users.id"
 	raw := &parse.RawSchema{
@@ -881,6 +903,7 @@ func strPtr(s string) *string { return &s }
 func boolPtr(b bool) *bool    { return &b }
 
 func TestBuildFunctions(t *testing.T) {
+	testenv.Isolate(t)
 	lang := "plpgsql"
 	returns := "numeric"
 	body := "SELECT 1;"
@@ -934,6 +957,7 @@ func TestBuildFunctions(t *testing.T) {
 }
 
 func TestBuild_FunctionAutoDepends_SQL(t *testing.T) {
+	testenv.Isolate(t)
 	if testing.Short() {
 		t.Skip("SQL function dependency detection requires WASM parser")
 	}
@@ -970,6 +994,7 @@ func TestBuild_FunctionAutoDepends_SQL(t *testing.T) {
 }
 
 func TestBuild_FunctionAutoDepends_PLpgSQL(t *testing.T) {
+	testenv.Isolate(t)
 	lang := "plpgsql"
 	returns := "void"
 	body := "BEGIN INSERT INTO users (name) VALUES ('test'); END;"
@@ -1000,6 +1025,7 @@ func TestBuild_FunctionAutoDepends_PLpgSQL(t *testing.T) {
 }
 
 func TestBuild_FunctionAutoDepends_ExplicitNotOverwritten(t *testing.T) {
+	testenv.Isolate(t)
 	lang := "sql"
 	returns := "bigint"
 	body := "SELECT count(*) FROM users WHERE active = true"
@@ -1031,6 +1057,7 @@ func TestBuild_FunctionAutoDepends_ExplicitNotOverwritten(t *testing.T) {
 }
 
 func TestBuildTriggers(t *testing.T) {
+	testenv.Isolate(t)
 	forEach := "ROW"
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "app", Version: 1},
@@ -1085,6 +1112,7 @@ func TestBuildTriggers(t *testing.T) {
 }
 
 func TestBuildTriggers_ConstraintMustBeAfter(t *testing.T) {
+	testenv.Isolate(t)
 	constraint := true
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "app", Version: 1},
@@ -1123,6 +1151,7 @@ func TestBuildTriggers_ConstraintMustBeAfter(t *testing.T) {
 }
 
 func TestBuild_StateMachineCreatesEnum(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	smType := semtype.UserTypeDef{
 		Name: "order_status",
@@ -1204,6 +1233,7 @@ func TestBuild_StateMachineCreatesEnum(t *testing.T) {
 }
 
 func TestBuildMulti_StateMachineEnumDedup(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	smType := semtype.UserTypeDef{
 		Name: "ticket_status",
@@ -1269,6 +1299,7 @@ func TestBuildMulti_StateMachineEnumDedup(t *testing.T) {
 }
 
 func TestIsStateMachineColumn(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	smType := semtype.UserTypeDef{
 		Name: "task_state",
@@ -1306,6 +1337,7 @@ func TestIsStateMachineColumn(t *testing.T) {
 // --- Integration tests: extends through Build() ---
 
 func TestBuild_ExtendsEnum(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	userTypes := []semtype.UserTypeDef{
 		{
@@ -1367,6 +1399,7 @@ func TestBuild_ExtendsEnum(t *testing.T) {
 }
 
 func TestBuild_ExtendsComposite(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	userTypes := []semtype.UserTypeDef{
 		{
@@ -1445,6 +1478,7 @@ func TestBuild_ExtendsComposite(t *testing.T) {
 // CREATE TYPE ... AS (...), ROW(...) construction, and tuple comparison.
 // Fields are declared deliberately non-alphabetically.
 func TestBuild_CompositeFieldDeclarationOrder(t *testing.T) {
+	testenv.Isolate(t)
 	const src = `
 format_version = 1
 [meta]
@@ -1490,6 +1524,7 @@ apartment = "integer"
 }
 
 func TestBuild_ExtendsStateMachine(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	userTypes := []semtype.UserTypeDef{
 		{
@@ -1573,6 +1608,7 @@ func TestBuild_ExtendsStateMachine(t *testing.T) {
 }
 
 func TestBuild_ExtendsEnumDedupValues(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	userTypes := []semtype.UserTypeDef{
 		{
@@ -1628,6 +1664,7 @@ func TestBuild_ExtendsEnumDedupValues(t *testing.T) {
 }
 
 func TestBuildMulti_SourceFile(t *testing.T) {
+	testenv.Isolate(t)
 	tracePath := filepath.Join("..", "codegen", "testdata", "split_trace.toml")
 	dispatchPath := filepath.Join("..", "codegen", "testdata", "split_dispatch.toml")
 
@@ -1739,6 +1776,7 @@ func TestBuildMulti_SourceFile(t *testing.T) {
 }
 
 func TestTypeKind_Enum(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	userTypes := []semtype.UserTypeDef{
 		{

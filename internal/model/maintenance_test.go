@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -49,6 +50,7 @@ func maintenanceRawSchema() *parse.RawSchema {
 }
 
 func TestBuild_MaintenanceValidBaseline(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := maintenanceRawSchema()
 	_, diags := Build(raw, reg)
@@ -58,6 +60,7 @@ func TestBuild_MaintenanceValidBaseline(t *testing.T) {
 }
 
 func TestBuild_MaintenancePremakeRequired(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := maintenanceRawSchema()
 	// Omit premake: silent zero would disable partman premaking.
@@ -73,6 +76,7 @@ func TestBuild_MaintenancePremakeRequired(t *testing.T) {
 }
 
 func TestBuild_MaintenanceScheduleRequiresPgCron(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := maintenanceRawSchema()
 	sched := "*/30 * * * *"
@@ -89,6 +93,7 @@ func TestBuild_MaintenanceScheduleRequiresPgCron(t *testing.T) {
 }
 
 func TestBuild_MaintenanceScheduleWithPgCron(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := maintenanceRawSchema()
 	raw.Meta.Extensions = []string{"pg_partman", "pg_cron"}

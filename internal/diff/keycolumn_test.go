@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -13,6 +14,7 @@ import (
 // with raw sliceEqual, so two ≈_syn-equal spellings of the same expression key
 // (function-case, whitespace) false-drifted as a change.
 func TestIndexEqualExpressionKeyColumn(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Index{
 		Name:    "idx_users_email_lower",
 		Columns: []string{"LOWER(email)"},
@@ -31,6 +33,7 @@ func TestIndexEqualExpressionKeyColumn(t *testing.T) {
 // compare EXACTLY — a genuine rename of a plain column is a real change and must
 // not be masked by routing through the expression normalizer.
 func TestIndexEqualPlainKeyColumnExact(t *testing.T) {
+	testenv.Isolate(t)
 	a := &model.Index{Name: "idx", Columns: []string{"email"}}
 	b := &model.Index{Name: "idx", Columns: []string{"username"}}
 	if indexEqual(a, b) {
@@ -48,6 +51,7 @@ func TestIndexEqualPlainKeyColumnExact(t *testing.T) {
 // and must NOT false-drift. A raw exact compare (the pre-fix behavior) reported
 // a spurious change.
 func TestIndexEqualUnquotedIdentifierCaseFolded(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Index{Name: "idx", Columns: []string{"Email"}}
 	actual := &model.Index{Name: "idx", Columns: []string{"email"}}
 	if !indexEqual(desired, actual) {
@@ -61,6 +65,7 @@ func TestIndexEqualUnquotedIdentifierCaseFolded(t *testing.T) {
 // and must NOT be folded together. Quoting routes the comparison through the
 // expression path, which preserves case.
 func TestIndexEqualQuotedIdentifierCaseSensitive(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Index{Name: "idx", Columns: []string{`"Email"`}}
 	actual := &model.Index{Name: "idx", Columns: []string{`"email"`}}
 	if indexEqual(desired, actual) {
@@ -72,6 +77,7 @@ func TestIndexEqualQuotedIdentifierCaseSensitive(t *testing.T) {
 // TestExclusionEqualExpressionColumn is the same hole for exclusion-constraint
 // element columns, which are also index key columns and can be expressions.
 func TestExclusionEqualExpressionColumn(t *testing.T) {
+	testenv.Isolate(t)
 	desired := model.ExclusionConstraint{
 		Name:   "ex_room_during",
 		Method: "gist",

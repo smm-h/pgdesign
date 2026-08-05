@@ -1,6 +1,7 @@
 package genkit
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"regexp"
 	"testing"
 )
@@ -10,6 +11,7 @@ import (
 var goGeneratedRe = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)
 
 func TestHeaderMatchesGoToolingRegex(t *testing.T) {
+	testenv.Isolate(t)
 	h := Header(CommentSlash)
 	// The banner is the first line, minus the trailing newline.
 	line := h
@@ -31,6 +33,7 @@ func indexByte(s string, b byte) int {
 }
 
 func TestParseStampRoundTripAllPrefixes(t *testing.T) {
+	testenv.Isolate(t)
 	for _, c := range []string{CommentSlash, CommentHash, CommentDash} {
 		out := Header(c)
 		ps, ok := ParseStamp([]byte(out))
@@ -50,6 +53,7 @@ func TestParseStampRoundTripAllPrefixes(t *testing.T) {
 }
 
 func TestParseStampWithInfo(t *testing.T) {
+	testenv.Isolate(t)
 	out := Stamp{Comment: CommentDash, Info: []string{"Seed data.", "extra"}}.Render()
 	ps, ok := ParseStamp([]byte(out))
 	if !ok {
@@ -64,6 +68,7 @@ func TestParseStampWithInfo(t *testing.T) {
 // provenance revision line (roadmap 4.2): setting Revision emits it, and the
 // parser reads it back, with no grammar change.
 func TestRevisionLineRoundTrips(t *testing.T) {
+	testenv.Isolate(t)
 	out := Stamp{Comment: CommentSlash, Revision: "abc123"}.Render()
 	ps, ok := ParseStamp([]byte(out))
 	if !ok {
@@ -80,6 +85,7 @@ func TestRevisionLineRoundTrips(t *testing.T) {
 }
 
 func TestParseStampRejectsNonStamp(t *testing.T) {
+	testenv.Isolate(t)
 	for _, bad := range []string{
 		"",
 		"package main\n",
@@ -94,6 +100,7 @@ func TestParseStampRejectsNonStamp(t *testing.T) {
 }
 
 func TestParseStampToleratesLeadingWhitespace(t *testing.T) {
+	testenv.Isolate(t)
 	out := "\n\n  " + Header(CommentHash)
 	if !HasStamp([]byte(out)) {
 		t.Errorf("HasStamp rejected stamp with leading whitespace")
@@ -106,6 +113,7 @@ func TestParseStampToleratesLeadingWhitespace(t *testing.T) {
 // enforces it — setting a non-empty revision while one is already set is a hard
 // error — so an accidental overlap can never silently stamp the wrong revision.
 func TestSetRevisionGuardRejectsReentry(t *testing.T) {
+	testenv.Isolate(t)
 	// Ensure a clean slate regardless of test ordering.
 	SetRevision("")
 	defer SetRevision("")

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/workload"
 )
 
 func TestFindDuplicateIndexes(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name    string
 		indexes []workload.IndexInfo
@@ -90,6 +92,7 @@ func TestFindDuplicateIndexes(t *testing.T) {
 }
 
 func TestFindDuplicateIndexesFields(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := []workload.IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_email", Columns: []string{"email"}},
 		{Schema: "public", Table: "users", Name: "idx_email_name", Columns: []string{"email", "name"}},
@@ -114,6 +117,7 @@ func TestFindDuplicateIndexesFields(t *testing.T) {
 }
 
 func TestFormatNumber(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		n    int64
 		want string

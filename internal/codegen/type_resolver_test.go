@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -8,6 +9,7 @@ import (
 )
 
 func TestTypeResolver_EnumColumn(t *testing.T) {
+	testenv.Isolate(t)
 	col := model.Column{
 		Name:     "status",
 		PGType:   typeinfo.Type{Base: "user_status"},
@@ -35,6 +37,7 @@ func TestTypeResolver_EnumColumn(t *testing.T) {
 }
 
 func TestTypeResolver_EnumColumn_Zig(t *testing.T) {
+	testenv.Isolate(t)
 	col := model.Column{
 		Name:     "status",
 		PGType:   typeinfo.Type{Base: "user_status"},
@@ -49,6 +52,7 @@ func TestTypeResolver_EnumColumn_Zig(t *testing.T) {
 }
 
 func TestTypeResolver_StateMachineColumn(t *testing.T) {
+	testenv.Isolate(t)
 	col := model.Column{
 		Name:     "order_status",
 		PGType:   typeinfo.Type{Base: "order_status"},
@@ -81,6 +85,7 @@ func TestTypeResolver_StateMachineColumn(t *testing.T) {
 }
 
 func TestTypeResolver_BuiltinColumn(t *testing.T) {
+	testenv.Isolate(t)
 	col := model.Column{
 		Name:     "age",
 		PGType:   typeinfo.Type{Base: "integer"},
@@ -113,6 +118,7 @@ func TestTypeResolver_BuiltinColumn(t *testing.T) {
 }
 
 func TestTypeResolver_MoneyColumn(t *testing.T) {
+	testenv.Isolate(t)
 	col := model.Column{
 		Name:             "price",
 		PGType:           typeinfo.Type{Base: "bigint"},
@@ -142,6 +148,7 @@ func TestTypeResolver_MoneyColumn(t *testing.T) {
 }
 
 func TestTypeResolver_DomainColumn(t *testing.T) {
+	testenv.Isolate(t)
 	// A scalar type with a CHECK becomes a domain. The underlying PG base
 	// type should be used for the native type mapping.
 	col := model.Column{
@@ -165,6 +172,7 @@ func TestTypeResolver_DomainColumn(t *testing.T) {
 }
 
 func TestTypeResolver_UnresolvedColumn(t *testing.T) {
+	testenv.Isolate(t)
 	// Columns from introspection may have no TypeKind.
 	col := model.Column{
 		Name:     "data",
@@ -181,6 +189,7 @@ func TestTypeResolver_UnresolvedColumn(t *testing.T) {
 }
 
 func TestEnumTypeName(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input string
 		want  string

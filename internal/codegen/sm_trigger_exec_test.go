@@ -3,6 +3,7 @@ package codegen
 import (
 	"context"
 	"errors"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -23,6 +24,7 @@ import (
 // All existing SM coverage asserts generated SQL text; this is the only test
 // that executes the trigger. It skips cleanly without local Postgres.
 func TestSMTrigger_RuntimeBehavior(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	schema, reg := loadExecMatrixSchema(t)
 	ctx := context.Background()

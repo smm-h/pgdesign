@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestKotlinValidatorGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -109,6 +111,7 @@ func TestKotlinValidatorGenerator_Generate(t *testing.T) {
 }
 
 func TestKotlinValidatorGenerator_NoPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 		Tables: []model.Table{
@@ -132,6 +135,7 @@ func TestKotlinValidatorGenerator_NoPolicies(t *testing.T) {
 }
 
 func TestKotlinValidatorGenerator_OwnershipPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -184,6 +188,7 @@ func TestKotlinValidatorGenerator_OwnershipPattern(t *testing.T) {
 }
 
 func TestKotlinValidatorGenerator_OrCompound(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -241,6 +246,7 @@ func TestKotlinValidatorGenerator_OrCompound(t *testing.T) {
 }
 
 func TestKotlinValidatorGenerator_NotExistsPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -295,6 +301,7 @@ func TestKotlinValidatorGenerator_NotExistsPattern(t *testing.T) {
 }
 
 func TestKotlinValidatorGenerator_UnparsableExpression(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{

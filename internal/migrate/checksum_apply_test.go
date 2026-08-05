@@ -16,6 +16,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,6 +63,7 @@ func tamperEdgeSlug(t *testing.T, dir, slug, replacement string) string {
 // TestApplySurfaceRefusesTamperedActiveEdge: a tampered LIVE edge is refused by
 // the apply surface's loader, naming the file (identity IS the checksum).
 func TestApplySurfaceRefusesTamperedActiveEdge(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, _, _, _, _, _ := threeEdgeChain(t)
 	name := tamperEdgeSlug(t, p.edgesPath(), "create-a", "create-X")
 
@@ -78,6 +80,7 @@ func TestApplySurfaceRefusesTamperedActiveEdge(t *testing.T) {
 // edges a mid-range database resumes through) is refused when the traversal domain
 // loads it, naming the file.
 func TestApplySurfaceRefusesTamperedArchivedEdge(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, _, _, r1, _, r3 := threeEdgeChain(t)
 	if _, err := SquashChain(p, r1.String(), r3.String(), ""); err != nil {
 		t.Fatalf("SquashChain: %v", err)
@@ -99,6 +102,7 @@ func TestApplySurfaceRefusesTamperedArchivedEdge(t *testing.T) {
 // TestApplyRefusesTamperedActiveEdgeDB: the full apply path refuses a tampered
 // active edge against a live database, naming the file — no DDL runs.
 func TestApplyRefusesTamperedActiveEdgeDB(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

@@ -2,11 +2,13 @@ package format
 
 import (
 	"bytes"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
 
 func TestSectionOrder_MetaBeforeTypesBeforeTables(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [tables.posts]
 comment = "Blog posts"
@@ -45,6 +47,7 @@ schema = "test"
 }
 
 func TestTableAlphabeticalOrder(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -93,6 +96,7 @@ type = "id"
 }
 
 func TestTableDependencyOrder(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -141,6 +145,7 @@ type = "id"
 }
 
 func TestColumnPKFKAlphaOrder(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -198,6 +203,7 @@ on_delete = "CASCADE"
 }
 
 func TestIdempotence(t *testing.T) {
+	testenv.Isolate(t)
 	// Format an already-canonical schema; result should be identical.
 	canonical := []byte(`format_version = 1
 [meta]
@@ -256,6 +262,7 @@ on_delete = "CASCADE"
 }
 
 func TestCheckMode(t *testing.T) {
+	testenv.Isolate(t)
 	// Simulate what the CLI --check flag does: format and compare to input.
 	unformatted := []byte(`format_version = 1
 [tables.posts]
@@ -290,6 +297,7 @@ schema = "test"
 }
 
 func TestTypesAlphabeticalOrder(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -328,6 +336,7 @@ base_type = "numeric"
 }
 
 func TestFKsAlphabeticalOrder(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -374,6 +383,7 @@ on_delete = "CASCADE"
 }
 
 func TestWithinTableSectionOrder(t *testing.T) {
+	testenv.Isolate(t)
 	// Verify that within a table, subsections follow the canonical order:
 	// comment, pk, columns, fks, indexes, unique, checks
 	input := []byte(`format_version = 1
@@ -448,6 +458,7 @@ columns = ["title"]
 }
 
 func TestColumnAlphabeticalOrder(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -489,6 +500,7 @@ type = "email"
 }
 
 func TestColumnPreserveOrder(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -531,6 +543,7 @@ type = "email"
 }
 
 func TestColumnFKLastOrder(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -588,6 +601,7 @@ on_delete = "CASCADE"
 }
 
 func TestCommentPreservation_LeadingCommentsOnSections(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -616,6 +630,7 @@ type = "id"
 }
 
 func TestCommentPreservation_InlineComments(t *testing.T) {
+	testenv.Isolate(t)
 	input := []byte(`format_version = 1
 [meta]
 version = 1
@@ -642,6 +657,7 @@ type = "email" # must be unique
 }
 
 func TestCommentPreservation_SectionReorderingKeepsComments(t *testing.T) {
+	testenv.Isolate(t)
 	// Comments should travel with their section during reordering.
 	input := []byte(`format_version = 1
 # Table section first (wrong order)
@@ -704,6 +720,7 @@ schema = "test"
 }
 
 func TestCommentPreservation_CanonicalOrderStillWorks(t *testing.T) {
+	testenv.Isolate(t)
 	// Verify that the canonical ordering still works correctly even with comments.
 	input := []byte(`format_version = 1
 [meta]
@@ -772,6 +789,7 @@ type = "id"
 }
 
 func TestCommentPreservation_Idempotence(t *testing.T) {
+	testenv.Isolate(t)
 	// Formatting a document with comments should be idempotent.
 	input := []byte(`format_version = 1
 # Schema metadata

@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -21,6 +22,7 @@ func containsTSField(s, fieldName, tsType string) bool {
 }
 
 func TestTSTypesGenerator_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -103,6 +105,7 @@ func TestTSTypesGenerator_Basic(t *testing.T) {
 }
 
 func TestTSTypesGenerator_NullableAndArray(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -154,6 +157,7 @@ func TestTSTypesGenerator_NullableAndArray(t *testing.T) {
 }
 
 func TestTSTypesGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 
 	gen := &TSTypesGenerator{}
@@ -176,6 +180,7 @@ func TestTSTypesGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestTSTypesGenerator_MoneySemanticType(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -204,6 +209,7 @@ func TestTSTypesGenerator_MoneySemanticType(t *testing.T) {
 }
 
 func TestTSTypesGenerator_MultipleTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

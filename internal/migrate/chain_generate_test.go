@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"path/filepath"
 	"testing"
 
@@ -35,6 +36,7 @@ func genesisDesired() *model.Schema {
 // writes the objects + revision manifest + one genesis edge, and the on-disk chain
 // is internally consistent (Merkle closure + edge endpoints + epoch homogeneity).
 func TestGenerateEdgeGenesis(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -85,6 +87,7 @@ func TestGenerateEdgeGenesis(t *testing.T) {
 // TestGenerateEdgeZeroOpGuard: a migration with no ops is a hard error, never an
 // empty edge.
 func TestGenerateEdgeZeroOpGuard(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -103,6 +106,7 @@ func TestGenerateEdgeZeroOpGuard(t *testing.T) {
 // defense-in-depth helper (squash's legacy path still calls it), exercised here
 // with a placeholder subcommand.
 func TestIsChainModeAndGuards(t *testing.T) {
+	testenv.Isolate(t)
 	// Legacy: a bare migrations dir with no chain/ subdir.
 	legacy := t.TempDir()
 	if IsChainMode(legacy) {

@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 // stamped position (a position that is not any edge endpoint) and passes for a
 // chain-reachable one.
 func TestBaselineReachabilityDivergence(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1, r2 := revAt(t, 0), revAt(t, 1), revAt(t, 2)
 	all := []Edge{edgeOf(rev.Revision{}, r0, "genesis"), edgeOf(r0, r1, "e1"), edgeOf(r1, r2, "e2")}
 	remap := RemapTable{}
@@ -33,6 +35,7 @@ func TestBaselineReachabilityDivergence(t *testing.T) {
 // baseline target is not reachable FROM the stamped position (cannot baseline
 // backward), and passes when it is forward-reachable.
 func TestBaselineReachabilityOutOfOrder(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1, r2 := revAt(t, 0), revAt(t, 1), revAt(t, 2)
 	all := []Edge{edgeOf(rev.Revision{}, r0, "genesis"), edgeOf(r0, r1, "e1"), edgeOf(r1, r2, "e2")}
 	remap := RemapTable{}

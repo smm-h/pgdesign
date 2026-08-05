@@ -2,6 +2,7 @@ package livenorm
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -31,6 +32,7 @@ import (
 // re-spells only the expression fields — so non-expression attributes match by
 // construction and the introspect gaps do not intrude.
 func TestDiffLiveCleanEndToEnd(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	ctx := context.Background()
 

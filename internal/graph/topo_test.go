@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 )
 
@@ -51,6 +52,7 @@ func assertNoCycles(t *testing.T, cycles [][]node) {
 }
 
 func TestTopoSort_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	sorted, cycles := TopoSort([]node{}, getName, getDeps)
 	if len(sorted) != 0 {
 		t.Fatalf("expected empty sorted, got %v", names(sorted))
@@ -59,6 +61,7 @@ func TestTopoSort_Empty(t *testing.T) {
 }
 
 func TestTopoSort_SingleItem(t *testing.T) {
+	testenv.Isolate(t)
 	items := []node{{name: "A"}}
 	sorted, cycles := TopoSort(items, getName, getDeps)
 	assertOrder(t, sorted, []string{"A"})
@@ -66,6 +69,7 @@ func TestTopoSort_SingleItem(t *testing.T) {
 }
 
 func TestTopoSort_LinearChain(t *testing.T) {
+	testenv.Isolate(t)
 	// C depends on B, B depends on A.
 	items := []node{
 		{name: "C", deps: []string{"B"}},
@@ -78,6 +82,7 @@ func TestTopoSort_LinearChain(t *testing.T) {
 }
 
 func TestTopoSort_Diamond(t *testing.T) {
+	testenv.Isolate(t)
 	// D depends on B and C; B depends on A; C depends on A.
 	items := []node{
 		{name: "A"},
@@ -91,6 +96,7 @@ func TestTopoSort_Diamond(t *testing.T) {
 }
 
 func TestTopoSort_Cycle(t *testing.T) {
+	testenv.Isolate(t)
 	// X depends on Y, Y depends on X.
 	items := []node{
 		{name: "X", deps: []string{"Y"}},
@@ -111,6 +117,7 @@ func TestTopoSort_Cycle(t *testing.T) {
 }
 
 func TestTopoSort_SelfDependency(t *testing.T) {
+	testenv.Isolate(t)
 	items := []node{
 		{name: "A", deps: []string{"A"}},
 	}
@@ -120,6 +127,7 @@ func TestTopoSort_SelfDependency(t *testing.T) {
 }
 
 func TestTopoSort_ExternalDependency(t *testing.T) {
+	testenv.Isolate(t)
 	items := []node{
 		{name: "A", deps: []string{"Z"}},
 	}
@@ -129,6 +137,7 @@ func TestTopoSort_ExternalDependency(t *testing.T) {
 }
 
 func TestTopoSort_PreservesInputOrder(t *testing.T) {
+	testenv.Isolate(t)
 	// All items independent -- should preserve input order.
 	items := []node{
 		{name: "C"},
@@ -141,6 +150,7 @@ func TestTopoSort_PreservesInputOrder(t *testing.T) {
 }
 
 func TestTopoSort_CycleMembersInSorted(t *testing.T) {
+	testenv.Isolate(t)
 	// Cycle members must appear in sorted output (not lost).
 	items := []node{
 		{name: "A", deps: []string{"B"}},
@@ -160,6 +170,7 @@ func TestTopoSort_CycleMembersInSorted(t *testing.T) {
 }
 
 func TestTopoSort_PartialCycle(t *testing.T) {
+	testenv.Isolate(t)
 	// A has no deps, B and C form a cycle.
 	items := []node{
 		{name: "A"},

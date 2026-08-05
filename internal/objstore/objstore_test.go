@@ -2,6 +2,7 @@ package objstore
 
 import (
 	"errors"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"sync"
@@ -45,6 +46,7 @@ func countObjects(root string) (int, error) {
 // TestGetPutIdentity is the get∘put = identity property: whatever bytes go in
 // come back out unchanged.
 func TestGetPutIdentity(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		store, err := New(tempRoot(rt.Cleanup), 1)
 		if err != nil {
@@ -68,6 +70,7 @@ func TestGetPutIdentity(t *testing.T) {
 // TestPutIdempotent is the idempotence property: putting the same bytes twice
 // yields the same id, no error, and exactly one object on disk.
 func TestPutIdempotent(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		root := tempRoot(rt.Cleanup)
 		store, err := New(root, 1)
@@ -101,6 +104,7 @@ func TestPutIdempotent(t *testing.T) {
 // stored in two independent roots (at the same epoch) gets the same id, and is
 // retrievable from both.
 func TestIDsLocationFree(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		a, err := New(tempRoot(rt.Cleanup), 1)
 		if err != nil {
@@ -144,6 +148,7 @@ func TestIDsLocationFree(t *testing.T) {
 // into one store. All must succeed, agree on the id, and leave exactly one
 // object on disk. Run under -race to catch data races in the write path.
 func TestConcurrentIdempotentPut(t *testing.T) {
+	testenv.Isolate(t)
 	root := t.TempDir()
 	store, err := New(root, 1)
 	if err != nil {
@@ -195,6 +200,7 @@ func TestConcurrentIdempotentPut(t *testing.T) {
 // TestEpochMismatchReadErrors verifies that reading an object through a store
 // opened at a different epoch is a hard error, never a silent mis-decode.
 func TestEpochMismatchReadErrors(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		root := tempRoot(rt.Cleanup)
 		writeEpoch := rapid.Uint32().Draw(rt, "writeEpoch")
@@ -243,6 +249,7 @@ func TestEpochMismatchReadErrors(t *testing.T) {
 
 // TestGetNotFound verifies Get returns ErrNotFound for an unknown id.
 func TestGetNotFound(t *testing.T) {
+	testenv.Isolate(t)
 	store, err := New(t.TempDir(), 1)
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -256,6 +263,7 @@ func TestGetNotFound(t *testing.T) {
 // TestCorruptContentDetected verifies that a corrupted object body (content no
 // longer hashing to its id) is caught rather than returned.
 func TestCorruptContentDetected(t *testing.T) {
+	testenv.Isolate(t)
 	store, err := New(t.TempDir(), 1)
 	if err != nil {
 		t.Fatalf("New: %v", err)

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/fd"
@@ -14,6 +15,7 @@ func testRegistry() *semtype.Registry {
 }
 
 func TestBuild_SimpleTwoTables(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{
@@ -65,6 +67,7 @@ func TestBuild_SimpleTwoTables(t *testing.T) {
 }
 
 func TestPK_ExplicitPK(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -87,6 +90,7 @@ func TestPK_ExplicitPK(t *testing.T) {
 }
 
 func TestPK_AutoDetectID(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -108,6 +112,7 @@ func TestPK_AutoDetectID(t *testing.T) {
 }
 
 func TestPK_AutoDetectAutoID(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -129,6 +134,7 @@ func TestPK_AutoDetectAutoID(t *testing.T) {
 }
 
 func TestPK_MissingPKError(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -157,6 +163,7 @@ func TestPK_MissingPKError(t *testing.T) {
 }
 
 func TestTopoSort_ThreeTableChain(t *testing.T) {
+	testenv.Isolate(t)
 	tables := []Table{
 		{Name: "c", FKs: []FK{{Columns: []string{"b_id"}, RefTable: "b"}}},
 		{Name: "a"},
@@ -182,6 +189,7 @@ func TestTopoSort_ThreeTableChain(t *testing.T) {
 }
 
 func TestTopoSort_CycleDetection(t *testing.T) {
+	testenv.Isolate(t)
 	tables := []Table{
 		{Name: "x", FKs: []FK{{Columns: []string{"y_id"}, RefTable: "y"}}},
 		{Name: "y", FKs: []FK{{Columns: []string{"x_id"}, RefTable: "x"}}},
@@ -200,6 +208,7 @@ func TestTopoSort_CycleDetection(t *testing.T) {
 }
 
 func TestHasIndexCovering(t *testing.T) {
+	testenv.Isolate(t)
 	tbl := Table{
 		Indexes: []Index{
 			{Name: "idx_ab", Columns: []string{"a", "b"}},
@@ -228,6 +237,7 @@ func TestHasIndexCovering(t *testing.T) {
 }
 
 func TestAutoFKIndexGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -273,6 +283,7 @@ func TestAutoFKIndexGeneration(t *testing.T) {
 }
 
 func TestAutoFKIndex_SkippedWhenCovered(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -313,6 +324,7 @@ func TestAutoFKIndex_SkippedWhenCovered(t *testing.T) {
 }
 
 func TestCandidateKeys(t *testing.T) {
+	testenv.Isolate(t)
 	tbl := Table{
 		Columns: []Column{
 			{Name: "a"},
@@ -335,6 +347,7 @@ func TestCandidateKeys(t *testing.T) {
 }
 
 func TestTableByName(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &Schema{
 		Tables: []Table{
 			{Name: "foo", Schema: "public"},
@@ -359,6 +372,7 @@ func TestTableByName(t *testing.T) {
 }
 
 func TestBuildMulti_CrossSchemaFK(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 
 	authRaw := &parse.RawSchema{
@@ -443,6 +457,7 @@ func TestBuildMulti_CrossSchemaFK(t *testing.T) {
 }
 
 func TestBuildMulti_MergesExtensions(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 
 	raw1 := &parse.RawSchema{
@@ -490,6 +505,7 @@ func TestBuildMulti_MergesExtensions(t *testing.T) {
 }
 
 func TestBuildMulti_MergesEnums(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 
 	// Register enum types in the registry.
@@ -541,6 +557,7 @@ func TestBuildMulti_MergesEnums(t *testing.T) {
 }
 
 func TestBuildMulti_SingleSchema(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -565,6 +582,7 @@ func TestBuildMulti_SingleSchema(t *testing.T) {
 }
 
 func TestEnumResolution(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	// Register an enum type.
 	err := reg.Register(&semtype.TypeDef{
@@ -608,6 +626,7 @@ func TestEnumResolution(t *testing.T) {
 }
 
 func TestBuild_PoliciesResolved(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -689,6 +708,7 @@ func TestBuild_PoliciesResolved(t *testing.T) {
 }
 
 func TestBuild_PolicyInvalidOperation(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -724,6 +744,7 @@ func TestBuild_PolicyInvalidOperation(t *testing.T) {
 }
 
 func TestBuild_PolicyMissingExpr(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -759,6 +780,7 @@ func TestBuild_PolicyMissingExpr(t *testing.T) {
 }
 
 func TestResolveIndex_PlainColumns(t *testing.T) {
+	testenv.Isolate(t)
 	// Plain column names without direction: should produce nil Desc (all ASC).
 	raw := parse.RawIndex{
 		Name:    "idx_test",
@@ -774,6 +796,7 @@ func TestResolveIndex_PlainColumns(t *testing.T) {
 }
 
 func TestResolveIndex_DESCColumn(t *testing.T) {
+	testenv.Isolate(t)
 	// "b DESC" should produce Desc[1]=true.
 	raw := parse.RawIndex{
 		Name:    "idx_test",
@@ -789,6 +812,7 @@ func TestResolveIndex_DESCColumn(t *testing.T) {
 }
 
 func TestResolveIndex_ExplicitASC(t *testing.T) {
+	testenv.Isolate(t)
 	// "a ASC" should strip the ASC suffix and leave Desc as nil (all ASC).
 	raw := parse.RawIndex{
 		Name:    "idx_test",
@@ -804,6 +828,7 @@ func TestResolveIndex_ExplicitASC(t *testing.T) {
 }
 
 func TestResolveIndex_MixedDirections(t *testing.T) {
+	testenv.Isolate(t)
 	raw := parse.RawIndex{
 		Name:    "idx_test",
 		Columns: []string{"a DESC", "b", "c DESC"},
@@ -821,6 +846,7 @@ func TestResolveIndex_MixedDirections(t *testing.T) {
 }
 
 func TestResolveIndex_CaseInsensitiveDirection(t *testing.T) {
+	testenv.Isolate(t)
 	raw := parse.RawIndex{
 		Name:    "idx_test",
 		Columns: []string{"a desc", "b Asc"},
@@ -835,6 +861,7 @@ func TestResolveIndex_CaseInsensitiveDirection(t *testing.T) {
 }
 
 func TestBuild_IndexDESCEndToEnd(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	trueVal := true
 	raw := &parse.RawSchema{
@@ -890,6 +917,7 @@ func TestBuild_IndexDESCEndToEnd(t *testing.T) {
 }
 
 func TestBuild_FDUnknownColumn_E221(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -923,6 +951,7 @@ func TestBuild_FDUnknownColumn_E221(t *testing.T) {
 }
 
 func TestBuild_FDValidColumns_NoE221(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -951,6 +980,7 @@ func TestBuild_FDValidColumns_NoE221(t *testing.T) {
 }
 
 func TestBuild_PolicyType(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -1017,6 +1047,7 @@ func TestBuild_PolicyType(t *testing.T) {
 }
 
 func TestBuild_PolicyInvalidType(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -1054,6 +1085,7 @@ func TestBuild_PolicyInvalidType(t *testing.T) {
 }
 
 func TestBuild_ForceRLSImpliesEnableRLS(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -1085,6 +1117,7 @@ func TestBuild_ForceRLSImpliesEnableRLS(t *testing.T) {
 }
 
 func TestBuild_GroupsValid(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -1115,6 +1148,7 @@ func TestBuild_GroupsValid(t *testing.T) {
 }
 
 func TestBuild_GroupsUnknownTable(t *testing.T) {
+	testenv.Isolate(t)
 	reg := testRegistry()
 	raw := &parse.RawSchema{
 		Meta: parse.RawMeta{Schema: "public"},
@@ -1140,6 +1174,7 @@ func TestBuild_GroupsUnknownTable(t *testing.T) {
 }
 
 func TestFilterByGroups(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &Schema{
 		Tables: []Table{
 			{Name: "users", Schema: "public"},
@@ -1170,6 +1205,7 @@ func TestFilterByGroups(t *testing.T) {
 }
 
 func TestFilterByGroupsEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &Schema{
 		Tables: []Table{
 			{Name: "users", Schema: "public"},
@@ -1183,6 +1219,7 @@ func TestFilterByGroupsEmpty(t *testing.T) {
 }
 
 func TestFilterBySource_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &Schema{
 		Tables: []Table{
 			{Name: "users", Schema: "public", SourceFile: "/project/schema/auth.toml"},
@@ -1210,6 +1247,7 @@ func TestFilterBySource_Basic(t *testing.T) {
 }
 
 func TestFilterBySource_TypesPassThrough(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &Schema{
 		Tables: []Table{
 			{Name: "users", Schema: "public", SourceFile: "/project/schema/auth.toml"},
@@ -1269,6 +1307,7 @@ func TestFilterBySource_TypesPassThrough(t *testing.T) {
 }
 
 func TestFilterBySource_EmptySource(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &Schema{
 		Tables: []Table{
 			{Name: "users", Schema: "public", SourceFile: "/project/schema/auth.toml"},
@@ -1287,6 +1326,7 @@ func TestFilterBySource_EmptySource(t *testing.T) {
 }
 
 func TestFilterBySource_ANDWithGroups(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &Schema{
 		Tables: []Table{
 			{Name: "users", Schema: "public", SourceFile: "/project/schema/auth.toml"},

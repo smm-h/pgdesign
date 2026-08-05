@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -30,6 +31,7 @@ func smTableDesired() *model.Schema {
 // desired model carries a state-machine type must be endpoint-consistent — the
 // sm_type manifest key is produced by a lowered sm_type op.
 func TestChainConsistencyWithStateMachine(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -52,6 +54,7 @@ func TestChainConsistencyWithStateMachine(t *testing.T) {
 // modifies an existing SM type's identity (a new transition) lowers to a
 // create_sm_type op that re-maps the sm_type key, keeping the edge consistent.
 func TestChainConsistencyWithStateMachineChange(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -88,6 +91,7 @@ func TestChainConsistencyWithStateMachineChange(t *testing.T) {
 
 // TestDiffStateMachinesFields pins the diff-level added/removed/changed reporting.
 func TestDiffStateMachinesFields(t *testing.T) {
+	testenv.Isolate(t)
 	withSM := smTableDesired()
 	without := twoTableDesired()
 

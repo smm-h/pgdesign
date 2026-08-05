@@ -1,12 +1,14 @@
 package typeinfo
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 )
 
 // --- Parse: alias map entries ---
 
 func TestParseAliases(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input string
 		want  string
@@ -47,6 +49,7 @@ func TestParseAliases(t *testing.T) {
 // --- Parse: parameterized types ---
 
 func TestParseParameterized(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("numeric(12,6)", func(t *testing.T) {
 		got := Parse("numeric(12,6)")
 		if got.Base != "numeric" {
@@ -190,6 +193,7 @@ func TestParseParameterized(t *testing.T) {
 // --- Parse: multi-word types with interior params ---
 
 func TestParseMultiWordWithParams(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("timestamp(3) with time zone", func(t *testing.T) {
 		got := Parse("timestamp(3) with time zone")
 		if got.Base != "timestamptz" {
@@ -244,6 +248,7 @@ func TestParseMultiWordWithParams(t *testing.T) {
 // --- Parse: extension types ---
 
 func TestParseExtensionTypes(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("vector(1536)", func(t *testing.T) {
 		got := Parse("vector(1536)")
 		if got.Base != "vector" {
@@ -275,6 +280,7 @@ func TestParseExtensionTypes(t *testing.T) {
 // --- Parse: bare types ---
 
 func TestParseBareTypes(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input string
 		want  string
@@ -313,6 +319,7 @@ func TestParseBareTypes(t *testing.T) {
 // --- Parse: empty and whitespace ---
 
 func TestParseEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	got := Parse("")
 	if got.Base != "" {
 		t.Errorf("Parse(\"\").Base = %q, want \"\"", got.Base)
@@ -327,6 +334,7 @@ func TestParseEmpty(t *testing.T) {
 // --- Parse: array types ---
 
 func TestParseArrayTypes(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("text[]", func(t *testing.T) {
 		got := Parse("text[]")
 		if got.Base != "text[]" {
@@ -355,6 +363,7 @@ func TestParseArrayTypes(t *testing.T) {
 // --- Reconstruct round-trips ---
 
 func TestReconstructRoundTrips(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input string
 		want  string // expected canonical form after round-trip
@@ -393,6 +402,7 @@ func TestReconstructRoundTrips(t *testing.T) {
 // --- Reconstruct with alias normalization ---
 
 func TestReconstructNormalized(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input string
 		want  string
@@ -422,6 +432,7 @@ func TestReconstructNormalized(t *testing.T) {
 // --- Reconstruct with DomainName ---
 
 func TestReconstructDomainName(t *testing.T) {
+	testenv.Isolate(t)
 	typ := Type{
 		Base:       "varchar",
 		DomainName: "email_address",
@@ -436,6 +447,7 @@ func TestReconstructDomainName(t *testing.T) {
 // --- Reconstruct empty ---
 
 func TestReconstructEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	got := Reconstruct(Type{})
 	if got != "" {
 		t.Errorf("Reconstruct(Type{}) = %q, want \"\"", got)
@@ -445,6 +457,7 @@ func TestReconstructEmpty(t *testing.T) {
 // --- T() helper ---
 
 func TestT(t *testing.T) {
+	testenv.Isolate(t)
 	got := T("text")
 	if got.Base != "text" {
 		t.Errorf("T(\"text\").Base = %q, want %q", got.Base, "text")
@@ -461,6 +474,7 @@ func TestT(t *testing.T) {
 // --- MustParse ---
 
 func TestMustParsePanics(t *testing.T) {
+	testenv.Isolate(t)
 	defer func() {
 		r := recover()
 		if r == nil {
@@ -471,6 +485,7 @@ func TestMustParsePanics(t *testing.T) {
 }
 
 func TestMustParsePanicsWhitespace(t *testing.T) {
+	testenv.Isolate(t)
 	defer func() {
 		r := recover()
 		if r == nil {
@@ -481,6 +496,7 @@ func TestMustParsePanicsWhitespace(t *testing.T) {
 }
 
 func TestMustParseValid(t *testing.T) {
+	testenv.Isolate(t)
 	got := MustParse("varchar(255)")
 	if got.Base != "varchar" {
 		t.Errorf("MustParse(\"varchar(255)\").Base = %q, want %q", got.Base, "varchar")
@@ -493,6 +509,7 @@ func TestMustParseValid(t *testing.T) {
 // --- DomainName is never set by Parse ---
 
 func TestParseDomainNameAlwaysEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	inputs := []string{
 		"text",
 		"varchar(255)",
@@ -515,6 +532,7 @@ func TestParseDomainNameAlwaysEmpty(t *testing.T) {
 // --- Reconstruct array types with params ---
 
 func TestReconstructArrayWithParams(t *testing.T) {
+	testenv.Isolate(t)
 	typ := Type{
 		Base:   "varchar[]",
 		Params: Params{Length: intPtr(100)},
@@ -528,6 +546,7 @@ func TestReconstructArrayWithParams(t *testing.T) {
 // --- Parse: bit varying with params ---
 
 func TestParseBitVaryingWithParams(t *testing.T) {
+	testenv.Isolate(t)
 	got := Parse("bit varying(128)")
 	if got.Base != "varbit" {
 		t.Errorf("Base = %q, want %q", got.Base, "varbit")
@@ -540,6 +559,7 @@ func TestParseBitVaryingWithParams(t *testing.T) {
 // --- Parse: character with params ---
 
 func TestParseCharacterWithParams(t *testing.T) {
+	testenv.Isolate(t)
 	got := Parse("character(10)")
 	if got.Base != "char" {
 		t.Errorf("Base = %q, want %q", got.Base, "char")

@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -13,6 +14,7 @@ func col(name, typ string) model.Column {
 }
 
 func TestD2CardinalityOneToMany(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -40,6 +42,7 @@ func TestD2CardinalityOneToMany(t *testing.T) {
 }
 
 func TestD2CardinalityOneToOne(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -97,6 +100,7 @@ func junctionSchema(extraCol bool) *model.Schema {
 }
 
 func TestD2CardinalityManyToManyCollapse(t *testing.T) {
+	testenv.Isolate(t)
 	s := junctionSchema(false)
 	out := GenerateD2(s, nil, DefaultD2Options())
 
@@ -120,6 +124,7 @@ func TestD2CardinalityManyToManyCollapse(t *testing.T) {
 }
 
 func TestD2CardinalityJunctionWithExtraColumnNotCollapsed(t *testing.T) {
+	testenv.Isolate(t)
 	s := junctionSchema(true)
 	out := GenerateD2(s, nil, DefaultD2Options())
 
@@ -138,6 +143,7 @@ func TestD2CardinalityJunctionWithExtraColumnNotCollapsed(t *testing.T) {
 }
 
 func TestD2CardinalityDisabled(t *testing.T) {
+	testenv.Isolate(t)
 	s := junctionSchema(false)
 	opts := DefaultD2Options()
 	opts.Cardinality = false

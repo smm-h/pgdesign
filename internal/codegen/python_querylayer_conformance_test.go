@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"regexp"
 	"sort"
 	"strings"
@@ -72,6 +73,7 @@ func extractPublicMethods(content, className string) []string {
 // TestConformance_SamePublicMethods verifies that PgBackend and InMemoryBackend
 // have the exact same set of public methods.
 func TestConformance_SamePublicMethods(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 	pgContent := string(files["pg_backend.py"])
 	memContent := string(files["memory_backend.py"])
@@ -120,6 +122,7 @@ func TestConformance_SamePublicMethods(t *testing.T) {
 // TestConformance_BothImplementBackendProtocol verifies that every method
 // declared in the Backend protocol exists on both PgBackend and InMemoryBackend.
 func TestConformance_BothImplementBackendProtocol(t *testing.T) {
+	testenv.Isolate(t)
 	files, protocols := conformanceSchema()
 
 	// Extract Backend protocol methods.
@@ -156,6 +159,7 @@ func TestConformance_BothImplementBackendProtocol(t *testing.T) {
 // uses parameterized SQL ($1, $2, ...) for all queries and never uses unsafe
 // string interpolation patterns (%s, %d in SQL strings).
 func TestConformance_PgUsesParameterizedSQL(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 
 	for name, data := range files {
@@ -190,6 +194,7 @@ func TestConformance_PgUsesParameterizedSQL(t *testing.T) {
 // (create uses validate_insert, update uses validate_update, SM transitions
 // use validate_update).
 func TestConformance_InMemoryDelegatesToConstraintEngine(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 
 	// Tables we expect to have write operations.
@@ -264,6 +269,7 @@ func TestConformance_InMemoryDelegatesToConstraintEngine(t *testing.T) {
 // machine transition methods (e.g., cancel_orders, confirm_orders) exist on
 // both backends with matching method signatures.
 func TestConformance_SMTransitionMethodsMatchBetweenBackends(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 	pgContent := string(files["pg_backend.py"])
 	memContent := string(files["memory_backend.py"])
@@ -299,6 +305,7 @@ func TestConformance_SMTransitionMethodsMatchBetweenBackends(t *testing.T) {
 // TestConformance_CascadeDeleteUsesALL_CONSTRAINTS verifies that every InMemory
 // delete method references ALL_CONSTRAINTS for cascade processing.
 func TestConformance_CascadeDeleteUsesALL_CONSTRAINTS(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 
 	// Tables that have delete methods (non-append-only).
@@ -340,6 +347,7 @@ func TestConformance_CascadeDeleteUsesALL_CONSTRAINTS(t *testing.T) {
 // the composite PgBackend and InMemoryBackend classes forward the exact same
 // set of methods (including parameter names).
 func TestConformance_BothCompositesHaveIdenticalForwardingMethods(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 	pgContent := string(files["pg_backend.py"])
 	memContent := string(files["memory_backend.py"])
@@ -377,6 +385,7 @@ func TestConformance_BothCompositesHaveIdenticalForwardingMethods(t *testing.T) 
 // TestConformance_PerTableDelegateMethodParity verifies that for each table,
 // the PG delegate and InMemory delegate have the same set of methods.
 func TestConformance_PerTableDelegateMethodParity(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 
 	tables := []struct {
@@ -426,6 +435,7 @@ func TestConformance_PerTableDelegateMethodParity(t *testing.T) {
 // TestConformance_WriterReaderProtocolCoverage verifies that both backends
 // implement all methods from both the per-table Writer and Reader protocols.
 func TestConformance_WriterReaderProtocolCoverage(t *testing.T) {
+	testenv.Isolate(t)
 	files, protocols := conformanceSchema()
 
 	// Extract per-table Writer and Reader protocol methods.
@@ -492,6 +502,7 @@ func TestConformance_WriterReaderProtocolCoverage(t *testing.T) {
 // TestConformance_PgDelegateForwardingCorrectness verifies that PgBackend
 // forwarding methods delegate to the correct per-table delegate attribute.
 func TestConformance_PgDelegateForwardingCorrectness(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 	pgContent := string(files["pg_backend.py"])
 
@@ -515,6 +526,7 @@ func TestConformance_PgDelegateForwardingCorrectness(t *testing.T) {
 // TestConformance_MemDelegateForwardingCorrectness verifies that InMemoryBackend
 // forwarding methods delegate to the correct per-table delegate attribute.
 func TestConformance_MemDelegateForwardingCorrectness(t *testing.T) {
+	testenv.Isolate(t)
 	files, _ := conformanceSchema()
 	memContent := string(files["memory_backend.py"])
 

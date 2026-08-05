@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"math/rand"
 	"sort"
 	"testing"
@@ -17,6 +18,7 @@ import (
 // generators). New generators added to SupportedModes are covered
 // automatically.
 func TestEveryGeneratorOutputCarriesStamp(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadDeterminismSchema(t)
 
 	modes := SupportedModes()
@@ -69,6 +71,7 @@ func TestEveryGeneratorOutputCarriesStamp(t *testing.T) {
 // through the same genkit writer with a free-text info line. Both the populated
 // path and the empty (rowsPerTable <= 0) path must carry the stamp.
 func TestSeedOutputCarriesStamp(t *testing.T) {
+	testenv.Isolate(t)
 	schema := loadDeterminismSchema(t)
 	rng := rand.New(rand.NewSource(1))
 

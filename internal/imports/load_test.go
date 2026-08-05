@@ -1,12 +1,14 @@
 package imports
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 )
 
 // TestLoadSurface_DecodesVendoredReferenceTables verifies the 7.3 loader decodes
 // the vendored surface back into REFERENCE tables stamped into the target schema.
 func TestLoadSurface_DecodesVendoredReferenceTables(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := lockAlias(t, []string{"users"})
 
 	surface, err := LoadSurface(projectDir, "framework")
@@ -25,6 +27,7 @@ func TestLoadSurface_DecodesVendoredReferenceTables(t *testing.T) {
 // TestLoadAllSurfaces_SkipsUnlockedAggregatesLocked verifies aggregation across
 // aliases and that an alias without a lockfile is silently skipped.
 func TestLoadAllSurfaces_SkipsUnlockedAggregatesLocked(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := lockAlias(t, []string{"users"})
 
 	// "framework" is locked; "other" is declared but never locked.

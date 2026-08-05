@@ -1,6 +1,7 @@
 package workload
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -24,6 +25,7 @@ func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnos
 // ---------------------------------------------------------------------------
 
 func TestStructural_W022_JsonbWithoutGIN(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "documents",
@@ -51,6 +53,7 @@ func TestStructural_W022_JsonbWithoutGIN(t *testing.T) {
 }
 
 func TestStructural_W022_JsonbWithGIN(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "documents",
@@ -74,6 +77,7 @@ func TestStructural_W022_JsonbWithGIN(t *testing.T) {
 }
 
 func TestStructural_W022_JsonbArrayNotTriggered(t *testing.T) {
+	testenv.Isolate(t)
 	// A jsonb[] column should trigger W023 (array), not W022 (jsonb).
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -97,6 +101,7 @@ func TestStructural_W022_JsonbArrayNotTriggered(t *testing.T) {
 }
 
 func TestStructural_W023_ArrayWithoutGIN(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "posts",
@@ -118,6 +123,7 @@ func TestStructural_W023_ArrayWithoutGIN(t *testing.T) {
 }
 
 func TestStructural_W023_ArrayWithGIN(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "posts",
@@ -141,6 +147,7 @@ func TestStructural_W023_ArrayWithGIN(t *testing.T) {
 }
 
 func TestStructural_W024_TsvectorWithoutGIN(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "articles",
@@ -162,6 +169,7 @@ func TestStructural_W024_TsvectorWithoutGIN(t *testing.T) {
 }
 
 func TestStructural_W024_TsvectorWithGIN(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "articles",
@@ -185,6 +193,7 @@ func TestStructural_W024_TsvectorWithGIN(t *testing.T) {
 }
 
 func TestStructural_I005_TimestampAppendOnlyWithoutBRIN(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:       "events",
@@ -210,6 +219,7 @@ func TestStructural_I005_TimestampAppendOnlyWithoutBRIN(t *testing.T) {
 }
 
 func TestStructural_I005_TimestampWithBRIN(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:       "events",
@@ -234,6 +244,7 @@ func TestStructural_I005_TimestampWithBRIN(t *testing.T) {
 }
 
 func TestStructural_I005_NonAppendOnlyNoTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:       "events",
@@ -253,6 +264,7 @@ func TestStructural_I005_NonAppendOnlyNoTrigger(t *testing.T) {
 }
 
 func TestStructural_I005_PlainTimestamp(t *testing.T) {
+	testenv.Isolate(t)
 	// "timestamp" (without tz) should also trigger I005 on append-only tables.
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -273,6 +285,7 @@ func TestStructural_I005_PlainTimestamp(t *testing.T) {
 }
 
 func TestStructural_MultipleColumnsMultipleDiags(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "mixed",
@@ -298,6 +311,7 @@ func TestStructural_MultipleColumnsMultipleDiags(t *testing.T) {
 }
 
 func TestStructural_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{}
 	diags := StructuralRecommendations(schema)
 	if len(diags) != 0 {
@@ -306,6 +320,7 @@ func TestStructural_EmptySchema(t *testing.T) {
 }
 
 func TestStructural_GINMethodCaseInsensitive(t *testing.T) {
+	testenv.Isolate(t)
 	// The columnHasIndexMethod check uses EqualFold, so "GIN" should match.
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -334,6 +349,7 @@ func TestStructural_GINMethodCaseInsensitive(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestNPlusOne_Detected(t *testing.T) {
+	testenv.Isolate(t)
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{
 			"order_items": {{
@@ -376,6 +392,7 @@ func TestNPlusOne_Detected(t *testing.T) {
 // in two schemas. N+1 detection iterates edge values, so it works unchanged
 // against the qualified-keyed graph.
 func TestNPlusOne_TwoSchemasQualifiedGraph(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{
 		Tables: []model.Table{
 			{Name: "account", Schema: "public"},
@@ -405,6 +422,7 @@ func TestNPlusOne_TwoSchemasQualifiedGraph(t *testing.T) {
 }
 
 func TestNPlusOne_RatioBelowThreshold(t *testing.T) {
+	testenv.Isolate(t)
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{
 			"order_items": {{
@@ -428,6 +446,7 @@ func TestNPlusOne_RatioBelowThreshold(t *testing.T) {
 }
 
 func TestNPlusOne_ParentCallsBelowMinimum(t *testing.T) {
+	testenv.Isolate(t)
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{
 			"order_items": {{
@@ -451,6 +470,7 @@ func TestNPlusOne_ParentCallsBelowMinimum(t *testing.T) {
 }
 
 func TestNPlusOne_ChildCallsBelowMinimum(t *testing.T) {
+	testenv.Isolate(t)
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{
 			"order_items": {{
@@ -474,6 +494,7 @@ func TestNPlusOne_ChildCallsBelowMinimum(t *testing.T) {
 }
 
 func TestNPlusOne_ExactThreshold(t *testing.T) {
+	testenv.Isolate(t)
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{
 			"order_items": {{
@@ -498,6 +519,7 @@ func TestNPlusOne_ExactThreshold(t *testing.T) {
 }
 
 func TestNPlusOne_EmptyStats(t *testing.T) {
+	testenv.Isolate(t)
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{
 			"order_items": {{
@@ -516,6 +538,7 @@ func TestNPlusOne_EmptyStats(t *testing.T) {
 }
 
 func TestNPlusOne_EmptyGraph(t *testing.T) {
+	testenv.Isolate(t)
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{},
 	}
@@ -530,6 +553,7 @@ func TestNPlusOne_EmptyGraph(t *testing.T) {
 }
 
 func TestNPlusOne_DedupPerPair(t *testing.T) {
+	testenv.Isolate(t)
 	// Multiple FK edges between same table pair should produce only one W025.
 	fkGraph := &model.FKGraph{
 		Forward: map[string][]model.FKEdge{
@@ -555,6 +579,7 @@ func TestNPlusOne_DedupPerPair(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSeqScanHeavy_Detected(t *testing.T) {
+	testenv.Isolate(t)
 	stats := []TableScanStats{{Schema: "public", Table: "users", SeqScan: 10000, IdxScan: 10}}
 	diags := DetectSeqScanHeavy(stats)
 	found := findByCode(diags, "W026")
@@ -570,6 +595,7 @@ func TestSeqScanHeavy_Detected(t *testing.T) {
 }
 
 func TestSeqScanHeavy_BalancedScans(t *testing.T) {
+	testenv.Isolate(t)
 	stats := []TableScanStats{{Schema: "public", Table: "users", SeqScan: 100, IdxScan: 100}}
 	diags := DetectSeqScanHeavy(stats)
 	found := findByCode(diags, "W026")
@@ -579,6 +605,7 @@ func TestSeqScanHeavy_BalancedScans(t *testing.T) {
 }
 
 func TestSeqScanHeavy_ZeroSeqScan(t *testing.T) {
+	testenv.Isolate(t)
 	stats := []TableScanStats{{Schema: "public", Table: "users", SeqScan: 0, IdxScan: 100}}
 	diags := DetectSeqScanHeavy(stats)
 	found := findByCode(diags, "W026")
@@ -588,6 +615,7 @@ func TestSeqScanHeavy_ZeroSeqScan(t *testing.T) {
 }
 
 func TestSeqScanHeavy_ZeroBothScans(t *testing.T) {
+	testenv.Isolate(t)
 	stats := []TableScanStats{{Schema: "public", Table: "users", SeqScan: 0, IdxScan: 0}}
 	diags := DetectSeqScanHeavy(stats)
 	found := findByCode(diags, "W026")
@@ -597,6 +625,7 @@ func TestSeqScanHeavy_ZeroBothScans(t *testing.T) {
 }
 
 func TestSeqScanHeavy_BoundaryExactly10x(t *testing.T) {
+	testenv.Isolate(t)
 	// SeqScan must be strictly greater than 10*IdxScan.
 	stats := []TableScanStats{{Schema: "public", Table: "users", SeqScan: 100, IdxScan: 10}}
 	diags := DetectSeqScanHeavy(stats)
@@ -607,6 +636,7 @@ func TestSeqScanHeavy_BoundaryExactly10x(t *testing.T) {
 }
 
 func TestSeqScanHeavy_ZeroIdxScan(t *testing.T) {
+	testenv.Isolate(t)
 	// SeqScan > 0 and IdxScan = 0: 10*0 = 0, so SeqScan > 0 triggers.
 	stats := []TableScanStats{{Schema: "public", Table: "users", SeqScan: 1, IdxScan: 0}}
 	diags := DetectSeqScanHeavy(stats)
@@ -617,6 +647,7 @@ func TestSeqScanHeavy_ZeroIdxScan(t *testing.T) {
 }
 
 func TestSeqScanHeavy_EmptyStats(t *testing.T) {
+	testenv.Isolate(t)
 	diags := DetectSeqScanHeavy(nil)
 	if len(diags) != 0 {
 		t.Fatalf("expected no diagnostics for empty stats, got %d", len(diags))
@@ -624,6 +655,7 @@ func TestSeqScanHeavy_EmptyStats(t *testing.T) {
 }
 
 func TestSeqScanHeavy_MultipleTables(t *testing.T) {
+	testenv.Isolate(t)
 	stats := []TableScanStats{
 		{Schema: "public", Table: "users", SeqScan: 10000, IdxScan: 10},
 		{Schema: "public", Table: "posts", SeqScan: 50, IdxScan: 100},
@@ -641,6 +673,7 @@ func TestSeqScanHeavy_MultipleTables(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestLowSelectivity_I006_Detected(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "users",
@@ -672,6 +705,7 @@ func TestLowSelectivity_I006_Detected(t *testing.T) {
 }
 
 func TestLowSelectivity_I006_NoBooleanIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "users",
@@ -690,6 +724,7 @@ func TestLowSelectivity_I006_NoBooleanIndex(t *testing.T) {
 }
 
 func TestLowSelectivity_I006_MultiColumnIndex(t *testing.T) {
+	testenv.Isolate(t)
 	// Boolean in a multi-column index should NOT trigger I006.
 	schema := &model.Schema{
 		Tables: []model.Table{{
@@ -714,6 +749,7 @@ func TestLowSelectivity_I006_MultiColumnIndex(t *testing.T) {
 }
 
 func TestLowSelectivity_I006_NonBooleanColumn(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name: "users",
@@ -740,6 +776,7 @@ func TestLowSelectivity_I006_NonBooleanColumn(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestExcessiveIndexes_I007_Detected(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := make([]model.Index, 10)
 	for i := range indexes {
 		indexes[i] = model.Index{Name: "idx_" + string(rune('a'+i)), Columns: []string{"col"}}
@@ -766,6 +803,7 @@ func TestExcessiveIndexes_I007_Detected(t *testing.T) {
 }
 
 func TestExcessiveIndexes_I007_BelowThreshold(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := make([]model.Index, 5)
 	for i := range indexes {
 		indexes[i] = model.Index{Name: "idx_" + string(rune('a'+i)), Columns: []string{"col"}}
@@ -786,6 +824,7 @@ func TestExcessiveIndexes_I007_BelowThreshold(t *testing.T) {
 }
 
 func TestExcessiveIndexes_I007_ExactlyNine(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := make([]model.Index, 9)
 	for i := range indexes {
 		indexes[i] = model.Index{Name: "idx_" + string(rune('a'+i)), Columns: []string{"col"}}
@@ -806,6 +845,7 @@ func TestExcessiveIndexes_I007_ExactlyNine(t *testing.T) {
 }
 
 func TestExcessiveIndexes_I007_NoIndexes(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "empty",
@@ -825,6 +865,7 @@ func TestExcessiveIndexes_I007_NoIndexes(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFindDuplicateIndexes_Detected(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := []IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
 		{Schema: "public", Table: "users", Name: "idx_ab", Columns: []string{"a", "b"}},
@@ -848,6 +889,7 @@ func TestFindDuplicateIndexes_Detected(t *testing.T) {
 }
 
 func TestFindDuplicateIndexes_SameColumnsNotDuplicate(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := []IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_a1", Columns: []string{"a", "b"}},
 		{Schema: "public", Table: "users", Name: "idx_a2", Columns: []string{"a", "b"}},
@@ -859,6 +901,7 @@ func TestFindDuplicateIndexes_SameColumnsNotDuplicate(t *testing.T) {
 }
 
 func TestFindDuplicateIndexes_DifferentTables(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := []IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_users_a", Columns: []string{"a"}},
 		{Schema: "public", Table: "posts", Name: "idx_posts_ab", Columns: []string{"a", "b"}},
@@ -870,6 +913,7 @@ func TestFindDuplicateIndexes_DifferentTables(t *testing.T) {
 }
 
 func TestFindDuplicateIndexes_DifferentSchemas(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := []IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
 		{Schema: "private", Table: "users", Name: "idx_ab", Columns: []string{"a", "b"}},
@@ -881,6 +925,7 @@ func TestFindDuplicateIndexes_DifferentSchemas(t *testing.T) {
 }
 
 func TestFindDuplicateIndexes_MultiLevel(t *testing.T) {
+	testenv.Isolate(t)
 	// a < a,b < a,b,c: both a and a,b are subsumed by a,b,c; a is also subsumed by a,b.
 	indexes := []IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
@@ -895,6 +940,7 @@ func TestFindDuplicateIndexes_MultiLevel(t *testing.T) {
 }
 
 func TestFindDuplicateIndexes_NonPrefixOverlap(t *testing.T) {
+	testenv.Isolate(t)
 	// (a, c) is not a prefix of (a, b, c).
 	indexes := []IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_ac", Columns: []string{"a", "c"}},
@@ -907,6 +953,7 @@ func TestFindDuplicateIndexes_NonPrefixOverlap(t *testing.T) {
 }
 
 func TestFindDuplicateIndexes_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	dups := FindDuplicateIndexes(nil)
 	if len(dups) != 0 {
 		t.Fatalf("expected no duplicates for empty input, got %d", len(dups))
@@ -914,6 +961,7 @@ func TestFindDuplicateIndexes_Empty(t *testing.T) {
 }
 
 func TestFindDuplicateIndexes_SingleIndex(t *testing.T) {
+	testenv.Isolate(t)
 	indexes := []IndexInfo{
 		{Schema: "public", Table: "users", Name: "idx_a", Columns: []string{"a"}},
 	}

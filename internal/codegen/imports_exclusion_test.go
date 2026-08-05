@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 // codegen iterates only owned Tables, so imported reference tables produce no
 // generated artifacts (no duplicate types).
 func TestCodegenExcludesImportedTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{

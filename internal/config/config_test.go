@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +11,7 @@ import (
 )
 
 func TestLoad(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["auth.toml", "game.toml"]
@@ -56,6 +58,7 @@ column_order = "pk_fk_alpha"
 }
 
 func TestSchemaFiles(t *testing.T) {
+	testenv.Isolate(t)
 	raw := &RawConfig{
 		Project: ProjectConfig[RelativePath]{
 			Schemas: []RelativePath{"auth.toml", "game.toml"},
@@ -80,6 +83,7 @@ func TestSchemaFiles(t *testing.T) {
 }
 
 func TestFindConfig(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 
 	// No pgdesign.toml yet.
@@ -104,6 +108,7 @@ func TestFindConfig(t *testing.T) {
 }
 
 func TestLoadMinimal(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -127,6 +132,7 @@ schemas = ["schema.toml"]
 }
 
 func TestLoadValidateSection(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -163,6 +169,7 @@ max_columns = 50
 }
 
 func TestLoadMigrateSection(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -185,6 +192,7 @@ lock_timeout = "5s"
 }
 
 func TestLoadExtensionsSection(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -236,6 +244,7 @@ index_methods = ["gin"]
 }
 
 func TestLoadOrDefault_NoConfig(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 
 	cfg, err := LoadOrDefault(tmpDir)
@@ -252,6 +261,7 @@ func TestLoadOrDefault_NoConfig(t *testing.T) {
 }
 
 func TestLoadOrDefault_WithConfig(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -274,6 +284,7 @@ max_columns = 42
 }
 
 func TestMergeValidateFlags(t *testing.T) {
+	testenv.Isolate(t)
 	cfg := &RawConfig{
 		Validate: ValidateConfig{
 			NamingPattern: "snake_case",
@@ -301,6 +312,7 @@ func TestMergeValidateFlags(t *testing.T) {
 }
 
 func TestLoadPoolConfig(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -327,6 +339,7 @@ pool_min_conns = 5
 }
 
 func TestLoadPoolConfig_Absent(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -352,6 +365,7 @@ pg_version = 16
 }
 
 func TestLoadPoolConfig_NegativeMaxConns(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -374,6 +388,7 @@ pool_max_conns = -1
 }
 
 func TestLoadPoolConfig_NegativeMinConns(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -396,6 +411,7 @@ pool_min_conns = -5
 }
 
 func TestLoadPoolConfig_MinExceedsMax(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -419,6 +435,7 @@ pool_min_conns = 10
 }
 
 func TestLoadOutputD2Subsection(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -499,6 +516,7 @@ path = "schema/plain.d2"
 }
 
 func TestLoadOutputD2InvalidLayout(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -524,6 +542,7 @@ layout = "tala"
 }
 
 func TestLoadOutputD2WrongFormat(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -546,6 +565,7 @@ layout = "elk"
 }
 
 func TestLoadOutputSection(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -625,6 +645,7 @@ mode = "validators"
 }
 
 func TestLoadOutput_MissingPath(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -647,6 +668,7 @@ format = "sql"
 }
 
 func TestLoadOutput_InvalidFormat(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -670,6 +692,7 @@ path = "out.yaml"
 }
 
 func TestLoadOutput_CodegenWithoutLang(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -694,6 +717,7 @@ mode = "constants"
 }
 
 func TestLoadOutput_CodegenWithoutMode(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -718,6 +742,7 @@ lang = "python"
 }
 
 func TestLoadOutput_InvalidLang(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -743,6 +768,7 @@ mode = "constants"
 }
 
 func TestLoadOutput_InvalidMode(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -768,6 +794,7 @@ mode = "classes"
 }
 
 func TestLoadSuppressSection(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -797,6 +824,7 @@ schemas = ["schema.toml"]
 }
 
 func TestLoadOutputGroups(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["schema.toml"]
@@ -835,6 +863,7 @@ path = "full.sql"
 }
 
 func TestResolveAllPathFields(t *testing.T) {
+	testenv.Isolate(t)
 	// Build a RawConfig with known relative paths in all path fields.
 	raw := &RawConfig{
 		Project: ProjectConfig[RelativePath]{
@@ -916,6 +945,7 @@ func TestResolveAllPathFields(t *testing.T) {
 }
 
 func TestResolveAlreadyAbsolutePaths(t *testing.T) {
+	testenv.Isolate(t)
 	raw := &RawConfig{
 		Project: ProjectConfig[RelativePath]{
 			Schemas:       []RelativePath{"/absolute/auth.toml"},
@@ -937,6 +967,7 @@ func TestResolveAlreadyAbsolutePaths(t *testing.T) {
 }
 
 func TestFindConfigWalkUp(t *testing.T) {
+	testenv.Isolate(t)
 	// Create a temp directory tree: root/a/b/c
 	tmpDir := t.TempDir()
 	aDir := filepath.Join(tmpDir, "a")
@@ -989,6 +1020,7 @@ func TestFindConfigWalkUp(t *testing.T) {
 }
 
 func TestFindConfigPreferClosest(t *testing.T) {
+	testenv.Isolate(t)
 	// If both parent and child have pgdesign.toml, the child's should be found.
 	tmpDir := t.TempDir()
 	childDir := filepath.Join(tmpDir, "child")
@@ -1015,6 +1047,7 @@ func TestFindConfigPreferClosest(t *testing.T) {
 }
 
 func TestLoadAndResolve(t *testing.T) {
+	testenv.Isolate(t)
 	tmpDir := t.TempDir()
 	content := `[project]
 schemas = ["auth.toml", "game.toml"]
@@ -1060,6 +1093,7 @@ path = "out/schema.sql"
 }
 
 func TestResolveNonPathFieldsPreserved(t *testing.T) {
+	testenv.Isolate(t)
 	raw := &RawConfig{
 		Database: DatabaseConfig{
 			URL:       "postgres://localhost/test",
@@ -1114,6 +1148,7 @@ func TestResolveNonPathFieldsPreserved(t *testing.T) {
 }
 
 func TestLoadImportsSection(t *testing.T) {
+	testenv.Isolate(t)
 	// Both inline-table and nested-table syntaxes must decode identically.
 	content := `[project]
 schemas = ["schema.toml"]
@@ -1144,6 +1179,7 @@ schema = "billing"
 }
 
 func TestLoadImports_UnknownKey(t *testing.T) {
+	testenv.Isolate(t)
 	content := `[imports.fw]
 git = "https://example.com/fw.git"
 ref = "v1"
@@ -1156,6 +1192,7 @@ branch = "oops"
 }
 
 func TestLoadImports_MissingRequired(t *testing.T) {
+	testenv.Isolate(t)
 	for _, tc := range []struct{ name, toml string }{
 		{"no-git", "[imports.fw]\nref=\"v1\"\nschema=\"app\"\n"},
 		{"no-ref", "[imports.fw]\ngit=\"u\"\nschema=\"app\"\n"},
@@ -1170,6 +1207,7 @@ func TestLoadImports_MissingRequired(t *testing.T) {
 }
 
 func TestLoadImports_InvalidAlias(t *testing.T) {
+	testenv.Isolate(t)
 	// A digit-leading alias is rejected.
 	content := "[imports.\"1bad\"]\ngit=\"u\"\nref=\"v1\"\nschema=\"app\"\n"
 	if _, err := LoadBytes([]byte(content)); err == nil {
@@ -1178,6 +1216,7 @@ func TestLoadImports_InvalidAlias(t *testing.T) {
 }
 
 func TestResolvePreservesImports(t *testing.T) {
+	testenv.Isolate(t)
 	content := `[imports.fw]
 git = "https://example.com/fw.git"
 ref = "v1"

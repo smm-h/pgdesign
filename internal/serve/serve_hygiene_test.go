@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 // handler observes cancellation and can stop early — and returns an explicit 503
 // to the client.
 func TestRequestTimeout_ObservesCancellation(t *testing.T) {
+	testenv.Isolate(t)
 	s := &Server{requestTimeout: 50 * time.Millisecond}
 
 	observed := make(chan struct{})
@@ -50,6 +52,7 @@ func TestRequestTimeout_ObservesCancellation(t *testing.T) {
 // TestRequestTimeout_DisabledPassesThrough verifies a zero timeout leaves the
 // handler unwrapped (no deadline enforced).
 func TestRequestTimeout_DisabledPassesThrough(t *testing.T) {
+	testenv.Isolate(t)
 	s := &Server{} // requestTimeout == 0
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 	if got := s.withTimeout(h); got == nil {
@@ -89,6 +92,7 @@ func waitFor(t *testing.T, d time.Duration, cond func() bool) {
 // frees capacity — the "cancellable; bounded" contract, tested without a database
 // via an injected blocking run function.
 func TestAuditJobManager_BoundedAndCancellable(t *testing.T) {
+	testenv.Isolate(t)
 	m := newAuditJobManager()
 	m.maxConcurrent = 2
 
@@ -128,6 +132,7 @@ func TestAuditJobManager_BoundedAndCancellable(t *testing.T) {
 // TestAuditJobManager_DoneCarriesDiagnostics verifies a completed job records the
 // run's diagnostics and terminal status.
 func TestAuditJobManager_DoneCarriesDiagnostics(t *testing.T) {
+	testenv.Isolate(t)
 	m := newAuditJobManager()
 	run := func(ctx context.Context) ([]diagnostic.Diagnostic, error) {
 		return []diagnostic.Diagnostic{{Severity: diagnostic.Warning, Code: "W999", Message: "example"}}, nil
@@ -150,6 +155,7 @@ func TestAuditJobManager_DoneCarriesDiagnostics(t *testing.T) {
 // against a live database: POST starts a job (202 + id), GET polls it to a
 // terminal state carrying diagnostics.
 func TestAuditJob_HTTPLifecycle(t *testing.T) {
+	testenv.Isolate(t)
 	srv := setupServer(t) // skips when no database is configured
 	ts := httptest.NewServer(srv)
 	defer ts.Close()

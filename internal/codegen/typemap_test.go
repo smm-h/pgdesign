@@ -1,8 +1,12 @@
 package codegen
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 func TestLookupType_AllLanguages(t *testing.T) {
+	testenv.Isolate(t)
 	type langExpect struct {
 		lang       Lang
 		wantType   string
@@ -106,6 +110,7 @@ func TestLookupType_AllLanguages(t *testing.T) {
 }
 
 func TestLookupType_Aliases(t *testing.T) {
+	testenv.Isolate(t)
 	aliases := []struct {
 		alias     string
 		canonical string
@@ -139,6 +144,7 @@ func TestLookupType_Aliases(t *testing.T) {
 }
 
 func TestLookupType_CaseInsensitive(t *testing.T) {
+	testenv.Isolate(t)
 	variants := []string{"INTEGER", "Integer", "iNtEgEr", "TEXT", "Text", "BOOLEAN", "Boolean", "UUID", "Uuid"}
 
 	for _, v := range variants {
@@ -168,6 +174,7 @@ func TestLookupType_CaseInsensitive(t *testing.T) {
 }
 
 func TestLookupType_Fallback(t *testing.T) {
+	testenv.Isolate(t)
 	unknownTypes := []string{"user_status", "my_custom_type", "order_state", ""}
 
 	expected := map[Lang]string{
@@ -193,6 +200,7 @@ func TestLookupType_Fallback(t *testing.T) {
 }
 
 func TestLookupMoneyType(t *testing.T) {
+	testenv.Isolate(t)
 	expected := map[Lang]string{
 		LangGo:     "int64",
 		LangTS:     "number",
@@ -211,6 +219,7 @@ func TestLookupMoneyType(t *testing.T) {
 }
 
 func TestApplyNullable(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		lang Lang
 		want string
@@ -232,6 +241,7 @@ func TestApplyNullable(t *testing.T) {
 }
 
 func TestApplyArray(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		lang Lang
 		want string
@@ -253,6 +263,7 @@ func TestApplyArray(t *testing.T) {
 }
 
 func TestApplyNullable_Array_Combination(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		lang Lang
 		want string

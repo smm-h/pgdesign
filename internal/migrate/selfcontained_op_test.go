@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/chain"
@@ -87,6 +88,7 @@ func mixedTable() (tbl model.Table, enums []model.Enum, domains []model.Domain, 
 // byte-identically after a store round-trip, and PGVersion is honored (VIRTUAL,
 // not STORED).
 func TestSelfContainedCreateTableMixed(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 	tbl, enums, domains, schema, pgVersion := mixedTable()
 
@@ -135,6 +137,7 @@ func containsWord(s, w string) bool {
 // store, and asserts the up and down renders equal generate's SQL (the sql.*
 // helpers) byte-for-byte.
 func TestSelfContainedFamilies(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 	schema := "app"
 
@@ -363,6 +366,7 @@ func assertEq(t *testing.T, got, want string) {
 // TestParseHardFailsOnMissingPayload proves an op whose payload does not resolve
 // is unrepresentable: ParseOp is a hard error, never a silent degraded op.
 func TestParseHardFailsOnMissingPayload(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 	j := OpJSON{
 		Kind:          "create_table",
@@ -378,6 +382,7 @@ func TestParseHardFailsOnMissingPayload(t *testing.T) {
 // TestVerifyDownRejectsTamper proves the load-time down-cache verifier catches a
 // down that is not the re-derivation of the up payload.
 func TestVerifyDownRejectsTamper(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 	view := model.View{Name: "v", Schema: "app", Query: "SELECT 1", Comment: "c"}
 	op, err := BuildCreateView(store, view, "app")

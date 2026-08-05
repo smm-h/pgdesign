@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,6 +20,7 @@ import (
 // A new file issuing such a write turns this test red until the write is routed
 // through the writer (or the file is added to the reviewed allow-list here).
 func TestSingleTrackingWritePath(t *testing.T) {
+	testenv.Isolate(t)
 	// tracking_chain.go: the journal writer (intent/confirm + chain_position).
 	// upgrade.go: the one-time legacy->chain fold (5.2 choreography, one bulk INSERT
 	// in a single verify-then-stamp transaction).

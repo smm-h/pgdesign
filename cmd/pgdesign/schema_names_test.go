@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"reflect"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 // named after the TOML filenames (trace/dispatch/auth), producing empty
 // introspection and total false drift.
 func TestModelSchemaNames(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name   string
 		schema *model.Schema

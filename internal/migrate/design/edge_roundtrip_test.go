@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -156,6 +157,7 @@ func compactJSON(t *testing.T, v any) []byte {
 }
 
 func TestEdgeArtifactRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	// (1) canonical model + object store.
 	s := buildFixtureModel()
 	store, err := objstore.New(t.TempDir(), enc.CodecVersion)

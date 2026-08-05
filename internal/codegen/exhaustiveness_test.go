@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	goast "go/ast"
 	goparser "go/parser"
 	gotoken "go/token"
@@ -15,6 +16,7 @@ import (
 // handled in codegen's analysis code or explicitly listed as knownUnhandled.
 // This catches new node types added to sqlexpr that codegen should consider.
 func TestNodeTypeExhaustiveness(t *testing.T) {
+	testenv.Isolate(t)
 	// Node types that codegen intentionally does not handle.
 	// These are value literals or expression types with no corresponding
 	// codegen pattern -- add a comment explaining why when adding entries.

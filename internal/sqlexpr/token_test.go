@@ -1,6 +1,9 @@
 package sqlexpr
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 func assertTokens(t *testing.T, input string, expected []token) {
 	t.Helper()
@@ -22,6 +25,7 @@ func assertTokens(t *testing.T, input string, expected []token) {
 }
 
 func TestTokenizeComparisons(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("all comparison operators", func(t *testing.T) {
 		assertTokens(t, "<= >= < > <>", []token{
 			{kind: tokenLessEqual, value: "<="},
@@ -60,6 +64,7 @@ func TestTokenizeComparisons(t *testing.T) {
 }
 
 func TestTokenizeArithmetic(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("slash and percent", func(t *testing.T) {
 		assertTokens(t, "/ %", []token{
 			{kind: tokenSlash, value: "/"},
@@ -95,6 +100,7 @@ func TestTokenizeArithmetic(t *testing.T) {
 }
 
 func TestTokenizeFloats(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name  string
 		input string
@@ -113,6 +119,7 @@ func TestTokenizeFloats(t *testing.T) {
 }
 
 func TestTokenizeKeywords(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("SQL keywords as identifiers", func(t *testing.T) {
 		assertTokens(t, "IN BETWEEN IS NULL LIKE ILIKE DISTINCT", []token{
 			{kind: tokenIdent, value: "IN"},
@@ -145,6 +152,7 @@ func TestTokenizeKeywords(t *testing.T) {
 }
 
 func TestTokenizeMixed(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("arithmetic and comparison", func(t *testing.T) {
 		assertTokens(t, "a < b + 1", []token{
 			{kind: tokenIdent, value: "a"},
@@ -165,6 +173,7 @@ func TestTokenizeMixed(t *testing.T) {
 }
 
 func TestTokenizeRegex(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("tilde", func(t *testing.T) {
 		assertTokens(t, "~", []token{{kind: tokenTilde, value: "~"}})
 	})

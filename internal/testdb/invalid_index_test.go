@@ -2,12 +2,14 @@ package testdb
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 )
 
 // TestCreateInvalidIndex verifies the helper deterministically leaves an
 // invalid index (pg_index.indisvalid = false) with no backend kill.
 func TestCreateInvalidIndex(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	ctx := context.Background()
 	mgr := testManager(t)

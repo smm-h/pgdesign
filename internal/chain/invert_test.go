@@ -3,6 +3,7 @@ package chain
 import (
 	"errors"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/enc"
@@ -91,6 +92,7 @@ func opFacetsEqual(a, b Op) bool {
 // is non-invertible. When defined it is the REVERSED composition of component
 // inverses.
 func TestInverseOfList_DefinedIffEveryComponentHasOne(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		ops := genOps(rt)
 		inv, ok := InverseOfList(ops)
@@ -123,6 +125,7 @@ func TestInverseOfList_DefinedIffEveryComponentHasOne(t *testing.T) {
 // containing a DECLARED-INVERSE op — which DOES have an inverse — still cannot
 // form a MechanicalRange ("declared-inverse-containing included").
 func TestMechanicalRange_ConstructibleIffAllMechanical(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		ops := genOps(rt)
 		_, err := NewMechanicalRange(ops)
@@ -141,6 +144,7 @@ func TestMechanicalRange_ConstructibleIffAllMechanical(t *testing.T) {
 // original op facets (the mocks' involution). Composed with the reversal, this
 // is InverseOfList(ManifestDiffDown) ~= original.
 func TestMechanicalRange_ManifestDiffDown_DoubleInverse(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		// Draw ops then force all to mechanical by regenerating any non-mechanical.
 		n := rapid.IntRange(0, 5).Draw(rt, "n")
@@ -183,6 +187,7 @@ func TestMechanicalRange_ManifestDiffDown_DoubleInverse(t *testing.T) {
 // (NewMechanicalRange refuses it). This is the distinction the whole rollback
 // design rests on.
 func TestDeclaredInverseRangeHasNoManifestDiffDown(t *testing.T) {
+	testenv.Isolate(t)
 	tgt := enc.Key{Kind: enc.KindTable, Schema: "public", Name: "orders"}
 	mech := mkInvertiblePair("add_column", tgt, "aaaa", MechanicallyInvertible)
 	dml := mkInvertiblePair("backfill", tgt, "bbbb", DeclaredInverse) // vacuous DML inverse
@@ -199,6 +204,7 @@ func TestDeclaredInverseRangeHasNoManifestDiffDown(t *testing.T) {
 // TestNonInvertibleRangeHasNeither confirms a non-invertible op blocks both the
 // composite inverse and the mechanical range.
 func TestNonInvertibleRangeHasNeither(t *testing.T) {
+	testenv.Isolate(t)
 	tgt := enc.Key{Kind: enc.KindTable, Schema: "public", Name: "audit"}
 	bad := mockOp{kind: "drop_with_data", target: tgt, class: NonInvertible, payload: "cccc"}
 	ops := []Op{bad}

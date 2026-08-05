@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestJavaConstraintsGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Enums: []model.Enum{
@@ -114,6 +116,7 @@ func TestJavaConstraintsGenerator_Generate(t *testing.T) {
 }
 
 func TestJavaConstraintsGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 	}
@@ -134,6 +137,7 @@ func TestJavaConstraintsGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestJavaConstraintsGenerator_NoConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -159,6 +163,7 @@ func TestJavaConstraintsGenerator_NoConstraints(t *testing.T) {
 }
 
 func TestJavaConstraintsGenerator_NoPatternWithoutLike(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

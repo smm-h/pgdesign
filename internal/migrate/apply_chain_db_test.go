@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"testing"
 	"time"
@@ -66,6 +67,7 @@ func countJournalRows(t *testing.T, ctx context.Context, conn *pgx.Conn, edgeID 
 // that is a no-op. Verifies the tables were created, the chain position advanced
 // to the head, and the applied-migrations view reports the edge.
 func TestChainApplyRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -134,6 +136,7 @@ func TestChainApplyRoundTrip(t *testing.T) {
 // consistent — the transactional ops roll back, the position is not advanced, and
 // no confirmed op rows remain for the edge.
 func TestChainApplyCrashMidEdge(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -195,6 +198,7 @@ func TestChainApplyCrashMidEdge(t *testing.T) {
 // TestChainApplyDryRunExecutesNothing: dry-run previews the plan and writes
 // nothing — no tables, and no tracking structures are even created.
 func TestChainApplyDryRunExecutesNothing(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -228,6 +232,7 @@ func TestChainApplyDryRunExecutesNothing(t *testing.T) {
 // is present and the chain position is absent, and passes for fresh and
 // post-upgrade databases.
 func TestPreUpgradeGuardAcrossStates(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

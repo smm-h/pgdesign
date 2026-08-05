@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,6 +18,7 @@ import (
 // the shadow database and diffs the result against the TOML schema (roadmap 5.10).
 // A genesis edge produced from the schema must replay cleanly and match, PASS.
 func TestMigrateTestShadowChainReplaysEdges(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := cmdEphemeralDB(t)
 
 	const chainShadowSchema = `format_version = 1

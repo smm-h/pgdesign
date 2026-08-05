@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 )
 
@@ -34,6 +35,7 @@ func projectionTestSchema() *Schema {
 // JSON bytes across repeated calls, independent of the graph's map iteration
 // order.
 func TestFKGraphProjection_Deterministic(t *testing.T) {
+	testenv.Isolate(t)
 	s := projectionTestSchema()
 	g := s.FKGraph
 
@@ -57,6 +59,7 @@ func TestFKGraphProjection_Deterministic(t *testing.T) {
 // projection and re-projecting yields byte-identical JSON: Project∘
 // FKGraphFromProjection∘Project == Project.
 func TestFKGraphProjection_RoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	s := projectionTestSchema()
 	p := s.FKGraph.Project()
 
@@ -88,6 +91,7 @@ func TestFKGraphProjection_RoundTrip(t *testing.T) {
 // TestFKGraphProjection_Qualified pins the (schema, name) keying and fan counts
 // in the projection for same-named tables across schemas.
 func TestFKGraphProjection_Qualified(t *testing.T) {
+	testenv.Isolate(t)
 	s := projectionTestSchema()
 	p := s.FKGraph.Project()
 

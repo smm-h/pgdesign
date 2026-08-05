@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -11,6 +12,7 @@ import (
 // imported reference tables live in ImportedTables, not Tables, so diff never
 // reports them as added/dropped (migrate would otherwise try to create them).
 func TestDiffExcludesImportedTables(t *testing.T) {
+	testenv.Isolate(t)
 	desired := &model.Schema{
 		Tables: []model.Table{
 			{Name: "orders", Schema: "app", Columns: []model.Column{{Name: "id", PGType: typeinfo.MustParse("uuid")}}, PK: []string{"id"}},

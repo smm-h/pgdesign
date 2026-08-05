@@ -1,6 +1,7 @@
 package sqlexpr
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	goast "go/ast"
 	goparser "go/parser"
 	gotoken "go/token"
@@ -12,6 +13,7 @@ import (
 )
 
 func TestWalkExhaustiveness(t *testing.T) {
+	testenv.Isolate(t)
 	// Find the package directory from this test file's location
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

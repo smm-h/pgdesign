@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -20,6 +21,7 @@ func containsZigField(s, fieldName, zigType string) bool {
 }
 
 func TestZigTypesGenerator_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -97,6 +99,7 @@ func TestZigTypesGenerator_Basic(t *testing.T) {
 }
 
 func TestZigTypesGenerator_NullableAndArray(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -148,6 +151,7 @@ func TestZigTypesGenerator_NullableAndArray(t *testing.T) {
 }
 
 func TestZigTypesGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 
 	gen := &ZigTypesGenerator{}
@@ -167,6 +171,7 @@ func TestZigTypesGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestZigTypesGenerator_MoneySemanticType(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -195,6 +200,7 @@ func TestZigTypesGenerator_MoneySemanticType(t *testing.T) {
 }
 
 func TestZigTypesGenerator_MultipleTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

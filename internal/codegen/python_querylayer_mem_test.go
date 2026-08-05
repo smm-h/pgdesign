@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 // --- Phase 17: Per-table InMemory delegate tests ---
 
 func TestMem_PerTableFilesProduced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -32,6 +34,7 @@ func TestMem_PerTableFilesProduced(t *testing.T) {
 }
 
 func TestMem_PerTableHeader(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -49,6 +52,7 @@ func TestMem_PerTableHeader(t *testing.T) {
 }
 
 func TestMem_PerTableClassStructure(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -70,6 +74,7 @@ func TestMem_PerTableClassStructure(t *testing.T) {
 }
 
 func TestMem_CreateMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -101,6 +106,7 @@ func TestMem_CreateMethod(t *testing.T) {
 }
 
 func TestMem_GetMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -120,6 +126,7 @@ func TestMem_GetMethod(t *testing.T) {
 }
 
 func TestMem_UpdateMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -139,6 +146,7 @@ func TestMem_UpdateMethod(t *testing.T) {
 }
 
 func TestMem_DeleteMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -162,6 +170,7 @@ func TestMem_DeleteMethod(t *testing.T) {
 }
 
 func TestMem_AppendOnlySkipsUpdateDelete(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -182,6 +191,7 @@ func TestMem_AppendOnlySkipsUpdateDelete(t *testing.T) {
 }
 
 func TestMem_GetByFK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -197,6 +207,7 @@ func TestMem_GetByFK(t *testing.T) {
 }
 
 func TestMem_GetByUnique(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -212,6 +223,7 @@ func TestMem_GetByUnique(t *testing.T) {
 }
 
 func TestMem_MultiColumnUnique(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -223,6 +235,7 @@ func TestMem_MultiColumnUnique(t *testing.T) {
 }
 
 func TestMem_ListMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -238,6 +251,7 @@ func TestMem_ListMethod(t *testing.T) {
 }
 
 func TestMem_SMTransitions(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -258,6 +272,7 @@ func TestMem_SMTransitions(t *testing.T) {
 }
 
 func TestMem_IdentityColumnAutoIncrement(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -270,6 +285,7 @@ func TestMem_IdentityColumnAutoIncrement(t *testing.T) {
 }
 
 func TestMem_GeneratedColumnExcluded(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -288,6 +304,7 @@ func TestMem_GeneratedColumnExcluded(t *testing.T) {
 }
 
 func TestMem_ConstraintImport(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -301,6 +318,7 @@ func TestMem_ConstraintImport(t *testing.T) {
 // --- Phase 18: InMemoryBackend composite tests ---
 
 func TestMem_MemoryBackendFileProduced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -315,6 +333,7 @@ func TestMem_MemoryBackendFileProduced(t *testing.T) {
 }
 
 func TestMem_MemoryBackendHeader(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -329,6 +348,7 @@ func TestMem_MemoryBackendHeader(t *testing.T) {
 }
 
 func TestMem_MemoryBackendImportsDelegates(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -346,6 +366,7 @@ func TestMem_MemoryBackendImportsDelegates(t *testing.T) {
 }
 
 func TestMem_MemoryBackendClassStructure(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -372,6 +393,7 @@ func TestMem_MemoryBackendClassStructure(t *testing.T) {
 }
 
 func TestMem_MemoryBackendForwardingMethods(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -419,6 +441,7 @@ func TestMem_MemoryBackendForwardingMethods(t *testing.T) {
 }
 
 func TestMem_MemoryBackendForwardsToDelegates(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -440,6 +463,7 @@ func TestMem_MemoryBackendForwardsToDelegates(t *testing.T) {
 }
 
 func TestMem_ForwardingMatchesProtocol(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -475,6 +499,7 @@ func TestMem_ForwardingMatchesProtocol(t *testing.T) {
 // --- Phase 19: File organization + wiring tests ---
 
 func TestInit_FileProduced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -489,6 +514,7 @@ func TestInit_FileProduced(t *testing.T) {
 }
 
 func TestInit_ExportsBackendAndRows(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -516,6 +542,7 @@ func TestInit_ExportsBackendAndRows(t *testing.T) {
 }
 
 func TestInit_AllList(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -533,6 +560,7 @@ func TestInit_AllList(t *testing.T) {
 }
 
 func TestInit_AllFilesProduced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -558,6 +586,7 @@ func TestInit_AllFilesProduced(t *testing.T) {
 }
 
 func TestBackendFiltering_PgOnly(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{Backends: []string{"pg"}}
 	files, _ := gen.GenerateFiles(schema)
@@ -589,6 +618,7 @@ func TestBackendFiltering_PgOnly(t *testing.T) {
 }
 
 func TestBackendFiltering_MemoryOnly(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{Backends: []string{"memory"}}
 	files, _ := gen.GenerateFiles(schema)
@@ -620,6 +650,7 @@ func TestBackendFiltering_MemoryOnly(t *testing.T) {
 }
 
 func TestBackendFiltering_Both(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{Backends: []string{"pg", "memory"}}
 	files, _ := gen.GenerateFiles(schema)
@@ -642,6 +673,7 @@ func TestBackendFiltering_Both(t *testing.T) {
 }
 
 func TestBackendFiltering_DefaultIsBoth(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{} // No Backends set
 	files, _ := gen.GenerateFiles(schema)
@@ -656,6 +688,7 @@ func TestBackendFiltering_DefaultIsBoth(t *testing.T) {
 }
 
 func TestConstraints_AllConstraintsDict(t *testing.T) {
+	testenv.Isolate(t)
 	schema := constraintTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -676,6 +709,7 @@ func TestConstraints_AllConstraintsDict(t *testing.T) {
 }
 
 func TestMem_EmptySchemaNoPerTableFiles(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -705,6 +739,7 @@ func TestMem_EmptySchemaNoPerTableFiles(t *testing.T) {
 }
 
 func TestMem_CompositePK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

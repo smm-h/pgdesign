@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/parse"
@@ -8,6 +9,7 @@ import (
 )
 
 func TestBuild_MaintenanceRequiresRangeStrategy(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := maintenanceRawSchema()
 	raw.Tables[0].Partitioning.Strategy = "list"
@@ -22,6 +24,7 @@ func TestBuild_MaintenanceRequiresRangeStrategy(t *testing.T) {
 }
 
 func TestBuild_MaintenanceRequiresPartitioning(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := maintenanceRawSchema()
 	raw.Tables[0].Partitioning = nil
@@ -33,6 +36,7 @@ func TestBuild_MaintenanceRequiresPartitioning(t *testing.T) {
 }
 
 func TestBuild_MaintenanceRequiresPartmanExtension(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := maintenanceRawSchema()
 	raw.Meta.Extensions = nil // pg_partman undeclared
@@ -47,6 +51,7 @@ func TestBuild_MaintenanceRequiresPartmanExtension(t *testing.T) {
 }
 
 func TestBuild_MaintenanceConflictsManualChildren(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	raw := maintenanceRawSchema()
 	raw.Tables[0].Partitioning.Partitions = []parse.RawPartitioning{

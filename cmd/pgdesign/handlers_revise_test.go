@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -138,6 +139,7 @@ func revisionFromSQL(t *testing.T, path string) string {
 // migration's to-revision are the SAME revision everywhere. With no DB, revise
 // exits reviseExitDBSkipped (non-zero) after committing the pure tier.
 func TestRunRevise_Genesis_EndToEnd(t *testing.T) {
+	testenv.Isolate(t)
 	dir := setupReviseRepo(t, "freshness_schema.toml", true)
 	t.Chdir(dir)
 
@@ -205,6 +207,7 @@ func gitStatusPorcelain(t *testing.T, dir string) string {
 // TestRunRevise_BCNFBlocksPureTier: a BCNF violation is promoted to error in the
 // pure NF core and blocks the whole pure tier — nothing is written or committed.
 func TestRunRevise_BCNFBlocksPureTier(t *testing.T) {
+	testenv.Isolate(t)
 	dir := setupReviseRepo(t, "revise_bcnf.toml", true)
 	t.Chdir(dir)
 
@@ -234,6 +237,7 @@ func TestRunRevise_BCNFBlocksPureTier(t *testing.T) {
 // pure tier still commits, revise exits non-zero, and the message names the
 // skipped DB tier.
 func TestRunRevise_DBUnreachable_NamesSkippedTier(t *testing.T) {
+	testenv.Isolate(t)
 	dir := setupReviseRepo(t, "freshness_schema.toml", true)
 	t.Chdir(dir)
 
@@ -259,6 +263,7 @@ func TestRunRevise_DBUnreachable_NamesSkippedTier(t *testing.T) {
 // TestRunRevise_CommitFailureHardErrors: when the commit cannot run (not a git
 // repo, so safegit fails) revise is a hard error — no warn-and-continue.
 func TestRunRevise_CommitFailureHardErrors(t *testing.T) {
+	testenv.Isolate(t)
 	dir := setupReviseRepo(t, "freshness_schema.toml", false) // NOT a git repo
 	t.Chdir(dir)
 
@@ -275,6 +280,7 @@ func TestRunRevise_CommitFailureHardErrors(t *testing.T) {
 // TestRunRevise_LegacyProjectRejected: a legacy semver-migration project is a
 // hard error naming `migrate upgrade`.
 func TestRunRevise_LegacyProjectRejected(t *testing.T) {
+	testenv.Isolate(t)
 	dir := setupReviseRepo(t, "freshness_schema.toml", true)
 	migDir := filepath.Join(dir, "migrations")
 	if err := os.MkdirAll(migDir, 0o755); err != nil {
@@ -304,6 +310,7 @@ func TestRunRevise_LegacyProjectRejected(t *testing.T) {
 // unresolved fork; revise (via the shared chain-generate core) hard-errors,
 // naming both heads and pointing at `migrate rebase`.
 func TestRunRevise_TwoHeadsPointAtRebase(t *testing.T) {
+	testenv.Isolate(t)
 	config.CodegenModes = SupportedModes()
 
 	// Build two distinct genesis-eligible schemas via the real parse/build path.

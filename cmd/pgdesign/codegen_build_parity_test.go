@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -73,6 +74,7 @@ groups = ["core"]
 // FilterByGroups/FilterBySource, so the same artifact had two contents
 // depending on the entry point.
 func TestCodegenBuildParity_GroupFilter(t *testing.T) {
+	testenv.Isolate(t)
 	dir, buildOut := writeGroupedProject(t)
 	schemaPath := filepath.Join(dir, "schema.toml")
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
@@ -133,6 +135,7 @@ func TestCodegenBuildParity_GroupFilter(t *testing.T) {
 // mechanism it exercised was removed. The surviving invariant — one enum
 // declaration per valid co-located package — is what this test now pins.)
 func TestCoLocatedGoEnumDeclaredOnce(t *testing.T) {
+	testenv.Isolate(t)
 	config.CodegenModes = SupportedModes()
 	dir := t.TempDir()
 	schema := `format_version = 1
@@ -289,6 +292,7 @@ source = ["schema_a.toml"]
 // FilterByGroups/FilterBySource, so the same artifact had two contents
 // depending on the entry point.
 func TestCodegenBuildParity_SourceFilter(t *testing.T) {
+	testenv.Isolate(t)
 	dir, buildOut, schemaPaths := writeSourcedProject(t)
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
 
@@ -343,6 +347,7 @@ func TestCodegenBuildParity_SourceFilter(t *testing.T) {
 // enforces. Before write-path consolidation the standalone write path did no
 // orphan detection at all.
 func TestCodegenWriteRefusesOrphans(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "faceted")
 	schemaPath := filepath.Join(dir, "schema.toml")
 	outDir := filepath.Join(dir, "gen")

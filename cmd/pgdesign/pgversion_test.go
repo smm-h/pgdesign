@@ -1,11 +1,13 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
 
 func TestResolvePGVersion(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name   string
 		live   int
@@ -31,6 +33,7 @@ func TestResolvePGVersion(t *testing.T) {
 }
 
 func TestRequirePGVersion(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("returns_resolved_version_live", func(t *testing.T) {
 		got, err := requirePGVersion(17, 15, 14)
 		if err != nil {

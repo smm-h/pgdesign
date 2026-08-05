@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -21,6 +22,7 @@ func containsAnnotation(s, annotation string) bool {
 }
 
 func TestJavaJPAGenerator_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -132,6 +134,7 @@ func TestJavaJPAGenerator_Basic(t *testing.T) {
 }
 
 func TestJavaJPAGenerator_NullableAndArray(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -192,6 +195,7 @@ func TestJavaJPAGenerator_NullableAndArray(t *testing.T) {
 }
 
 func TestJavaJPAGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 
 	gen := &JavaJPAGenerator{}
@@ -217,6 +221,7 @@ func TestJavaJPAGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestJavaJPAGenerator_MoneySemanticType(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -246,6 +251,7 @@ func TestJavaJPAGenerator_MoneySemanticType(t *testing.T) {
 }
 
 func TestJavaJPAGenerator_ForeignKeys(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -321,6 +327,7 @@ func TestJavaJPAGenerator_ForeignKeys(t *testing.T) {
 }
 
 func TestJavaJPAGenerator_MultipleTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -378,6 +385,7 @@ func TestJavaJPAGenerator_MultipleTables(t *testing.T) {
 }
 
 func TestJavaJPAGenerator_DefaultExpr(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/enc"
@@ -28,6 +29,7 @@ func revN(t *testing.T, name string) rev.Revision {
 // TestManifestClosureRoundTrip: storing a model's objects makes its manifest's
 // ids resolve (closure passes); a manifest referencing an absent id fails.
 func TestManifestClosureRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{
 		Name:   "shop",
 		Tables: []model.Table{{Name: "users", Comment: "users"}},
@@ -57,6 +59,7 @@ func TestManifestClosureRoundTrip(t *testing.T) {
 // TestManifestEqualAndBuildParity: BuildManifest ids equal the objstore Put ids
 // (both are SHA-256 of the same canonical bytes), and Equal reflects that.
 func TestManifestEqualAndBuildParity(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{Name: "s", Tables: []model.Table{{Name: "t", Comment: "c"}}}
 	s.Canonicalize()
 	m1, err := BuildManifest(s)
@@ -77,6 +80,7 @@ func TestManifestEqualAndBuildParity(t *testing.T) {
 // naming exactly the changed object; adding/removing a table shows up as
 // Added/Removed.
 func TestManifestDiffSymmetricDifference(t *testing.T) {
+	testenv.Isolate(t)
 	base := &model.Schema{Name: "s", Tables: []model.Table{{Name: "a", Comment: "c"}, {Name: "b", Comment: "c"}}}
 	base.Canonicalize()
 	// Change table a's comment -> its object id changes (Changed).
@@ -106,6 +110,7 @@ func TestManifestDiffSymmetricDifference(t *testing.T) {
 // TestManifestKindQualifiedKeysNoCollision: a table x and a function x occupy
 // DISTINCT manifest keys (kind-qualification), so both coexist.
 func TestManifestKindQualifiedKeysNoCollision(t *testing.T) {
+	testenv.Isolate(t)
 	tableX := enc.Key{Kind: enc.KindTable, Schema: "public", Name: "x"}
 	funcX := enc.Key{Kind: enc.KindFunction, Schema: "public", Name: "x", ArgSig: "()"}
 	if tableX == funcX {
@@ -125,6 +130,7 @@ func TestManifestKindQualifiedKeysNoCollision(t *testing.T) {
 // TestChangedKeysFastPath: ChangedKeys is empty for equal manifests and names
 // the differing keys otherwise.
 func TestChangedKeysFastPath(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{Name: "s", Tables: []model.Table{{Name: "t", Comment: "c"}}}
 	s.Canonicalize()
 	m, _ := BuildManifest(s)
@@ -139,6 +145,7 @@ func TestChangedKeysFastPath(t *testing.T) {
 // revisions whose Equal errors (L7) — the type-level guarantee re-checked at the
 // chain boundary.
 func TestOpaqueRevisionCrossClassErrors(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{Name: "s"}
 	s.Canonicalize()
 	present, err := RevisionOf(s, rev.RegistryPresent)
@@ -159,6 +166,7 @@ func TestOpaqueRevisionCrossClassErrors(t *testing.T) {
 // TestEdgeIDContentDerived: identical content -> identical id; any change to
 // ops, slug, or an endpoint -> different id.
 func TestEdgeIDContentDerived(t *testing.T) {
+	testenv.Isolate(t)
 	r0 := revN(t, "r0")
 	r1 := revN(t, "r1")
 	tgt := enc.Key{Kind: enc.KindTable, Name: "t"}
@@ -190,6 +198,7 @@ func TestEdgeIDContentDerived(t *testing.T) {
 // different ops) are distinct; pure-DML endomorphisms (R -> R) with different
 // slugs are distinct and legal.
 func TestParallelEdgesAndEndomorphismsDistinct(t *testing.T) {
+	testenv.Isolate(t)
 	r1 := revN(t, "r1")
 	tgt := enc.Key{Kind: enc.KindTable, Name: "t"}
 
@@ -214,6 +223,7 @@ func TestParallelEdgesAndEndomorphismsDistinct(t *testing.T) {
 // edges (null parent) are found and their targets are heads only if nothing
 // descends from them.
 func TestFindHeadsAndGenesis(t *testing.T) {
+	testenv.Isolate(t)
 	r0 := revN(t, "r0")
 	r1 := revN(t, "r1")
 	r2 := revN(t, "r2")
@@ -247,6 +257,7 @@ func TestFindHeadsAndGenesis(t *testing.T) {
 // TestComposePath: contiguous path concatenates ops in order; non-contiguous
 // errors; empty path is the virtual identity (nil ops, no error).
 func TestComposePath(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1, r2 := revN(t, "r0"), revN(t, "r1"), revN(t, "r2")
 	tgt := enc.Key{Kind: enc.KindTable, Name: "t"}
 	opA := mockOp{kind: "a", target: tgt, class: MechanicallyInvertible, payload: "a"}
@@ -279,6 +290,7 @@ func TestComposePath(t *testing.T) {
 // without an OpSimulator (op simulation lands with 5.2); with a simulator it
 // passes when the ops map from->to and fails otherwise.
 func TestVerifyEdgeEndpointRequiresSimulator(t *testing.T) {
+	testenv.Isolate(t)
 	r0, r1 := revN(t, "r0"), revN(t, "r1")
 	from := Manifest{enc.Key{Kind: enc.KindTable, Name: "t"}: "id0"}
 	to := Manifest{enc.Key{Kind: enc.KindTable, Name: "t"}: "id1"}

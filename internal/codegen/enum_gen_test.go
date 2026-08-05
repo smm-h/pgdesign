@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func TestSanitizeEnumValue_Go(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		input string
 		want  string
@@ -28,6 +30,7 @@ func TestSanitizeEnumValue_Go(t *testing.T) {
 }
 
 func TestSanitizeEnumValue_Python(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		input string
 		want  string
@@ -47,6 +50,7 @@ func TestSanitizeEnumValue_Python(t *testing.T) {
 }
 
 func TestSanitizeEnumValue_TS(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		input string
 		want  string
@@ -64,6 +68,7 @@ func TestSanitizeEnumValue_TS(t *testing.T) {
 }
 
 func TestSanitizeEnumValue_Zig(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		input string
 		want  string
@@ -82,6 +87,7 @@ func TestSanitizeEnumValue_Zig(t *testing.T) {
 }
 
 func TestSanitizeEnumValue_JavaKotlin(t *testing.T) {
+	testenv.Isolate(t)
 	values := []string{"active", "in-progress", "3rd-party", "ALREADY_CAPS"}
 	for _, v := range values {
 		java := sanitizeEnumValue(v, LangJava)
@@ -101,6 +107,7 @@ func testEnum() model.Enum {
 }
 
 func TestGenerateGoEnum(t *testing.T) {
+	testenv.Isolate(t)
 	out := GenerateEnums([]model.Enum{testEnum()}, LangGo)
 	// Branded enum: opaque struct + var members + validating Parse + boundary
 	// methods (Stringer/Valuer/Marshaler and Parse-routed Scanner/Unmarshalers).
@@ -125,6 +132,7 @@ func TestGenerateGoEnum(t *testing.T) {
 }
 
 func TestGenerateTSEnum(t *testing.T) {
+	testenv.Isolate(t)
 	out := GenerateEnums([]model.Enum{testEnum()}, LangTS)
 	want := `export type Status = "active" | "in-progress" | "banned";`
 	if !strings.Contains(out, want) {
@@ -133,6 +141,7 @@ func TestGenerateTSEnum(t *testing.T) {
 }
 
 func TestGeneratePythonEnum(t *testing.T) {
+	testenv.Isolate(t)
 	out := GenerateEnums([]model.Enum{testEnum()}, LangPython)
 	for _, want := range []string{
 		"class Status(StrEnum):",
@@ -148,6 +157,7 @@ func TestGeneratePythonEnum(t *testing.T) {
 }
 
 func TestGenerateJavaEnum(t *testing.T) {
+	testenv.Isolate(t)
 	out := GenerateEnums([]model.Enum{testEnum()}, LangJava)
 	for _, want := range []string{
 		"public enum Status {",
@@ -164,6 +174,7 @@ func TestGenerateJavaEnum(t *testing.T) {
 }
 
 func TestGenerateKotlinEnum(t *testing.T) {
+	testenv.Isolate(t)
 	out := GenerateEnums([]model.Enum{testEnum()}, LangKotlin)
 	for _, want := range []string{
 		"enum class Status(val value: String) {",
@@ -178,6 +189,7 @@ func TestGenerateKotlinEnum(t *testing.T) {
 }
 
 func TestGenerateZigEnum(t *testing.T) {
+	testenv.Isolate(t)
 	out := GenerateEnums([]model.Enum{testEnum()}, LangZig)
 	// Branded wrapper struct with member constants and a validating parse.
 	for _, want := range []string{
@@ -197,6 +209,7 @@ func TestGenerateZigEnum(t *testing.T) {
 }
 
 func TestGenerateEnums_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	got := GenerateEnums(nil, LangGo)
 	if got != "" {
 		t.Errorf("GenerateEnums(nil, LangGo) = %q, want empty string", got)
@@ -204,6 +217,7 @@ func TestGenerateEnums_Empty(t *testing.T) {
 }
 
 func TestGenerateEnums_Multiple(t *testing.T) {
+	testenv.Isolate(t)
 	enums := []model.Enum{
 		{Name: "color", Values: []string{"red", "blue"}, Comment: "colors"},
 		{Name: "size", Values: []string{"small", "large"}, Comment: "sizes"},
@@ -217,6 +231,7 @@ func TestGenerateEnums_Multiple(t *testing.T) {
 }
 
 func TestSanitizeEnumValue_SpecialCharacters(t *testing.T) {
+	testenv.Isolate(t)
 	// "foo@bar" splits into ["foo", "bar"]
 	cases := []struct {
 		input string

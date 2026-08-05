@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/catalog"
@@ -36,6 +37,7 @@ func fromModelColumn(colType string) *model.Schema {
 // model and is OID-probed, so alias spellings (int4 vs integer) do NOT false-drift
 // while a genuinely wrong live type is caught precisely.
 func TestPreconditionColumnTypeFromManifest(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -90,6 +92,7 @@ func TestPreconditionColumnTypeFromManifest(t *testing.T) {
 // round-tripped, so equivalent spellings do NOT false-drift and a genuine
 // definition mismatch is caught.
 func TestPreconditionConstraintDefFromManifest(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -136,6 +139,7 @@ func TestPreconditionConstraintDefFromManifest(t *testing.T) {
 // TestPreconditionMissingTableFromManifest confirms a drop against an absent object
 // still hard-errors (existence check precedes any attribute match).
 func TestPreconditionMissingTableFromManifest(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

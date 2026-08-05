@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func TestEnumsGenerator_Python(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Schema: "public", Values: []string{"active", "inactive"}},
@@ -31,6 +33,7 @@ func TestEnumsGenerator_Python(t *testing.T) {
 }
 
 func TestEnumsGenerator_Go(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Schema: "public", Values: []string{"active", "inactive"}},
@@ -51,6 +54,7 @@ func TestEnumsGenerator_Go(t *testing.T) {
 }
 
 func TestEnumsGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{}
 	gen := &EnumsGenerator{Lang: LangPython}
 	out, diags := gen.Generate(schema)

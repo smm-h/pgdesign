@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -19,6 +20,7 @@ func findByCode(diags []diagnostic.Diagnostic, code string) []diagnostic.Diagnos
 }
 
 func TestC100_TableWithoutCheckConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "orders",
@@ -41,6 +43,7 @@ func TestC100_TableWithoutCheckConstraints(t *testing.T) {
 }
 
 func TestC100_SkipsSmallTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "tags",
@@ -59,6 +62,7 @@ func TestC100_SkipsSmallTable(t *testing.T) {
 }
 
 func TestC100_SkipsAppendOnly(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:       "events",
@@ -79,6 +83,7 @@ func TestC100_SkipsAppendOnly(t *testing.T) {
 }
 
 func TestC100_PassWithChecks(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "orders",
@@ -101,6 +106,7 @@ func TestC100_PassWithChecks(t *testing.T) {
 }
 
 func TestC101_FKWithoutIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "orders",
@@ -129,6 +135,7 @@ func TestC101_FKWithoutIndex(t *testing.T) {
 }
 
 func TestC101_FKWithIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "orders",
@@ -158,6 +165,7 @@ func TestC101_FKWithIndex(t *testing.T) {
 }
 
 func TestC102_UnusedEnum(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Enums: []model.Enum{{
 			Name:   "status",
@@ -180,6 +188,7 @@ func TestC102_UnusedEnum(t *testing.T) {
 }
 
 func TestC102_UsedEnum(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Enums: []model.Enum{{
 			Name:   "status",
@@ -202,6 +211,7 @@ func TestC102_UsedEnum(t *testing.T) {
 }
 
 func TestC103_OrphanTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "orphan",
@@ -224,6 +234,7 @@ func TestC103_OrphanTable(t *testing.T) {
 }
 
 func TestC103_SkipsSmallTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "small",
@@ -242,6 +253,7 @@ func TestC103_SkipsSmallTable(t *testing.T) {
 }
 
 func TestC103_TableWithOutgoingFK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:   "orders",
@@ -268,6 +280,7 @@ func TestC103_TableWithOutgoingFK(t *testing.T) {
 }
 
 func TestC103_TableReferencedByOther(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -307,6 +320,7 @@ func TestC103_TableReferencedByOther(t *testing.T) {
 }
 
 func TestC104_SuggestsFilterIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -348,6 +362,7 @@ func TestC104_SuggestsFilterIndex(t *testing.T) {
 }
 
 func TestC104_NoSuggestionWithoutFilterColumns(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

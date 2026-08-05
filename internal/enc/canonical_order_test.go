@@ -2,6 +2,7 @@ package enc
 
 import (
 	"bytes"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -13,6 +14,7 @@ import (
 // encode to identical bytes. Canonicalize sorts the set; the encoder emits it
 // verbatim, so convergence depends on the sort.
 func TestViewDependsOnIsCanonical(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func(deps []string) *model.Schema {
 		s := &model.Schema{
 			Name: "public",
@@ -39,6 +41,7 @@ func TestViewDependsOnIsCanonical(t *testing.T) {
 // TestMaterializedViewDependsOnIsCanonical: same as views — the matview
 // DependsOn set must converge under permutation.
 func TestMaterializedViewDependsOnIsCanonical(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func(deps []string) *model.Schema {
 		s := &model.Schema{
 			Name: "public",
@@ -65,6 +68,7 @@ func TestMaterializedViewDependsOnIsCanonical(t *testing.T) {
 // TestFunctionDependsOnIsCanonical: same as views — the function DependsOn set
 // must converge under permutation.
 func TestFunctionDependsOnIsCanonical(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func(deps []string) *model.Schema {
 		s := &model.Schema{
 			Name: "public",
@@ -94,6 +98,7 @@ func TestFunctionDependsOnIsCanonical(t *testing.T) {
 // different orders must encode identically. Canonicalize sorts children by name
 // recursively.
 func TestPartitionChildrenAreCanonical(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func(children []model.PartitionSpec) *model.Schema {
 		s := &model.Schema{
 			Name: "public",

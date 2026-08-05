@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -43,6 +44,7 @@ func frameworkModel() *model.Schema {
 func strptr(s string) *string { return &s }
 
 func TestExtractSurface_ReferencedTablesAndTypeClosure(t *testing.T) {
+	testenv.Isolate(t)
 	fw := frameworkModel()
 	surface, err := ExtractSurface(fw, []string{"users"}, "app")
 	if err != nil {
@@ -70,6 +72,7 @@ func TestExtractSurface_ReferencedTablesAndTypeClosure(t *testing.T) {
 }
 
 func TestExtractSurface_MissingTableIsError(t *testing.T) {
+	testenv.Isolate(t)
 	fw := frameworkModel()
 	if _, err := ExtractSurface(fw, []string{"nonexistent"}, "app"); err == nil {
 		t.Fatal("expected error for referenced table not in framework")
@@ -77,6 +80,7 @@ func TestExtractSurface_MissingTableIsError(t *testing.T) {
 }
 
 func TestVendor_PerObjectIDsStable(t *testing.T) {
+	testenv.Isolate(t)
 	fw := frameworkModel()
 	surface, _ := ExtractSurface(fw, []string{"users"}, "app")
 
@@ -106,6 +110,7 @@ func TestVendor_PerObjectIDsStable(t *testing.T) {
 // redundant parens) while the raw-id surface hash changes. This is exactly why
 // the drift channel uses N, not surface ids.
 func TestVendor_SemanticHashIgnoresEquivalentDefault(t *testing.T) {
+	testenv.Isolate(t)
 	fw := frameworkModel()
 	base, _ := ExtractSurface(fw, []string{"users"}, "app")
 
@@ -136,6 +141,7 @@ func TestVendor_SemanticHashIgnoresEquivalentDefault(t *testing.T) {
 // TestVendor_SemanticHashChangesOnTypeChange: a real column type change DOES move
 // the semantic hash.
 func TestVendor_SemanticHashChangesOnTypeChange(t *testing.T) {
+	testenv.Isolate(t)
 	fw := frameworkModel()
 	base, _ := ExtractSurface(fw, []string{"users"}, "app")
 

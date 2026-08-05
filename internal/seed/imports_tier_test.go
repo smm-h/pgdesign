@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"math/rand"
 	"strings"
 	"testing"
@@ -47,6 +48,7 @@ func seedHasCode(diags diagnostic.Diagnostics, code string) bool {
 // Tier 2 offline INSERT: an imported FK yields a count-wrapped ordered-offset
 // subquery, NEVER a random UUID (the silent fallback is unreachable).
 func TestSeedTier2_OfflineSubquery_NoUUIDFallback(t *testing.T) {
+	testenv.Isolate(t)
 	s := importConsumer(true, nil, nil)
 	rng := rand.New(rand.NewSource(1))
 	out, diags := Generate(s, 3, rng, &SeedConfig{Format: "insert", DBAvailable: false})
@@ -63,6 +65,7 @@ func TestSeedTier2_OfflineSubquery_NoUUIDFallback(t *testing.T) {
 
 // Determinism: same seed + same config => byte-identical output.
 func TestSeedTier2_Deterministic(t *testing.T) {
+	testenv.Isolate(t)
 	run := func() string {
 		s := importConsumer(true, nil, nil)
 		return mustGen(t, s, 5, 7, &SeedConfig{Format: "insert", DBAvailable: false})
@@ -76,6 +79,7 @@ func TestSeedTier2_Deterministic(t *testing.T) {
 // count reuses offsets deterministically (0,1,2,... all wrapped by the same
 // count subquery).
 func TestSeedTier2_OffsetWrap(t *testing.T) {
+	testenv.Isolate(t)
 	s := importConsumer(true, nil, nil)
 	rng := rand.New(rand.NewSource(1))
 	out, _ := Generate(s, 4, rng, &SeedConfig{Format: "insert", DBAvailable: false})
@@ -89,6 +93,7 @@ func TestSeedTier2_OffsetWrap(t *testing.T) {
 // Tier-2 rescoped UNIQUE error: a UNIQUE distinguished SOLELY by the imported FK
 // column is a hard error offline (S002).
 func TestSeedTier2_UniqueSoleImportedFK_HardError(t *testing.T) {
+	testenv.Isolate(t)
 	s := importConsumer(true, []model.UniqueConstraint{{Name: "uq_user", Columns: []string{"user_id"}}}, nil)
 	rng := rand.New(rand.NewSource(1))
 	_, diags := Generate(s, 3, rng, &SeedConfig{Format: "insert", DBAvailable: false})
@@ -99,6 +104,7 @@ func TestSeedTier2_UniqueSoleImportedFK_HardError(t *testing.T) {
 
 // A composite UNIQUE with an offline-distinct local column is FINE.
 func TestSeedTier2_CompositeUniqueWithLocalCol_OK(t *testing.T) {
+	testenv.Isolate(t)
 	s := importConsumer(true,
 		[]model.UniqueConstraint{{Name: "uq_user_seq", Columns: []string{"user_id", "seq"}}},
 		[]model.Column{{Name: "seq", PGType: typeinfo.T("int8"), NotNull: true, SemanticTypeName: "counter"}},
@@ -112,6 +118,7 @@ func TestSeedTier2_CompositeUniqueWithLocalCol_OK(t *testing.T) {
 
 // Tier-3 triple-constraint error: offline + COPY + NOT NULL imported FK (S003).
 func TestSeedTier3_OfflineCopyNotNull_HardError(t *testing.T) {
+	testenv.Isolate(t)
 	s := importConsumer(true, nil, nil)
 	rng := rand.New(rand.NewSource(1))
 	_, diags := Generate(s, 3, rng, &SeedConfig{Format: "copy", DBAvailable: false})
@@ -122,6 +129,7 @@ func TestSeedTier3_OfflineCopyNotNull_HardError(t *testing.T) {
 
 // Offline + COPY + NULLABLE imported FK is allowed (emits NULL).
 func TestSeedTier3_OfflineCopyNullable_OK(t *testing.T) {
+	testenv.Isolate(t)
 	s := importConsumer(false, nil, nil)
 	rng := rand.New(rand.NewSource(1))
 	_, diags := Generate(s, 3, rng, &SeedConfig{Format: "copy", DBAvailable: false})
@@ -133,6 +141,7 @@ func TestSeedTier3_OfflineCopyNullable_OK(t *testing.T) {
 // Tier 1 (DB pool supplied): imported FK resolves to a real key from the pool,
 // never a subquery or UUID.
 func TestSeedTier1_RealKeyPool(t *testing.T) {
+	testenv.Isolate(t)
 	s := importConsumer(true, nil, nil)
 	rng := rand.New(rand.NewSource(1))
 	pools := map[string][]string{
@@ -153,6 +162,7 @@ func TestSeedTier1_RealKeyPool(t *testing.T) {
 
 // Tier 1 with empty live pool + NOT NULL imported FK is a hard error (S004).
 func TestSeedTier1_EmptyPoolNotNull_HardError(t *testing.T) {
+	testenv.Isolate(t)
 	s := importConsumer(true, nil, nil)
 	rng := rand.New(rand.NewSource(1))
 	_, diags := Generate(s, 3, rng, &SeedConfig{Format: "insert", DBAvailable: true, ImportedFKPools: map[string][]string{}})

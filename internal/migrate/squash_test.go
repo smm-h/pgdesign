@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 // SquashMigrations refuses to run without a database connection, since the
 // M200 applied-version safety check is mandatory.
 func TestSquashMigrations_RequiresDB(t *testing.T) {
+	testenv.Isolate(t)
 	_, err := SquashMigrations(context.Background(), nil, t.TempDir(), "0.1.0", "0.2.0")
 	if err == nil {
 		t.Fatal("expected error when conn is nil (mandatory M200 check)")
@@ -22,6 +24,7 @@ func TestSquashMigrations_RequiresDB(t *testing.T) {
 }
 
 func TestSquashMigrations_IrreversiblePropagation(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	m1 := &Migration{
@@ -66,6 +69,7 @@ func TestSquashMigrations_IrreversiblePropagation(t *testing.T) {
 }
 
 func TestSquashMigrations_InvalidRange(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	// from > to
@@ -76,6 +80,7 @@ func TestSquashMigrations_InvalidRange(t *testing.T) {
 }
 
 func TestSquashMigrations_InvalidSemver(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	_, err := squashFiles(dir, "not-semver", "0.1.0")
@@ -90,6 +95,7 @@ func TestSquashMigrations_InvalidSemver(t *testing.T) {
 }
 
 func TestSquashMigrations_SingleMigration(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	m := &Migration{
@@ -107,6 +113,7 @@ func TestSquashMigrations_SingleMigration(t *testing.T) {
 }
 
 func TestSquashMigrations_NoMigrationsInRange(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	m := &Migration{
@@ -124,6 +131,7 @@ func TestSquashMigrations_NoMigrationsInRange(t *testing.T) {
 }
 
 func TestSquashMigrations_PreservesOutOfRangeMigrations(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	// Create 4 migrations, squash the middle 2.
@@ -162,6 +170,7 @@ func TestSquashMigrations_PreservesOutOfRangeMigrations(t *testing.T) {
 }
 
 func TestSquashMigrations_WithDMLOps(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	m1 := &Migration{
@@ -212,6 +221,7 @@ func TestSquashMigrations_WithDMLOps(t *testing.T) {
 }
 
 func TestSquashMigrations_RoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	// Test that the squashed migration can be written and re-read.
 	dir := t.TempDir()
 
@@ -268,6 +278,7 @@ func TestSquashMigrations_RoundTrip(t *testing.T) {
 }
 
 func TestOutputPath(t *testing.T) {
+	testenv.Isolate(t)
 	got := OutputPath("/migrations", "0.3.0")
 	want := filepath.Join("/migrations", "0.3.0.toml")
 	if got != want {
@@ -283,6 +294,7 @@ func TestOutputPath(t *testing.T) {
 // This test exercises that move with NO external tool involved — it passes even
 // with an empty PATH.
 func TestArchiveLegacyOriginals(t *testing.T) {
+	testenv.Isolate(t)
 	t.Setenv("PATH", "") // prove the archive shells out to nothing.
 
 	dir := t.TempDir()
@@ -318,6 +330,7 @@ func TestArchiveLegacyOriginals(t *testing.T) {
 }
 
 func TestSquashMigrations_StripPhases(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 
 	m1 := &Migration{
@@ -355,4 +368,3 @@ func TestSquashMigrations_StripPhases(t *testing.T) {
 		}
 	}
 }
-

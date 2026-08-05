@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -22,6 +23,7 @@ func hasCode(diags []diagnostic.Diagnostic, code string) (diagnostic.Diagnostic,
 // top-level format_version gate field is rejected by the strictspec shape gate
 // with STRICTSPEC_GATE_ABSENT, and the native walk is skipped (schema is nil).
 func TestGate_FormatVersionAbsent(t *testing.T) {
+	testenv.Isolate(t)
 	// A valid pgdesign schema fragment WITHOUT format_version (a pre-stamp
 	// corpus file copy).
 	content := `[meta]
@@ -47,6 +49,7 @@ type = "bigint"
 // hard error (STRICTSPEC_KEY_UNKNOWN) carrying a did-you-mean suggestion in its
 // message.
 func TestGate_UnknownKeyWithSuggestion(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 
 [tables.users]
@@ -76,6 +79,7 @@ nulable = true
 // position must be a record, so a bare string there is STRICTSPEC_TYPE_NOT_RECORD
 // with the offending table/column named.
 func TestGate_CompactColumnsForm(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 
 [tables.users]
@@ -104,6 +108,7 @@ id = "bigint"
 // not a valid identifier (leading digit) fails the identifier custom scalar's
 // lexeme rule.
 func TestGate_BadIdentifierLexeme(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 
 [tables.users]
@@ -126,6 +131,7 @@ type = "bigint"
 // TestGate_BadPgtypeLexeme: a column type with an embedded space breaks the
 // pgtype surface-syntax lexeme rule.
 func TestGate_BadPgtypeLexeme(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 
 [tables.users]

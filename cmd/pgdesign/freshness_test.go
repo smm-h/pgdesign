@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,6 +102,7 @@ func facetedOnlyFile(t *testing.T, projectDir string) (string, []byte) {
 // output directory must be reported as orphans and fail the build check —
 // otherwise they stay committed and green forever.
 func TestCheckBuild_DetectsOrphanAfterSplitModeSwitch(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "self-contained")
 	t.Chdir(dir)
 
@@ -138,6 +140,7 @@ func TestCheckBuild_DetectsOrphanAfterSplitModeSwitch(t *testing.T) {
 // output directory contains an orphan, the build exits 1 and writes NOTHING —
 // not the planned files, and never a deletion of the orphan.
 func TestHandleBuild_OrphanBlocksBuildBeforeWriting(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "self-contained")
 	t.Chdir(dir)
 
@@ -182,6 +185,7 @@ func TestHandleBuild_OrphanBlocksBuildBeforeWriting(t *testing.T) {
 // TestHandleBuild_DryRunReportsOrphans verifies --dry-run exits 1 when an
 // orphan exists (a real build would refuse to run) while writing nothing.
 func TestHandleBuild_DryRunReportsOrphans(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "self-contained")
 	t.Chdir(dir)
 
@@ -204,6 +208,7 @@ func TestHandleBuild_DryRunReportsOrphans(t *testing.T) {
 // TestScanOrphans_IgnoreList verifies that __pycache__ directories (and their
 // contents) and *.pyc files are the only exemptions from orphan detection.
 func TestScanOrphans_IgnoreList(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 	mustWrite := func(rel string, data string) {
 		t.Helper()
@@ -234,6 +239,7 @@ func TestScanOrphans_IgnoreList(t *testing.T) {
 // TestScanOrphans_MissingDirectory verifies a not-yet-created output
 // directory yields no orphans and no error.
 func TestScanOrphans_MissingDirectory(t *testing.T) {
+	testenv.Isolate(t)
 	orphans, err := scanOrphans(filepath.Join(t.TempDir(), "does-not-exist"), nil)
 	if err != nil {
 		t.Fatalf("expected no error for missing directory, got %v", err)
@@ -246,6 +252,7 @@ func TestScanOrphans_MissingDirectory(t *testing.T) {
 // TestPlan_OwnedDirs_SingleFileOutputsOwnNothing verifies that single-file
 // outputs (a plain file path, not a directory) get no ownership scanning.
 func TestPlan_OwnedDirs_SingleFileOutputsOwnNothing(t *testing.T) {
+	testenv.Isolate(t)
 	schema := minimalSchema()
 	cfg := &config.ResolvedConfig{
 		Output: map[string]config.OutputConfig[config.AbsolutePath]{
@@ -270,6 +277,7 @@ func TestPlan_OwnedDirs_SingleFileOutputsOwnNothing(t *testing.T) {
 // outputs writing into the same directory union their owned sets, so neither
 // output's files are flagged as orphans of the other.
 func TestPlan_OwnedDirs_SharedDirectoryUnion(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "")
 	schema, _, exitCode := parseAndBuild(nil, []string{filepath.Join(dir, "schema.toml")})
 	if exitCode != 0 {
@@ -330,6 +338,7 @@ func TestPlan_OwnedDirs_SharedDirectoryUnion(t *testing.T) {
 // rendering is non-deterministic) falling inside an owned codegen directory
 // is treated as owned, not orphaned.
 func TestPlan_OwnedDirs_ConfiguredSVGInsideOwnedDirIsNotOrphan(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "")
 	schema, _, exitCode := parseAndBuild(nil, []string{filepath.Join(dir, "schema.toml")})
 	if exitCode != 0 {
@@ -411,6 +420,7 @@ func makeCodegenKwargsWithSplit(schemaPath, lang, mode, output, splitMode string
 }
 
 func TestHandleCodegenCheck_RequiresOutput(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "")
 	schemaPath := filepath.Join(dir, "schema.toml")
 	if code := runCodegen(nil, true, makeCodegenKwargs(schemaPath, "go", "constants", "", true)); code != 1 {
@@ -422,6 +432,7 @@ func TestHandleCodegenCheck_RequiresOutput(t *testing.T) {
 // multi-file mode: missing before generation, fresh after, stale after edit,
 // orphan after planting an unowned file, and __pycache__ exemption.
 func TestHandleCodegenCheck_MultiFile(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "")
 	schemaPath := filepath.Join(dir, "schema.toml")
 	outDir := filepath.Join(dir, "out")
@@ -499,6 +510,7 @@ func TestHandleCodegenCheck_MultiFile(t *testing.T) {
 // TestHandleCodegenCheck_SingleFile covers --check for a single-file mode:
 // byte-exact comparison, no directory ownership.
 func TestHandleCodegenCheck_SingleFile(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "")
 	schemaPath := filepath.Join(dir, "schema.toml")
 	outFile := filepath.Join(dir, "out", "constants.go")
@@ -540,6 +552,7 @@ func TestHandleCodegenCheck_SingleFile(t *testing.T) {
 // any output is stale or missing. This is the contract that
 // `pgdesign check --tag build` (exit 0 / non-zero) exposes.
 func TestCheckBuild_FreshPassStaleFailLifecycle(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeFreshnessProject(t, "self-contained")
 	t.Chdir(dir)
 

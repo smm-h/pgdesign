@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestZigConstraintsGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Enums: []model.Enum{
@@ -116,6 +118,7 @@ func TestZigConstraintsGenerator_Generate(t *testing.T) {
 }
 
 func TestZigConstraintsGenerator_LikePatterns(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -168,6 +171,7 @@ func TestZigConstraintsGenerator_LikePatterns(t *testing.T) {
 }
 
 func TestZigConstraintsGenerator_NotLikePatterns(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -203,6 +207,7 @@ func TestZigConstraintsGenerator_NotLikePatterns(t *testing.T) {
 }
 
 func TestZigConstraintsGenerator_Comparison(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -237,6 +242,7 @@ func TestZigConstraintsGenerator_Comparison(t *testing.T) {
 }
 
 func TestZigConstraintsGenerator_ILIKEPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -272,6 +278,7 @@ func TestZigConstraintsGenerator_ILIKEPattern(t *testing.T) {
 }
 
 func TestZigConstraintsGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 	}
@@ -292,6 +299,7 @@ func TestZigConstraintsGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestZigConstraintsGenerator_NoConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

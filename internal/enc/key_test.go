@@ -1,6 +1,7 @@
 package enc
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -10,6 +11,7 @@ import (
 // TestKeysKindQualified: a table x and a function x — same schema, same name —
 // are DISTINCT manifest keys. Kind-qualification is what prevents the collision.
 func TestKeysKindQualified(t *testing.T) {
+	testenv.Isolate(t)
 	tbl := model.Table{Name: "x", Schema: "public"}
 	fn := model.Function{Name: "x", Schema: "public"}
 
@@ -33,6 +35,7 @@ func TestKeysKindQualified(t *testing.T) {
 // TestFunctionOverloadsDistinct: two functions with the same name but different
 // argument types are distinct manifest keys (overloads coexist).
 func TestFunctionOverloadsDistinct(t *testing.T) {
+	testenv.Isolate(t)
 	f1 := model.Function{Name: "f", Schema: "public", Args: []model.FunctionArg{
 		{Name: "a", Type: typeinfo.Type{Base: "int4"}},
 	}}
@@ -58,6 +61,7 @@ func TestFunctionOverloadsDistinct(t *testing.T) {
 
 // TestKeyStringFormsStable pins the textual key forms for the remaining kinds.
 func TestKeyStringForms(t *testing.T) {
+	testenv.Isolate(t)
 	cases := map[string]string{
 		Key{Kind: KindView, Schema: "s", Name: "v"}.String():      "view:s.v",
 		Key{Kind: KindMatView, Schema: "s", Name: "m"}.String():   "matview:s.m",
@@ -78,6 +82,7 @@ func TestKeyStringForms(t *testing.T) {
 // TestPseudoTargetGrammar pins the edge_format.md TENSION 2 grammar for DML/raw
 // pseudo-targets: byte-stable and identity-load-bearing.
 func TestPseudoTargetGrammar(t *testing.T) {
+	testenv.Isolate(t)
 	cases := map[string]string{
 		KeyForDML(0).String(): "dml:0",
 		KeyForDML(7).String(): "dml:7",

@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -59,6 +60,7 @@ func mustGen(t *testing.T, schema *model.Schema, format string) string {
 // Canonicalize it is stable (GREEN). The fixture carries >= 2 entries in every
 // map-sourced collection so ordering is actually observable.
 func TestDeterminism_MultiIteration(t *testing.T) {
+	testenv.Isolate(t)
 	const iterations = 50
 
 	var firstSQL, firstJSON string
@@ -88,6 +90,7 @@ func TestDeterminism_MultiIteration(t *testing.T) {
 // order — but with identical column and enum-value order — must produce
 // byte-identical DDL and JSON.
 func TestCanonicality_ShuffledDeclarationOrder(t *testing.T) {
+	testenv.Isolate(t)
 	canonical := buildDeterminismSchema(t, "canonical.toml")
 	shuffled := buildDeterminismSchema(t, "shuffled.toml")
 
@@ -109,6 +112,7 @@ func TestCanonicality_ShuffledDeclarationOrder(t *testing.T) {
 // (build.go constraintName), never positional, so reordering the FK
 // declarations must not change the emitted auto-FK index names.
 func TestConstraintAutoNames_StableUnderReordering(t *testing.T) {
+	testenv.Isolate(t)
 	canonSQL := mustGen(t, buildDeterminismSchema(t, "canonical.toml"), "sql")
 	shufSQL := mustGen(t, buildDeterminismSchema(t, "shuffled.toml"), "sql")
 
@@ -127,6 +131,7 @@ func TestConstraintAutoNames_StableUnderReordering(t *testing.T) {
 // TestViewReferencesView_DependencyOrdered asserts a view that references
 // another view is emitted after its dependency, regardless of declaration order.
 func TestViewReferencesView_DependencyOrdered(t *testing.T) {
+	testenv.Isolate(t)
 	for _, fixture := range []string{"canonical.toml", "shuffled.toml"} {
 		sql := mustGen(t, buildDeterminismSchema(t, fixture), "sql")
 		base := strings.Index(sql, "CREATE VIEW shop.active_orders AS")

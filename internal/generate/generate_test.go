@@ -2,6 +2,7 @@ package generate
 
 import (
 	"flag"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +38,7 @@ func mustGenerate(t *testing.T, schema *model.Schema, opts Options) string {
 }
 
 func TestMinimalTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -74,6 +76,7 @@ func TestMinimalTable(t *testing.T) {
 }
 
 func TestTwoTablesWithFK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "blog",
 		Tables: []model.Table{
@@ -127,6 +130,7 @@ func TestTwoTablesWithFK(t *testing.T) {
 }
 
 func TestEnumGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Enums: []model.Enum{
@@ -169,6 +173,7 @@ func TestEnumGeneration(t *testing.T) {
 }
 
 func TestIndexGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -201,6 +206,7 @@ func TestIndexGeneration(t *testing.T) {
 }
 
 func TestCommentsIncluded(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -229,6 +235,7 @@ func TestCommentsIncluded(t *testing.T) {
 }
 
 func TestCommentsExcluded(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -253,6 +260,7 @@ func TestCommentsExcluded(t *testing.T) {
 }
 
 func TestIdempotentMode(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:       "app",
 		Extensions: []string{"pgcrypto"},
@@ -308,6 +316,7 @@ func TestIdempotentMode(t *testing.T) {
 // it round-trips the MODEL clause through pg_get_constraintdef and RAISEs on drift,
 // instead of the old silent create-if-absent guard.
 func TestIdempotentCheckConstraintRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -350,6 +359,7 @@ func TestIdempotentCheckConstraintRoundTrip(t *testing.T) {
 // (which materializes as an enum during Build) also gets the valid DO-block
 // idempotent form, never CREATE TYPE IF NOT EXISTS.
 func TestIdempotentMode_StateMachineEnum(t *testing.T) {
+	testenv.Isolate(t)
 	content := `format_version = 1
 [meta]
 version = 1
@@ -413,6 +423,7 @@ type = "ticket_status"
 }
 
 func TestDeterminism(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:       "det",
 		Extensions: []string{"pgcrypto", "uuid-ossp"},
@@ -456,6 +467,7 @@ func TestDeterminism(t *testing.T) {
 }
 
 func TestJSONFormat(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:       "myapp",
 		Extensions: []string{"pgcrypto"},
@@ -566,6 +578,7 @@ func TestJSONFormat(t *testing.T) {
 }
 
 func TestOwnerGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -590,6 +603,7 @@ func TestOwnerGeneration(t *testing.T) {
 }
 
 func TestSchemaAndExtensions(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:       "myapp",
 		Extensions: []string{"pgcrypto", "uuid-ossp"},
@@ -610,6 +624,7 @@ func TestSchemaAndExtensions(t *testing.T) {
 }
 
 func TestTrailingNewline(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "test",
 		Tables: []model.Table{
@@ -633,6 +648,7 @@ func TestTrailingNewline(t *testing.T) {
 }
 
 func TestMultiSchemaQualifiedNames(t *testing.T) {
+	testenv.Isolate(t)
 	// In multi-schema mode, schema.Name is empty. Each table carries its own
 	// Schema field and all SQL statements must use that per-table schema.
 	schema := &model.Schema{
@@ -748,6 +764,7 @@ func TestMultiSchemaQualifiedNames(t *testing.T) {
 }
 
 func TestUniqueIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -781,6 +798,7 @@ func TestUniqueIndex(t *testing.T) {
 }
 
 func TestIdentityColumnPGVersionGate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -829,6 +847,7 @@ func TestIdentityColumnPGVersionGate(t *testing.T) {
 }
 
 func TestPartitionChildrenGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -883,6 +902,7 @@ func TestPartitionChildrenGeneration(t *testing.T) {
 }
 
 func TestPartitionChildrenRecursive(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -938,6 +958,7 @@ func TestPartitionChildrenRecursive(t *testing.T) {
 }
 
 func TestPartmanGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:       "app",
 		Extensions: []string{"pg_partman"},
@@ -1001,6 +1022,7 @@ func TestPartmanGeneration(t *testing.T) {
 }
 
 func TestPartmanNotEmittedWithoutExtension(t *testing.T) {
+	testenv.Isolate(t)
 	// Without pg_partman in extensions, no partman SQL should be emitted.
 	schema := &model.Schema{
 		Name: "app",
@@ -1036,6 +1058,7 @@ func TestPartmanNotEmittedWithoutExtension(t *testing.T) {
 }
 
 func TestPartmanMultiColumnError(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:       "app",
 		Extensions: []string{"pg_partman"},
@@ -1083,6 +1106,7 @@ func TestPartmanMultiColumnError(t *testing.T) {
 }
 
 func TestPartmanSchemaSetup(t *testing.T) {
+	testenv.Isolate(t)
 	// Verify that pg_partman extension setup emits:
 	// 1. CREATE SCHEMA IF NOT EXISTS partman; (before CREATE EXTENSION)
 	// 2. CREATE EXTENSION pg_partman SCHEMA partman;
@@ -1132,6 +1156,7 @@ func TestPartmanSchemaSetup(t *testing.T) {
 }
 
 func TestPartmanSeparateIntervalRetention(t *testing.T) {
+	testenv.Isolate(t)
 	// Verify that interval and retention are distinct in the generated DDL.
 	// interval controls partition width (p_interval in create_parent),
 	// retention controls how long old partitions are kept (part_config.retention).
@@ -1179,6 +1204,7 @@ func TestPartmanSeparateIntervalRetention(t *testing.T) {
 }
 
 func TestPartmanScheduleEmitsCron(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name:       "app",
 		Extensions: []string{"pg_partman", "pg_cron"},
@@ -1214,6 +1240,7 @@ func TestPartmanScheduleEmitsCron(t *testing.T) {
 }
 
 func TestRLSPolicyGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1283,6 +1310,7 @@ func TestRLSPolicyGeneration(t *testing.T) {
 }
 
 func TestRLSWithoutPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	// enable_rls = true but no policies: should still emit ALTER TABLE ENABLE RLS.
 	schema := &model.Schema{
 		Name: "app",
@@ -1311,6 +1339,7 @@ func TestRLSWithoutPolicies(t *testing.T) {
 }
 
 func TestNoPoliciesNoRLS(t *testing.T) {
+	testenv.Isolate(t)
 	// No policies, no enable_rls: no RLS statements at all.
 	schema := &model.Schema{
 		Name: "app",
@@ -1338,6 +1367,7 @@ func TestNoPoliciesNoRLS(t *testing.T) {
 }
 
 func TestRLSPolicyAllOperation(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1382,6 +1412,7 @@ func TestRLSPolicyAllOperation(t *testing.T) {
 }
 
 func TestForceRLSGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1437,6 +1468,7 @@ func TestForceRLSGeneration(t *testing.T) {
 }
 
 func TestRestrictivePolicyGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1482,6 +1514,7 @@ func TestRestrictivePolicyGeneration(t *testing.T) {
 }
 
 func TestForceRLSDocOutput(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1506,6 +1539,7 @@ func TestForceRLSDocOutput(t *testing.T) {
 }
 
 func TestAppendOnlyTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1556,6 +1590,7 @@ func TestAppendOnlyTrigger(t *testing.T) {
 var updateGolden = flag.Bool("update", false, "update golden files")
 
 func TestGoldenFile(t *testing.T) {
+	testenv.Isolate(t)
 	inputPath := filepath.Join("testdata", "simple_input.toml")
 
 	raw, diags := parse.File(inputPath)
@@ -1596,6 +1631,7 @@ func TestGoldenFile(t *testing.T) {
 }
 
 func TestJSONSchemaCheckConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "shop",
 		Tables: []model.Table{
@@ -1634,6 +1670,7 @@ func TestJSONSchemaCheckConstraints(t *testing.T) {
 }
 
 func TestGenerate_UnsupportedFormat(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1666,6 +1703,7 @@ func TestGenerate_UnsupportedFormat(t *testing.T) {
 }
 
 func TestJSONSchemaEndToEnd(t *testing.T) {
+	testenv.Isolate(t)
 	inputPath := filepath.Join("testdata", "json_schema.toml")
 
 	raw, diags := parse.File(inputPath)
@@ -1699,6 +1737,7 @@ func TestJSONSchemaEndToEnd(t *testing.T) {
 }
 
 func TestDocFormat(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "myapp",
 		Enums: []model.Enum{
@@ -1901,6 +1940,7 @@ func TestDocFormat(t *testing.T) {
 }
 
 func TestGenerateDoc_Views(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -1977,6 +2017,7 @@ func TestGenerateDoc_Views(t *testing.T) {
 }
 
 func TestGenerate_Views(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -2047,6 +2088,7 @@ func TestGenerate_Views(t *testing.T) {
 }
 
 func TestGenerate_ViewsNoComments(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -2081,6 +2123,7 @@ func TestGenerate_ViewsNoComments(t *testing.T) {
 }
 
 func TestGenerateSQL_MaterializedView(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -2132,6 +2175,7 @@ func TestGenerateSQL_MaterializedView(t *testing.T) {
 }
 
 func TestGenerateSQL_MaterializedViewWithIndex(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -2179,6 +2223,7 @@ func TestGenerateSQL_MaterializedViewWithIndex(t *testing.T) {
 }
 
 func TestSetStatistics(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -2208,6 +2253,7 @@ func TestSetStatistics(t *testing.T) {
 }
 
 func TestSetStatistics_NotEmittedWhenNil(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -2232,6 +2278,7 @@ func TestSetStatistics_NotEmittedWhenNil(t *testing.T) {
 }
 
 func TestDomainDDL(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Domains: []model.Domain{
@@ -2300,6 +2347,7 @@ func TestDomainDDL(t *testing.T) {
 }
 
 func TestDomainResolution_DDL(t *testing.T) {
+	testenv.Isolate(t)
 	// End-to-end test: schema with domains and tables referencing them.
 	// Verifies CREATE DOMAIN appears, columns reference domain names,
 	// and no spurious CHECK constraints exist.
@@ -2376,6 +2424,7 @@ func TestDomainResolution_DDL(t *testing.T) {
 }
 
 func TestExclusionConstraintDDL(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "bookings",
@@ -2406,6 +2455,7 @@ func TestExclusionConstraintDDL(t *testing.T) {
 }
 
 func TestExclusionConstraintDDLWithWhere(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "bookings",
@@ -2439,6 +2489,7 @@ func TestExclusionConstraintDDLWithWhere(t *testing.T) {
 }
 
 func TestTriggerGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -2500,6 +2551,7 @@ func TestTriggerGeneration(t *testing.T) {
 }
 
 func TestTriggerGeneration_NoTriggers(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -2522,6 +2574,7 @@ func TestTriggerGeneration_NoTriggers(t *testing.T) {
 }
 
 func TestStateMachineTriggerGeneration(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewRegistry()
 	diags := reg.LoadUserTypes([]semtype.UserTypeDef{
 		{
@@ -2579,6 +2632,7 @@ func TestStateMachineTriggerGeneration(t *testing.T) {
 }
 
 func TestStateMachineTriggerGeneration_EnforceFalse(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewRegistry()
 	diags := reg.LoadUserTypes([]semtype.UserTypeDef{
 		{
@@ -2624,6 +2678,7 @@ func TestStateMachineTriggerGeneration_EnforceFalse(t *testing.T) {
 }
 
 func TestStateMachineTriggerGeneration_FilterFromSection17(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewRegistry()
 	diags := reg.LoadUserTypes([]semtype.UserTypeDef{
 		{
@@ -2696,6 +2751,7 @@ func TestStateMachineTriggerGeneration_FilterFromSection17(t *testing.T) {
 }
 
 func TestExtensionDDLNameResolution(t *testing.T) {
+	testenv.Isolate(t)
 	// Schema declares "pgvector" as extension name (the config/registry name).
 	// The generated DDL must use "vector" (the PostgreSQL CREATE EXTENSION name).
 	schema := &model.Schema{
@@ -2731,6 +2787,7 @@ func TestExtensionDDLNameResolution(t *testing.T) {
 }
 
 func TestExtensionDDLNamePassthrough(t *testing.T) {
+	testenv.Isolate(t)
 	// Extensions without DDLName should use their Name directly.
 	schema := &model.Schema{
 		Name:       "app",
@@ -2762,6 +2819,7 @@ func TestExtensionDDLNamePassthrough(t *testing.T) {
 }
 
 func TestExtensionDDLNamePgPartman(t *testing.T) {
+	testenv.Isolate(t)
 	// pg_partman has special schema handling; verify DDL name resolution
 	// still applies through the schema path.
 	schema := &model.Schema{
@@ -2795,6 +2853,7 @@ func TestExtensionDDLNamePgPartman(t *testing.T) {
 }
 
 func TestExtensionDDLNameNilRegistry(t *testing.T) {
+	testenv.Isolate(t)
 	// When ExtRegistry is nil (backward compat), extension names pass through.
 	schema := &model.Schema{
 		Name:       "app",
@@ -2825,6 +2884,7 @@ func TestExtensionDDLNameNilRegistry(t *testing.T) {
 }
 
 func TestIdempotentAddColumnGuards(t *testing.T) {
+	testenv.Isolate(t)
 	defVal := "active"
 	schema := &model.Schema{
 		Name: "app",
@@ -2908,6 +2968,7 @@ func TestIdempotentAddColumnGuards(t *testing.T) {
 // 7.4): the app's DDL never emits CREATE TABLE for an imported reference table,
 // but the local FK constraint still references it schema-qualified.
 func TestGenerateSQLExcludesImportedTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{

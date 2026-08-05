@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 // --- Phase 14: Per-table PG delegate tests ---
 
 func TestPythonQueryLayerPg_PerTableFilesProduced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -32,6 +34,7 @@ func TestPythonQueryLayerPg_PerTableFilesProduced(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_PerTableHeader(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -49,6 +52,7 @@ func TestPythonQueryLayerPg_PerTableHeader(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_PerTableClassStructure(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -66,6 +70,7 @@ func TestPythonQueryLayerPg_PerTableClassStructure(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_CreateMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -96,6 +101,7 @@ func TestPythonQueryLayerPg_CreateMethod(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_GetMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -115,6 +121,7 @@ func TestPythonQueryLayerPg_GetMethod(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_UpdateMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -139,6 +146,7 @@ func TestPythonQueryLayerPg_UpdateMethod(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_DeleteMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -158,6 +166,7 @@ func TestPythonQueryLayerPg_DeleteMethod(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_AppendOnlySkipsUpdateDelete(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -179,6 +188,7 @@ func TestPythonQueryLayerPg_AppendOnlySkipsUpdateDelete(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_GetByFK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -197,6 +207,7 @@ func TestPythonQueryLayerPg_GetByFK(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_GetByUnique(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -215,6 +226,7 @@ func TestPythonQueryLayerPg_GetByUnique(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_MultiColumnUnique(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -230,6 +242,7 @@ func TestPythonQueryLayerPg_MultiColumnUnique(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_ListMethod(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -248,6 +261,7 @@ func TestPythonQueryLayerPg_ListMethod(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_SMTransitions(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -278,6 +292,7 @@ func TestPythonQueryLayerPg_SMTransitions(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_ParameterizedSQL(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -314,6 +329,7 @@ func TestPythonQueryLayerPg_ParameterizedSQL(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_GeneratedColumnExcluded(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -329,6 +345,7 @@ func TestPythonQueryLayerPg_GeneratedColumnExcluded(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_IdentityColumnExcluded(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -351,6 +368,7 @@ func TestPythonQueryLayerPg_IdentityColumnExcluded(t *testing.T) {
 // --- Phase 15: PgBackend composite tests ---
 
 func TestPythonQueryLayerPg_PgBackendFileProduced(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -365,6 +383,7 @@ func TestPythonQueryLayerPg_PgBackendFileProduced(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_PgBackendHeader(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -379,6 +398,7 @@ func TestPythonQueryLayerPg_PgBackendHeader(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_PgBackendImportsDelegates(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -396,6 +416,7 @@ func TestPythonQueryLayerPg_PgBackendImportsDelegates(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_PgBackendClassStructure(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -422,6 +443,7 @@ func TestPythonQueryLayerPg_PgBackendClassStructure(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_PgBackendForwardingMethods(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -471,6 +493,7 @@ func TestPythonQueryLayerPg_PgBackendForwardingMethods(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_PgBackendForwardsToDelegates(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -493,6 +516,7 @@ func TestPythonQueryLayerPg_PgBackendForwardsToDelegates(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_ForwardingMatchesProtocol(t *testing.T) {
+	testenv.Isolate(t)
 	schema := qlTestSchema()
 	gen := &PythonQueryLayerGenerator{}
 	files, _ := gen.GenerateFiles(schema)
@@ -527,6 +551,7 @@ func TestPythonQueryLayerPg_ForwardingMatchesProtocol(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_EmptySchemaNoPerTableFiles(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 	gen := &PythonQueryLayerGenerator{}
 	files, diags := gen.GenerateFiles(schema)
@@ -550,6 +575,7 @@ func TestPythonQueryLayerPg_EmptySchemaNoPerTableFiles(t *testing.T) {
 }
 
 func TestPythonQueryLayerPg_CompositePK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

@@ -1,11 +1,13 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
 
 func TestClassifyPhase_MixedPhases(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "mixed phases",
 		DDLOps: []DDLOp{
@@ -31,6 +33,7 @@ func TestClassifyPhase_MixedPhases(t *testing.T) {
 }
 
 func TestClassifyPhase_AllSafe_Collapsed(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "all safe ops",
 		DDLOps: []DDLOp{
@@ -55,6 +58,7 @@ func TestClassifyPhase_AllSafe_Collapsed(t *testing.T) {
 }
 
 func TestClassifyPhase_DMLOps(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "ddl and dml",
 		DDLOps: []DDLOp{
@@ -80,6 +84,7 @@ func TestClassifyPhase_DMLOps(t *testing.T) {
 }
 
 func TestClassifyPhase_ValidateConstraint(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "fk with validate",
 		DDLOps: []DDLOp{
@@ -103,6 +108,7 @@ func TestClassifyPhase_ValidateConstraint(t *testing.T) {
 }
 
 func TestPhase_TOMLRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "test phases",
 		DDLOps: []DDLOp{
@@ -152,6 +158,7 @@ func TestPhase_TOMLRoundTrip(t *testing.T) {
 }
 
 func TestPhase_TOMLRoundTrip_NoPhases(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "no phases",
 		DDLOps: []DDLOp{
@@ -179,6 +186,7 @@ func TestPhase_TOMLRoundTrip_NoPhases(t *testing.T) {
 }
 
 func TestClassifyPhase_AddColumnRisk(t *testing.T) {
+	testenv.Isolate(t)
 	// Nullable add_column is Safe -> expand.
 	// Pair with drop_table to prevent collapse.
 	m := &Migration{
@@ -216,6 +224,7 @@ func TestClassifyPhase_AddColumnRisk(t *testing.T) {
 }
 
 func TestHasPhases(t *testing.T) {
+	testenv.Isolate(t)
 	// Empty migration -> false.
 	empty := &Migration{Description: "empty"}
 	if HasPhases(empty) {
@@ -251,6 +260,7 @@ func TestHasPhases(t *testing.T) {
 }
 
 func TestBatchSize_WithPhaseAnnotation(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Migration{
 		Description: "Batched backfill with phases",
 		DDLOps: []DDLOp{

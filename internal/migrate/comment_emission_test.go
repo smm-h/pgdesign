@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -70,6 +71,7 @@ func commentModel(suffix string) *model.Schema {
 // endpoint-consistent — which proves each comment_on op maps its OWNING object's
 // manifest key to the correct post-state id for every object kind.
 func TestCommentOnlyChangeProducesEdgeAndReconcilesInManifest(t *testing.T) {
+	testenv.Isolate(t)
 	a := commentModel("")
 	b := commentModel(" (v2)")
 
@@ -130,6 +132,7 @@ func TestCommentOnlyChangeProducesEdgeAndReconcilesInManifest(t *testing.T) {
 // lowered to zero ops, and even a chain-created table carried no comment because
 // reconcile's stripComments papered over the hole.
 func TestReconcileCertifiesCommentChange(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

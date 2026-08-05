@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"testing"
 
@@ -70,6 +71,7 @@ func hasCode(diags []diagnostic.Diagnostic, code string) bool {
 // verification seam (roadmap 7.4): a present matching imported table+column passes,
 // an absent table is E238, and a type mismatch on the referenced column is E239.
 func TestVerifyLiveImports_PresentAbsentMismatch(t *testing.T) {
+	testenv.Isolate(t)
 	conn, ctx := liveConn(t)
 	schema := buildConsumerWithImportedFK(t)
 
@@ -110,6 +112,7 @@ func TestVerifyLiveImports_PresentAbsentMismatch(t *testing.T) {
 // loadImportedFKPools reads real keys from the live imported table, keyed by
 // "<schema>.<table>.<column>", as quoted SQL literals.
 func TestLoadImportedFKPools_LiveEndToEnd(t *testing.T) {
+	testenv.Isolate(t)
 	conn, ctx := liveConn(t)
 	schema := buildConsumerWithImportedFK(t)
 

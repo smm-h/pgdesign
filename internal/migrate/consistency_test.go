@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,6 +41,7 @@ func (o SelfContainedOp) payloadDefID(t *testing.T, p *ChainProject) string {
 }
 
 func TestConsistencyPasses(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	writeControlledGenesis(t, p, e)
 	if err := VerifyChainConsistency(p); err != nil {
@@ -50,6 +52,7 @@ func TestConsistencyPasses(t *testing.T) {
 // TestConsistencyEndpointMismatch: a to-manifest whose table id differs from what
 // the op produces makes the edge-endpoint check red.
 func TestConsistencyEndpointMismatch(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	if _, err := p.WriteEdge(e); err != nil {
 		t.Fatal(err)
@@ -73,6 +76,7 @@ func TestConsistencyEndpointMismatch(t *testing.T) {
 // TestConsistencyClosureViolation: a manifest referencing an object not in the
 // store is a closure violation.
 func TestConsistencyClosureViolation(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	if _, err := p.WriteEdge(e); err != nil {
 		t.Fatal(err)
@@ -90,6 +94,7 @@ func TestConsistencyClosureViolation(t *testing.T) {
 // TestConsistencyMixedEpochRejected: an edge file carrying a foreign codec epoch
 // is rejected (mixed-epoch = corruption).
 func TestConsistencyMixedEpochRejected(t *testing.T) {
+	testenv.Isolate(t)
 	p, e, _ := fixtureProject(t)
 	name, err := p.WriteEdge(e)
 	if err != nil {
@@ -119,6 +124,7 @@ func TestConsistencyMixedEpochRejected(t *testing.T) {
 // superseded list is non-identity metadata, so this tamper survives LoadEdge's
 // content-hash check — the consistency checker is the gate that catches it.)
 func TestConsistencyConsolidationDangling(t *testing.T) {
+	testenv.Isolate(t)
 	p, _, _, _, r1, _, r3 := threeEdgeChain(t)
 	res, err := SquashChain(p, r1.String(), r3.String(), "")
 	if err != nil {

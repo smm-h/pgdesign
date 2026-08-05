@@ -1,12 +1,14 @@
 package introspect
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/typeinfo"
 )
 
 func TestParseFunctionArgs_Simple(t *testing.T) {
+	testenv.Isolate(t)
 	args := parseFunctionArgs("order_id uuid, amount numeric")
 	if len(args) != 2 {
 		t.Fatalf("expected 2 args, got %d", len(args))
@@ -20,6 +22,7 @@ func TestParseFunctionArgs_Simple(t *testing.T) {
 }
 
 func TestParseFunctionArgs_WithDefault(t *testing.T) {
+	testenv.Isolate(t)
 	args := parseFunctionArgs("tax_rate numeric DEFAULT 0.1")
 	if len(args) != 1 {
 		t.Fatalf("expected 1 arg, got %d", len(args))
@@ -30,6 +33,7 @@ func TestParseFunctionArgs_WithDefault(t *testing.T) {
 }
 
 func TestParseFunctionArgs_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	args := parseFunctionArgs("")
 	if len(args) != 0 {
 		t.Errorf("expected 0 args for empty string, got %d", len(args))
@@ -37,6 +41,7 @@ func TestParseFunctionArgs_Empty(t *testing.T) {
 }
 
 func TestParseFunctionArgs_ParenthesizedType(t *testing.T) {
+	testenv.Isolate(t)
 	args := parseFunctionArgs("price numeric(10,2), name varchar(255)")
 	if len(args) != 2 {
 		t.Fatalf("expected 2 args, got %d", len(args))
@@ -52,6 +57,7 @@ func TestParseFunctionArgs_ParenthesizedType(t *testing.T) {
 }
 
 func TestParseFunctionArgs_ModePrefix(t *testing.T) {
+	testenv.Isolate(t)
 	args := parseFunctionArgs("IN x integer, OUT y text")
 	if len(args) != 2 {
 		t.Fatalf("expected 2 args, got %d", len(args))
@@ -65,6 +71,7 @@ func TestParseFunctionArgs_ModePrefix(t *testing.T) {
 }
 
 func TestExtractFunctionBody_DollarQuote(t *testing.T) {
+	testenv.Isolate(t)
 	funcdef := `CREATE OR REPLACE FUNCTION public.calc(amount numeric)
  RETURNS numeric
  LANGUAGE plpgsql
@@ -81,6 +88,7 @@ $$`
 }
 
 func TestExtractFunctionBody_NamedTag(t *testing.T) {
+	testenv.Isolate(t)
 	funcdef := `CREATE OR REPLACE FUNCTION public.calc()
  RETURNS void
  LANGUAGE plpgsql
@@ -97,6 +105,7 @@ $func$`
 }
 
 func TestExtractFunctionBody_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	body := extractFunctionBody("some random text with no dollar quotes")
 	if body != "" {
 		t.Errorf("expected empty body, got %q", body)

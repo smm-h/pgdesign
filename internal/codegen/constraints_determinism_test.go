@@ -3,6 +3,7 @@ package codegen
 import (
 	"bytes"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diagnostic"
@@ -53,6 +54,7 @@ func determinismSchema() *model.Schema {
 // schema. Map iteration order in Go is randomized, so any generator that
 // ranges over ConstraintSet maps directly will flake here.
 func TestConstraintsGenerators_Deterministic(t *testing.T) {
+	testenv.Isolate(t)
 	generators := map[string]genkit.Generator{
 		"go":     &GoConstraintsGenerator{},
 		"python": &PythonConstraintsGenerator{},

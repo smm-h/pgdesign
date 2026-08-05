@@ -2,11 +2,13 @@ package diagnostic
 
 import (
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
 
 func TestSeverityString(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		s    Severity
 		want string
@@ -25,6 +27,7 @@ func TestSeverityString(t *testing.T) {
 }
 
 func TestHasErrors(t *testing.T) {
+	testenv.Isolate(t)
 	yes := Diagnostics{
 		{Severity: Warning, Message: "w"},
 		{Severity: Error, Message: "e"},
@@ -48,6 +51,7 @@ func TestHasErrors(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Error, Code: "E001"},
 		{Severity: Warning, Code: "W001"},
@@ -63,6 +67,7 @@ func TestErrors(t *testing.T) {
 }
 
 func TestWarnings(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Error, Code: "E001"},
 		{Severity: Warning, Code: "W001"},
@@ -75,6 +80,7 @@ func TestWarnings(t *testing.T) {
 }
 
 func TestRenderTerminal(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{
 			Severity:   Error,
@@ -99,6 +105,7 @@ func TestRenderTerminal(t *testing.T) {
 }
 
 func TestRenderTerminalEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	out := RenderTerminal(Diagnostics{}, false)
 	if out != "" {
 		t.Errorf("expected empty output, got %q", out)
@@ -106,6 +113,7 @@ func TestRenderTerminalEmpty(t *testing.T) {
 }
 
 func TestRenderJSON(t *testing.T) {
+	testenv.Isolate(t)
 	diags := Diagnostics{
 		{Severity: Error, Code: "E001", Message: "bad"},
 	}

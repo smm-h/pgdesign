@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
@@ -9,6 +10,7 @@ import (
 // (schema, name) collides with a vendored imported reference table is a hard error
 // naming BOTH sources (E244), replacing the earlier silent owned-wins shadowing.
 func TestImportsE2E_OwnedImportedTableCollision(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 
 	// Consumer lives in the SAME target schema ("app") the framework's `users`

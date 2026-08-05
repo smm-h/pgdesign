@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -40,6 +41,7 @@ func smallSchema() *model.Schema {
 }
 
 func TestD2OptionsValidate(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name    string
 		mutate  func(*D2Options)
@@ -70,6 +72,7 @@ func TestD2OptionsValidate(t *testing.T) {
 }
 
 func TestD2OptionsValidateTALAMessage(t *testing.T) {
+	testenv.Isolate(t)
 	opts := DefaultD2Options()
 	opts.Layout = "tala"
 	err := opts.Validate()
@@ -79,6 +82,7 @@ func TestD2OptionsValidateTALAMessage(t *testing.T) {
 }
 
 func TestGenerateD2Direction(t *testing.T) {
+	testenv.Isolate(t)
 	s := smallSchema()
 
 	// Default: down.
@@ -109,6 +113,7 @@ func TestGenerateD2Direction(t *testing.T) {
 // in the OSS d2 library (via an embedded JS runtime), so it is exercised
 // directly rather than skipped.
 func TestRenderSVGDagreAndELK(t *testing.T) {
+	testenv.Isolate(t)
 	s := smallSchema()
 	src := GenerateD2(s, nil, DefaultD2Options())
 
@@ -128,6 +133,7 @@ func TestRenderSVGDagreAndELK(t *testing.T) {
 }
 
 func TestRenderSVGThemeID(t *testing.T) {
+	testenv.Isolate(t)
 	s := smallSchema()
 	src := GenerateD2(s, nil, DefaultD2Options())
 	opts := DefaultD2Options()

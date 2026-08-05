@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
@@ -10,6 +11,7 @@ import (
 // text explicitly states there is NO AUTHENTICATION. Auth itself is the deferred
 // frontend's concern — a decided non-goal, not an omission.
 func TestServeBindPosture(t *testing.T) {
+	testenv.Isolate(t)
 	app := buildApp()
 	res := app.Test([]string{"serve", "--help"})
 

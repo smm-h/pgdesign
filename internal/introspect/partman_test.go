@@ -2,6 +2,7 @@ package introspect
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"strings"
 	"testing"
@@ -23,6 +24,7 @@ func partmanTestBaseURL() string {
 // partman.part_config into the model. Requires a PostgreSQL server with
 // pg_partman available; skips cleanly otherwise.
 func TestIntrospectPartmanMaintenance(t *testing.T) {
+	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	testdb.SkipIfNoPartman(t)
 

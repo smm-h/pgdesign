@@ -1,12 +1,14 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
 )
 
 func TestExtractPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -65,6 +67,7 @@ func TestExtractPolicies(t *testing.T) {
 }
 
 func TestFilterGeneratable(t *testing.T) {
+	testenv.Isolate(t)
 	policies := []PolicyContext{
 		{
 			PolicyName: "read_all",
@@ -108,6 +111,7 @@ func TestFilterGeneratable(t *testing.T) {
 }
 
 func TestFilterGeneratable_Empty(t *testing.T) {
+	testenv.Isolate(t)
 	policies := []PolicyContext{
 		{PolicyName: "read_all", Using: "true"},
 		{PolicyName: "own_only", Using: "player_id = current_setting('app.player_id')"},

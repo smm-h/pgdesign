@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -38,6 +39,7 @@ func writeGenesisEdgeForServe(t *testing.T, p *migrate.ChainProject) error {
 // legacy pgdesign_migrations table is served when only it exists, and the
 // chain-era pgdesign_applied_migrations view TAKES PRECEDENCE once present.
 func TestGetMigrationsViewPrecedence(t *testing.T) {
+	testenv.Isolate(t)
 	srv := setupServer(t)
 	ctx := context.Background()
 
@@ -117,6 +119,7 @@ func TestGetMigrationsViewPrecedence(t *testing.T) {
 // TestGetMigrationVersionChainEdge verifies the version endpoint serves the raw
 // chain edge artifact by its content-hash prefix for a chain-mode project.
 func TestGetMigrationVersionChainEdge(t *testing.T) {
+	testenv.Isolate(t)
 	if testDB == nil {
 		t.Skip("no database configured (set PGDESIGN_DB); skipping database-backed test")
 	}

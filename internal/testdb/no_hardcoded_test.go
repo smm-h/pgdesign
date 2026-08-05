@@ -1,6 +1,7 @@
 package testdb
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +15,7 @@ import (
 // re-introduction of patterns that were removed during the test
 // infrastructure migration to the testdb package.
 func TestNoHardcodedTestConnStr(t *testing.T) {
+	testenv.Isolate(t)
 	patterns := []string{
 		"postgres:///pgdesign_test",
 		"postgres://localhost:5432/pgdesign_test",

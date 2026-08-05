@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -22,6 +23,7 @@ func longName(prefix63 string, suffix string) string {
 // truncate to the same 63 bytes must be a HARD ERROR naming both, not a silent
 // ambiguous match.
 func TestCheckTruncationCollisionDetected(t *testing.T) {
+	testenv.Isolate(t)
 	prefix := strings.Repeat("a", 63)
 	n1 := longName(prefix, "_one")
 	n2 := longName(prefix, "_two")
@@ -48,6 +50,7 @@ func TestCheckTruncationCollisionDetected(t *testing.T) {
 // TestCheckTruncationCollisionCleanSchema confirms distinct short names, and
 // distinct long names that truncate differently, do NOT trip the guard.
 func TestCheckTruncationCollisionCleanSchema(t *testing.T) {
+	testenv.Isolate(t)
 	s := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -70,6 +73,7 @@ func TestCheckTruncationCollisionCleanSchema(t *testing.T) {
 // TestCheckTruncationCollisionMatView covers the materialized-view index
 // collection, which also uses truncation-aware matching.
 func TestCheckTruncationCollisionMatView(t *testing.T) {
+	testenv.Isolate(t)
 	prefix := strings.Repeat("m", 63)
 	s := &model.Schema{
 		MaterializedViews: []model.MaterializedView{

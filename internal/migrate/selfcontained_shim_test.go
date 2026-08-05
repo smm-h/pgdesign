@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/chain"
@@ -41,6 +42,7 @@ var allOpToSQLKinds = []string{
 // generate emits (via OpToSQL) plus the DML and 5.1b-minted kinds — no kind is
 // left unclassified.
 func TestInventoryTotality(t *testing.T) {
+	testenv.Isolate(t)
 	for _, k := range allOpToSQLKinds {
 		if _, ok := categoryForKind(k); !ok {
 			t.Errorf("kind %q has no simulation category (inventory gap)", k)
@@ -106,6 +108,7 @@ type shimCase struct {
 // converts through the shim and renders byte-identically to OpToSQL. Down renders
 // are byte-compared for the delta families (where OpToSQL is the down oracle).
 func TestShimRendersLikeOpToSQL(t *testing.T) {
+	testenv.Isolate(t)
 	desired := richModel(t)
 	view := &desired.Views[0]
 	mv := &desired.MaterializedViews[0]
@@ -198,11 +201,11 @@ func TestShimRendersLikeOpToSQL(t *testing.T) {
 		// trigger / policy / rls
 		{"create_trigger", DDLOp{Op: "create_trigger", Table: "app.users", Name: "trg", PGVersion: 17,
 			TriggerDef: &model.Trigger{Name: "trg", Function: "app.fn", Events: []string{"INSERT"}, Timing: "AFTER", ForEach: "ROW"},
-			Down: &DownOp{Ops: []DDLOp{{Op: "drop_trigger", Table: "app.users", Name: "trg"}}}}, chain.MechanicallyInvertible, false},
+			Down:       &DownOp{Ops: []DDLOp{{Op: "drop_trigger", Table: "app.users", Name: "trg"}}}}, chain.MechanicallyInvertible, false},
 		{"drop_trigger", DDLOp{Op: "drop_trigger", Table: "app.users", Name: "trg", Down: &DownOp{Irreversible: true}}, chain.NonInvertible, false},
 		{"create_policy", DDLOp{Op: "create_policy", Table: "app.users", Name: "pol", PGVersion: 17,
 			PolicyDef: &model.Policy{Name: "pol", Operation: "SELECT", Role: "app_user", Using: "id > 0"},
-			Down: &DownOp{Ops: []DDLOp{{Op: "drop_policy", Table: "app.users", Name: "pol"}}}}, chain.MechanicallyInvertible, false},
+			Down:      &DownOp{Ops: []DDLOp{{Op: "drop_policy", Table: "app.users", Name: "pol"}}}}, chain.MechanicallyInvertible, false},
 		{"drop_policy", DDLOp{Op: "drop_policy", Table: "app.users", Name: "pol", Down: &DownOp{Irreversible: true}}, chain.NonInvertible, false},
 		{"enable_rls", DDLOp{Op: "enable_rls", Table: "app.users", Schema: "app",
 			Down: &DownOp{Ops: []DDLOp{{Op: "disable_rls", Table: "app.users", Schema: "app"}}}}, chain.DeclaredInverse, true},
@@ -276,6 +279,7 @@ func TestShimRendersLikeOpToSQL(t *testing.T) {
 // TestShimRenameTableRoundTrips proves rename_table converts, renders, and its
 // structural (swapped) inverse round-trips.
 func TestShimRenameTableRoundTrips(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 	desired := richModel(t)
 	op := DDLOp{Op: "rename_table", Table: "app.users", Name: "members"}
@@ -307,6 +311,7 @@ func TestShimRenameTableRoundTrips(t *testing.T) {
 // TestSchemaMetaRoundTrip proves the schema-meta op round-trips and renders the
 // extension DDL, with a declared inverse restoring the prior meta.
 func TestSchemaMetaRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 	prev := &model.Schema{Name: "app", Extensions: []string{"pgcrypto"}, PGVersion: 17}
 	desired := &model.Schema{Name: "app", Extensions: []string{"pgcrypto", "uuid-ossp"}, PGVersion: 17}
@@ -331,6 +336,7 @@ func TestSchemaMetaRoundTrip(t *testing.T) {
 // changed extension list). The edge ops are built via the shim/builders and the
 // simulator must carry from-manifest(A) EXACTLY to to-manifest(B).
 func TestShimEndToEndSimulation(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 
 	modelA := &model.Schema{

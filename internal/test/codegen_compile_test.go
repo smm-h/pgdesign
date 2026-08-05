@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -147,6 +148,7 @@ func runCompile(t *testing.T, dir string, extraEnv []string, name string, args .
 }
 
 func TestCompileGoTypes(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "go")
 	dir := t.TempDir()
 	files := generateTypeFiles(t, &codegen.GoTypesGenerator{}, "types.go")
@@ -175,6 +177,7 @@ func goModWithUUID(t *testing.T, dir string) {
 // !IsValid() for NOT NULL branded-enum columns, so it only compiles against the
 // branded types (roadmap 4.1).
 func TestCompileGoConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "go")
 	dir := t.TempDir()
 	writeFiles(t, dir, generateTypeFiles(t, &codegen.GoTypesGenerator{}, "types.go"))
@@ -194,6 +197,7 @@ func TestCompileGoConstraints(t *testing.T) {
 // This pins that gorm+constraints co-location compiles, which is what the build
 // guard now permits (and requires, when both are configured, in one directory).
 func TestCompileGoGormConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "go")
 	dir := t.TempDir()
 	schema := loadCompileSchema(t)
@@ -215,6 +219,7 @@ func TestCompileGoGormConstraints(t *testing.T) {
 // reject), and driver.Value. It is the behavioral witness that every ingress
 // validates and round-trips (roadmap 4.1 "Go all-ingress round-trip").
 func TestCompileGoEnumAllIngress(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "go")
 	dir := t.TempDir()
 	writeFiles(t, dir, generateTypeFiles(t, &codegen.GoTypesGenerator{}, "types.go"))
@@ -286,6 +291,7 @@ func TestRoleAllIngress(t *testing.T) {
 }
 
 func TestCompileTSTypes(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "tsc")
 	dir := t.TempDir()
 	files := generateTypeFiles(t, &codegen.TSTypesGenerator{}, "types.ts")
@@ -320,6 +326,7 @@ export const parsed: Role = parseRole("admin");
 }
 
 func TestCompilePythonTypes(t *testing.T) {
+	testenv.Isolate(t)
 	// Python type-check via mypy (the toolchain the repo/CI provisions).
 	requireTool(t, "mypy")
 	dir := t.TempDir()
@@ -336,6 +343,7 @@ func TestCompilePythonTypes(t *testing.T) {
 // yield enum-typed fields, the coercion is idempotent, invalid values raise, and
 // enum-typed rows pickle round-trip.
 func TestRunPythonQueryLayerEnums(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "python3")
 	base := t.TempDir()
 	pkgDir := filepath.Join(base, "qlpkg")
@@ -396,6 +404,7 @@ func pyModuleAvailable(mod string) bool {
 // gates toolchain binaries, not optional third-party libraries. CI must
 // provision sqlalchemy for this check to run.
 func TestCompilePythonSQLAlchemy(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "mypy")
 	if !pyModuleAvailable("sqlalchemy") {
 		t.Skip("sqlalchemy not importable (provision it in CI to run this check)")
@@ -408,6 +417,7 @@ func TestCompilePythonSQLAlchemy(t *testing.T) {
 }
 
 func TestCompileJavaTypes(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "javac")
 	dir := t.TempDir()
 	// Java types is a MultiFileGenerator: one public type per file. javac
@@ -423,16 +433,16 @@ func TestCompileJavaTypes(t *testing.T) {
 // stubs let javac verify the generated entities, converters, and enum classes
 // type-check without pulling a dependency.
 var javaxPersistenceStubs = map[string]string{
-	"javax/persistence/Entity.java":     "package javax.persistence;\npublic @interface Entity {}\n",
-	"javax/persistence/Table.java":      "package javax.persistence;\npublic @interface Table { String name() default \"\"; }\n",
-	"javax/persistence/Id.java":         "package javax.persistence;\npublic @interface Id {}\n",
-	"javax/persistence/Column.java":     "package javax.persistence;\npublic @interface Column { String name() default \"\"; boolean nullable() default true; String columnDefinition() default \"\"; }\n",
-	"javax/persistence/JoinColumn.java": "package javax.persistence;\npublic @interface JoinColumn { String name() default \"\"; boolean nullable() default true; }\n",
-	"javax/persistence/ManyToOne.java":  "package javax.persistence;\npublic @interface ManyToOne { FetchType fetch() default FetchType.EAGER; }\n",
-	"javax/persistence/OneToMany.java":  "package javax.persistence;\npublic @interface OneToMany { String mappedBy() default \"\"; }\n",
-	"javax/persistence/FetchType.java":  "package javax.persistence;\npublic enum FetchType { LAZY, EAGER }\n",
-	"javax/persistence/Convert.java":    "package javax.persistence;\npublic @interface Convert { Class<?> converter() default void.class; }\n",
-	"javax/persistence/Converter.java":  "package javax.persistence;\npublic @interface Converter { boolean autoApply() default false; }\n",
+	"javax/persistence/Entity.java":             "package javax.persistence;\npublic @interface Entity {}\n",
+	"javax/persistence/Table.java":              "package javax.persistence;\npublic @interface Table { String name() default \"\"; }\n",
+	"javax/persistence/Id.java":                 "package javax.persistence;\npublic @interface Id {}\n",
+	"javax/persistence/Column.java":             "package javax.persistence;\npublic @interface Column { String name() default \"\"; boolean nullable() default true; String columnDefinition() default \"\"; }\n",
+	"javax/persistence/JoinColumn.java":         "package javax.persistence;\npublic @interface JoinColumn { String name() default \"\"; boolean nullable() default true; }\n",
+	"javax/persistence/ManyToOne.java":          "package javax.persistence;\npublic @interface ManyToOne { FetchType fetch() default FetchType.EAGER; }\n",
+	"javax/persistence/OneToMany.java":          "package javax.persistence;\npublic @interface OneToMany { String mappedBy() default \"\"; }\n",
+	"javax/persistence/FetchType.java":          "package javax.persistence;\npublic enum FetchType { LAZY, EAGER }\n",
+	"javax/persistence/Convert.java":            "package javax.persistence;\npublic @interface Convert { Class<?> converter() default void.class; }\n",
+	"javax/persistence/Converter.java":          "package javax.persistence;\npublic @interface Converter { boolean autoApply() default false; }\n",
 	"javax/persistence/AttributeConverter.java": "package javax.persistence;\npublic interface AttributeConverter<X, Y> { Y convertToDatabaseColumn(X attribute); X convertToEntityAttribute(Y dbData); }\n",
 }
 
@@ -442,6 +452,7 @@ var javaxPersistenceStubs = map[string]string{
 // (never @Enumerated(STRING)). Compiled against stub javax.persistence sources
 // (roadmap 4.1).
 func TestCompileJavaJPA(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "javac")
 	dir := t.TempDir()
 	files, diags := (&codegen.JavaJPAGenerator{}).GenerateFiles(loadCompileSchema(t))
@@ -491,6 +502,7 @@ func TestCompileJavaJPA(t *testing.T) {
 // branded enum's getValue() (roadmap 4.1 "Java contains(getValue())"), so the
 // validators only compile against the branded record types + enum classes.
 func TestCompileJavaConstraints(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "javac")
 	dir := t.TempDir()
 	schema := loadCompileSchema(t)
@@ -504,6 +516,7 @@ func TestCompileJavaConstraints(t *testing.T) {
 }
 
 func TestCompileKotlinTypes(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "kotlinc")
 	dir := t.TempDir()
 	files := generateTypeFiles(t, &codegen.KotlinTypesGenerator{}, "SchemaTypes.kt")
@@ -514,6 +527,7 @@ func TestCompileKotlinTypes(t *testing.T) {
 }
 
 func TestCompileZigTypes(t *testing.T) {
+	testenv.Isolate(t)
 	requireTool(t, "zig")
 	dir := t.TempDir()
 	files := generateTypeFiles(t, &codegen.ZigTypesGenerator{}, "types.zig")

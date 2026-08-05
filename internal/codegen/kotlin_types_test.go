@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -22,6 +23,7 @@ func containsKotlinField(s, fieldName, kotlinType string) bool {
 }
 
 func TestKotlinTypesGenerator_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -113,6 +115,7 @@ func TestKotlinTypesGenerator_Basic(t *testing.T) {
 }
 
 func TestKotlinTypesGenerator_NullableAndArray(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -164,6 +167,7 @@ func TestKotlinTypesGenerator_NullableAndArray(t *testing.T) {
 }
 
 func TestKotlinTypesGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 
 	gen := &KotlinTypesGenerator{}
@@ -186,6 +190,7 @@ func TestKotlinTypesGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestKotlinTypesGenerator_MoneySemanticType(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -214,6 +219,7 @@ func TestKotlinTypesGenerator_MoneySemanticType(t *testing.T) {
 }
 
 func TestKotlinTypesGenerator_MultipleTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os/exec"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 // panicking. This catches strictcli flag-spec errors (e.g., missing Unique on
 // Repeatable flags) that cause a panic on any invocation.
 func TestCLIRegistration(t *testing.T) {
+	testenv.Isolate(t)
 	root := projectRoot(t)
 	cmd := exec.Command("go", "run", "./cmd/pgdesign/", "--help")
 	cmd.Dir = root

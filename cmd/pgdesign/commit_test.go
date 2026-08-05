@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 // hard dependency, so this is a hard error (never a silent skip) — but the
 // message must tell the user how to proceed.
 func TestSafegitCommit_MissingBinaryActionableError(t *testing.T) {
+	testenv.Isolate(t)
 	// Strip PATH to a directory that cannot contain safegit (the package's
 	// TestMain installs a fake safegit on the real PATH; override it here).
 	empty := t.TempDir()

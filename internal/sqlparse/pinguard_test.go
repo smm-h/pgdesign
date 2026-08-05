@@ -2,6 +2,7 @@ package sqlparse
 
 import (
 	"bufio"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"strings"
 	"testing"
@@ -30,6 +31,7 @@ const (
 )
 
 func TestPinGuard_GoPgqueryVersionSanctioned(t *testing.T) {
+	testenv.Isolate(t)
 	sanctioned, err := os.ReadFile(sanctionedFilePath)
 	if err != nil {
 		t.Fatalf("read sanctioned version file: %v", err)
@@ -64,6 +66,7 @@ procedure. Otherwise, pin go-pgquery back to the sanctioned version.`,
 // (not vacuously green): a go.mod pinning a different version must be detected
 // as unequal to the sanctioned string.
 func TestPinGuard_DetectsDivergence(t *testing.T) {
+	testenv.Isolate(t)
 	sanctioned, err := os.ReadFile(sanctionedFilePath)
 	if err != nil {
 		t.Fatalf("read sanctioned version file: %v", err)

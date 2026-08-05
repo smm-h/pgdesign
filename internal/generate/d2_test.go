@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 )
 
 func TestGenerateD2TwoTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "blog",
 		Tables: []model.Table{
@@ -64,6 +66,7 @@ func TestGenerateD2TwoTables(t *testing.T) {
 }
 
 func TestGenerateD2SQLTableShape(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -86,6 +89,7 @@ func TestGenerateD2SQLTableShape(t *testing.T) {
 }
 
 func TestGenerateD2FKEdgeLabelOnDelete(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -128,6 +132,7 @@ func TestGenerateD2FKEdgeLabelOnDelete(t *testing.T) {
 }
 
 func TestGenerateD2DefaultOnDelete(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -170,6 +175,7 @@ func TestGenerateD2DefaultOnDelete(t *testing.T) {
 }
 
 func TestGenerateD2PrimaryKeyConstraint(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -197,6 +203,7 @@ func TestGenerateD2PrimaryKeyConstraint(t *testing.T) {
 }
 
 func TestGenerateD2ForeignKeyConstraint(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -238,6 +245,7 @@ func TestGenerateD2ForeignKeyConstraint(t *testing.T) {
 }
 
 func TestGenerateD2ViaGenerate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "test",
 		Tables: []model.Table{
@@ -261,6 +269,7 @@ func TestGenerateD2ViaGenerate(t *testing.T) {
 }
 
 func TestRenderSVG(t *testing.T) {
+	testenv.Isolate(t)
 	d2Source := `users: {
   shape: sql_table
   id: uuid {constraint: primary_key}
@@ -292,6 +301,7 @@ posts.author_id -> users.id: CASCADE
 }
 
 func TestGenerateD2_Views(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -340,6 +350,7 @@ func TestGenerateD2_Views(t *testing.T) {
 }
 
 func TestGenerateSVGFormat(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "test",
 		Tables: []model.Table{
@@ -363,6 +374,7 @@ func TestGenerateSVGFormat(t *testing.T) {
 }
 
 func TestGenerateD2_StateMachine(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewRegistry()
 	diags := reg.LoadUserTypes([]semtype.UserTypeDef{
 		{
@@ -438,6 +450,7 @@ func TestGenerateD2_StateMachine(t *testing.T) {
 }
 
 func TestGenerateD2_NilRegistry(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -463,6 +476,7 @@ func TestGenerateD2_NilRegistry(t *testing.T) {
 // 7.3/7.4): imported tables render as minimal, schema-qualified reference shapes
 // and FK edges point at them qualified. The whole diagram must still compile.
 func TestGenerateD2ImportedRef(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{

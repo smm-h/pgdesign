@@ -3,6 +3,7 @@ package migrate
 import (
 	"context"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"strconv"
 	"testing"
@@ -159,6 +160,7 @@ func l10Iterations() int {
 // TestL10RoundTrip is the central property: applying gen(diff(a,b)) to a world at
 // revision(a) lands it at revision(b), verified by both split oracles.
 func TestL10RoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	mgr := l10Manager(t)
 	cfg := l10Config()
 
@@ -218,6 +220,7 @@ func TestL10RoundTrip(t *testing.T) {
 // reconcile built into apply, a mutated edge either errors during apply (a dropped
 // prerequisite) or lands a database that fails the re-introspection oracle.
 func TestL10DiffMinimality(t *testing.T) {
+	testenv.Isolate(t)
 	mgr := l10Manager(t)
 	cfg := l10Config()
 
@@ -361,6 +364,7 @@ func l10SMConfig() modelgen.Config {
 // recorded manifest carries the first-class sm_type object while re-introspecting
 // the same applied database recovers only the state enum, no state machine.
 func TestL10StateMachineManifestRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	mgr := l10Manager(t)
 	cfg := l10SMConfig()
 

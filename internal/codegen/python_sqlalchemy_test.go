@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -23,6 +24,7 @@ func containsSARel(s, fieldName, mappedType string) bool {
 }
 
 func TestPythonSQLAlchemyGenerator_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -134,6 +136,7 @@ func TestPythonSQLAlchemyGenerator_Basic(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_NullableAndArray(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -198,6 +201,7 @@ func TestPythonSQLAlchemyGenerator_NullableAndArray(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 
 	gen := &PythonSQLAlchemyGenerator{}
@@ -225,6 +229,7 @@ func TestPythonSQLAlchemyGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_MoneySemanticType(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -253,6 +258,7 @@ func TestPythonSQLAlchemyGenerator_MoneySemanticType(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_Enums(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "account_status", Values: []string{"active", "inactive", "banned"}},
@@ -308,6 +314,7 @@ func TestPythonSQLAlchemyGenerator_Enums(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_StateMachine(t *testing.T) {
+	testenv.Isolate(t)
 	// State machine types appear in schema.Enums (build.go appends them) and
 	// their columns carry TypeKind "state_machine".
 	schema := &model.Schema{
@@ -346,6 +353,7 @@ func TestPythonSQLAlchemyGenerator_StateMachine(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_ForeignKeys(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -412,6 +420,7 @@ func TestPythonSQLAlchemyGenerator_ForeignKeys(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_ServerDefault(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -448,6 +457,7 @@ func TestPythonSQLAlchemyGenerator_ServerDefault(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_MultipleTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -500,6 +510,7 @@ func TestPythonSQLAlchemyGenerator_MultipleTables(t *testing.T) {
 }
 
 func TestPythonSQLAlchemyGenerator_DefaultExpr(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

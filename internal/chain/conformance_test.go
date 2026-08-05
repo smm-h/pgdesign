@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"reflect"
 	"sort"
 	"testing"
@@ -53,6 +54,7 @@ func deepCopyModel(t rapid.TB, jsonBytes []byte) *model.Schema {
 // The forward direction's real content is catching a differ that reads
 // non-encoded state — if diff saw something identity does not, this would fail.
 func TestConformance_RevisionEqualImpliesDiffEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		raws := modelgen.Draw(rt, modelgen.DefaultConfig())
 		m := buildModel(rt, raws)
@@ -93,6 +95,7 @@ func TestConformance_RevisionEqualImpliesDiffEmpty(t *testing.T) {
 // <=> manifest-equal (both derive from the same per-object bytes). A model and
 // its round-trip have equal manifests; a comment perturbation makes them differ.
 func TestConformance_ManifestEqualsRevision(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		raws := modelgen.Draw(rt, modelgen.DefaultConfig())
 		m := buildModel(rt, raws)
@@ -379,6 +382,7 @@ func blindKeysFor(t rapid.TB, m *model.Schema, encFields map[string][]string) ma
 // encoded field that diff cannot see turns this RED — retiring the
 // under-reporting defect class by construction rather than field-by-field.
 func TestDiffTotalityMutationGuard(t *testing.T) {
+	testenv.Isolate(t)
 	encFields := enc.EncodedModelFields()
 	rapid.Check(t, func(rt *rapid.T) {
 		// Small models keep the guard fast: it deep-copies + canonicalizes +
@@ -409,6 +413,7 @@ func TestDiffTotalityMutationGuard(t *testing.T) {
 // evidence behind acceptedDiffBlind. It never fails (it is documentation), so it
 // can be read with `go test -run TestDiffTotalityDiscoversBlindSet -v`.
 func TestDiffTotalityDiscoversBlindSet(t *testing.T) {
+	testenv.Isolate(t)
 	encFields := enc.EncodedModelFields()
 	gen := modelgen.Generator(func() modelgen.Config {
 		c := modelgen.DefaultConfig()
@@ -439,6 +444,7 @@ func TestDiffTotalityDiscoversBlindSet(t *testing.T) {
 
 // TestDiffAgainstItselfEmpty PINS diff(a,a) = empty over generated models.
 func TestDiffAgainstItselfEmpty(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		raws := modelgen.Draw(rt, modelgen.DefaultConfig())
 		m := buildModel(rt, raws)

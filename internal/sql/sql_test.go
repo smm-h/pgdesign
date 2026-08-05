@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 )
 
 func TestQuoteIdent(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		input string
 		want  string
@@ -33,6 +35,7 @@ func TestQuoteIdent(t *testing.T) {
 }
 
 func TestQualifiedName(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		schema string
 		name   string
@@ -56,6 +59,7 @@ func TestQualifiedName(t *testing.T) {
 }
 
 func TestLiteralValue(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		value  string
 		pgType string
@@ -79,6 +83,7 @@ func TestLiteralValue(t *testing.T) {
 }
 
 func TestExprValue(t *testing.T) {
+	testenv.Isolate(t)
 	expr := "now()"
 	got := ExprValue(expr)
 	if got != expr {
@@ -87,6 +92,7 @@ func TestExprValue(t *testing.T) {
 }
 
 func TestConstraintName(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		table string
 		kind  string
@@ -110,6 +116,7 @@ func TestConstraintName(t *testing.T) {
 }
 
 func TestCreateTable(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "posts",
 		Schema: "public",
@@ -145,6 +152,7 @@ func TestCreateTable(t *testing.T) {
 }
 
 func TestCreateTable_WithPartitioning(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "events",
 		Schema: "public",
@@ -167,6 +175,7 @@ func TestCreateTable_WithPartitioning(t *testing.T) {
 }
 
 func TestCreateTable_WithMultiColumnPartitioning(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "events",
 		Schema: "public",
@@ -188,6 +197,7 @@ func TestCreateTable_WithMultiColumnPartitioning(t *testing.T) {
 }
 
 func TestCreateTable_GeneratedColumn(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "products",
 		Schema: "public",
@@ -207,6 +217,7 @@ func TestCreateTable_GeneratedColumn(t *testing.T) {
 }
 
 func TestColumnDef_VirtualVersionGate(t *testing.T) {
+	testenv.Isolate(t)
 	base := &model.Table{
 		Name:   "t",
 		Schema: "public",
@@ -263,6 +274,7 @@ func TestColumnDef_VirtualVersionGate(t *testing.T) {
 }
 
 func TestCreateTable_IdentityColumn(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "events",
 		Schema: "public",
@@ -285,6 +297,7 @@ func TestCreateTable_IdentityColumn(t *testing.T) {
 }
 
 func TestCreateTable_IdentityByDefault(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "logs",
 		Schema: "public",
@@ -303,6 +316,7 @@ func TestCreateTable_IdentityByDefault(t *testing.T) {
 }
 
 func TestCreateTable_IdentityFallbackPrePG10(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "events",
 		Schema: "public",
@@ -325,6 +339,7 @@ func TestCreateTable_IdentityFallbackPrePG10(t *testing.T) {
 }
 
 func TestCreateTable_IdentityNoFallbackPG10(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "events",
 		Schema: "public",
@@ -344,6 +359,7 @@ func TestCreateTable_IdentityNoFallbackPG10(t *testing.T) {
 }
 
 func TestCreateTable_IdentityFallbackUnknown(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "events",
 		Schema: "public",
@@ -365,6 +381,7 @@ func TestCreateTable_IdentityFallbackUnknown(t *testing.T) {
 }
 
 func TestCreateIndex(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:      "idx_posts_author_active",
 		Columns:   []string{"author_id"},
@@ -386,6 +403,7 @@ func TestCreateIndex(t *testing.T) {
 }
 
 func TestCreateIndex_GinMethod(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:      "idx_docs_content",
 		Columns:   []string{"content"},
@@ -401,6 +419,7 @@ func TestCreateIndex_GinMethod(t *testing.T) {
 }
 
 func TestCreateIndex_WithInclude(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:    "idx_orders_status",
 		Columns: []string{"status"},
@@ -415,6 +434,7 @@ func TestCreateIndex_WithInclude(t *testing.T) {
 }
 
 func TestCreateEnum(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateEnum("game", "status", []string{"active", "inactive"}, false)
 
 	expected := "CREATE TYPE game.status AS ENUM ('active', 'inactive');"
@@ -424,6 +444,7 @@ func TestCreateEnum(t *testing.T) {
 }
 
 func TestCreateEnum_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateEnum("game", "status", []string{"active"}, true)
 
 	// PostgreSQL has never supported CREATE TYPE IF NOT EXISTS; the
@@ -446,6 +467,7 @@ func TestCreateEnum_Idempotent(t *testing.T) {
 }
 
 func TestCreateTable_EnumColumnSchemaQualified(t *testing.T) {
+	testenv.Isolate(t)
 	enums := []model.Enum{
 		{Schema: "game", Name: "server_type", Values: []string{"pvp", "pve"}},
 		{Schema: "game", Name: "status", Values: []string{"active", "inactive"}},
@@ -482,6 +504,7 @@ func TestCreateTable_EnumColumnSchemaQualified(t *testing.T) {
 }
 
 func TestCreateTable_ArrayColumn(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "posts",
 		Schema: "public",
@@ -509,6 +532,7 @@ func TestCreateTable_ArrayColumn(t *testing.T) {
 }
 
 func TestCreateTable_ArrayColumnWithEnum(t *testing.T) {
+	testenv.Isolate(t)
 	enums := []model.Enum{
 		{Schema: "app", Name: "tag_type", Values: []string{"a", "b"}},
 	}
@@ -531,6 +555,7 @@ func TestCreateTable_ArrayColumnWithEnum(t *testing.T) {
 }
 
 func TestCreateTable_CrossSchemaEnum(t *testing.T) {
+	testenv.Isolate(t)
 	// Enum defined in a different schema than the table.
 	enums := []model.Enum{
 		{Schema: "shared", Name: "priority", Values: []string{"low", "medium", "high"}},
@@ -555,6 +580,7 @@ func TestCreateTable_CrossSchemaEnum(t *testing.T) {
 }
 
 func TestAlterTableAddFK(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "posts",
 		Schema: "blog",
@@ -585,6 +611,7 @@ func TestAlterTableAddFK(t *testing.T) {
 }
 
 func TestAlterTableAddUnique(t *testing.T) {
+	testenv.Isolate(t)
 	uq := &model.UniqueConstraint{
 		Name:    "uq_users_email",
 		Columns: []string{"email"},
@@ -598,6 +625,7 @@ func TestAlterTableAddUnique(t *testing.T) {
 }
 
 func TestAlterTableAddCheck(t *testing.T) {
+	testenv.Isolate(t)
 	ck := &model.CheckConstraint{
 		Name: "ck_orders_positive_amount",
 		Expr: "amount > 0",
@@ -611,6 +639,7 @@ func TestAlterTableAddCheck(t *testing.T) {
 }
 
 func TestIdempotentMode(t *testing.T) {
+	testenv.Isolate(t)
 	// CreateSchema
 	got := CreateSchema("myapp", true)
 	if !strings.Contains(got, "IF NOT EXISTS") {
@@ -654,6 +683,7 @@ func TestIdempotentMode(t *testing.T) {
 }
 
 func TestCreateSchema(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateSchema("myapp", false)
 	if got != "CREATE SCHEMA myapp;" {
 		t.Errorf("CreateSchema = %q, want %q", got, "CREATE SCHEMA myapp;")
@@ -661,6 +691,7 @@ func TestCreateSchema(t *testing.T) {
 }
 
 func TestCreateExtension(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateExtension("pgcrypto", false)
 	if got != "CREATE EXTENSION pgcrypto;" {
 		t.Errorf("CreateExtension = %q, want %q", got, "CREATE EXTENSION pgcrypto;")
@@ -668,6 +699,7 @@ func TestCreateExtension(t *testing.T) {
 }
 
 func TestCommentOn(t *testing.T) {
+	testenv.Isolate(t)
 	got := CommentOn("TABLE", "public.users", "All registered users")
 	expected := "COMMENT ON TABLE public.users IS 'All registered users';"
 	if got != expected {
@@ -676,6 +708,7 @@ func TestCommentOn(t *testing.T) {
 }
 
 func TestCommentOn_EscapesSingleQuotes(t *testing.T) {
+	testenv.Isolate(t)
 	got := CommentOn("COLUMN", "public.users.name", "User's full name")
 	if !strings.Contains(got, "User''s full name") {
 		t.Errorf("expected escaped single quote, got: %s", got)
@@ -683,6 +716,7 @@ func TestCommentOn_EscapesSingleQuotes(t *testing.T) {
 }
 
 func TestAlterTableOwner(t *testing.T) {
+	testenv.Isolate(t)
 	got := AlterTableOwner("public", "users", "app_role")
 	expected := "ALTER TABLE public.users OWNER TO app_role;"
 	if got != expected {
@@ -691,6 +725,7 @@ func TestAlterTableOwner(t *testing.T) {
 }
 
 func TestCreateIndex_AllASC(t *testing.T) {
+	testenv.Isolate(t)
 	// All ASC (default) -- no Desc field set. Backward compatible.
 	index := &model.Index{
 		Name:    "idx_events_channel_sent",
@@ -708,6 +743,7 @@ func TestCreateIndex_AllASC(t *testing.T) {
 }
 
 func TestCreateIndex_SomeDESC(t *testing.T) {
+	testenv.Isolate(t)
 	// Mixed: first column ASC, second column DESC.
 	index := &model.Index{
 		Name:    "idx_events_channel_sent",
@@ -730,6 +766,7 @@ func TestCreateIndex_SomeDESC(t *testing.T) {
 }
 
 func TestCreateIndex_AllDESC(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:    "idx_events_recent",
 		Columns: []string{"created_at", "id"},
@@ -744,6 +781,7 @@ func TestCreateIndex_AllDESC(t *testing.T) {
 }
 
 func TestCreateIndex_DESCWithOpclass(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:      "idx_docs_title",
 		Columns:   []string{"title"},
@@ -760,6 +798,7 @@ func TestCreateIndex_DESCWithOpclass(t *testing.T) {
 }
 
 func TestCreateIndex_Concurrently(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:    "idx_posts_author_id",
 		Columns: []string{"author_id"},
@@ -776,6 +815,7 @@ func TestCreateIndex_Concurrently(t *testing.T) {
 }
 
 func TestCreateIndex_ConcurrentlyWithIdempotent(t *testing.T) {
+	testenv.Isolate(t)
 	// When both concurrently and idempotent are true, CONCURRENTLY wins
 	// and IF NOT EXISTS is omitted (incompatible in some PG versions).
 	index := &model.Index{
@@ -794,6 +834,7 @@ func TestCreateIndex_ConcurrentlyWithIdempotent(t *testing.T) {
 }
 
 func TestAlterTableAddFK_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "posts",
 		Schema: "blog",
@@ -827,6 +868,7 @@ func TestAlterTableAddFK_Idempotent(t *testing.T) {
 }
 
 func TestAlterTableAddUnique_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	uq := &model.UniqueConstraint{
 		Name:    "uq_users_email",
 		Columns: []string{"email"},
@@ -852,6 +894,7 @@ func TestAlterTableAddUnique_Idempotent(t *testing.T) {
 }
 
 func TestAlterTableAddUnique_Deferrable(t *testing.T) {
+	testenv.Isolate(t)
 	uq := &model.UniqueConstraint{
 		Name:       "uq_users_email",
 		Columns:    []string{"email"},
@@ -866,6 +909,7 @@ func TestAlterTableAddUnique_Deferrable(t *testing.T) {
 }
 
 func TestAlterTableAddUnique_DeferrableInitiallyDeferred(t *testing.T) {
+	testenv.Isolate(t)
 	uq := &model.UniqueConstraint{
 		Name:              "uq_users_email",
 		Columns:           []string{"email"},
@@ -881,6 +925,7 @@ func TestAlterTableAddUnique_DeferrableInitiallyDeferred(t *testing.T) {
 }
 
 func TestCreatePartitionOf(t *testing.T) {
+	testenv.Isolate(t)
 	child := &model.PartitionSpec{
 		Name:  "events_2024_01",
 		Bound: "FROM ('2024-01-01') TO ('2024-02-01')",
@@ -900,6 +945,7 @@ func TestCreatePartitionOf(t *testing.T) {
 }
 
 func TestCreatePartitionOf_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	child := &model.PartitionSpec{
 		Name:  "events_2024_01",
 		Bound: "FROM ('2024-01-01') TO ('2024-02-01')",
@@ -913,6 +959,7 @@ func TestCreatePartitionOf_Idempotent(t *testing.T) {
 }
 
 func TestCreatePartmanParent(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreatePartmanParent("app", "events", "created_at", "1 month", 4)
 
 	if !strings.Contains(got, "partman.create_parent(") {
@@ -933,6 +980,7 @@ func TestCreatePartmanParent(t *testing.T) {
 }
 
 func TestUpdatePartmanConfig(t *testing.T) {
+	testenv.Isolate(t)
 	got := UpdatePartmanConfig("app", "events", "6 months", true)
 
 	if !strings.Contains(got, "UPDATE partman.part_config") {
@@ -950,6 +998,7 @@ func TestUpdatePartmanConfig(t *testing.T) {
 }
 
 func TestUpdatePartmanConfig_KeepTableFalse(t *testing.T) {
+	testenv.Isolate(t)
 	got := UpdatePartmanConfig("app", "events", "3 months", false)
 
 	if !strings.Contains(got, "retention_keep_table = false") {
@@ -958,6 +1007,7 @@ func TestUpdatePartmanConfig_KeepTableFalse(t *testing.T) {
 }
 
 func TestAlterTableEnableRLS(t *testing.T) {
+	testenv.Isolate(t)
 	got := AlterTableEnableRLS("app", "documents")
 	expected := "ALTER TABLE app.documents ENABLE ROW LEVEL SECURITY;"
 	if got != expected {
@@ -966,6 +1016,7 @@ func TestAlterTableEnableRLS(t *testing.T) {
 }
 
 func TestAlterTableEnableRLS_ReservedTableName(t *testing.T) {
+	testenv.Isolate(t)
 	got := AlterTableEnableRLS("public", "user")
 	expected := `ALTER TABLE public."user" ENABLE ROW LEVEL SECURITY;`
 	if got != expected {
@@ -974,6 +1025,7 @@ func TestAlterTableEnableRLS_ReservedTableName(t *testing.T) {
 }
 
 func TestCreatePolicy_SelectUsingOnly(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "users_see_own",
 		Operation: "SELECT",
@@ -1001,6 +1053,7 @@ func TestCreatePolicy_SelectUsingOnly(t *testing.T) {
 }
 
 func TestCreatePolicy_InsertWithCheckOnly(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "users_insert_own",
 		Operation: "INSERT",
@@ -1022,6 +1075,7 @@ func TestCreatePolicy_InsertWithCheckOnly(t *testing.T) {
 }
 
 func TestCreatePolicy_UpdateBothClauses(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "users_update_own",
 		Operation: "UPDATE",
@@ -1044,6 +1098,7 @@ func TestCreatePolicy_UpdateBothClauses(t *testing.T) {
 }
 
 func TestCreatePolicy_AllOmitsFOR(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "users_all",
 		Operation: "ALL",
@@ -1062,6 +1117,7 @@ func TestCreatePolicy_AllOmitsFOR(t *testing.T) {
 }
 
 func TestCreatePolicy_NoRole(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "public_read",
 		Operation: "SELECT",
@@ -1079,6 +1135,7 @@ func TestCreatePolicy_NoRole(t *testing.T) {
 }
 
 func TestCreatePolicy_SchemaQualified(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "tenant_isolation",
 		Operation: "SELECT",
@@ -1095,6 +1152,7 @@ func TestCreatePolicy_SchemaQualified(t *testing.T) {
 }
 
 func TestCreatePolicy_RestrictiveType(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "deny_all",
 		Type:      "RESTRICTIVE",
@@ -1117,6 +1175,7 @@ func TestCreatePolicy_RestrictiveType(t *testing.T) {
 }
 
 func TestCreatePolicy_PermissiveOmitted(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "allow_read",
 		Type:      "PERMISSIVE",
@@ -1135,6 +1194,7 @@ func TestCreatePolicy_PermissiveOmitted(t *testing.T) {
 }
 
 func TestCreatePolicy_IdempotentFalse(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "users_see_own",
 		Operation: "SELECT",
@@ -1156,6 +1216,7 @@ func TestCreatePolicy_IdempotentFalse(t *testing.T) {
 }
 
 func TestCreatePolicy_IdempotentPG15(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "users_see_own",
 		Operation: "SELECT",
@@ -1177,6 +1238,7 @@ func TestCreatePolicy_IdempotentPG15(t *testing.T) {
 }
 
 func TestCreatePolicy_IdempotentPG13(t *testing.T) {
+	testenv.Isolate(t)
 	p := model.Policy{
 		Name:      "users_see_own",
 		Operation: "SELECT",
@@ -1207,6 +1269,7 @@ func TestCreatePolicy_IdempotentPG13(t *testing.T) {
 }
 
 func TestAlterTableForceRLS(t *testing.T) {
+	testenv.Isolate(t)
 	got := AlterTableForceRLS("app", "secrets")
 	expected := "ALTER TABLE app.secrets FORCE ROW LEVEL SECURITY;"
 	if got != expected {
@@ -1215,6 +1278,7 @@ func TestAlterTableForceRLS(t *testing.T) {
 }
 
 func TestAlterTableForceRLS_ReservedName(t *testing.T) {
+	testenv.Isolate(t)
 	got := AlterTableForceRLS("public", "user")
 	expected := `ALTER TABLE public."user" FORCE ROW LEVEL SECURITY;`
 	if got != expected {
@@ -1223,6 +1287,7 @@ func TestAlterTableForceRLS_ReservedName(t *testing.T) {
 }
 
 func TestAlterTableAddCheck_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	ck := &model.CheckConstraint{
 		Name: "ck_orders_positive_amount",
 		Expr: "amount > 0",
@@ -1245,6 +1310,7 @@ func TestAlterTableAddCheck_Idempotent(t *testing.T) {
 }
 
 func TestLiteralValue_EnumDefault_Correct(t *testing.T) {
+	testenv.Isolate(t)
 	// Correct flow: col.Default = "created", col.PGType = "status" (enum name)
 	// LiteralValue should produce 'created' (single-quoted, as enum literals are strings)
 	got := LiteralValue("created", "status")
@@ -1255,6 +1321,7 @@ func TestLiteralValue_EnumDefault_Correct(t *testing.T) {
 }
 
 func TestCreateDenyMutationFunction(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateDenyMutationFunction("app")
 	if !strings.Contains(got, "CREATE OR REPLACE FUNCTION app.pgdesign_deny_mutation()") {
 		t.Errorf("expected function creation, got:\n%s", got)
@@ -1268,6 +1335,7 @@ func TestCreateDenyMutationFunction(t *testing.T) {
 }
 
 func TestCreateAppendOnlyTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateAppendOnlyTrigger("app", "events", false, 0)
 	want := "CREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON app.events FOR EACH ROW EXECUTE FUNCTION app.pgdesign_deny_mutation();"
 	if got != want {
@@ -1276,6 +1344,7 @@ func TestCreateAppendOnlyTrigger(t *testing.T) {
 }
 
 func TestCreateAppendOnlyTrigger_IdempotentPG14(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateAppendOnlyTrigger("app", "events", true, 14)
 	want := "CREATE OR REPLACE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON app.events FOR EACH ROW EXECUTE FUNCTION app.pgdesign_deny_mutation();"
 	if got != want {
@@ -1284,6 +1353,7 @@ func TestCreateAppendOnlyTrigger_IdempotentPG14(t *testing.T) {
 }
 
 func TestCreateAppendOnlyTrigger_IdempotentPG13(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateAppendOnlyTrigger("app", "events", true, 13)
 	want := "DROP TRIGGER IF EXISTS deny_mutation ON app.events;\nCREATE TRIGGER deny_mutation BEFORE UPDATE OR DELETE ON app.events FOR EACH ROW EXECUTE FUNCTION app.pgdesign_deny_mutation();"
 	if got != want {
@@ -1292,6 +1362,7 @@ func TestCreateAppendOnlyTrigger_IdempotentPG13(t *testing.T) {
 }
 
 func TestLiteralValue_ArrayDefaults(t *testing.T) {
+	testenv.Isolate(t)
 	// Array defaults are always array literals (e.g., {}, {1,2,3}) which
 	// PostgreSQL expects as single-quoted strings regardless of element type.
 	tests := []struct {
@@ -1317,6 +1388,7 @@ func TestLiteralValue_ArrayDefaults(t *testing.T) {
 }
 
 func TestIsNumericType_ArraySuffix(t *testing.T) {
+	testenv.Isolate(t)
 	// "integer[]" must NOT be considered numeric -- it's an array type,
 	// and array literals like {} need single-quoting.
 	if isNumericType("integer[]") {
@@ -1325,6 +1397,7 @@ func TestIsNumericType_ArraySuffix(t *testing.T) {
 }
 
 func TestColumnDef_ArrayIntegerDefault_QuotedEmptyArray(t *testing.T) {
+	testenv.Isolate(t)
 	// Regression test: columnDef must pass the resolved pgType (with "[]" suffix)
 	// to LiteralValue, so array literals like {} are single-quoted.
 	table := &model.Table{
@@ -1350,6 +1423,7 @@ func TestColumnDef_ArrayIntegerDefault_QuotedEmptyArray(t *testing.T) {
 }
 
 func TestCreateIndex_WithParams(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:    "idx_items_embedding",
 		Columns: []string{"embedding"},
@@ -1369,6 +1443,7 @@ func TestCreateIndex_WithParams(t *testing.T) {
 }
 
 func TestCreateIndex_WithParamsAndWhere(t *testing.T) {
+	testenv.Isolate(t)
 	// WITH must come before WHERE.
 	index := &model.Index{
 		Name:    "idx_items_embedding",
@@ -1394,6 +1469,7 @@ func TestCreateIndex_WithParamsAndWhere(t *testing.T) {
 }
 
 func TestCreateView(t *testing.T) {
+	testenv.Isolate(t)
 	view := &model.View{
 		Name:  "active_users",
 		Query: "SELECT id, name FROM users WHERE active = true",
@@ -1425,6 +1501,7 @@ func TestCreateView(t *testing.T) {
 }
 
 func TestDropView(t *testing.T) {
+	testenv.Isolate(t)
 	// Basic DROP VIEW (not idempotent).
 	got := DropView("app", "active_users", false)
 	if got != "DROP VIEW app.active_users;\n" {
@@ -1439,6 +1516,7 @@ func TestDropView(t *testing.T) {
 }
 
 func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
+	testenv.Isolate(t)
 	// Wrong pattern: if someone writes default = "'created'" in TOML,
 	// the value reaching LiteralValue is "'created'" (with embedded single quotes).
 	// LiteralValue escapes the quotes: '''created''' -- this is bad SQL.
@@ -1450,6 +1528,7 @@ func TestLiteralValue_EnumDefault_DoubleQuotedBug(t *testing.T) {
 }
 
 func TestCreateMaterializedView_WithData(t *testing.T) {
+	testenv.Isolate(t)
 	mv := &model.MaterializedView{
 		Name:     "monthly_stats",
 		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
@@ -1468,6 +1547,7 @@ func TestCreateMaterializedView_WithData(t *testing.T) {
 }
 
 func TestCreateMaterializedView_WithNoData(t *testing.T) {
+	testenv.Isolate(t)
 	mv := &model.MaterializedView{
 		Name:     "monthly_stats",
 		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
@@ -1488,6 +1568,7 @@ func TestCreateMaterializedView_WithNoData(t *testing.T) {
 }
 
 func TestCreateMaterializedView_IdempotentFalse(t *testing.T) {
+	testenv.Isolate(t)
 	mv := &model.MaterializedView{
 		Name:     "monthly_stats",
 		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
@@ -1504,6 +1585,7 @@ func TestCreateMaterializedView_IdempotentFalse(t *testing.T) {
 }
 
 func TestCreateMaterializedView_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	mv := &model.MaterializedView{
 		Name:     "monthly_stats",
 		Query:    "SELECT date_trunc('month', created_at) AS month, count(*) FROM orders GROUP BY 1",
@@ -1536,6 +1618,7 @@ func TestCreateMaterializedView_Idempotent(t *testing.T) {
 }
 
 func TestDropMaterializedView(t *testing.T) {
+	testenv.Isolate(t)
 	got := DropMaterializedView("public", "monthly_stats", false)
 	if got != "DROP MATERIALIZED VIEW public.monthly_stats;\n" {
 		t.Errorf("DropMaterializedView = %q, want %q", got, "DROP MATERIALIZED VIEW public.monthly_stats;\n")
@@ -1546,6 +1629,7 @@ func TestDropMaterializedView(t *testing.T) {
 }
 
 func TestDropMaterializedView_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	got := DropMaterializedView("public", "monthly_stats", true)
 	if got != "DROP MATERIALIZED VIEW IF EXISTS public.monthly_stats;\n" {
 		t.Errorf("DropMaterializedView idempotent = %q, want %q", got, "DROP MATERIALIZED VIEW IF EXISTS public.monthly_stats;\n")
@@ -1553,6 +1637,7 @@ func TestDropMaterializedView_Idempotent(t *testing.T) {
 }
 
 func TestRefreshMaterializedView(t *testing.T) {
+	testenv.Isolate(t)
 	got := RefreshMaterializedView("public", "monthly_stats", false)
 	if got != "REFRESH MATERIALIZED VIEW public.monthly_stats;\n" {
 		t.Errorf("RefreshMaterializedView = %q, want %q", got, "REFRESH MATERIALIZED VIEW public.monthly_stats;\n")
@@ -1563,6 +1648,7 @@ func TestRefreshMaterializedView(t *testing.T) {
 }
 
 func TestRefreshMaterializedView_Concurrently(t *testing.T) {
+	testenv.Isolate(t)
 	got := RefreshMaterializedView("public", "monthly_stats", true)
 	if got != "REFRESH MATERIALIZED VIEW CONCURRENTLY public.monthly_stats;\n" {
 		t.Errorf("RefreshMaterializedView concurrent = %q, want %q", got, "REFRESH MATERIALIZED VIEW CONCURRENTLY public.monthly_stats;\n")
@@ -1570,6 +1656,7 @@ func TestRefreshMaterializedView_Concurrently(t *testing.T) {
 }
 
 func TestCreateTable_ColumnCollation(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "messages",
 		Schema: "public",
@@ -1590,6 +1677,7 @@ func TestCreateTable_ColumnCollation(t *testing.T) {
 }
 
 func TestCreateTable_ColumnCollation_NoCollation(t *testing.T) {
+	testenv.Isolate(t)
 	table := &model.Table{
 		Name:   "items",
 		Schema: "public",
@@ -1606,6 +1694,7 @@ func TestCreateTable_ColumnCollation_NoCollation(t *testing.T) {
 }
 
 func TestCreateIndex_WithCollation(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:       "idx_messages_content",
 		Columns:    []string{"content"},
@@ -1618,6 +1707,7 @@ func TestCreateIndex_WithCollation(t *testing.T) {
 }
 
 func TestCreateIndex_WithCollationAndOpclass(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:       "idx_messages_content",
 		Columns:    []string{"content"},
@@ -1632,6 +1722,7 @@ func TestCreateIndex_WithCollationAndOpclass(t *testing.T) {
 }
 
 func TestCreateIndex_WithCollationAndDesc(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:       "idx_messages_content",
 		Columns:    []string{"content"},
@@ -1645,6 +1736,7 @@ func TestCreateIndex_WithCollationAndDesc(t *testing.T) {
 }
 
 func TestCreateIndex_MultiColumnCollation(t *testing.T) {
+	testenv.Isolate(t)
 	index := &model.Index{
 		Name:       "idx_multi",
 		Columns:    []string{"first_name", "last_name"},
@@ -1660,6 +1752,7 @@ func TestCreateIndex_MultiColumnCollation(t *testing.T) {
 }
 
 func TestCreateDomain(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name   string
 		schema string
@@ -1715,6 +1808,7 @@ func TestCreateDomain(t *testing.T) {
 }
 
 func TestCreateCompositeType(t *testing.T) {
+	testenv.Isolate(t)
 	ct := model.CompositeType{
 		Name:   "address",
 		Schema: "public",
@@ -1748,6 +1842,7 @@ func TestCreateCompositeType(t *testing.T) {
 }
 
 func TestCreateCompositeType_ReservedFieldName(t *testing.T) {
+	testenv.Isolate(t)
 	ct := model.CompositeType{
 		Name:   "meta",
 		Schema: "app",
@@ -1764,6 +1859,7 @@ func TestCreateCompositeType_ReservedFieldName(t *testing.T) {
 }
 
 func TestDropCompositeType(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name    string
 		schema  string
@@ -1798,6 +1894,7 @@ func TestDropCompositeType(t *testing.T) {
 }
 
 func TestDropDomain(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name    string
 		schema  string
@@ -1832,6 +1929,7 @@ func TestDropDomain(t *testing.T) {
 }
 
 func TestCreateSequence_Full(t *testing.T) {
+	testenv.Isolate(t)
 	seq := &model.Sequence{
 		Name:      "order_seq",
 		Start:     model.Int64Ptr(100),
@@ -1850,6 +1948,7 @@ func TestCreateSequence_Full(t *testing.T) {
 }
 
 func TestCreateSequence_Minimal(t *testing.T) {
+	testenv.Isolate(t)
 	seq := &model.Sequence{Name: "simple_seq"}
 	got := CreateSequence("public", seq, false)
 	want := "CREATE SEQUENCE public.simple_seq NO MINVALUE NO MAXVALUE NO CYCLE;"
@@ -1859,6 +1958,7 @@ func TestCreateSequence_Minimal(t *testing.T) {
 }
 
 func TestCreateSequence_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	seq := &model.Sequence{Name: "order_seq"}
 	got := CreateSequence("public", seq, true)
 	want := "CREATE SEQUENCE IF NOT EXISTS public.order_seq NO MINVALUE NO MAXVALUE NO CYCLE;"
@@ -1868,6 +1968,7 @@ func TestCreateSequence_Idempotent(t *testing.T) {
 }
 
 func TestCreateSequence_NotIdempotent(t *testing.T) {
+	testenv.Isolate(t)
 	seq := &model.Sequence{Name: "order_seq"}
 	got := CreateSequence("public", seq, false)
 	if strings.Contains(got, "IF NOT EXISTS") {
@@ -1880,6 +1981,7 @@ func TestCreateSequence_NotIdempotent(t *testing.T) {
 }
 
 func TestWrapIdempotentCatalogCheck(t *testing.T) {
+	testenv.Isolate(t)
 	catalogSQL := "SELECT 1 FROM pg_type WHERE typname = 'my_domain'"
 	createStmt := "CREATE DOMAIN public.my_domain AS text"
 	got := wrapIdempotentCatalogCheck(catalogSQL, createStmt)
@@ -1895,6 +1997,7 @@ END $$;`
 }
 
 func TestWrapIdempotentCatalogCheck_EscapesSingleQuotes(t *testing.T) {
+	testenv.Isolate(t)
 	catalogSQL := "SELECT 1 FROM pg_type WHERE typname = 'status'"
 	createStmt := "CREATE DOMAIN public.status AS text DEFAULT 'active' CHECK (VALUE IN ('active', 'inactive'))"
 	got := wrapIdempotentCatalogCheck(catalogSQL, createStmt)
@@ -1908,6 +2011,7 @@ func TestWrapIdempotentCatalogCheck_EscapesSingleQuotes(t *testing.T) {
 }
 
 func TestDropSequence(t *testing.T) {
+	testenv.Isolate(t)
 	got := DropSequence("myapp", "order_seq", false)
 	want := "DROP SEQUENCE myapp.order_seq;"
 	if got != want {
@@ -1916,6 +2020,7 @@ func TestDropSequence(t *testing.T) {
 }
 
 func TestDropSequence_Cascade(t *testing.T) {
+	testenv.Isolate(t)
 	got := DropSequence("myapp", "order_seq", true)
 	want := "DROP SEQUENCE myapp.order_seq CASCADE;"
 	if got != want {
@@ -1924,6 +2029,7 @@ func TestDropSequence_Cascade(t *testing.T) {
 }
 
 func TestAlterSequence(t *testing.T) {
+	testenv.Isolate(t)
 	seq := &model.Sequence{
 		Name:  "order_seq",
 		Start: model.Int64Ptr(500),
@@ -1937,6 +2043,7 @@ func TestAlterSequence(t *testing.T) {
 }
 
 func TestCreateFunction_Full(t *testing.T) {
+	testenv.Isolate(t)
 	f := model.Function{
 		Name:       "calc_total",
 		Language:   "plpgsql",
@@ -1973,6 +2080,7 @@ func TestCreateFunction_Full(t *testing.T) {
 }
 
 func TestCreateFunction_Minimal(t *testing.T) {
+	testenv.Isolate(t)
 	f := model.Function{
 		Name:       "get_one",
 		Language:   "sql",
@@ -2005,6 +2113,7 @@ func TestCreateFunction_Minimal(t *testing.T) {
 }
 
 func TestCreateFunction_Procedure(t *testing.T) {
+	testenv.Isolate(t)
 	f := model.Function{
 		Name:     "do_cleanup",
 		Language: "plpgsql",
@@ -2031,6 +2140,7 @@ func TestCreateFunction_Procedure(t *testing.T) {
 }
 
 func TestDropFunction(t *testing.T) {
+	testenv.Isolate(t)
 	f := model.Function{
 		Name: "calc_total",
 		Args: []model.FunctionArg{
@@ -2051,6 +2161,7 @@ func TestDropFunction(t *testing.T) {
 }
 
 func TestDropFunction_Procedure(t *testing.T) {
+	testenv.Isolate(t)
 	f := model.Function{
 		Name:   "do_cleanup",
 		IsProc: true,
@@ -2063,6 +2174,7 @@ func TestDropFunction_Procedure(t *testing.T) {
 }
 
 func TestCreateTrigger_Full(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:     "audit_changes",
 		Function: "audit_func",
@@ -2100,6 +2212,7 @@ func TestCreateTrigger_Full(t *testing.T) {
 }
 
 func TestStateMachineTriggerFuncName(t *testing.T) {
+	testenv.Isolate(t)
 	got := StateMachineTriggerFuncName("orders", "status")
 	want := "_pgdesign_sm_orders_status"
 	if got != want {
@@ -2108,6 +2221,7 @@ func TestStateMachineTriggerFuncName(t *testing.T) {
 }
 
 func TestCreateStateMachineTriggerFunction(t *testing.T) {
+	testenv.Isolate(t)
 	transitions := []semtype.SMTransitionDef{
 		{
 			Name: "activate",
@@ -2180,6 +2294,7 @@ func TestCreateStateMachineTriggerFunction(t *testing.T) {
 }
 
 func TestCreateStateMachineTriggerFunction_NoRequires(t *testing.T) {
+	testenv.Isolate(t)
 	transitions := []semtype.SMTransitionDef{
 		{Name: "start", From: []string{"draft"}, To: "active"},
 		{Name: "finish", From: []string{"active"}, To: "done"},
@@ -2201,6 +2316,7 @@ func TestCreateStateMachineTriggerFunction_NoRequires(t *testing.T) {
 }
 
 func TestCreateStateMachineTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateStateMachineTrigger("app", "orders", "status", false, 0)
 	want := "CREATE TRIGGER _pgdesign_sm_orders_status BEFORE UPDATE OF status ON app.orders FOR EACH ROW EXECUTE FUNCTION app._pgdesign_sm_orders_status();"
 	if got != want {
@@ -2209,6 +2325,7 @@ func TestCreateStateMachineTrigger(t *testing.T) {
 }
 
 func TestCreateStateMachineTrigger_ReservedColumnName(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateStateMachineTrigger("app", "items", "type", false, 0)
 	// "type" is a reserved word and should be quoted.
 	if !strings.Contains(got, `UPDATE OF "type"`) {
@@ -2217,6 +2334,7 @@ func TestCreateStateMachineTrigger_ReservedColumnName(t *testing.T) {
 }
 
 func TestCreateStateMachineTrigger_IdempotentPG14(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateStateMachineTrigger("app", "orders", "status", true, 14)
 	want := "CREATE OR REPLACE TRIGGER _pgdesign_sm_orders_status BEFORE UPDATE OF status ON app.orders FOR EACH ROW EXECUTE FUNCTION app._pgdesign_sm_orders_status();"
 	if got != want {
@@ -2225,6 +2343,7 @@ func TestCreateStateMachineTrigger_IdempotentPG14(t *testing.T) {
 }
 
 func TestCreateStateMachineTrigger_IdempotentPG13(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateStateMachineTrigger("app", "orders", "status", true, 13)
 	// Pre-PG14: should emit DROP IF EXISTS before CREATE.
 	if !strings.Contains(got, "DROP TRIGGER IF EXISTS _pgdesign_sm_orders_status ON app.orders;") {
@@ -2239,6 +2358,7 @@ func TestCreateStateMachineTrigger_IdempotentPG13(t *testing.T) {
 }
 
 func TestCreateTrigger_Minimal(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:     "simple",
 		Function: "my_func",
@@ -2269,6 +2389,7 @@ func TestCreateTrigger_Minimal(t *testing.T) {
 }
 
 func TestCreateTrigger_Constraint(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:              "fk_check",
 		Function:          "check_func",
@@ -2292,6 +2413,7 @@ func TestCreateTrigger_Constraint(t *testing.T) {
 }
 
 func TestCreateTrigger_WithReferencing(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:           "log_changes",
 		Function:       "log_func",
@@ -2308,6 +2430,7 @@ func TestCreateTrigger_WithReferencing(t *testing.T) {
 }
 
 func TestCreateTrigger_Statement(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:     "batch_notify",
 		Function: "notify_func",
@@ -2327,6 +2450,7 @@ func TestCreateTrigger_Statement(t *testing.T) {
 }
 
 func TestCreateTrigger_IdempotentPG14(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:     "audit_changes",
 		Function: "audit_func",
@@ -2344,6 +2468,7 @@ func TestCreateTrigger_IdempotentPG14(t *testing.T) {
 }
 
 func TestCreateTrigger_IdempotentPG13(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:     "audit_changes",
 		Function: "audit_func",
@@ -2364,6 +2489,7 @@ func TestCreateTrigger_IdempotentPG13(t *testing.T) {
 }
 
 func TestCreateTrigger_IdempotentConstraintPG14(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:       "fk_check",
 		Function:   "check_func",
@@ -2379,6 +2505,7 @@ func TestCreateTrigger_IdempotentConstraintPG14(t *testing.T) {
 }
 
 func TestCreateTrigger_IdempotentConstraintPG13(t *testing.T) {
+	testenv.Isolate(t)
 	trig := model.Trigger{
 		Name:       "fk_check",
 		Function:   "check_func",
@@ -2400,6 +2527,7 @@ func TestCreateTrigger_IdempotentConstraintPG13(t *testing.T) {
 }
 
 func TestDropTrigger(t *testing.T) {
+	testenv.Isolate(t)
 	got := DropTrigger("app", "orders", "audit_changes")
 	for _, want := range []string{
 		"DROP TRIGGER",
@@ -2414,6 +2542,7 @@ func TestDropTrigger(t *testing.T) {
 }
 
 func TestCreateDomain_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	d := model.Domain{Name: "slug", BaseType: typeinfo.T("text"), NotNull: true, Check: "VALUE ~ '^[a-z0-9-]+$'"}
 
 	// idempotent=false: bare CREATE DOMAIN
@@ -2451,6 +2580,7 @@ func TestCreateDomain_Idempotent(t *testing.T) {
 }
 
 func TestCreateCompositeType_Idempotent(t *testing.T) {
+	testenv.Isolate(t)
 	ct := model.CompositeType{
 		Name:   "address",
 		Schema: "public",
@@ -2500,6 +2630,7 @@ func TestCreateCompositeType_Idempotent(t *testing.T) {
 // be emitted bare (e.g. "email_addr" instead of "game.email_addr"), which
 // failed on fresh connections whose search_path does not include the schema.
 func TestCreateTable_DomainColumnSchemaQualified(t *testing.T) {
+	testenv.Isolate(t)
 	domains := []model.Domain{
 		{Schema: "game", Name: "email_addr", BaseType: typeinfo.T("text"), Check: "VALUE LIKE '%@%'"},
 	}
@@ -2528,6 +2659,7 @@ func TestCreateTable_DomainColumnSchemaQualified(t *testing.T) {
 }
 
 func TestCreateExtensionInSchema(t *testing.T) {
+	testenv.Isolate(t)
 	got := CreateExtensionInSchema("pg_partman", "partman", false)
 	want := "CREATE EXTENSION pg_partman SCHEMA partman;"
 	if got != want {
@@ -2542,6 +2674,7 @@ func TestCreateExtensionInSchema(t *testing.T) {
 }
 
 func TestPartmanRunMaintenanceCron(t *testing.T) {
+	testenv.Isolate(t)
 	got := PartmanRunMaintenanceCron("*/30 * * * *")
 	// Golden assertion: exact SQL output for pg_cron scheduling of partman maintenance.
 	want := `SELECT cron.schedule('partman-maintenance', '*/30 * * * *', $$CALL partman.run_maintenance_proc()$$);`
@@ -2551,6 +2684,7 @@ func TestPartmanRunMaintenanceCron(t *testing.T) {
 }
 
 func TestPartmanRunMaintenanceCron_CustomSchedule(t *testing.T) {
+	testenv.Isolate(t)
 	got := PartmanRunMaintenanceCron("0 3 * * *")
 	want := `SELECT cron.schedule('partman-maintenance', '0 3 * * *', $$CALL partman.run_maintenance_proc()$$);`
 	if got != want {

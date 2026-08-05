@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -29,6 +30,7 @@ import (
 //     internal/sqlparse, and the retired normalizer internals (canonicalString,
 //     collapseWhitespace) appear nowhere.
 func TestNoSecondNormalizer(t *testing.T) {
+	testenv.Isolate(t)
 	repoRoot := filepath.Join("..", "..")
 
 	// Packages permitted to import go-pgquery directly. sqlparse IS N's home;

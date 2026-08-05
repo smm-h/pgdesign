@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -122,6 +123,7 @@ on_delete = "CASCADE"
 }
 
 func TestImportsE2E_LockVendorsSurfaceAndCheckPasses(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 	consumer := makeConsumer(t, fw, "ref")
 	t.Chdir(consumer)
@@ -168,6 +170,7 @@ func TestImportsE2E_LockVendorsSurfaceAndCheckPasses(t *testing.T) {
 }
 
 func TestImportsE2E_UpdateRequiresExistingLock(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 	consumer := makeConsumer(t, fw, "ref")
 	t.Chdir(consumer)
@@ -192,6 +195,7 @@ func TestImportsE2E_UpdateRequiresExistingLock(t *testing.T) {
 }
 
 func TestImportsE2E_UnknownAliasArg(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 	consumer := makeConsumer(t, fw, "ref")
 	t.Chdir(consumer)
@@ -203,6 +207,7 @@ func TestImportsE2E_UnknownAliasArg(t *testing.T) {
 }
 
 func TestImportsE2E_BadRef(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 	consumer := t.TempDir()
 	writeFile(t, consumer, "pgdesign.toml", `[project]
@@ -242,6 +247,7 @@ on_delete = "CASCADE"
 }
 
 func TestImportsE2E_DriftedColumnTypeDetectedOffline(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 	// Consumer's local user_id is "text" but the framework users.id is uuid-based
 	// "id" -> junction type drift.

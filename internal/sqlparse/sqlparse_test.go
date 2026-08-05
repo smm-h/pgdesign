@@ -1,6 +1,7 @@
 package sqlparse
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func TestSplitStatements(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("single statement", func(t *testing.T) {
 		stmts, err := SplitStatements("SELECT 1;")
 		if err != nil {
@@ -121,6 +123,7 @@ $$ LANGUAGE plpgsql;`
 }
 
 func TestDeparseExpr(t *testing.T) {
+	testenv.Isolate(t)
 	t.Run("simple column reference", func(t *testing.T) {
 		node := &pg.Node{Node: &pg.Node_ColumnRef{ColumnRef: &pg.ColumnRef{
 			Fields: []*pg.Node{{Node: &pg.Node_String_{String_: &pg.String{Sval: "name"}}}},
@@ -178,6 +181,7 @@ func TestDeparseExpr(t *testing.T) {
 }
 
 func TestExtractTableRefs(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name    string
 		sql     string
@@ -267,6 +271,7 @@ func TestExtractTableRefs(t *testing.T) {
 }
 
 func TestExtractTableRefsEdgeCases(t *testing.T) {
+	testenv.Isolate(t)
 	// Verify the function compiles and handles whitespace-only input.
 	refs, err := ExtractTableRefs("   \t\n  ")
 	if err != nil {

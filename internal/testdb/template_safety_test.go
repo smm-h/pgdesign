@@ -1,6 +1,7 @@
 package testdb
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"net/url"
 	"regexp"
 	"strings"
@@ -12,6 +13,7 @@ import (
 // the class of bug where a database name is interpolated into SQL instead of
 // using $1, ?, or %s placeholders.
 func TestTemplateNoSQLInterpolation(t *testing.T) {
+	testenv.Isolate(t)
 	// Direct check: datname comparisons must use parameterized queries.
 	// This is the specific pattern from the bug: WHERE datname = '<interpolated>'.
 	t.Run("datname_parameterized", func(t *testing.T) {
@@ -166,6 +168,7 @@ func TestTemplateNoSQLInterpolation(t *testing.T) {
 // as a public/exported field. The name must be private to enforce the opaque
 // handle pattern.
 func TestTemplateNoPublicName(t *testing.T) {
+	testenv.Isolate(t)
 	type check struct {
 		lang    string
 		pattern *regexp.Regexp
@@ -199,6 +202,7 @@ func TestTemplateNoPublicName(t *testing.T) {
 // TestTemplateNoJSONParsing verifies that no template uses JSON parsing.
 // All templates should use the .sqlsplit format instead.
 func TestTemplateNoJSONParsing(t *testing.T) {
+	testenv.Isolate(t)
 	jsonPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`(?i)json\.parse\b`),
 		regexp.MustCompile(`(?i)json\.unmarshal\b`),
@@ -230,6 +234,7 @@ func TestTemplateNoJSONParsing(t *testing.T) {
 // TestTemplateHasNameGuard verifies that every template validates the ephemeral
 // database name against the expected pattern before use.
 func TestTemplateHasNameGuard(t *testing.T) {
+	testenv.Isolate(t)
 	for lang, file := range langTemplates {
 		t.Run(lang, func(t *testing.T) {
 			data, err := TemplateFS.ReadFile("templates/" + file)
@@ -254,6 +259,7 @@ func TestTemplateHasNameGuard(t *testing.T) {
 // (no bias). Only Zig and TypeScript generate raw random bytes and must reject
 // values >= 252.
 func TestTemplateRejectionSampling(t *testing.T) {
+	testenv.Isolate(t)
 	needsRejectionSampling := map[string]bool{
 		"zig": true,
 		"ts":  true,
@@ -287,6 +293,7 @@ func TestTemplateRejectionSampling(t *testing.T) {
 // PostgreSQL driver does not parse user:password from the URL's authority
 // section; credentials must be passed as query parameters (?user=X&password=Y).
 func TestTemplateJdbcUserinfoStripping(t *testing.T) {
+	testenv.Isolate(t)
 	jdbcLangs := []string{"java", "kotlin"}
 
 	for _, lang := range jdbcLangs {
@@ -362,6 +369,7 @@ func TestTemplateJdbcUserinfoStripping(t *testing.T) {
 // returns a URL with credentials embedded (via query params), so callers don't
 // need to pass separate user/password arguments.
 func TestTemplateJdbcConnectionStringSelfContained(t *testing.T) {
+	testenv.Isolate(t)
 	jdbcLangs := []string{"java", "kotlin"}
 
 	for _, lang := range jdbcLangs {

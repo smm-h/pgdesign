@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -8,6 +9,7 @@ import (
 )
 
 func TestExtractConstraints_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := model.Schema{
 		Enums: []model.Enum{
 			{Name: "status", Values: []string{"active", "inactive", "pending"}},
@@ -108,6 +110,7 @@ func TestExtractConstraints_Basic(t *testing.T) {
 }
 
 func TestExtractConstraints_EmptyTable(t *testing.T) {
+	testenv.Isolate(t)
 	schema := model.Schema{
 		Tables: []model.Table{
 			{
@@ -150,6 +153,7 @@ func TestExtractConstraints_EmptyTable(t *testing.T) {
 }
 
 func TestClassifyCheck(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name     string
 		expr     string
@@ -186,6 +190,7 @@ func TestClassifyCheck(t *testing.T) {
 }
 
 func TestClassifyCheck_RangeDetails(t *testing.T) {
+	testenv.Isolate(t)
 	pat := classifyCheck("score >= 0 AND score <= 100")
 	rp, ok := pat.(*rangePattern)
 	if !ok {
@@ -209,6 +214,7 @@ func TestClassifyCheck_RangeDetails(t *testing.T) {
 }
 
 func TestClassifyCheck_LengthDetails(t *testing.T) {
+	testenv.Isolate(t)
 	pat := classifyCheck("LENGTH(slug) <= 50")
 	lp, ok := pat.(*lengthPattern)
 	if !ok {
@@ -226,6 +232,7 @@ func TestClassifyCheck_LengthDetails(t *testing.T) {
 }
 
 func TestLikePattern_IsCaseInsensitive(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		op   string
 		want bool
@@ -246,6 +253,7 @@ func TestLikePattern_IsCaseInsensitive(t *testing.T) {
 }
 
 func TestLikePattern_IsNegated(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		op   string
 		want bool
@@ -266,6 +274,7 @@ func TestLikePattern_IsNegated(t *testing.T) {
 }
 
 func TestLikeToRegex(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		pattern string
 		want    string

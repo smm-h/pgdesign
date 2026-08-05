@@ -1,6 +1,7 @@
 package generate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"go/parser"
 	"go/token"
 	"os"
@@ -33,6 +34,7 @@ func hubSchema() *model.Schema {
 }
 
 func TestD2HeatMapFanIn(t *testing.T) {
+	testenv.Isolate(t)
 	s := hubSchema()
 	opts := DefaultD2Options()
 	opts.HeatMap = "fan-in"
@@ -54,6 +56,7 @@ func TestD2HeatMapFanIn(t *testing.T) {
 }
 
 func TestD2HeatMapFanOut(t *testing.T) {
+	testenv.Isolate(t)
 	s := hubSchema()
 	opts := DefaultD2Options()
 	opts.HeatMap = "fan-out"
@@ -72,6 +75,7 @@ func TestD2HeatMapFanOut(t *testing.T) {
 }
 
 func TestD2HeatMapOffNoStroke(t *testing.T) {
+	testenv.Isolate(t)
 	s := hubSchema()
 	out := GenerateD2(s, nil, DefaultD2Options()) // HeatMap == ""
 	if strings.Contains(out, "style.stroke:") {
@@ -82,6 +86,7 @@ func TestD2HeatMapOffNoStroke(t *testing.T) {
 // TestD2InjectedStats verifies caller-provided live stats are rendered without
 // the generate package ever touching a database (the stats arrive as data).
 func TestD2InjectedStats(t *testing.T) {
+	testenv.Isolate(t)
 	s := hubSchema()
 	opts := DefaultD2Options()
 	opts.Stats = map[string]TableStats{
@@ -107,6 +112,7 @@ func TestD2InjectedStats(t *testing.T) {
 // TestGenerateHasNoDBImport enforces roadmap L5: the generate package stays
 // DB-free. Live stats must arrive as caller-provided data, never fetched here.
 func TestGenerateHasNoDBImport(t *testing.T) {
+	testenv.Isolate(t)
 	forbidden := []string{
 		"github.com/jackc/pgx",
 		"database/sql",

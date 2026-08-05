@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"testing"
@@ -84,6 +85,7 @@ func defaultSeeds(t *testing.T) []legacySeed {
 // reproduces the snapshot, the legacy table is gone, chain_position is stamped at
 // the boundary, the prefix edge is on disk, and consistency is green.
 func TestUpgradeEndToEnd(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -202,6 +204,7 @@ func assertViewMatches(t *testing.T, ctx context.Context, conn *pgx.Conn, snapsh
 // TestUpgradeAmnesty: a historical file whose bytes no longer match its recorded
 // checksum yields a NAMED amnesty report, and the upgrade PROCEEDS by content.
 func TestUpgradeAmnesty(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -239,6 +242,7 @@ func TestUpgradeAmnesty(t *testing.T) {
 // TestUpgradeDriftRefusal: an out-of-band change so the TOML no longer matches
 // the live DB refuses the upgrade, naming the drift.
 func TestUpgradeDriftRefusal(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -282,6 +286,7 @@ func TestUpgradeDriftRefusal(t *testing.T) {
 // TestUpgradeCrashBeforeCommit: a BeforeCommit failure rolls the whole
 // transaction back (files already landed), and a clean re-run completes.
 func TestUpgradeCrashBeforeCommit(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -331,6 +336,7 @@ func TestUpgradeCrashBeforeCommit(t *testing.T) {
 // TestUpgradeConcurrentApplyBlocked: while an upgrade transaction is open and
 // holds the advisory lock, a concurrent apply cannot proceed.
 func TestUpgradeConcurrentApplyBlocked(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)
@@ -385,6 +391,7 @@ func TestUpgradeConcurrentApplyBlocked(t *testing.T) {
 // the shared prefix edge is written once, and each database's journal reproduces
 // its own applied set.
 func TestUpgradeMultiDatabase(t *testing.T) {
+	testenv.Isolate(t)
 	ctx := context.Background()
 	// Shared chain files directory (the union of both databases' prefixes).
 	dir := t.TempDir()
@@ -511,6 +518,7 @@ func setupPreUpgradeDBWith(t *testing.T, ctx context.Context, ephDB *testdb.Ephe
 // TestUpgradePostUpgradeApplyContinues: after an upgrade, a NEW chain-mode edge
 // generated from the reconstructed head applies forward from the boundary.
 func TestUpgradePostUpgradeApplyContinues(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

@@ -3,6 +3,7 @@ package serve
 import (
 	"context"
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -67,6 +68,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetExtensions(t *testing.T) {
+	testenv.Isolate(t)
 	srv := setupServer(t)
 
 	ts := httptest.NewServer(srv)
@@ -93,6 +95,7 @@ func TestGetExtensions(t *testing.T) {
 }
 
 func TestGetStats(t *testing.T) {
+	testenv.Isolate(t)
 	srv := setupServer(t)
 
 	ts := httptest.NewServer(srv)
@@ -118,6 +121,7 @@ func TestGetStats(t *testing.T) {
 }
 
 func TestGetSchema(t *testing.T) {
+	testenv.Isolate(t)
 	srv := setupServer(t)
 
 	ts := httptest.NewServer(srv)
@@ -154,6 +158,7 @@ func TestGetSchema(t *testing.T) {
 }
 
 func TestPostValidateValid(t *testing.T) {
+	testenv.Isolate(t)
 	srv := setupServer(t)
 
 	ts := httptest.NewServer(srv)
@@ -195,6 +200,7 @@ type = "short_text"
 }
 
 func TestPostValidateInvalid(t *testing.T) {
+	testenv.Isolate(t)
 	srv := setupServer(t)
 
 	ts := httptest.NewServer(srv)
@@ -236,6 +242,7 @@ pk = ["id"]
 }
 
 func TestPoolConfigApplied(t *testing.T) {
+	testenv.Isolate(t)
 	if testDB == nil {
 		t.Skip("no database configured (set PGDESIGN_DB); skipping database-backed test")
 	}
@@ -285,6 +292,7 @@ func TestPoolConfigApplied(t *testing.T) {
 }
 
 func TestFindDuplicateIndexes(t *testing.T) {
+	testenv.Isolate(t)
 	tests := []struct {
 		name    string
 		indexes []workload.IndexInfo

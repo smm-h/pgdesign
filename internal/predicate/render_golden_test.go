@@ -1,6 +1,9 @@
 package predicate
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 // TestRenderAssertGolden pins the exact DO-block SQL the renderer emits for
 // representative preconditions. This is the "golden idempotent DO-block SQL" the
@@ -14,6 +17,7 @@ import "testing"
 // via a temp-object round-trip DECLARE block that canonicalizes the MODEL text
 // through the live DB and compares PG's own pg_get_constraintdef.
 func TestRenderAssertGolden(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name string
 		p    Precondition
@@ -107,6 +111,7 @@ $pgdpred$;`,
 // degrades to create-if-absent with NO false RAISE. This is the exact SQL shape
 // generate --idempotent now ships for constraints.
 func TestRenderIdempotentCreateGolden(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name      string
 		p         Precondition

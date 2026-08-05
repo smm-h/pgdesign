@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/rev"
@@ -17,6 +18,7 @@ import (
 // that ALREADY exists in the database (its precondition is index-MustBeAbsent),
 // modelling an out-of-band index that drifted the world off the edge's from-state.
 func TestNonTxFreshDriftLeavesNoIntentRow(t *testing.T) {
+	testenv.Isolate(t)
 	ephDB := chainEphemeralDB(t)
 	ctx := context.Background()
 	conn, err := ephDB.Connect(ctx)

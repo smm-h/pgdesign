@@ -1,6 +1,9 @@
 package introspect
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 // TestManagedNamePredicates pins the distinction the I201 filtering relies on:
 // isManagedObjectName recognizes the whole reserved namespace, while
@@ -9,6 +12,7 @@ import "testing"
 // is a user collision that must surface an I201 (managed && !machinery); a
 // machinery name is filtered silently.
 func TestManagedNamePredicates(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name      string
 		managed   bool // matches the reserved pattern (filtered)
@@ -52,6 +56,7 @@ func TestManagedNamePredicates(t *testing.T) {
 // TestReservedNameDiagIsVisible pins that a user collision produces a warning-
 // severity I201 (not silently dropped), so the filtering never goes unnoticed.
 func TestReservedNameDiagIsVisible(t *testing.T) {
+	testenv.Isolate(t)
 	d := reservedNameDiag("function", "public", "pgdesign_my_helper")
 	if d.Code != "I201" {
 		t.Errorf("code = %q, want I201", d.Code)

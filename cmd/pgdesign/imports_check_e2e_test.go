@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 )
@@ -11,6 +12,7 @@ import (
 // diagnostics. (An unused declaration is a valid intermediate state — you can pin a
 // dependency before wiring the first cross-project FK.)
 func TestImportsE2E_DeclaredButUnreferencedAliasBuildsClean(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 
 	consumer := t.TempDir()
@@ -58,6 +60,7 @@ type = "id"
 // re-declaration + pg_version floor). A consumer that re-declares the required
 // extension and targets a compatible version passes with exit 0.
 func TestImportsE2E_CheckFrameworkImportsPasses(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 
 	consumer := t.TempDir()
@@ -111,6 +114,7 @@ on_delete = "CASCADE"
 // command FAILS when the consumer omits an extension the imported surface requires
 // (E241), proving requirement enforcement runs through `check --tag imports`.
 func TestImportsE2E_CheckFrameworkImportsMissingExtension(t *testing.T) {
+	testenv.Isolate(t)
 	fw := makeFrameworkRepo(t)
 	// makeConsumer does NOT declare pgcrypto, which the framework surface requires.
 	consumer := makeConsumer(t, fw, "ref")

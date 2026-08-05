@@ -2,6 +2,7 @@ package testdb
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"net/url"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 // when the caller has not set one, so an unreachable-but-not-refused host fails fast
 // instead of hanging the test binary until the go-test timeout.
 func TestNewManagerBoundsConnectTimeout(t *testing.T) {
+	testenv.Isolate(t)
 	mgr, err := NewManager("postgres://localhost:5432/pgdesign?sslmode=disable")
 	if err != nil {
 		t.Fatal(err)
@@ -28,6 +30,7 @@ func TestNewManagerBoundsConnectTimeout(t *testing.T) {
 // TestNewManagerPreservesConnectTimeout verifies a caller-provided connect_timeout
 // is respected, never overridden by the injected default.
 func TestNewManagerPreservesConnectTimeout(t *testing.T) {
+	testenv.Isolate(t)
 	mgr, err := NewManager("postgres://localhost:5432/pgdesign?sslmode=disable&connect_timeout=2")
 	if err != nil {
 		t.Fatal(err)
@@ -49,6 +52,7 @@ func TestNewManagerPreservesConnectTimeout(t *testing.T) {
 // pgx.Connect hung here for the full go-test timeout — exactly how serve's TestMain
 // stalled for 10 minutes. No real PostgreSQL is needed; the connect must fail.
 func TestManagerCreateFailsFastOnUnreachable(t *testing.T) {
+	testenv.Isolate(t)
 	mgr, err := NewManager("postgres://192.0.2.1:5432/pgdesign?sslmode=disable")
 	if err != nil {
 		t.Fatal(err)

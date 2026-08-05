@@ -8,6 +8,7 @@ package migrate
 
 import (
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/chain"
@@ -20,6 +21,7 @@ import (
 // and a DML op (opaque SQL blob). Each must render byte-identically to its
 // generate-side oracle after a full trip through the store.
 func TestShimRendersCreateTablePartitionPartmanDML(t *testing.T) {
+	testenv.Isolate(t)
 	desired := richModel(t)
 
 	t.Run("create_table", func(t *testing.T) {
@@ -120,6 +122,7 @@ func TestShimRendersCreateTablePartitionPartmanDML(t *testing.T) {
 // from-manifest(A) EXACTLY to to-manifest(B) with both a catWholeDrop and a
 // catRenameTable op in play.
 func TestShimEndToEndDropAndRename(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 
 	modelA := &model.Schema{
@@ -182,6 +185,7 @@ func TestShimEndToEndDropAndRename(t *testing.T) {
 // add_column's recorded inverse (drop_column) is relabeled to a bogus kind, and
 // VerifyDown re-derives the true down from the up payload and rejects the mismatch.
 func TestShimVerifyDownTamperNestedModifier(t *testing.T) {
+	testenv.Isolate(t)
 	store := newTestStore(t)
 	desired := richModel(t)
 	op := DDLOp{Op: "add_column", Table: "app.users", Column: "nick", Type: "text", NotNull: true,

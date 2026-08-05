@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestJavaValidatorGenerator_Generate(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -126,6 +128,7 @@ func TestJavaValidatorGenerator_Generate(t *testing.T) {
 }
 
 func TestJavaValidatorGenerator_NoPolicies(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "empty",
 		Tables: []model.Table{
@@ -149,6 +152,7 @@ func TestJavaValidatorGenerator_NoPolicies(t *testing.T) {
 }
 
 func TestJavaValidatorGenerator_OwnershipPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{
@@ -198,6 +202,7 @@ func TestJavaValidatorGenerator_OwnershipPattern(t *testing.T) {
 }
 
 func TestJavaValidatorGenerator_OrCompound(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -255,6 +260,7 @@ func TestJavaValidatorGenerator_OrCompound(t *testing.T) {
 }
 
 func TestJavaValidatorGenerator_NotExistsPattern(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "app",
 		Tables: []model.Table{
@@ -309,6 +315,7 @@ func TestJavaValidatorGenerator_NotExistsPattern(t *testing.T) {
 }
 
 func TestJavaValidatorGenerator_UnparsableExpression(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Name: "game",
 		Tables: []model.Table{

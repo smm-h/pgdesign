@@ -2,6 +2,7 @@ package enc
 
 import (
 	"bytes"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"reflect"
 	"testing"
 
@@ -38,6 +39,7 @@ func buildModel(t rapid.TB, raws []*parse.RawSchema) *model.Schema {
 // bytes the table gets inside a full-schema EncodeObjects, regardless of which
 // other objects share the schema.
 func TestPerObjectBytesIndependentOfNeighbors(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		s := buildModel(rt, modelgen.Draw(rt, modelgen.DefaultConfig()))
 		objs, err := EncodeObjects(s)
@@ -64,6 +66,7 @@ func TestPerObjectBytesIndependentOfNeighbors(t *testing.T) {
 // the right formulation because non-identity fields — caches, provenance — are
 // deliberately not decoded; re-encoding proves all IDENTITY content survives.)
 func TestDecodeEncodeRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		s := buildModel(rt, modelgen.Draw(rt, modelgen.DefaultConfig()))
 		objs1, err := EncodeObjects(s)
@@ -88,6 +91,7 @@ func TestDecodeEncodeRoundTrip(t *testing.T) {
 // repeatability — the encoder must erase declaration order that PostgreSQL does
 // not observe. Column order is SEMANTIC and therefore never permuted.
 func TestShuffledDeclarationOrderConvergence(t *testing.T) {
+	testenv.Isolate(t)
 	rapid.Check(t, func(rt *rapid.T) {
 		raws := modelgen.Draw(rt, modelgen.DefaultConfig())
 
@@ -142,6 +146,7 @@ func indices(n int) []int {
 // key-sorting, so this static check protects identity from a whole class of
 // modeling mistakes.
 func TestSemanticCollectionsAreSlices(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		typ   reflect.Type
 		field string
@@ -176,6 +181,7 @@ func TestSemanticCollectionsAreSlices(t *testing.T) {
 // uses a hand-built index whose opclass/collation/with maps are populated in
 // two different insertion orders.
 func TestMapKeyOrderingDeterministic(t *testing.T) {
+	testenv.Isolate(t)
 	mk := func() model.Index {
 		return model.Index{
 			Name:    "idx",
@@ -215,6 +221,7 @@ func TestMapKeyOrderingDeterministic(t *testing.T) {
 // TestCodecVersionPresent: every top-level form carries the codec epoch and its
 // self-describing kind. A decode at a different epoch is a hard error.
 func TestCodecVersionPresent(t *testing.T) {
+	testenv.Isolate(t)
 	tbl := model.Table{Name: "t", Schema: "public", Comment: "c",
 		Columns: []model.Column{{Name: "id", PGType: typeinfo.Type{Base: "int4"}, NotNull: true}}, PK: []string{"id"}}
 	b, err := EncodeTable(tbl)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,6 +108,7 @@ func writeMultiOutputProject(t *testing.T) string {
 // ONE output REFUSES, naming the now-stale siblings (including the group-filtered
 // ones).
 func TestRevision_EditThenBuildSucceedsThenPartialWriteRefuses(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeMultiOutputProject(t)
 	t.Chdir(dir)
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
@@ -183,6 +185,7 @@ func runCodegenCapturingStderr(t *testing.T, cfgPath *string, kwargs map[string]
 // path: fmt rewrites the schema source (reordering columns), prints the follow-up
 // notice, and the revision check then reports the outputs as stale.
 func TestRevision_FmtPrintsNoticeAndCheckGoesStale(t *testing.T) {
+	testenv.Isolate(t)
 	dir := t.TempDir()
 	config.CodegenModes = SupportedModes()
 
@@ -256,6 +259,7 @@ path = "schema.md"
 // check, [revision-mismatch]) AND the byte-compare (`build` check, [stale]), and
 // the two read distinctly.
 func TestRevision_TamperedHeaderDistinguishesSignals(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeMultiOutputProject(t)
 	t.Chdir(dir)
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
@@ -317,6 +321,7 @@ func replaceRevisionLine(t *testing.T, content, newRev string) string {
 // and seed output are NOT [output] artifacts, so the revision check never flags
 // them even when they carry a stale/foreign stamp.
 func TestRevision_ScaffoldingAndSeedNeverFlagged(t *testing.T) {
+	testenv.Isolate(t)
 	dir := writeMultiOutputProject(t)
 	t.Chdir(dir)
 	cfgPath := filepath.Join(dir, "pgdesign.toml")
@@ -342,6 +347,7 @@ func TestRevision_ScaffoldingAndSeedNeverFlagged(t *testing.T) {
 // the revision check invokes migrate.VerifyChainConsistency, so a corrupted chain
 // is reported with the [chain] signal.
 func TestRevision_ChainViolationCaught(t *testing.T) {
+	testenv.Isolate(t)
 	dir := setupReviseRepo(t, "freshness_schema.toml", true)
 	t.Chdir(dir)
 

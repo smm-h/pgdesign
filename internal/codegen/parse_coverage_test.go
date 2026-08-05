@@ -115,6 +115,7 @@ package codegen
 
 import (
 	"fmt"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/sqlutil"
@@ -124,6 +125,7 @@ import (
 // comparison operators beyond "=" parse successfully. These are parseable but
 // not yet matched by FilterGeneratable or detectOwnership.
 func TestParseCoverage_ComparisonOwnership(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name string
 		expr string
@@ -184,6 +186,7 @@ func TestParseCoverage_ComparisonOwnership(t *testing.T) {
 // current_setting parse successfully. These involve concatenation on the
 // pattern side and are not yet matched by codegen.
 func TestParseCoverage_LikePatterns(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name string
 		expr string
@@ -234,6 +237,7 @@ func TestParseCoverage_LikePatterns(t *testing.T) {
 // TestParseCoverage_InMembership verifies that IN/NOT IN membership checks
 // parse successfully. These are a new pattern class not recognized by codegen.
 func TestParseCoverage_InMembership(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name string
 		expr string
@@ -284,6 +288,7 @@ func TestParseCoverage_InMembership(t *testing.T) {
 // parse successfully. These produce UnaryOp nodes, not BinaryOp, so they
 // require a new match arm in FilterGeneratable.
 func TestParseCoverage_NullChecks(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name string
 		expr string
@@ -326,6 +331,7 @@ func TestParseCoverage_NullChecks(t *testing.T) {
 // successfully. The parser represents BETWEEN as
 // BinaryOp{Op: "BETWEEN", Right: BinaryOp{Op: "AND", Left: lo, Right: hi}}.
 func TestParseCoverage_BetweenRanges(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name string
 		expr string
@@ -374,6 +380,7 @@ func TestParseCoverage_BetweenRanges(t *testing.T) {
 // by FilterGeneratable's walk, but the new-operator parts are silently ignored
 // by the analysis layer.
 func TestParseCoverage_CompoundWithNewOps(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name          string
 		expr          string
@@ -442,6 +449,7 @@ func TestParseCoverage_CompoundWithNewOps(t *testing.T) {
 // TestParseCoverage_NewLiterals verifies that new literal types (float, NULL)
 // parse correctly in RLS-like expressions.
 func TestParseCoverage_NewLiterals(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name string
 		expr string
@@ -474,6 +482,7 @@ func TestParseCoverage_NewLiterals(t *testing.T) {
 // recognizes "=" and misses other comparison operators, even when
 // current_setting is present. This documents the specific gap in analysis.go.
 func TestParseCoverage_DetectOwnershipGap(t *testing.T) {
+	testenv.Isolate(t)
 	// This IS detected (baseline).
 	t.Run("equality is detected", func(t *testing.T) {
 		ast, diag := sqlutil.ParseExpr("player_id::text = current_setting('app.player_id')", "test")

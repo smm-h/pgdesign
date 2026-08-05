@@ -2,12 +2,14 @@ package testdb
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestGenerateName_Format(t *testing.T) {
+	testenv.Isolate(t)
 	name := GenerateName("myapp")
 	if !nameRegex.MatchString(name) {
 		t.Fatalf("generated name %q does not match expected format", name)
@@ -15,6 +17,7 @@ func TestGenerateName_Format(t *testing.T) {
 }
 
 func TestGenerateName_Uniqueness(t *testing.T) {
+	testenv.Isolate(t)
 	seen := make(map[string]bool)
 	for i := 0; i < 100; i++ {
 		name := GenerateName("myapp")
@@ -26,6 +29,7 @@ func TestGenerateName_Uniqueness(t *testing.T) {
 }
 
 func TestGenerateName_Length(t *testing.T) {
+	testenv.Isolate(t)
 	base := strings.Repeat("a", 50)
 	name := GenerateName(base)
 	if len(name) > MaxNameLen {
@@ -34,6 +38,7 @@ func TestGenerateName_Length(t *testing.T) {
 }
 
 func TestGenerateName_TruncatesLongBase(t *testing.T) {
+	testenv.Isolate(t)
 	base := strings.Repeat("x", 60)
 	name := GenerateName(base)
 	if len(name) > MaxNameLen {
@@ -52,6 +57,7 @@ func TestGenerateName_TruncatesLongBase(t *testing.T) {
 }
 
 func TestGenerateName_UTF8SafeTruncation(t *testing.T) {
+	testenv.Isolate(t)
 	// Build a base name that places a multi-byte rune right at the truncation
 	// boundary. MaxNameLen - SuffixLen = 38. Use 37 ASCII chars + a 3-byte
 	// rune (e.g., U+4E16 = '世', 3 bytes in UTF-8). The full base is 40 bytes,
@@ -79,6 +85,7 @@ func TestGenerateName_UTF8SafeTruncation(t *testing.T) {
 }
 
 func TestParseName_Valid(t *testing.T) {
+	testenv.Isolate(t)
 	ts := time.Now().Unix()
 	name := "mydb_test_1234567890_abcd1234"
 	baseName, created, random, ok := ParseName(name)
@@ -98,6 +105,7 @@ func TestParseName_Valid(t *testing.T) {
 }
 
 func TestParseName_Invalid(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []string{
 		"mydb",                           // no _test_ segment
 		"mydb_test_123_abcd1234",         // timestamp too short
@@ -115,6 +123,7 @@ func TestParseName_Invalid(t *testing.T) {
 }
 
 func TestParseName_RoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	base := "testapp"
 	before := time.Now()
 	name := GenerateName(base)
@@ -136,6 +145,7 @@ func TestParseName_RoundTrip(t *testing.T) {
 }
 
 func TestCreateOptionsValidate(t *testing.T) {
+	testenv.Isolate(t)
 	// Neither set: valid.
 	if err := (CreateOptions{}).Validate(); err != nil {
 		t.Fatalf("expected no error for empty options, got: %v", err)
@@ -162,11 +172,13 @@ func TestCreateOptionsValidate(t *testing.T) {
 }
 
 func TestSkipIfNoPostgres(t *testing.T) {
+	testenv.Isolate(t)
 	SkipIfNoPostgres(t)
 	// If we reach here, PostgreSQL is available.
 }
 
 func TestDrop_InvalidName(t *testing.T) {
+	testenv.Isolate(t)
 	// Manager with a dummy maintenance URL — we never actually connect.
 	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
 
@@ -194,6 +206,7 @@ func TestDrop_InvalidName(t *testing.T) {
 }
 
 func TestDrop_ValidName(t *testing.T) {
+	testenv.Isolate(t)
 	// A validly-formatted name should pass the guard and fail later at pgx.Connect.
 	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
 	db := &EphemeralDB{Name: "mydb_test_1234567890_abcd1234"}
@@ -208,6 +221,7 @@ func TestDrop_ValidName(t *testing.T) {
 }
 
 func TestDropByName_InvalidName(t *testing.T) {
+	testenv.Isolate(t)
 	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
 	err := m.DropByName(context.Background(), "production_db")
 	if err == nil {

@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"path/filepath"
 	"testing"
 )
@@ -8,6 +9,7 @@ import (
 // TestMigrationVersionPath_Traversal verifies the migration-version endpoint's
 // path resolution rejects traversal attempts and accepts normal versions.
 func TestMigrationVersionPath_Traversal(t *testing.T) {
+	testenv.Isolate(t)
 	dir := "/srv/app/migrations"
 
 	rejected := []string{

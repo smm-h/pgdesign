@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 func strptr(s string) *string { return &s }
 
@@ -11,6 +14,7 @@ func strptr(s string) *string { return &s }
 // old sentinel logic (dir == "migrations" && cfg != "") could not tell an
 // explicit "migrations" from the default, so config silently won.
 func TestResolveMigrationsDir(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []struct {
 		name    string
 		dirFlag *string

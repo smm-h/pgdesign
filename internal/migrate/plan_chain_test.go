@@ -1,6 +1,7 @@
 package migrate
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -36,6 +37,7 @@ func usersWithName() *model.Schema {
 // only on-disk edges — no database. From genesis it lists the whole chain; from
 // a mid revision it lists the tail; from the head it lists nothing.
 func TestPlanChainEdges_Pure(t *testing.T) {
+	testenv.Isolate(t)
 	p, err := OpenChainProject(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

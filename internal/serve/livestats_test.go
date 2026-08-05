@@ -2,6 +2,7 @@ package serve
 
 import (
 	"context"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 // a DB-free (project mode) server is a hard error naming the requirement, never
 // a silent no-op that drops the annotation.
 func TestProjectMode_LiveStatsHardError(t *testing.T) {
+	testenv.Isolate(t)
 	schema, reg := buildTestProject(t, projectTOML)
 	srv := NewProject(schema, reg, nil, []string{"public"}, "")
 	ts := httptest.NewServer(srv)
@@ -48,6 +50,7 @@ func TestProjectMode_LiveStatsHardError(t *testing.T) {
 // live_stats=true fetches pg_stat_user_tables and renders the row-count
 // annotation into the diagram for the served (introspected) schema.
 func TestLiveStats_DBModeParam(t *testing.T) {
+	testenv.Isolate(t)
 	srv := setupServer(t) // skips when no database is configured
 	ctx := context.Background()
 

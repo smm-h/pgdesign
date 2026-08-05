@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -9,6 +10,7 @@ import (
 // TestCheckRequirements_MissingExtension verifies E241 when the consumer does not
 // re-declare an extension the imported surface requires.
 func TestCheckRequirements_MissingExtension(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := t.TempDir()
 	lf := &Lockfile{
 		Alias: "framework", URL: "file:///fw", Ref: "v1", Commit: "abc",
@@ -28,6 +30,7 @@ func TestCheckRequirements_MissingExtension(t *testing.T) {
 // TestCheckRequirements_PGVersionBelowFloor verifies E242 when the consumer's
 // pg_version is below the imported floor.
 func TestCheckRequirements_PGVersionBelowFloor(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := t.TempDir()
 	lf := &Lockfile{
 		Alias: "framework", URL: "file:///fw", Ref: "v1", Commit: "abc",
@@ -46,6 +49,7 @@ func TestCheckRequirements_PGVersionBelowFloor(t *testing.T) {
 
 // TestCheckRequirements_AllSatisfied verifies no diagnostics when requirements met.
 func TestCheckRequirements_AllSatisfied(t *testing.T) {
+	testenv.Isolate(t)
 	projectDir := t.TempDir()
 	lf := &Lockfile{
 		Alias: "framework", URL: "file:///fw", Ref: "v1", Commit: "abc",

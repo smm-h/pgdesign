@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -22,6 +23,7 @@ func containsJavaField(s, fieldName, javaType string) bool {
 }
 
 func TestJavaTypesGenerator_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -113,6 +115,7 @@ func TestJavaTypesGenerator_Basic(t *testing.T) {
 }
 
 func TestJavaTypesGenerator_NullableAndArray(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -169,6 +172,7 @@ func TestJavaTypesGenerator_NullableAndArray(t *testing.T) {
 }
 
 func TestJavaTypesGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 
 	gen := &JavaTypesGenerator{}
@@ -191,6 +195,7 @@ func TestJavaTypesGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestJavaTypesGenerator_MoneySemanticType(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -219,6 +224,7 @@ func TestJavaTypesGenerator_MoneySemanticType(t *testing.T) {
 }
 
 func TestJavaTypesGenerator_MultipleTables(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{

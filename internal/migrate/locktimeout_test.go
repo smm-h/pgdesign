@@ -1,8 +1,12 @@
 package migrate
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 func TestValidateLockTimeout(t *testing.T) {
+	testenv.Isolate(t)
 	valid := []struct{ in, want string }{
 		{"", "5s"},
 		{"5s", "5s"},

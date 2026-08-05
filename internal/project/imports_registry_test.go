@@ -1,6 +1,7 @@
 package project
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
 
 	"github.com/smm-h/pgdesign/internal/model"
@@ -10,6 +11,7 @@ import (
 // TestRegisterImportedTypes_Collision verifies an imported type name that collides
 // with a local (non-builtin) type is a hard error (E243).
 func TestRegisterImportedTypes_Collision(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	// Local enum "status".
 	localDiags := reg.LoadUserTypes([]semtype.UserTypeDef{{Name: "status", Kind: "enum", Values: []string{"a", "b"}}})
@@ -34,6 +36,7 @@ func TestRegisterImportedTypes_Collision(t *testing.T) {
 // TestRegisterImportedTypes_EnumUsable verifies a non-colliding imported enum is
 // registered so local columns can resolve it.
 func TestRegisterImportedTypes_EnumUsable(t *testing.T) {
+	testenv.Isolate(t)
 	reg := semtype.NewBuiltinRegistry()
 	surface := &model.Schema{
 		Enums: []model.Enum{{Name: "framework_role", Schema: "app", Values: []string{"admin", "user"}}},

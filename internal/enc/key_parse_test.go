@@ -1,10 +1,14 @@
 package enc
 
-import "testing"
+import (
+	"github.com/smm-h/pgdesign/internal/testenv"
+	"testing"
+)
 
 // TestParseKeyRoundTrip pins ParseKey as the exact inverse of Key.String() for
 // every object kind that appears in a manifest.
 func TestParseKeyRoundTrip(t *testing.T) {
+	testenv.Isolate(t)
 	cases := []Key{
 		{Kind: KindSchemaMeta, Name: "shop"},
 		{Kind: KindRegistrySnap},
@@ -38,6 +42,7 @@ func TestParseKeyRoundTrip(t *testing.T) {
 // TestParseKeyRejectsPseudoAndMalformed pins the hard-error paths: dml/raw
 // pseudo-targets never resolve in a manifest, and malformed strings error.
 func TestParseKeyRejectsPseudoAndMalformed(t *testing.T) {
+	testenv.Isolate(t)
 	bad := []string{
 		"dml:0",
 		"raw:3",

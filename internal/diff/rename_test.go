@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -29,6 +30,7 @@ func renameSchema(tables ...model.Table) *model.Schema {
 // TestRenameGate_DeclaredColumn: a declared column rename resolves to a
 // ColumnsRenamed entry and empties the paired add/remove.
 func TestRenameGate_DeclaredColumn(t *testing.T) {
+	testenv.Isolate(t)
 	actual := renameSchema(usersTable(rcol("email_addr", "")))
 	desired := renameSchema(usersTable(rcol("email", "")))
 	d := Diff(desired, actual)
@@ -52,6 +54,7 @@ func TestRenameGate_DeclaredColumn(t *testing.T) {
 // TestRenameGate_UndeclaredColumnBlocks: an undeclared plausible column rename
 // is a hard error naming the pair and pointing at [renames].
 func TestRenameGate_UndeclaredColumnBlocks(t *testing.T) {
+	testenv.Isolate(t)
 	actual := renameSchema(usersTable(rcol("email_addr", "")))
 	desired := renameSchema(usersTable(rcol("email", "")))
 	d := Diff(desired, actual)
@@ -72,6 +75,7 @@ func TestRenameGate_UndeclaredColumnBlocks(t *testing.T) {
 // TestRenameGate_AmbiguousColumn: a removed column content-equal to more than
 // one added column is a hard error listing all candidates, never auto-paired.
 func TestRenameGate_AmbiguousColumn(t *testing.T) {
+	testenv.Isolate(t)
 	actual := renameSchema(usersTable(rcol("a", "")))
 	desired := renameSchema(usersTable(rcol("b", ""), rcol("c", "")))
 	d := Diff(desired, actual)
@@ -92,6 +96,7 @@ func TestRenameGate_AmbiguousColumn(t *testing.T) {
 // TestRenameGate_DeliberateDropEscape: making the definitions differ (a comment)
 // defeats plausibility, so the drop+add proceeds with no gate error.
 func TestRenameGate_DeliberateDropEscape(t *testing.T) {
+	testenv.Isolate(t)
 	actual := renameSchema(usersTable(rcol("foo", "")))
 	desired := renameSchema(usersTable(rcol("bar", "a different purpose")))
 	d := Diff(desired, actual)
@@ -108,6 +113,7 @@ func TestRenameGate_DeliberateDropEscape(t *testing.T) {
 // TestRenameGate_StaleColumnEntry: a declared rename whose old column is not
 // being dropped is a validation error.
 func TestRenameGate_StaleColumnEntry(t *testing.T) {
+	testenv.Isolate(t)
 	// email_addr exists in both -> not removed; the declared rename is stale.
 	actual := renameSchema(usersTable(rcol("email_addr", "")))
 	desired := renameSchema(usersTable(rcol("email_addr", "")))
@@ -123,6 +129,7 @@ func TestRenameGate_StaleColumnEntry(t *testing.T) {
 // TestRenameGate_DeclaredTable: a declared table rename resolves via masked
 // content-id equality into a TablesRenamed entry.
 func TestRenameGate_DeclaredTable(t *testing.T) {
+	testenv.Isolate(t)
 	body := []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}, rcol("x", "")}
 	oldT := model.Table{Name: "old_t", Schema: "public", PK: []string{"id"}, Comment: "t", Columns: body}
 	newT := model.Table{Name: "new_t", Schema: "public", PK: []string{"id"}, Comment: "t", Columns: body}
@@ -174,6 +181,7 @@ func fkBearingTable(name string) model.Table {
 // DIFFER and the rename silently escapes as a drop+create (the data-loss hazard
 // the gate exists to prevent).
 func TestRenameGate_UndeclaredFKTableBlocks(t *testing.T) {
+	testenv.Isolate(t)
 	oldT := fkBearingTable("old_t")
 	newT := fkBearingTable("new_t")
 	d := Diff(renameSchema(newT), renameSchema(oldT))
@@ -192,6 +200,7 @@ func TestRenameGate_UndeclaredFKTableBlocks(t *testing.T) {
 // ids differ and the declared rename is wrongly rejected as "differ beyond their
 // name".
 func TestRenameGate_DeclaredFKTableResolves(t *testing.T) {
+	testenv.Isolate(t)
 	oldT := fkBearingTable("old_t")
 	newT := fkBearingTable("new_t")
 	actual := renameSchema(oldT)
@@ -215,6 +224,7 @@ func TestRenameGate_DeclaredFKTableResolves(t *testing.T) {
 // name must mask DIFFERENTLY, so no false rename pairing occurs (the drop+create
 // proceeds without a spurious gate error).
 func TestRenameGate_CustomNamedIndexNotBlanked(t *testing.T) {
+	testenv.Isolate(t)
 	oldT := model.Table{
 		Name: "old_t", Schema: "public", Comment: "t", PK: []string{"id"},
 		Columns: []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}, rcol("x", "")},
@@ -234,6 +244,7 @@ func TestRenameGate_CustomNamedIndexNotBlanked(t *testing.T) {
 // TestRenameGate_UndeclaredTableBlocks: an undeclared plausible table rename
 // (equal masked content-id) is a hard error.
 func TestRenameGate_UndeclaredTableBlocks(t *testing.T) {
+	testenv.Isolate(t)
 	body := []model.Column{{Name: "id", PGType: typeinfo.T("int8"), NotNull: true}, rcol("x", "")}
 	oldT := model.Table{Name: "old_t", Schema: "public", PK: []string{"id"}, Comment: "t", Columns: body}
 	newT := model.Table{Name: "new_t", Schema: "public", PK: []string{"id"}, Comment: "t", Columns: body}

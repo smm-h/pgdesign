@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestTSDrizzleGenerator_Basic(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "users",
@@ -71,6 +73,7 @@ func TestTSDrizzleGenerator_Basic(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_Defaults(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "configs",
@@ -147,6 +150,7 @@ func TestTSDrizzleGenerator_Defaults(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_Relations(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{
 			{
@@ -217,6 +221,7 @@ func TestTSDrizzleGenerator_Relations(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_CompositePK(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "order_items",
@@ -262,6 +267,7 @@ func TestTSDrizzleGenerator_CompositePK(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_Indexes(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "events",
@@ -307,6 +313,7 @@ func TestTSDrizzleGenerator_Indexes(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_EmptySchema(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{Tables: []model.Table{}}
 
 	gen := &TSDrizzleGenerator{}
@@ -329,6 +336,7 @@ func TestTSDrizzleGenerator_EmptySchema(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_NullableAndArray(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "items",
@@ -373,6 +381,7 @@ func TestTSDrizzleGenerator_NullableAndArray(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_TypeMapping(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "all_types",
@@ -453,6 +462,7 @@ func TestTSDrizzleGenerator_TypeMapping(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_Enums(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Enums: []model.Enum{
 			{Name: "user_role", Values: []string{"admin", "editor", "viewer"}},
@@ -533,6 +543,7 @@ func TestTSDrizzleGenerator_Enums(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_StateMachine(t *testing.T) {
+	testenv.Isolate(t)
 	// State machine types appear in schema.Enums (build.go appends them) and
 	// their columns carry TypeKind "state_machine".
 	schema := &model.Schema{
@@ -567,6 +578,7 @@ func TestTSDrizzleGenerator_StateMachine(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_EnumColumnWithoutTypeKind(t *testing.T) {
+	testenv.Isolate(t)
 	// A column referencing an unknown type without TypeKind must keep the
 	// text fallback even when unrelated enums exist in the schema.
 	schema := &model.Schema{
@@ -605,6 +617,7 @@ func TestTSDrizzleGenerator_EnumColumnWithoutTypeKind(t *testing.T) {
 }
 
 func TestTSDrizzleGenerator_DefaultExpr(t *testing.T) {
+	testenv.Isolate(t)
 	schema := &model.Schema{
 		Tables: []model.Table{{
 			Name:    "items",
