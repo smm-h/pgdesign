@@ -1,9 +1,12 @@
 {
   "version": 1,
   "files": {
-    ".github/workflows/ci.yml": "13b72235fae66c201e36d4b183f969e1ba483e6b1cff7a8634114f0bf29a6000",
+    ".github/workflows/ci-go.yml": "6c119d6524df2f1c4608d6ddc1fd1ea5778e4232cfcde201b449b37c70abaefc",
+    ".github/workflows/ci-pypi.yml": "e6d981bde8b61dc9c42f0acb1194834a295220eb5c44c04bab171c6e6704251b",
+    "VERSION": "98c9e27ccefc72e9fe151671f865b91b381eac25a9bc03baa7db45a8658781e3",
+    ".goreleaser.yml": "cff25efee366e2ae9b1fca8a9210296481dbfa71c52f9ee63f90873a73a6d36f",
     ".npmignore": "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3",
-    ".github/workflows/publish.yml": "1f2534441f53fed3dbedd0d286676542a0ba7537c1ac6f8d8e938478f0a249e3",
+    ".github/workflows/publish.yml": "1d9ca5e37d395c1b494c7509745937e0326e8e0ca69c03e5da669984a88dfb2d",
     "CHANGELOG.md": "3de48723fc179b8d0a5b807da46856cd2ebcc1c1213af04fa1f397c5405aeb89",
     ".gitignore": "eaef9dcf74bcc7b0f9eaed90fab7aac363646cc479f2c6d9c9a2ac1230a0e983",
     ".rlsbl/changes/unreleased.jsonl": "dfc415ccb0ef568437987703934f5a48e79f3818c9e2f3e9364f463049b94d6b",
