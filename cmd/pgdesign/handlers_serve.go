@@ -12,7 +12,7 @@ import (
 func registerServeCmd(app *strictcli.App) {
 	app.Command("serve", "Start the pgdesign HTTP API server and web interface",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
@@ -87,6 +87,7 @@ func registerServeCmd(app *strictcli.App) {
 			}
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server (omit for DB-free project mode)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.IntFlag("port", "TCP port number for the HTTP API server to listen on", strictcli.Default(8080)),

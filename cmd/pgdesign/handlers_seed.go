@@ -83,7 +83,7 @@ func loadImportedFKPools(ctx context.Context, conn *pgx.Conn, schema *model.Sche
 func registerSeedCmd(app *strictcli.App) {
 	app.Command("seed", "Generate type-aware test data for all schema tables",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			paths := kwargsStrSlice(kwargs["path"])
@@ -220,6 +220,7 @@ func registerSeedCmd(app *strictcli.App) {
 
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.IntFlag("rows", "Number of rows to generate per table in the schema", strictcli.Default(10)),
 			strictcli.IntFlag("seed", "Random number generator seed for deterministic output", strictcli.Default(nil)),

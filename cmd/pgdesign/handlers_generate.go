@@ -82,6 +82,7 @@ func registerGenerateCmd(app *strictcli.App) {
 			fmt.Print(out)
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all generated DDL statements", strictcli.Default(false)),
 			strictcli.BoolFlag("comments", "Include COMMENT ON statements in the generated output", strictcli.Default(true)),

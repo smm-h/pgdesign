@@ -84,6 +84,7 @@ type vacuumCandidate struct {
 func registerStatsCmd(app *strictcli.App) {
 	app.Command("stats", "Analyze database statistics, index usage, and health",
 		handleStats,
+		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.BoolFlag("json", "Output all statistics in machine-readable JSON format", strictcli.Default(false)),

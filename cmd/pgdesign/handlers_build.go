@@ -24,10 +24,10 @@ import (
 func registerBuildCmd(app *strictcli.App) {
 	app.Command("build", "Generate all configured outputs from pgdesign.toml",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			return strictcli.Exit(runBuild(kwargsConfigOverride(kwargs), kwargsQuiet(kwargs), kwargs["dry_run"].(bool), kwargs["auto_commit"].(bool), kwargsDBURL(kwargs)))
+			return strictcli.Exit(runBuild(kwargsConfigOverride(kwargs), ctx.Quiet(), ctx.DryRun(), kwargs["auto_commit"].(bool), kwargsDBURL(kwargs)))
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.BoolFlag("dry-run", "Show what would be generated without writing any files", strictcli.Default(false)),
 			strictcli.BoolFlag("auto-commit", "Automatically git commit the generated output files after a successful build; pass --no-auto-commit to leave them in the working tree", strictcli.Default(true)),
 			strictcli.StringFlag("db", "PostgreSQL connection URL; required only when a [output.<name>.d2] sets live_stats=true", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),

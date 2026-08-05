@@ -33,9 +33,10 @@ const (
 
 func registerReviseCmd(app *strictcli.App) {
 	app.Command("revise", "Regenerate all outputs, chain the migration, and commit — the one-command project revision. Runs the PURE tier (build outputs, chain-mode migration, blocking normal-form and structural checks) and commits it, then runs the non-retroactive DB tier (live FD discovery, pg_stat workload).",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			return strictcli.Exit(runRevise(kwargsConfigOverride(kwargs), kwargsQuiet(kwargs), kwargsOptString(kwargs, "dir"), kwargsDBURL(kwargs)))
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			return strictcli.Exit(runRevise(kwargsConfigOverride(kwargs), ctx.Quiet(), kwargsOptString(kwargs, "dir"), kwargsDBURL(kwargs)))
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the non-retroactive DB tier (live FD discovery, pg_stat workload). When absent, the DB tier is skipped and revise exits non-zero after committing the pure tier.", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing the chain-format migrations project (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),

@@ -37,8 +37,8 @@ func preUpgradeGuardURL(ctx context.Context, dbURL string) error {
 
 func registerMigratePlanCmd(g *strictcli.Group) {
 	g.Command("plan", "Preview the migration chain PURELY, without touching any database (roadmap 5.9). In a chain-mode project it enumerates the edges from GENESIS -- or from an explicit --from revision -- to the single live head, in path-finder order, listing each edge's id, slug, and op summary. Drift preview against a live database is `diff --live`'s job; per-database pending is `migrate status`'s. A legacy (semver-TOML) project keeps the old live-diff plan (requires --db) until it is upgraded to the chain.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			paths := kwargsStrSlice(kwargs["path"])
@@ -68,6 +68,7 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 			// upgraded to the chain.
 			return strictcli.Exit(handleMigratePlanLegacy(kwargs, schema, cfg, quiet))
 		},
+		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL (legacy-mode only; chain-mode plan is pure and ignores it)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("from", "Chain-mode only: revision string to enumerate from (pure input); absent enumerates from genesis", strictcli.Default(nil)),
@@ -149,12 +150,12 @@ func handleMigratePlanLegacy(kwargs map[string]interface{}, schema *model.Schema
 
 	schemaNames := modelSchemaNames(schema)
 
-	ctx := context.Background()
-	if err := preUpgradeGuardURL(ctx, dbURL); err != nil {
+	bgCtx := context.Background()
+	if err := preUpgradeGuardURL(bgCtx, dbURL); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
+	actual, diags, err := introspect.Introspect(bgCtx, dbURL, schemaNames)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
@@ -218,8 +219,8 @@ func handleMigratePlanLegacy(kwargs map[string]interface{}, schema *model.Schema
 
 func registerMigrateGenerateCmd(g *strictcli.Group) {
 	g.Command("generate", "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			paths := kwargsStrSlice(kwargs["path"])
@@ -260,12 +261,12 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 
 			schemaNames := modelSchemaNames(schema)
 
-			ctx := context.Background()
-			if err := preUpgradeGuardURL(ctx, dbURL); err != nil {
+			bgCtx := context.Background()
+			if err := preUpgradeGuardURL(bgCtx, dbURL); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
+			actual, diags, err := introspect.Introspect(bgCtx, dbURL, schemaNames)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
@@ -330,6 +331,7 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server (legacy-mode only; chain-mode generate is pure)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
@@ -483,8 +485,8 @@ func slugifyDescription(desc string) string {
 
 func registerMigrateApplyCmd(g *strictcli.Group) {
 	g.Command("apply", "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			dbURL := kwargsDBURL(kwargs)
@@ -501,17 +503,17 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 
 			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
-			dryRun := kwargs["dry_run"].(bool)
+			dryRun := ctx.DryRun()
 
-			ctx := context.Background()
-			conn, err := pgx.Connect(ctx, dbURL)
+			bgCtx := context.Background()
+			conn, err := pgx.Connect(bgCtx, dbURL)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			defer conn.Close(ctx)
+			defer conn.Close(bgCtx)
 
-			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+			if err := migrate.GuardNotPreUpgrade(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
@@ -521,14 +523,14 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 			// Chain-mode project: route through the on-disk chain (path-finder +
 			// self-contained renderer). Legacy-mode projects keep the semver path.
 			if migrate.IsChainMode(dir) {
-				return strictcli.Exit(handleMigrateApplyChain(ctx, conn, dbURL, dir, lockTimeout, dryRun, quiet))
+				return strictcli.Exit(handleMigrateApplyChain(bgCtx, conn, dbURL, dir, lockTimeout, dryRun, quiet))
 			}
 
 			if dryRun {
-				return strictcli.Exit(handleMigrateApplyDryRun(ctx, conn, dir, quiet))
+				return strictcli.Exit(handleMigrateApplyDryRun(bgCtx, conn, dir, quiet))
 			}
 
-			applied, err := migrate.Apply(ctx, conn, dir, lockTimeout)
+			applied, err := migrate.Apply(bgCtx, conn, dir, lockTimeout)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				if len(applied) > 0 {
@@ -552,10 +554,11 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 			}
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
+		strictcli.WithConsequential(),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
-			strictcli.BoolFlag("dry-run", "Preview the migration SQL statements without executing", strictcli.Default(false)),
 		),
 	)
 }
@@ -704,8 +707,8 @@ func handleMigrateApplyDryRun(ctx context.Context, conn *pgx.Conn, dir string, q
 
 func registerMigrateRollbackCmd(g *strictcli.Group) {
 	g.Command("rollback", "Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			dbURL := kwargsDBURL(kwargs)
@@ -724,15 +727,15 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 
 			lockTimeout := cfg.Migrate.LockTimeout
 
-			ctx := context.Background()
-			conn, err := pgx.Connect(ctx, dbURL)
+			bgCtx := context.Background()
+			conn, err := pgx.Connect(bgCtx, dbURL)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			defer conn.Close(ctx)
+			defer conn.Close(bgCtx)
 
-			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+			if err := migrate.GuardNotPreUpgrade(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
@@ -742,11 +745,11 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 			// Chain-mode project: journal-driven rollback (roadmap 5.6). Reverses
 			// recorded down-ops in reverse journal order; --to is a target REVISION.
 			if migrate.IsChainMode(dir) {
-				return strictcli.Exit(handleMigrateRollbackChain(ctx, conn, dir, toVersion, lockTimeout, quiet))
+				return strictcli.Exit(handleMigrateRollbackChain(bgCtx, conn, dir, toVersion, lockTimeout, quiet))
 			}
 
 			if toVersion != "" {
-				rolledBack, err := migrate.RollbackTo(ctx, conn, dir, toVersion, lockTimeout)
+				rolledBack, err := migrate.RollbackTo(bgCtx, conn, dir, toVersion, lockTimeout)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error: %v\n", err)
 					if len(rolledBack) > 0 {
@@ -763,7 +766,7 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 				return strictcli.Exit(0)
 			}
 
-			version, err := migrate.Rollback(ctx, conn, dir, lockTimeout)
+			version, err := migrate.Rollback(bgCtx, conn, dir, lockTimeout)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
@@ -774,6 +777,8 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 			}
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
+		strictcli.WithConsequential(),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
@@ -816,7 +821,7 @@ func handleMigrateRollbackChain(ctx context.Context, conn *pgx.Conn, dir, toRevi
 
 func registerMigrateStatusCmd(g *strictcli.Group) {
 	g.Command("status", "Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			dbURL := kwargsDBURL(kwargs)
@@ -833,13 +838,13 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 
 			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
-			ctx := context.Background()
-			conn, err := pgx.Connect(ctx, dbURL)
+			bgCtx := context.Background()
+			conn, err := pgx.Connect(bgCtx, dbURL)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			defer conn.Close(ctx)
+			defer conn.Close(bgCtx)
 
 			// Mode check FIRST. A chain-mode project uses chain-aware status, a
 			// pure READ that NEVER creates any managed structure (the legacy
@@ -851,7 +856,7 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 					fmt.Fprintf(os.Stderr, "error: %v\n", err)
 					return strictcli.Exit(1)
 				}
-				st, err := migrate.ComputeChainStatus(ctx, conn, p)
+				st, err := migrate.ComputeChainStatus(bgCtx, conn, p)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error: %v\n", err)
 					return strictcli.Exit(1)
@@ -863,11 +868,11 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 			// Legacy-mode status. Refuse to create a legacy tracking table on a
 			// database that is already on the chain (an upgraded DB paired with a
 			// legacy-format migrations directory) — that would resurrect the table.
-			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+			if err := migrate.GuardNotPreUpgrade(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			if chainExists, err := migrate.ChainStructuresExist(ctx, conn); err != nil {
+			if chainExists, err := migrate.ChainStructuresExist(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			} else if chainExists {
@@ -875,12 +880,12 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
+			if err := migrate.EnsureMigrationsTable(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
 
-			applied, err := migrate.AppliedVersions(ctx, conn)
+			applied, err := migrate.AppliedVersions(bgCtx, conn)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
@@ -929,6 +934,7 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
@@ -975,8 +981,8 @@ func displayRevString(s string) string {
 
 func registerMigrateSquashCmd(g *strictcli.Group) {
 	g.Command("squash", "Consolidate a range of sequential migrations. In chain mode (a migrations/chain/ project) squash mints a CONSOLIDATION EDGE whose op-list is the ordered concatenation of the range, retiring the superseded originals intact to migrations/archive/ (never a rewrite) so mid-range databases resume via the path-finder; --from/--to are revision-or-edge references. In legacy (semver-TOML) mode squash concatenates the range into one combined migration file. --db is required.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
@@ -1004,15 +1010,15 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			ctx := context.Background()
-			conn, err := pgx.Connect(ctx, dbURL)
+			bgCtx := context.Background()
+			conn, err := pgx.Connect(bgCtx, dbURL)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: connect for safety check: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			defer conn.Close(ctx)
+			defer conn.Close(bgCtx)
 
-			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+			if err := migrate.GuardNotPreUpgrade(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
@@ -1047,7 +1053,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 			}
 
 			// Legacy (semver-TOML) mode: concatenate into one combined file.
-			result, err := migrate.SquashMigrations(ctx, conn, dir, from, to)
+			result, err := migrate.SquashMigrations(bgCtx, conn, dir, from, to)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
@@ -1086,6 +1092,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("from", "Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix)"),
 			strictcli.StringFlag("to", "End of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode)"),
@@ -1098,8 +1105,8 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 
 func registerMigrateRebaseCmd(g *strictcli.Group) {
 	g.Command("rebase", "Resolve a two-head fork (chain mode). Re-parents the tail of the head NOT named by --head onto the head that IS named, re-simulating each re-parented edge's ops to recompute its revision and content-derived edge file. The rebased-away originals retire INTACT to migrations/archive/ (never rewritten or deleted), and the rebase revision-remap table (migrations/remap.json) is written so a database stamped at a rebased-away revision is served forward to the live head, never orphaned. A pure file operation: no database is required.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			cfg, cfgErr := loadProjectConfig(cfgOverride, ".")
@@ -1139,6 +1146,7 @@ func registerMigrateRebaseCmd(g *strictcli.Group) {
 			}
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("head", "The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it"),
 			strictcli.StringFlag("dir", "Directory containing the chain project (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
@@ -1148,8 +1156,8 @@ func registerMigrateRebaseCmd(g *strictcli.Group) {
 
 func registerMigrateTestCmd(g *strictcli.Group) {
 	g.Command("test", "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			dbURL := kwargsDBURL(kwargs)
@@ -1175,27 +1183,27 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 
 			dir := resolveMigrationsDir(dirFlag, string(cfg.Project.MigrationsDir))
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+			bgCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 			defer cancel()
 
-			conn, err := pgx.Connect(ctx, dbURL)
+			conn, err := pgx.Connect(bgCtx, dbURL)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			defer conn.Close(ctx)
+			defer conn.Close(bgCtx)
 
-			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+			if err := migrate.GuardNotPreUpgrade(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
 
-			if err := migrate.EnsureMigrationsTable(ctx, conn); err != nil {
+			if err := migrate.EnsureMigrationsTable(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
 
-			applied, err := migrate.AppliedVersions(ctx, conn)
+			applied, err := migrate.AppliedVersions(bgCtx, conn)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
@@ -1243,12 +1251,12 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 
 			totalStart := time.Now()
 
-			tx, err := conn.Begin(ctx)
+			tx, err := conn.Begin(bgCtx)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: begin transaction: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			defer tx.Rollback(ctx)
+			defer tx.Rollback(bgCtx)
 
 			failed := false
 			skippedNonTx := 0
@@ -1285,7 +1293,7 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 						break
 					}
 					for _, stmt := range stmts {
-						if _, err := tx.Exec(ctx, stmt); err != nil {
+						if _, err := tx.Exec(bgCtx, stmt); err != nil {
 							fmt.Fprintf(os.Stderr, "  [fail] %s: %v\n    SQL: %s\n", pm.version, err, stmt)
 							migFailed = true
 							break
@@ -1301,7 +1309,7 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 						if op.SQL == "" {
 							continue
 						}
-						if _, err := tx.Exec(ctx, op.SQL); err != nil {
+						if _, err := tx.Exec(bgCtx, op.SQL); err != nil {
 							fmt.Fprintf(os.Stderr, "  [fail] %s: DML error: %v\n    SQL: %s\n", pm.version, err, op.SQL)
 							migFailed = true
 							break
@@ -1321,7 +1329,7 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 				}
 			}
 
-			tx.Rollback(ctx)
+			tx.Rollback(bgCtx)
 
 			totalElapsed := time.Since(totalStart)
 
@@ -1344,6 +1352,7 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 			}
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
@@ -1380,25 +1389,25 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 
 	schemaNames := modelSchemaNames(schema)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	bgCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	conn, err := pgx.Connect(ctx, dbURL)
+	conn, err := pgx.Connect(bgCtx, dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
 		return 1
 	}
-	defer conn.Close(ctx)
+	defer conn.Close(bgCtx)
 
 	// Pre-upgrade guard FIRST — before any shadow database is created — so a
 	// pre-upgrade database is refused (naming `migrate upgrade`) exactly like
 	// every other --db subcommand, rather than silently proceeding.
-	if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+	if err := migrate.GuardNotPreUpgrade(bgCtx, conn); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
 
-	rows, err := conn.Query(ctx, "SELECT datname FROM pg_database WHERE datname LIKE 'pgdesign_shadow_%'")
+	rows, err := conn.Query(bgCtx, "SELECT datname FROM pg_database WHERE datname LIKE 'pgdesign_shadow_%'")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: cannot check for stale shadow databases: %v\n", err)
 	} else {
@@ -1424,7 +1433,7 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 		fmt.Printf("Creating shadow database: %s\n", shadowName)
 	}
 
-	if _, err := conn.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s", shadowName)); err != nil {
+	if _, err := conn.Exec(bgCtx, fmt.Sprintf("CREATE DATABASE %s", shadowName)); err != nil {
 		fmt.Fprintf(os.Stderr, "error: create shadow database: %v\n", err)
 		return 1
 	}
@@ -1445,7 +1454,7 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 		return 1
 	}
 
-	shadowConn, err := pgx.Connect(ctx, shadowURL)
+	shadowConn, err := pgx.Connect(bgCtx, shadowURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: connect to shadow: %v\n", err)
 		return 1
@@ -1465,15 +1474,15 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 	if migrate.IsChainMode(dir) {
 		p, perr := migrate.OpenChainProject(dir)
 		if perr != nil {
-			shadowConn.Close(ctx)
+			shadowConn.Close(bgCtx)
 			fmt.Fprintf(os.Stderr, "error: open chain project: %v\n", perr)
 			return 1
 		}
-		applied, err = migrate.ApplyChain(ctx, shadowConn, p, "", lockTimeout, nil)
+		applied, err = migrate.ApplyChain(bgCtx, shadowConn, p, "", lockTimeout, nil)
 	} else {
-		applied, err = migrate.Apply(ctx, shadowConn, dir, lockTimeout)
+		applied, err = migrate.Apply(bgCtx, shadowConn, dir, lockTimeout)
 	}
-	shadowConn.Close(ctx)
+	shadowConn.Close(bgCtx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: replay migrations: %v\n", err)
 		if len(applied) > 0 {
@@ -1489,7 +1498,7 @@ func runMigrateTestShadow(dbURL string, dirFlag *string, timeout int, paths []st
 	if !quiet {
 		fmt.Println("Introspecting shadow database...")
 	}
-	actual, intrDiags, err := introspect.Introspect(ctx, shadowURL, schemaNames)
+	actual, intrDiags, err := introspect.Introspect(bgCtx, shadowURL, schemaNames)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: introspect shadow: %v\n", err)
 		return 1
@@ -1652,8 +1661,8 @@ func printSchemaDiffSummary(d *diff.SchemaDiff) {
 
 func registerMigrateUpgradeCmd(g *strictcli.Group) {
 	g.Command("upgrade", "One-time adoption of a legacy (semver-TOML) database onto the on-disk chain. Verifies the schema TOML matches the live database exactly (refusing to stamp over drift), folds the existing pgdesign_migrations rows into the chain journal, writes the content-addressed prefix edge, and stamps this database's upgrade boundary in a single transaction. Requires a clean working tree for the schema files when inside a git repository. Run once per database; a fresh database uses `migrate apply` directly.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			dbURL := kwargsDBURL(kwargs)
@@ -1684,18 +1693,18 @@ func registerMigrateUpgradeCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			ctx := context.Background()
-			conn, err := pgx.Connect(ctx, dbURL)
+			bgCtx := context.Background()
+			conn, err := pgx.Connect(bgCtx, dbURL)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			defer conn.Close(ctx)
+			defer conn.Close(bgCtx)
 
 			// Introspect the live database for the reconcile, resolving the live PG
 			// version onto the desired model so an unpinned pg_version does not
 			// register as spurious drift (mirrors migrate generate/plan).
-			actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
+			actual, diags, err := introspect.Introspect(bgCtx, dbURL, schemaNames)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: introspect: %v\n", err)
 				return strictcli.Exit(1)
@@ -1716,12 +1725,12 @@ func registerMigrateUpgradeCmd(g *strictcli.Group) {
 
 			// LIVE ROUND-TRIP NORMALIZATION for the reconcile (best-effort).
 			var ln diff.LiveNormalizer
-			if n, nerr := livenorm.New(ctx, dbURL); nerr == nil {
+			if n, nerr := livenorm.New(bgCtx, dbURL); nerr == nil {
 				defer n.Close()
 				ln = n
 			}
 
-			report, err := migrate.Upgrade(ctx, conn, p, desired, actual, ln, dir, schemaFiles, nil)
+			report, err := migrate.Upgrade(bgCtx, conn, p, desired, actual, ln, dir, schemaFiles, nil)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
@@ -1749,6 +1758,8 @@ func registerMigrateUpgradeCmd(g *strictcli.Group) {
 			}
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
+		strictcli.WithConsequential(),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the database to upgrade", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
@@ -1761,8 +1772,8 @@ func registerMigrateUpgradeCmd(g *strictcli.Group) {
 
 func registerMigrateBaselineCmd(g *strictcli.Group) {
 	g.Command("baseline", "Adopt an existing database onto the migration chain without executing any migration SQL. Use this for a database whose schema was created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying the introspected manifest, and stamps this database's baseline boundary (rollback-frozen); pass the schema TOML path(s) so the correct schema search-path is introspected. In legacy (semver-TOML) mode it records a semver --version. Idempotent: re-baselining at the same state is a no-op.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 
 			dbURL := kwargsDBURL(kwargs)
@@ -1780,13 +1791,13 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 			description := kwargs["description"].(string)
 
-			ctx := context.Background()
-			conn, err := pgx.Connect(ctx, dbURL)
+			bgCtx := context.Background()
+			conn, err := pgx.Connect(bgCtx, dbURL)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: connect: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			defer conn.Close(ctx)
+			defer conn.Close(bgCtx)
 
 			// Chain mode: introspect the live database and adopt its state as a
 			// genesis baseline edge, stamping the baseline boundary (roadmap 5.10).
@@ -1800,7 +1811,7 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 					}
 					schemaNames = modelSchemaNames(desired)
 				}
-				actual, diags, err := introspect.Introspect(ctx, dbURL, schemaNames)
+				actual, diags, err := introspect.Introspect(bgCtx, dbURL, schemaNames)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error: introspect: %v\n", err)
 					return strictcli.Exit(1)
@@ -1816,7 +1827,7 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 					fmt.Fprintf(os.Stderr, "error: %v\n", err)
 					return strictcli.Exit(1)
 				}
-				report, err := migrate.BaselineChain(ctx, conn, p, actual, description)
+				report, err := migrate.BaselineChain(bgCtx, conn, p, actual, description)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error: %v\n", err)
 					return strictcli.Exit(1)
@@ -1839,11 +1850,11 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 				fmt.Fprintln(os.Stderr, "error: --version is required for migrate baseline in legacy (semver-TOML) mode")
 				return strictcli.Exit(1)
 			}
-			if err := migrate.GuardNotPreUpgrade(ctx, conn); err != nil {
+			if err := migrate.GuardNotPreUpgrade(bgCtx, conn); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
-			if err := migrate.Baseline(ctx, conn, dir, version, description); err != nil {
+			if err := migrate.Baseline(bgCtx, conn, dir, version, description); err != nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return strictcli.Exit(1)
 			}
@@ -1852,6 +1863,8 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			}
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
+		strictcli.WithConsequential(),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),

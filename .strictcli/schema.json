@@ -107,14 +107,8 @@
   },
   "commands": {
     "build": {
+      "effect": "mutating",
       "flags": [
-        {
-          "default": false,
-          "help": "Show what would be generated without writing any files",
-          "name": "dry-run",
-          "negatable": true,
-          "type": "bool"
-        },
         {
           "default": true,
           "help": "Automatically git commit the generated output files after a successful build; pass --no-auto-commit to leave them in the working tree",
@@ -133,6 +127,7 @@
       "name": "build"
     },
     "check": {
+      "effect": "read_only",
       "flags": [
         {
           "default": false,
@@ -173,22 +168,11 @@
           "name": "ignore-warnings",
           "negatable": true,
           "type": "bool"
-        },
-        {
-          "default": false,
-          "help": "Show per-check notes and durations (including on passing checks) plus a trailing pass/fail/warn/skip count summary",
-          "name": "verbose",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": false,
-          "help": "Show which checks would run based on current filters without executing them",
-          "name": "dry-run",
-          "negatable": true,
-          "type": "bool"
         }
       ],
+      "forwarding": {
+        "reason": "framework-internal: absorbs app-defined global flag values"
+      },
       "help": "Run project checks registered via the check framework and report results",
       "name": "check"
     },
@@ -200,6 +184,7 @@
           "variadic": true
         }
       ],
+      "effect": "mutating",
       "flags": [
         {
           "choices": [
@@ -280,6 +265,7 @@
           "variadic": true
         }
       ],
+      "effect": "read_only",
       "flags": [
         {
           "default": false,
@@ -315,6 +301,7 @@
           "name": "path"
         }
       ],
+      "effect": "mutating",
       "flags": [
         {
           "default": false,
@@ -357,6 +344,7 @@
           "variadic": true
         }
       ],
+      "effect": "read_only",
       "flags": [
         {
           "default": false,
@@ -398,6 +386,7 @@
       "name": "generate"
     },
     "introspect": {
+      "effect": "mutating",
       "flags": [
         {
           "env": "PGDESIGN_DB",
@@ -430,6 +419,7 @@
       "name": "introspect"
     },
     "revise": {
+      "effect": "mutating",
       "flags": [
         {
           "env": "PGDESIGN_DB",
@@ -454,6 +444,7 @@
           "variadic": true
         }
       ],
+      "effect": "mutating",
       "flags": [
         {
           "default": 10,
@@ -524,6 +515,7 @@
       "name": "seed"
     },
     "serve": {
+      "effect": "read_only",
       "flags": [
         {
           "env": "PGDESIGN_DB",
@@ -570,6 +562,7 @@
           "variadic": true
         }
       ],
+      "effect": "read_only",
       "flags": [
         {
           "env": "PGDESIGN_DB",
@@ -645,13 +638,6 @@
   },
   "global_flags": [
     {
-      "default": false,
-      "help": "Suppress non-error output",
-      "name": "quiet",
-      "negatable": true,
-      "type": "bool"
-    },
-    {
       "help": "Path to pgdesign.toml (bypasses directory search)",
       "name": "project-config",
       "type": "str"
@@ -668,6 +654,7 @@
               "required": false
             }
           ],
+          "effect": "mutating",
           "help": "Resolve each [imports] alias's git pin, vendor the referenced surface (tables + type closure) into imports/\u003calias\u003e/, and write the lockfile. Refuses to overwrite an existing lockfile — use `import update` to re-pin.",
           "name": "lock"
         },
@@ -679,6 +666,7 @@
               "required": false
             }
           ],
+          "effect": "mutating",
           "help": "Re-resolve each [imports] alias's git ref and re-vendor its surface, updating the lockfile. Requires an existing lockfile — use `import lock` for the first pin.",
           "name": "update"
         }
@@ -689,6 +677,8 @@
     "migrate": {
       "commands": {
         "apply": {
+          "consequential": true,
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -700,13 +690,6 @@
               "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
               "name": "dir",
               "type": "str"
-            },
-            {
-              "default": false,
-              "help": "Preview the migration SQL statements without executing",
-              "name": "dry-run",
-              "negatable": true,
-              "type": "bool"
             }
           ],
           "help": "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.",
@@ -721,6 +704,8 @@
               "variadic": true
             }
           ],
+          "consequential": true,
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -757,6 +742,7 @@
               "variadic": true
             }
           ],
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -781,6 +767,7 @@
               "variadic": true
             }
           ],
+          "effect": "read_only",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -803,6 +790,7 @@
           "name": "plan"
         },
         "rebase": {
+          "effect": "mutating",
           "flags": [
             {
               "help": "The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it",
@@ -819,6 +807,8 @@
           "name": "rebase"
         },
         "rollback": {
+          "consequential": true,
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -842,6 +832,7 @@
           "name": "rollback"
         },
         "squash": {
+          "effect": "mutating",
           "flags": [
             {
               "help": "Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix)",
@@ -874,6 +865,7 @@
           "name": "squash"
         },
         "status": {
+          "effect": "read_only",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -899,6 +891,7 @@
               "variadic": true
             }
           ],
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -936,6 +929,8 @@
               "variadic": true
             }
           ],
+          "consequential": true,
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -959,6 +954,8 @@
     "testdb": {
       "commands": {
         "gc": {
+          "consequential": true,
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -976,6 +973,7 @@
           "name": "gc"
         },
         "init": {
+          "effect": "mutating",
           "flags": [
             {
               "default": [],
@@ -1014,6 +1012,7 @@
           "name": "init"
         },
         "setup": {
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",
@@ -1031,6 +1030,8 @@
           "name": "setup"
         },
         "teardown": {
+          "consequential": true,
+          "effect": "mutating",
           "flags": [
             {
               "env": "PGDESIGN_DB",

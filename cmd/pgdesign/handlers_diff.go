@@ -124,6 +124,7 @@ func registerDiffCmd(app *strictcli.App) {
 			fmt.Print(diff.FormatTerminal(d))
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("json", "Output the schema diff in machine-readable JSON format", strictcli.Default(false)),
 			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),

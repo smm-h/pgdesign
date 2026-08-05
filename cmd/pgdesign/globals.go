@@ -4,16 +4,14 @@ import "github.com/smm-h/strictcli/go/strictcli"
 
 // registerGlobals adds app-wide global flags. Handlers read them from kwargs:
 //
-//	quiet          -> kwargs["quiet"].(bool)
 //	project_config -> kwargs["project_config"] (nil when not provided, string when set)
+//
+// --quiet is NOT here: it is one of strictcli's reserved quartet
+// (--dry-run, --approve-consequential, --quiet, --verbose), owned by the
+// framework and delivered on the Context. Handlers read ctx.Quiet(); declaring
+// it as a flag at any level is a registration-time hard error.
 func registerGlobals(app *strictcli.App) {
-	app.GlobalFlag(strictcli.BoolFlag("quiet", "Suppress non-error output", strictcli.Default(false)))
 	app.GlobalFlag(strictcli.StringFlag("project-config", "Path to pgdesign.toml (bypasses directory search)", strictcli.Default(nil)))
-}
-
-// kwargsQuiet extracts the quiet global flag from kwargs.
-func kwargsQuiet(kwargs map[string]interface{}) bool {
-	return kwargs["quiet"].(bool)
 }
 
 // kwargsConfigOverride extracts the project-config global flag from kwargs.

@@ -15,7 +15,7 @@ import (
 func registerIntrospectCmd(app *strictcli.App) {
 	app.Command("introspect", "Introspect a live PostgreSQL database into TOML schema",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+			quiet := ctx.Quiet()
 
 			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
@@ -152,6 +152,7 @@ func registerIntrospectCmd(app *strictcli.App) {
 
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("schema", "PostgreSQL schema name(s) to introspect (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),

@@ -49,6 +49,7 @@ func registerFmtCmd(app *strictcli.App) {
 			}
 			return strictcli.Exit(fmtFile(target, fmtConfig, check))
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("check", "Check if file is already formatted (exit 1 if not)", strictcli.Default(false)),
 			strictcli.StringFlag("table-order", "Table ordering strategy: dependency-based or alphabetical", strictcli.Default("dependency"), strictcli.Choices("dependency", "alphabetical")),

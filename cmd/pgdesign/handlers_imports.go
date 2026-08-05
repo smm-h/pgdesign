@@ -22,9 +22,10 @@ func registerImportCmds(app *strictcli.App) {
 
 func registerImportLockCmd(g *strictcli.Group) {
 	g.Command("lock", "Resolve each [imports] alias's git pin, vendor the referenced surface (tables + type closure) into imports/<alias>/, and write the lockfile. Refuses to overwrite an existing lockfile — use `import update` to re-pin.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			return runImportPin(kwargs, false)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			return runImportPin(ctx, kwargs, false)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithArgs(
 			strictcli.NewArg("alias", "Name of the single [imports] alias to lock; omit to lock every alias declared in pgdesign.toml", strictcli.ArgRequired(false)),
 		),
@@ -33,9 +34,10 @@ func registerImportLockCmd(g *strictcli.Group) {
 
 func registerImportUpdateCmd(g *strictcli.Group) {
 	g.Command("update", "Re-resolve each [imports] alias's git ref and re-vendor its surface, updating the lockfile. Requires an existing lockfile — use `import lock` for the first pin.",
-		func(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			return runImportPin(kwargs, true)
+		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+			return runImportPin(ctx, kwargs, true)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithArgs(
 			strictcli.NewArg("alias", "Name of the single [imports] alias to re-resolve and update; omit to update every declared alias", strictcli.ArgRequired(false)),
 		),
@@ -46,7 +48,7 @@ func registerImportUpdateCmd(g *strictcli.Group) {
 // `import update` (update=true). It builds the consumer model to learn which
 // tables each alias references, clones each pinned framework, extracts and
 // vendors the surface, and writes the lockfile.
-func runImportPin(kwargs map[string]interface{}, update bool) strictcli.Outcome {
+func runImportPin(ctx *strictcli.Context, kwargs map[string]interface{}, update bool) strictcli.Outcome {
 	cfgOverride := kwargsConfigOverride(kwargs)
 
 	projectRoot, cfg, err := resolveProjectRootAndConfig(cfgOverride)
@@ -107,7 +109,7 @@ func runImportPin(kwargs map[string]interface{}, update bool) strictcli.Outcome 
 		if update {
 			verb = "updated"
 		}
-		if !kwargsQuiet(kwargs) {
+		if !ctx.Quiet() {
 			fmt.Printf("%s import %q -> %s (%d surface objects)\n", verb, alias, decl.Ref, len(refByAlias[alias]))
 		}
 	}

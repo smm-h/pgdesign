@@ -16,10 +16,11 @@ import (
 func registerCodegenCmd(app *strictcli.App) {
 	app.Command("codegen", "Generate type-safe application code from schema definitions",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
-			quiet := kwargsQuiet(kwargs)
+			quiet := ctx.Quiet()
 			cfgOverride := kwargsConfigOverride(kwargs)
 			return strictcli.Exit(runCodegen(cfgOverride, quiet, kwargs))
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
 			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toIfaces(SupportedModeNames())...)),

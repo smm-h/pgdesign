@@ -53,6 +53,7 @@ func registerTestdbSetupCmd(g *strictcli.Group) {
 			fmt.Println(db.URL)
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("ddl", "Path to the SQL DDL file to apply to the test database"),
@@ -94,6 +95,8 @@ func registerTestdbTeardownCmd(g *strictcli.Group) {
 
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
+		strictcli.WithConsequential(),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),
@@ -159,6 +162,8 @@ func registerTestdbGCCmd(g *strictcli.Group) {
 			}
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
+		strictcli.WithConsequential(),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("older-than", "Drop databases older than this duration (e.g., 2h, 30m)"),
@@ -352,6 +357,7 @@ func registerTestdbInitCmd(g *strictcli.Group) {
 
 			return strictcli.Exit(0)
 		},
+		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
 			strictcli.StringFlag("language", "Target programming language(s) for wrapper generation", strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Default(nil)),
