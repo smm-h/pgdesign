@@ -124,8 +124,10 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 ## CLI (strictcli)
 
 - Commands registered via `app.Command(name, desc, handler, strictcli.WithArgs(...), strictcli.WithFlags(...))`
-- Handler signature: `func(kwargs map[string]interface{}) int` (returns exit code)
-- Global flags: `quiet`, `--project-config` (explicit pgdesign.toml override — a missing/unusable override is a hard error, never a silent fall back)
+- Handler signature: `func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome`
+- Global flags: `--project-config` (explicit pgdesign.toml override — a missing/unusable override is a hard error, never a silent fall back)
+- RESERVED QUARTET: `--dry-run`, `--approve-consequential`, `--quiet` and `--verbose` are owned by strictcli, available on every command, and read off the Context (`ctx.DryRun()`, `ctx.Quiet()`, ...). Declaring any of them as a flag at any level is a registration-time hard error.
+- EFFECT CLASSIFICATION: every command declares `strictcli.WithEffect(strictcli.EffectReadOnly)` or `...EffectMutating`; registration hard-errors without it. Commands whose act is worth interrupting someone for additionally declare `strictcli.WithConsequential()`, and the framework prompts for exactly those: `migrate apply`, `migrate rollback`, `migrate upgrade`, `migrate baseline`, `testdb teardown`, `testdb gc`. `cmd/pgdesign/classification_test.go` pins the whole table (total over the live command set, like `writersRegistry`) with the reasoning for every row.
 - CONNECTION ENV: `PGDESIGN_DB` is the single connection env for every database-backed command and check, registered via `strictcli.WithConnectionEnv`. Every `--db`/`--live` flag binds to it via `ConnectionURLFlag` — an unbound DB-URL flag is a registration-time error. Under `--hermetic`, DB work resolves as absent and skips visibly instead of connecting.
 - Commands: `revise`, `generate`, `check`, `fmt`, `introspect`, `diff`, `seed`, `serve`, `codegen`, `build`, `stats`
 - Command groups: `migrate` (`plan`, `generate`, `apply`, `rollback`, `status`, `squash`, `rebase`, `test`, `baseline`, `upgrade`), `import` (`lock`, `update`), `testdb` (`setup`, `teardown`, `gc`, `init`)

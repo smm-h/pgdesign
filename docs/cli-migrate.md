@@ -21,7 +21,6 @@ Apply all pending migrations to the target database in order. Each migration run
 | --- | --- | --- | --- | --- | --- |
 | `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
 | `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
-| `--dry-run` |  | bool |  |  | Preview the migration SQL statements without executing |
 
 ## migrate baseline
 
