@@ -127,12 +127,27 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
   tmpfs directory, reachable only through a unix socket), and every guard goes
   through `testdb.DatabaseURL`/`RequireURL`. Never reintroduce a default DSN, and
   never write a connection literal into a test -- `TestNoHardcodedTestConnStr`
-  scans every `*_test.go` in the repository for exactly that.
+  scans every `.go` file in the repository (test and non-test, `internal/testdb`
+  included) for exactly that, with a line-scoped allowlist and no directory
+  exemptions.
+- NO TEST DECIDES ON ITS OWN THAT A BROKEN DATABASE IS A REASON TO SKIP. A test
+  obtains its database through `testdb.RequireManager`,
+  `testdb.RequireEphemeralDB` or `testdb.RequireConn`; a `TestMain` uses
+  `testdb.MainManager`. They resolve the DSN and route every downstream failure
+  through one verdict, so `PGDESIGN_REQUIRE_DB` is honored everywhere. Calling
+  `testdb.NewManager` from a test is banned by the same guard. An ABSENT DSN is
+  the only outcome that may end in a skip: a database that was named but does not
+  work is a hard failure, always -- `testdb.MainFailed` for a `TestMain`, exit 1
+  regardless of the require variables.
 - The ephemeral cluster inherits the HOST's extension library, so pg_partman and
   pgvector tests pass or skip according to what is installed on the machine. CI
   installs them as apt packages rather than running a service container.
-- `PGDESIGN_REQUIRE_DB=1` / `PGDESIGN_REQUIRE_PARTMAN=1` turn a skip into a hard
-  failure. CI sets both so a provisioning regression cannot pass as green.
+- `PGDESIGN_REQUIRE_DB=1` / `PGDESIGN_REQUIRE_PARTMAN=1` / `PGDESIGN_REQUIRE_TCP_LANES=1`
+  turn a skip into a hard failure. CI sets the first two so a provisioning
+  regression cannot pass as green. It deliberately does NOT set the third: the
+  ephemeral cluster listens on a unix socket only, so the JDBC lanes legitimately
+  skip there. Set `PGDESIGN_REQUIRE_TCP_LANES=1` when you point `PGDESIGN_DB` at a
+  TCP-reachable server and want the Java/Kotlin conformance lanes to be mandatory.
 - Setting `PGDESIGN_DB` yourself is explicit mode selection: no cluster is booted
   and the DSN is used as given. The JDBC conformance lanes (Java, Kotlin) run
   ONLY in that mode -- pgjdbc has no unix-socket transport, so they skip against
