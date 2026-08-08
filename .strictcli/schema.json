@@ -118,7 +118,7 @@
         },
         {
           "env": "PGDESIGN_DB",
-          "help": "PostgreSQL connection URL; required only when a [output.\u003cname\u003e.d2] sets live_stats=true",
+          "help": "PostgreSQL connection URL; required only when a [output.<name>.d2] sets live_stats=true",
           "name": "db",
           "type": "str"
         }
@@ -138,7 +138,7 @@
         },
         {
           "default": "",
-          "help": "Tag DSL expression to select checks (e.g. 'changelog \u0026 !quality')",
+          "help": "Tag DSL expression to select checks (e.g. 'changelog & !quality')",
           "name": "tag",
           "type": "str"
         },
@@ -433,7 +433,7 @@
           "type": "str"
         }
       ],
-      "help": "Regenerate all outputs, chain the migration, and commit — the one-command project revision. Runs the PURE tier (build outputs, chain-mode migration, blocking normal-form and structural checks) and commits it, then runs the non-retroactive DB tier (live FD discovery, pg_stat workload).",
+      "help": "Regenerate all outputs, chain the migration, and commit \u2014 the one-command project revision. Runs the PURE tier (build outputs, chain-mode migration, blocking normal-form and structural checks) and commits it, then runs the non-retroactive DB tier (live FD discovery, pg_stat workload).",
       "name": "revise"
     },
     "seed": {
@@ -655,7 +655,7 @@
             }
           ],
           "effect": "mutating",
-          "help": "Resolve each [imports] alias's git pin, vendor the referenced surface (tables + type closure) into imports/\u003calias\u003e/, and write the lockfile. Refuses to overwrite an existing lockfile — use `import update` to re-pin.",
+          "help": "Resolve each [imports] alias's git pin, vendor the referenced surface (tables + type closure) into imports/<alias>/, and write the lockfile. Refuses to overwrite an existing lockfile \u2014 use `import update` to re-pin.",
           "name": "lock"
         },
         "update": {
@@ -667,7 +667,7 @@
             }
           ],
           "effect": "mutating",
-          "help": "Re-resolve each [imports] alias's git ref and re-vendor its surface, updating the lockfile. Requires an existing lockfile — use `import lock` for the first pin.",
+          "help": "Re-resolve each [imports] alias's git ref and re-vendor its surface, updating the lockfile. Requires an existing lockfile \u2014 use `import lock` for the first pin.",
           "name": "update"
         }
       },
@@ -1060,5 +1060,5 @@
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
   "schema_version": 1,
-  "version": ""
+  "version": "0.26.0"
 }
