@@ -16,19 +16,17 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: --health-cmd "pg_isready -U test" --health-interval 10s --health-timeout 5s --health-retries 5
     env:
-      PGDESIGN_DB: postgres://test:test@localhost:5432/postgres?sslmode=disable
+      # PGDESIGN_DB is deliberately NOT set. Each database-backed test binary
+      # boots its own ephemeral cluster in TestMain (testdb.RunWithCluster) from
+      # the PostgreSQL packages installed on the runner host below, and exports
+      # the DSN itself. A DSN handed in here would point the suite at a server
+      # nobody asked it to touch -- which is the pattern this lane replaced.
+      #
+      # These two turn a failed provisioning step into a failed run instead of a
+      # green run full of skips.
       PGDESIGN_REQUIRE_DB: '1'
+      PGDESIGN_REQUIRE_PARTMAN: '1'
       # Make the DB-free compile checks (internal/test/codegen_compile_test.go)
       # hard-fail if any of the six language toolchains is missing, so CI can
       # never silently skip a language. Every toolchain below must be provisioned.
@@ -36,10 +34,32 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       # go.mod: go 1.26.3
-      - name: Set up postgres service container
+      # --- PostgreSQL on the runner host (no service container) ---
+      # The suite boots its own throwaway cluster on a unix socket, so what CI
+      # has to provide is the server BINARIES and the extension library, not a
+      # running server: an ephemeral cluster inherits whatever extensions are
+      # installed alongside the initdb that created it. pg_partman and pgvector
+      # are both schema features pgdesign generates DDL for, so both must be
+      # present or the tests that exercise them would quietly skip.
+      - name: Install PostgreSQL 18 with pg_partman and pgvector
         run: |
-          docker exec ${{ job.services.postgres.id }} bash -c "apt-get update && apt-get install -y --no-install-recommends postgresql-17-partman && rm -rf /var/lib/apt/lists/*"
-          PGPASSWORD=test psql -h localhost -U test -d postgres -c "SELECT name, default_version FROM pg_available_extensions WHERE name = 'pg_partman';"
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            postgresql-18 postgresql-18-partman postgresql-18-pgvector
+          # initdb and pg_ctl live in the version directory, not on PATH. Putting
+          # PG 18's bin first makes the cluster launcher pick that version
+          # outright rather than falling to the runner's preinstalled older one.
+          echo /usr/lib/postgresql/18/bin >> "$GITHUB_PATH"
+      - name: Verify the extension library the cluster will inherit
+        run: |
+          ls /usr/share/postgresql/18/extension/pg_partman.control
+          ls /usr/share/postgresql/18/extension/vector.control
+          initdb --version
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
