@@ -118,6 +118,23 @@ The dependency flow is: parse -> model -> validate/generate/audit/diff/codegen -
 - Test fixtures live in `testdata/` subdirectories within each package.
 - Run tests: `go test ./... -race -short -timeout=10m`
 - Lint: `go vet ./...`
+- THE DATABASE IS NEVER GUESSED. `PGDESIGN_DB` is the only source of a connection
+  string; there is no default and no localhost fallback. Every database-backed
+  test binary boots its own throwaway cluster in `TestMain` via
+  `testdb.RunWithCluster` (stricttest's `pgcluster`: a postmaster on a private
+  tmpfs directory, reachable only through a unix socket), and every guard goes
+  through `testdb.DatabaseURL`/`RequireURL`. Never reintroduce a default DSN, and
+  never write a connection literal into a test -- `TestNoHardcodedTestConnStr`
+  scans every `*_test.go` in the repository for exactly that.
+- The ephemeral cluster inherits the HOST's extension library, so pg_partman and
+  pgvector tests pass or skip according to what is installed on the machine. CI
+  installs them as apt packages rather than running a service container.
+- `PGDESIGN_REQUIRE_DB=1` / `PGDESIGN_REQUIRE_PARTMAN=1` turn a skip into a hard
+  failure. CI sets both so a provisioning regression cannot pass as green.
+- Setting `PGDESIGN_DB` yourself is explicit mode selection: no cluster is booted
+  and the DSN is used as given. The JDBC conformance lanes (Java, Kotlin) run
+  ONLY in that mode -- pgjdbc has no unix-socket transport, so they skip against
+  the socket cluster.
 
 ## CLI (strictcli)
 
@@ -148,3 +165,16 @@ No Makefile or build scripts. Direct Go commands only:
 - `go build ./cmd/pgdesign`
 - `go test ./...`
 - `go vet ./...`
+
+## Distribution: the phantom v1.0.0
+
+A `v1.0.0` tag reached the Go module proxy once and cannot be removed: proxy
+entries are permanent and immutable, so `github.com/smm-h/pgdesign@v1.0.0`
+resolves forever to code that was never released under that version. Because
+`@latest` prefers it over every real release, **every install instruction for
+this module must say `@v0`** (or an exact `@v0.x.y`), and no documentation,
+template, or scaffold may say `@latest`.
+
+It cannot be retracted. `retract` only takes effect in a version the proxy also
+serves, so retracting `v1.0.0` would require tagging `v1.0.1` -- and no 1.x tag
+is ever created for this project. The trap is permanent; the pin is the fix.

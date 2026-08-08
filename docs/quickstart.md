@@ -12,8 +12,12 @@ pgdesign is a PostgreSQL schema compiler. You define your database schema in TOM
 ### Go
 
 ```
-go install github.com/smm-h/pgdesign/cmd/pgdesign@latest
+go install github.com/smm-h/pgdesign/cmd/pgdesign@v0
 ```
+
+`@v0`, not `@latest`. The Go module proxy has a cached `v1.0.0` for this
+module that was never a real release, and `@latest` resolves to it. See
+[the phantom v1.0.0 note](#the-phantom-v100) below.
 
 ### npm
 
@@ -26,6 +30,19 @@ npm install pgdesign
 ```
 pip install pgdesign
 ```
+
+### The phantom v1.0.0
+
+A `v1.0.0` tag was pushed to this repository once and immediately removed, but
+the Go module proxy had already cached it. Proxy entries are permanent and
+immutable: `github.com/smm-h/pgdesign@v1.0.0` will resolve forever, to code that
+was never released under that version, and `go install ...@latest` picks it up
+in preference to every real release.
+
+It cannot be retracted. A `retract` directive only takes effect in a version the
+proxy also serves, so retracting `v1.0.0` would mean tagging `v1.0.1` -- and this
+project does not issue 1.x tags. Pin `@v0` (or an exact `@v0.x.y`) and the proxy
+serves the real releases.
 
 ## Creating your first schema
 
