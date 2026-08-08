@@ -16,26 +16,9 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: --health-cmd "pg_isready -U test" --health-interval 10s --health-timeout 5s --health-retries 5
-    env:
-      PGDESIGN_DB: postgres://test:test@localhost:5432/postgres?sslmode=disable
-      PGDESIGN_REQUIRE_DB: '1'
     steps:
       - uses: actions/checkout@v6
       # go.mod: go 1.26.3
-      - name: Set up postgres service container
-        run: |
-          docker exec ${{ job.services.postgres.id }} bash -c "apt-get update && apt-get install -y --no-install-recommends postgresql-17-partman && rm -rf /var/lib/apt/lists/*"
-          PGPASSWORD=test psql -h localhost -U test -d postgres -c "SELECT name, default_version FROM pg_available_extensions WHERE name = 'pg_partman';"
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
