@@ -57,6 +57,7 @@ func scrubAmbientPostgres(t *testing.T) {
 	t.Helper()
 	testenv.Unset(t, ConnectionEnv)
 	testenv.Unset(t, requireDBEnv)
+	testenv.Unset(t, requireTCPLanesEnv)
 	for _, entry := range os.Environ() {
 		name, _, _ := strings.Cut(entry, "=")
 		if strings.HasPrefix(name, "PG") {
@@ -207,5 +208,57 @@ func TestNoDialWithoutADSN(t *testing.T) {
 	if !rec.skipped || !partmanRec.skipped {
 		t.Fatalf("guards did not skip: postgres skipped=%v partman skipped=%v",
 			rec.skipped, partmanRec.skipped)
+	}
+}
+
+// TestSkipIfNoTCPHostHonorsRequireTCPLanes pins the require declaration on the
+// JDBC conformance lanes. They were the one corner of this suite no lane could
+// declare: pgjdbc cannot reach the ephemeral socket cluster, so they always
+// skipped, and a regression in the generated Java or Kotlin wrapper would have
+// been invisible even to a run that required everything else.
+func TestSkipIfNoTCPHostHonorsRequireTCPLanes(t *testing.T) {
+	testenv.Isolate(t)
+	scrubAmbientPostgres(t)
+	const socketDSN = "postgres:///pgdesign?host=/dev/shm/pgd-1234"
+	const tcpDSN = "postgres://u@198.51.100.7:6543/pgdesign"
+
+	// Without the declaration, a socket-only database skips: that is the
+	// recorded, accepted behavior of the cluster adoption and CI relies on it.
+	rec := &recordingTB{TB: t}
+	SkipIfNoTCPHost(rec, socketDSN)
+	if rec.failed {
+		t.Fatalf("SkipIfNoTCPHost failed without %s: %s", requireTCPLanesEnv, rec.failMsg)
+	}
+	if !rec.skipped {
+		t.Fatal("SkipIfNoTCPHost neither skipped nor failed for a socket-only database")
+	}
+
+	// A TCP-reachable database runs the lane in either mode -- the guard is
+	// about the transport, not about the require variable.
+	rec = &recordingTB{TB: t}
+	SkipIfNoTCPHost(rec, tcpDSN)
+	if rec.skipped || rec.failed {
+		t.Fatalf("SkipIfNoTCPHost did not let a TCP database through: skipped=%v failed=%v",
+			rec.skipped, rec.failed)
+	}
+
+	t.Setenv(requireTCPLanesEnv, "1")
+	rec = &recordingTB{TB: t}
+	SkipIfNoTCPHost(rec, socketDSN)
+	if rec.skipped {
+		t.Fatalf("SkipIfNoTCPHost skipped under %s=1: %s", requireTCPLanesEnv, rec.skipMsg)
+	}
+	if !rec.failed {
+		t.Fatalf("SkipIfNoTCPHost did not fail under %s=1", requireTCPLanesEnv)
+	}
+	if !strings.Contains(rec.failMsg, requireTCPLanesEnv) {
+		t.Errorf("failure message does not name %s: %s", requireTCPLanesEnv, rec.failMsg)
+	}
+
+	rec = &recordingTB{TB: t}
+	SkipIfNoTCPHost(rec, tcpDSN)
+	if rec.skipped || rec.failed {
+		t.Fatalf("SkipIfNoTCPHost rejected a TCP database under %s=1: skipped=%v failed=%v",
+			requireTCPLanesEnv, rec.skipped, rec.failed)
 	}
 }

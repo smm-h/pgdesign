@@ -27,6 +27,13 @@ jobs:
       # green run full of skips.
       PGDESIGN_REQUIRE_DB: '1'
       PGDESIGN_REQUIRE_PARTMAN: '1'
+      # PGDESIGN_REQUIRE_TCP_LANES is the third variable of the same family and
+      # is deliberately NOT set here. The ephemeral cluster listens on a unix
+      # socket and opens no TCP port, and pgjdbc has no unix-socket transport,
+      # so the Java and Kotlin conformance lanes legitimately skip on this
+      # runner -- a recorded, accepted consequence of dropping the service
+      # container. Set it only in a lane that points PGDESIGN_DB at a
+      # TCP-reachable server, where those lanes must run.
       # Make the DB-free compile checks (internal/test/codegen_compile_test.go)
       # hard-fail if any of the six language toolchains is missing, so CI can
       # never silently skip a language. Every toolchain below must be provisioned.

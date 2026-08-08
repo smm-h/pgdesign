@@ -25,6 +25,19 @@ const (
 	// requirePartmanEnv is the same declaration for pg_partman, which is a
 	// separate provisioning decision: a lane can have PostgreSQL without it.
 	requirePartmanEnv = "PGDESIGN_REQUIRE_PARTMAN"
+
+	// requireTCPLanesEnv is the same declaration for the lanes that can only
+	// run against a TCP-reachable server -- the Java and Kotlin JDBC
+	// conformance lanes, which pgjdbc cannot point at a unix socket.
+	//
+	// It is a THIRD variable and not part of PGDESIGN_REQUIRE_DB on purpose.
+	// The ephemeral cluster this suite boots listens on a socket and opens no
+	// TCP port, so a lane can legitimately require a database AND still skip
+	// these -- which is exactly what CI does, and why CI does not set this one.
+	// It exists so that a lane which DOES provision a TCP server can declare
+	// it, instead of the JDBC lanes being the one corner of the suite where a
+	// regression is invisible even to a require-everything run.
+	requireTCPLanesEnv = "PGDESIGN_REQUIRE_TCP_LANES"
 )
 
 // noDatabaseMessage is the one explanation every guard gives when there is no
@@ -63,6 +76,13 @@ func RequirePartman() bool {
 	return os.Getenv(requirePartmanEnv) == "1"
 }
 
+// RequireTCPLanes reports whether this lane has declared that the JDBC
+// conformance lanes must run -- that is, that the database it points at is
+// reachable over TCP and not only over a unix socket.
+func RequireTCPLanes() bool {
+	return os.Getenv(requireTCPLanesEnv) == "1"
+}
+
 // RequireURL returns the connection string for a test that needs a database,
 // skipping t when there is none (or failing it under PGDESIGN_REQUIRE_DB=1).
 //
@@ -92,6 +112,12 @@ func RequireURL(t testing.TB) string {
 // deliberately opens no TCP port. That is a property of the driver, not a
 // defect in the generated wrapper, which says the same thing in its own
 // toJdbcUrl. Point PGDESIGN_DB at a TCP-reachable server to run these lanes.
+//
+// When PGDESIGN_REQUIRE_TCP_LANES=1 the skip becomes a hard failure, the same
+// way PGDESIGN_REQUIRE_DB and PGDESIGN_REQUIRE_PARTMAN work. Without it these
+// two lanes were the only database-backed tests in the suite that no lane could
+// declare, so a regression in the generated Java or Kotlin wrapper stayed
+// invisible even in a run that required everything else.
 func SkipIfNoTCPHost(t testing.TB, dbURL string) {
 	t.Helper()
 	u, err := url.Parse(dbURL)
@@ -99,11 +125,17 @@ func SkipIfNoTCPHost(t testing.TB, dbURL string) {
 		t.Fatalf("parsing %s: %v", ConnectionEnv, err)
 		return
 	}
-	if u.Host == "" {
-		t.Skipf("the configured database is reached over a unix socket (%s), and the "+
-			"PostgreSQL JDBC driver has no unix-socket transport; point %s at a "+
-			"TCP-reachable server to run this lane", dbURL, ConnectionEnv)
+	if u.Host != "" {
+		return
 	}
+	msg := fmt.Sprintf("the configured database is reached over a unix socket (%s), and the "+
+		"PostgreSQL JDBC driver has no unix-socket transport; point %s at a "+
+		"TCP-reachable server to run this lane", dbURL, ConnectionEnv)
+	if RequireTCPLanes() {
+		t.Fatalf("a TCP-reachable PostgreSQL is required (%s=1) but %s", requireTCPLanesEnv, msg)
+		return
+	}
+	t.Skipf("%s", msg)
 }
 
 // MainNoDatabase is the exit code for a TestMain that has no database to give
