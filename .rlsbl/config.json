@@ -36,16 +36,6 @@
   "publish_mode": "ci",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": [
-      {
-        "reason": "**New documentation: codegen, diff and introspect guides.** Three new guides cover code generation for all six target languages, the three diff modes (`--live`, `--against`, `--base`), and live-database introspection. The format reference gained its missing sections, and the semantic-type and validation-rule pages are now generated from the source of truth instead of hand-maintained.",
-        "entries": [
-          {
-            "version": "unreleased",
-            "line": 7
-          }
-        ]
-      }
-    ]
+    "exclusions": []
   }
 }
