@@ -35,14 +35,9 @@ func TestMain(m *testing.M) {
 // the exit code instead of calling os.Exit so that RunWithCluster always gets
 // to stop the cluster it started.
 func runTests(m *testing.M) int {
-	dbURL, ok := testdb.DatabaseURL()
+	mgr, code, ok := testdb.MainManager()
 	if !ok {
-		return testdb.MainNoDatabase(nil)
-	}
-
-	mgr, err := testdb.NewManager(dbURL)
-	if err != nil {
-		return testdb.MainNoDatabase(err)
+		return code
 	}
 	testManager = mgr
 
@@ -57,12 +52,12 @@ func runTests(m *testing.M) int {
 	db, err := mgr.Create(ctx, testdb.CreateOptions{DDL: ddlFile})
 	ddlFile.Close()
 	if err != nil {
-		return testdb.MainNoDatabase(err)
+		return testdb.MainFailed(fmt.Errorf("creating the ephemeral database: %w", err))
 	}
 	ephemeralDB = db
 	testConnStr = db.URL
 
-	code := m.Run()
+	code = m.Run()
 
 	// Teardown: drop ephemeral database.
 	if err := mgr.Drop(ctx, ephemeralDB); err != nil {

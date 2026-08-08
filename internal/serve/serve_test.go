@@ -3,7 +3,7 @@ package serve
 import (
 	"context"
 	"encoding/json"
-	"github.com/smm-h/pgdesign/internal/testenv"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/smm-h/pgdesign/internal/rev"
 	"github.com/smm-h/pgdesign/internal/testdb"
+	"github.com/smm-h/pgdesign/internal/testenv"
 	"github.com/smm-h/pgdesign/internal/workload"
 )
 
@@ -22,17 +23,28 @@ var (
 	testDB  *testdb.EphemeralDB
 )
 
-// setupServer creates a Server backed by a real pgxpool for integration tests. It
-// SKIPS the test when no database is configured (testDB == nil), so the DB-backed
-// tests are skipped rather than aborting the whole package — the DB-free
-// project-mode tests still run. (Previously TestMain hard-exited when no database
-// was reachable, which prevented every test in the package from running without a
-// database.)
+// requireTestDB ends t when this binary has no ephemeral database.
+//
+// That state has exactly one cause: no DSN was configured at all. runTests
+// fails the whole binary for every OTHER setup outcome, so an absent database
+// is the only thing left to decide here -- and the verdict is the same one
+// every database-backed test in this repository gets: skip, or fail under
+// PGDESIGN_REQUIRE_DB=1.
+func requireTestDB(t *testing.T) {
+	t.Helper()
+	if testDB != nil {
+		return
+	}
+	testdb.RequireURL(t) // skips, or fails under the require gate
+	t.Fatal("this test binary has no ephemeral database even though a DSN is configured")
+}
+
+// setupServer creates a Server backed by a real pgxpool for integration tests.
+// The DB-free project-mode tests in this package run regardless; only these
+// need a database.
 func setupServer(t *testing.T) *Server {
 	t.Helper()
-	if testDB == nil {
-		t.Skip("no database configured (set PGDESIGN_DB); skipping database-backed test")
-	}
+	requireTestDB(t)
 	ctx := context.Background()
 	pool, err := testDB.Pool(ctx)
 	if err != nil {
@@ -45,8 +57,8 @@ func setupServer(t *testing.T) *Server {
 // TestMain boots one ephemeral PostgreSQL cluster for this test binary and
 // exports its base URL under PGDESIGN_DB. There is no fallback: on a machine
 // without the PostgreSQL binaries the variable stays unset, the DB-backed tests
-// skip themselves through setupServer, and the DB-free project-mode tests still
-// run.
+// skip themselves through requireTestDB, and the DB-free project-mode tests
+// still run.
 func TestMain(m *testing.M) {
 	os.Exit(testdb.RunWithCluster(func() int { return runTests(m) }))
 }
@@ -54,26 +66,35 @@ func TestMain(m *testing.M) {
 // runTests sets this package's ephemeral database up around m.Run. It returns
 // the exit code instead of calling os.Exit so that RunWithCluster always gets
 // to stop the cluster it started.
+//
+// Setup failures are FAILURES. This used to be a best-effort block that
+// swallowed every error and left testDB nil, so a database that was named but
+// unusable produced a run where all ten database-backed serve tests skipped and
+// the package still reported ok -- green CI with zero serve database coverage,
+// even under PGDESIGN_REQUIRE_DB=1. An absent DSN is the only outcome that may
+// end in a skip, and that verdict is testdb.MainManager's to give.
 func runTests(m *testing.M) int {
 	ctx := context.Background()
 
-	// Best-effort database setup: on any failure, testDB stays nil and DB-backed
-	// tests skip themselves via setupServer, but the DB-free project-mode tests
-	// still run under m.Run().
-	if dbURL, ok := testdb.DatabaseURL(); ok {
-		if mgr, err := testdb.NewManager(dbURL); err == nil {
-			testMgr = mgr
-			if db, err := testMgr.Create(ctx, testdb.CreateOptions{}); err == nil {
-				testDB = db
-			}
+	mgr, code, ok := testdb.MainManager()
+	if !ok {
+		if code != 0 {
+			return code
 		}
+		// No database named at all: the DB-free project-mode tests still run.
+		return m.Run()
 	}
+	testMgr = mgr
 
-	code := m.Run()
-
-	if testMgr != nil && testDB != nil {
-		_ = testMgr.Drop(ctx, testDB)
+	db, err := testMgr.Create(ctx, testdb.CreateOptions{})
+	if err != nil {
+		return testdb.MainFailed(fmt.Errorf("creating the ephemeral database: %w", err))
 	}
+	testDB = db
+
+	code = m.Run()
+
+	_ = testMgr.Drop(ctx, testDB)
 	return code
 }
 
@@ -253,9 +274,7 @@ pk = ["id"]
 
 func TestPoolConfigApplied(t *testing.T) {
 	testenv.Isolate(t)
-	if testDB == nil {
-		t.Skip("no database configured (set PGDESIGN_DB); skipping database-backed test")
-	}
+	requireTestDB(t)
 	// Verify that PoolConfig values are applied to pgxpool.Config when non-zero,
 	// and pgxpool defaults are preserved when zero.
 	connStr := testDB.URL

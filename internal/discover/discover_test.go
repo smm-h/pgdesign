@@ -32,14 +32,9 @@ func TestMain(m *testing.M) {
 func runTests(m *testing.M) int {
 	ctx := context.Background()
 
-	baseURL, ok := testdb.DatabaseURL()
+	manager, code, ok := testdb.MainManager()
 	if !ok {
-		return testdb.MainNoDatabase(nil)
-	}
-
-	manager, err := testdb.NewManager(baseURL)
-	if err != nil {
-		return testdb.MainNoDatabase(err)
+		return code
 	}
 
 	ddl, err := os.Open("testdata/setup.sql")
@@ -51,12 +46,12 @@ func runTests(m *testing.M) int {
 	db, err := manager.Create(ctx, testdb.CreateOptions{DDL: ddl})
 	ddl.Close()
 	if err != nil {
-		return testdb.MainNoDatabase(err)
+		return testdb.MainFailed(fmt.Errorf("creating the ephemeral database: %w", err))
 	}
 
 	ephemeralURL = db.URL
 
-	code := m.Run()
+	code = m.Run()
 
 	_ = manager.Drop(ctx, db)
 	return code
