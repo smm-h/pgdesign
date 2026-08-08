@@ -41,6 +41,14 @@ var bannedPatterns = []bannedPattern{
 	{text: "canSetup()", why: "a legacy skip helper: use testdb.SkipIfNoPostgres"},
 	{text: "getTestConnStr()", why: "a legacy DSN helper: use testdb.RequireURL"},
 	{text: "connectTestDB(", why: "a legacy connect helper: use testdb.RequireConn"},
+	// Reading the connection env by hand is how a test escapes the require
+	// gate entirely: os.Getenv + t.Skip skips under PGDESIGN_REQUIRE_DB=1,
+	// where testdb.RequireURL and friends fail. testdb resolves it through the
+	// ConnectionEnv constant, which does not match this literal.
+	{
+		text: `Getenv("` + ConnectionEnv + `")`,
+		why:  "reads the connection env by hand and cannot honor PGDESIGN_REQUIRE_DB: use testdb.RequireURL/RequireConn/RequireManager",
+	},
 }
 
 // allowedLines names the exact source lines that may contain a banned pattern,

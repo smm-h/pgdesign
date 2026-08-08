@@ -2,33 +2,29 @@ package main
 
 import (
 	"context"
-	"github.com/smm-h/pgdesign/internal/testenv"
-	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/diagnostic"
 	"github.com/smm-h/pgdesign/internal/model"
+	"github.com/smm-h/pgdesign/internal/testdb"
+	"github.com/smm-h/pgdesign/internal/testenv"
 )
 
-// liveConn dials the PGDESIGN_DB database for DB-gated import tests, skipping when
-// no database is configured. It also resets the "app" import-target schema so each
-// test starts clean.
+// liveConn connects to the configured database for DB-gated import tests and
+// resets the "app" import-target schema so each test starts clean.
+//
+// The connection comes from testdb.RequireConn and not from a hand-rolled
+// os.Getenv + t.Skip, which is what this used to be: reading the env directly
+// meant an absent or unreachable database skipped even under
+// PGDESIGN_REQUIRE_DB=1, so a CI lane that declared PostgreSQL must exist could
+// run none of these tests and still report green.
 func liveConn(t *testing.T) (*pgx.Conn, context.Context) {
 	t.Helper()
-	dbURL := os.Getenv("PGDESIGN_DB")
-	if dbURL == "" {
-		t.Skip("PGDESIGN_DB not set; skipping DB-gated import test")
-	}
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		t.Skipf("cannot connect to PGDESIGN_DB: %v", err)
-	}
-	t.Cleanup(func() {
-		conn.Exec(ctx, "DROP SCHEMA IF EXISTS app CASCADE")
-		conn.Close(ctx)
-	})
+	conn := testdb.RequireConn(t, ctx)
+	// Registered after RequireConn's own close, so it runs BEFORE it.
+	t.Cleanup(func() { conn.Exec(ctx, "DROP SCHEMA IF EXISTS app CASCADE") })
 	if _, err := conn.Exec(ctx, "DROP SCHEMA IF EXISTS app CASCADE"); err != nil {
 		t.Fatalf("reset app schema: %v", err)
 	}
