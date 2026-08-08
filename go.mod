@@ -8,7 +8,7 @@ require (
 	github.com/smm-h/go-toml-edit v0.3.0
 	github.com/smm-h/strictcli/go v0.29.0
 	github.com/smm-h/strictspec/go v0.1.0
-	github.com/smm-h/stricttest/go v0.1.1
+	github.com/smm-h/stricttest/go v0.2.0
 	github.com/wasilibs/go-pgquery v0.0.0-20260616022436-0b34969e40e5
 	google.golang.org/protobuf v1.36.11
 	oss.terrastruct.com/d2 v0.7.1
