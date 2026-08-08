@@ -2,11 +2,32 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "New codegen, diff and introspect guides; the `@v0` install pin; generated test wrappers that handle unix-socket connection URLs."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+Two of the three user-facing items fall out of a test-infrastructure change.
+
+The suite used to resolve its database as "PGDESIGN_DB, or else
+postgres://localhost:5432/postgres". On a developer's machine that second half
+was not a fallback but the default: running `go test` connected to whatever
+PostgreSQL happened to be listening locally and created and dropped databases
+inside it. There is no default any more -- each database-backed test binary boots
+its own throwaway cluster on a private unix socket, and CI provisions PostgreSQL
+18 with pg_partman and pgvector on the runner host instead of running a service
+container. Running the suite against a socket DSN for the first time exposed two
+real defects in the wrappers `pgdesign testdb init` generates for consumers: the
+TypeScript one dropped the username from such a URL, and the JDBC ones built an
+unusable jdbc:postgresql://null/db instead of saying that the driver has no
+unix-socket transport at all.
+
+The `@v0` pin is unrelated and permanent. The Go module proxy serves a v1.0.0 for
+this module that was never a real release, and `@latest` prefers it over every
+real version. It cannot be retracted: a retraction only takes effect in a version
+the proxy also serves, which would mean tagging 1.x, which this project does not
+do.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
