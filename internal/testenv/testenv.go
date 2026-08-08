@@ -14,6 +14,7 @@
 package testenv
 
 import (
+	"os"
 	"testing"
 
 	"github.com/smm-h/stricttest/go/hygiene"
@@ -30,4 +31,22 @@ func Isolate(t testing.TB) {
 		hygiene.GoPath, hygiene.GoModCache, hygiene.GoCache,
 		hygiene.PythonUserBase, hygiene.NpmCache,
 	))
+}
+
+// Unset removes name from the environment for the duration of t, restoring
+// whatever it held when t finishes.
+//
+// TB has no Unsetenv, so this goes through TB.Setenv first -- which is what
+// registers the restore -- and then unsets the now-empty variable outright.
+// A bare os.Unsetenv registers nothing: the variable stays gone for every test
+// that runs after it in the same binary. That is not hypothetical. A test here
+// unset PGDESIGN_DB that way, and once the suite began booting a cluster and
+// exporting the DSN under it, every later database-backed test in the binary
+// found no database.
+func Unset(t testing.TB, name string) {
+	t.Helper()
+	t.Setenv(name, "")
+	if err := os.Unsetenv(name); err != nil {
+		t.Fatalf("testenv: unsetting %s: %v", name, err)
+	}
 }

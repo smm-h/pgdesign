@@ -50,29 +50,18 @@ func (r *recordingTB) Logf(format string, args ...any) {
 	r.logLines = append(r.logLines, fmt.Sprintf(format, args...))
 }
 
-// unsetEnv removes name for the duration of t. TB has no Unsetenv, so this
-// routes through TB.Setenv (which registers the restore) and then unsets the
-// now-empty variable outright.
-func unsetEnv(t *testing.T, name string) {
-	t.Helper()
-	t.Setenv(name, "")
-	if err := os.Unsetenv(name); err != nil {
-		t.Fatalf("unsetting %s: %v", name, err)
-	}
-}
-
 // scrubAmbientPostgres removes PGDESIGN_DB and every ambient PG* variable for
 // the duration of t. PG* matters because libpq (and therefore pgx) fills in
 // every connection field a DSN leaves unspecified from the environment: an
 // ambient PGHOST/PGPORT is a second, quieter route to a developer's own server.
 func scrubAmbientPostgres(t *testing.T) {
 	t.Helper()
-	unsetEnv(t, ConnectionEnv)
-	unsetEnv(t, requireDBEnv)
+	testenv.Unset(t, ConnectionEnv)
+	testenv.Unset(t, requireDBEnv)
 	for _, entry := range os.Environ() {
 		name, _, _ := strings.Cut(entry, "=")
 		if strings.HasPrefix(name, "PG") {
-			unsetEnv(t, name)
+			testenv.Unset(t, name)
 		}
 	}
 }

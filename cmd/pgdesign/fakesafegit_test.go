@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
 // TestMain installs a hermetic fake `safegit` on PATH for the whole cmd/pgdesign
@@ -18,15 +20,27 @@ import (
 // example, running in a directory that is not a git repository) propagates as a
 // non-zero exit, so the "commit failure is a hard error" tests still observe a
 // failing commit exactly as they would with the real tool.
+// It also boots one ephemeral PostgreSQL cluster for this test binary and
+// exports its base URL under PGDESIGN_DB, so the database-backed tests here
+// (migrate --shadow) have a server of their own. There is no fallback: on a
+// machine without the PostgreSQL binaries the variable stays unset and those
+// tests skip rather than reaching for whatever server happens to be listening
+// locally.
 func TestMain(m *testing.M) {
+	os.Exit(testdb.RunWithCluster(func() int { return runTests(m) }))
+}
+
+// runTests installs the shim around m.Run. It returns the exit code instead of
+// calling os.Exit so that RunWithCluster always gets to stop the cluster it
+// started.
+func runTests(m *testing.M) int {
 	cleanup, err := installFakeSafegit()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "test setup: install fake safegit: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
-	code := m.Run()
-	cleanup()
-	os.Exit(code)
+	defer cleanup()
+	return m.Run()
 }
 
 // installFakeSafegit writes an executable `safegit` shim into a temp dir and

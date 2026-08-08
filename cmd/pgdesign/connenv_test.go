@@ -143,7 +143,7 @@ func TestResolveCheckDBURL(t *testing.T) {
 	// os.LookupEnv workaround saw "unset" and fell through to the config URL --
 	// connecting despite --hermetic. IsHermetic() distinguishes the cases.
 	t.Run("hermetic: env unset + config present => skip, config ignored", func(t *testing.T) {
-		os.Unsetenv("PGDESIGN_DB")
+		testenv.Unset(t, "PGDESIGN_DB")
 		ctx := fakeConnReader{present: false, hermetic: true}
 		url, herm := resolveCheckDBURL(ctx, withCfg)
 		if !herm {
@@ -155,7 +155,7 @@ func TestResolveCheckDBURL(t *testing.T) {
 	})
 
 	t.Run("env unset, config layer used", func(t *testing.T) {
-		os.Unsetenv("PGDESIGN_DB")
+		testenv.Unset(t, "PGDESIGN_DB")
 		ctx := fakeConnReader{present: false}
 		url, herm := resolveCheckDBURL(ctx, withCfg)
 		if herm || url != "postgres://config/url" {
@@ -164,7 +164,7 @@ func TestResolveCheckDBURL(t *testing.T) {
 	})
 
 	t.Run("nothing configured => empty, not hermetic", func(t *testing.T) {
-		os.Unsetenv("PGDESIGN_DB")
+		testenv.Unset(t, "PGDESIGN_DB")
 		ctx := fakeConnReader{present: false}
 		url, herm := resolveCheckDBURL(ctx, empty)
 		if herm || url != "" {
