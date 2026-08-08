@@ -6,5 +6,5 @@ set -euo pipefail
 
 # Only run build if the project has a pgdesign.toml config.
 if [ -f pgdesign.toml ]; then
-  pgdesign build --no-commit
+  pgdesign build --no-auto-commit
 fi
