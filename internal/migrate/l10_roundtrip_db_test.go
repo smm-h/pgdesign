@@ -325,21 +325,12 @@ func l10EdgeWithoutOp(e Edge, j int) Edge {
 	return m
 }
 
-// l10Manager builds the ephemeral-DB manager, skipping cleanly without Postgres.
+// l10Manager builds the ephemeral-DB manager. Absent database -> skip, or a
+// hard failure under PGDESIGN_REQUIRE_DB=1; unusable database -> the same
+// verdict, which the hand-rolled probe-and-skip this replaced could not give.
 func l10Manager(t *testing.T) *testdb.Manager {
 	t.Helper()
-	dbURL := testdb.RequireURL(t)
-	ctx := context.Background()
-	probe, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		t.Skipf("no database available: %v", err)
-	}
-	probe.Close(ctx)
-	mgr, err := testdb.NewManager(dbURL)
-	if err != nil {
-		t.Skipf("no database manager: %v", err)
-	}
-	return mgr
+	return testdb.RequireManager(t)
 }
 
 // l10SMConfig is the UNRESTRICTED-fragment config (roadmap 5.8b): l10Config plus

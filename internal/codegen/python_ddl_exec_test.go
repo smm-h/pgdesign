@@ -166,11 +166,7 @@ func TestBuildTuples_IdempotentSQLContract(t *testing.T) {
 
 func execMatrixManager(t *testing.T) *testdb.Manager {
 	t.Helper()
-	m, err := testdb.NewManager(testdb.RequireURL(t))
-	if err != nil {
-		t.Fatalf("create testdb manager: %v", err)
-	}
-	return m
+	return testdb.RequireManager(t)
 }
 
 // execSQLBlock splits a (possibly multi-statement) SQL string and executes

@@ -39,16 +39,14 @@ func TestDiffLiveCleanEndToEnd(t *testing.T) {
 	// A pristine ephemeral database: introspecting the whole `public` schema must
 	// see ONLY this test's objects, so any residual DiffLive difference is an
 	// expression-spelling difference, never leftover state from another test.
-	mgr, err := testdb.NewManager(testdb.RequireURL(t))
-	if err != nil {
-		t.Skipf("no database manager: %v", err)
-	}
-	ephDB := mgr.SetupForTest(t, testdb.CreateOptions{})
+	ephDB := testdb.RequireEphemeralDB(t)
 	url := ephDB.URL
 
+	// The database was just created, so failing to reach it is a real failure
+	// and never a reason to skip.
 	admin, err := ephDB.Connect(ctx)
 	if err != nil {
-		t.Skipf("connect: %v", err)
+		t.Fatalf("connect to the ephemeral database: %v", err)
 	}
 	defer admin.Close(ctx)
 

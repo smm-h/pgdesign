@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/smm-h/pgdesign/internal/testenv"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/diff"
@@ -14,23 +13,15 @@ import (
 	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
-// chainEphemeralDB returns a fresh ephemeral database, skipping the test cleanly
-// when no PostgreSQL server is reachable.
+// chainEphemeralDB returns a fresh ephemeral database.
+//
+// The probe-and-skip this used to do resolved the DSN through the
+// require-honoring testdb.RequireURL and then skipped anyway when the dial
+// failed, so these tests skipped silently under PGDESIGN_REQUIRE_DB=1.
+// testdb.RequireEphemeralDB decides skip-or-fail in one place.
 func chainEphemeralDB(t *testing.T) *testdb.EphemeralDB {
 	t.Helper()
-	dbURL := testdb.RequireURL(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	probe, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		t.Skipf("no database available: %v", err)
-	}
-	probe.Close(ctx)
-	mgr, err := testdb.NewManager(dbURL)
-	if err != nil {
-		t.Skipf("no database manager: %v", err)
-	}
-	return mgr.SetupForTest(t, testdb.CreateOptions{})
+	return testdb.RequireEphemeralDB(t)
 }
 
 // genesisChainProject builds a chain project with a single genesis edge for the

@@ -21,10 +21,7 @@ func setupTable(t *testing.T) (*Normalizer, func()) {
 	ctx := context.Background()
 	url := testdb.RequireURL(t)
 
-	admin, err := pgx.Connect(ctx, url)
-	if err != nil {
-		t.Skipf("connect: %v", err)
-	}
+	admin := testdb.RequireConn(t, ctx)
 	if _, err := admin.Exec(ctx, `DROP TABLE IF EXISTS livenorm_rt`); err != nil {
 		admin.Close(ctx)
 		t.Fatalf("drop pre-existing: %v", err)
@@ -137,11 +134,7 @@ func TestRoundTripNamespaceScoped(t *testing.T) {
 	ctx := context.Background()
 	url := testdb.RequireURL(t)
 
-	admin, err := pgx.Connect(ctx, url)
-	if err != nil {
-		t.Skipf("connect: %v", err)
-	}
-	defer admin.Close(ctx)
+	admin := testdb.RequireConn(t, ctx)
 	if _, err := admin.Exec(ctx, `DROP TABLE IF EXISTS livenorm_ns`); err != nil {
 		t.Fatalf("drop pre-existing: %v", err)
 	}
@@ -152,9 +145,11 @@ func TestRoundTripNamespaceScoped(t *testing.T) {
 
 	// Two independent sessions, each with a colliding _pgd_rt_1 / _pgd_c.
 	setup := func(check string) *pgx.Conn {
+		// The server has already answered for admin, so a refused session is a
+		// real failure and never a reason to skip.
 		c, err := pgx.Connect(ctx, url)
 		if err != nil {
-			t.Skipf("connect session: %v", err)
+			t.Fatalf("connect an independent session: %v", err)
 		}
 		if _, err := c.Exec(ctx, `CREATE TEMP TABLE _pgd_rt_1 (LIKE livenorm_ns)`); err != nil {
 			t.Fatalf("create temp: %v", err)

@@ -1537,11 +1537,7 @@ func TestGenerateMigration_ViewQueryChanged(t *testing.T) {
 
 func testManager(t *testing.T) *testdb.Manager {
 	t.Helper()
-	mgr, err := testdb.NewManager(testdb.RequireURL(t))
-	if err != nil {
-		t.Fatalf("create testdb manager: %v", err)
-	}
-	return mgr
+	return testdb.RequireManager(t)
 }
 
 func setupEphemeralDB(t *testing.T) *testdb.EphemeralDB {

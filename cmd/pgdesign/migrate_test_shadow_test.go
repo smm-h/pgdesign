@@ -7,30 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/smm-h/pgdesign/internal/migrate"
 	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
-// cmdEphemeralDB returns a fresh ephemeral database, skipping cleanly when no
-// PostgreSQL server is reachable.
+// cmdEphemeralDB returns a fresh ephemeral database. Skip-or-fail is
+// testdb.RequireEphemeralDB's decision, so an unreachable server fails under
+// PGDESIGN_REQUIRE_DB=1 instead of skipping past the require gate.
 func cmdEphemeralDB(t *testing.T) *testdb.EphemeralDB {
 	t.Helper()
-	dbURL := testdb.RequireURL(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	probe, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		t.Skipf("no database available: %v", err)
-	}
-	probe.Close(ctx)
-	mgr, err := testdb.NewManager(dbURL)
-	if err != nil {
-		t.Skipf("no database manager: %v", err)
-	}
-	return mgr.SetupForTest(t, testdb.CreateOptions{})
+	return testdb.RequireEphemeralDB(t)
 }
 
 const shadowGuardSchema = `format_version = 1

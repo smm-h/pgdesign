@@ -53,14 +53,11 @@ func conformanceFixtureDDL(t *testing.T) string {
 	return strings.Join(stmts, "\n")
 }
 
-// conformanceManager creates a testdb.Manager from the base URL.
+// conformanceManager returns the ephemeral-DB manager for the configured
+// server.
 func conformanceManager(t *testing.T) *testdb.Manager {
 	t.Helper()
-	m, err := testdb.NewManager(conformanceBaseURL(t))
-	if err != nil {
-		t.Fatalf("create manager: %v", err)
-	}
-	return m
+	return testdb.RequireManager(t)
 }
 
 // TestConformanceGo verifies the Go engine creates an ephemeral database with

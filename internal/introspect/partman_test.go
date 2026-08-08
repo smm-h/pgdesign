@@ -26,10 +26,7 @@ func TestIntrospectPartmanMaintenance(t *testing.T) {
 	testdb.SkipIfNoPartman(t)
 
 	ctx := context.Background()
-	mgr, err := testdb.NewManager(partmanTestBaseURL(t))
-	if err != nil {
-		t.Fatalf("new manager: %v", err)
-	}
+	mgr := testdb.RequireManager(t)
 
 	setup := strings.NewReader(`
 CREATE SCHEMA IF NOT EXISTS partman;

@@ -15,11 +15,7 @@ func setupDB(t *testing.T) (context.Context, *pgx.Conn) {
 	t.Helper()
 	testdb.SkipIfNoPostgres(t)
 	ctx := context.Background()
-	mgr, err := testdb.NewManager(testdb.RequireURL(t))
-	if err != nil {
-		t.Skipf("no manager: %v", err)
-	}
-	db := mgr.SetupForTest(t, testdb.CreateOptions{})
+	db := testdb.RequireEphemeralDB(t)
 	conn, err := db.Connect(ctx)
 	if err != nil {
 		t.Fatal(err)

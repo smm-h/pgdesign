@@ -49,6 +49,18 @@ var bannedPatterns = []bannedPattern{
 		text: `Getenv("` + ConnectionEnv + `")`,
 		why:  "reads the connection env by hand and cannot honor PGDESIGN_REQUIRE_DB: use testdb.RequireURL/RequireConn/RequireManager",
 	},
+	// Building a Manager by hand is the other half of the same escape. Every
+	// site that did it followed with `t.Skipf("no database manager: %v", err)`
+	// -- a skip for a database that WAS named, which is exactly what the
+	// require gate forbids. testdb.RequireManager (or MainManager in a
+	// TestMain) makes that verdict unreachable. The CLI's own testdb handlers
+	// build managers from a --db flag and are production code, so the ban is
+	// scoped to tests.
+	{
+		text:      "testdb.NewManager(",
+		testsOnly: true,
+		why:       "a hand-built manager skips on failure and cannot honor PGDESIGN_REQUIRE_DB: use testdb.RequireManager, testdb.RequireEphemeralDB, or testdb.MainManager",
+	},
 }
 
 // allowedLines names the exact source lines that may contain a banned pattern,
