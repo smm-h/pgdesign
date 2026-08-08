@@ -2,6 +2,56 @@
 
 # Changelog
 
+## 0.26.0
+
+New codegen, diff and introspect guides; the `@v0` install pin; generated test wrappers that handle unix-socket connection URLs.
+
+<details>
+<summary>Context</summary>
+
+Two of the three user-facing items fall out of a test-infrastructure change.
+
+The suite used to resolve its database as "PGDESIGN_DB, or else
+postgres://localhost:5432/postgres". On a developer's machine that second half
+was not a fallback but the default: running `go test` connected to whatever
+PostgreSQL happened to be listening locally and created and dropped databases
+inside it. There is no default any more -- each database-backed test binary boots
+its own throwaway cluster on a private unix socket, and CI provisions PostgreSQL
+18 with pg_partman and pgvector on the runner host instead of running a service
+container. Running the suite against a socket DSN for the first time exposed two
+real defects in the wrappers `pgdesign testdb init` generates for consumers: the
+TypeScript one dropped the username from such a URL, and the JDBC ones built an
+unusable jdbc:postgresql://null/db instead of saying that the driver has no
+unix-socket transport at all.
+
+The `@v0` pin is unrelated and permanent. The Go module proxy serves a v1.0.0 for
+this module that was never a real release, and `@latest` prefers it over every
+real version. It cannot be retracted: a retraction only takes effect in a version
+the proxy also serves, which would mean tagging 1.x, which this project does not
+do.
+
+</details>
+
+### Breaking
+
+- **Effect classification and consequential prompts.** Every command declares its strictcli effect, and six database-mutating commands (`migrate apply`, `migrate rollback`, `migrate upgrade`, `migrate baseline`, `testdb teardown`, `testdb gc`) now ask for confirmation before running; pass `--approve-consequential` to skip the prompt in scripts. `--dry-run`, `--quiet` and `--verbose` are provided by the framework on every command instead of being declared per-command, so `--dry-run` now works everywhere and a dry run prints a `DRY RUN` header.
+
+### Features
+
+- **New architecture page: the laws.** The kernel's algebra, laws L1-L10, boundary doctrine, decision provenance, and the ruled-out designs register are now permanent documentation at docs/architecture-laws.md.
+- **New documentation: codegen, diff and introspect guides.** Three new guides cover code generation for all six target languages, the three diff modes (`--live`, `--against`, `--base`), and live-database introspection. The format reference gained its missing sections, and the semantic-type and validation-rule pages are now generated from the source of truth instead of hand-maintained.
+
+### Fixes
+
+- **Install with `@v0`, not `@latest`.** The Go module proxy permanently serves a `v1.0.0` for this module that was never a real release, so `go install github.com/smm-h/pgdesign/cmd/pgdesign@latest` installed it in preference to every real version. Every install instruction now pins `@v0`, and the docs explain why the phantom version cannot be retracted.
+- **Generated test wrappers handle unix-socket connection URLs.** The generated TypeScript wrapper dropped the username when rewriting a socket DSN (`postgresql://someuser@/db?host=/run/postgresql`), silently connecting as the process owner instead. The Java and Kotlin wrappers built `jdbc:postgresql://null/db` from the same URL and failed much later with an opaque driver error; they now refuse it up front, since the PostgreSQL JDBC driver has no unix-socket transport.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.25.3
 
 Make the live-stats test tolerate PostgreSQL's non-deterministic n_live_tup estimate so CI passes and the release can publish.
@@ -22,12 +72,6 @@ user-facing 0.25.1 fixes (see the 0.25.1 CHANGELOG section) to registries.
 ### Infrastructure
 
 - Make the live-stats test tolerate PostgreSQL's non-deterministic n_live_tup estimate so CI passes and the release can publish.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.25.2
 

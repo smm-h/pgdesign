@@ -55,8 +55,6 @@ github.com/smm-h/strictcli/go v0.29.0 h1:n0+NckMikyL/b3omhv2pSVKQOeGrMI505JkDLbl
 github.com/smm-h/strictcli/go v0.29.0/go.mod h1:CFDJB7rDMon5TFSn5JqCy7I2PYv43j/KQDs1OlE2Ezg=
 github.com/smm-h/strictspec/go v0.1.0 h1:C0yKlFwj1xH4KW6oQy3XiXklz1ROQhwdupycunuIHs8=
 github.com/smm-h/strictspec/go v0.1.0/go.mod h1:KRf+ygogdYS+mzHkGg4DBPffwyqW5Gvqx9ZdkkZc3/k=
-github.com/smm-h/stricttest/go v0.1.1 h1:z3N7RPoeLjrWTrcudxNJh2W5PVYZPJ/WsqX8ssXTkNE=
-github.com/smm-h/stricttest/go v0.1.1/go.mod h1:/rFaWmnLgp6wY9Ne+/kZIMUdOOGTPjjTHDgJjxyaYTs=
 github.com/smm-h/stricttest/go v0.2.0 h1:Yanc930kSovMdCMmB+KPbqbRZTdeWiivlOwvs0qBztM=
 github.com/smm-h/stricttest/go v0.2.0/go.mod h1:/rFaWmnLgp6wY9Ne+/kZIMUdOOGTPjjTHDgJjxyaYTs=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
