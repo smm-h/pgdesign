@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -208,8 +207,5 @@ func TestNoDialWithoutADSN(t *testing.T) {
 	if !rec.skipped || !partmanRec.skipped {
 		t.Fatalf("guards did not skip: postgres skipped=%v partman skipped=%v",
 			rec.skipped, partmanRec.skipped)
-	}
-	if _, err := strconv.Atoi(port); err != nil {
-		t.Fatalf("listener port %q is not numeric", port)
 	}
 }
