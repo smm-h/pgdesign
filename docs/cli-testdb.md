@@ -15,6 +15,8 @@ Manage ephemeral test databases for schema testing
 
 Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -25,6 +27,8 @@ Drop orphaned test databases that were not properly torn down after test runs. S
 ## testdb init
 
 Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.
+
+**Effect:** mutating
 
 ### Flags
 
@@ -40,6 +44,8 @@ Generate test database wrapper code for consumer projects that need to run integ
 
 Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.
 
+**Effect:** mutating
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -50,6 +56,8 @@ Create an ephemeral test database on the PostgreSQL server and apply the specifi
 ## testdb teardown
 
 Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 

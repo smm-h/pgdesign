@@ -11,6 +11,8 @@ nav_order: 5
 
 Format a pgdesign TOML schema file or directory in place
 
+**Effect:** mutating
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

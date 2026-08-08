@@ -11,6 +11,8 @@ nav_order: 4
 
 Compare schema file(s) or directory against another target
 
+**Effect:** read_only
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

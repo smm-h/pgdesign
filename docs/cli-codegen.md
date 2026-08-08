@@ -11,6 +11,8 @@ nav_order: 3
 
 Generate type-safe application code from schema definitions
 
+**Effect:** mutating
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

@@ -11,6 +11,8 @@ nav_order: 11
 
 Generate type-aware test data for all schema tables
 
+**Effect:** mutating
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

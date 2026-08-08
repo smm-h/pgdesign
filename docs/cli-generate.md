@@ -11,6 +11,8 @@ nav_order: 6
 
 Generate SQL DDL from TOML schema file(s) or directory
 
+**Effect:** read_only
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

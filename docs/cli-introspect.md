@@ -11,6 +11,8 @@ nav_order: 8
 
 Introspect a live PostgreSQL database into TOML schema
 
+**Effect:** mutating
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

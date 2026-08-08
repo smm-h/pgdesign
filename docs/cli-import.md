@@ -16,6 +16,8 @@ Pin and vendor imported schema surfaces from other pgdesign projects
 
 Resolve each [imports] alias's git pin, vendor the referenced surface (tables + type closure) into imports/<alias>/, and write the lockfile. Refuses to overwrite an existing lockfile — use `import update` to re-pin.
 
+**Effect:** mutating
+
 ### Arguments
 
 | Name | Required | Description |
@@ -25,6 +27,8 @@ Resolve each [imports] alias's git pin, vendor the referenced surface (tables + 
 ## import update
 
 Re-resolve each [imports] alias's git ref and re-vendor its surface, updating the lockfile. Requires an existing lockfile — use `import lock` for the first pin.
+
+**Effect:** mutating
 
 ### Arguments
 

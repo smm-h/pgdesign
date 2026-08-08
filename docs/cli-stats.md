@@ -11,6 +11,8 @@ nav_order: 13
 
 Analyze database statistics, index usage, and health
 
+**Effect:** read_only
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

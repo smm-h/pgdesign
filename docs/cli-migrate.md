@@ -15,6 +15,8 @@ Database migration planning, generation, and execution
 
 Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.
 
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -25,6 +27,8 @@ Apply all pending migrations to the target database in order. Each migration run
 ## migrate baseline
 
 Adopt an existing database onto the migration chain without executing any migration SQL. Use this for a database whose schema was created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying the introspected manifest, and stamps this database's baseline boundary (rollback-frozen); pass the schema TOML path(s) so the correct schema search-path is introspected. In legacy (semver-TOML) mode it records a semver --version. Idempotent: re-baselining at the same state is a no-op.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 
@@ -45,6 +49,8 @@ Adopt an existing database onto the migration chain without executing any migrat
 
 Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.
 
+**Effect:** mutating
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -61,6 +67,8 @@ Generate versioned migration files by comparing the TOML schema against a live d
 ## migrate plan
 
 Preview the migration chain PURELY, without touching any database (roadmap 5.9). In a chain-mode project it enumerates the edges from GENESIS -- or from an explicit --from revision -- to the single live head, in path-finder order, listing each edge's id, slug, and op summary. Drift preview against a live database is `diff --live`'s job; per-database pending is `migrate status`'s. A legacy (semver-TOML) project keeps the old live-diff plan (requires --db) until it is upgraded to the chain.
+
+**Effect:** read_only
 
 ### Flags
 
@@ -80,6 +88,8 @@ Preview the migration chain PURELY, without touching any database (roadmap 5.9).
 
 Resolve a two-head fork (chain mode). Re-parents the tail of the head NOT named by --head onto the head that IS named, re-simulating each re-parented edge's ops to recompute its revision and content-derived edge file. The rebased-away originals retire INTACT to migrations/archive/ (never rewritten or deleted), and the rebase revision-remap table (migrations/remap.json) is written so a database stamped at a rebased-away revision is served forward to the live head, never orphaned. A pure file operation: no database is required.
 
+**Effect:** mutating
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -90,6 +100,8 @@ Resolve a two-head fork (chain mode). Re-parents the tail of the head NOT named 
 ## migrate rollback
 
 Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 
@@ -102,6 +114,8 @@ Rollback applied database migrations to a specified target version. Executes dow
 ## migrate squash
 
 Consolidate a range of sequential migrations. In chain mode (a migrations/chain/ project) squash mints a CONSOLIDATION EDGE whose op-list is the ordered concatenation of the range, retiring the superseded originals intact to migrations/archive/ (never a rewrite) so mid-range databases resume via the path-finder; --from/--to are revision-or-edge references. In legacy (semver-TOML) mode squash concatenates the range into one combined migration file. --db is required.
+
+**Effect:** mutating
 
 ### Flags
 
@@ -117,6 +131,8 @@ Consolidate a range of sequential migrations. In chain mode (a migrations/chain/
 
 Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.
 
+**Effect:** read_only
+
 ### Flags
 
 | Name | Short | Type | Default | Env | Description |
@@ -127,6 +143,8 @@ Show which migrations have been applied to the target database and which are sti
 ## migrate test
 
 Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.
+
+**Effect:** mutating
 
 ### Flags
 
@@ -146,6 +164,8 @@ Test migrations by applying them against a staging database to verify correctnes
 ## migrate upgrade
 
 One-time adoption of a legacy (semver-TOML) database onto the on-disk chain. Verifies the schema TOML matches the live database exactly (refusing to stamp over drift), folds the existing pgdesign_migrations rows into the chain journal, writes the content-addressed prefix edge, and stamps this database's upgrade boundary in a single transaction. Requires a clean working tree for the schema files when inside a git repository. Run once per database; a fresh database uses `migrate apply` directly.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 

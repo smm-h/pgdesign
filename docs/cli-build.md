@@ -11,6 +11,8 @@ nav_order: 1
 
 Generate all configured outputs from pgdesign.toml
 
+**Effect:** mutating
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |

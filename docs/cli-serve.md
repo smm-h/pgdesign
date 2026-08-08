@@ -11,6 +11,8 @@ nav_order: 12
 
 Start the pgdesign HTTP API server and web interface
 
+**Effect:** read_only
+
 ## Flags
 
 | Name | Short | Type | Default | Env | Description |
