@@ -328,10 +328,7 @@ func l10EdgeWithoutOp(e Edge, j int) Edge {
 // l10Manager builds the ephemeral-DB manager, skipping cleanly without Postgres.
 func l10Manager(t *testing.T) *testdb.Manager {
 	t.Helper()
-	dbURL := os.Getenv("PGDESIGN_DB")
-	if dbURL == "" {
-		dbURL = "postgres://localhost:5432/pgdesign?sslmode=disable"
-	}
+	dbURL := testdb.RequireURL(t)
 	ctx := context.Background()
 	probe, err := pgx.Connect(ctx, dbURL)
 	if err != nil {

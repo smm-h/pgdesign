@@ -22,17 +22,27 @@ var (
 	testManager *testdb.Manager
 )
 
+// TestMain boots one ephemeral PostgreSQL cluster for this test binary and
+// exports its base URL under PGDESIGN_DB. There is no fallback: on a machine
+// without the PostgreSQL binaries the variable stays unset and this package's
+// tests are skipped rather than pointed at whatever server happens to be
+// listening locally.
 func TestMain(m *testing.M) {
-	dbURL := os.Getenv("PGDESIGN_DB")
-	if dbURL == "" {
-		dbURL = "postgres://localhost:5432/postgres?sslmode=disable"
+	os.Exit(testdb.RunWithCluster(func() int { return runTests(m) }))
+}
+
+// runTests sets this package's ephemeral database up around m.Run. It returns
+// the exit code instead of calling os.Exit so that RunWithCluster always gets
+// to stop the cluster it started.
+func runTests(m *testing.M) int {
+	dbURL, ok := testdb.DatabaseURL()
+	if !ok {
+		return testdb.MainNoDatabase(nil)
 	}
 
 	mgr, err := testdb.NewManager(dbURL)
 	if err != nil {
-		// Cannot set up manager; skip all tests.
-		fmt.Fprintf(os.Stderr, "testdb.NewManager: %v (skipping tests)\n", err)
-		os.Exit(0)
+		return testdb.MainNoDatabase(err)
 	}
 	testManager = mgr
 
@@ -41,15 +51,13 @@ func TestMain(m *testing.M) {
 	ddlFile, err := os.Open("testdata/setup.sql")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "open testdata/setup.sql: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	db, err := mgr.Create(ctx, testdb.CreateOptions{DDL: ddlFile})
 	ddlFile.Close()
 	if err != nil {
-		// If Postgres is not available, skip rather than fail.
-		fmt.Fprintf(os.Stderr, "create ephemeral database: %v (skipping tests)\n", err)
-		os.Exit(0)
+		return testdb.MainNoDatabase(err)
 	}
 	ephemeralDB = db
 	testConnStr = db.URL
@@ -61,7 +69,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "drop ephemeral database %s: %v\n", ephemeralDB.Name, err)
 	}
 
-	os.Exit(code)
+	return code
 }
 
 func TestIntrospectTables(t *testing.T) {

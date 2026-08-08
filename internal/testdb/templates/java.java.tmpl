@@ -179,6 +179,19 @@ public class TestDB implements BeforeAllCallback, AfterAllCallback {
 
         // Rebuild URL without userinfo.
         String host = uri.getHost();
+        if (host == null || host.isEmpty()) {
+            // A unix-socket DSN (postgresql://user@/db?host=/run/postgresql) has
+            // no host in its authority. The PostgreSQL JDBC driver has no
+            // unix-socket transport at all, so there is nothing to translate
+            // this into -- refuse loudly instead of emitting
+            // jdbc:postgresql://null/db and failing with an opaque
+            // PSQLException later.
+            throw new IllegalArgumentException(
+                "pgdesign testdb: cannot use the connection URL " + pgUrl
+                + ": it reaches PostgreSQL over a unix socket, and the PostgreSQL"
+                + " JDBC driver only speaks TCP. Point PGDESIGN_DB at a host:port"
+                + " server.");
+        }
         int port = uri.getPort();
         String path = uri.getPath();
         String query = uri.getQuery();

@@ -431,3 +431,58 @@ func TestTemplateJdbcConnectionStringSelfContained(t *testing.T) {
 	// the template logic pattern.
 	_ = url.Parse // ensure net/url import is used
 }
+
+// TestTemplateJdbcRefusesSocketURL pins the JDBC templates' refusal of a
+// unix-socket DSN.
+//
+// A URL like postgresql://someuser@/mydb?host=/run/postgresql has no host in
+// its authority, and the PostgreSQL JDBC driver has no unix-socket transport at
+// all. Before this guard the templates appended a null host and produced
+// jdbc:postgresql://null/mydb, which failed much later with an opaque
+// PSQLException. The wrapper must say what is actually wrong instead.
+func TestTemplateJdbcRefusesSocketURL(t *testing.T) {
+	testenv.Isolate(t)
+
+	for _, lang := range []string{"java", "kotlin"} {
+		t.Run(lang, func(t *testing.T) {
+			file := langTemplates[lang]
+			data, err := TemplateFS.ReadFile("templates/" + file)
+			if err != nil {
+				t.Fatalf("read template %s: %v", file, err)
+			}
+			content := string(data)
+
+			if !strings.Contains(content, "unix socket") {
+				t.Error("toJdbcUrl does not mention the unix-socket limitation")
+			}
+			if !strings.Contains(content, "only speaks TCP") {
+				t.Error("toJdbcUrl does not refuse a host-less URL with an explanation")
+			}
+		})
+	}
+}
+
+// TestTemplateSwapDBPreservesUserinfo pins that swapping the database name in a
+// connection URL never drops the userinfo.
+//
+// The TypeScript template used Node's legacy url.format, which emits the auth
+// section only when the URL also has a host -- so for a unix-socket DSN it
+// silently rewrote postgresql://someuser@/db into postgresql:///db, and the
+// driver then connected as whoever was running the process.
+func TestTemplateSwapDBPreservesUserinfo(t *testing.T) {
+	testenv.Isolate(t)
+
+	data, err := TemplateFS.ReadFile("templates/" + langTemplates["ts"])
+	if err != nil {
+		t.Fatalf("read TypeScript template: %v", err)
+	}
+	content := string(data)
+
+	if strings.Contains(content, "formatUrl") {
+		t.Error("the TypeScript template still formats URLs through Node's legacy url.format, " +
+			"which drops the userinfo of a host-less (unix-socket) DSN")
+	}
+	if !strings.Contains(content, "authority") {
+		t.Error("swapDB no longer explains how it preserves the authority section")
+	}
+}

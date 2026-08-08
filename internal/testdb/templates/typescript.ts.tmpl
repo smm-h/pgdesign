@@ -4,7 +4,6 @@
 import { Client } from "pg";
 import { readFileSync } from "fs";
 import { randomFillSync } from "crypto";
-import { parse as parseUrl, format as formatUrl, UrlWithStringQuery } from "url";
 
 const DDL_PATH = "{{DDL_PATH}}";
 const BASE_URL = "{{BASE_URL}}";
@@ -84,13 +83,37 @@ function generateName(): string {
   return name;
 }
 
+/**
+ * Rewrite a PostgreSQL connection URL so it names a different database.
+ *
+ * The rewrite is textual on purpose. A unix-socket DSN has no host in its
+ * authority -- postgresql://someuser@/mydb?host=/run/postgresql -- and both of
+ * Node's URL implementations mishandle that shape: the WHATWG parser rejects it
+ * outright, and the legacy url.format drops the userinfo, silently turning
+ * "connect as someuser over this socket" into "connect as whoever is running
+ * the process". Splicing the path leaves the authority and the query exactly as
+ * the caller wrote them.
+ */
 function swapDB(connUrl: string, dbName: string): string {
-  const parsed = parseUrl(connUrl);
-  const swapped: UrlWithStringQuery = {
-    ...parsed,
-    pathname: "/" + dbName,
-  };
-  return formatUrl(swapped);
+  const schemeEnd = connUrl.indexOf("://");
+  if (schemeEnd < 0) {
+    throw new Error(`pgdesign testdb: not a PostgreSQL connection URL: ${connUrl}`);
+  }
+  // The authority runs from after "://" up to the first "/", "?" or "#".
+  const authorityStart = schemeEnd + 3;
+  let authorityEnd = connUrl.length;
+  for (let i = authorityStart; i < connUrl.length; i++) {
+    const c = connUrl[i];
+    if (c === "/" || c === "?" || c === "#") {
+      authorityEnd = i;
+      break;
+    }
+  }
+  const authority = connUrl.slice(0, authorityEnd);
+  const rest = connUrl.slice(authorityEnd);
+  const tailStart = rest.search(/[?#]/);
+  const tail = tailStart < 0 ? "" : rest.slice(tailStart);
+  return `${authority}/${dbName}${tail}`;
 }
 
 function escapeIdentifier(name: string): string {

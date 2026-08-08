@@ -3,7 +3,6 @@ package introspect
 import (
 	"context"
 	"github.com/smm-h/pgdesign/internal/testenv"
-	"os"
 	"strings"
 	"testing"
 
@@ -11,12 +10,10 @@ import (
 )
 
 // partmanTestBaseURL mirrors the base-URL resolution used by the other
-// DB-backed suites.
-func partmanTestBaseURL() string {
-	if u := os.Getenv("PGDESIGN_DB"); u != "" {
-		return u
-	}
-	return "postgres://localhost:5432/postgres?sslmode=disable"
+// DB-backed suites: PGDESIGN_DB or a clean skip, never a guessed host.
+func partmanTestBaseURL(t *testing.T) string {
+	t.Helper()
+	return testdb.RequireURL(t)
 }
 
 // TestIntrospectPartmanMaintenance verifies that a partman-managed parent
@@ -29,7 +26,7 @@ func TestIntrospectPartmanMaintenance(t *testing.T) {
 	testdb.SkipIfNoPartman(t)
 
 	ctx := context.Background()
-	mgr, err := testdb.NewManager(partmanTestBaseURL())
+	mgr, err := testdb.NewManager(partmanTestBaseURL(t))
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}

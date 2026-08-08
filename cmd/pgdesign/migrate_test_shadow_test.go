@@ -18,10 +18,7 @@ import (
 // PostgreSQL server is reachable.
 func cmdEphemeralDB(t *testing.T) *testdb.EphemeralDB {
 	t.Helper()
-	dbURL := os.Getenv("PGDESIGN_DB")
-	if dbURL == "" {
-		dbURL = "postgres://localhost:5432/pgdesign?sslmode=disable"
-	}
+	dbURL := testdb.RequireURL(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	probe, err := pgx.Connect(ctx, dbURL)

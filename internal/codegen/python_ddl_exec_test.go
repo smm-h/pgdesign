@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/smm-h/pgdesign/internal/testenv"
-	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -165,16 +164,9 @@ func TestBuildTuples_IdempotentSQLContract(t *testing.T) {
 
 // -- Live execution matrix (requires PostgreSQL) --
 
-func execMatrixBaseURL() string {
-	if u := os.Getenv("PGDESIGN_DB"); u != "" {
-		return u
-	}
-	return "postgres://localhost:5432/postgres?sslmode=disable"
-}
-
 func execMatrixManager(t *testing.T) *testdb.Manager {
 	t.Helper()
-	m, err := testdb.NewManager(execMatrixBaseURL())
+	m, err := testdb.NewManager(testdb.RequireURL(t))
 	if err != nil {
 		t.Fatalf("create testdb manager: %v", err)
 	}

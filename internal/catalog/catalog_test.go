@@ -3,7 +3,6 @@ package catalog
 import (
 	"context"
 	"github.com/smm-h/pgdesign/internal/testenv"
-	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -16,11 +15,7 @@ func setupDB(t *testing.T) (context.Context, *pgx.Conn) {
 	t.Helper()
 	testdb.SkipIfNoPostgres(t)
 	ctx := context.Background()
-	url := os.Getenv("PGDESIGN_DB")
-	if url == "" {
-		url = "postgres://localhost:5432/postgres?sslmode=disable"
-	}
-	mgr, err := testdb.NewManager(url)
+	mgr, err := testdb.NewManager(testdb.RequireURL(t))
 	if err != nil {
 		t.Skipf("no manager: %v", err)
 	}

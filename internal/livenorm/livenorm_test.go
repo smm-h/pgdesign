@@ -3,7 +3,6 @@ package livenorm
 import (
 	"context"
 	"github.com/smm-h/pgdesign/internal/testenv"
-	"os"
 	"strings"
 	"testing"
 
@@ -13,14 +12,6 @@ import (
 	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
-func testDBURL() string {
-	u := os.Getenv("PGDESIGN_DB")
-	if u == "" {
-		u = "postgres://localhost:5432/postgres?sslmode=disable"
-	}
-	return u
-}
-
 // setupTable creates a real table the round-trip can clone (LIKE), and returns
 // a Normalizer plus a cleanup func. Skips cleanly without Postgres.
 func setupTable(t *testing.T) (*Normalizer, func()) {
@@ -28,7 +19,7 @@ func setupTable(t *testing.T) (*Normalizer, func()) {
 	testdb.SkipIfNoPostgres(t)
 
 	ctx := context.Background()
-	url := testDBURL()
+	url := testdb.RequireURL(t)
 
 	admin, err := pgx.Connect(ctx, url)
 	if err != nil {
@@ -144,7 +135,7 @@ func TestRoundTripNamespaceScoped(t *testing.T) {
 	testenv.Isolate(t)
 	testdb.SkipIfNoPostgres(t)
 	ctx := context.Background()
-	url := testDBURL()
+	url := testdb.RequireURL(t)
 
 	admin, err := pgx.Connect(ctx, url)
 	if err != nil {

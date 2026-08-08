@@ -39,7 +39,7 @@ func TestDiffLiveCleanEndToEnd(t *testing.T) {
 	// A pristine ephemeral database: introspecting the whole `public` schema must
 	// see ONLY this test's objects, so any residual DiffLive difference is an
 	// expression-spelling difference, never leftover state from another test.
-	mgr, err := testdb.NewManager(testDBURL())
+	mgr, err := testdb.NewManager(testdb.RequireURL(t))
 	if err != nil {
 		t.Skipf("no database manager: %v", err)
 	}

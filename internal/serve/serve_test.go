@@ -42,20 +42,30 @@ func setupServer(t *testing.T) *Server {
 	return NewFromPool(pool, []string{"public"}, "")
 }
 
+// TestMain boots one ephemeral PostgreSQL cluster for this test binary and
+// exports its base URL under PGDESIGN_DB. There is no fallback: on a machine
+// without the PostgreSQL binaries the variable stays unset, the DB-backed tests
+// skip themselves through setupServer, and the DB-free project-mode tests still
+// run.
 func TestMain(m *testing.M) {
-	dbURL := os.Getenv("PGDESIGN_DB")
-	if dbURL == "" {
-		dbURL = "postgres://localhost:5432/pgdesign?sslmode=disable"
-	}
+	os.Exit(testdb.RunWithCluster(func() int { return runTests(m) }))
+}
 
+// runTests sets this package's ephemeral database up around m.Run. It returns
+// the exit code instead of calling os.Exit so that RunWithCluster always gets
+// to stop the cluster it started.
+func runTests(m *testing.M) int {
 	ctx := context.Background()
+
 	// Best-effort database setup: on any failure, testDB stays nil and DB-backed
 	// tests skip themselves via setupServer, but the DB-free project-mode tests
 	// still run under m.Run().
-	if mgr, err := testdb.NewManager(dbURL); err == nil {
-		testMgr = mgr
-		if db, err := testMgr.Create(ctx, testdb.CreateOptions{}); err == nil {
-			testDB = db
+	if dbURL, ok := testdb.DatabaseURL(); ok {
+		if mgr, err := testdb.NewManager(dbURL); err == nil {
+			testMgr = mgr
+			if db, err := testMgr.Create(ctx, testdb.CreateOptions{}); err == nil {
+				testDB = db
+			}
 		}
 	}
 
@@ -64,7 +74,7 @@ func TestMain(m *testing.M) {
 	if testMgr != nil && testDB != nil {
 		_ = testMgr.Drop(ctx, testDB)
 	}
-	os.Exit(code)
+	return code
 }
 
 func TestGetExtensions(t *testing.T) {

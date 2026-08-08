@@ -3,7 +3,6 @@ package testdb
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -11,29 +10,37 @@ import (
 	"github.com/smm-h/pgdesign/internal/dbutil"
 )
 
-const defaultPostgresURL = "postgres://localhost:5432/postgres?sslmode=disable"
-
-// SkipIfNoPostgres skips the test if no PostgreSQL server is available.
-// It probes connectivity using the PGDESIGN_DB environment variable,
-// or falls back to "postgres://localhost:5432/postgres?sslmode=disable".
+// SkipIfNoPostgres skips the test unless a PostgreSQL server has been named.
 //
-// When the PGDESIGN_REQUIRE_DB=1 environment variable is set, the test
-// fails instead of skipping. This converts a silent skip into a hard
-// failure, useful in CI lanes that are known to have Postgres available.
+// The connection string comes from PGDESIGN_DB and from nowhere else: there is
+// no default target. A test binary that wants a database of its own boots one
+// in TestMain through [RunWithCluster], which exports the ephemeral cluster's
+// DSN under the same variable. With neither, the test skips -- it does not go
+// looking for a server on localhost, so this suite can never connect to, create
+// databases in, or drop databases from whatever PostgreSQL a developer happens
+// to be running.
+//
+// When the PGDESIGN_REQUIRE_DB=1 environment variable is set, the test fails
+// instead of skipping. This converts a silent skip into a hard failure, which
+// is what CI lanes that provision PostgreSQL declare.
 func SkipIfNoPostgres(t testing.TB) {
 	t.Helper()
 
-	dbURL := os.Getenv("PGDESIGN_DB")
-	if dbURL == "" {
-		dbURL = defaultPostgresURL
+	dbURL, ok := DatabaseURL()
+	if !ok {
+		if RequireDB() {
+			t.Fatalf("PostgreSQL required (%s=1) but %s", requireDBEnv, noDatabaseMessage)
+			return
+		}
+		t.Skipf("%s", noDatabaseMessage)
+		return
 	}
-
-	requireDB := os.Getenv("PGDESIGN_REQUIRE_DB") == "1"
 
 	maintenanceURL, err := dbutil.MaintenanceURL(dbURL)
 	if err != nil {
-		if requireDB {
-			t.Fatalf("PostgreSQL required (PGDESIGN_REQUIRE_DB=1) but not available: %v", err)
+		if RequireDB() {
+			t.Fatalf("PostgreSQL required (%s=1) but not available: %v", requireDBEnv, err)
+			return
 		}
 		t.Skipf("PostgreSQL not available: %v", err)
 		return
@@ -44,8 +51,9 @@ func SkipIfNoPostgres(t testing.TB) {
 
 	conn, err := pgx.Connect(ctx, maintenanceURL)
 	if err != nil {
-		if requireDB {
-			t.Fatalf("PostgreSQL required (PGDESIGN_REQUIRE_DB=1) but not available: %v", err)
+		if RequireDB() {
+			t.Fatalf("PostgreSQL required (%s=1) but not available: %v", requireDBEnv, err)
+			return
 		}
 		t.Skipf("PostgreSQL not available: %v", err)
 		return
@@ -63,6 +71,11 @@ type PartmanInfo struct {
 // extension and records the detected version. This is separate from
 // SkipIfNoPostgres: a CI lane can have Postgres without partman.
 //
+// The DSN is resolved exactly as [SkipIfNoPostgres] resolves it: PGDESIGN_DB or
+// nothing. An ephemeral cluster inherits the host's extension library, so
+// pg_partman is available to it precisely when the machine has the package
+// installed -- which is what the CI lane provisions on the runner host.
+//
 // When the PGDESIGN_REQUIRE_PARTMAN=1 environment variable is set, the
 // test fails instead of skipping.
 //
@@ -71,17 +84,23 @@ type PartmanInfo struct {
 func SkipIfNoPartman(t testing.TB) *PartmanInfo {
 	t.Helper()
 
-	dbURL := os.Getenv("PGDESIGN_DB")
-	if dbURL == "" {
-		dbURL = defaultPostgresURL
-	}
+	requirePartman := RequirePartman()
 
-	requirePartman := os.Getenv("PGDESIGN_REQUIRE_PARTMAN") == "1"
+	dbURL, ok := DatabaseURL()
+	if !ok {
+		if requirePartman {
+			t.Fatalf("pg_partman required (%s=1) but %s", requirePartmanEnv, noDatabaseMessage)
+			return nil
+		}
+		t.Skipf("pg_partman not available: %s", noDatabaseMessage)
+		return nil
+	}
 
 	maintenanceURL, err := dbutil.MaintenanceURL(dbURL)
 	if err != nil {
 		if requirePartman {
-			t.Fatalf("pg_partman required (PGDESIGN_REQUIRE_PARTMAN=1) but PostgreSQL not available: %v", err)
+			t.Fatalf("pg_partman required (%s=1) but PostgreSQL not available: %v", requirePartmanEnv, err)
+			return nil
 		}
 		t.Skipf("pg_partman not available (no PostgreSQL): %v", err)
 		return nil
@@ -93,7 +112,8 @@ func SkipIfNoPartman(t testing.TB) *PartmanInfo {
 	conn, err := pgx.Connect(ctx, maintenanceURL)
 	if err != nil {
 		if requirePartman {
-			t.Fatalf("pg_partman required (PGDESIGN_REQUIRE_PARTMAN=1) but PostgreSQL not available: %v", err)
+			t.Fatalf("pg_partman required (%s=1) but PostgreSQL not available: %v", requirePartmanEnv, err)
+			return nil
 		}
 		t.Skipf("pg_partman not available (no PostgreSQL): %v", err)
 		return nil
@@ -113,7 +133,8 @@ func SkipIfNoPartman(t testing.TB) *PartmanInfo {
 			msg = fmt.Sprintf("pg_partman not available: %v", err)
 		}
 		if requirePartman {
-			t.Fatalf("pg_partman required (PGDESIGN_REQUIRE_PARTMAN=1) but %s", msg)
+			t.Fatalf("pg_partman required (%s=1) but %s", requirePartmanEnv, msg)
+			return nil
 		}
 		t.Skipf("%s", msg)
 		return nil

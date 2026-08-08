@@ -16,12 +16,11 @@ import (
 	"github.com/smm-h/pgdesign/internal/testdb"
 )
 
-// conformanceBaseURL returns the database URL for conformance tests.
-func conformanceBaseURL() string {
-	if u := os.Getenv("PGDESIGN_DB"); u != "" {
-		return u
-	}
-	return "postgres://localhost:5432/postgres?sslmode=disable"
+// conformanceBaseURL returns the database URL for conformance tests, skipping
+// t when no database has been named. There is no default target.
+func conformanceBaseURL(t *testing.T) string {
+	t.Helper()
+	return testdb.RequireURL(t)
 }
 
 // conformanceFixturePath returns the absolute path to the conformance DDL fixture.
@@ -57,7 +56,7 @@ func conformanceFixtureDDL(t *testing.T) string {
 // conformanceManager creates a testdb.Manager from the base URL.
 func conformanceManager(t *testing.T) *testdb.Manager {
 	t.Helper()
-	m, err := testdb.NewManager(conformanceBaseURL())
+	m, err := testdb.NewManager(conformanceBaseURL(t))
 	if err != nil {
 		t.Fatalf("create manager: %v", err)
 	}
@@ -197,7 +196,7 @@ func TestConformanceGoCleanup(t *testing.T) {
 	})
 
 	// After the subtest, the database should be gone.
-	maintURL := conformanceBaseURL()
+	maintURL := conformanceBaseURL(t)
 	// Connect to maintenance database to check.
 	maintConn, err := pgx.Connect(ctx, swapToMaintenance(maintURL))
 	if err != nil {
@@ -260,7 +259,7 @@ func TestConformancePython(t *testing.T) {
 	}
 
 	fixturePath := conformanceFixturePath(t)
-	baseURL := conformanceBaseURL()
+	baseURL := conformanceBaseURL(t)
 
 	// Extract base name from URL.
 	baseName := extractDBName(baseURL)
@@ -328,7 +327,7 @@ func TestConformanceTypeScript(t *testing.T) {
 	}
 
 	fixturePath := conformanceFixturePath(t)
-	baseURL := conformanceBaseURL()
+	baseURL := conformanceBaseURL(t)
 	baseName := extractDBName(baseURL)
 
 	rendered, err := testdb.RenderTemplate("ts", fixturePath, baseURL, baseName)
@@ -452,7 +451,12 @@ func TestConformanceJava(t *testing.T) {
 	}
 
 	fixturePath := conformanceFixturePath(t)
-	baseURL := conformanceBaseURL()
+	baseURL := conformanceBaseURL(t)
+	// The generated Java wrapper connects through JDBC, which has no
+	// unix-socket transport -- so it cannot reach the ephemeral cluster this
+	// suite boots. The wrapper refuses such a URL outright; this lane runs only
+	// against a TCP-reachable server.
+	testdb.SkipIfNoTCPHost(t, baseURL)
 	baseName := extractDBName(baseURL)
 
 	rendered, err := testdb.RenderTemplate("java", fixturePath, baseURL, baseName)
@@ -569,7 +573,12 @@ func TestConformanceKotlin(t *testing.T) {
 	}
 
 	fixturePath := conformanceFixturePath(t)
-	baseURL := conformanceBaseURL()
+	baseURL := conformanceBaseURL(t)
+	// The generated Kotlin wrapper connects through JDBC, which has no
+	// unix-socket transport -- so it cannot reach the ephemeral cluster this
+	// suite boots. The wrapper refuses such a URL outright; this lane runs only
+	// against a TCP-reachable server.
+	testdb.SkipIfNoTCPHost(t, baseURL)
 	baseName := extractDBName(baseURL)
 
 	rendered, err := testdb.RenderTemplate("kotlin", fixturePath, baseURL, baseName)
@@ -681,7 +690,7 @@ func TestConformanceZig(t *testing.T) {
 	}
 
 	fixturePath := conformanceFixturePath(t)
-	baseURL := conformanceBaseURL()
+	baseURL := conformanceBaseURL(t)
 	baseName := extractDBName(baseURL)
 
 	// Verify the template renders without error.

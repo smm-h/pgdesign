@@ -3,25 +3,16 @@ package testdb
 import (
 	"context"
 	"github.com/smm-h/pgdesign/internal/testenv"
-	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
-// testURL returns the database URL for tests.
-func testURL() string {
-	if u := os.Getenv("PGDESIGN_DB"); u != "" {
-		return u
-	}
-	return defaultPostgresURL
-}
-
-// testManager creates a Manager for tests using the test URL.
+// testManager creates a Manager for tests against the configured database.
 func testManager(t *testing.T) *Manager {
 	t.Helper()
-	m, err := NewManager(testURL())
+	m, err := NewManager(RequireURL(t))
 	if err != nil {
 		t.Fatalf("create manager: %v", err)
 	}

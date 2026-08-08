@@ -177,10 +177,20 @@ func TestSkipIfNoPostgres(t *testing.T) {
 	// If we reach here, PostgreSQL is available.
 }
 
+// unreachableMaintenanceURL is a DSN that cannot reach any server at all: it
+// names a unix socket directory that does not exist, so libpq fails at the
+// socket path without ever opening a connection.
+//
+// A "dummy" URL naming localhost would not be dummy. TestDrop_ValidName below
+// deliberately gets PAST the name guard and on to the connection, so against a
+// localhost URL it would dial whatever PostgreSQL the developer is running and
+// issue a real DROP DATABASE at it -- the exact class of accident this suite's
+// no-default-DSN rule exists to prevent.
+const unreachableMaintenanceURL = "postgres://postgres@/postgres?host=/nonexistent/pgdesign-no-such-socket-dir"
+
 func TestDrop_InvalidName(t *testing.T) {
 	testenv.Isolate(t)
-	// Manager with a dummy maintenance URL — we never actually connect.
-	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
+	m := &Manager{maintenanceURL: unreachableMaintenanceURL}
 
 	cases := []struct {
 		name string
@@ -208,7 +218,7 @@ func TestDrop_InvalidName(t *testing.T) {
 func TestDrop_ValidName(t *testing.T) {
 	testenv.Isolate(t)
 	// A validly-formatted name should pass the guard and fail later at pgx.Connect.
-	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
+	m := &Manager{maintenanceURL: unreachableMaintenanceURL}
 	db := &EphemeralDB{Name: "mydb_test_1234567890_abcd1234"}
 	err := m.Drop(context.Background(), db)
 	if err == nil {
@@ -222,7 +232,7 @@ func TestDrop_ValidName(t *testing.T) {
 
 func TestDropByName_InvalidName(t *testing.T) {
 	testenv.Isolate(t)
-	m := &Manager{maintenanceURL: "postgres://localhost:5432/postgres"}
+	m := &Manager{maintenanceURL: unreachableMaintenanceURL}
 	err := m.DropByName(context.Background(), "production_db")
 	if err == nil {
 		t.Fatal("expected error for invalid name, got nil")

@@ -1537,11 +1537,7 @@ func TestGenerateMigration_ViewQueryChanged(t *testing.T) {
 
 func testManager(t *testing.T) *testdb.Manager {
 	t.Helper()
-	dbURL := os.Getenv("PGDESIGN_DB")
-	if dbURL == "" {
-		dbURL = "postgres://localhost:5432/pgdesign?sslmode=disable"
-	}
-	mgr, err := testdb.NewManager(dbURL)
+	mgr, err := testdb.NewManager(testdb.RequireURL(t))
 	if err != nil {
 		t.Fatalf("create testdb manager: %v", err)
 	}
