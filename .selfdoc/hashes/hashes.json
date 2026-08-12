@@ -4,6 +4,10 @@
     "content": "3854e4072820d7ede797ffd3a161809b6f2bd23cd3c4d6fd3fd13ae991d37aff",
     "description": "9e6dcb99bb9f76976d43860d9f81ebdc3dee13993d7791d7d29fb397c8d5a1d3"
   },
+  "en/blog/content-addressed-schemas-making-schema-drift-unrepresentable.md": {
+    "content": "44764627dd10000928da14db800c0e9e655087a127c7a23193f5b52156d5a45c",
+    "description": "6b031a03dc302bcba53b4ea2749fce766aab2a37f120501bce811bd562b8d2f9"
+  },
   "en/cli-build.md": {
     "content": "81f0be6e8b102cf9ef96784b8d8bf49f89e5a88b9a41577dcdebbe5c7a9767b1",
     "description": "0133c2b98efb5e8f65c3e8b2bef097d1d0b4db29c70ea6c468cab465c3fb4e9c",
