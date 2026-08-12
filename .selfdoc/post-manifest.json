@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "pgdesign",
+  "slug": "pgdesign",
+  "version": "0.26.0",
+  "description": "",
+  "language": "go",
+  "base_url": "https://pgdesign.smmh.dev",
+  "pages": [],
+  "posts": [
+    {
+      "path": "2026-07-28-content-addressed-schemas-making-schema-drift-unrepresentable.md",
+      "title": "Content-Addressed Schemas: Making Schema Drift Unrepresentable",
+      "date": "2026-07-28",
+      "slug": "content-addressed-schemas-making-schema-drift-unrepresentable",
+      "tags": [
+        "\"postgresql\"",
+        "\"schema\"",
+        "\"migrations\"",
+        "\"content-addressing\"",
+        "\"database\""
+      ]
+    }
+  ],
+  "last_gen": "2026-08-12T14:52:27.684515+00:00"
+}
