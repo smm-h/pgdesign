@@ -1,7 +1,7 @@
 {
   "_hash_version": 3,
   "en/architecture-laws.md": {
-    "content": "c6862132f28e5ef607214b0035bf1796679202f49c77c66d6bd2f48740b4b419",
+    "content": "3854e4072820d7ede797ffd3a161809b6f2bd23cd3c4d6fd3fd13ae991d37aff",
     "description": "9e6dcb99bb9f76976d43860d9f81ebdc3dee13993d7791d7d29fb397c8d5a1d3"
   },
   "en/cli-build.md": {
@@ -41,7 +41,7 @@
     "seed_hash": "5eb88e6a891d619ad9420de08c7668ca50fcda6c01455163f5a479848910b174"
   },
   "en/cli-index.md": {
-    "content": "8b723d3bdd76da690c6c6f8f9e5e19afaf1a7a95406ff4ae04f985d8e71fd791",
+    "content": "90104177034bc6e553cda2bca83c2d78d9db73ed326213e945e5214ff510455d",
     "description": "9cad7754013b69219b0722945a040382b6fdca4ca878bfdad54760604ef7ac5a"
   },
   "en/cli-introspect.md": {
@@ -50,9 +50,9 @@
     "schema_hash": "f77b97b7d2a555ab38faf11824cc861cbee7160363d3270890ee5550e0533e4b"
   },
   "en/cli-migrate.md": {
-    "content": "ba1c8ce83115ffc2cf01c67509b197c5bd3e063bd7a03ff064972bd5bdf39e09",
+    "content": "6b57f0d404c11c3effbc3cc3125e59972650e344b596e10d6f08e96d2f98b946",
     "description": "dbb04d64166ce34f6848729e6605119ca287c842991af2d2fc8250d9c5301863",
-    "schema_hash": "5ff62badd1dd1d5fd7613492eef5d5f3e00a9adfd9360dd8c8ba666ccd98e1c5"
+    "schema_hash": "beba439cc5047a47146a4c9f22699320f33bd1adb2e2c9bd410b20c192a05126"
   },
   "en/cli-revise.md": {
     "content": "453b0a6fdbc1982cc7b8df927f006e714175587d50175a6755f8979233855292",
