@@ -26,7 +26,7 @@ Resolve each [imports] alias's git pin, vendor the referenced surface (tables + 
 
 ## import update
 
-Re-resolve each [imports] alias's git ref and re-vendor its surface, updating the lockfile. Requires an existing lockfile — use `import lock` for the first pin.
+Re-resolve each [imports] alias's git ref, re-extract the surface your schema actually references, and rewrite the lockfile at the new commit. Each declared framework is cloned into a temp directory that is removed on return, and only the tables your schema uses are vendored. Requires an existing lockfile — use `import lock` for the first pin. Pass an alias to update just that one.
 
 **Effect:** mutating
 

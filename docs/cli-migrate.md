@@ -26,7 +26,7 @@ Apply all pending migrations to the target database in order. Each migration run
 
 ## migrate baseline
 
-Adopt an existing database onto the migration chain without executing any migration SQL. Use this for a database whose schema was created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying the introspected manifest, and stamps this database's baseline boundary (rollback-frozen); pass the schema TOML path(s) so the correct schema search-path is introspected. In legacy (semver-TOML) mode it records a semver --version. Idempotent: re-baselining at the same state is a no-op.
+Adopt an existing database onto the migration chain without executing any migration SQL — for a schema created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying that manifest, and stamps the baseline boundary (rollback-frozen); pass the schema TOML path(s) so the right search-path is introspected. Legacy semver-TOML mode records a semver --version instead. Re-baselining at the same state is a no-op.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
