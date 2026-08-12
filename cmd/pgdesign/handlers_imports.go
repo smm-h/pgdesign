@@ -33,7 +33,7 @@ func registerImportLockCmd(g *strictcli.Group) {
 }
 
 func registerImportUpdateCmd(g *strictcli.Group) {
-	g.Command("update", "Re-resolve each [imports] alias's git ref and re-vendor its surface, updating the lockfile. Requires an existing lockfile — use `import lock` for the first pin.",
+	g.Command("update", "Re-resolve each [imports] alias's git ref, re-extract the surface your schema actually references, and rewrite the lockfile at the new commit. Each declared framework is cloned into a temp directory that is removed on return, and only the tables your schema uses are vendored. Requires an existing lockfile — use `import lock` for the first pin. Pass an alias to update just that one.",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 			return runImportPin(ctx, kwargs, true)
 		},

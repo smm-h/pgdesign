@@ -2,8 +2,10 @@
 title: "Content-Addressed Schemas: Making Schema Drift Unrepresentable"
 date: 2026-07-28
 slug: content-addressed-schemas-making-schema-drift-unrepresentable
+description: "How deriving a schema's identity from its content — rather than from filenames and sequence numbers — turns migration renumbering, edited-after-apply files, and lying rollback scripts from discipline problems into states the tool cannot represent."
 tags: ["postgresql", "schema", "migrations", "content-addressing", "database"]
 draft: false
+directives: false
 project: pgdesign
 ---
 

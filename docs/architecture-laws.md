@@ -121,7 +121,7 @@ The law numbering is stable and referenced from code comments — do not renumbe
   whose chain_position holds a rebased-away revision is served forward, never
   orphaned. Outside an epoch bump, mutation of STORE CONTENT (objects,
   manifests) is not an operation this structure has. Chain-edge FILES are
-  location-addressed — their append-onlyness is CHECKED POLICY (the consistency
+  location-addressed — their append-only property is CHECKED POLICY (the consistency
   checker, including its edge-endpoint check), not structural impossibility.
 - **L3 (The chain is the free category on the edge graph).** Composition = path
   concatenation; identities = empty paths — VIRTUAL: never files, never applied
