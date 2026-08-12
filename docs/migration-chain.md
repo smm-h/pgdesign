@@ -5,7 +5,7 @@ description: "How pgdesign's content-addressed migration chain works: revisions,
 
 # The Migration Chain
 
-This page explains the *concepts* behind pgdesign's migration system — what a revision is, what an edge is, and why the design gives you integrity guarantees that file-numbered migration tools cannot. For the command-by-command how-to (generate, apply, rollback, squash, rebase, upgrade, baseline), see the [Migration Guide](migration-guide.html).
+This page explains the *concepts* behind pgdesign's migration system — what a revision is, what an edge is, and why the design gives you integrity guarantees that file-numbered migration tools cannot. For the command-by-command how-to (generate, apply, rollback, squash, rebase, upgrade, baseline), see the [Migration Guide](migration-guide.md).
 
 ## The core idea: identity by content, not by filename
 
@@ -111,4 +111,4 @@ Every guarantee above is structural -- enforced by the content-addressed algebra
 - You cannot apply to a database that has drifted without hearing about it, named object by named object.
 - You cannot orphan a database by squashing or rebasing.
 
-The chain is a small algebra — content-addressed objects, revisions, and edges — and these properties fall out of it rather than being bolted on. See the [Migration Guide](migration-guide.html) for the commands, flags, and worked examples.
+The chain is a small algebra — content-addressed objects, revisions, and edges — and these properties fall out of it rather than being bolted on. See the [Migration Guide](migration-guide.md) for the commands, flags, and worked examples.

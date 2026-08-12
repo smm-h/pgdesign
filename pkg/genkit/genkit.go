@@ -1,7 +1,7 @@
 // Package genkit provides the generator interface contract and freshness/orphan
 // orchestration for deterministic code generation pipelines.
 //
-// # Stability
+// Stability
 //
 // This package follows semver 0.x: breaking changes bump the minor version.
 // The Generator and MultiFileGenerator interfaces are the stable core.
@@ -9,7 +9,7 @@
 // stable utilities. OrphanIgnored's ignore list may expand (but not shrink)
 // between minor versions.
 //
-// # Generator contract
+// Generator contract
 //
 // All generators must produce deterministic output: given the same input schema,
 // they must produce byte-identical output every time. This property enables
@@ -18,14 +18,14 @@
 // using random IDs or timestamps) break this contract and cannot participate in
 // freshness checking.
 //
-// # Single-file vs multi-file
+// Single-file vs multi-file
 //
 // A Generator produces a single output ([]byte). A MultiFileGenerator produces
 // multiple files as a map[string][]byte of relative paths to contents. Multi-file
 // generators own their output directory: every file found in the directory must
 // be either planned output or on the ignore list; anything else is an orphan.
 //
-// # Freshness orchestration
+// Freshness orchestration
 //
 // The freshness system compares planned output against on-disk state:
 //   - Missing: planned file does not exist on disk

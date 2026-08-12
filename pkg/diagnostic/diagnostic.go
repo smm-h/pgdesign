@@ -2,7 +2,7 @@
 // used by schema compiler passes. This is the public API surface; internal
 // packages re-export these types.
 //
-// # Stability
+// Stability
 //
 // This package follows semver 0.x: breaking changes bump the minor version.
 // The Severity enum values, Diagnostic struct fields, and Diagnostics methods

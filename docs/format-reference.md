@@ -666,7 +666,7 @@ schema = "billing"
 | `ref` | string | Git ref to pin (resolved to an exact commit at lock time) |
 | `schema` | string | The PostgreSQL namespace an `alias:table` reference resolves into |
 
-Run `pgdesign import lock` to resolve the pins and vendor the referenced surface into `imports/<alias>/`, and `pgdesign check --tag imports` to detect drift. See [Cross-Repository Imports](imports.html) for the full workflow.
+Run `pgdesign import lock` to resolve the pins and vendor the referenced surface into `imports/<alias>/`, and `pgdesign check --tag imports` to detect drift. See [Cross-Repository Imports](imports.md) for the full workflow.
 
 ### [renames]
 

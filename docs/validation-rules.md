@@ -313,7 +313,7 @@ These diagnostics come from the semantic type system (`E1xx`), the model builder
 
 ## Imports
 
-Cross-repository import diagnostics (`E230`--`E244`) cover 15 error conditions raised while resolving, verifying, and validating `[imports]`. These range from unknown aliases and missing vendored surfaces to semantic drift detection and junction-type mismatches. See [Cross-Repository Imports](imports.html) for the full import workflow.
+Cross-repository import diagnostics (`E230`--`E244`) cover 15 error conditions raised while resolving, verifying, and validating `[imports]`. These range from unknown aliases and missing vendored surfaces to semantic drift detection and junction-type mismatches. See [Cross-Repository Imports](imports.md) for the full import workflow.
 
 | Code | Meaning |
 |------|---------|
@@ -547,6 +547,6 @@ Suggests composite indexes for common join-and-filter patterns. When a foreign k
 
 Beyond the schema-level diagnostics above, 3 checks verify project-level integrity rather than individual diagnostic codes. All 3 are error-severity and hard-fail CI, covering build freshness, revision provenance, and import surface integrity.
 
-- `check --tag build` — freshness. Every configured `[output]` is regenerated in memory and byte-compared against what is on disk; a stale or hand-edited artifact fails. See [Format Reference](format-reference.html) for details.
+- `check --tag build` — freshness. Every configured `[output]` is regenerated in memory and byte-compared against what is on disk; a stale or hand-edited artifact fails. See [Format Reference](format-reference.md) for details.
 - `check --tag revision` — provenance. Every regenerable artifact must carry the current full-project revision stamp; a missing, old-format, or mismatched stamp is stale (run `pgdesign build`). JSON envelopes additionally have their revision recomputed and their model class verified.
-- `check --tag imports` — import surface integrity and drift (see [Imports](#imports) above and [Cross-Repository Imports](imports.html)).
+- `check --tag imports` — import surface integrity and drift (see [Imports](#imports) above and [Cross-Repository Imports](imports.md)).

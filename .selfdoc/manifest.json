@@ -1407,6 +1407,33 @@
       ]
     },
     {
+      "path": "index.md",
+      "title": "pgdesign",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "pgdesign",
+          "anchor": "pgdesign"
+        },
+        {
+          "level": 2,
+          "text": "Start here",
+          "anchor": "start-here"
+        },
+        {
+          "level": 2,
+          "text": "Guides",
+          "anchor": "guides"
+        },
+        {
+          "level": 2,
+          "text": "Reference",
+          "anchor": "reference"
+        }
+      ]
+    },
+    {
       "path": "internal-audit.md",
       "title": "internal/audit",
       "type": "doc",
@@ -1559,11 +1586,6 @@
           "level": 2,
           "text": "internal/chain",
           "anchor": "internalchain"
-        },
-        {
-          "level": 1,
-          "text": "Revision / manifest reconciliation (ONE concept, not two)",
-          "anchor": "revision-manifest-reconciliation-one-concept-not-two"
         },
         {
           "level": 3,
@@ -6842,26 +6864,6 @@
           "anchor": "internalsqlexpr"
         },
         {
-          "level": 1,
-          "text": "Operator precedence",
-          "anchor": "operator-precedence"
-        },
-        {
-          "level": 1,
-          "text": "Node types",
-          "anchor": "node-types"
-        },
-        {
-          "level": 1,
-          "text": "Keywords",
-          "anchor": "keywords"
-        },
-        {
-          "level": 1,
-          "text": "Limitations",
-          "anchor": "limitations"
-        },
-        {
           "level": 3,
           "text": "Node",
           "anchor": "node"
@@ -9141,5 +9143,5 @@
       ]
     }
   ],
-  "last_gen": "2026-08-12T03:36:19.565239+00:00"
+  "last_gen": "2026-08-12T12:07:36.816244+00:00"
 }

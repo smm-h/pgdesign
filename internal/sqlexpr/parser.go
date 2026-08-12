@@ -2,7 +2,7 @@
 // SQL expressions. It tokenizes an input string and produces an AST of Node
 // values suitable for static analysis, validation, and code generation.
 //
-// # Operator precedence
+// Operator precedence
 //
 // Levels from lowest to highest binding:
 //
@@ -18,7 +18,7 @@
 //  9. Primary: literals, identifiers, function calls, parenthesized
 //     expressions, unary minus, EXISTS, CASE
 //
-// # Node types
+// Node types
 //
 // The AST consists of the following node types, all implementing [Node]:
 //
@@ -38,13 +38,13 @@
 //   - [ParenExpr]: parenthesized expression
 //   - [CaseExpr]: CASE WHEN ... THEN ... ELSE ... END (with [WhenClause])
 //
-// # Keywords
+// Keywords
 //
 // The following keywords are recognized (case-insensitive): OR, AND, NOT, IS,
 // NULL, DISTINCT, FROM, IN, BETWEEN, LIKE, ILIKE, EXISTS, SELECT, WHERE, CASE,
 // WHEN, THEN, ELSE, END, TRUE, FALSE, CAST, AS.
 //
-// # Limitations
+// Limitations
 //
 //   - No full SELECT statements; only simple SELECT inside EXISTS with FROM and
 //     optional WHERE.

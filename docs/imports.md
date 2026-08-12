@@ -95,7 +95,7 @@ The check reports, among others:
 - A junction-type mismatch: your local FK column's type disagreeing with the imported column it references.
 - An import whose required PostgreSQL version floor exceeds your project's target version.
 
-The import diagnostics are `E230`–`E244`; see the [Validation Rules](validation-rules.html#imports) reference for the full list.
+The import diagnostics are `E230`–`E244`; see the [Validation Rules](validation-rules.md#imports) reference for the full list.
 
 ## How imported tables behave
 

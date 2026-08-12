@@ -103,7 +103,7 @@ columns = ["author_id"]
 
 Key design decisions enforced by pgdesign:
 
-- Every schema document must declare `format_version = 1` at the top level (see [Format Reference](format-reference.html#format_version)).
+- Every schema document must declare `format_version = 1` at the top level (see [Format Reference](format-reference.md#format_version)).
 - Every table requires a `comment`.
 - Columns use semantic types (`id`, `email`, `timestamp`) instead of raw PG types.
 - Every FK must declare `on_delete`.
@@ -190,13 +190,13 @@ pgdesign revise
 
 `revise` regenerates every configured output, generates the migration edge for your schema change, and commits — the pure tier (outputs + migration + blocking normal-form and structural checks) first, then a non-retroactive database tier (live FD discovery and workload analysis) when a database is reachable. The result is one schema **revision** stamped consistently across every artifact.
 
-Under the hood, migrations form a content-addressed chain: each change is an edge between two schema revisions, applied with preconditions, a journal, and a post-apply reconcile. See [The Migration Chain](migration-chain.html) for the concepts and the [Migration Guide](migration-guide.html) for the commands.
+Under the hood, migrations form a content-addressed chain: each change is an edge between two schema revisions, applied with preconditions, a journal, and a post-apply reconcile. See [The Migration Chain](migration-chain.md) for the concepts and the [Migration Guide](migration-guide.md) for the commands.
 
 ## Next steps
 
-- [Format Reference](format-reference.html) -- full TOML schema syntax
-- [Semantic Types](semantic-types.html) -- built-in and custom types
-- [Validation Rules](validation-rules.html) -- all error and warning codes
-- [The Migration Chain](migration-chain.html) -- revisions, edges, the journal, and the integrity guarantees
-- [Migration Guide](migration-guide.html) -- generating and applying migrations
-- [Cross-Repository Imports](imports.html) -- referencing another project's tables across a git pin
+- [Format Reference](format-reference.md) -- full TOML schema syntax
+- [Semantic Types](semantic-types.md) -- built-in and custom types
+- [Validation Rules](validation-rules.md) -- all error and warning codes
+- [The Migration Chain](migration-chain.md) -- revisions, edges, the journal, and the integrity guarantees
+- [Migration Guide](migration-guide.md) -- generating and applying migrations
+- [Cross-Repository Imports](imports.md) -- referencing another project's tables across a git pin

@@ -14,9 +14,8 @@
 // on-disk chain files, no tracking schemas, and no database — those are
 // phase 5. 1.4 is the types and the laws and their property tests.
 //
-// # Revision / manifest reconciliation (ONE concept, not two)
-//
-// Part I of the roadmap frames the revision two ways that must be reconciled:
+// Revision / manifest reconciliation (ONE concept, not two): Part I of the
+// roadmap frames the revision two ways that must be reconciled:
 //
 //   - "revision = hash of canonical bytes" (kernel 1.5, internal/rev): rev
 //     concatenates every per-object canonical form, in sorted manifest-key
