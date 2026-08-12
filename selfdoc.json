@@ -194,10 +194,6 @@
     "diagnostic-count": "docs/directives/diagnostic_count.py",
     "table-semantic-types": "docs/directives/semantic_type_table.py"
   },
-  "deploy": {
-    "provider": "cloudflare-pages",
-    "project": "pgdesign"
-  },
   "topology": {
     "slug": "pgdesign",
     "docs_base": "https://smmh.dev",

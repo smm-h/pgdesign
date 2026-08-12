@@ -105,4 +105,4 @@ None of this is a linter you can forget to run or a convention that erodes under
 
 Schema drift is the accumulated cost of a hundred small unverified assumptions. The fix isn't more discipline; it's removing the assumptions. When identity comes from content, most of them simply have nowhere to hide.
 
-pgdesign is open source. If any of these problems are familiar ghosts, the [documentation](https://pgdesign.smmh.dev) — start with the quickstart and *The Migration Chain* — is the place to begin.
+pgdesign is open source. If any of these problems are familiar ghosts, the [documentation](https://smmh.dev/pgdesign/) — start with the quickstart and *The Migration Chain* — is the place to begin.
