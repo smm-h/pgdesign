@@ -7,3 +7,4 @@
 {"format_version":1,"id":"18c9eff192a016bd455f22a7cbd54232b1c0da8bbc759e02","commits":["83bff1e1a720dff681f59531b72e2e23cc08cdf3"],"user_facing":false}
 {"format_version":1,"id":"18caf1a6872a2e56374e31392b0143c0872ce06201025be2","commits":["583ac5a2fa3bf89fd8ce9c99d9eea2d1bf03673d"],"user_facing":false}
 {"format_version":1,"id":"18caf1a6904a7cc00622e2dadb114ebc99b7b296e9008229","commits":["387601cdff599a51141c97119d7247e04346eec3"],"user_facing":true,"description":"Clearer `pgdesign import update` help text, and a tighter `migrate baseline` description.","type":"feature"}
+{"format_version":1,"id":"18cb0d82b60ba77b5d62decfd61a432cabfbdac1dce7d34e","commits":["d8ea6be0232635579ed25abc2b9be225ede3721f"],"user_facing":true,"description":"**Documentation site builds again.** pgdesign's docs now have a home page, intra-doc links resolve under the current output scheme, and the API reference pages no longer carry stray extra top-level headings.","type":"fix"}
