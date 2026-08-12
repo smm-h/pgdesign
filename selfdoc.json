@@ -2,6 +2,14 @@
   "name": "pgdesign",
   "version": "0.26.0",
   "base_url": "https://pgdesign.smmh.dev",
+  "search_engine": "pagefind",
+  "author": {
+    "name": "SMMH",
+    "url": "https://smmh.dev",
+    "same_as": [
+      "https://github.com/smm-h"
+    ]
+  },
   "root_files": [
     "docs/_CLAUDE.md",
     "docs/_README.md"
@@ -172,8 +180,7 @@
   "output": "docs/_build/",
   "versions": [
     {
-      "version": "0.26.0",
-      "indexed": true
+      "version": "0.26.0"
     }
   ],
   "locales": [
@@ -193,7 +200,7 @@
   },
   "topology": {
     "slug": "pgdesign",
-    "docs_base": "https://docs.smmh.dev",
+    "docs_base": "https://smmh.dev",
     "posts_base": "https://blog.smmh.dev",
     "projects": {
       "pixelweaver": "https://docs.smmh.dev/pixelweaver",
