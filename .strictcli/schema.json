@@ -157,13 +157,6 @@
         },
         {
           "default": false,
-          "help": "Output check results as machine-readable JSON instead of human text",
-          "name": "json",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": false,
           "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
           "name": "ignore-warnings",
           "negatable": true,
@@ -174,7 +167,13 @@
         "reason": "framework-internal: absorbs app-defined global flag values"
       },
       "help": "Run project checks registered via the check framework and report results",
-      "name": "check"
+      "name": "check",
+      "payload_schema": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      }
     },
     "codegen": {
       "args": [
@@ -268,13 +267,6 @@
       "effect": "read_only",
       "flags": [
         {
-          "default": false,
-          "help": "Output the schema diff in machine-readable JSON format",
-          "name": "json",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
           "env": "PGDESIGN_DB",
           "help": "PostgreSQL connection URL for live database comparison",
           "name": "live",
@@ -292,7 +284,95 @@
         }
       ],
       "help": "Compare schema file(s) or directory against another target",
-      "name": "diff"
+      "name": "diff",
+      "payload_schema": {
+        "additionalProperties": true,
+        "properties": {
+          "enums_added": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "enums_changed": {
+            "items": {
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "enums_removed": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "extensions_added": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "extensions_removed": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "tables_added": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "tables_changed": {
+            "items": {
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "tables_removed": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "tables_added",
+          "tables_removed",
+          "tables_changed",
+          "enums_added",
+          "enums_removed",
+          "enums_changed",
+          "extensions_added",
+          "extensions_removed"
+        ],
+        "type": "object"
+      }
     },
     "fmt": {
       "args": [
@@ -571,13 +651,6 @@
           "type": "str"
         },
         {
-          "default": false,
-          "help": "Output all statistics in machine-readable JSON format",
-          "name": "json",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
           "default": [],
           "help": "PostgreSQL schema name to analyze (repeatable for multiple)",
           "name": "schema",
@@ -587,7 +660,154 @@
         }
       ],
       "help": "Analyze database statistics, index usage, and health",
-      "name": "stats"
+      "name": "stats",
+      "payload_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "cache_hit_ratio": {
+            "type": "number"
+          },
+          "database": {
+            "type": "string"
+          },
+          "duplicate_indexes": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "string"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "superset_index": {
+                  "type": "string"
+                },
+                "table": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "schema",
+                "table",
+                "index",
+                "superset_index"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "tables": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "dead_tuples": {
+                  "type": "integer"
+                },
+                "last_vacuum": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "live_tuples": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "seq_scans": {
+                  "type": "integer"
+                },
+                "vacuum_needed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "schema",
+                "name",
+                "live_tuples",
+                "dead_tuples",
+                "seq_scans",
+                "last_vacuum",
+                "vacuum_needed"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "unused_indexes": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "index": {
+                  "type": "string"
+                },
+                "scans": {
+                  "type": "integer"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "table": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "schema",
+                "table",
+                "index",
+                "scans"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "vacuum_candidates": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "dead_ratio": {
+                  "type": "number"
+                },
+                "dead_tuples": {
+                  "type": "integer"
+                },
+                "live_tuples": {
+                  "type": "integer"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "table": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "schema",
+                "table",
+                "live_tuples",
+                "dead_tuples",
+                "dead_ratio"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "database",
+          "cache_hit_ratio",
+          "tables",
+          "unused_indexes",
+          "vacuum_candidates",
+          "duplicate_indexes"
+        ],
+        "type": "object"
+      }
     }
   },
   "defaults": {
@@ -1060,5 +1280,5 @@
   "name": "pgdesign",
   "project_id": "github.com/smm-h/pgdesign",
   "schema_version": 1,
-  "version": "0.26.0"
+  "version": ""
 }

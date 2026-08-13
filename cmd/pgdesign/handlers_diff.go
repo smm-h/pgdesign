@@ -20,6 +20,45 @@ import (
 	"github.com/smm-h/strictcli/go/strictcli"
 )
 
+// diffPayloadSchema is the `diff` machine payload: the diff.SchemaDiff
+// document. Its eight unconditional members are declared here (each is null
+// rather than [] when the differ found nothing of that kind); the rest of the
+// document is the omitempty tail -- views, sequences, functions, state
+// machines and the rest -- whose members appear only when non-empty, so the
+// declaration admits them rather than pinning a list that grows with the
+// object model.
+var diffPayloadSchema = map[string]interface{}{
+	"type": "object",
+	"properties": map[string]interface{}{
+		"tables_added":       diffNameListSchema,
+		"tables_removed":     diffNameListSchema,
+		"tables_changed":     diffObjectListSchema,
+		"enums_added":        diffNameListSchema,
+		"enums_removed":      diffNameListSchema,
+		"enums_changed":      diffObjectListSchema,
+		"extensions_added":   diffNameListSchema,
+		"extensions_removed": diffNameListSchema,
+	},
+	"required": []interface{}{
+		"tables_added", "tables_removed", "tables_changed",
+		"enums_added", "enums_removed", "enums_changed",
+		"extensions_added", "extensions_removed",
+	},
+	"additionalProperties": true,
+}
+
+// diffNameListSchema is a list of object names, null when empty.
+var diffNameListSchema = map[string]interface{}{
+	"type":  []interface{}{"array", "null"},
+	"items": map[string]interface{}{"type": "string"},
+}
+
+// diffObjectListSchema is a list of per-object change records, null when empty.
+var diffObjectListSchema = map[string]interface{}{
+	"type":  []interface{}{"array", "null"},
+	"items": map[string]interface{}{"type": "object"},
+}
+
 func registerDiffCmd(app *strictcli.App) {
 	app.Command("diff", "Compare schema file(s) or directory against another target",
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
@@ -116,8 +155,10 @@ func registerDiffCmd(app *strictcli.App) {
 				d = diff.Diff(schema, actual)
 			}
 
-			if kwargs["json"].(bool) {
-				fmt.Println(diff.FormatJSON(d))
+			// The machine payload is supplied in both modes; the framework
+			// emits it only under --json (effects contract §19.4).
+			ctx.Payload(d)
+			if ctx.JSON() {
 				return strictcli.Exit(0)
 			}
 
@@ -125,8 +166,8 @@ func registerDiffCmd(app *strictcli.App) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithEffect(strictcli.EffectReadOnly),
+		strictcli.PayloadSchema(diffPayloadSchema),
 		strictcli.WithFlags(
-			strictcli.BoolFlag("json", "Output the schema diff in machine-readable JSON format", strictcli.Default(false)),
 			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.StringFlag("against", "Path to TOML schema file or directory to compare against", strictcli.Default(nil)),
 			strictcli.StringFlag("base", "Git ref to compare the current schema against (e.g., main)", strictcli.Default(nil)),

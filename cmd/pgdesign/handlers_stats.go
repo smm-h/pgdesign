@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -81,29 +80,108 @@ type vacuumCandidate struct {
 	DeadRatio  float64 `json:"dead_ratio"`
 }
 
+// statsPayloadSchema is the `stats` machine payload: the statsOutput document
+// above, declared field by field. `last_vacuum` is null for a table that has
+// never been vacuumed, which is why it carries a type list.
+var statsPayloadSchema = map[string]interface{}{
+	"type": "object",
+	"properties": map[string]interface{}{
+		"database":        map[string]interface{}{"type": "string"},
+		"cache_hit_ratio": map[string]interface{}{"type": "number"},
+		"tables": map[string]interface{}{
+			"type": "array",
+			"items": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"schema":        map[string]interface{}{"type": "string"},
+					"name":          map[string]interface{}{"type": "string"},
+					"live_tuples":   map[string]interface{}{"type": "integer"},
+					"dead_tuples":   map[string]interface{}{"type": "integer"},
+					"seq_scans":     map[string]interface{}{"type": "integer"},
+					"last_vacuum":   map[string]interface{}{"type": []interface{}{"string", "null"}},
+					"vacuum_needed": map[string]interface{}{"type": "boolean"},
+				},
+				"required": []interface{}{
+					"schema", "name", "live_tuples", "dead_tuples", "seq_scans",
+					"last_vacuum", "vacuum_needed",
+				},
+				"additionalProperties": false,
+			},
+		},
+		"unused_indexes": map[string]interface{}{
+			"type": "array",
+			"items": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"schema": map[string]interface{}{"type": "string"},
+					"table":  map[string]interface{}{"type": "string"},
+					"index":  map[string]interface{}{"type": "string"},
+					"scans":  map[string]interface{}{"type": "integer"},
+				},
+				"required":             []interface{}{"schema", "table", "index", "scans"},
+				"additionalProperties": false,
+			},
+		},
+		"vacuum_candidates": map[string]interface{}{
+			"type": "array",
+			"items": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"schema":      map[string]interface{}{"type": "string"},
+					"table":       map[string]interface{}{"type": "string"},
+					"live_tuples": map[string]interface{}{"type": "integer"},
+					"dead_tuples": map[string]interface{}{"type": "integer"},
+					"dead_ratio":  map[string]interface{}{"type": "number"},
+				},
+				"required": []interface{}{
+					"schema", "table", "live_tuples", "dead_tuples", "dead_ratio",
+				},
+				"additionalProperties": false,
+			},
+		},
+		"duplicate_indexes": map[string]interface{}{
+			"type": "array",
+			"items": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"schema":         map[string]interface{}{"type": "string"},
+					"table":          map[string]interface{}{"type": "string"},
+					"index":          map[string]interface{}{"type": "string"},
+					"superset_index": map[string]interface{}{"type": "string"},
+				},
+				"required":             []interface{}{"schema", "table", "index", "superset_index"},
+				"additionalProperties": false,
+			},
+		},
+	},
+	"required": []interface{}{
+		"database", "cache_hit_ratio", "tables", "unused_indexes",
+		"vacuum_candidates", "duplicate_indexes",
+	},
+	"additionalProperties": false,
+}
+
 func registerStatsCmd(app *strictcli.App) {
 	app.Command("stats", "Analyze database statistics, index usage, and health",
 		handleStats,
 		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
 			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.BoolFlag("json", "Output all statistics in machine-readable JSON format", strictcli.Default(false)),
 			strictcli.StringFlag("schema", "PostgreSQL schema name to analyze (repeatable for multiple)", strictcli.Repeatable(), strictcli.Unique(true)),
 		),
 		strictcli.WithArgs(
 			strictcli.NewArg("path", "TOML schema file(s) for cross-referencing with live data", strictcli.Variadic(), strictcli.ArgRequired(false)),
 		),
+		strictcli.PayloadSchema(statsPayloadSchema),
 	)
 }
 
-func handleStats(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
+func handleStats(sctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 	dbURL := kwargsDBURL(kwargs)
 	if dbURL == "" {
 		fmt.Fprintln(os.Stderr, "error: --db is required for stats")
 		return strictcli.Exit(1)
 	}
-
-	jsonOutput := kwargs["json"].(bool)
 
 	schemaNames := kwargsStrSlice(kwargs["schema"])
 	if len(schemaNames) == 0 {
@@ -320,22 +398,17 @@ func handleStats(_ *strictcli.Context, kwargs map[string]interface{}) strictcli.
 		duplicates = []workload.DuplicateIndex{}
 	}
 
-	// Output
-	if jsonOutput {
-		out := statsOutput{
-			Database:         dbName,
-			CacheHitRatio:    math.Round(cacheHitRatio*10000) / 10000,
-			Tables:           tableOutput,
-			UnusedIndexes:    unused,
-			VacuumCandidates: vacuumCands,
-			DuplicateIndexes: duplicates,
-		}
-		enc := json.NewEncoder(os.Stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(out); err != nil {
-			fmt.Fprintf(os.Stderr, "error: encode JSON: %v\n", err)
-			return strictcli.Exit(1)
-		}
+	// The machine payload is supplied in both modes; the framework emits it
+	// only under --json (effects contract §19.4).
+	sctx.Payload(statsOutput{
+		Database:         dbName,
+		CacheHitRatio:    math.Round(cacheHitRatio*10000) / 10000,
+		Tables:           tableOutput,
+		UnusedIndexes:    unused,
+		VacuumCandidates: vacuumCands,
+		DuplicateIndexes: duplicates,
+	})
+	if sctx.JSON() {
 		return strictcli.Exit(0)
 	}
 

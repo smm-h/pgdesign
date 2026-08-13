@@ -129,22 +129,22 @@ Example output:
     default: "" -> "unknown@example.com"
 ```
 
-### JSON output (`--json`)
+### Machine output (`--json`)
 
-Pass `--json` for machine-readable output. The JSON structure mirrors the `SchemaDiff` type exactly, with fields for every object category (`tables_added`, `tables_removed`, `tables_changed`, `enums_added`, etc.). Empty arrays are included; empty optional fields are omitted.
+`--json` is owned by strictcli and selects machine mode on every command. In machine mode stdout carries exactly one document -- the framework envelope -- and the diff rides its `payload` member. The payload structure mirrors the `SchemaDiff` type exactly, with fields for every object category (`tables_added`, `tables_removed`, `tables_changed`, `enums_added`, etc.). Empty optional fields are omitted.
 
 ```
-pgdesign diff schema.toml --live $PGDESIGN_DB --json
+pgdesign diff schema.toml --live $PGDESIGN_DB --json | jq .payload
 ```
 
-The JSON output is useful for CI pipelines, automated drift detection, or feeding into other tools.
+The envelope also carries the app name and version, the command path, the exit code and any diagnostics the run emitted, which is what makes it useful for CI pipelines, automated drift detection, or feeding into other tools.
 
 ### Empty diff
 
 An empty diff means the schema and target are semantically identical after normalization -- every object type (tables, columns, constraints, indexes, views, functions, sequences, policies, triggers) matches between the two sides. When the schema matches the target exactly, the output format determines the representation:
 
 - Terminal: prints `Schema is up to date.`
-- JSON: all arrays are empty, all optional fields are null
+- Machine mode: the envelope's `payload` carries an empty diff -- the unconditional arrays are null and every optional field is absent
 
 ## Normalization
 
