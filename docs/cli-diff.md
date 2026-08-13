@@ -17,7 +17,6 @@ Compare schema file(s) or directory against another target
 
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--json` |  | bool |  |  | Output the schema diff in machine-readable JSON format |
 | `--live` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for live database comparison |
 | `--against` |  | str |  |  | Path to TOML schema file or directory to compare against |
 | `--base` |  | str |  |  | Git ref to compare the current schema against (e.g., main) |

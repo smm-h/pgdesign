@@ -930,177 +930,177 @@
         },
         {
           "level": 2,
-          "text": "internal/diff",
+          "text": "`internal/diff`",
           "anchor": "internaldiff"
         },
         {
           "level": 3,
-          "text": "SchemaDiff",
+          "text": "`SchemaDiff`",
           "anchor": "schemadiff"
         },
         {
           "level": 3,
-          "text": "RenamePair",
+          "text": "`RenamePair`",
           "anchor": "renamepair"
         },
         {
           "level": 3,
-          "text": "RenameSpec",
+          "text": "`RenameSpec`",
           "anchor": "renamespec"
         },
         {
           "level": 3,
-          "text": "ColumnRenameSpec",
+          "text": "`ColumnRenameSpec`",
           "anchor": "columnrenamespec"
         },
         {
           "level": 3,
-          "text": "SMTransitionDiff",
+          "text": "`SMTransitionDiff`",
           "anchor": "smtransitiondiff"
         },
         {
           "level": 3,
-          "text": "SMTransitionRef",
+          "text": "`SMTransitionRef`",
           "anchor": "smtransitionref"
         },
         {
           "level": 3,
-          "text": "TableDiff",
+          "text": "`TableDiff`",
           "anchor": "tablediff"
         },
         {
           "level": 3,
-          "text": "ColumnChange",
+          "text": "`ColumnChange`",
           "anchor": "columnchange"
         },
         {
           "level": 3,
-          "text": "EnumDiff",
+          "text": "`EnumDiff`",
           "anchor": "enumdiff"
         },
         {
           "level": 3,
-          "text": "EnumValueInsert",
+          "text": "`EnumValueInsert`",
           "anchor": "enumvalueinsert"
         },
         {
           "level": 3,
-          "text": "ViewDiff",
+          "text": "`ViewDiff`",
           "anchor": "viewdiff"
         },
         {
           "level": 3,
-          "text": "MaterializedViewDiff",
+          "text": "`MaterializedViewDiff`",
           "anchor": "materializedviewdiff"
         },
         {
           "level": 3,
-          "text": "SequenceDiff",
+          "text": "`SequenceDiff`",
           "anchor": "sequencediff"
         },
         {
           "level": 3,
-          "text": "CompositeTypeDiff",
+          "text": "`CompositeTypeDiff`",
           "anchor": "compositetypediff"
         },
         {
           "level": 3,
-          "text": "CompositeFieldChange",
+          "text": "`CompositeFieldChange`",
           "anchor": "compositefieldchange"
         },
         {
           "level": 3,
-          "text": "FunctionDiff",
+          "text": "`FunctionDiff`",
           "anchor": "functiondiff"
         },
         {
           "level": 3,
-          "text": "DomainDiff",
+          "text": "`DomainDiff`",
           "anchor": "domaindiff"
         },
         {
           "level": 3,
-          "text": "FKChange",
+          "text": "`FKChange`",
           "anchor": "fkchange"
         },
         {
           "level": 3,
-          "text": "IndexChange",
+          "text": "`IndexChange`",
           "anchor": "indexchange"
         },
         {
           "level": 3,
-          "text": "TriggerChange",
+          "text": "`TriggerChange`",
           "anchor": "triggerchange"
         },
         {
           "level": 3,
-          "text": "PolicyDiff",
+          "text": "`PolicyDiff`",
           "anchor": "policydiff"
         },
         {
           "level": 3,
-          "text": "PartitionDiff",
+          "text": "`PartitionDiff`",
           "anchor": "partitiondiff"
         },
         {
           "level": 3,
-          "text": "MaintenanceDiff",
+          "text": "`MaintenanceDiff`",
           "anchor": "maintenancediff"
         },
         {
           "level": 3,
-          "text": "LiveNormalizer",
+          "text": "`LiveNormalizer`",
           "anchor": "livenormalizer"
         },
         {
           "level": 3,
-          "text": "Diff",
+          "text": "`Diff`",
           "anchor": "diff"
         },
         {
           "level": 3,
-          "text": "DiffLive",
+          "text": "`DiffLive`",
           "anchor": "difflive"
         },
         {
           "level": 3,
-          "text": "IsWidening",
+          "text": "`IsWidening`",
           "anchor": "iswidening"
         },
         {
           "level": 3,
-          "text": "ChangedObjectKeys",
+          "text": "`ChangedObjectKeys`",
           "anchor": "changedobjectkeys"
         },
         {
           "level": 3,
-          "text": "FormatTerminal",
+          "text": "`FormatTerminal`",
           "anchor": "formatterminal"
         },
         {
           "level": 3,
-          "text": "FormatJSON",
+          "text": "`FormatJSON`",
           "anchor": "formatjson"
         },
         {
           "level": 3,
-          "text": "CheckTruncationCollisions",
+          "text": "`CheckTruncationCollisions`",
           "anchor": "checktruncationcollisions"
         },
         {
           "level": 3,
-          "text": "ResolveRenames",
+          "text": "`ResolveRenames`",
           "anchor": "resolverenames"
         },
         {
           "level": 3,
-          "text": "SchemaDiff.IsEmpty",
+          "text": "`SchemaDiff.IsEmpty`",
           "anchor": "schemadiffisempty"
         },
         {
           "level": 3,
-          "text": "SchemaDiff.Summary",
+          "text": "`SchemaDiff.Summary`",
           "anchor": "schemadiffsummary"
         },
         {
@@ -1140,8 +1140,8 @@
         },
         {
           "level": 3,
-          "text": "JSON output (`--json`)",
-          "anchor": "json-output-json"
+          "text": "Machine output (`--json`)",
+          "anchor": "machine-output-json"
         },
         {
           "level": 3,
@@ -1445,12 +1445,12 @@
         },
         {
           "level": 2,
-          "text": "internal/audit",
+          "text": "`internal/audit`",
           "anchor": "internalaudit"
         },
         {
           "level": 3,
-          "text": "Audit",
+          "text": "`Audit`",
           "anchor": "audit"
         }
       ]
@@ -1467,107 +1467,107 @@
         },
         {
           "level": 2,
-          "text": "internal/catalog",
+          "text": "`internal/catalog`",
           "anchor": "internalcatalog"
         },
         {
           "level": 3,
-          "text": "Querier",
+          "text": "`Querier`",
           "anchor": "querier"
         },
         {
           "level": 3,
-          "text": "ColumnInfo",
+          "text": "`ColumnInfo`",
           "anchor": "columninfo"
         },
         {
           "level": 3,
-          "text": "IndexInfo",
+          "text": "`IndexInfo`",
           "anchor": "indexinfo"
         },
         {
           "level": 3,
-          "text": "Version",
+          "text": "`Version`",
           "anchor": "version"
         },
         {
           "level": 3,
-          "text": "TableExists",
+          "text": "`TableExists`",
           "anchor": "tableexists"
         },
         {
           "level": 3,
-          "text": "ViewExists",
+          "text": "`ViewExists`",
           "anchor": "viewexists"
         },
         {
           "level": 3,
-          "text": "MatViewExists",
+          "text": "`MatViewExists`",
           "anchor": "matviewexists"
         },
         {
           "level": 3,
-          "text": "SequenceExists",
+          "text": "`SequenceExists`",
           "anchor": "sequenceexists"
         },
         {
           "level": 3,
-          "text": "EnumExists",
+          "text": "`EnumExists`",
           "anchor": "enumexists"
         },
         {
           "level": 3,
-          "text": "DomainExists",
+          "text": "`DomainExists`",
           "anchor": "domainexists"
         },
         {
           "level": 3,
-          "text": "CompositeExists",
+          "text": "`CompositeExists`",
           "anchor": "compositeexists"
         },
         {
           "level": 3,
-          "text": "FunctionExists",
+          "text": "`FunctionExists`",
           "anchor": "functionexists"
         },
         {
           "level": 3,
-          "text": "Column",
+          "text": "`Column`",
           "anchor": "column"
         },
         {
           "level": 3,
-          "text": "ColumnTypeMatches",
+          "text": "`ColumnTypeMatches`",
           "anchor": "columntypematches"
         },
         {
           "level": 3,
-          "text": "ConstraintDef",
+          "text": "`ConstraintDef`",
           "anchor": "constraintdef"
         },
         {
           "level": 3,
-          "text": "Index",
+          "text": "`Index`",
           "anchor": "index"
         },
         {
           "level": 3,
-          "text": "EnumHasValue",
+          "text": "`EnumHasValue`",
           "anchor": "enumhasvalue"
         },
         {
           "level": 3,
-          "text": "TriggerExists",
+          "text": "`TriggerExists`",
           "anchor": "triggerexists"
         },
         {
           "level": 3,
-          "text": "PolicyExists",
+          "text": "`PolicyExists`",
           "anchor": "policyexists"
         },
         {
           "level": 3,
-          "text": "ExtensionExists",
+          "text": "`ExtensionExists`",
           "anchor": "extensionexists"
         }
       ]
@@ -1584,172 +1584,172 @@
         },
         {
           "level": 2,
-          "text": "internal/chain",
+          "text": "`internal/chain`",
           "anchor": "internalchain"
         },
         {
           "level": 3,
-          "text": "MechanicallyInvertible",
+          "text": "`MechanicallyInvertible`",
           "anchor": "mechanicallyinvertible"
         },
         {
           "level": 3,
-          "text": "DeclaredInverse",
+          "text": "`DeclaredInverse`",
           "anchor": "declaredinverse"
         },
         {
           "level": 3,
-          "text": "NonInvertible",
+          "text": "`NonInvertible`",
           "anchor": "noninvertible"
         },
         {
           "level": 3,
-          "text": "ErrNotFullyMechanical",
+          "text": "`ErrNotFullyMechanical`",
           "anchor": "errnotfullymechanical"
         },
         {
           "level": 3,
-          "text": "Edge",
+          "text": "`Edge`",
           "anchor": "edge"
         },
         {
           "level": 3,
-          "text": "OpSimulator",
+          "text": "`OpSimulator`",
           "anchor": "opsimulator"
         },
         {
           "level": 3,
-          "text": "InvertibilityClass",
+          "text": "`InvertibilityClass`",
           "anchor": "invertibilityclass"
         },
         {
           "level": 3,
-          "text": "Op",
+          "text": "`Op`",
           "anchor": "op"
         },
         {
           "level": 3,
-          "text": "MechanicalRange",
+          "text": "`MechanicalRange`",
           "anchor": "mechanicalrange"
         },
         {
           "level": 3,
-          "text": "Manifest",
+          "text": "`Manifest`",
           "anchor": "manifest"
         },
         {
           "level": 3,
-          "text": "Putter",
+          "text": "`Putter`",
           "anchor": "putter"
         },
         {
           "level": 3,
-          "text": "ManifestDelta",
+          "text": "`ManifestDelta`",
           "anchor": "manifestdelta"
         },
         {
           "level": 3,
-          "text": "Resolver",
+          "text": "`Resolver`",
           "anchor": "resolver"
         },
         {
           "level": 3,
-          "text": "FindHeads",
+          "text": "`FindHeads`",
           "anchor": "findheads"
         },
         {
           "level": 3,
-          "text": "FindGenesis",
+          "text": "`FindGenesis`",
           "anchor": "findgenesis"
         },
         {
           "level": 3,
-          "text": "ComposePath",
+          "text": "`ComposePath`",
           "anchor": "composepath"
         },
         {
           "level": 3,
-          "text": "VerifyEdgeEndpoint",
+          "text": "`VerifyEdgeEndpoint`",
           "anchor": "verifyedgeendpoint"
         },
         {
           "level": 3,
-          "text": "InverseOfList",
+          "text": "`InverseOfList`",
           "anchor": "inverseoflist"
         },
         {
           "level": 3,
-          "text": "AllMechanicallyInvertible",
+          "text": "`AllMechanicallyInvertible`",
           "anchor": "allmechanicallyinvertible"
         },
         {
           "level": 3,
-          "text": "NewMechanicalRange",
+          "text": "`NewMechanicalRange`",
           "anchor": "newmechanicalrange"
         },
         {
           "level": 3,
-          "text": "BuildManifest",
+          "text": "`BuildManifest`",
           "anchor": "buildmanifest"
         },
         {
           "level": 3,
-          "text": "BuildManifestInto",
+          "text": "`BuildManifestInto`",
           "anchor": "buildmanifestinto"
         },
         {
           "level": 3,
-          "text": "ChangedKeys",
+          "text": "`ChangedKeys`",
           "anchor": "changedkeys"
         },
         {
           "level": 3,
-          "text": "RevisionOf",
+          "text": "`RevisionOf`",
           "anchor": "revisionof"
         },
         {
           "level": 3,
-          "text": "VerifyClosure",
+          "text": "`VerifyClosure`",
           "anchor": "verifyclosure"
         },
         {
           "level": 3,
-          "text": "Edge.IsGenesis",
+          "text": "`Edge.IsGenesis`",
           "anchor": "edgeisgenesis"
         },
         {
           "level": 3,
-          "text": "Edge.ID",
+          "text": "`Edge.ID`",
           "anchor": "edgeid"
         },
         {
           "level": 3,
-          "text": "InvertibilityClass.String",
+          "text": "`InvertibilityClass.String`",
           "anchor": "invertibilityclassstring"
         },
         {
           "level": 3,
-          "text": "MechanicalRange.Ops",
+          "text": "`MechanicalRange.Ops`",
           "anchor": "mechanicalrangeops"
         },
         {
           "level": 3,
-          "text": "MechanicalRange.ManifestDiffDown",
+          "text": "`MechanicalRange.ManifestDiffDown`",
           "anchor": "mechanicalrangemanifestdiffdown"
         },
         {
           "level": 3,
-          "text": "Manifest.Equal",
+          "text": "`Manifest.Equal`",
           "anchor": "manifestequal"
         },
         {
           "level": 3,
-          "text": "ManifestDelta.Empty",
+          "text": "`ManifestDelta.Empty`",
           "anchor": "manifestdeltaempty"
         },
         {
           "level": 3,
-          "text": "Manifest.Diff",
+          "text": "`Manifest.Diff`",
           "anchor": "manifestdiff"
         }
       ]
@@ -1766,542 +1766,542 @@
         },
         {
           "level": 2,
-          "text": "internal/codegen",
+          "text": "`internal/codegen`",
           "anchor": "internalcodegen"
         },
         {
           "level": 3,
-          "text": "SplitModeNone",
+          "text": "`SplitModeNone`",
           "anchor": "splitmodenone"
         },
         {
           "level": 3,
-          "text": "SplitModeFaceted",
+          "text": "`SplitModeFaceted`",
           "anchor": "splitmodefaceted"
         },
         {
           "level": 3,
-          "text": "SplitModeSelfContained",
+          "text": "`SplitModeSelfContained`",
           "anchor": "splitmodeselfcontained"
         },
         {
           "level": 3,
-          "text": "LangGo",
+          "text": "`LangGo`",
           "anchor": "langgo"
         },
         {
           "level": 3,
-          "text": "LangTS",
+          "text": "`LangTS`",
           "anchor": "langts"
         },
         {
           "level": 3,
-          "text": "LangPython",
+          "text": "`LangPython`",
           "anchor": "langpython"
         },
         {
           "level": 3,
-          "text": "LangJava",
+          "text": "`LangJava`",
           "anchor": "langjava"
         },
         {
           "level": 3,
-          "text": "LangKotlin",
+          "text": "`LangKotlin`",
           "anchor": "langkotlin"
         },
         {
           "level": 3,
-          "text": "LangZig",
+          "text": "`LangZig`",
           "anchor": "langzig"
         },
         {
           "level": 3,
-          "text": "AllSplitModes",
+          "text": "`AllSplitModes`",
           "anchor": "allsplitmodes"
         },
         {
           "level": 3,
-          "text": "PolicyContext",
+          "text": "`PolicyContext`",
           "anchor": "policycontext"
         },
         {
           "level": 3,
-          "text": "ConstantsLang",
+          "text": "`ConstantsLang`",
           "anchor": "constantslang"
         },
         {
           "level": 3,
-          "text": "PythonConstantsGenerator",
+          "text": "`PythonConstantsGenerator`",
           "anchor": "pythonconstantsgenerator"
         },
         {
           "level": 3,
-          "text": "ZigConstantsGenerator",
+          "text": "`ZigConstantsGenerator`",
           "anchor": "zigconstantsgenerator"
         },
         {
           "level": 3,
-          "text": "TSConstantsGenerator",
+          "text": "`TSConstantsGenerator`",
           "anchor": "tsconstantsgenerator"
         },
         {
           "level": 3,
-          "text": "JavaConstantsGenerator",
+          "text": "`JavaConstantsGenerator`",
           "anchor": "javaconstantsgenerator"
         },
         {
           "level": 3,
-          "text": "KotlinConstantsGenerator",
+          "text": "`KotlinConstantsGenerator`",
           "anchor": "kotlinconstantsgenerator"
         },
         {
           "level": 3,
-          "text": "GoConstantsGenerator",
+          "text": "`GoConstantsGenerator`",
           "anchor": "goconstantsgenerator"
         },
         {
           "level": 3,
-          "text": "ConstraintSet",
+          "text": "`ConstraintSet`",
           "anchor": "constraintset"
         },
         {
           "level": 3,
-          "text": "EnumField",
+          "text": "`EnumField`",
           "anchor": "enumfield"
         },
         {
           "level": 3,
-          "text": "CheckExpr",
+          "text": "`CheckExpr`",
           "anchor": "checkexpr"
         },
         {
           "level": 3,
-          "text": "EnumsGenerator",
+          "text": "`EnumsGenerator`",
           "anchor": "enumsgenerator"
         },
         {
           "level": 3,
-          "text": "GoConstraintsGenerator",
+          "text": "`GoConstraintsGenerator`",
           "anchor": "goconstraintsgenerator"
         },
         {
           "level": 3,
-          "text": "ValidationError",
+          "text": "`ValidationError`",
           "anchor": "validationerror"
         },
         {
           "level": 3,
-          "text": "GoGormGenerator",
+          "text": "`GoGormGenerator`",
           "anchor": "gogormgenerator"
         },
         {
           "level": 3,
-          "text": "GoTypesGenerator",
+          "text": "`GoTypesGenerator`",
           "anchor": "gotypesgenerator"
         },
         {
           "level": 3,
-          "text": "GoValidatorGenerator",
+          "text": "`GoValidatorGenerator`",
           "anchor": "govalidatorgenerator"
         },
         {
           "level": 3,
-          "text": "PolicyResult",
+          "text": "`PolicyResult`",
           "anchor": "policyresult"
         },
         {
           "level": 3,
-          "text": "JavaConstraintsGenerator",
+          "text": "`JavaConstraintsGenerator`",
           "anchor": "javaconstraintsgenerator"
         },
         {
           "level": 3,
-          "text": "JavaJPAGenerator",
+          "text": "`JavaJPAGenerator`",
           "anchor": "javajpagenerator"
         },
         {
           "level": 3,
-          "text": "JavaTypesGenerator",
+          "text": "`JavaTypesGenerator`",
           "anchor": "javatypesgenerator"
         },
         {
           "level": 3,
-          "text": "JavaValidatorGenerator",
+          "text": "`JavaValidatorGenerator`",
           "anchor": "javavalidatorgenerator"
         },
         {
           "level": 3,
-          "text": "KotlinConstraintsGenerator",
+          "text": "`KotlinConstraintsGenerator`",
           "anchor": "kotlinconstraintsgenerator"
         },
         {
           "level": 3,
-          "text": "KotlinTypesGenerator",
+          "text": "`KotlinTypesGenerator`",
           "anchor": "kotlintypesgenerator"
         },
         {
           "level": 3,
-          "text": "KotlinValidatorGenerator",
+          "text": "`KotlinValidatorGenerator`",
           "anchor": "kotlinvalidatorgenerator"
         },
         {
           "level": 3,
-          "text": "PythonGenerator",
+          "text": "`PythonGenerator`",
           "anchor": "pythongenerator"
         },
         {
           "level": 3,
-          "text": "PythonConstraintsGenerator",
+          "text": "`PythonConstraintsGenerator`",
           "anchor": "pythonconstraintsgenerator"
         },
         {
           "level": 3,
-          "text": "SplitMode",
+          "text": "`SplitMode`",
           "anchor": "splitmode"
         },
         {
           "level": 3,
-          "text": "PythonDDLGenerator",
+          "text": "`PythonDDLGenerator`",
           "anchor": "pythonddlgenerator"
         },
         {
           "level": 3,
-          "text": "PythonQueryLayerGenerator",
+          "text": "`PythonQueryLayerGenerator`",
           "anchor": "pythonquerylayergenerator"
         },
         {
           "level": 3,
-          "text": "PythonSQLAlchemyGenerator",
+          "text": "`PythonSQLAlchemyGenerator`",
           "anchor": "pythonsqlalchemygenerator"
         },
         {
           "level": 3,
-          "text": "PythonTypesGenerator",
+          "text": "`PythonTypesGenerator`",
           "anchor": "pythontypesgenerator"
         },
         {
           "level": 3,
-          "text": "TSConstraintsGenerator",
+          "text": "`TSConstraintsGenerator`",
           "anchor": "tsconstraintsgenerator"
         },
         {
           "level": 3,
-          "text": "TSDrizzleGenerator",
+          "text": "`TSDrizzleGenerator`",
           "anchor": "tsdrizzlegenerator"
         },
         {
           "level": 3,
-          "text": "TSTypesGenerator",
+          "text": "`TSTypesGenerator`",
           "anchor": "tstypesgenerator"
         },
         {
           "level": 3,
-          "text": "TSValidatorGenerator",
+          "text": "`TSValidatorGenerator`",
           "anchor": "tsvalidatorgenerator"
         },
         {
           "level": 3,
-          "text": "TypeResolver",
+          "text": "`TypeResolver`",
           "anchor": "typeresolver"
         },
         {
           "level": 3,
-          "text": "Lang",
+          "text": "`Lang`",
           "anchor": "lang"
         },
         {
           "level": 3,
-          "text": "TypeMapping",
+          "text": "`TypeMapping`",
           "anchor": "typemapping"
         },
         {
           "level": 3,
-          "text": "ZigConstraintsGenerator",
+          "text": "`ZigConstraintsGenerator`",
           "anchor": "zigconstraintsgenerator"
         },
         {
           "level": 3,
-          "text": "ZigTypesGenerator",
+          "text": "`ZigTypesGenerator`",
           "anchor": "zigtypesgenerator"
         },
         {
           "level": 3,
-          "text": "ZigValidatorGenerator",
+          "text": "`ZigValidatorGenerator`",
           "anchor": "zigvalidatorgenerator"
         },
         {
           "level": 3,
-          "text": "ExtractPolicies",
+          "text": "`ExtractPolicies`",
           "anchor": "extractpolicies"
         },
         {
           "level": 3,
-          "text": "FilterGeneratable",
+          "text": "`FilterGeneratable`",
           "anchor": "filtergeneratable"
         },
         {
           "level": 3,
-          "text": "ExtractConstraints",
+          "text": "`ExtractConstraints`",
           "anchor": "extractconstraints"
         },
         {
           "level": 3,
-          "text": "GenerateEnums",
+          "text": "`GenerateEnums`",
           "anchor": "generateenums"
         },
         {
           "level": 3,
-          "text": "GenerateTransitionMaps",
+          "text": "`GenerateTransitionMaps`",
           "anchor": "generatetransitionmaps"
         },
         {
           "level": 3,
-          "text": "GenerateConstantsTransitionMaps",
+          "text": "`GenerateConstantsTransitionMaps`",
           "anchor": "generateconstantstransitionmaps"
         },
         {
           "level": 3,
-          "text": "NewTypeResolver",
+          "text": "`NewTypeResolver`",
           "anchor": "newtyperesolver"
         },
         {
           "level": 3,
-          "text": "EnumTypeName",
+          "text": "`EnumTypeName`",
           "anchor": "enumtypename"
         },
         {
           "level": 3,
-          "text": "LookupType",
+          "text": "`LookupType`",
           "anchor": "lookuptype"
         },
         {
           "level": 3,
-          "text": "LookupMoneyType",
+          "text": "`LookupMoneyType`",
           "anchor": "lookupmoneytype"
         },
         {
           "level": 3,
-          "text": "ApplyNullable",
+          "text": "`ApplyNullable`",
           "anchor": "applynullable"
         },
         {
           "level": 3,
-          "text": "ApplyArray",
+          "text": "`ApplyArray`",
           "anchor": "applyarray"
         },
         {
           "level": 3,
-          "text": "likePattern.IsCaseInsensitive",
+          "text": "`likePattern.IsCaseInsensitive`",
           "anchor": "likepatterniscaseinsensitive"
         },
         {
           "level": 3,
-          "text": "likePattern.IsNegated",
+          "text": "`likePattern.IsNegated`",
           "anchor": "likepatternisnegated"
         },
         {
           "level": 3,
-          "text": "PythonConstantsGenerator.Generate",
+          "text": "`PythonConstantsGenerator.Generate`",
           "anchor": "pythonconstantsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "ZigConstantsGenerator.Generate",
+          "text": "`ZigConstantsGenerator.Generate`",
           "anchor": "zigconstantsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "TSConstantsGenerator.Generate",
+          "text": "`TSConstantsGenerator.Generate`",
           "anchor": "tsconstantsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "JavaConstantsGenerator.Generate",
+          "text": "`JavaConstantsGenerator.Generate`",
           "anchor": "javaconstantsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "KotlinConstantsGenerator.Generate",
+          "text": "`KotlinConstantsGenerator.Generate`",
           "anchor": "kotlinconstantsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "GoConstantsGenerator.Generate",
+          "text": "`GoConstantsGenerator.Generate`",
           "anchor": "goconstantsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "ConstraintSet.HasConstraints",
+          "text": "`ConstraintSet.HasConstraints`",
           "anchor": "constraintsethasconstraints"
         },
         {
           "level": 3,
-          "text": "ConstraintSet.SortedEnumFields",
+          "text": "`ConstraintSet.SortedEnumFields`",
           "anchor": "constraintsetsortedenumfields"
         },
         {
           "level": 3,
-          "text": "ConstraintSet.SortedCheckExprs",
+          "text": "`ConstraintSet.SortedCheckExprs`",
           "anchor": "constraintsetsortedcheckexprs"
         },
         {
           "level": 3,
-          "text": "EnumsGenerator.Generate",
+          "text": "`EnumsGenerator.Generate`",
           "anchor": "enumsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "GoConstraintsGenerator.Generate",
+          "text": "`GoConstraintsGenerator.Generate`",
           "anchor": "goconstraintsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "ValidationError.Error",
+          "text": "`ValidationError.Error`",
           "anchor": "validationerrorerror"
         },
         {
           "level": 3,
-          "text": "GoGormGenerator.Generate",
+          "text": "`GoGormGenerator.Generate`",
           "anchor": "gogormgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "GoTypesGenerator.Generate",
+          "text": "`GoTypesGenerator.Generate`",
           "anchor": "gotypesgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "GoValidatorGenerator.Generate",
+          "text": "`GoValidatorGenerator.Generate`",
           "anchor": "govalidatorgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "JavaConstraintsGenerator.Generate",
+          "text": "`JavaConstraintsGenerator.Generate`",
           "anchor": "javaconstraintsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "JavaConstraintsGenerator.GenerateFiles",
+          "text": "`JavaConstraintsGenerator.GenerateFiles`",
           "anchor": "javaconstraintsgeneratorgeneratefiles"
         },
         {
           "level": 3,
-          "text": "JavaJPAGenerator.Generate",
+          "text": "`JavaJPAGenerator.Generate`",
           "anchor": "javajpageneratorgenerate"
         },
         {
           "level": 3,
-          "text": "JavaJPAGenerator.GenerateFiles",
+          "text": "`JavaJPAGenerator.GenerateFiles`",
           "anchor": "javajpageneratorgeneratefiles"
         },
         {
           "level": 3,
-          "text": "JavaTypesGenerator.Generate",
+          "text": "`JavaTypesGenerator.Generate`",
           "anchor": "javatypesgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "JavaTypesGenerator.GenerateFiles",
+          "text": "`JavaTypesGenerator.GenerateFiles`",
           "anchor": "javatypesgeneratorgeneratefiles"
         },
         {
           "level": 3,
-          "text": "JavaValidatorGenerator.Generate",
+          "text": "`JavaValidatorGenerator.Generate`",
           "anchor": "javavalidatorgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "KotlinConstraintsGenerator.Generate",
+          "text": "`KotlinConstraintsGenerator.Generate`",
           "anchor": "kotlinconstraintsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "KotlinTypesGenerator.Generate",
+          "text": "`KotlinTypesGenerator.Generate`",
           "anchor": "kotlintypesgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "KotlinValidatorGenerator.Generate",
+          "text": "`KotlinValidatorGenerator.Generate`",
           "anchor": "kotlinvalidatorgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "PythonGenerator.Generate",
+          "text": "`PythonGenerator.Generate`",
           "anchor": "pythongeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "PythonConstraintsGenerator.Generate",
+          "text": "`PythonConstraintsGenerator.Generate`",
           "anchor": "pythonconstraintsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "PythonDDLGenerator.Generate",
+          "text": "`PythonDDLGenerator.Generate`",
           "anchor": "pythonddlgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "PythonDDLGenerator.GenerateFiles",
+          "text": "`PythonDDLGenerator.GenerateFiles`",
           "anchor": "pythonddlgeneratorgeneratefiles"
         },
         {
           "level": 3,
-          "text": "PythonQueryLayerGenerator.Generate",
+          "text": "`PythonQueryLayerGenerator.Generate`",
           "anchor": "pythonquerylayergeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "PythonQueryLayerGenerator.GenerateFiles",
+          "text": "`PythonQueryLayerGenerator.GenerateFiles`",
           "anchor": "pythonquerylayergeneratorgeneratefiles"
         },
         {
           "level": 3,
-          "text": "PythonSQLAlchemyGenerator.Generate",
+          "text": "`PythonSQLAlchemyGenerator.Generate`",
           "anchor": "pythonsqlalchemygeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "PythonTypesGenerator.Generate",
+          "text": "`PythonTypesGenerator.Generate`",
           "anchor": "pythontypesgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "TSConstraintsGenerator.Generate",
+          "text": "`TSConstraintsGenerator.Generate`",
           "anchor": "tsconstraintsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "TSDrizzleGenerator.Generate",
+          "text": "`TSDrizzleGenerator.Generate`",
           "anchor": "tsdrizzlegeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "TSTypesGenerator.Generate",
+          "text": "`TSTypesGenerator.Generate`",
           "anchor": "tstypesgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "TSValidatorGenerator.Generate",
+          "text": "`TSValidatorGenerator.Generate`",
           "anchor": "tsvalidatorgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "TypeResolver.Resolve",
+          "text": "`TypeResolver.Resolve`",
           "anchor": "typeresolverresolve"
         },
         {
           "level": 3,
-          "text": "ZigConstraintsGenerator.Generate",
+          "text": "`ZigConstraintsGenerator.Generate`",
           "anchor": "zigconstraintsgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "ZigTypesGenerator.Generate",
+          "text": "`ZigTypesGenerator.Generate`",
           "anchor": "zigtypesgeneratorgenerate"
         },
         {
           "level": 3,
-          "text": "ZigValidatorGenerator.Generate",
+          "text": "`ZigValidatorGenerator.Generate`",
           "anchor": "zigvalidatorgeneratorgenerate"
         }
       ]
@@ -2318,117 +2318,117 @@
         },
         {
           "level": 2,
-          "text": "internal/config",
+          "text": "`internal/config`",
           "anchor": "internalconfig"
         },
         {
           "level": 3,
-          "text": "CodegenModes",
+          "text": "`CodegenModes`",
           "anchor": "codegenmodes"
         },
         {
           "level": 3,
-          "text": "RelativePath",
+          "text": "`RelativePath`",
           "anchor": "relativepath"
         },
         {
           "level": 3,
-          "text": "AbsolutePath",
+          "text": "`AbsolutePath`",
           "anchor": "absolutepath"
         },
         {
           "level": 3,
-          "text": "PathKind",
+          "text": "`PathKind`",
           "anchor": "pathkind"
         },
         {
           "level": 3,
-          "text": "RawConfig",
+          "text": "`RawConfig`",
           "anchor": "rawconfig"
         },
         {
           "level": 3,
-          "text": "ResolvedConfig",
+          "text": "`ResolvedConfig`",
           "anchor": "resolvedconfig"
         },
         {
           "level": 3,
-          "text": "DatabaseConfig",
+          "text": "`DatabaseConfig`",
           "anchor": "databaseconfig"
         },
         {
           "level": 3,
-          "text": "FormatConfig",
+          "text": "`FormatConfig`",
           "anchor": "formatconfig"
         },
         {
           "level": 3,
-          "text": "ValidateConfig",
+          "text": "`ValidateConfig`",
           "anchor": "validateconfig"
         },
         {
           "level": 3,
-          "text": "MigrateConfig",
+          "text": "`MigrateConfig`",
           "anchor": "migrateconfig"
         },
         {
           "level": 3,
-          "text": "D2Config",
+          "text": "`D2Config`",
           "anchor": "d2config"
         },
         {
           "level": 3,
-          "text": "RenamesConfig",
+          "text": "`RenamesConfig`",
           "anchor": "renamesconfig"
         },
         {
           "level": 3,
-          "text": "TableRename",
+          "text": "`TableRename`",
           "anchor": "tablerename"
         },
         {
           "level": 3,
-          "text": "ColumnRename",
+          "text": "`ColumnRename`",
           "anchor": "columnrename"
         },
         {
           "level": 3,
-          "text": "ImportDecl",
+          "text": "`ImportDecl`",
           "anchor": "importdecl"
         },
         {
           "level": 3,
-          "text": "ExtensionConfig",
+          "text": "`ExtensionConfig`",
           "anchor": "extensionconfig"
         },
         {
           "level": 3,
-          "text": "Load",
+          "text": "`Load`",
           "anchor": "load"
         },
         {
           "level": 3,
-          "text": "LoadBytes",
+          "text": "`LoadBytes`",
           "anchor": "loadbytes"
         },
         {
           "level": 3,
-          "text": "LoadOrDefault",
+          "text": "`LoadOrDefault`",
           "anchor": "loadordefault"
         },
         {
           "level": 3,
-          "text": "LoadAndResolve",
+          "text": "`LoadAndResolve`",
           "anchor": "loadandresolve"
         },
         {
           "level": 3,
-          "text": "Resolve",
+          "text": "`Resolve`",
           "anchor": "resolve"
         },
         {
           "level": 3,
-          "text": "FindConfig",
+          "text": "`FindConfig`",
           "anchor": "findconfig"
         }
       ]
@@ -2445,17 +2445,17 @@
         },
         {
           "level": 2,
-          "text": "internal/dbutil",
+          "text": "`internal/dbutil`",
           "anchor": "internaldbutil"
         },
         {
           "level": 3,
-          "text": "SwapDatabase",
+          "text": "`SwapDatabase`",
           "anchor": "swapdatabase"
         },
         {
           "level": 3,
-          "text": "MaintenanceURL",
+          "text": "`MaintenanceURL`",
           "anchor": "maintenanceurl"
         }
       ]
@@ -2472,52 +2472,52 @@
         },
         {
           "level": 2,
-          "text": "internal/diagnostic",
+          "text": "`internal/diagnostic`",
           "anchor": "internaldiagnostic"
         },
         {
           "level": 3,
-          "text": "Error",
+          "text": "`Error`",
           "anchor": "error"
         },
         {
           "level": 3,
-          "text": "Warning",
+          "text": "`Warning`",
           "anchor": "warning"
         },
         {
           "level": 3,
-          "text": "Info",
+          "text": "`Info`",
           "anchor": "info"
         },
         {
           "level": 3,
-          "text": "Hint",
+          "text": "`Hint`",
           "anchor": "hint"
         },
         {
           "level": 3,
-          "text": "Severity",
+          "text": "`Severity`",
           "anchor": "severity"
         },
         {
           "level": 3,
-          "text": "Diagnostic",
+          "text": "`Diagnostic`",
           "anchor": "diagnostic"
         },
         {
           "level": 3,
-          "text": "Diagnostics",
+          "text": "`Diagnostics`",
           "anchor": "diagnostics"
         },
         {
           "level": 3,
-          "text": "RenderTerminal",
+          "text": "`RenderTerminal`",
           "anchor": "renderterminal"
         },
         {
           "level": 3,
-          "text": "RenderJSON",
+          "text": "`RenderJSON`",
           "anchor": "renderjson"
         }
       ]
@@ -2534,177 +2534,177 @@
         },
         {
           "level": 2,
-          "text": "internal/diff",
+          "text": "`internal/diff`",
           "anchor": "internaldiff"
         },
         {
           "level": 3,
-          "text": "SchemaDiff",
+          "text": "`SchemaDiff`",
           "anchor": "schemadiff"
         },
         {
           "level": 3,
-          "text": "RenamePair",
+          "text": "`RenamePair`",
           "anchor": "renamepair"
         },
         {
           "level": 3,
-          "text": "RenameSpec",
+          "text": "`RenameSpec`",
           "anchor": "renamespec"
         },
         {
           "level": 3,
-          "text": "ColumnRenameSpec",
+          "text": "`ColumnRenameSpec`",
           "anchor": "columnrenamespec"
         },
         {
           "level": 3,
-          "text": "SMTransitionDiff",
+          "text": "`SMTransitionDiff`",
           "anchor": "smtransitiondiff"
         },
         {
           "level": 3,
-          "text": "SMTransitionRef",
+          "text": "`SMTransitionRef`",
           "anchor": "smtransitionref"
         },
         {
           "level": 3,
-          "text": "TableDiff",
+          "text": "`TableDiff`",
           "anchor": "tablediff"
         },
         {
           "level": 3,
-          "text": "ColumnChange",
+          "text": "`ColumnChange`",
           "anchor": "columnchange"
         },
         {
           "level": 3,
-          "text": "EnumDiff",
+          "text": "`EnumDiff`",
           "anchor": "enumdiff"
         },
         {
           "level": 3,
-          "text": "EnumValueInsert",
+          "text": "`EnumValueInsert`",
           "anchor": "enumvalueinsert"
         },
         {
           "level": 3,
-          "text": "ViewDiff",
+          "text": "`ViewDiff`",
           "anchor": "viewdiff"
         },
         {
           "level": 3,
-          "text": "MaterializedViewDiff",
+          "text": "`MaterializedViewDiff`",
           "anchor": "materializedviewdiff"
         },
         {
           "level": 3,
-          "text": "SequenceDiff",
+          "text": "`SequenceDiff`",
           "anchor": "sequencediff"
         },
         {
           "level": 3,
-          "text": "CompositeTypeDiff",
+          "text": "`CompositeTypeDiff`",
           "anchor": "compositetypediff"
         },
         {
           "level": 3,
-          "text": "CompositeFieldChange",
+          "text": "`CompositeFieldChange`",
           "anchor": "compositefieldchange"
         },
         {
           "level": 3,
-          "text": "FunctionDiff",
+          "text": "`FunctionDiff`",
           "anchor": "functiondiff"
         },
         {
           "level": 3,
-          "text": "DomainDiff",
+          "text": "`DomainDiff`",
           "anchor": "domaindiff"
         },
         {
           "level": 3,
-          "text": "FKChange",
+          "text": "`FKChange`",
           "anchor": "fkchange"
         },
         {
           "level": 3,
-          "text": "IndexChange",
+          "text": "`IndexChange`",
           "anchor": "indexchange"
         },
         {
           "level": 3,
-          "text": "TriggerChange",
+          "text": "`TriggerChange`",
           "anchor": "triggerchange"
         },
         {
           "level": 3,
-          "text": "PolicyDiff",
+          "text": "`PolicyDiff`",
           "anchor": "policydiff"
         },
         {
           "level": 3,
-          "text": "PartitionDiff",
+          "text": "`PartitionDiff`",
           "anchor": "partitiondiff"
         },
         {
           "level": 3,
-          "text": "MaintenanceDiff",
+          "text": "`MaintenanceDiff`",
           "anchor": "maintenancediff"
         },
         {
           "level": 3,
-          "text": "LiveNormalizer",
+          "text": "`LiveNormalizer`",
           "anchor": "livenormalizer"
         },
         {
           "level": 3,
-          "text": "Diff",
+          "text": "`Diff`",
           "anchor": "diff"
         },
         {
           "level": 3,
-          "text": "DiffLive",
+          "text": "`DiffLive`",
           "anchor": "difflive"
         },
         {
           "level": 3,
-          "text": "IsWidening",
+          "text": "`IsWidening`",
           "anchor": "iswidening"
         },
         {
           "level": 3,
-          "text": "ChangedObjectKeys",
+          "text": "`ChangedObjectKeys`",
           "anchor": "changedobjectkeys"
         },
         {
           "level": 3,
-          "text": "FormatTerminal",
+          "text": "`FormatTerminal`",
           "anchor": "formatterminal"
         },
         {
           "level": 3,
-          "text": "FormatJSON",
+          "text": "`FormatJSON`",
           "anchor": "formatjson"
         },
         {
           "level": 3,
-          "text": "CheckTruncationCollisions",
+          "text": "`CheckTruncationCollisions`",
           "anchor": "checktruncationcollisions"
         },
         {
           "level": 3,
-          "text": "ResolveRenames",
+          "text": "`ResolveRenames`",
           "anchor": "resolverenames"
         },
         {
           "level": 3,
-          "text": "SchemaDiff.IsEmpty",
+          "text": "`SchemaDiff.IsEmpty`",
           "anchor": "schemadiffisempty"
         },
         {
           "level": 3,
-          "text": "SchemaDiff.Summary",
+          "text": "`SchemaDiff.Summary`",
           "anchor": "schemadiffsummary"
         }
       ]
@@ -2721,17 +2721,17 @@
         },
         {
           "level": 2,
-          "text": "internal/discover",
+          "text": "`internal/discover`",
           "anchor": "internaldiscover"
         },
         {
           "level": 3,
-          "text": "Options",
+          "text": "`Options`",
           "anchor": "options"
         },
         {
           "level": 3,
-          "text": "Discover",
+          "text": "`Discover`",
           "anchor": "discover"
         }
       ]
@@ -2748,297 +2748,297 @@
         },
         {
           "level": 2,
-          "text": "internal/enc",
+          "text": "`internal/enc`",
           "anchor": "internalenc"
         },
         {
           "level": 3,
-          "text": "CodecVersion",
+          "text": "`CodecVersion`",
           "anchor": "codecversion"
         },
         {
           "level": 3,
-          "text": "KindSchemaMeta",
+          "text": "`KindSchemaMeta`",
           "anchor": "kindschemameta"
         },
         {
           "level": 3,
-          "text": "KindTable",
+          "text": "`KindTable`",
           "anchor": "kindtable"
         },
         {
           "level": 3,
-          "text": "KindView",
+          "text": "`KindView`",
           "anchor": "kindview"
         },
         {
           "level": 3,
-          "text": "KindMatView",
+          "text": "`KindMatView`",
           "anchor": "kindmatview"
         },
         {
           "level": 3,
-          "text": "KindSequence",
+          "text": "`KindSequence`",
           "anchor": "kindsequence"
         },
         {
           "level": 3,
-          "text": "KindFunction",
+          "text": "`KindFunction`",
           "anchor": "kindfunction"
         },
         {
           "level": 3,
-          "text": "KindEnum",
+          "text": "`KindEnum`",
           "anchor": "kindenum"
         },
         {
           "level": 3,
-          "text": "KindDomain",
+          "text": "`KindDomain`",
           "anchor": "kinddomain"
         },
         {
           "level": 3,
-          "text": "KindComposite",
+          "text": "`KindComposite`",
           "anchor": "kindcomposite"
         },
         {
           "level": 3,
-          "text": "KindSMType",
+          "text": "`KindSMType`",
           "anchor": "kindsmtype"
         },
         {
           "level": 3,
-          "text": "KindRegistrySnap",
+          "text": "`KindRegistrySnap`",
           "anchor": "kindregistrysnap"
         },
         {
           "level": 3,
-          "text": "KindDML",
+          "text": "`KindDML`",
           "anchor": "kinddml"
         },
         {
           "level": 3,
-          "text": "KindRaw",
+          "text": "`KindRaw`",
           "anchor": "kindraw"
         },
         {
           "level": 3,
-          "text": "SchemaMeta",
+          "text": "`SchemaMeta`",
           "anchor": "schemameta"
         },
         {
           "level": 3,
-          "text": "Kind",
+          "text": "`Kind`",
           "anchor": "kind"
         },
         {
           "level": 3,
-          "text": "Key",
+          "text": "`Key`",
           "anchor": "key"
         },
         {
           "level": 3,
-          "text": "DecodeTable",
+          "text": "`DecodeTable`",
           "anchor": "decodetable"
         },
         {
           "level": 3,
-          "text": "DecodeView",
+          "text": "`DecodeView`",
           "anchor": "decodeview"
         },
         {
           "level": 3,
-          "text": "DecodeMaterializedView",
+          "text": "`DecodeMaterializedView`",
           "anchor": "decodematerializedview"
         },
         {
           "level": 3,
-          "text": "DecodeSequence",
+          "text": "`DecodeSequence`",
           "anchor": "decodesequence"
         },
         {
           "level": 3,
-          "text": "DecodeFunction",
+          "text": "`DecodeFunction`",
           "anchor": "decodefunction"
         },
         {
           "level": 3,
-          "text": "DecodeEnum",
+          "text": "`DecodeEnum`",
           "anchor": "decodeenum"
         },
         {
           "level": 3,
-          "text": "DecodeDomain",
+          "text": "`DecodeDomain`",
           "anchor": "decodedomain"
         },
         {
           "level": 3,
-          "text": "DecodeCompositeType",
+          "text": "`DecodeCompositeType`",
           "anchor": "decodecompositetype"
         },
         {
           "level": 3,
-          "text": "DecodeStateMachine",
+          "text": "`DecodeStateMachine`",
           "anchor": "decodestatemachine"
         },
         {
           "level": 3,
-          "text": "DecodeSchemaMeta",
+          "text": "`DecodeSchemaMeta`",
           "anchor": "decodeschemameta"
         },
         {
           "level": 3,
-          "text": "EncodeTable",
+          "text": "`EncodeTable`",
           "anchor": "encodetable"
         },
         {
           "level": 3,
-          "text": "EncodeView",
+          "text": "`EncodeView`",
           "anchor": "encodeview"
         },
         {
           "level": 3,
-          "text": "EncodeMaterializedView",
+          "text": "`EncodeMaterializedView`",
           "anchor": "encodematerializedview"
         },
         {
           "level": 3,
-          "text": "EncodeSequence",
+          "text": "`EncodeSequence`",
           "anchor": "encodesequence"
         },
         {
           "level": 3,
-          "text": "EncodeFunction",
+          "text": "`EncodeFunction`",
           "anchor": "encodefunction"
         },
         {
           "level": 3,
-          "text": "EncodeEnum",
+          "text": "`EncodeEnum`",
           "anchor": "encodeenum"
         },
         {
           "level": 3,
-          "text": "EncodeDomain",
+          "text": "`EncodeDomain`",
           "anchor": "encodedomain"
         },
         {
           "level": 3,
-          "text": "EncodeCompositeType",
+          "text": "`EncodeCompositeType`",
           "anchor": "encodecompositetype"
         },
         {
           "level": 3,
-          "text": "EncodeStateMachine",
+          "text": "`EncodeStateMachine`",
           "anchor": "encodestatemachine"
         },
         {
           "level": 3,
-          "text": "EncodeSchemaMeta",
+          "text": "`EncodeSchemaMeta`",
           "anchor": "encodeschemameta"
         },
         {
           "level": 3,
-          "text": "FunctionArgSig",
+          "text": "`FunctionArgSig`",
           "anchor": "functionargsig"
         },
         {
           "level": 3,
-          "text": "KeyForTable",
+          "text": "`KeyForTable`",
           "anchor": "keyfortable"
         },
         {
           "level": 3,
-          "text": "KeyForView",
+          "text": "`KeyForView`",
           "anchor": "keyforview"
         },
         {
           "level": 3,
-          "text": "KeyForMatView",
+          "text": "`KeyForMatView`",
           "anchor": "keyformatview"
         },
         {
           "level": 3,
-          "text": "KeyForSequence",
+          "text": "`KeyForSequence`",
           "anchor": "keyforsequence"
         },
         {
           "level": 3,
-          "text": "KeyForFunction",
+          "text": "`KeyForFunction`",
           "anchor": "keyforfunction"
         },
         {
           "level": 3,
-          "text": "KeyForEnum",
+          "text": "`KeyForEnum`",
           "anchor": "keyforenum"
         },
         {
           "level": 3,
-          "text": "KeyForDomain",
+          "text": "`KeyForDomain`",
           "anchor": "keyfordomain"
         },
         {
           "level": 3,
-          "text": "KeyForComposite",
+          "text": "`KeyForComposite`",
           "anchor": "keyforcomposite"
         },
         {
           "level": 3,
-          "text": "KeyForStateMachine",
+          "text": "`KeyForStateMachine`",
           "anchor": "keyforstatemachine"
         },
         {
           "level": 3,
-          "text": "ParseKey",
+          "text": "`ParseKey`",
           "anchor": "parsekey"
         },
         {
           "level": 3,
-          "text": "KeyForDML",
+          "text": "`KeyForDML`",
           "anchor": "keyfordml"
         },
         {
           "level": 3,
-          "text": "KeyForRaw",
+          "text": "`KeyForRaw`",
           "anchor": "keyforraw"
         },
         {
           "level": 3,
-          "text": "EncodeObjects",
+          "text": "`EncodeObjects`",
           "anchor": "encodeobjects"
         },
         {
           "level": 3,
-          "text": "PeekKind",
+          "text": "`PeekKind`",
           "anchor": "peekkind"
         },
         {
           "level": 3,
-          "text": "DecodeObject",
+          "text": "`DecodeObject`",
           "anchor": "decodeobject"
         },
         {
           "level": 3,
-          "text": "DecodeObjects",
+          "text": "`DecodeObjects`",
           "anchor": "decodeobjects"
         },
         {
           "level": 3,
-          "text": "EncodedModelFields",
+          "text": "`EncodedModelFields`",
           "anchor": "encodedmodelfields"
         },
         {
           "level": 3,
-          "text": "EncodeRegistrySnapshot",
+          "text": "`EncodeRegistrySnapshot`",
           "anchor": "encoderegistrysnapshot"
         },
         {
           "level": 3,
-          "text": "RegistrySnapshotEmpty",
+          "text": "`RegistrySnapshotEmpty`",
           "anchor": "registrysnapshotempty"
         },
         {
           "level": 3,
-          "text": "Key.String",
+          "text": "`Key.String`",
           "anchor": "keystring"
         }
       ]
@@ -3055,72 +3055,72 @@
         },
         {
           "level": 2,
-          "text": "internal/extregistry",
+          "text": "`internal/extregistry`",
           "anchor": "internalextregistry"
         },
         {
           "level": 3,
-          "text": "Extension",
+          "text": "`Extension`",
           "anchor": "extension"
         },
         {
           "level": 3,
-          "text": "Registry",
+          "text": "`Registry`",
           "anchor": "registry"
         },
         {
           "level": 3,
-          "text": "UserExtension",
+          "text": "`UserExtension`",
           "anchor": "userextension"
         },
         {
           "level": 3,
-          "text": "NewBuiltinRegistry",
+          "text": "`NewBuiltinRegistry`",
           "anchor": "newbuiltinregistry"
         },
         {
           "level": 3,
-          "text": "NewRegistry",
+          "text": "`NewRegistry`",
           "anchor": "newregistry"
         },
         {
           "level": 3,
-          "text": "Registry.Register",
+          "text": "`Registry.Register`",
           "anchor": "registryregister"
         },
         {
           "level": 3,
-          "text": "Registry.ResolveDDLName",
+          "text": "`Registry.ResolveDDLName`",
           "anchor": "registryresolveddlname"
         },
         {
           "level": 3,
-          "text": "Registry.RequiredExtension",
+          "text": "`Registry.RequiredExtension`",
           "anchor": "registryrequiredextension"
         },
         {
           "level": 3,
-          "text": "Registry.RequiredExtensionForType",
+          "text": "`Registry.RequiredExtensionForType`",
           "anchor": "registryrequiredextensionfortype"
         },
         {
           "level": 3,
-          "text": "Registry.RequiredExtensionForFunction",
+          "text": "`Registry.RequiredExtensionForFunction`",
           "anchor": "registryrequiredextensionforfunction"
         },
         {
           "level": 3,
-          "text": "Registry.RequiredExtensionForMethod",
+          "text": "`Registry.RequiredExtensionForMethod`",
           "anchor": "registryrequiredextensionformethod"
         },
         {
           "level": 3,
-          "text": "Registry.ValidIndexParams",
+          "text": "`Registry.ValidIndexParams`",
           "anchor": "registryvalidindexparams"
         },
         {
           "level": 3,
-          "text": "Registry.LoadUserExtensions",
+          "text": "`Registry.LoadUserExtensions`",
           "anchor": "registryloaduserextensions"
         }
       ]
@@ -3137,72 +3137,72 @@
         },
         {
           "level": 2,
-          "text": "internal/fd",
+          "text": "`internal/fd`",
           "anchor": "internalfd"
         },
         {
           "level": 3,
-          "text": "FuncDep",
+          "text": "`FuncDep`",
           "anchor": "funcdep"
         },
         {
           "level": 3,
-          "text": "Component",
+          "text": "`Component`",
           "anchor": "component"
         },
         {
           "level": 3,
-          "text": "Closure",
+          "text": "`Closure`",
           "anchor": "closure"
         },
         {
           "level": 3,
-          "text": "MinimalCover",
+          "text": "`MinimalCover`",
           "anchor": "minimalcover"
         },
         {
           "level": 3,
-          "text": "CandidateKeys",
+          "text": "`CandidateKeys`",
           "anchor": "candidatekeys"
         },
         {
           "level": 3,
-          "text": "IsSuperkey",
+          "text": "`IsSuperkey`",
           "anchor": "issuperkey"
         },
         {
           "level": 3,
-          "text": "IsPrime",
+          "text": "`IsPrime`",
           "anchor": "isprime"
         },
         {
           "level": 3,
-          "text": "BCNFDecompose",
+          "text": "`BCNFDecompose`",
           "anchor": "bcnfdecompose"
         },
         {
           "level": 3,
-          "text": "IsLosslessJoin",
+          "text": "`IsLosslessJoin`",
           "anchor": "islosslessjoin"
         },
         {
           "level": 3,
-          "text": "PreservesDependencies",
+          "text": "`PreservesDependencies`",
           "anchor": "preservesdependencies"
         },
         {
           "level": 3,
-          "text": "ArmstrongRelation",
+          "text": "`ArmstrongRelation`",
           "anchor": "armstrongrelation"
         },
         {
           "level": 3,
-          "text": "FormatRelation",
+          "text": "`FormatRelation`",
           "anchor": "formatrelation"
         },
         {
           "level": 3,
-          "text": "FuncDep.String",
+          "text": "`FuncDep.String`",
           "anchor": "funcdepstring"
         }
       ]
@@ -3219,22 +3219,22 @@
         },
         {
           "level": 2,
-          "text": "internal/format",
+          "text": "`internal/format`",
           "anchor": "internalformat"
         },
         {
           "level": 3,
-          "text": "Config",
+          "text": "`Config`",
           "anchor": "config"
         },
         {
           "level": 3,
-          "text": "DefaultConfig",
+          "text": "`DefaultConfig`",
           "anchor": "defaultconfig"
         },
         {
           "level": 3,
-          "text": "Format",
+          "text": "`Format`",
           "anchor": "format"
         }
       ]
@@ -3251,47 +3251,47 @@
         },
         {
           "level": 2,
-          "text": "internal/generate",
+          "text": "`internal/generate`",
           "anchor": "internalgenerate"
         },
         {
           "level": 3,
-          "text": "TableStats",
+          "text": "`TableStats`",
           "anchor": "tablestats"
         },
         {
           "level": 3,
-          "text": "D2Options",
+          "text": "`D2Options`",
           "anchor": "d2options"
         },
         {
           "level": 3,
-          "text": "Options",
+          "text": "`Options`",
           "anchor": "options"
         },
         {
           "level": 3,
-          "text": "GenerateD2",
+          "text": "`GenerateD2`",
           "anchor": "generated2"
         },
         {
           "level": 3,
-          "text": "RenderSVG",
+          "text": "`RenderSVG`",
           "anchor": "rendersvg"
         },
         {
           "level": 3,
-          "text": "DefaultD2Options",
+          "text": "`DefaultD2Options`",
           "anchor": "defaultd2options"
         },
         {
           "level": 3,
-          "text": "Generate",
+          "text": "`Generate`",
           "anchor": "generate"
         },
         {
           "level": 3,
-          "text": "D2Options.Validate",
+          "text": "`D2Options.Validate`",
           "anchor": "d2optionsvalidate"
         }
       ]
@@ -3308,7 +3308,7 @@
         },
         {
           "level": 2,
-          "text": "internal/graph",
+          "text": "`internal/graph`",
           "anchor": "internalgraph"
         }
       ]
@@ -3325,102 +3325,102 @@
         },
         {
           "level": 2,
-          "text": "internal/imports",
+          "text": "`internal/imports`",
           "anchor": "internalimports"
         },
         {
           "level": 3,
-          "text": "LockfileName",
+          "text": "`LockfileName`",
           "anchor": "lockfilename"
         },
         {
           "level": 3,
-          "text": "ObjectEntry",
+          "text": "`ObjectEntry`",
           "anchor": "objectentry"
         },
         {
           "level": 3,
-          "text": "Lockfile",
+          "text": "`Lockfile`",
           "anchor": "lockfile"
         },
         {
           "level": 3,
-          "text": "Check",
+          "text": "`Check`",
           "anchor": "check"
         },
         {
           "level": 3,
-          "text": "ImportAliases",
+          "text": "`ImportAliases`",
           "anchor": "importaliases"
         },
         {
           "level": 3,
-          "text": "CheckGitAvailable",
+          "text": "`CheckGitAvailable`",
           "anchor": "checkgitavailable"
         },
         {
           "level": 3,
-          "text": "ResolveRemoteRef",
+          "text": "`ResolveRemoteRef`",
           "anchor": "resolveremoteref"
         },
         {
           "level": 3,
-          "text": "CloneAt",
+          "text": "`CloneAt`",
           "anchor": "cloneat"
         },
         {
           "level": 3,
-          "text": "AliasDir",
+          "text": "`AliasDir`",
           "anchor": "aliasdir"
         },
         {
           "level": 3,
-          "text": "LockfilePath",
+          "text": "`LockfilePath`",
           "anchor": "lockfilepath"
         },
         {
           "level": 3,
-          "text": "WriteLockfile",
+          "text": "`WriteLockfile`",
           "anchor": "writelockfile"
         },
         {
           "level": 3,
-          "text": "ReadLockfile",
+          "text": "`ReadLockfile`",
           "anchor": "readlockfile"
         },
         {
           "level": 3,
-          "text": "LockfileExists",
+          "text": "`LockfileExists`",
           "anchor": "lockfileexists"
         },
         {
           "level": 3,
-          "text": "LoadSurface",
+          "text": "`LoadSurface`",
           "anchor": "loadsurface"
         },
         {
           "level": 3,
-          "text": "LoadAllSurfaces",
+          "text": "`LoadAllSurfaces`",
           "anchor": "loadallsurfaces"
         },
         {
           "level": 3,
-          "text": "CheckRequirements",
+          "text": "`CheckRequirements`",
           "anchor": "checkrequirements"
         },
         {
           "level": 3,
-          "text": "ExtractSurface",
+          "text": "`ExtractSurface`",
           "anchor": "extractsurface"
         },
         {
           "level": 3,
-          "text": "Vendor",
+          "text": "`Vendor`",
           "anchor": "vendor"
         },
         {
           "level": 3,
-          "text": "InferRequirements",
+          "text": "`InferRequirements`",
           "anchor": "inferrequirements"
         }
       ]
@@ -3437,17 +3437,17 @@
         },
         {
           "level": 2,
-          "text": "internal/introspect",
+          "text": "`internal/introspect`",
           "anchor": "internalintrospect"
         },
         {
           "level": 3,
-          "text": "Export",
+          "text": "`Export`",
           "anchor": "export"
         },
         {
           "level": 3,
-          "text": "Introspect",
+          "text": "`Introspect`",
           "anchor": "introspect"
         }
       ]
@@ -3464,27 +3464,27 @@
         },
         {
           "level": 2,
-          "text": "internal/livenorm",
+          "text": "`internal/livenorm`",
           "anchor": "internallivenorm"
         },
         {
           "level": 3,
-          "text": "Normalizer",
+          "text": "`Normalizer`",
           "anchor": "normalizer"
         },
         {
           "level": 3,
-          "text": "New",
+          "text": "`New`",
           "anchor": "new"
         },
         {
           "level": 3,
-          "text": "Normalizer.Close",
+          "text": "`Normalizer.Close`",
           "anchor": "normalizerclose"
         },
         {
           "level": 3,
-          "text": "Normalizer.NormalizeExprForTable",
+          "text": "`Normalizer.NormalizeExprForTable`",
           "anchor": "normalizernormalizeexprfortable"
         }
       ]
@@ -3501,17 +3501,17 @@
         },
         {
           "level": 2,
-          "text": "internal/livestats",
+          "text": "`internal/livestats`",
           "anchor": "internallivestats"
         },
         {
           "level": 3,
-          "text": "Querier",
+          "text": "`Querier`",
           "anchor": "querier"
         },
         {
           "level": 3,
-          "text": "Fetch",
+          "text": "`Fetch`",
           "anchor": "fetch"
         }
       ]
@@ -3528,7 +3528,7 @@
         },
         {
           "level": 2,
-          "text": "internal/migrate/design",
+          "text": "`internal/migrate/design`",
           "anchor": "internalmigratedesign"
         }
       ]
@@ -3545,612 +3545,612 @@
         },
         {
           "level": 2,
-          "text": "internal/migrate",
+          "text": "`internal/migrate`",
           "anchor": "internalmigrate"
         },
         {
           "level": 3,
-          "text": "PhaseExpand",
+          "text": "`PhaseExpand`",
           "anchor": "phaseexpand"
         },
         {
           "level": 3,
-          "text": "PhaseMigrate",
+          "text": "`PhaseMigrate`",
           "anchor": "phasemigrate"
         },
         {
           "level": 3,
-          "text": "PhaseContract",
+          "text": "`PhaseContract`",
           "anchor": "phasecontract"
         },
         {
           "level": 3,
-          "text": "LegacyArchiveDir",
+          "text": "`LegacyArchiveDir`",
           "anchor": "legacyarchivedir"
         },
         {
           "level": 3,
-          "text": "CHECK",
+          "text": "`CHECK`",
           "anchor": "check"
         },
         {
           "level": 3,
-          "text": "CONSTRAINT",
+          "text": "`CONSTRAINT`",
           "anchor": "constraint"
         },
         {
           "level": 3,
-          "text": "PRIMARY",
+          "text": "`PRIMARY`",
           "anchor": "primary"
         },
         {
           "level": 3,
-          "text": "ErrNoEdgeOps",
+          "text": "`ErrNoEdgeOps`",
           "anchor": "errnoedgeops"
         },
         {
           "level": 3,
-          "text": "ErrRevisionManifestNotFound",
+          "text": "`ErrRevisionManifestNotFound`",
           "anchor": "errrevisionmanifestnotfound"
         },
         {
           "level": 3,
-          "text": "ApplyHooks",
+          "text": "`ApplyHooks`",
           "anchor": "applyhooks"
         },
         {
           "level": 3,
-          "text": "EdgePlan",
+          "text": "`EdgePlan`",
           "anchor": "edgeplan"
         },
         {
           "level": 3,
-          "text": "BaselineReport",
+          "text": "`BaselineReport`",
           "anchor": "baselinereport"
         },
         {
           "level": 3,
-          "text": "Edge",
+          "text": "`Edge`",
           "anchor": "edge"
         },
         {
           "level": 3,
-          "text": "ChainProject",
+          "text": "`ChainProject`",
           "anchor": "chainproject"
         },
         {
           "level": 3,
-          "text": "Migration",
+          "text": "`Migration`",
           "anchor": "migration"
         },
         {
           "level": 3,
-          "text": "DDLOp",
+          "text": "`DDLOp`",
           "anchor": "ddlop"
         },
         {
           "level": 3,
-          "text": "DMLOp",
+          "text": "`DMLOp`",
           "anchor": "dmlop"
         },
         {
           "level": 3,
-          "text": "DownOp",
+          "text": "`DownOp`",
           "anchor": "downop"
         },
         {
           "level": 3,
-          "text": "RemapTable",
+          "text": "`RemapTable`",
           "anchor": "remaptable"
         },
         {
           "level": 3,
-          "text": "NoPathError",
+          "text": "`NoPathError`",
           "anchor": "nopatherror"
         },
         {
           "level": 3,
-          "text": "ForkError",
+          "text": "`ForkError`",
           "anchor": "forkerror"
         },
         {
           "level": 3,
-          "text": "RebaseResult",
+          "text": "`RebaseResult`",
           "anchor": "rebaseresult"
         },
         {
           "level": 3,
-          "text": "SelfContainedOp",
+          "text": "`SelfContainedOp`",
           "anchor": "selfcontainedop"
         },
         {
           "level": 3,
-          "text": "OpJSON",
+          "text": "`OpJSON`",
           "anchor": "opjson"
         },
         {
           "level": 3,
-          "text": "SquashResult",
+          "text": "`SquashResult`",
           "anchor": "squashresult"
         },
         {
           "level": 3,
-          "text": "ChainSquashResult",
+          "text": "`ChainSquashResult`",
           "anchor": "chainsquashresult"
         },
         {
           "level": 3,
-          "text": "AppliedChainEdge",
+          "text": "`AppliedChainEdge`",
           "anchor": "appliedchainedge"
         },
         {
           "level": 3,
-          "text": "ChainStatus",
+          "text": "`ChainStatus`",
           "anchor": "chainstatus"
         },
         {
           "level": 3,
-          "text": "AmnestyEntry",
+          "text": "`AmnestyEntry`",
           "anchor": "amnestyentry"
         },
         {
           "level": 3,
-          "text": "UpgradeReport",
+          "text": "`UpgradeReport`",
           "anchor": "upgradereport"
         },
         {
           "level": 3,
-          "text": "UpgradeHooks",
+          "text": "`UpgradeHooks`",
           "anchor": "upgradehooks"
         },
         {
           "level": 3,
-          "text": "Apply",
+          "text": "`Apply`",
           "anchor": "apply"
         },
         {
           "level": 3,
-          "text": "ApplyChain",
+          "text": "`ApplyChain`",
           "anchor": "applychain"
         },
         {
           "level": 3,
-          "text": "PlanChainEdges",
+          "text": "`PlanChainEdges`",
           "anchor": "planchainedges"
         },
         {
           "level": 3,
-          "text": "RenderedEdgeSQL",
+          "text": "`RenderedEdgeSQL`",
           "anchor": "renderededgesql"
         },
         {
           "level": 3,
-          "text": "PlanApplyChain",
+          "text": "`PlanApplyChain`",
           "anchor": "planapplychain"
         },
         {
           "level": 3,
-          "text": "BaselineChain",
+          "text": "`BaselineChain`",
           "anchor": "baselinechain"
         },
         {
           "level": 3,
-          "text": "Baseline",
+          "text": "`Baseline`",
           "anchor": "baseline"
         },
         {
           "level": 3,
-          "text": "GenerateEdge",
+          "text": "`GenerateEdge`",
           "anchor": "generateedge"
         },
         {
           "level": 3,
-          "text": "IsChainMode",
+          "text": "`IsChainMode`",
           "anchor": "ischainmode"
         },
         {
           "level": 3,
-          "text": "OpenChainProject",
+          "text": "`OpenChainProject`",
           "anchor": "openchainproject"
         },
         {
           "level": 3,
-          "text": "VerifyChainConsistency",
+          "text": "`VerifyChainConsistency`",
           "anchor": "verifychainconsistency"
         },
         {
           "level": 3,
-          "text": "GenerateMigration",
+          "text": "`GenerateMigration`",
           "anchor": "generatemigration"
         },
         {
           "level": 3,
-          "text": "ParseMigrationFile",
+          "text": "`ParseMigrationFile`",
           "anchor": "parsemigrationfile"
         },
         {
           "level": 3,
-          "text": "ParseMigration",
+          "text": "`ParseMigration`",
           "anchor": "parsemigration"
         },
         {
           "level": 3,
-          "text": "WriteMigrationFile",
+          "text": "`WriteMigrationFile`",
           "anchor": "writemigrationfile"
         },
         {
           "level": 3,
-          "text": "FormatMigration",
+          "text": "`FormatMigration`",
           "anchor": "formatmigration"
         },
         {
           "level": 3,
-          "text": "FindPath",
+          "text": "`FindPath`",
           "anchor": "findpath"
         },
         {
           "level": 3,
-          "text": "AnnotatePhases",
+          "text": "`AnnotatePhases`",
           "anchor": "annotatephases"
         },
         {
           "level": 3,
-          "text": "HasPhases",
+          "text": "`HasPhases`",
           "anchor": "hasphases"
         },
         {
           "level": 3,
-          "text": "RebaseChain",
+          "text": "`RebaseChain`",
           "anchor": "rebasechain"
         },
         {
           "level": 3,
-          "text": "ReconcileAfterApply",
+          "text": "`ReconcileAfterApply`",
           "anchor": "reconcileafterapply"
         },
         {
           "level": 3,
-          "text": "ReconstructModel",
+          "text": "`ReconstructModel`",
           "anchor": "reconstructmodel"
         },
         {
           "level": 3,
-          "text": "ChainHead",
+          "text": "`ChainHead`",
           "anchor": "chainhead"
         },
         {
           "level": 3,
-          "text": "Rollback",
+          "text": "`Rollback`",
           "anchor": "rollback"
         },
         {
           "level": 3,
-          "text": "RollbackTo",
+          "text": "`RollbackTo`",
           "anchor": "rollbackto"
         },
         {
           "level": 3,
-          "text": "RollbackChain",
+          "text": "`RollbackChain`",
           "anchor": "rollbackchain"
         },
         {
           "level": 3,
-          "text": "BuildCreateTable",
+          "text": "`BuildCreateTable`",
           "anchor": "buildcreatetable"
         },
         {
           "level": 3,
-          "text": "BuildCreateView",
+          "text": "`BuildCreateView`",
           "anchor": "buildcreateview"
         },
         {
           "level": 3,
-          "text": "BuildCreateMaterializedView",
+          "text": "`BuildCreateMaterializedView`",
           "anchor": "buildcreatematerializedview"
         },
         {
           "level": 3,
-          "text": "BuildCreateSequence",
+          "text": "`BuildCreateSequence`",
           "anchor": "buildcreatesequence"
         },
         {
           "level": 3,
-          "text": "BuildCreateCompositeType",
+          "text": "`BuildCreateCompositeType`",
           "anchor": "buildcreatecompositetype"
         },
         {
           "level": 3,
-          "text": "BuildCreateDomain",
+          "text": "`BuildCreateDomain`",
           "anchor": "buildcreatedomain"
         },
         {
           "level": 3,
-          "text": "BuildCreateFunction",
+          "text": "`BuildCreateFunction`",
           "anchor": "buildcreatefunction"
         },
         {
           "level": 3,
-          "text": "BuildCreateTrigger",
+          "text": "`BuildCreateTrigger`",
           "anchor": "buildcreatetrigger"
         },
         {
           "level": 3,
-          "text": "BuildCreatePolicy",
+          "text": "`BuildCreatePolicy`",
           "anchor": "buildcreatepolicy"
         },
         {
           "level": 3,
-          "text": "BuildCreatePartition",
+          "text": "`BuildCreatePartition`",
           "anchor": "buildcreatepartition"
         },
         {
           "level": 3,
-          "text": "BuildCreateOrReplaceView",
+          "text": "`BuildCreateOrReplaceView`",
           "anchor": "buildcreateorreplaceview"
         },
         {
           "level": 3,
-          "text": "BuildCreateOrReplaceFunction",
+          "text": "`BuildCreateOrReplaceFunction`",
           "anchor": "buildcreateorreplacefunction"
         },
         {
           "level": 3,
-          "text": "BuildAlterSequence",
+          "text": "`BuildAlterSequence`",
           "anchor": "buildaltersequence"
         },
         {
           "level": 3,
-          "text": "BuildSchemaMeta",
+          "text": "`BuildSchemaMeta`",
           "anchor": "buildschemameta"
         },
         {
           "level": 3,
-          "text": "BuildRawOp",
+          "text": "`BuildRawOp`",
           "anchor": "buildrawop"
         },
         {
           "level": 3,
-          "text": "BuildDMLOp",
+          "text": "`BuildDMLOp`",
           "anchor": "builddmlop"
         },
         {
           "level": 3,
-          "text": "MarshalOp",
+          "text": "`MarshalOp`",
           "anchor": "marshalop"
         },
         {
           "level": 3,
-          "text": "ParseOp",
+          "text": "`ParseOp`",
           "anchor": "parseop"
         },
         {
           "level": 3,
-          "text": "UnmarshalOp",
+          "text": "`UnmarshalOp`",
           "anchor": "unmarshalop"
         },
         {
           "level": 3,
-          "text": "VerifyDown",
+          "text": "`VerifyDown`",
           "anchor": "verifydown"
         },
         {
           "level": 3,
-          "text": "DDLOpToSelfContained",
+          "text": "`DDLOpToSelfContained`",
           "anchor": "ddloptoselfcontained"
         },
         {
           "level": 3,
-          "text": "NextSemverVersion",
+          "text": "`NextSemverVersion`",
           "anchor": "nextsemverversion"
         },
         {
           "level": 3,
-          "text": "InSemverRange",
+          "text": "`InSemverRange`",
           "anchor": "insemverrange"
         },
         {
           "level": 3,
-          "text": "OpToSQL",
+          "text": "`OpToSQL`",
           "anchor": "optosql"
         },
         {
           "level": 3,
-          "text": "IsNonTransactional",
+          "text": "`IsNonTransactional`",
           "anchor": "isnontransactional"
         },
         {
           "level": 3,
-          "text": "SquashMigrations",
+          "text": "`SquashMigrations`",
           "anchor": "squashmigrations"
         },
         {
           "level": 3,
-          "text": "OutputPath",
+          "text": "`OutputPath`",
           "anchor": "outputpath"
         },
         {
           "level": 3,
-          "text": "ArchiveLegacyOriginals",
+          "text": "`ArchiveLegacyOriginals`",
           "anchor": "archivelegacyoriginals"
         },
         {
           "level": 3,
-          "text": "SquashChain",
+          "text": "`SquashChain`",
           "anchor": "squashchain"
         },
         {
           "level": 3,
-          "text": "EnsureMigrationsTable",
+          "text": "`EnsureMigrationsTable`",
           "anchor": "ensuremigrationstable"
         },
         {
           "level": 3,
-          "text": "AppliedVersions",
+          "text": "`AppliedVersions`",
           "anchor": "appliedversions"
         },
         {
           "level": 3,
-          "text": "RecordMigration",
+          "text": "`RecordMigration`",
           "anchor": "recordmigration"
         },
         {
           "level": 3,
-          "text": "AcquireAdvisoryLock",
+          "text": "`AcquireAdvisoryLock`",
           "anchor": "acquireadvisorylock"
         },
         {
           "level": 3,
-          "text": "ReleaseAdvisoryLock",
+          "text": "`ReleaseAdvisoryLock`",
           "anchor": "releaseadvisorylock"
         },
         {
           "level": 3,
-          "text": "ComputeChainStatus",
+          "text": "`ComputeChainStatus`",
           "anchor": "computechainstatus"
         },
         {
           "level": 3,
-          "text": "CreateTrackingStructures",
+          "text": "`CreateTrackingStructures`",
           "anchor": "createtrackingstructures"
         },
         {
           "level": 3,
-          "text": "ChainStructuresExist",
+          "text": "`ChainStructuresExist`",
           "anchor": "chainstructuresexist"
         },
         {
           "level": 3,
-          "text": "LegacyTrackingExists",
+          "text": "`LegacyTrackingExists`",
           "anchor": "legacytrackingexists"
         },
         {
           "level": 3,
-          "text": "GuardNotPreUpgrade",
+          "text": "`GuardNotPreUpgrade`",
           "anchor": "guardnotpreupgrade"
         },
         {
           "level": 3,
-          "text": "Upgrade",
+          "text": "`Upgrade`",
           "anchor": "upgrade"
         },
         {
           "level": 3,
-          "text": "Edge.ID",
+          "text": "`Edge.ID`",
           "anchor": "edgeid"
         },
         {
           "level": 3,
-          "text": "Edge.IsGenesis",
+          "text": "`Edge.IsGenesis`",
           "anchor": "edgeisgenesis"
         },
         {
           "level": 3,
-          "text": "ChainProject.WriteEdge",
+          "text": "`ChainProject.WriteEdge`",
           "anchor": "chainprojectwriteedge"
         },
         {
           "level": 3,
-          "text": "ChainProject.ArchiveEdge",
+          "text": "`ChainProject.ArchiveEdge`",
           "anchor": "chainprojectarchiveedge"
         },
         {
           "level": 3,
-          "text": "ChainProject.LoadEdge",
+          "text": "`ChainProject.LoadEdge`",
           "anchor": "chainprojectloadedge"
         },
         {
           "level": 3,
-          "text": "ChainProject.LoadLiveEdges",
+          "text": "`ChainProject.LoadLiveEdges`",
           "anchor": "chainprojectloadliveedges"
         },
         {
           "level": 3,
-          "text": "ChainProject.LoadArchivedEdges",
+          "text": "`ChainProject.LoadArchivedEdges`",
           "anchor": "chainprojectloadarchivededges"
         },
         {
           "level": 3,
-          "text": "ChainProject.LoadAllEdges",
+          "text": "`ChainProject.LoadAllEdges`",
           "anchor": "chainprojectloadalledges"
         },
         {
           "level": 3,
-          "text": "ChainProject.WriteRevisionManifest",
+          "text": "`ChainProject.WriteRevisionManifest`",
           "anchor": "chainprojectwriterevisionmanifest"
         },
         {
           "level": 3,
-          "text": "ChainProject.ReadRevisionManifest",
+          "text": "`ChainProject.ReadRevisionManifest`",
           "anchor": "chainprojectreadrevisionmanifest"
         },
         {
           "level": 3,
-          "text": "ChainProject.Store",
+          "text": "`ChainProject.Store`",
           "anchor": "chainprojectstore"
         },
         {
           "level": 3,
-          "text": "ChainProject.Root",
+          "text": "`ChainProject.Root`",
           "anchor": "chainprojectroot"
         },
         {
           "level": 3,
-          "text": "opSimulator.Simulate",
+          "text": "`opSimulator.Simulate`",
           "anchor": "opsimulatorsimulate"
         },
         {
           "level": 3,
-          "text": "NoPathError.Error",
+          "text": "`NoPathError.Error`",
           "anchor": "nopatherrorerror"
         },
         {
           "level": 3,
-          "text": "ForkError.Error",
+          "text": "`ForkError.Error`",
           "anchor": "forkerrorerror"
         },
         {
           "level": 3,
-          "text": "ChainProject.LoadRemap",
+          "text": "`ChainProject.LoadRemap`",
           "anchor": "chainprojectloadremap"
         },
         {
           "level": 3,
-          "text": "ChainProject.WriteRemap",
+          "text": "`ChainProject.WriteRemap`",
           "anchor": "chainprojectwriteremap"
         },
         {
           "level": 3,
-          "text": "SelfContainedOp.Kind",
+          "text": "`SelfContainedOp.Kind`",
           "anchor": "selfcontainedopkind"
         },
         {
           "level": 3,
-          "text": "SelfContainedOp.Target",
+          "text": "`SelfContainedOp.Target`",
           "anchor": "selfcontainedoptarget"
         },
         {
           "level": 3,
-          "text": "SelfContainedOp.Invertibility",
+          "text": "`SelfContainedOp.Invertibility`",
           "anchor": "selfcontainedopinvertibility"
         },
         {
           "level": 3,
-          "text": "SelfContainedOp.PayloadID",
+          "text": "`SelfContainedOp.PayloadID`",
           "anchor": "selfcontainedoppayloadid"
         },
         {
           "level": 3,
-          "text": "SelfContainedOp.Inverse",
+          "text": "`SelfContainedOp.Inverse`",
           "anchor": "selfcontainedopinverse"
         },
         {
           "level": 3,
-          "text": "SelfContainedOp.RenderSQL",
+          "text": "`SelfContainedOp.RenderSQL`",
           "anchor": "selfcontainedoprendersql"
         },
         {
           "level": 3,
-          "text": "SelfContainedOp.Serialize",
+          "text": "`SelfContainedOp.Serialize`",
           "anchor": "selfcontainedopserialize"
         }
       ]
@@ -4167,307 +4167,307 @@
         },
         {
           "level": 2,
-          "text": "internal/model",
+          "text": "`internal/model`",
           "anchor": "internalmodel"
         },
         {
           "level": 3,
-          "text": "TowardReferencing",
+          "text": "`TowardReferencing`",
           "anchor": "towardreferencing"
         },
         {
           "level": 3,
-          "text": "TowardReferenced",
+          "text": "`TowardReferenced`",
           "anchor": "towardreferenced"
         },
         {
           "level": 3,
-          "text": "BuildOption",
+          "text": "`BuildOption`",
           "anchor": "buildoption"
         },
         {
           "level": 3,
-          "text": "FKEdge",
+          "text": "`FKEdge`",
           "anchor": "fkedge"
         },
         {
           "level": 3,
-          "text": "FKGraph",
+          "text": "`FKGraph`",
           "anchor": "fkgraph"
         },
         {
           "level": 3,
-          "text": "WalkDirection",
+          "text": "`WalkDirection`",
           "anchor": "walkdirection"
         },
         {
           "level": 3,
-          "text": "FKNodeProjection",
+          "text": "`FKNodeProjection`",
           "anchor": "fknodeprojection"
         },
         {
           "level": 3,
-          "text": "FKEdgeProjection",
+          "text": "`FKEdgeProjection`",
           "anchor": "fkedgeprojection"
         },
         {
           "level": 3,
-          "text": "FKGraphProjection",
+          "text": "`FKGraphProjection`",
           "anchor": "fkgraphprojection"
         },
         {
           "level": 3,
-          "text": "NamedTransition",
+          "text": "`NamedTransition`",
           "anchor": "namedtransition"
         },
         {
           "level": 3,
-          "text": "SMTransitionMap",
+          "text": "`SMTransitionMap`",
           "anchor": "smtransitionmap"
         },
         {
           "level": 3,
-          "text": "SMState",
+          "text": "`SMState`",
           "anchor": "smstate"
         },
         {
           "level": 3,
-          "text": "SMTransition",
+          "text": "`SMTransition`",
           "anchor": "smtransition"
         },
         {
           "level": 3,
-          "text": "StateMachine",
+          "text": "`StateMachine`",
           "anchor": "statemachine"
         },
         {
           "level": 3,
-          "text": "Schema",
+          "text": "`Schema`",
           "anchor": "schema"
         },
         {
           "level": 3,
-          "text": "View",
+          "text": "`View`",
           "anchor": "view"
         },
         {
           "level": 3,
-          "text": "MaterializedView",
+          "text": "`MaterializedView`",
           "anchor": "materializedview"
         },
         {
           "level": 3,
-          "text": "Table",
+          "text": "`Table`",
           "anchor": "table"
         },
         {
           "level": 3,
-          "text": "Column",
+          "text": "`Column`",
           "anchor": "column"
         },
         {
           "level": 3,
-          "text": "FK",
+          "text": "`FK`",
           "anchor": "fk"
         },
         {
           "level": 3,
-          "text": "Index",
+          "text": "`Index`",
           "anchor": "index"
         },
         {
           "level": 3,
-          "text": "UniqueConstraint",
+          "text": "`UniqueConstraint`",
           "anchor": "uniqueconstraint"
         },
         {
           "level": 3,
-          "text": "CheckConstraint",
+          "text": "`CheckConstraint`",
           "anchor": "checkconstraint"
         },
         {
           "level": 3,
-          "text": "ExclusionElement",
+          "text": "`ExclusionElement`",
           "anchor": "exclusionelement"
         },
         {
           "level": 3,
-          "text": "ExclusionConstraint",
+          "text": "`ExclusionConstraint`",
           "anchor": "exclusionconstraint"
         },
         {
           "level": 3,
-          "text": "Policy",
+          "text": "`Policy`",
           "anchor": "policy"
         },
         {
           "level": 3,
-          "text": "Trigger",
+          "text": "`Trigger`",
           "anchor": "trigger"
         },
         {
           "level": 3,
-          "text": "Enum",
+          "text": "`Enum`",
           "anchor": "enum"
         },
         {
           "level": 3,
-          "text": "Sequence",
+          "text": "`Sequence`",
           "anchor": "sequence"
         },
         {
           "level": 3,
-          "text": "FunctionArg",
+          "text": "`FunctionArg`",
           "anchor": "functionarg"
         },
         {
           "level": 3,
-          "text": "Function",
+          "text": "`Function`",
           "anchor": "function"
         },
         {
           "level": 3,
-          "text": "Domain",
+          "text": "`Domain`",
           "anchor": "domain"
         },
         {
           "level": 3,
-          "text": "CompositeField",
+          "text": "`CompositeField`",
           "anchor": "compositefield"
         },
         {
           "level": 3,
-          "text": "CompositeType",
+          "text": "`CompositeType`",
           "anchor": "compositetype"
         },
         {
           "level": 3,
-          "text": "PartitionSpec",
+          "text": "`PartitionSpec`",
           "anchor": "partitionspec"
         },
         {
           "level": 3,
-          "text": "MaintenanceConfig",
+          "text": "`MaintenanceConfig`",
           "anchor": "maintenanceconfig"
         },
         {
           "level": 3,
-          "text": "WithImports",
+          "text": "`WithImports`",
           "anchor": "withimports"
         },
         {
           "level": 3,
-          "text": "WithImportedTables",
+          "text": "`WithImportedTables`",
           "anchor": "withimportedtables"
         },
         {
           "level": 3,
-          "text": "Build",
+          "text": "`Build`",
           "anchor": "build"
         },
         {
           "level": 3,
-          "text": "BuildMulti",
+          "text": "`BuildMulti`",
           "anchor": "buildmulti"
         },
         {
           "level": 3,
-          "text": "IsStateMachineColumn",
+          "text": "`IsStateMachineColumn`",
           "anchor": "isstatemachinecolumn"
         },
         {
           "level": 3,
-          "text": "TableKey",
+          "text": "`TableKey`",
           "anchor": "tablekey"
         },
         {
           "level": 3,
-          "text": "FKGraphFromProjection",
+          "text": "`FKGraphFromProjection`",
           "anchor": "fkgraphfromprojection"
         },
         {
           "level": 3,
-          "text": "StrPtr",
+          "text": "`StrPtr`",
           "anchor": "strptr"
         },
         {
           "level": 3,
-          "text": "Int64Ptr",
+          "text": "`Int64Ptr`",
           "anchor": "int64ptr"
         },
         {
           "level": 3,
-          "text": "Float64Ptr",
+          "text": "`Float64Ptr`",
           "anchor": "float64ptr"
         },
         {
           "level": 3,
-          "text": "Schema.Canonicalize",
+          "text": "`Schema.Canonicalize`",
           "anchor": "schemacanonicalize"
         },
         {
           "level": 3,
-          "text": "FKGraph.WalkCascade",
+          "text": "`FKGraph.WalkCascade`",
           "anchor": "fkgraphwalkcascade"
         },
         {
           "level": 3,
-          "text": "FKGraph.CascadeDepth",
+          "text": "`FKGraph.CascadeDepth`",
           "anchor": "fkgraphcascadedepth"
         },
         {
           "level": 3,
-          "text": "FKGraph.CascadeBreadth",
+          "text": "`FKGraph.CascadeBreadth`",
           "anchor": "fkgraphcascadebreadth"
         },
         {
           "level": 3,
-          "text": "FKGraph.CascadeChain",
+          "text": "`FKGraph.CascadeChain`",
           "anchor": "fkgraphcascadechain"
         },
         {
           "level": 3,
-          "text": "Schema.ReferencedTableKeys",
+          "text": "`Schema.ReferencedTableKeys`",
           "anchor": "schemareferencedtablekeys"
         },
         {
           "level": 3,
-          "text": "Schema.BuildFKGraph",
+          "text": "`Schema.BuildFKGraph`",
           "anchor": "schemabuildfkgraph"
         },
         {
           "level": 3,
-          "text": "FKGraph.Project",
+          "text": "`FKGraph.Project`",
           "anchor": "fkgraphproject"
         },
         {
           "level": 3,
-          "text": "Schema.TableOrder",
+          "text": "`Schema.TableOrder`",
           "anchor": "schematableorder"
         },
         {
           "level": 3,
-          "text": "Schema.TableByName",
+          "text": "`Schema.TableByName`",
           "anchor": "schematablebyname"
         },
         {
           "level": 3,
-          "text": "Schema.FilterByGroups",
+          "text": "`Schema.FilterByGroups`",
           "anchor": "schemafilterbygroups"
         },
         {
           "level": 3,
-          "text": "Schema.FilterBySource",
+          "text": "`Schema.FilterBySource`",
           "anchor": "schemafilterbysource"
         },
         {
           "level": 3,
-          "text": "Table.HasIndexCovering",
+          "text": "`Table.HasIndexCovering`",
           "anchor": "tablehasindexcovering"
         },
         {
           "level": 3,
-          "text": "Table.CandidateKeys",
+          "text": "`Table.CandidateKeys`",
           "anchor": "tablecandidatekeys"
         }
       ]
@@ -4484,42 +4484,42 @@
         },
         {
           "level": 2,
-          "text": "internal/modelgen",
+          "text": "`internal/modelgen`",
           "anchor": "internalmodelgen"
         },
         {
           "level": 3,
-          "text": "Config",
+          "text": "`Config`",
           "anchor": "config"
         },
         {
           "level": 3,
-          "text": "DefaultConfig",
+          "text": "`DefaultConfig`",
           "anchor": "defaultconfig"
         },
         {
           "level": 3,
-          "text": "Generator",
+          "text": "`Generator`",
           "anchor": "generator"
         },
         {
           "level": 3,
-          "text": "Draw",
+          "text": "`Draw`",
           "anchor": "draw"
         },
         {
           "level": 3,
-          "text": "GeneratePair",
+          "text": "`GeneratePair`",
           "anchor": "generatepair"
         },
         {
           "level": 3,
-          "text": "DrawPair",
+          "text": "`DrawPair`",
           "anchor": "drawpair"
         },
         {
           "level": 3,
-          "text": "ExamplePair",
+          "text": "`ExamplePair`",
           "anchor": "examplepair"
         }
       ]
@@ -4536,72 +4536,72 @@
         },
         {
           "level": 2,
-          "text": "internal/objstore",
+          "text": "`internal/objstore`",
           "anchor": "internalobjstore"
         },
         {
           "level": 3,
-          "text": "ErrNotFound",
+          "text": "`ErrNotFound`",
           "anchor": "errnotfound"
         },
         {
           "level": 3,
-          "text": "EpochMismatch",
+          "text": "`EpochMismatch`",
           "anchor": "epochmismatch"
         },
         {
           "level": 3,
-          "text": "CorruptObject",
+          "text": "`CorruptObject`",
           "anchor": "corruptobject"
         },
         {
           "level": 3,
-          "text": "Store",
+          "text": "`Store`",
           "anchor": "store"
         },
         {
           "level": 3,
-          "text": "New",
+          "text": "`New`",
           "anchor": "new"
         },
         {
           "level": 3,
-          "text": "ID",
+          "text": "`ID`",
           "anchor": "id"
         },
         {
           "level": 3,
-          "text": "EpochMismatch.Error",
+          "text": "`EpochMismatch.Error`",
           "anchor": "epochmismatcherror"
         },
         {
           "level": 3,
-          "text": "CorruptObject.Error",
+          "text": "`CorruptObject.Error`",
           "anchor": "corruptobjecterror"
         },
         {
           "level": 3,
-          "text": "Store.Root",
+          "text": "`Store.Root`",
           "anchor": "storeroot"
         },
         {
           "level": 3,
-          "text": "Store.Epoch",
+          "text": "`Store.Epoch`",
           "anchor": "storeepoch"
         },
         {
           "level": 3,
-          "text": "Store.Put",
+          "text": "`Store.Put`",
           "anchor": "storeput"
         },
         {
           "level": 3,
-          "text": "Store.Has",
+          "text": "`Store.Has`",
           "anchor": "storehas"
         },
         {
           "level": 3,
-          "text": "Store.Get",
+          "text": "`Store.Get`",
           "anchor": "storeget"
         }
       ]
@@ -4618,872 +4618,872 @@
         },
         {
           "level": 2,
-          "text": "internal/parse/pgschema",
+          "text": "`internal/parse/pgschema`",
           "anchor": "internalparsepgschema"
         },
         {
           "level": 3,
-          "text": "GeneratedBy",
+          "text": "`GeneratedBy`",
           "anchor": "generatedby"
         },
         {
           "level": 3,
-          "text": "SchemaFormatVersion",
+          "text": "`SchemaFormatVersion`",
           "anchor": "schemaformatversion"
         },
         {
           "level": 3,
-          "text": "Schema",
+          "text": "`Schema`",
           "anchor": "schema"
         },
         {
           "level": 3,
-          "text": "Meta",
+          "text": "`Meta`",
           "anchor": "meta"
         },
         {
           "level": 3,
-          "text": "TypeDef",
+          "text": "`TypeDef`",
           "anchor": "typedef"
         },
         {
           "level": 3,
-          "text": "SMState",
+          "text": "`SMState`",
           "anchor": "smstate"
         },
         {
           "level": 3,
-          "text": "SMTransition",
+          "text": "`SMTransition`",
           "anchor": "smtransition"
         },
         {
           "level": 3,
-          "text": "Table",
+          "text": "`Table`",
           "anchor": "table"
         },
         {
           "level": 3,
-          "text": "Column",
+          "text": "`Column`",
           "anchor": "column"
         },
         {
           "level": 3,
-          "text": "FK",
+          "text": "`FK`",
           "anchor": "fk"
         },
         {
           "level": 3,
-          "text": "Index",
+          "text": "`Index`",
           "anchor": "index"
         },
         {
           "level": 3,
-          "text": "Unique",
+          "text": "`Unique`",
           "anchor": "unique"
         },
         {
           "level": 3,
-          "text": "Check",
+          "text": "`Check`",
           "anchor": "check"
         },
         {
           "level": 3,
-          "text": "Exclusion",
+          "text": "`Exclusion`",
           "anchor": "exclusion"
         },
         {
           "level": 3,
-          "text": "Policy",
+          "text": "`Policy`",
           "anchor": "policy"
         },
         {
           "level": 3,
-          "text": "Trigger",
+          "text": "`Trigger`",
           "anchor": "trigger"
         },
         {
           "level": 3,
-          "text": "Partitioning",
+          "text": "`Partitioning`",
           "anchor": "partitioning"
         },
         {
           "level": 3,
-          "text": "Dependency",
+          "text": "`Dependency`",
           "anchor": "dependency"
         },
         {
           "level": 3,
-          "text": "Maintenance",
+          "text": "`Maintenance`",
           "anchor": "maintenance"
         },
         {
           "level": 3,
-          "text": "View",
+          "text": "`View`",
           "anchor": "view"
         },
         {
           "level": 3,
-          "text": "MatView",
+          "text": "`MatView`",
           "anchor": "matview"
         },
         {
           "level": 3,
-          "text": "Sequence",
+          "text": "`Sequence`",
           "anchor": "sequence"
         },
         {
           "level": 3,
-          "text": "Function",
+          "text": "`Function`",
           "anchor": "function"
         },
         {
           "level": 3,
-          "text": "FunctionArg",
+          "text": "`FunctionArg`",
           "anchor": "functionarg"
         },
         {
           "level": 3,
-          "text": "ValidateBytes",
+          "text": "`ValidateBytes`",
           "anchor": "validatebytes"
         },
         {
           "level": 3,
-          "text": "ValidateValue",
+          "text": "`ValidateValue`",
           "anchor": "validatevalue"
         },
         {
           "level": 3,
-          "text": "ValidateBytesWithEvidence",
+          "text": "`ValidateBytesWithEvidence`",
           "anchor": "validatebyteswithevidence"
         },
         {
           "level": 3,
-          "text": "Schema.WithMeta",
+          "text": "`Schema.WithMeta`",
           "anchor": "schemawithmeta"
         },
         {
           "level": 3,
-          "text": "Schema.WithTypes",
+          "text": "`Schema.WithTypes`",
           "anchor": "schemawithtypes"
         },
         {
           "level": 3,
-          "text": "Schema.WithTables",
+          "text": "`Schema.WithTables`",
           "anchor": "schemawithtables"
         },
         {
           "level": 3,
-          "text": "Schema.WithViews",
+          "text": "`Schema.WithViews`",
           "anchor": "schemawithviews"
         },
         {
           "level": 3,
-          "text": "Schema.WithMaterializedViews",
+          "text": "`Schema.WithMaterializedViews`",
           "anchor": "schemawithmaterializedviews"
         },
         {
           "level": 3,
-          "text": "Schema.WithSequences",
+          "text": "`Schema.WithSequences`",
           "anchor": "schemawithsequences"
         },
         {
           "level": 3,
-          "text": "Schema.WithFunctions",
+          "text": "`Schema.WithFunctions`",
           "anchor": "schemawithfunctions"
         },
         {
           "level": 3,
-          "text": "Schema.WithGroups",
+          "text": "`Schema.WithGroups`",
           "anchor": "schemawithgroups"
         },
         {
           "level": 3,
-          "text": "Meta.WithVersion",
+          "text": "`Meta.WithVersion`",
           "anchor": "metawithversion"
         },
         {
           "level": 3,
-          "text": "Meta.WithSchema",
+          "text": "`Meta.WithSchema`",
           "anchor": "metawithschema"
         },
         {
           "level": 3,
-          "text": "Meta.WithExtensions",
+          "text": "`Meta.WithExtensions`",
           "anchor": "metawithextensions"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithKind",
+          "text": "`TypeDef.WithKind`",
           "anchor": "typedefwithkind"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithExtends",
+          "text": "`TypeDef.WithExtends`",
           "anchor": "typedefwithextends"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithBaseType",
+          "text": "`TypeDef.WithBaseType`",
           "anchor": "typedefwithbasetype"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithValues",
+          "text": "`TypeDef.WithValues`",
           "anchor": "typedefwithvalues"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithNotNull",
+          "text": "`TypeDef.WithNotNull`",
           "anchor": "typedefwithnotnull"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithDefault",
+          "text": "`TypeDef.WithDefault`",
           "anchor": "typedefwithdefault"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithDefaultExpr",
+          "text": "`TypeDef.WithDefaultExpr`",
           "anchor": "typedefwithdefaultexpr"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithCheck",
+          "text": "`TypeDef.WithCheck`",
           "anchor": "typedefwithcheck"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithUnique",
+          "text": "`TypeDef.WithUnique`",
           "anchor": "typedefwithunique"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithArray",
+          "text": "`TypeDef.WithArray`",
           "anchor": "typedefwitharray"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithComment",
+          "text": "`TypeDef.WithComment`",
           "anchor": "typedefwithcomment"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithInitial",
+          "text": "`TypeDef.WithInitial`",
           "anchor": "typedefwithinitial"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithEnforce",
+          "text": "`TypeDef.WithEnforce`",
           "anchor": "typedefwithenforce"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithFields",
+          "text": "`TypeDef.WithFields`",
           "anchor": "typedefwithfields"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithStates",
+          "text": "`TypeDef.WithStates`",
           "anchor": "typedefwithstates"
         },
         {
           "level": 3,
-          "text": "TypeDef.WithTransitions",
+          "text": "`TypeDef.WithTransitions`",
           "anchor": "typedefwithtransitions"
         },
         {
           "level": 3,
-          "text": "SMState.WithTerminal",
+          "text": "`SMState.WithTerminal`",
           "anchor": "smstatewithterminal"
         },
         {
           "level": 3,
-          "text": "SMState.WithComment",
+          "text": "`SMState.WithComment`",
           "anchor": "smstatewithcomment"
         },
         {
           "level": 3,
-          "text": "SMTransition.WithName",
+          "text": "`SMTransition.WithName`",
           "anchor": "smtransitionwithname"
         },
         {
           "level": 3,
-          "text": "SMTransition.WithFrom",
+          "text": "`SMTransition.WithFrom`",
           "anchor": "smtransitionwithfrom"
         },
         {
           "level": 3,
-          "text": "SMTransition.WithTo",
+          "text": "`SMTransition.WithTo`",
           "anchor": "smtransitionwithto"
         },
         {
           "level": 3,
-          "text": "SMTransition.WithRequires",
+          "text": "`SMTransition.WithRequires`",
           "anchor": "smtransitionwithrequires"
         },
         {
           "level": 3,
-          "text": "SMTransition.WithComment",
+          "text": "`SMTransition.WithComment`",
           "anchor": "smtransitionwithcomment"
         },
         {
           "level": 3,
-          "text": "Table.WithComment",
+          "text": "`Table.WithComment`",
           "anchor": "tablewithcomment"
         },
         {
           "level": 3,
-          "text": "Table.WithPk",
+          "text": "`Table.WithPk`",
           "anchor": "tablewithpk"
         },
         {
           "level": 3,
-          "text": "Table.WithEnableRls",
+          "text": "`Table.WithEnableRls`",
           "anchor": "tablewithenablerls"
         },
         {
           "level": 3,
-          "text": "Table.WithForceRls",
+          "text": "`Table.WithForceRls`",
           "anchor": "tablewithforcerls"
         },
         {
           "level": 3,
-          "text": "Table.WithAppendOnly",
+          "text": "`Table.WithAppendOnly`",
           "anchor": "tablewithappendonly"
         },
         {
           "level": 3,
-          "text": "Table.WithColumns",
+          "text": "`Table.WithColumns`",
           "anchor": "tablewithcolumns"
         },
         {
           "level": 3,
-          "text": "Table.WithFks",
+          "text": "`Table.WithFks`",
           "anchor": "tablewithfks"
         },
         {
           "level": 3,
-          "text": "Table.WithIndexes",
+          "text": "`Table.WithIndexes`",
           "anchor": "tablewithindexes"
         },
         {
           "level": 3,
-          "text": "Table.WithUnique",
+          "text": "`Table.WithUnique`",
           "anchor": "tablewithunique"
         },
         {
           "level": 3,
-          "text": "Table.WithChecks",
+          "text": "`Table.WithChecks`",
           "anchor": "tablewithchecks"
         },
         {
           "level": 3,
-          "text": "Table.WithExclusions",
+          "text": "`Table.WithExclusions`",
           "anchor": "tablewithexclusions"
         },
         {
           "level": 3,
-          "text": "Table.WithPolicies",
+          "text": "`Table.WithPolicies`",
           "anchor": "tablewithpolicies"
         },
         {
           "level": 3,
-          "text": "Table.WithTriggers",
+          "text": "`Table.WithTriggers`",
           "anchor": "tablewithtriggers"
         },
         {
           "level": 3,
-          "text": "Table.WithPartitioning",
+          "text": "`Table.WithPartitioning`",
           "anchor": "tablewithpartitioning"
         },
         {
           "level": 3,
-          "text": "Table.WithDependencies",
+          "text": "`Table.WithDependencies`",
           "anchor": "tablewithdependencies"
         },
         {
           "level": 3,
-          "text": "Table.WithMaintenance",
+          "text": "`Table.WithMaintenance`",
           "anchor": "tablewithmaintenance"
         },
         {
           "level": 3,
-          "text": "Column.WithType",
+          "text": "`Column.WithType`",
           "anchor": "columnwithtype"
         },
         {
           "level": 3,
-          "text": "Column.WithNullable",
+          "text": "`Column.WithNullable`",
           "anchor": "columnwithnullable"
         },
         {
           "level": 3,
-          "text": "Column.WithDefault",
+          "text": "`Column.WithDefault`",
           "anchor": "columnwithdefault"
         },
         {
           "level": 3,
-          "text": "Column.WithDefaultExpr",
+          "text": "`Column.WithDefaultExpr`",
           "anchor": "columnwithdefaultexpr"
         },
         {
           "level": 3,
-          "text": "Column.WithGenerated",
+          "text": "`Column.WithGenerated`",
           "anchor": "columnwithgenerated"
         },
         {
           "level": 3,
-          "text": "Column.WithStored",
+          "text": "`Column.WithStored`",
           "anchor": "columnwithstored"
         },
         {
           "level": 3,
-          "text": "Column.WithArray",
+          "text": "`Column.WithArray`",
           "anchor": "columnwitharray"
         },
         {
           "level": 3,
-          "text": "Column.WithComment",
+          "text": "`Column.WithComment`",
           "anchor": "columnwithcomment"
         },
         {
           "level": 3,
-          "text": "Column.WithJsonSchema",
+          "text": "`Column.WithJsonSchema`",
           "anchor": "columnwithjsonschema"
         },
         {
           "level": 3,
-          "text": "Column.WithCollation",
+          "text": "`Column.WithCollation`",
           "anchor": "columnwithcollation"
         },
         {
           "level": 3,
-          "text": "Column.WithStatistics",
+          "text": "`Column.WithStatistics`",
           "anchor": "columnwithstatistics"
         },
         {
           "level": 3,
-          "text": "FK.WithColumns",
+          "text": "`FK.WithColumns`",
           "anchor": "fkwithcolumns"
         },
         {
           "level": 3,
-          "text": "FK.WithRefTable",
+          "text": "`FK.WithRefTable`",
           "anchor": "fkwithreftable"
         },
         {
           "level": 3,
-          "text": "FK.WithRefColumns",
+          "text": "`FK.WithRefColumns`",
           "anchor": "fkwithrefcolumns"
         },
         {
           "level": 3,
-          "text": "FK.WithOnDelete",
+          "text": "`FK.WithOnDelete`",
           "anchor": "fkwithondelete"
         },
         {
           "level": 3,
-          "text": "Index.WithColumns",
+          "text": "`Index.WithColumns`",
           "anchor": "indexwithcolumns"
         },
         {
           "level": 3,
-          "text": "Index.WithMethod",
+          "text": "`Index.WithMethod`",
           "anchor": "indexwithmethod"
         },
         {
           "level": 3,
-          "text": "Index.WithOpclass",
+          "text": "`Index.WithOpclass`",
           "anchor": "indexwithopclass"
         },
         {
           "level": 3,
-          "text": "Index.WithCollation",
+          "text": "`Index.WithCollation`",
           "anchor": "indexwithcollation"
         },
         {
           "level": 3,
-          "text": "Index.WithWhere",
+          "text": "`Index.WithWhere`",
           "anchor": "indexwithwhere"
         },
         {
           "level": 3,
-          "text": "Index.WithInclude",
+          "text": "`Index.WithInclude`",
           "anchor": "indexwithinclude"
         },
         {
           "level": 3,
-          "text": "Index.WithUnique",
+          "text": "`Index.WithUnique`",
           "anchor": "indexwithunique"
         },
         {
           "level": 3,
-          "text": "Index.WithWith",
+          "text": "`Index.WithWith`",
           "anchor": "indexwithwith"
         },
         {
           "level": 3,
-          "text": "Unique.WithColumns",
+          "text": "`Unique.WithColumns`",
           "anchor": "uniquewithcolumns"
         },
         {
           "level": 3,
-          "text": "Unique.WithDeferrable",
+          "text": "`Unique.WithDeferrable`",
           "anchor": "uniquewithdeferrable"
         },
         {
           "level": 3,
-          "text": "Unique.WithInitiallyDeferred",
+          "text": "`Unique.WithInitiallyDeferred`",
           "anchor": "uniquewithinitiallydeferred"
         },
         {
           "level": 3,
-          "text": "Check.WithExpr",
+          "text": "`Check.WithExpr`",
           "anchor": "checkwithexpr"
         },
         {
           "level": 3,
-          "text": "Exclusion.WithColumns",
+          "text": "`Exclusion.WithColumns`",
           "anchor": "exclusionwithcolumns"
         },
         {
           "level": 3,
-          "text": "Exclusion.WithOperators",
+          "text": "`Exclusion.WithOperators`",
           "anchor": "exclusionwithoperators"
         },
         {
           "level": 3,
-          "text": "Exclusion.WithMethod",
+          "text": "`Exclusion.WithMethod`",
           "anchor": "exclusionwithmethod"
         },
         {
           "level": 3,
-          "text": "Exclusion.WithWhere",
+          "text": "`Exclusion.WithWhere`",
           "anchor": "exclusionwithwhere"
         },
         {
           "level": 3,
-          "text": "Exclusion.WithDeferrable",
+          "text": "`Exclusion.WithDeferrable`",
           "anchor": "exclusionwithdeferrable"
         },
         {
           "level": 3,
-          "text": "Exclusion.WithInitiallyDeferred",
+          "text": "`Exclusion.WithInitiallyDeferred`",
           "anchor": "exclusionwithinitiallydeferred"
         },
         {
           "level": 3,
-          "text": "Policy.WithType",
+          "text": "`Policy.WithType`",
           "anchor": "policywithtype"
         },
         {
           "level": 3,
-          "text": "Policy.WithFor",
+          "text": "`Policy.WithFor`",
           "anchor": "policywithfor"
         },
         {
           "level": 3,
-          "text": "Policy.WithTo",
+          "text": "`Policy.WithTo`",
           "anchor": "policywithto"
         },
         {
           "level": 3,
-          "text": "Policy.WithUsing",
+          "text": "`Policy.WithUsing`",
           "anchor": "policywithusing"
         },
         {
           "level": 3,
-          "text": "Policy.WithWithCheck",
+          "text": "`Policy.WithWithCheck`",
           "anchor": "policywithwithcheck"
         },
         {
           "level": 3,
-          "text": "Policy.WithErrorCode",
+          "text": "`Policy.WithErrorCode`",
           "anchor": "policywitherrorcode"
         },
         {
           "level": 3,
-          "text": "Policy.WithErrorMessage",
+          "text": "`Policy.WithErrorMessage`",
           "anchor": "policywitherrormessage"
         },
         {
           "level": 3,
-          "text": "Trigger.WithFunction",
+          "text": "`Trigger.WithFunction`",
           "anchor": "triggerwithfunction"
         },
         {
           "level": 3,
-          "text": "Trigger.WithEvents",
+          "text": "`Trigger.WithEvents`",
           "anchor": "triggerwithevents"
         },
         {
           "level": 3,
-          "text": "Trigger.WithTiming",
+          "text": "`Trigger.WithTiming`",
           "anchor": "triggerwithtiming"
         },
         {
           "level": 3,
-          "text": "Trigger.WithForEach",
+          "text": "`Trigger.WithForEach`",
           "anchor": "triggerwithforeach"
         },
         {
           "level": 3,
-          "text": "Trigger.WithWhen",
+          "text": "`Trigger.WithWhen`",
           "anchor": "triggerwithwhen"
         },
         {
           "level": 3,
-          "text": "Trigger.WithConstraint",
+          "text": "`Trigger.WithConstraint`",
           "anchor": "triggerwithconstraint"
         },
         {
           "level": 3,
-          "text": "Trigger.WithDeferrable",
+          "text": "`Trigger.WithDeferrable`",
           "anchor": "triggerwithdeferrable"
         },
         {
           "level": 3,
-          "text": "Trigger.WithInitiallyDeferred",
+          "text": "`Trigger.WithInitiallyDeferred`",
           "anchor": "triggerwithinitiallydeferred"
         },
         {
           "level": 3,
-          "text": "Trigger.WithReferencingOld",
+          "text": "`Trigger.WithReferencingOld`",
           "anchor": "triggerwithreferencingold"
         },
         {
           "level": 3,
-          "text": "Trigger.WithReferencingNew",
+          "text": "`Trigger.WithReferencingNew`",
           "anchor": "triggerwithreferencingnew"
         },
         {
           "level": 3,
-          "text": "Trigger.WithComment",
+          "text": "`Trigger.WithComment`",
           "anchor": "triggerwithcomment"
         },
         {
           "level": 3,
-          "text": "Partitioning.WithStrategy",
+          "text": "`Partitioning.WithStrategy`",
           "anchor": "partitioningwithstrategy"
         },
         {
           "level": 3,
-          "text": "Partitioning.WithColumn",
+          "text": "`Partitioning.WithColumn`",
           "anchor": "partitioningwithcolumn"
         },
         {
           "level": 3,
-          "text": "Partitioning.WithColumns",
+          "text": "`Partitioning.WithColumns`",
           "anchor": "partitioningwithcolumns"
         },
         {
           "level": 3,
-          "text": "Partitioning.WithName",
+          "text": "`Partitioning.WithName`",
           "anchor": "partitioningwithname"
         },
         {
           "level": 3,
-          "text": "Partitioning.WithBound",
+          "text": "`Partitioning.WithBound`",
           "anchor": "partitioningwithbound"
         },
         {
           "level": 3,
-          "text": "Partitioning.WithPartitions",
+          "text": "`Partitioning.WithPartitions`",
           "anchor": "partitioningwithpartitions"
         },
         {
           "level": 3,
-          "text": "Dependency.WithDeterminant",
+          "text": "`Dependency.WithDeterminant`",
           "anchor": "dependencywithdeterminant"
         },
         {
           "level": 3,
-          "text": "Dependency.WithDependent",
+          "text": "`Dependency.WithDependent`",
           "anchor": "dependencywithdependent"
         },
         {
           "level": 3,
-          "text": "Maintenance.WithInterval",
+          "text": "`Maintenance.WithInterval`",
           "anchor": "maintenancewithinterval"
         },
         {
           "level": 3,
-          "text": "Maintenance.WithPremake",
+          "text": "`Maintenance.WithPremake`",
           "anchor": "maintenancewithpremake"
         },
         {
           "level": 3,
-          "text": "Maintenance.WithRetention",
+          "text": "`Maintenance.WithRetention`",
           "anchor": "maintenancewithretention"
         },
         {
           "level": 3,
-          "text": "Maintenance.WithRetentionKeepTable",
+          "text": "`Maintenance.WithRetentionKeepTable`",
           "anchor": "maintenancewithretentionkeeptable"
         },
         {
           "level": 3,
-          "text": "Maintenance.WithSchedule",
+          "text": "`Maintenance.WithSchedule`",
           "anchor": "maintenancewithschedule"
         },
         {
           "level": 3,
-          "text": "View.WithQuery",
+          "text": "`View.WithQuery`",
           "anchor": "viewwithquery"
         },
         {
           "level": 3,
-          "text": "View.WithComment",
+          "text": "`View.WithComment`",
           "anchor": "viewwithcomment"
         },
         {
           "level": 3,
-          "text": "View.WithDependsOn",
+          "text": "`View.WithDependsOn`",
           "anchor": "viewwithdependson"
         },
         {
           "level": 3,
-          "text": "MatView.WithQuery",
+          "text": "`MatView.WithQuery`",
           "anchor": "matviewwithquery"
         },
         {
           "level": 3,
-          "text": "MatView.WithComment",
+          "text": "`MatView.WithComment`",
           "anchor": "matviewwithcomment"
         },
         {
           "level": 3,
-          "text": "MatView.WithDependsOn",
+          "text": "`MatView.WithDependsOn`",
           "anchor": "matviewwithdependson"
         },
         {
           "level": 3,
-          "text": "MatView.WithWithData",
+          "text": "`MatView.WithWithData`",
           "anchor": "matviewwithwithdata"
         },
         {
           "level": 3,
-          "text": "MatView.WithIndexes",
+          "text": "`MatView.WithIndexes`",
           "anchor": "matviewwithindexes"
         },
         {
           "level": 3,
-          "text": "Sequence.WithStart",
+          "text": "`Sequence.WithStart`",
           "anchor": "sequencewithstart"
         },
         {
           "level": 3,
-          "text": "Sequence.WithIncrement",
+          "text": "`Sequence.WithIncrement`",
           "anchor": "sequencewithincrement"
         },
         {
           "level": 3,
-          "text": "Sequence.WithMinValue",
+          "text": "`Sequence.WithMinValue`",
           "anchor": "sequencewithminvalue"
         },
         {
           "level": 3,
-          "text": "Sequence.WithMaxValue",
+          "text": "`Sequence.WithMaxValue`",
           "anchor": "sequencewithmaxvalue"
         },
         {
           "level": 3,
-          "text": "Sequence.WithCache",
+          "text": "`Sequence.WithCache`",
           "anchor": "sequencewithcache"
         },
         {
           "level": 3,
-          "text": "Sequence.WithCycle",
+          "text": "`Sequence.WithCycle`",
           "anchor": "sequencewithcycle"
         },
         {
           "level": 3,
-          "text": "Sequence.WithOwnedBy",
+          "text": "`Sequence.WithOwnedBy`",
           "anchor": "sequencewithownedby"
         },
         {
           "level": 3,
-          "text": "Sequence.WithComment",
+          "text": "`Sequence.WithComment`",
           "anchor": "sequencewithcomment"
         },
         {
           "level": 3,
-          "text": "Function.WithLanguage",
+          "text": "`Function.WithLanguage`",
           "anchor": "functionwithlanguage"
         },
         {
           "level": 3,
-          "text": "Function.WithReturns",
+          "text": "`Function.WithReturns`",
           "anchor": "functionwithreturns"
         },
         {
           "level": 3,
-          "text": "Function.WithBody",
+          "text": "`Function.WithBody`",
           "anchor": "functionwithbody"
         },
         {
           "level": 3,
-          "text": "Function.WithFile",
+          "text": "`Function.WithFile`",
           "anchor": "functionwithfile"
         },
         {
           "level": 3,
-          "text": "Function.WithComment",
+          "text": "`Function.WithComment`",
           "anchor": "functionwithcomment"
         },
         {
           "level": 3,
-          "text": "Function.WithVolatility",
+          "text": "`Function.WithVolatility`",
           "anchor": "functionwithvolatility"
         },
         {
           "level": 3,
-          "text": "Function.WithParallel",
+          "text": "`Function.WithParallel`",
           "anchor": "functionwithparallel"
         },
         {
           "level": 3,
-          "text": "Function.WithSecurityDefiner",
+          "text": "`Function.WithSecurityDefiner`",
           "anchor": "functionwithsecuritydefiner"
         },
         {
           "level": 3,
-          "text": "Function.WithProcedure",
+          "text": "`Function.WithProcedure`",
           "anchor": "functionwithprocedure"
         },
         {
           "level": 3,
-          "text": "Function.WithCost",
+          "text": "`Function.WithCost`",
           "anchor": "functionwithcost"
         },
         {
           "level": 3,
-          "text": "Function.WithRows",
+          "text": "`Function.WithRows`",
           "anchor": "functionwithrows"
         },
         {
           "level": 3,
-          "text": "Function.WithDependsOn",
+          "text": "`Function.WithDependsOn`",
           "anchor": "functionwithdependson"
         },
         {
           "level": 3,
-          "text": "Function.WithArgs",
+          "text": "`Function.WithArgs`",
           "anchor": "functionwithargs"
         },
         {
           "level": 3,
-          "text": "FunctionArg.WithName",
+          "text": "`FunctionArg.WithName`",
           "anchor": "functionargwithname"
         },
         {
           "level": 3,
-          "text": "FunctionArg.WithType",
+          "text": "`FunctionArg.WithType`",
           "anchor": "functionargwithtype"
         },
         {
           "level": 3,
-          "text": "FunctionArg.WithDefault",
+          "text": "`FunctionArg.WithDefault`",
           "anchor": "functionargwithdefault"
         }
       ]
@@ -5500,147 +5500,147 @@
         },
         {
           "level": 2,
-          "text": "internal/parse",
+          "text": "`internal/parse`",
           "anchor": "internalparse"
         },
         {
           "level": 3,
-          "text": "RawSchema",
+          "text": "`RawSchema`",
           "anchor": "rawschema"
         },
         {
           "level": 3,
-          "text": "RawMeta",
+          "text": "`RawMeta`",
           "anchor": "rawmeta"
         },
         {
           "level": 3,
-          "text": "RawSMState",
+          "text": "`RawSMState`",
           "anchor": "rawsmstate"
         },
         {
           "level": 3,
-          "text": "RawSMTransition",
+          "text": "`RawSMTransition`",
           "anchor": "rawsmtransition"
         },
         {
           "level": 3,
-          "text": "RawCompositeField",
+          "text": "`RawCompositeField`",
           "anchor": "rawcompositefield"
         },
         {
           "level": 3,
-          "text": "RawType",
+          "text": "`RawType`",
           "anchor": "rawtype"
         },
         {
           "level": 3,
-          "text": "RawView",
+          "text": "`RawView`",
           "anchor": "rawview"
         },
         {
           "level": 3,
-          "text": "RawMaterializedView",
+          "text": "`RawMaterializedView`",
           "anchor": "rawmaterializedview"
         },
         {
           "level": 3,
-          "text": "RawSequence",
+          "text": "`RawSequence`",
           "anchor": "rawsequence"
         },
         {
           "level": 3,
-          "text": "RawTable",
+          "text": "`RawTable`",
           "anchor": "rawtable"
         },
         {
           "level": 3,
-          "text": "RawColumn",
+          "text": "`RawColumn`",
           "anchor": "rawcolumn"
         },
         {
           "level": 3,
-          "text": "RawFK",
+          "text": "`RawFK`",
           "anchor": "rawfk"
         },
         {
           "level": 3,
-          "text": "RawIndex",
+          "text": "`RawIndex`",
           "anchor": "rawindex"
         },
         {
           "level": 3,
-          "text": "RawUnique",
+          "text": "`RawUnique`",
           "anchor": "rawunique"
         },
         {
           "level": 3,
-          "text": "RawCheck",
+          "text": "`RawCheck`",
           "anchor": "rawcheck"
         },
         {
           "level": 3,
-          "text": "RawExclusion",
+          "text": "`RawExclusion`",
           "anchor": "rawexclusion"
         },
         {
           "level": 3,
-          "text": "RawPolicy",
+          "text": "`RawPolicy`",
           "anchor": "rawpolicy"
         },
         {
           "level": 3,
-          "text": "RawTrigger",
+          "text": "`RawTrigger`",
           "anchor": "rawtrigger"
         },
         {
           "level": 3,
-          "text": "RawPartitioning",
+          "text": "`RawPartitioning`",
           "anchor": "rawpartitioning"
         },
         {
           "level": 3,
-          "text": "RawDependency",
+          "text": "`RawDependency`",
           "anchor": "rawdependency"
         },
         {
           "level": 3,
-          "text": "RawMaintenance",
+          "text": "`RawMaintenance`",
           "anchor": "rawmaintenance"
         },
         {
           "level": 3,
-          "text": "RawFunctionArg",
+          "text": "`RawFunctionArg`",
           "anchor": "rawfunctionarg"
         },
         {
           "level": 3,
-          "text": "RawFunction",
+          "text": "`RawFunction`",
           "anchor": "rawfunction"
         },
         {
           "level": 3,
-          "text": "CollectUserTypes",
+          "text": "`CollectUserTypes`",
           "anchor": "collectusertypes"
         },
         {
           "level": 3,
-          "text": "File",
+          "text": "`File`",
           "anchor": "file"
         },
         {
           "level": 3,
-          "text": "Bytes",
+          "text": "`Bytes`",
           "anchor": "bytes"
         },
         {
           "level": 3,
-          "text": "Files",
+          "text": "`Files`",
           "anchor": "files"
         },
         {
           "level": 3,
-          "text": "Dir",
+          "text": "`Dir`",
           "anchor": "dir"
         }
       ]
@@ -5657,147 +5657,147 @@
         },
         {
           "level": 2,
-          "text": "internal/predicate",
+          "text": "`internal/predicate`",
           "anchor": "internalpredicate"
         },
         {
           "level": 3,
-          "text": "MustBeAbsent",
+          "text": "`MustBeAbsent`",
           "anchor": "mustbeabsent"
         },
         {
           "level": 3,
-          "text": "MustBePresent",
+          "text": "`MustBePresent`",
           "anchor": "mustbepresent"
         },
         {
           "level": 3,
-          "text": "ClassTable",
+          "text": "`ClassTable`",
           "anchor": "classtable"
         },
         {
           "level": 3,
-          "text": "ClassColumn",
+          "text": "`ClassColumn`",
           "anchor": "classcolumn"
         },
         {
           "level": 3,
-          "text": "ClassConstraint",
+          "text": "`ClassConstraint`",
           "anchor": "classconstraint"
         },
         {
           "level": 3,
-          "text": "ClassIndex",
+          "text": "`ClassIndex`",
           "anchor": "classindex"
         },
         {
           "level": 3,
-          "text": "ClassView",
+          "text": "`ClassView`",
           "anchor": "classview"
         },
         {
           "level": 3,
-          "text": "ClassMatView",
+          "text": "`ClassMatView`",
           "anchor": "classmatview"
         },
         {
           "level": 3,
-          "text": "ClassSequence",
+          "text": "`ClassSequence`",
           "anchor": "classsequence"
         },
         {
           "level": 3,
-          "text": "ClassEnum",
+          "text": "`ClassEnum`",
           "anchor": "classenum"
         },
         {
           "level": 3,
-          "text": "ClassEnumValue",
+          "text": "`ClassEnumValue`",
           "anchor": "classenumvalue"
         },
         {
           "level": 3,
-          "text": "ClassDomain",
+          "text": "`ClassDomain`",
           "anchor": "classdomain"
         },
         {
           "level": 3,
-          "text": "ClassComposite",
+          "text": "`ClassComposite`",
           "anchor": "classcomposite"
         },
         {
           "level": 3,
-          "text": "ClassFunction",
+          "text": "`ClassFunction`",
           "anchor": "classfunction"
         },
         {
           "level": 3,
-          "text": "ClassTrigger",
+          "text": "`ClassTrigger`",
           "anchor": "classtrigger"
         },
         {
           "level": 3,
-          "text": "ClassPolicy",
+          "text": "`ClassPolicy`",
           "anchor": "classpolicy"
         },
         {
           "level": 3,
-          "text": "ClassExtension",
+          "text": "`ClassExtension`",
           "anchor": "classextension"
         },
         {
           "level": 3,
-          "text": "Execer",
+          "text": "`Execer`",
           "anchor": "execer"
         },
         {
           "level": 3,
-          "text": "Result",
+          "text": "`Result`",
           "anchor": "result"
         },
         {
           "level": 3,
-          "text": "Existence",
+          "text": "`Existence`",
           "anchor": "existence"
         },
         {
           "level": 3,
-          "text": "Class",
+          "text": "`Class`",
           "anchor": "class"
         },
         {
           "level": 3,
-          "text": "Match",
+          "text": "`Match`",
           "anchor": "match"
         },
         {
           "level": 3,
-          "text": "Precondition",
+          "text": "`Precondition`",
           "anchor": "precondition"
         },
         {
           "level": 3,
-          "text": "Check",
+          "text": "`Check`",
           "anchor": "check"
         },
         {
           "level": 3,
-          "text": "RenderIdempotentCreate",
+          "text": "`RenderIdempotentCreate`",
           "anchor": "renderidempotentcreate"
         },
         {
           "level": 3,
-          "text": "RenderAssert",
+          "text": "`RenderAssert`",
           "anchor": "renderassert"
         },
         {
           "level": 3,
-          "text": "Result.Err",
+          "text": "`Result.Err`",
           "anchor": "resulterr"
         },
         {
           "level": 3,
-          "text": "Existence.String",
+          "text": "`Existence.String`",
           "anchor": "existencestring"
         }
       ]
@@ -5814,27 +5814,27 @@
         },
         {
           "level": 2,
-          "text": "internal/project",
+          "text": "`internal/project`",
           "anchor": "internalproject"
         },
         {
           "level": 3,
-          "text": "Project",
+          "text": "`Project`",
           "anchor": "project"
         },
         {
           "level": 3,
-          "text": "Build",
+          "text": "`Build`",
           "anchor": "build"
         },
         {
           "level": 3,
-          "text": "ImportAliasSchemas",
+          "text": "`ImportAliasSchemas`",
           "anchor": "importaliasschemas"
         },
         {
           "level": 3,
-          "text": "RegisterImportedTypes",
+          "text": "`RegisterImportedTypes`",
           "anchor": "registerimportedtypes"
         }
       ]
@@ -5851,92 +5851,92 @@
         },
         {
           "level": 2,
-          "text": "internal/rev",
+          "text": "`internal/rev`",
           "anchor": "internalrev"
         },
         {
           "level": 3,
-          "text": "FormatVersion",
+          "text": "`FormatVersion`",
           "anchor": "formatversion"
         },
         {
           "level": 3,
-          "text": "RegistryPresent",
+          "text": "`RegistryPresent`",
           "anchor": "registrypresent"
         },
         {
           "level": 3,
-          "text": "RegistryAbsent",
+          "text": "`RegistryAbsent`",
           "anchor": "registryabsent"
         },
         {
           "level": 3,
-          "text": "ModelClass",
+          "text": "`ModelClass`",
           "anchor": "modelclass"
         },
         {
           "level": 3,
-          "text": "Revision",
+          "text": "`Revision`",
           "anchor": "revision"
         },
         {
           "level": 3,
-          "text": "Envelope",
+          "text": "`Envelope`",
           "anchor": "envelope"
         },
         {
           "level": 3,
-          "text": "ParseRevision",
+          "text": "`ParseRevision`",
           "anchor": "parserevision"
         },
         {
           "level": 3,
-          "text": "CanonicalBytes",
+          "text": "`CanonicalBytes`",
           "anchor": "canonicalbytes"
         },
         {
           "level": 3,
-          "text": "Compute",
+          "text": "`Compute`",
           "anchor": "compute"
         },
         {
           "level": 3,
-          "text": "Marshal",
+          "text": "`Marshal`",
           "anchor": "marshal"
         },
         {
           "level": 3,
-          "text": "Parse",
+          "text": "`Parse`",
           "anchor": "parse"
         },
         {
           "level": 3,
-          "text": "DecodeModel",
+          "text": "`DecodeModel`",
           "anchor": "decodemodel"
         },
         {
           "level": 3,
-          "text": "Revision.Class",
+          "text": "`Revision.Class`",
           "anchor": "revisionclass"
         },
         {
           "level": 3,
-          "text": "Revision.IsZero",
+          "text": "`Revision.IsZero`",
           "anchor": "revisioniszero"
         },
         {
           "level": 3,
-          "text": "Revision.Hex",
+          "text": "`Revision.Hex`",
           "anchor": "revisionhex"
         },
         {
           "level": 3,
-          "text": "Revision.String",
+          "text": "`Revision.String`",
           "anchor": "revisionstring"
         },
         {
           "level": 3,
-          "text": "Revision.Equal",
+          "text": "`Revision.Equal`",
           "anchor": "revisionequal"
         }
       ]
@@ -5953,357 +5953,357 @@
         },
         {
           "level": 2,
-          "text": "internal/risk",
+          "text": "`internal/risk`",
           "anchor": "internalrisk"
         },
         {
           "level": 3,
-          "text": "Safe",
+          "text": "`Safe`",
           "anchor": "safe"
         },
         {
           "level": 3,
-          "text": "Caution",
+          "text": "`Caution`",
           "anchor": "caution"
         },
         {
           "level": 3,
-          "text": "Dangerous",
+          "text": "`Dangerous`",
           "anchor": "dangerous"
         },
         {
           "level": 3,
-          "text": "LockNone",
+          "text": "`LockNone`",
           "anchor": "locknone"
         },
         {
           "level": 3,
-          "text": "LockShareLock",
+          "text": "`LockShareLock`",
           "anchor": "locksharelock"
         },
         {
           "level": 3,
-          "text": "LockShareRowExclusive",
+          "text": "`LockShareRowExclusive`",
           "anchor": "locksharerowexclusive"
         },
         {
           "level": 3,
-          "text": "LockShareUpdateExclusive",
+          "text": "`LockShareUpdateExclusive`",
           "anchor": "lockshareupdateexclusive"
         },
         {
           "level": 3,
-          "text": "LockAccessExclusive",
+          "text": "`LockAccessExclusive`",
           "anchor": "lockaccessexclusive"
         },
         {
           "level": 3,
-          "text": "OpCreateTable",
+          "text": "`OpCreateTable`",
           "anchor": "opcreatetable"
         },
         {
           "level": 3,
-          "text": "OpDropTable",
+          "text": "`OpDropTable`",
           "anchor": "opdroptable"
         },
         {
           "level": 3,
-          "text": "OpAddColumn",
+          "text": "`OpAddColumn`",
           "anchor": "opaddcolumn"
         },
         {
           "level": 3,
-          "text": "OpDropColumn",
+          "text": "`OpDropColumn`",
           "anchor": "opdropcolumn"
         },
         {
           "level": 3,
-          "text": "OpAlterColumnType",
+          "text": "`OpAlterColumnType`",
           "anchor": "opaltercolumntype"
         },
         {
           "level": 3,
-          "text": "OpSetNotNull",
+          "text": "`OpSetNotNull`",
           "anchor": "opsetnotnull"
         },
         {
           "level": 3,
-          "text": "OpDropNotNull",
+          "text": "`OpDropNotNull`",
           "anchor": "opdropnotnull"
         },
         {
           "level": 3,
-          "text": "OpAddFK",
+          "text": "`OpAddFK`",
           "anchor": "opaddfk"
         },
         {
           "level": 3,
-          "text": "OpAddFKNotValid",
+          "text": "`OpAddFKNotValid`",
           "anchor": "opaddfknotvalid"
         },
         {
           "level": 3,
-          "text": "OpValidateConstraint",
+          "text": "`OpValidateConstraint`",
           "anchor": "opvalidateconstraint"
         },
         {
           "level": 3,
-          "text": "OpCreateIndex",
+          "text": "`OpCreateIndex`",
           "anchor": "opcreateindex"
         },
         {
           "level": 3,
-          "text": "OpCreateIndexConcurrently",
+          "text": "`OpCreateIndexConcurrently`",
           "anchor": "opcreateindexconcurrently"
         },
         {
           "level": 3,
-          "text": "OpDropIndex",
+          "text": "`OpDropIndex`",
           "anchor": "opdropindex"
         },
         {
           "level": 3,
-          "text": "OpDropIndexConcurrently",
+          "text": "`OpDropIndexConcurrently`",
           "anchor": "opdropindexconcurrently"
         },
         {
           "level": 3,
-          "text": "OpRenameTable",
+          "text": "`OpRenameTable`",
           "anchor": "oprenametable"
         },
         {
           "level": 3,
-          "text": "OpRenameColumn",
+          "text": "`OpRenameColumn`",
           "anchor": "oprenamecolumn"
         },
         {
           "level": 3,
-          "text": "OpAlterEnumAddValue",
+          "text": "`OpAlterEnumAddValue`",
           "anchor": "opalterenumaddvalue"
         },
         {
           "level": 3,
-          "text": "OpAddUnique",
+          "text": "`OpAddUnique`",
           "anchor": "opaddunique"
         },
         {
           "level": 3,
-          "text": "OpDropUnique",
+          "text": "`OpDropUnique`",
           "anchor": "opdropunique"
         },
         {
           "level": 3,
-          "text": "OpAddCheck",
+          "text": "`OpAddCheck`",
           "anchor": "opaddcheck"
         },
         {
           "level": 3,
-          "text": "OpDropCheck",
+          "text": "`OpDropCheck`",
           "anchor": "opdropcheck"
         },
         {
           "level": 3,
-          "text": "OpAddExclusion",
+          "text": "`OpAddExclusion`",
           "anchor": "opaddexclusion"
         },
         {
           "level": 3,
-          "text": "OpDropExclusion",
+          "text": "`OpDropExclusion`",
           "anchor": "opdropexclusion"
         },
         {
           "level": 3,
-          "text": "OpAlterIndexSet",
+          "text": "`OpAlterIndexSet`",
           "anchor": "opalterindexset"
         },
         {
           "level": 3,
-          "text": "OpCreateView",
+          "text": "`OpCreateView`",
           "anchor": "opcreateview"
         },
         {
           "level": 3,
-          "text": "OpDropView",
+          "text": "`OpDropView`",
           "anchor": "opdropview"
         },
         {
           "level": 3,
-          "text": "OpCreateOrReplaceView",
+          "text": "`OpCreateOrReplaceView`",
           "anchor": "opcreateorreplaceview"
         },
         {
           "level": 3,
-          "text": "OpCreateMaterializedView",
+          "text": "`OpCreateMaterializedView`",
           "anchor": "opcreatematerializedview"
         },
         {
           "level": 3,
-          "text": "OpDropMaterializedView",
+          "text": "`OpDropMaterializedView`",
           "anchor": "opdropmaterializedview"
         },
         {
           "level": 3,
-          "text": "OpRefreshMaterializedView",
+          "text": "`OpRefreshMaterializedView`",
           "anchor": "oprefreshmaterializedview"
         },
         {
           "level": 3,
-          "text": "OpCreateSequence",
+          "text": "`OpCreateSequence`",
           "anchor": "opcreatesequence"
         },
         {
           "level": 3,
-          "text": "OpDropSequence",
+          "text": "`OpDropSequence`",
           "anchor": "opdropsequence"
         },
         {
           "level": 3,
-          "text": "OpAlterSequence",
+          "text": "`OpAlterSequence`",
           "anchor": "opaltersequence"
         },
         {
           "level": 3,
-          "text": "OpCreateEnum",
+          "text": "`OpCreateEnum`",
           "anchor": "opcreateenum"
         },
         {
           "level": 3,
-          "text": "OpCreateCompositeType",
+          "text": "`OpCreateCompositeType`",
           "anchor": "opcreatecompositetype"
         },
         {
           "level": 3,
-          "text": "OpDropCompositeType",
+          "text": "`OpDropCompositeType`",
           "anchor": "opdropcompositetype"
         },
         {
           "level": 3,
-          "text": "OpCreateDomain",
+          "text": "`OpCreateDomain`",
           "anchor": "opcreatedomain"
         },
         {
           "level": 3,
-          "text": "OpDropDomain",
+          "text": "`OpDropDomain`",
           "anchor": "opdropdomain"
         },
         {
           "level": 3,
-          "text": "OpAlterDomain",
+          "text": "`OpAlterDomain`",
           "anchor": "opalterdomain"
         },
         {
           "level": 3,
-          "text": "OpCreateFunction",
+          "text": "`OpCreateFunction`",
           "anchor": "opcreatefunction"
         },
         {
           "level": 3,
-          "text": "OpDropFunction",
+          "text": "`OpDropFunction`",
           "anchor": "opdropfunction"
         },
         {
           "level": 3,
-          "text": "OpCreateOrReplaceFunction",
+          "text": "`OpCreateOrReplaceFunction`",
           "anchor": "opcreateorreplacefunction"
         },
         {
           "level": 3,
-          "text": "OpCreateTrigger",
+          "text": "`OpCreateTrigger`",
           "anchor": "opcreatetrigger"
         },
         {
           "level": 3,
-          "text": "OpDropTrigger",
+          "text": "`OpDropTrigger`",
           "anchor": "opdroptrigger"
         },
         {
           "level": 3,
-          "text": "OpCreatePolicy",
+          "text": "`OpCreatePolicy`",
           "anchor": "opcreatepolicy"
         },
         {
           "level": 3,
-          "text": "OpDropPolicy",
+          "text": "`OpDropPolicy`",
           "anchor": "opdroppolicy"
         },
         {
           "level": 3,
-          "text": "OpAlterPolicy",
+          "text": "`OpAlterPolicy`",
           "anchor": "opalterpolicy"
         },
         {
           "level": 3,
-          "text": "OpEnableRLS",
+          "text": "`OpEnableRLS`",
           "anchor": "openablerls"
         },
         {
           "level": 3,
-          "text": "OpDisableRLS",
+          "text": "`OpDisableRLS`",
           "anchor": "opdisablerls"
         },
         {
           "level": 3,
-          "text": "OpForceRLS",
+          "text": "`OpForceRLS`",
           "anchor": "opforcerls"
         },
         {
           "level": 3,
-          "text": "OpNoForceRLS",
+          "text": "`OpNoForceRLS`",
           "anchor": "opnoforcerls"
         },
         {
           "level": 3,
-          "text": "OpCreatePartmanParent",
+          "text": "`OpCreatePartmanParent`",
           "anchor": "opcreatepartmanparent"
         },
         {
           "level": 3,
-          "text": "OpUpdatePartmanRetention",
+          "text": "`OpUpdatePartmanRetention`",
           "anchor": "opupdatepartmanretention"
         },
         {
           "level": 3,
-          "text": "OpUpdatePartmanPremake",
+          "text": "`OpUpdatePartmanPremake`",
           "anchor": "opupdatepartmanpremake"
         },
         {
           "level": 3,
-          "text": "RiskLevel",
+          "text": "`RiskLevel`",
           "anchor": "risklevel"
         },
         {
           "level": 3,
-          "text": "LockType",
+          "text": "`LockType`",
           "anchor": "locktype"
         },
         {
           "level": 3,
-          "text": "OpType",
+          "text": "`OpType`",
           "anchor": "optype"
         },
         {
           "level": 3,
-          "text": "OpContext",
+          "text": "`OpContext`",
           "anchor": "opcontext"
         },
         {
           "level": 3,
-          "text": "Classification",
+          "text": "`Classification`",
           "anchor": "classification"
         },
         {
           "level": 3,
-          "text": "Classify",
+          "text": "`Classify`",
           "anchor": "classify"
         },
         {
           "level": 3,
-          "text": "RiskLevel.String",
+          "text": "`RiskLevel.String`",
           "anchor": "risklevelstring"
         },
         {
           "level": 3,
-          "text": "LockType.String",
+          "text": "`LockType.String`",
           "anchor": "locktypestring"
         }
       ]
@@ -6320,17 +6320,17 @@
         },
         {
           "level": 2,
-          "text": "internal/seed",
+          "text": "`internal/seed`",
           "anchor": "internalseed"
         },
         {
           "level": 3,
-          "text": "SeedConfig",
+          "text": "`SeedConfig`",
           "anchor": "seedconfig"
         },
         {
           "level": 3,
-          "text": "Generate",
+          "text": "`Generate`",
           "anchor": "generate"
         }
       ]
@@ -6347,137 +6347,137 @@
         },
         {
           "level": 2,
-          "text": "internal/semtype",
+          "text": "`internal/semtype`",
           "anchor": "internalsemtype"
         },
         {
           "level": 3,
-          "text": "KindScalar",
+          "text": "`KindScalar`",
           "anchor": "kindscalar"
         },
         {
           "level": 3,
-          "text": "KindEnum",
+          "text": "`KindEnum`",
           "anchor": "kindenum"
         },
         {
           "level": 3,
-          "text": "KindComposite",
+          "text": "`KindComposite`",
           "anchor": "kindcomposite"
         },
         {
           "level": 3,
-          "text": "KindStateMachine",
+          "text": "`KindStateMachine`",
           "anchor": "kindstatemachine"
         },
         {
           "level": 3,
-          "text": "Kind",
+          "text": "`Kind`",
           "anchor": "kind"
         },
         {
           "level": 3,
-          "text": "CompositeField",
+          "text": "`CompositeField`",
           "anchor": "compositefield"
         },
         {
           "level": 3,
-          "text": "SMStateDef",
+          "text": "`SMStateDef`",
           "anchor": "smstatedef"
         },
         {
           "level": 3,
-          "text": "SMTransitionDef",
+          "text": "`SMTransitionDef`",
           "anchor": "smtransitiondef"
         },
         {
           "level": 3,
-          "text": "TypeDef",
+          "text": "`TypeDef`",
           "anchor": "typedef"
         },
         {
           "level": 3,
-          "text": "Registry",
+          "text": "`Registry`",
           "anchor": "registry"
         },
         {
           "level": 3,
-          "text": "UserSMState",
+          "text": "`UserSMState`",
           "anchor": "usersmstate"
         },
         {
           "level": 3,
-          "text": "UserSMTransition",
+          "text": "`UserSMTransition`",
           "anchor": "usersmtransition"
         },
         {
           "level": 3,
-          "text": "UserTypeDef",
+          "text": "`UserTypeDef`",
           "anchor": "usertypedef"
         },
         {
           "level": 3,
-          "text": "ResolvedColumn",
+          "text": "`ResolvedColumn`",
           "anchor": "resolvedcolumn"
         },
         {
           "level": 3,
-          "text": "NewBuiltinRegistry",
+          "text": "`NewBuiltinRegistry`",
           "anchor": "newbuiltinregistry"
         },
         {
           "level": 3,
-          "text": "NewRegistry",
+          "text": "`NewRegistry`",
           "anchor": "newregistry"
         },
         {
           "level": 3,
-          "text": "Kind.String",
+          "text": "`Kind.String`",
           "anchor": "kindstring"
         },
         {
           "level": 3,
-          "text": "Registry.AddExtensionTypes",
+          "text": "`Registry.AddExtensionTypes`",
           "anchor": "registryaddextensiontypes"
         },
         {
           "level": 3,
-          "text": "Registry.Register",
+          "text": "`Registry.Register`",
           "anchor": "registryregister"
         },
         {
           "level": 3,
-          "text": "Registry.ShadowDiags",
+          "text": "`Registry.ShadowDiags`",
           "anchor": "registryshadowdiags"
         },
         {
           "level": 3,
-          "text": "Registry.IsBuiltin",
+          "text": "`Registry.IsBuiltin`",
           "anchor": "registryisbuiltin"
         },
         {
           "level": 3,
-          "text": "Registry.BuiltinNames",
+          "text": "`Registry.BuiltinNames`",
           "anchor": "registrybuiltinnames"
         },
         {
           "level": 3,
-          "text": "Registry.Resolve",
+          "text": "`Registry.Resolve`",
           "anchor": "registryresolve"
         },
         {
           "level": 3,
-          "text": "Registry.StateMachineTypes",
+          "text": "`Registry.StateMachineTypes`",
           "anchor": "registrystatemachinetypes"
         },
         {
           "level": 3,
-          "text": "Registry.LoadUserTypes",
+          "text": "`Registry.LoadUserTypes`",
           "anchor": "registryloadusertypes"
         },
         {
           "level": 3,
-          "text": "Registry.ResolveColumn",
+          "text": "`Registry.ResolveColumn`",
           "anchor": "registryresolvecolumn"
         }
       ]
@@ -6494,57 +6494,57 @@
         },
         {
           "level": 2,
-          "text": "internal/serve",
+          "text": "`internal/serve`",
           "anchor": "internalserve"
         },
         {
           "level": 3,
-          "text": "PoolConfig",
+          "text": "`PoolConfig`",
           "anchor": "poolconfig"
         },
         {
           "level": 3,
-          "text": "Server",
+          "text": "`Server`",
           "anchor": "server"
         },
         {
           "level": 3,
-          "text": "New",
+          "text": "`New`",
           "anchor": "new"
         },
         {
           "level": 3,
-          "text": "NewFromPool",
+          "text": "`NewFromPool`",
           "anchor": "newfrompool"
         },
         {
           "level": 3,
-          "text": "NewProject",
+          "text": "`NewProject`",
           "anchor": "newproject"
         },
         {
           "level": 3,
-          "text": "badParamError.Error",
+          "text": "`badParamError.Error`",
           "anchor": "badparamerrorerror"
         },
         {
           "level": 3,
-          "text": "Server.SetRequestTimeout",
+          "text": "`Server.SetRequestTimeout`",
           "anchor": "serversetrequesttimeout"
         },
         {
           "level": 3,
-          "text": "Server.ListenAndServe",
+          "text": "`Server.ListenAndServe`",
           "anchor": "serverlistenandserve"
         },
         {
           "level": 3,
-          "text": "Server.ServeHTTP",
+          "text": "`Server.ServeHTTP`",
           "anchor": "serverservehttp"
         },
         {
           "level": 3,
-          "text": "Server.Close",
+          "text": "`Server.Close`",
           "anchor": "serverclose"
         }
       ]
@@ -6561,17 +6561,17 @@
         },
         {
           "level": 2,
-          "text": "internal/splitfmt",
+          "text": "`internal/splitfmt`",
           "anchor": "internalsplitfmt"
         },
         {
           "level": 3,
-          "text": "Encode",
+          "text": "`Encode`",
           "anchor": "encode"
         },
         {
           "level": 3,
-          "text": "Decode",
+          "text": "`Decode`",
           "anchor": "decode"
         }
       ]
@@ -6588,262 +6588,262 @@
         },
         {
           "level": 2,
-          "text": "internal/sql",
+          "text": "`internal/sql`",
           "anchor": "internalsql"
         },
         {
           "level": 3,
-          "text": "QuoteIdent",
+          "text": "`QuoteIdent`",
           "anchor": "quoteident"
         },
         {
           "level": 3,
-          "text": "QualifiedName",
+          "text": "`QualifiedName`",
           "anchor": "qualifiedname"
         },
         {
           "level": 3,
-          "text": "LiteralValue",
+          "text": "`LiteralValue`",
           "anchor": "literalvalue"
         },
         {
           "level": 3,
-          "text": "ExprValue",
+          "text": "`ExprValue`",
           "anchor": "exprvalue"
         },
         {
           "level": 3,
-          "text": "ConstraintName",
+          "text": "`ConstraintName`",
           "anchor": "constraintname"
         },
         {
           "level": 3,
-          "text": "CreateSchema",
+          "text": "`CreateSchema`",
           "anchor": "createschema"
         },
         {
           "level": 3,
-          "text": "CreateExtension",
+          "text": "`CreateExtension`",
           "anchor": "createextension"
         },
         {
           "level": 3,
-          "text": "CreateExtensionInSchema",
+          "text": "`CreateExtensionInSchema`",
           "anchor": "createextensioninschema"
         },
         {
           "level": 3,
-          "text": "CreateEnum",
+          "text": "`CreateEnum`",
           "anchor": "createenum"
         },
         {
           "level": 3,
-          "text": "CreateDomain",
+          "text": "`CreateDomain`",
           "anchor": "createdomain"
         },
         {
           "level": 3,
-          "text": "CreateCompositeType",
+          "text": "`CreateCompositeType`",
           "anchor": "createcompositetype"
         },
         {
           "level": 3,
-          "text": "DropCompositeType",
+          "text": "`DropCompositeType`",
           "anchor": "dropcompositetype"
         },
         {
           "level": 3,
-          "text": "DropDomain",
+          "text": "`DropDomain`",
           "anchor": "dropdomain"
         },
         {
           "level": 3,
-          "text": "CreateTable",
+          "text": "`CreateTable`",
           "anchor": "createtable"
         },
         {
           "level": 3,
-          "text": "GeneratedStorageKeyword",
+          "text": "`GeneratedStorageKeyword`",
           "anchor": "generatedstoragekeyword"
         },
         {
           "level": 3,
-          "text": "AlterTableAddColumnIfNotExists",
+          "text": "`AlterTableAddColumnIfNotExists`",
           "anchor": "altertableaddcolumnifnotexists"
         },
         {
           "level": 3,
-          "text": "AlterTableAddFK",
+          "text": "`AlterTableAddFK`",
           "anchor": "altertableaddfk"
         },
         {
           "level": 3,
-          "text": "AlterTableAddUnique",
+          "text": "`AlterTableAddUnique`",
           "anchor": "altertableaddunique"
         },
         {
           "level": 3,
-          "text": "AlterTableAddCheck",
+          "text": "`AlterTableAddCheck`",
           "anchor": "altertableaddcheck"
         },
         {
           "level": 3,
-          "text": "AlterTableAddExclusion",
+          "text": "`AlterTableAddExclusion`",
           "anchor": "altertableaddexclusion"
         },
         {
           "level": 3,
-          "text": "CreateIndex",
+          "text": "`CreateIndex`",
           "anchor": "createindex"
         },
         {
           "level": 3,
-          "text": "CommentOn",
+          "text": "`CommentOn`",
           "anchor": "commenton"
         },
         {
           "level": 3,
-          "text": "CommentsOnTable",
+          "text": "`CommentsOnTable`",
           "anchor": "commentsontable"
         },
         {
           "level": 3,
-          "text": "CreatePartitionOf",
+          "text": "`CreatePartitionOf`",
           "anchor": "createpartitionof"
         },
         {
           "level": 3,
-          "text": "CreatePartmanParent",
+          "text": "`CreatePartmanParent`",
           "anchor": "createpartmanparent"
         },
         {
           "level": 3,
-          "text": "UpdatePartmanConfig",
+          "text": "`UpdatePartmanConfig`",
           "anchor": "updatepartmanconfig"
         },
         {
           "level": 3,
-          "text": "PartmanRunMaintenanceCron",
+          "text": "`PartmanRunMaintenanceCron`",
           "anchor": "partmanrunmaintenancecron"
         },
         {
           "level": 3,
-          "text": "AlterTableOwner",
+          "text": "`AlterTableOwner`",
           "anchor": "altertableowner"
         },
         {
           "level": 3,
-          "text": "AlterTableEnableRLS",
+          "text": "`AlterTableEnableRLS`",
           "anchor": "altertableenablerls"
         },
         {
           "level": 3,
-          "text": "AlterTableForceRLS",
+          "text": "`AlterTableForceRLS`",
           "anchor": "altertableforcerls"
         },
         {
           "level": 3,
-          "text": "CreatePolicy",
+          "text": "`CreatePolicy`",
           "anchor": "createpolicy"
         },
         {
           "level": 3,
-          "text": "DropPolicy",
+          "text": "`DropPolicy`",
           "anchor": "droppolicy"
         },
         {
           "level": 3,
-          "text": "AlterTableDisableRLS",
+          "text": "`AlterTableDisableRLS`",
           "anchor": "altertabledisablerls"
         },
         {
           "level": 3,
-          "text": "AlterTableNoForceRLS",
+          "text": "`AlterTableNoForceRLS`",
           "anchor": "altertablenoforcerls"
         },
         {
           "level": 3,
-          "text": "CreateView",
+          "text": "`CreateView`",
           "anchor": "createview"
         },
         {
           "level": 3,
-          "text": "DropView",
+          "text": "`DropView`",
           "anchor": "dropview"
         },
         {
           "level": 3,
-          "text": "CreateMaterializedView",
+          "text": "`CreateMaterializedView`",
           "anchor": "creatematerializedview"
         },
         {
           "level": 3,
-          "text": "DropMaterializedView",
+          "text": "`DropMaterializedView`",
           "anchor": "dropmaterializedview"
         },
         {
           "level": 3,
-          "text": "RefreshMaterializedView",
+          "text": "`RefreshMaterializedView`",
           "anchor": "refreshmaterializedview"
         },
         {
           "level": 3,
-          "text": "CreateSequence",
+          "text": "`CreateSequence`",
           "anchor": "createsequence"
         },
         {
           "level": 3,
-          "text": "DropSequence",
+          "text": "`DropSequence`",
           "anchor": "dropsequence"
         },
         {
           "level": 3,
-          "text": "AlterSequence",
+          "text": "`AlterSequence`",
           "anchor": "altersequence"
         },
         {
           "level": 3,
-          "text": "CreateDenyMutationFunction",
+          "text": "`CreateDenyMutationFunction`",
           "anchor": "createdenymutationfunction"
         },
         {
           "level": 3,
-          "text": "CreateAppendOnlyTrigger",
+          "text": "`CreateAppendOnlyTrigger`",
           "anchor": "createappendonlytrigger"
         },
         {
           "level": 3,
-          "text": "StateMachineTriggerFuncName",
+          "text": "`StateMachineTriggerFuncName`",
           "anchor": "statemachinetriggerfuncname"
         },
         {
           "level": 3,
-          "text": "CreateStateMachineTriggerFunction",
+          "text": "`CreateStateMachineTriggerFunction`",
           "anchor": "createstatemachinetriggerfunction"
         },
         {
           "level": 3,
-          "text": "CreateStateMachineTrigger",
+          "text": "`CreateStateMachineTrigger`",
           "anchor": "createstatemachinetrigger"
         },
         {
           "level": 3,
-          "text": "CreateTrigger",
+          "text": "`CreateTrigger`",
           "anchor": "createtrigger"
         },
         {
           "level": 3,
-          "text": "DropTrigger",
+          "text": "`DropTrigger`",
           "anchor": "droptrigger"
         },
         {
           "level": 3,
-          "text": "CreateFunction",
+          "text": "`CreateFunction`",
           "anchor": "createfunction"
         },
         {
           "level": 3,
-          "text": "DropFunction",
+          "text": "`DropFunction`",
           "anchor": "dropfunction"
         }
       ]
@@ -6860,112 +6860,112 @@
         },
         {
           "level": 2,
-          "text": "internal/sqlexpr",
+          "text": "`internal/sqlexpr`",
           "anchor": "internalsqlexpr"
         },
         {
           "level": 3,
-          "text": "Node",
+          "text": "`Node`",
           "anchor": "node"
         },
         {
           "level": 3,
-          "text": "ColumnRef",
+          "text": "`ColumnRef`",
           "anchor": "columnref"
         },
         {
           "level": 3,
-          "text": "BoolLiteral",
+          "text": "`BoolLiteral`",
           "anchor": "boolliteral"
         },
         {
           "level": 3,
-          "text": "StringLiteral",
+          "text": "`StringLiteral`",
           "anchor": "stringliteral"
         },
         {
           "level": 3,
-          "text": "IntLiteral",
+          "text": "`IntLiteral`",
           "anchor": "intliteral"
         },
         {
           "level": 3,
-          "text": "FloatLiteral",
+          "text": "`FloatLiteral`",
           "anchor": "floatliteral"
         },
         {
           "level": 3,
-          "text": "NullLiteral",
+          "text": "`NullLiteral`",
           "anchor": "nullliteral"
         },
         {
           "level": 3,
-          "text": "FuncCall",
+          "text": "`FuncCall`",
           "anchor": "funccall"
         },
         {
           "level": 3,
-          "text": "Cast",
+          "text": "`Cast`",
           "anchor": "cast"
         },
         {
           "level": 3,
-          "text": "BinaryOp",
+          "text": "`BinaryOp`",
           "anchor": "binaryop"
         },
         {
           "level": 3,
-          "text": "UnaryOp",
+          "text": "`UnaryOp`",
           "anchor": "unaryop"
         },
         {
           "level": 3,
-          "text": "ExistsExpr",
+          "text": "`ExistsExpr`",
           "anchor": "existsexpr"
         },
         {
           "level": 3,
-          "text": "SelectExpr",
+          "text": "`SelectExpr`",
           "anchor": "selectexpr"
         },
         {
           "level": 3,
-          "text": "ParenExpr",
+          "text": "`ParenExpr`",
           "anchor": "parenexpr"
         },
         {
           "level": 3,
-          "text": "CaseExpr",
+          "text": "`CaseExpr`",
           "anchor": "caseexpr"
         },
         {
           "level": 3,
-          "text": "WhenClause",
+          "text": "`WhenClause`",
           "anchor": "whenclause"
         },
         {
           "level": 3,
-          "text": "ParseError",
+          "text": "`ParseError`",
           "anchor": "parseerror"
         },
         {
           "level": 3,
-          "text": "Parse",
+          "text": "`Parse`",
           "anchor": "parse"
         },
         {
           "level": 3,
-          "text": "Walk",
+          "text": "`Walk`",
           "anchor": "walk"
         },
         {
           "level": 3,
-          "text": "CollectColumnRefs",
+          "text": "`CollectColumnRefs`",
           "anchor": "collectcolumnrefs"
         },
         {
           "level": 3,
-          "text": "ParseError.Error",
+          "text": "`ParseError.Error`",
           "anchor": "parseerrorerror"
         }
       ]
@@ -6982,32 +6982,32 @@
         },
         {
           "level": 2,
-          "text": "internal/sqlparse",
+          "text": "`internal/sqlparse`",
           "anchor": "internalsqlparse"
         },
         {
           "level": 3,
-          "text": "NormalizeExpr",
+          "text": "`NormalizeExpr`",
           "anchor": "normalizeexpr"
         },
         {
           "level": 3,
-          "text": "ExprEqual",
+          "text": "`ExprEqual`",
           "anchor": "exprequal"
         },
         {
           "level": 3,
-          "text": "SplitStatements",
+          "text": "`SplitStatements`",
           "anchor": "splitstatements"
         },
         {
           "level": 3,
-          "text": "ExtractTableRefs",
+          "text": "`ExtractTableRefs`",
           "anchor": "extracttablerefs"
         },
         {
           "level": 3,
-          "text": "DeparseExpr",
+          "text": "`DeparseExpr`",
           "anchor": "deparseexpr"
         }
       ]
@@ -7024,12 +7024,12 @@
         },
         {
           "level": 2,
-          "text": "internal/sqlutil",
+          "text": "`internal/sqlutil`",
           "anchor": "internalsqlutil"
         },
         {
           "level": 3,
-          "text": "ParseExpr",
+          "text": "`ParseExpr`",
           "anchor": "parseexpr"
         }
       ]
@@ -7046,262 +7046,262 @@
         },
         {
           "level": 2,
-          "text": "internal/testdb",
+          "text": "`internal/testdb`",
           "anchor": "internaltestdb"
         },
         {
           "level": 3,
-          "text": "ConnectionEnv",
+          "text": "`ConnectionEnv`",
           "anchor": "connectionenv"
         },
         {
           "level": 3,
-          "text": "NamePrefix",
+          "text": "`NamePrefix`",
           "anchor": "nameprefix"
         },
         {
           "level": 3,
-          "text": "RandLen",
+          "text": "`RandLen`",
           "anchor": "randlen"
         },
         {
           "level": 3,
-          "text": "RandCharset",
+          "text": "`RandCharset`",
           "anchor": "randcharset"
         },
         {
           "level": 3,
-          "text": "MaxNameLen",
+          "text": "`MaxNameLen`",
           "anchor": "maxnamelen"
         },
         {
           "level": 3,
-          "text": "SuffixLen",
+          "text": "`SuffixLen`",
           "anchor": "suffixlen"
         },
         {
           "level": 3,
-          "text": "TemplateFS",
+          "text": "`TemplateFS`",
           "anchor": "templatefs"
         },
         {
           "level": 3,
-          "text": "CITemplateFS",
+          "text": "`CITemplateFS`",
           "anchor": "citemplatefs"
         },
         {
           "level": 3,
-          "text": "Barrier",
+          "text": "`Barrier`",
           "anchor": "barrier"
         },
         {
           "level": 3,
-          "text": "PartmanInfo",
+          "text": "`PartmanInfo`",
           "anchor": "partmaninfo"
         },
         {
           "level": 3,
-          "text": "CITemplateOptions",
+          "text": "`CITemplateOptions`",
           "anchor": "citemplateoptions"
         },
         {
           "level": 3,
-          "text": "Manager",
+          "text": "`Manager`",
           "anchor": "manager"
         },
         {
           "level": 3,
-          "text": "EphemeralDB",
+          "text": "`EphemeralDB`",
           "anchor": "ephemeraldb"
         },
         {
           "level": 3,
-          "text": "CreateOptions",
+          "text": "`CreateOptions`",
           "anchor": "createoptions"
         },
         {
           "level": 3,
-          "text": "NewBarrier",
+          "text": "`NewBarrier`",
           "anchor": "newbarrier"
         },
         {
           "level": 3,
-          "text": "DatabaseURL",
+          "text": "`DatabaseURL`",
           "anchor": "databaseurl"
         },
         {
           "level": 3,
-          "text": "RequireDB",
+          "text": "`RequireDB`",
           "anchor": "requiredb"
         },
         {
           "level": 3,
-          "text": "RequirePartman",
+          "text": "`RequirePartman`",
           "anchor": "requirepartman"
         },
         {
           "level": 3,
-          "text": "RequireTCPLanes",
+          "text": "`RequireTCPLanes`",
           "anchor": "requiretcplanes"
         },
         {
           "level": 3,
-          "text": "RequireURL",
+          "text": "`RequireURL`",
           "anchor": "requireurl"
         },
         {
           "level": 3,
-          "text": "SkipIfNoTCPHost",
+          "text": "`SkipIfNoTCPHost`",
           "anchor": "skipifnotcphost"
         },
         {
           "level": 3,
-          "text": "MainNoDatabase",
+          "text": "`MainNoDatabase`",
           "anchor": "mainnodatabase"
         },
         {
           "level": 3,
-          "text": "RunWithCluster",
+          "text": "`RunWithCluster`",
           "anchor": "runwithcluster"
         },
         {
           "level": 3,
-          "text": "CreateInvalidIndex",
+          "text": "`CreateInvalidIndex`",
           "anchor": "createinvalidindex"
         },
         {
           "level": 3,
-          "text": "Unavailable",
+          "text": "`Unavailable`",
           "anchor": "unavailable"
         },
         {
           "level": 3,
-          "text": "RequireManager",
+          "text": "`RequireManager`",
           "anchor": "requiremanager"
         },
         {
           "level": 3,
-          "text": "RequireEphemeralDB",
+          "text": "`RequireEphemeralDB`",
           "anchor": "requireephemeraldb"
         },
         {
           "level": 3,
-          "text": "RequireConn",
+          "text": "`RequireConn`",
           "anchor": "requireconn"
         },
         {
           "level": 3,
-          "text": "MainManager",
+          "text": "`MainManager`",
           "anchor": "mainmanager"
         },
         {
           "level": 3,
-          "text": "MainFailed",
+          "text": "`MainFailed`",
           "anchor": "mainfailed"
         },
         {
           "level": 3,
-          "text": "SkipIfNoPostgres",
+          "text": "`SkipIfNoPostgres`",
           "anchor": "skipifnopostgres"
         },
         {
           "level": 3,
-          "text": "SkipIfNoPartman",
+          "text": "`SkipIfNoPartman`",
           "anchor": "skipifnopartman"
         },
         {
           "level": 3,
-          "text": "SupportedLanguages",
+          "text": "`SupportedLanguages`",
           "anchor": "supportedlanguages"
         },
         {
           "level": 3,
-          "text": "RenderTemplate",
+          "text": "`RenderTemplate`",
           "anchor": "rendertemplate"
         },
         {
           "level": 3,
-          "text": "WrapperOutputPath",
+          "text": "`WrapperOutputPath`",
           "anchor": "wrapperoutputpath"
         },
         {
           "level": 3,
-          "text": "RenderCITemplate",
+          "text": "`RenderCITemplate`",
           "anchor": "rendercitemplate"
         },
         {
           "level": 3,
-          "text": "NewManager",
+          "text": "`NewManager`",
           "anchor": "newmanager"
         },
         {
           "level": 3,
-          "text": "GenerateName",
+          "text": "`GenerateName`",
           "anchor": "generatename"
         },
         {
           "level": 3,
-          "text": "ParseName",
+          "text": "`ParseName`",
           "anchor": "parsename"
         },
         {
           "level": 3,
-          "text": "Barrier.Arrive",
+          "text": "`Barrier.Arrive`",
           "anchor": "barrierarrive"
         },
         {
           "level": 3,
-          "text": "Barrier.WaitArrived",
+          "text": "`Barrier.WaitArrived`",
           "anchor": "barrierwaitarrived"
         },
         {
           "level": 3,
-          "text": "Barrier.Release",
+          "text": "`Barrier.Release`",
           "anchor": "barrierrelease"
         },
         {
           "level": 3,
-          "text": "CreateOptions.Validate",
+          "text": "`CreateOptions.Validate`",
           "anchor": "createoptionsvalidate"
         },
         {
           "level": 3,
-          "text": "Manager.Create",
+          "text": "`Manager.Create`",
           "anchor": "managercreate"
         },
         {
           "level": 3,
-          "text": "Manager.Drop",
+          "text": "`Manager.Drop`",
           "anchor": "managerdrop"
         },
         {
           "level": 3,
-          "text": "Manager.DropByName",
+          "text": "`Manager.DropByName`",
           "anchor": "managerdropbyname"
         },
         {
           "level": 3,
-          "text": "EphemeralDB.Connect",
+          "text": "`EphemeralDB.Connect`",
           "anchor": "ephemeraldbconnect"
         },
         {
           "level": 3,
-          "text": "EphemeralDB.Pool",
+          "text": "`EphemeralDB.Pool`",
           "anchor": "ephemeraldbpool"
         },
         {
           "level": 3,
-          "text": "Manager.ApplyDDL",
+          "text": "`Manager.ApplyDDL`",
           "anchor": "managerapplyddl"
         },
         {
           "level": 3,
-          "text": "Manager.ListOrphans",
+          "text": "`Manager.ListOrphans`",
           "anchor": "managerlistorphans"
         },
         {
           "level": 3,
-          "text": "Manager.SetupForTest",
+          "text": "`Manager.SetupForTest`",
           "anchor": "managersetupfortest"
         }
       ]
@@ -7318,42 +7318,42 @@
         },
         {
           "level": 2,
-          "text": "internal/typeinfo",
+          "text": "`internal/typeinfo`",
           "anchor": "internaltypeinfo"
         },
         {
           "level": 3,
-          "text": "Params",
+          "text": "`Params`",
           "anchor": "params"
         },
         {
           "level": 3,
-          "text": "Type",
+          "text": "`Type`",
           "anchor": "type"
         },
         {
           "level": 3,
-          "text": "Parse",
+          "text": "`Parse`",
           "anchor": "parse"
         },
         {
           "level": 3,
-          "text": "Reconstruct",
+          "text": "`Reconstruct`",
           "anchor": "reconstruct"
         },
         {
           "level": 3,
-          "text": "T",
+          "text": "`T`",
           "anchor": "t"
         },
         {
           "level": 3,
-          "text": "MustParse",
+          "text": "`MustParse`",
           "anchor": "mustparse"
         },
         {
           "level": 3,
-          "text": "Type.Equal",
+          "text": "`Type.Equal`",
           "anchor": "typeequal"
         }
       ]
@@ -7370,27 +7370,27 @@
         },
         {
           "level": 2,
-          "text": "internal/validate",
+          "text": "`internal/validate`",
           "anchor": "internalvalidate"
         },
         {
           "level": 3,
-          "text": "Config",
+          "text": "`Config`",
           "anchor": "config"
         },
         {
           "level": 3,
-          "text": "SuppressedDiagnostic",
+          "text": "`SuppressedDiagnostic`",
           "anchor": "suppresseddiagnostic"
         },
         {
           "level": 3,
-          "text": "DefaultConfig",
+          "text": "`DefaultConfig`",
           "anchor": "defaultconfig"
         },
         {
           "level": 3,
-          "text": "Validate",
+          "text": "`Validate`",
           "anchor": "validate"
         }
       ]
@@ -7407,77 +7407,77 @@
         },
         {
           "level": 2,
-          "text": "internal/workload",
+          "text": "`internal/workload`",
           "anchor": "internalworkload"
         },
         {
           "level": 3,
-          "text": "NPlusOneThreshold",
+          "text": "`NPlusOneThreshold`",
           "anchor": "nplusonethreshold"
         },
         {
           "level": 3,
-          "text": "MinSignificantCalls",
+          "text": "`MinSignificantCalls`",
           "anchor": "minsignificantcalls"
         },
         {
           "level": 3,
-          "text": "IndexInfo",
+          "text": "`IndexInfo`",
           "anchor": "indexinfo"
         },
         {
           "level": 3,
-          "text": "DuplicateIndex",
+          "text": "`DuplicateIndex`",
           "anchor": "duplicateindex"
         },
         {
           "level": 3,
-          "text": "TableScanStats",
+          "text": "`TableScanStats`",
           "anchor": "tablescanstats"
         },
         {
           "level": 3,
-          "text": "StatementStats",
+          "text": "`StatementStats`",
           "anchor": "statementstats"
         },
         {
           "level": 3,
-          "text": "FindDuplicateIndexes",
+          "text": "`FindDuplicateIndexes`",
           "anchor": "findduplicateindexes"
         },
         {
           "level": 3,
-          "text": "DetectNPlusOne",
+          "text": "`DetectNPlusOne`",
           "anchor": "detectnplusone"
         },
         {
           "level": 3,
-          "text": "QueryTableScanStats",
+          "text": "`QueryTableScanStats`",
           "anchor": "querytablescanstats"
         },
         {
           "level": 3,
-          "text": "DetectSeqScanHeavy",
+          "text": "`DetectSeqScanHeavy`",
           "anchor": "detectseqscanheavy"
         },
         {
           "level": 3,
-          "text": "DetectLowSelectivityIndexes",
+          "text": "`DetectLowSelectivityIndexes`",
           "anchor": "detectlowselectivityindexes"
         },
         {
           "level": 3,
-          "text": "DetectExcessiveIndexes",
+          "text": "`DetectExcessiveIndexes`",
           "anchor": "detectexcessiveindexes"
         },
         {
           "level": 3,
-          "text": "QueryStatements",
+          "text": "`QueryStatements`",
           "anchor": "querystatements"
         },
         {
           "level": 3,
-          "text": "StructuralRecommendations",
+          "text": "`StructuralRecommendations`",
           "anchor": "structuralrecommendations"
         }
       ]
@@ -7494,17 +7494,17 @@
         },
         {
           "level": 2,
-          "text": "internal/introspect",
+          "text": "`internal/introspect`",
           "anchor": "internalintrospect"
         },
         {
           "level": 3,
-          "text": "Export",
+          "text": "`Export`",
           "anchor": "export"
         },
         {
           "level": 3,
-          "text": "Introspect",
+          "text": "`Introspect`",
           "anchor": "introspect"
         },
         {
@@ -9143,5 +9143,5 @@
       ]
     }
   ],
-  "last_gen": "2026-08-12T12:07:36.816244+00:00"
+  "last_gen": "2026-08-13T06:24:17.534793+00:00"
 }

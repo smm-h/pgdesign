@@ -18,7 +18,6 @@ Analyze database statistics, index usage, and health
 | Name | Short | Type | Default | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--json` |  | bool |  |  | Output all statistics in machine-readable JSON format |
 | `--schema` |  | str |  |  | PostgreSQL schema name to analyze (repeatable for multiple) |
 
 ## Arguments
