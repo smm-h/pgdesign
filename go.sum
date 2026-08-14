@@ -49,10 +49,12 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
+github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 h1:1EYB5IzjZawrrnELUi78f9fPu57HuXjmddZPjrls/28=
+github.com/santhosh-tekuri/jsonschema/v6 v6.0.3/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
 github.com/smm-h/go-toml-edit v0.3.0 h1:XOt0AsBYafNc8PQpJ7jpfdUiUILFuYRr8Xv8ZPit5U8=
 github.com/smm-h/go-toml-edit v0.3.0/go.mod h1:ateUuu33c4CaaB3XUQgsyuPEsIkAWRV8nahfZqpNhm4=
-github.com/smm-h/strictcli/go v0.29.0 h1:n0+NckMikyL/b3omhv2pSVKQOeGrMI505JkDLblcbVc=
-github.com/smm-h/strictcli/go v0.29.0/go.mod h1:CFDJB7rDMon5TFSn5JqCy7I2PYv43j/KQDs1OlE2Ezg=
+github.com/smm-h/strictcli/go v0.32.0 h1:W4FcR1cGzY1LspRUS8fueUttDuPcO/WwDAHx6Yol4U4=
+github.com/smm-h/strictcli/go v0.32.0/go.mod h1:6VmdZhLUAAmlPH4lmH4wfdwIR0ituavDD7W2U+rXMA8=
 github.com/smm-h/strictspec/go v0.1.0 h1:C0yKlFwj1xH4KW6oQy3XiXklz1ROQhwdupycunuIHs8=
 github.com/smm-h/strictspec/go v0.1.0/go.mod h1:KRf+ygogdYS+mzHkGg4DBPffwyqW5Gvqx9ZdkkZc3/k=
 github.com/smm-h/stricttest/go v0.2.0 h1:Yanc930kSovMdCMmB+KPbqbRZTdeWiivlOwvs0qBztM=
