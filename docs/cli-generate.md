@@ -15,15 +15,15 @@ Generate SQL DDL from TOML schema file(s) or directory
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--idempotent` |  | bool |  |  | Add IF NOT EXISTS guards to all generated DDL statements |
-| `--comments` |  | bool | True |  | Include COMMENT ON statements in the generated output |
-| `--format` |  | str | sql |  | Output format for the generated schema representation |
-| `--strict-nf` |  | bool |  |  | Promote normal form violations to errors instead of warnings |
+| `--idempotent`, `--no-idempotent` |  | bool | default: `false` |  | Add IF NOT EXISTS guards to all generated DDL statements |
+| `--comments`, `--no-comments` |  | bool | default: `true` |  | Include COMMENT ON statements in the generated output |
+| `--format` |  | str | default: `sql` |  | Output format for the generated schema representation Values: `sql` (PostgreSQL DDL statements), `json` (the canonical whole-model envelope (format_version, revision, model), hash-verifiable by its reader), `d2` (a D2 entity-relationship diagram source), `svg` (the D2 diagram rendered to SVG), `doc` (human-readable schema documentation), `graphql` (GraphQL SDL with types, relations, enums and custom scalars). |
+| `--strict-nf`, `--no-strict-nf` |  | bool | default: `false` |  | Promote normal form violations to errors instead of warnings |
 
 ## Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Path to TOML schema file(s) or directory containing them |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | required | Path to TOML schema file(s) or directory containing them |

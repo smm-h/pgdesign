@@ -299,23 +299,13 @@
         },
         {
           "level": 2,
-          "text": "migrate apply",
-          "anchor": "migrate-apply"
+          "text": "migrate plan",
+          "anchor": "migrate-plan"
         },
         {
           "level": 3,
           "text": "Flags",
           "anchor": "flags"
-        },
-        {
-          "level": 2,
-          "text": "migrate baseline",
-          "anchor": "migrate-baseline"
-        },
-        {
-          "level": 3,
-          "text": "Flags",
-          "anchor": "flags-1"
         },
         {
           "level": 3,
@@ -330,7 +320,7 @@
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-2"
+          "anchor": "flags-1"
         },
         {
           "level": 3,
@@ -339,28 +329,13 @@
         },
         {
           "level": 2,
-          "text": "migrate plan",
-          "anchor": "migrate-plan"
+          "text": "migrate apply",
+          "anchor": "migrate-apply"
         },
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-3"
-        },
-        {
-          "level": 3,
-          "text": "Arguments",
-          "anchor": "arguments-2"
-        },
-        {
-          "level": 2,
-          "text": "migrate rebase",
-          "anchor": "migrate-rebase"
-        },
-        {
-          "level": 3,
-          "text": "Flags",
-          "anchor": "flags-4"
+          "anchor": "flags-2"
         },
         {
           "level": 2,
@@ -370,17 +345,7 @@
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-5"
-        },
-        {
-          "level": 2,
-          "text": "migrate squash",
-          "anchor": "migrate-squash"
-        },
-        {
-          "level": 3,
-          "text": "Flags",
-          "anchor": "flags-6"
+          "anchor": "flags-3"
         },
         {
           "level": 2,
@@ -390,12 +355,47 @@
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-7"
+          "anchor": "flags-4"
+        },
+        {
+          "level": 2,
+          "text": "migrate squash",
+          "anchor": "migrate-squash"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-5"
+        },
+        {
+          "level": 2,
+          "text": "migrate rebase",
+          "anchor": "migrate-rebase"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-6"
         },
         {
           "level": 2,
           "text": "migrate test",
           "anchor": "migrate-test"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-7"
+        },
+        {
+          "level": 3,
+          "text": "Arguments",
+          "anchor": "arguments-2"
+        },
+        {
+          "level": 2,
+          "text": "migrate baseline",
+          "anchor": "migrate-baseline"
         },
         {
           "level": 3,
@@ -514,8 +514,8 @@
         },
         {
           "level": 2,
-          "text": "testdb gc",
-          "anchor": "testdb-gc"
+          "text": "testdb setup",
+          "anchor": "testdb-setup"
         },
         {
           "level": 3,
@@ -524,8 +524,8 @@
         },
         {
           "level": 2,
-          "text": "testdb init",
-          "anchor": "testdb-init"
+          "text": "testdb teardown",
+          "anchor": "testdb-teardown"
         },
         {
           "level": 3,
@@ -534,8 +534,8 @@
         },
         {
           "level": 2,
-          "text": "testdb setup",
-          "anchor": "testdb-setup"
+          "text": "testdb gc",
+          "anchor": "testdb-gc"
         },
         {
           "level": 3,
@@ -544,8 +544,8 @@
         },
         {
           "level": 2,
-          "text": "testdb teardown",
-          "anchor": "testdb-teardown"
+          "text": "testdb init",
+          "anchor": "testdb-init"
         },
         {
           "level": 3,
@@ -9143,5 +9143,6 @@
       ]
     }
   ],
-  "last_gen": "2026-08-13T06:24:17.534793+00:00"
+  "last_gen": "2026-08-17T15:11:43.075855+00:00",
+  "theme": "minimal"
 }

@@ -11,39 +11,25 @@ nav_order: 9
 
 Database migration planning, generation, and execution
 
-## migrate apply
+## migrate plan
 
-Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.
+Preview the migration chain PURELY, without touching any database (roadmap 5.9). In a chain-mode project it enumerates the edges from GENESIS -- or from an explicit --from revision -- to the single live head, in path-finder order, listing each edge's id, slug, and op summary. Drift preview against a live database is `diff --live`'s job; per-database pending is `migrate status`'s. A legacy (semver-TOML) project keeps the old live-diff plan (requires --db) until it is upgraded to the chain.
 
-**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
-
-### Flags
-
-| Name | Short | Type | Default | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
-
-## migrate baseline
-
-Adopt an existing database onto the migration chain without executing any migration SQL — for a schema created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying that manifest, and stamps the baseline boundary (rollback-frozen); pass the schema TOML path(s) so the right search-path is introspected. Legacy semver-TOML mode records a semver --version instead. Re-baselining at the same state is a no-op.
-
-**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+**Effect:** read_only
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
-| `--version` |  | str |  |  | Version label for the baseline record (legacy semver-TOML mode only) |
-| `--description` |  | str | Initial baseline |  | Human-readable note recorded with the baseline, shown in migrate status and history output |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL (legacy-mode only; chain-mode plan is pure and ignores it) |
+| `--from` |  | str | optional |  | Chain-mode only: revision string to enumerate from (pure input); absent enumerates from genesis |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | no | Schema TOML file(s) or directory (chain mode; selects the schema search-path to introspect) |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | required | Path to TOML schema file(s) or directory containing them |
 
 ## migrate generate
 
@@ -53,49 +39,29 @@ Generate versioned migration files by comparing the TOML schema against a live d
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server (legacy-mode only; chain-mode generate is pure) |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server (legacy-mode only; chain-mode generate is pure) |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Path to TOML schema file(s) or directory containing them |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | required | Path to TOML schema file(s) or directory containing them |
 
-## migrate plan
+## migrate apply
 
-Preview the migration chain PURELY, without touching any database (roadmap 5.9). In a chain-mode project it enumerates the edges from GENESIS -- or from an explicit --from revision -- to the single live head, in path-finder order, listing each edge's id, slug, and op summary. Drift preview against a live database is `diff --live`'s job; per-database pending is `migrate status`'s. A legacy (semver-TOML) project keeps the old live-diff plan (requires --db) until it is upgraded to the chain.
+Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.
 
-**Effect:** read_only
-
-### Flags
-
-| Name | Short | Type | Default | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL (legacy-mode only; chain-mode plan is pure and ignores it) |
-| `--from` |  | str |  |  | Chain-mode only: revision string to enumerate from (pure input); absent enumerates from genesis |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
-
-### Arguments
-
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Path to TOML schema file(s) or directory containing them |
-
-## migrate rebase
-
-Resolve a two-head fork (chain mode). Re-parents the tail of the head NOT named by --head onto the head that IS named, re-simulating each re-parented edge's ops to recompute its revision and content-derived edge file. The rebased-away originals retire INTACT to migrations/archive/ (never rewritten or deleted), and the rebase revision-remap table (migrations/remap.json) is written so a database stamped at a rebased-away revision is served forward to the live head, never orphaned. A pure file operation: no database is required.
-
-**Effect:** mutating
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--head` |  | str |  |  | The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it |
-| `--dir` |  | str |  |  | Directory containing the chain project (defaults to project config migrations_dir, else migrations) |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
 
 ## migrate rollback
 
@@ -105,27 +71,11 @@ Rollback applied database migrations to a specified target version. Executes dow
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
-| `--to` |  | str |  |  | Target version to rollback to (exclusive -- this version stays applied) |
-
-## migrate squash
-
-Consolidate a range of sequential migrations. In chain mode (a migrations/chain/ project) squash mints a CONSOLIDATION EDGE whose op-list is the ordered concatenation of the range, retiring the superseded originals intact to migrations/archive/ (never a rewrite) so mid-range databases resume via the path-finder; --from/--to are revision-or-edge references. In legacy (semver-TOML) mode squash concatenates the range into one combined migration file. --db is required.
-
-**Effect:** mutating
-
-### Flags
-
-| Name | Short | Type | Default | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--from` |  | str |  |  | Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix) |
-| `--to` |  | str |  |  | End of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode) |
-| `--slug` |  | str |  |  | Display slug for the consolidation edge (chain mode; auto-derived from endpoint hashes when omitted) |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL (REQUIRED); the pre-upgrade guard runs against it (legacy mode also runs the M200 applied-version check) |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
+| `--to` |  | str | optional |  | Target version or revision to roll back to (exclusive -- it stays applied); omitted means roll back a single step |
 
 ## migrate status
 
@@ -135,10 +85,39 @@ Show which migrations have been applied to the target database and which are sti
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
+
+## migrate squash
+
+Consolidate a range of sequential migrations. In chain mode (a migrations/chain/ project) squash mints a CONSOLIDATION EDGE whose op-list is the ordered concatenation of the range, retiring the superseded originals intact to migrations/archive/ (never a rewrite) so mid-range databases resume via the path-finder; --from/--to are revision-or-edge references. In legacy (semver-TOML) mode squash concatenates the range into one combined migration file. --db is required.
+
+**Effect:** mutating
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--from` |  | str | required |  | Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix) |
+| `--to` |  | str | required |  | End of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode) |
+| `--slug` |  | str | optional |  | Display slug for the consolidation edge (chain mode; auto-derived from endpoint hashes when omitted) |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL (REQUIRED); the pre-upgrade guard runs against it (legacy mode also runs the M200 applied-version check) |
+
+## migrate rebase
+
+Resolve a two-head fork (chain mode). Re-parents the tail of the head NOT named by --head onto the head that IS named, re-simulating each re-parented edge's ops to recompute its revision and content-derived edge file. The rebased-away originals retire INTACT to migrations/archive/ (never rewritten or deleted), and the rebase revision-remap table (migrations/remap.json) is written so a database stamped at a rebased-away revision is served forward to the live head, never orphaned. A pure file operation: no database is required.
+
+**Effect:** mutating
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--head` |  | str | required |  | The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it |
+| `--dir` |  | str | optional |  | Directory containing the chain project; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
 
 ## migrate test
 
@@ -148,18 +127,39 @@ Test migrations by applying them against a staging database to verify correctnes
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the staging test database |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
-| `--timeout` |  | int | 60 |  | Maximum time in seconds before the test run is aborted |
-| `--shadow` |  | bool |  |  | Test by replaying migrations into a shadow database and diffing against TOML schema |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the staging test database |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
+| `--timeout` |  | int | optional |  | Maximum time in seconds before the test run is aborted; omitted means 60 |
+| `--shadow`, `--no-shadow` |  | bool | optional |  | Test by replaying migrations into a shadow database and diffing against TOML schema; omitted means the staging replay is run instead |
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | no | Schema file(s) or directory (required with --shadow) |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | optional | Schema file(s) or directory (required with --shadow) |
+
+## migrate baseline
+
+Adopt an existing database onto the migration chain without executing any migration SQL — for a schema created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying that manifest, and stamps the baseline boundary (rollback-frozen); pass the schema TOML path(s) so the right search-path is introspected. Legacy semver-TOML mode records a semver --version instead. Re-baselining at the same state is a no-op.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
+| `--version` |  | str | optional |  | Version label for the baseline record (legacy semver-TOML mode only); omitted is an error in that mode and ignored in chain mode |
+| `--description` |  | str | optional |  | Human-readable note recorded with the baseline, shown in migrate status and history output; omitted means "Initial baseline" |
+
+### Arguments
+
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | optional | Schema TOML file(s) or directory (chain mode; selects the schema search-path to introspect) |
 
 ## migrate upgrade
 
@@ -169,13 +169,13 @@ One-time adoption of a legacy (semver-TOML) database onto the on-disk chain. Ver
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the database to upgrade |
-| `--dir` |  | str |  |  | Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations) |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the database to upgrade |
+| `--dir` |  | str | optional |  | Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations |
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Path to TOML schema file(s) or directory containing them |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | required | Path to TOML schema file(s) or directory containing them |

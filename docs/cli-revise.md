@@ -16,7 +16,7 @@ Regenerate all outputs, chain the migration, and commit — the one-command proj
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the non-retroactive DB tier (live FD discovery, pg_stat workload). When absent, the DB tier is skipped and revise exits non-zero after committing the pure tier. |
-| `--dir` |  | str |  |  | Directory containing the chain-format migrations project (defaults to project config migrations_dir, else migrations) |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the non-retroactive DB tier (live FD discovery, pg_stat workload). When absent, the DB tier is skipped and revise exits non-zero after committing the pure tier. |
+| `--dir` |  | str | optional |  | Directory containing the chain-format migrations project; omitted means [project].migrations_dir from pgdesign.toml, else migrations |

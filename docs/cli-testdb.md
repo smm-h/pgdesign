@@ -11,35 +11,6 @@ nav_order: 14
 
 Manage ephemeral test databases for schema testing
 
-## testdb gc
-
-Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.
-
-**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
-
-### Flags
-
-| Name | Short | Type | Default | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--older-than` |  | str |  |  | Drop databases older than this duration (e.g., 2h, 30m) |
-
-## testdb init
-
-Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.
-
-**Effect:** mutating
-
-### Flags
-
-| Name | Short | Type | Default | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--language` |  | str |  |  | Target programming language(s) for wrapper generation |
-| `--output` |  | str |  |  | Name of the SQL output section (for disambiguation) |
-| `--force-overwrite` |  | bool |  |  | Overwrite existing wrapper files without prompting |
-| `--ci` |  | str |  |  | CI provider for workflow generation (e.g., github-actions) |
-| `--partman` |  | bool |  |  | Include pg_partman installation step in CI workflow |
-
 ## testdb setup
 
 Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.
@@ -48,10 +19,10 @@ Create an ephemeral test database on the PostgreSQL server and apply the specifi
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--ddl` |  | str |  |  | Path to the SQL DDL file to apply to the test database |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--ddl` |  | str | required |  | Path to the SQL DDL file to apply to the test database |
 
 ## testdb teardown
 
@@ -61,6 +32,35 @@ Drop an ephemeral test database that was previously created by testdb setup. Ter
 
 ### Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+
+## testdb gc
+
+Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--older-than` |  | str | required |  | Drop databases older than this duration (e.g., 2h, 30m) |
+
+## testdb init
+
+Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.
+
+**Effect:** mutating
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--language` |  | list[str] (unique) | required |  | Target programming language(s) for wrapper generation |
+| `--output` |  | str | optional |  | Name of the SQL output section (for disambiguation) |
+| `--force-overwrite`, `--no-force-overwrite` |  | bool | optional |  | Overwrite existing wrapper files without prompting; omitted means an existing file is left alone and reported |
+| `--ci` |  | str | optional |  | CI provider for workflow generation (e.g., github-actions) |
+| `--partman`, `--no-partman` |  | bool | optional |  | Include pg_partman installation step in CI workflow; omitted means the step is not emitted |

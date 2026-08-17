@@ -15,14 +15,14 @@ Compare schema file(s) or directory against another target
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--live` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for live database comparison |
-| `--against` |  | str |  |  | Path to TOML schema file or directory to compare against |
-| `--base` |  | str |  |  | Git ref to compare the current schema against (e.g., main) |
+| `--live` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for live database comparison |
+| `--against` |  | str | optional |  | Path to TOML schema file or directory to compare against |
+| `--base` |  | str | optional |  | Git ref to compare the current schema against (e.g., main) |
 
 ## Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Path to TOML schema file(s) or directory containing them |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | required | Path to TOML schema file(s) or directory containing them |

@@ -20,9 +20,9 @@ Resolve each [imports] alias's git pin, vendor the referenced surface (tables + 
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `alias` | no | Name of the single [imports] alias to lock; omit to lock every alias declared in pgdesign.toml |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `alias` | str | optional | Name of the single [imports] alias to lock; omit to lock every alias declared in pgdesign.toml |
 
 ## import update
 
@@ -32,6 +32,6 @@ Re-resolve each [imports] alias's git ref, re-extract the surface your schema ac
 
 ### Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `alias` | no | Name of the single [imports] alias to re-resolve and update; omit to update every declared alias |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `alias` | str | optional | Name of the single [imports] alias to re-resolve and update; omit to update every declared alias |

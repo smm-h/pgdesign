@@ -15,9 +15,9 @@ Introspect a live PostgreSQL database into TOML schema
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--schema` |  | str |  |  | PostgreSQL schema name(s) to introspect (repeatable) |
-| `--output` |  | str |  |  | Write output to a file at this path instead of stdout |
-| `--extensions` |  | bool |  |  | Discover extension types, functions, and opclasses |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--schema` |  | list[str] (unique) | optional |  | PostgreSQL schema name(s) to introspect (repeatable); omitted means public |
+| `--output` |  | str | optional |  | Write output to a file at this path instead of stdout |
+| `--extensions`, `--no-extensions` |  | bool | optional |  | Discover extension types, functions, and opclasses; omitted means they are not discovered |

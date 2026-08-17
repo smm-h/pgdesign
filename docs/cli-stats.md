@@ -15,13 +15,13 @@ Analyze database statistics, index usage, and health
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
-| `--schema` |  | str |  |  | PostgreSQL schema name to analyze (repeatable for multiple) |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server |
+| `--schema` |  | list[str] (unique) | optional |  | PostgreSQL schema name to analyze (repeatable for multiple) |
 
 ## Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | no | TOML schema file(s) for cross-referencing with live data |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | optional | TOML schema file(s) for cross-referencing with live data |

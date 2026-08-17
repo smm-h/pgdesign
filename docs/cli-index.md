@@ -14,29 +14,29 @@ PostgreSQL schema compiler
 
 ## Commands
 
-- [build](../cli-build/) -- Generate all configured outputs from pgdesign.toml
 - [check](../cli-check/) -- Run project checks registered via the check framework and report results
-- [codegen](../cli-codegen/) -- Generate type-safe application code from schema definitions
-- [diff](../cli-diff/) -- Compare schema file(s) or directory against another target
-- [fmt](../cli-fmt/) -- Format a pgdesign TOML schema file or directory in place
 - [generate](../cli-generate/) -- Generate SQL DDL from TOML schema file(s) or directory
+- [fmt](../cli-fmt/) -- Format a pgdesign TOML schema file or directory in place
 - [introspect](../cli-introspect/) -- Introspect a live PostgreSQL database into TOML schema
-- [revise](../cli-revise/) -- Regenerate all outputs, chain the migration, and commit — the one-command project revision. Runs the PURE tier (build outputs, chain-mode migration, blocking normal-form and structural checks) and commits it, then runs the non-retroactive DB tier (live FD discovery, pg_stat workload).
+- [diff](../cli-diff/) -- Compare schema file(s) or directory against another target
 - [seed](../cli-seed/) -- Generate type-aware test data for all schema tables
 - [serve](../cli-serve/) -- Start the pgdesign HTTP API server and web interface
+- [codegen](../cli-codegen/) -- Generate type-safe application code from schema definitions
+- [build](../cli-build/) -- Generate all configured outputs from pgdesign.toml
+- [revise](../cli-revise/) -- Regenerate all outputs, chain the migration, and commit — the one-command project revision. Runs the PURE tier (build outputs, chain-mode migration, blocking normal-form and structural checks) and commits it, then runs the non-retroactive DB tier (live FD discovery, pg_stat workload).
 - [stats](../cli-stats/) -- Analyze database statistics, index usage, and health
 
 ## Command Groups
 
-- [import](../cli-import/) -- Pin and vendor imported schema surfaces from other pgdesign projects
 - [migrate](../cli-migrate/) -- Database migration planning, generation, and execution
+- [import](../cli-import/) -- Pin and vendor imported schema surfaces from other pgdesign projects
 - [testdb](../cli-testdb/) -- Manage ephemeral test databases for schema testing
 
 ## Global flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--project-config` |  | str |  |  | Path to pgdesign.toml (bypasses directory search) |
+| `--project-config` |  | str | optional |  | Path to pgdesign.toml (bypasses directory search) |
 
 ## Framework flags
 

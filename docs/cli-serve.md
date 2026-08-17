@@ -15,10 +15,10 @@ Start the pgdesign HTTP API server and web interface
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL for the target database server (omit for DB-free project mode) |
-| `--port` |  | int | 8080 |  | TCP port number for the HTTP API server to listen on |
-| `--bind` |  | str | 127.0.0.1 |  | Network interface address to bind the HTTP server to. Defaults to 127.0.0.1 (loopback only). WARNING: the server has NO AUTHENTICATION; binding to a non-loopback address (e.g. 0.0.0.0) exposes the schema, database statistics, and diff endpoints to anyone who can reach that address. |
-| `--schema` |  | str |  |  | PostgreSQL schema name to serve via the API (repeatable) |
-| `--timeout` |  | int | 30 |  | Maximum time in seconds for each HTTP request to complete |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL for the target database server (omit for DB-free project mode) |
+| `--port` |  | int | default: `8080` |  | TCP port number for the HTTP API server to listen on |
+| `--bind` |  | str | default: `127.0.0.1` |  | Network interface address to bind the HTTP server to. Defaults to 127.0.0.1 (loopback only). WARNING: the server has NO AUTHENTICATION; binding to a non-loopback address (e.g. 0.0.0.0) exposes the schema, database statistics, and diff endpoints to anyone who can reach that address. |
+| `--schema` |  | list[str] (unique) | optional |  | PostgreSQL schema name to serve via the API (repeatable) |
+| `--timeout` |  | int | default: `30` |  | Maximum time in seconds for each HTTP request to complete |

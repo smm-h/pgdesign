@@ -15,7 +15,7 @@ Generate all configured outputs from pgdesign.toml
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit` |  | bool | True |  | Automatically git commit the generated output files after a successful build; pass --no-auto-commit to leave them in the working tree |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL; required only when a [output.<name>.d2] sets live_stats=true |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Automatically git commit the generated output files after a successful build; omitted means they are committed, and --no-auto-commit leaves them in the working tree |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL; required only when a [output.<name>.d2] sets live_stats=true |

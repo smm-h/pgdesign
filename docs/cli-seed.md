@@ -15,20 +15,20 @@ Generate type-aware test data for all schema tables
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--rows` |  | int | 10 |  | Number of rows to generate per table in the schema |
-| `--seed` |  | int |  |  | Random number generator seed for deterministic output |
-| `--output` |  | str |  |  | Write output to a file at this path instead of stdout |
-| `--apply` |  | bool |  |  | Insert generated seed data directly into the database |
-| `--db` |  | str |  | PGDESIGN_DB | PostgreSQL connection URL, required when using --apply |
-| `--schema` |  | str |  |  | PostgreSQL schema name to filter seed generation to |
-| `--format` |  | str | insert |  | SQL output format for generated seed data statements |
-| `--clean` |  | bool |  |  | Emit TRUNCATE CASCADE statements before inserting seeds |
-| `--mode` |  | str | normal |  | Data generation strategy: normal values or edge-cases |
+| `--rows` |  | int | optional |  | Number of rows to generate per table in the schema; omitted means 10 |
+| `--seed` |  | int | optional |  | Random number generator seed for deterministic output; omitted means a fresh seed is drawn and reported on stderr |
+| `--output` |  | str | optional |  | Write output to a file at this path instead of stdout |
+| `--apply`, `--no-apply` |  | bool | optional |  | Insert generated seed data directly into the database; omitted means the statements are only emitted |
+| `--db` |  | str | optional | PGDESIGN_DB | PostgreSQL connection URL, required when using --apply |
+| `--schema` |  | list[str] (unique) | optional |  | PostgreSQL schema name to filter seed generation to |
+| `--format` |  | str | optional |  | SQL output format for generated seed data statements; omitted means insert Values: `insert` (batched INSERT statements, portable across every client), `copy` (COPY blocks, 5-10x faster to load but psql-only). |
+| `--clean`, `--no-clean` |  | bool | optional |  | Emit TRUNCATE CASCADE statements before inserting seeds; omitted means existing rows are left in place |
+| `--mode` |  | str | optional |  | Data generation strategy; omitted means normal Values: `normal` (plausible values drawn from the declared distributions), `edge-cases` (boundary values that exercise the declared constraints). |
 
 ## Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Path to TOML schema file(s) or directory for seed generation |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | list[str] (variadic) | required | Path to TOML schema file(s) or directory for seed generation |

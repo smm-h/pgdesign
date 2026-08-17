@@ -15,14 +15,14 @@ Format a pgdesign TOML schema file or directory in place
 
 ## Flags
 
-| Name | Short | Type | Default | Env | Description |
+| Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--check` |  | bool |  |  | Check if file is already formatted (exit 1 if not) |
-| `--table-order` |  | str | dependency |  | Table ordering strategy: dependency-based or alphabetical |
-| `--column-order` |  | str | pk_fk_alpha |  | Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve |
+| `--check`, `--no-check` |  | bool | optional |  | Check if file is already formatted (exit 1 if not); omitted means the file is rewritten in place |
+| `--table-order` |  | str | optional |  | Table ordering strategy; omitted means [format].table_order from pgdesign.toml, else dependency Values: `dependency` (order tables so a table follows the tables it depends on), `alphabetical` (order tables by name). |
+| `--column-order` |  | str | optional |  | Column ordering; omitted means [format].column_order from pgdesign.toml, else pk_fk_alpha Values: `pk_fk_alpha` (primary key first, then foreign keys, then the rest alphabetically), `alphabetical` (order every column by name), `fk_last` (order columns alphabetically with the foreign keys moved to the end), `preserve` (leave the declared column order untouched). |
 
 ## Arguments
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `path` | yes | Path to the TOML schema file or directory to format |
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | str | required | Path to the TOML schema file or directory to format |
