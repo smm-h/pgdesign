@@ -25,7 +25,7 @@ Generate type-aware test data for all schema tables
 | `--schema` |  | list[str] (unique) | optional |  | PostgreSQL schema name to filter seed generation to |
 | `--format` |  | str | optional |  | SQL output format for generated seed data statements; omitted means insert Values: `insert` (batched INSERT statements, portable across every client), `copy` (COPY blocks, 5-10x faster to load but psql-only). |
 | `--clean`, `--no-clean` |  | bool | optional |  | Emit TRUNCATE CASCADE statements before inserting seeds; omitted means existing rows are left in place |
-| `--mode` |  | str | optional |  | Data generation strategy; omitted means normal Values: `normal` (plausible values drawn from the declared distributions), `edge-cases` (boundary values that exercise the declared constraints). |
+| `--mode` |  | str | optional |  | Data generation strategy for the generated column values; omitted means normal Values: `normal` (plausible values drawn from the declared distributions), `edge-cases` (boundary values that exercise the declared constraints). |
 
 ## Arguments
 
