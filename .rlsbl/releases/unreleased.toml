@@ -2,11 +2,34 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Every CLI flag and argument now declares whether it is required, optional or defaulted, no mutating command hides a default, and `generate --format json` keeps its exact bytes under `--json`."
 # Optional context explaining why these changes were made
-context = ""
+context = """
+pgdesign moved onto go-strictcli 0.33, whose flag system makes presence an
+explicit, mandatory declaration on every flag and positional argument and bans
+a value default on any declaration of a mutating command: absence must never
+resolve to a value the invocation did not state, because on a mutating command
+a value the framework picked is a value the framework writes. Every switch that
+carried such a default now declares itself optional and names its fallback in
+its own help text, resolved in one place rather than scattered through the
+handlers.
+
+Two real defects fell out of doing this honestly rather than mechanically.
+`fmt` resolved --table-order and --column-order by comparing the parsed value
+against the default string, so an explicitly typed value could not be told from
+an absent flag and pgdesign.toml silently overrode it. And `generate --format
+json --json` appended the framework's machine envelope to stdout right after
+the hash-verified schema document, so the stream carried two concatenated JSON
+documents; `generate` now declares that its stdout is the artifact, which moves
+the envelope to stderr and leaves every format's bytes untouched.
+
+The choices lists became value-plus-help records in the same pass, so --help
+and the CLI reference explain what each format, mode and language actually
+produces, and the codegen mode registry became one table that the map, the
+sorted name list and the choice help all derive from.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
