@@ -237,7 +237,7 @@ func registerSeedCmd(app *strictcli.App) {
 				strictcli.Ch("copy", "COPY blocks, 5-10x faster to load but psql-only"),
 			)),
 			strictcli.BoolFlag("clean", "Emit TRUNCATE CASCADE statements before inserting seeds; omitted means existing rows are left in place", strictcli.Optional()),
-			strictcli.StringFlag("mode", "Data generation strategy; omitted means normal", strictcli.Optional(), strictcli.Choices(
+			strictcli.StringFlag("mode", "Data generation strategy for the generated column values; omitted means normal", strictcli.Optional(), strictcli.Choices(
 				strictcli.Ch("normal", "plausible values drawn from the declared distributions"),
 				strictcli.Ch("edge-cases", "boundary values that exercise the declared constraints"),
 			)),

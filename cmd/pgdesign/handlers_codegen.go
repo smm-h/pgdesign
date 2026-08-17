@@ -32,7 +32,7 @@ func registerCodegenCmd(app *strictcli.App) {
 			)),
 			strictcli.StringFlag("mode", "Code generation mode determining what code to produce; omitted means validators", strictcli.Optional(), strictcli.Choices(SupportedModeChoices()...)),
 			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Optional()),
-			strictcli.StringFlag("split-mode", "How to split multi-file Python DDL output", strictcli.Optional(), strictcli.Choices(
+			strictcli.StringFlag("split-mode", "How to split multi-file Python DDL output; only meaningful with --mode ddl --lang python", strictcli.Optional(), strictcli.Choices(
 				strictcli.Ch("faceted", "write one file per object kind"),
 				strictcli.Ch("self-contained", "emit a single importable module"),
 			)),
