@@ -96,6 +96,48 @@ func TestGenerateJSONIsByteExactOnStdout(t *testing.T) {
 	}
 }
 
+// TestGenerateJSONIsByteExactUnderMachineMode is the same pin under the
+// framework-owned --json. `generate` declares OwnsStdout() (strictcli contract
+// §19.6) precisely because its stdout IS the artifact: in machine mode the
+// envelope moves to stderr and the document's bytes are untouched. Without that
+// declaration the envelope was written to stdout right after the document, so
+// `--format json --json` produced two concatenated JSON documents and any reader
+// that hashes the whole stream saw a different digest.
+func TestGenerateJSONIsByteExactUnderMachineMode(t *testing.T) {
+	testenv.Isolate(t)
+	dir := t.TempDir()
+	writeFile(t, dir, "schema.toml", bytePinSchema)
+	t.Chdir(dir)
+
+	plain := buildApp().Test([]string{"generate", "schema.toml", "--format", "json"})
+	if plain.ExitCode != 0 {
+		t.Fatalf("generate --format json: exit %d\n%s%s", plain.ExitCode, plain.Stdout, plain.Stderr)
+	}
+	machine := buildApp().Test([]string{"generate", "schema.toml", "--format", "json", "--json"})
+	if machine.ExitCode != 0 {
+		t.Fatalf("generate --format json --json: exit %d\n%s%s", machine.ExitCode, machine.Stdout, machine.Stderr)
+	}
+
+	if machine.Stdout != plain.Stdout {
+		t.Errorf("machine mode changed the document's bytes\nhuman   (%d bytes): %q\nmachine (%d bytes): %q",
+			len(plain.Stdout), plain.Stdout, len(machine.Stdout), machine.Stdout)
+	}
+
+	dec := json.NewDecoder(strings.NewReader(machine.Stdout))
+	var doc map[string]json.RawMessage
+	if err := dec.Decode(&doc); err != nil {
+		t.Fatalf("machine-mode stdout is not one JSON document: %v\n%s", err, machine.Stdout)
+	}
+	if dec.More() {
+		t.Errorf("machine-mode stdout carries more than one document; the envelope is on stdout beside the artifact:\n%s", machine.Stdout)
+	}
+
+	// The envelope is still owed -- it moved to stderr, it did not vanish.
+	if !strings.Contains(machine.Stderr, `"interface_version"`) {
+		t.Errorf("machine mode emitted no envelope on stderr:\n%s", machine.Stderr)
+	}
+}
+
 // TestGenerateJSONHelpPinsTheFormatChoices pins the format vocabulary as a set.
 // The choices are a declaration that may be respelled (bare values became
 // value-plus-help records at strictcli 0.33); the accepted values may not

@@ -83,6 +83,13 @@ func registerGenerateCmd(app *strictcli.App) {
 			return strictcli.Exit(0)
 		},
 		strictcli.WithEffect(strictcli.EffectReadOnly),
+		// generate's stdout IS the artifact for every format it emits -- DDL,
+		// D2 source, SVG, documentation, GraphQL SDL, and the canonical JSON
+		// envelope its readers hash-verify. OwnsStdout (strictcli contract
+		// §19.6) is what keeps that true under the framework-owned --json: the
+		// machine envelope goes to stderr instead of being written to stdout
+		// right after the document. Outside machine mode it changes nothing.
+		strictcli.OwnsStdout(),
 		strictcli.WithFlags(
 			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all generated DDL statements", strictcli.Default(false)),
 			strictcli.BoolFlag("comments", "Include COMMENT ON statements in the generated output", strictcli.Default(true)),
