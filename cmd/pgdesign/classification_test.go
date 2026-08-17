@@ -233,6 +233,99 @@ func collectCommands(app *strictcli.App) map[string]*strictcli.Command {
 	return out
 }
 
+// TestNoCommandDeclaresAnUpdate pins the third registration-level judgment
+// beside effect and consequential: strictcli's update declaration (contract
+// §27.2 -- `WithUpdateOf(resource, mode, Identity(...), Properties(...))`).
+//
+// The verdict for pgdesign is NONE, over the whole live command set, and the
+// judgment is recorded here rather than left implicit so a future command that
+// genuinely is an update has to argue its way past this test.
+//
+// §27 defines an update command as one that changes SOME PROPERTIES OF ONE
+// RESOURCE INSTANCE and leaves the rest alone: it names the resource, the
+// declarations that identify the instance, the flags that carry the changes,
+// and whether the write is sparse or a full replace. The framework then refuses
+// an invocation supplying no property and renders the write set. Every pgdesign
+// mutator fails that test, and each fails it for a structural reason:
+//
+//   - build, revise, codegen, generate -- FULL REGENERATORS. Their output is a
+//     total function of the project's model, not a set of properties an
+//     invocation writes. --lang, --mode, --output and --format select WHAT is
+//     produced and WHERE it goes; none of them is a fact about a resource that
+//     an absent flag would leave untouched. `revise` even commits, which is the
+//     opposite of sparse.
+//   - fmt -- rewrites a schema source file WHOLE. --table-order and
+//     --column-order configure the transformation; they are not properties
+//     stored on the file, and there is no instance whose other properties
+//     survive the rewrite.
+//   - introspect, testdb init -- SCAFFOLDING WRITERS. They CREATE a file from a
+//     live database or from templates. Creation is not a partial update, and
+//     §27's at-least-one-property rule has nothing to fire on.
+//   - seed -- generates rows and, with --apply, INSERTs them. New rows are not
+//     properties of an addressed instance.
+//   - migrate generate/squash/rebase/upgrade/baseline -- append to the
+//     content-addressed chain or stamp an adoption boundary. Chain edges are
+//     IMMUTABLE and content-derived: nothing is ever updated in place, which is
+//     the chain model's whole point. `baseline`'s --description is the closest
+//     call in the CLI, and it is still a field of a row the command CREATES.
+//   - migrate apply/rollback -- execute recorded ops against a database. The
+//     resource they change is the database's schema, and the ops come from the
+//     chain, not from property flags on the invocation.
+//   - import lock/update -- `import update` re-resolves an alias's pin from the
+//     git ref already declared in pgdesign.toml. It has an identity (the alias)
+//     and ZERO properties: there is no flag by which a caller says what the new
+//     value should be, because the whole point is that the value is derived.
+//     §27 requires a floor of one property, and the honest count here is zero.
+//   - testdb setup/teardown/gc -- create and drop databases. Whole-instance
+//     lifecycle, not per-property writes.
+//
+// The check is mechanical rather than a comment alone: `update_of` is published
+// in --dump-schema (§27.13), so the declaration cannot appear anywhere in the
+// app without turning this red.
+func TestNoCommandDeclaresAnUpdate(t *testing.T) {
+	testenv.Isolate(t)
+
+	schema := buildApp().DumpSchemaDict()
+
+	seen := 0
+	var walk func(where string, entries map[string]interface{})
+	walk = func(where string, entries map[string]interface{}) {
+		cmds, _ := entries["commands"].(map[string]interface{})
+		seen += len(cmds)
+		var names []string
+		for name := range cmds {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			cmd, _ := cmds[name].(map[string]interface{})
+			if _, ok := cmd["update_of"]; ok {
+				t.Errorf("command %q declares update_of; no pgdesign command is an update command -- "+
+					"add the reasoning to TestNoCommandDeclaresAnUpdate before declaring one", where+name)
+			}
+		}
+		groups, _ := entries["groups"].(map[string]interface{})
+		var gnames []string
+		for gname := range groups {
+			gnames = append(gnames, gname)
+		}
+		sort.Strings(gnames)
+		for _, gname := range gnames {
+			g, _ := groups[gname].(map[string]interface{})
+			walk(where+gname+".", g)
+		}
+	}
+	walk("", schema)
+
+	// Non-vacuity: the walk must have reached every command the classification
+	// table pins, or a shape change in --dump-schema would turn this test into
+	// an assertion about nothing.
+	if seen != len(classification) {
+		t.Errorf("the schema walk reached %d commands but the classification table pins %d; "+
+			"the --dump-schema shape moved and this test is no longer total", seen, len(classification))
+	}
+}
+
 // TestNoReservedGlobalFlagNames guards strictcli's reserved quartet at the app
 // level. pgdesign used to declare a --quiet global and a --dry-run flag on both
 // `build` and `migrate apply`; all three are framework-owned now and are read
