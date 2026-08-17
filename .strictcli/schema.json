@@ -1,290 +1,388 @@
 {
-  "checks": {
-    "build": {
-      "depends_on": [
-        "validation"
-      ],
-      "fast": true,
-      "needs_network": false,
-      "pure": true,
-      "severity": "error",
-      "tags": [
-        "build"
-      ]
+  "schema_version": 2,
+  "defaults": {
+    "schema_version": 2,
+    "app": {
+      "env_prefix": null,
+      "config": false,
+      "config_format": "json",
+      "config_path": null,
+      "config_conflict_mode": "cli-wins",
+      "proc_observe_allowlist": [],
+      "global_flags": [],
+      "commands": {},
+      "groups": {},
+      "deprecated": {},
+      "tag_contracts": {},
+      "checks": {},
+      "config_fields": {},
+      "infra": {}
     },
-    "coverage": {
-      "depends_on": [
-        "validation"
-      ],
-      "fast": true,
-      "needs_network": false,
-      "pure": true,
-      "severity": "warn",
-      "tags": [
-        "coverage"
-      ]
+    "flag": {
+      "short": null,
+      "env": null,
+      "env_separator": null,
+      "prefixed": true,
+      "choices": null,
+      "elect_by": null,
+      "unique": false,
+      "conflict_mode": null,
+      "negatable": null,
+      "nullable": false
     },
-    "design": {
-      "depends_on": [
-        "validation"
-      ],
-      "fast": true,
-      "needs_network": false,
-      "pure": true,
-      "severity": "warn",
-      "tags": [
-        "design"
-      ]
+    "arg": {
+      "variadic": false,
+      "choices": null
     },
-    "imports": {
-      "depends_on": [
-        "validation"
-      ],
-      "fast": true,
-      "needs_network": false,
-      "pure": true,
-      "severity": "error",
-      "tags": [
-        "imports"
-      ]
+    "choice": {
+      "flags": []
     },
-    "nf": {
-      "depends_on": [],
-      "fast": false,
-      "needs_network": true,
-      "pure": false,
-      "severity": "warn",
-      "tags": [
-        "nf"
-      ]
+    "choice_record": {
+      "help": null
     },
-    "revision": {
-      "depends_on": [
-        "validation"
-      ],
-      "fast": true,
-      "needs_network": false,
-      "pure": true,
-      "severity": "error",
-      "tags": [
-        "revision"
-      ]
+    "command": {
+      "consequential": false,
+      "dry_run_supported": true,
+      "dry_run_unsupported_reason": null,
+      "update_of": null,
+      "write_mode": null,
+      "payload_schema": null,
+      "owns_stdout": false,
+      "passthrough": false,
+      "flags": [],
+      "flag_sets": [],
+      "args": [],
+      "tags": [],
+      "constraints": [],
+      "hidden": false,
+      "interactive": false,
+      "config_fields": [],
+      "grants": [],
+      "forwarding": null
     },
-    "structural": {
-      "depends_on": [
-        "validation"
-      ],
-      "fast": true,
-      "needs_network": false,
-      "pure": true,
-      "severity": "warn",
-      "tags": [
-        "design"
-      ]
+    "group": {
+      "commands": {},
+      "groups": {},
+      "deprecated": {},
+      "tags": [],
+      "hidden": false
     },
-    "validation": {
-      "depends_on": [],
-      "fast": true,
-      "needs_network": false,
-      "pure": true,
-      "severity": "error",
-      "tags": [
-        "validation"
-      ]
-    },
-    "workload": {
-      "depends_on": [
-        "validation"
-      ],
-      "fast": false,
-      "needs_network": true,
-      "pure": false,
-      "severity": "warn",
-      "tags": [
-        "workload"
-      ]
-    }
-  },
-  "commands": {
-    "build": {
-      "effect": "mutating",
-      "flags": [
-        {
-          "default": true,
-          "help": "Automatically git commit the generated output files after a successful build; pass --no-auto-commit to leave them in the working tree",
-          "name": "auto-commit",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "env": "PGDESIGN_DB",
-          "help": "PostgreSQL connection URL; required only when a [output.\u003cname\u003e.d2] sets live_stats=true",
-          "name": "db",
-          "type": "str"
-        }
-      ],
-      "help": "Generate all configured outputs from pgdesign.toml",
-      "name": "build"
+    "config_field": {
+      "default": null,
+      "bound_commands": []
     },
     "check": {
-      "effect": "read_only",
-      "flags": [
-        {
-          "default": false,
-          "help": "Run every registered check regardless of tag or name filters",
-          "name": "all",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": "",
-          "help": "Tag DSL expression to select checks (e.g. 'changelog \u0026 !quality')",
-          "name": "tag",
-          "type": "str"
-        },
-        {
-          "default": "",
-          "help": "Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*')",
-          "name": "name",
-          "type": "str"
-        },
-        {
-          "default": false,
-          "help": "List all registered checks with their tags and exit without running",
-          "name": "list",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": false,
-          "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
-          "name": "ignore-warnings",
-          "negatable": true,
-          "type": "bool"
-        }
-      ],
-      "forwarding": {
-        "reason": "framework-internal: absorbs app-defined global flag values"
+      "scope": null
+    },
+    "infra": {
+      "roots": [],
+      "handshakes": [],
+      "connections": []
+    }
+  },
+  "project_id": "github.com/smm-h/pgdesign",
+  "name": "pgdesign",
+  "version": "",
+  "help": "PostgreSQL schema compiler",
+  "global_flags": [
+    {
+      "name": "project-config",
+      "help": "Path to pgdesign.toml (bypasses directory search)",
+      "value_schema": {
+        "type": "string"
       },
-      "help": "Run project checks registered via the check framework and report results",
+      "presence": "optional"
+    }
+  ],
+  "commands": {
+    "check": {
       "name": "check",
+      "help": "Run project checks registered via the check framework and report results",
+      "effect": "read_only",
       "payload_schema": {
         "items": {
           "type": "object"
         },
         "type": "array"
-      }
-    },
-    "codegen": {
-      "args": [
+      },
+      "flags": [
         {
-          "help": "Path to TOML schema file(s) or directory containing them",
-          "name": "path",
-          "variadic": true
+          "name": "all",
+          "help": "Run every registered check regardless of tag or name filters",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
+          "default": false,
+          "negatable": true
+        },
+        {
+          "name": "tag",
+          "help": "Tag DSL expression to select checks (e.g. 'changelog & !quality')",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
+          "default": ""
+        },
+        {
+          "name": "name",
+          "help": "Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*')",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
+          "default": ""
+        },
+        {
+          "name": "list",
+          "help": "List all registered checks with their tags and exit without running",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
+          "default": false,
+          "negatable": true
+        },
+        {
+          "name": "ignore-warnings",
+          "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
+          "default": false,
+          "negatable": true
         }
       ],
+      "forwarding": {
+        "reason": "framework-internal: absorbs app-defined global flag values"
+      }
+    },
+    "generate": {
+      "name": "generate",
+      "help": "Generate SQL DDL from TOML schema file(s) or directory",
+      "effect": "read_only",
+      "owns_stdout": true,
+      "flags": [
+        {
+          "name": "idempotent",
+          "help": "Add IF NOT EXISTS guards to all generated DDL statements",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
+          "default": false,
+          "negatable": true
+        },
+        {
+          "name": "comments",
+          "help": "Include COMMENT ON statements in the generated output",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
+          "default": true,
+          "negatable": true
+        },
+        {
+          "name": "format",
+          "help": "Output format for the generated schema representation",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "sql",
+              "json",
+              "d2",
+              "svg",
+              "doc",
+              "graphql"
+            ]
+          },
+          "presence": "default",
+          "default": "sql",
+          "choices": [
+            {
+              "value": "sql",
+              "help": "PostgreSQL DDL statements"
+            },
+            {
+              "value": "json",
+              "help": "the canonical whole-model envelope (format_version, revision, model), hash-verifiable by its reader"
+            },
+            {
+              "value": "d2",
+              "help": "a D2 entity-relationship diagram source"
+            },
+            {
+              "value": "svg",
+              "help": "the D2 diagram rendered to SVG"
+            },
+            {
+              "value": "doc",
+              "help": "human-readable schema documentation"
+            },
+            {
+              "value": "graphql",
+              "help": "GraphQL SDL with types, relations, enums and custom scalars"
+            }
+          ]
+        },
+        {
+          "name": "strict-nf",
+          "help": "Promote normal form violations to errors instead of warnings",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
+          "default": false,
+          "negatable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "path",
+          "help": "Path to TOML schema file(s) or directory containing them",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "required",
+          "variadic": true
+        }
+      ]
+    },
+    "fmt": {
+      "name": "fmt",
+      "help": "Format a pgdesign TOML schema file or directory in place",
       "effect": "mutating",
       "flags": [
         {
-          "choices": [
-            "python",
-            "zig",
-            "go",
-            "ts",
-            "java",
-            "kotlin"
-          ],
-          "help": "Target programming language for the generated code",
-          "name": "lang",
-          "type": "str"
-        },
-        {
-          "choices": [
-            "constants",
-            "constraints",
-            "ddl",
-            "drizzle",
-            "enums",
-            "gorm",
-            "jpa",
-            "query-layer",
-            "sqlalchemy",
-            "types",
-            "validators"
-          ],
-          "default": "validators",
-          "help": "Code generation mode determining what code to produce",
-          "name": "mode",
-          "type": "str"
-        },
-        {
-          "help": "Write output to a file at this path instead of stdout",
-          "name": "output",
-          "type": "str"
-        },
-        {
-          "choices": [
-            "faceted",
-            "self-contained"
-          ],
-          "help": "How to split multi-file Python DDL output: 'faceted' writes one file per object kind, 'self-contained' emits a single importable module",
-          "name": "split-mode",
-          "type": "str"
-        },
-        {
-          "help": "Restrict generation to tables in these schema groups (matches build's per-output group filtering)",
-          "name": "groups",
-          "repeatable": true,
-          "type": "list[str]",
-          "unique": true
-        },
-        {
-          "help": "Restrict generation to tables from these source file basenames (matches build's per-output source filtering)",
-          "name": "source",
-          "repeatable": true,
-          "type": "list[str]",
-          "unique": true
-        },
-        {
-          "default": false,
-          "help": "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file",
           "name": "check",
-          "negatable": true,
-          "type": "bool"
+          "help": "Check if file is already formatted (exit 1 if not); omitted means the file is rewritten in place",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
+          "negatable": true
+        },
+        {
+          "name": "table-order",
+          "help": "Table ordering strategy; omitted means [format].table_order from pgdesign.toml, else dependency",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "dependency",
+              "alphabetical"
+            ]
+          },
+          "presence": "optional",
+          "choices": [
+            {
+              "value": "dependency",
+              "help": "order tables so a table follows the tables it depends on"
+            },
+            {
+              "value": "alphabetical",
+              "help": "order tables by name"
+            }
+          ]
+        },
+        {
+          "name": "column-order",
+          "help": "Column ordering; omitted means [format].column_order from pgdesign.toml, else pk_fk_alpha",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "pk_fk_alpha",
+              "alphabetical",
+              "fk_last",
+              "preserve"
+            ]
+          },
+          "presence": "optional",
+          "choices": [
+            {
+              "value": "pk_fk_alpha",
+              "help": "primary key first, then foreign keys, then the rest alphabetically"
+            },
+            {
+              "value": "alphabetical",
+              "help": "order every column by name"
+            },
+            {
+              "value": "fk_last",
+              "help": "order columns alphabetically with the foreign keys moved to the end"
+            },
+            {
+              "value": "preserve",
+              "help": "leave the declared column order untouched"
+            }
+          ]
         }
       ],
-      "help": "Generate type-safe application code from schema definitions",
-      "name": "codegen"
-    },
-    "diff": {
       "args": [
         {
-          "help": "Path to TOML schema file(s) or directory containing them",
           "name": "path",
-          "variadic": true
+          "help": "Path to the TOML schema file or directory to format",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "required"
         }
-      ],
-      "effect": "read_only",
+      ]
+    },
+    "introspect": {
+      "name": "introspect",
+      "help": "Introspect a live PostgreSQL database into TOML schema",
+      "effect": "mutating",
       "flags": [
         {
-          "env": "PGDESIGN_DB",
-          "help": "PostgreSQL connection URL for live database comparison",
-          "name": "live",
-          "type": "str"
+          "name": "db",
+          "help": "PostgreSQL connection URL for the target database server",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional",
+          "env": "PGDESIGN_DB"
         },
         {
-          "help": "Path to TOML schema file or directory to compare against",
-          "name": "against",
-          "type": "str"
+          "name": "schema",
+          "help": "PostgreSQL schema name(s) to introspect (repeatable); omitted means public",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "optional",
+          "unique": true
         },
         {
-          "help": "Git ref to compare the current schema against (e.g., main)",
-          "name": "base",
-          "type": "str"
+          "name": "output",
+          "help": "Write output to a file at this path instead of stdout",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
+        },
+        {
+          "name": "extensions",
+          "help": "Discover extension types, functions, and opclasses; omitted means they are not discovered",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
+          "negatable": true
         }
-      ],
-      "help": "Compare schema file(s) or directory against another target",
+      ]
+    },
+    "diff": {
       "name": "diff",
+      "help": "Compare schema file(s) or directory against another target",
+      "effect": "read_only",
       "payload_schema": {
         "additionalProperties": true,
         "properties": {
@@ -372,295 +470,478 @@
           "extensions_removed"
         ],
         "type": "object"
-      }
-    },
-    "fmt": {
-      "args": [
-        {
-          "help": "Path to the TOML schema file or directory to format",
-          "name": "path"
-        }
-      ],
-      "effect": "mutating",
+      },
       "flags": [
         {
-          "default": false,
-          "help": "Check if file is already formatted (exit 1 if not)",
-          "name": "check",
-          "negatable": true,
-          "type": "bool"
+          "name": "live",
+          "help": "PostgreSQL connection URL for live database comparison",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional",
+          "env": "PGDESIGN_DB"
         },
         {
-          "choices": [
-            "dependency",
-            "alphabetical"
-          ],
-          "default": "dependency",
-          "help": "Table ordering strategy: dependency-based or alphabetical",
-          "name": "table-order",
-          "type": "str"
+          "name": "against",
+          "help": "Path to TOML schema file or directory to compare against",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         },
         {
-          "choices": [
-            "pk_fk_alpha",
-            "alphabetical",
-            "fk_last",
-            "preserve"
-          ],
-          "default": "pk_fk_alpha",
-          "help": "Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve",
-          "name": "column-order",
-          "type": "str"
+          "name": "base",
+          "help": "Git ref to compare the current schema against (e.g., main)",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         }
       ],
-      "help": "Format a pgdesign TOML schema file or directory in place",
-      "name": "fmt"
-    },
-    "generate": {
       "args": [
         {
-          "help": "Path to TOML schema file(s) or directory containing them",
           "name": "path",
+          "help": "Path to TOML schema file(s) or directory containing them",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "required",
           "variadic": true
         }
-      ],
-      "effect": "read_only",
-      "flags": [
-        {
-          "default": false,
-          "help": "Add IF NOT EXISTS guards to all generated DDL statements",
-          "name": "idempotent",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "default": true,
-          "help": "Include COMMENT ON statements in the generated output",
-          "name": "comments",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
-          "choices": [
-            "sql",
-            "json",
-            "d2",
-            "svg",
-            "doc",
-            "graphql"
-          ],
-          "default": "sql",
-          "help": "Output format for the generated schema representation",
-          "name": "format",
-          "type": "str"
-        },
-        {
-          "default": false,
-          "help": "Promote normal form violations to errors instead of warnings",
-          "name": "strict-nf",
-          "negatable": true,
-          "type": "bool"
-        }
-      ],
-      "help": "Generate SQL DDL from TOML schema file(s) or directory",
-      "name": "generate"
-    },
-    "introspect": {
-      "effect": "mutating",
-      "flags": [
-        {
-          "env": "PGDESIGN_DB",
-          "help": "PostgreSQL connection URL for the target database server",
-          "name": "db",
-          "type": "str"
-        },
-        {
-          "default": [],
-          "help": "PostgreSQL schema name(s) to introspect (repeatable)",
-          "name": "schema",
-          "repeatable": true,
-          "type": "str",
-          "unique": true
-        },
-        {
-          "help": "Write output to a file at this path instead of stdout",
-          "name": "output",
-          "type": "str"
-        },
-        {
-          "default": false,
-          "help": "Discover extension types, functions, and opclasses",
-          "name": "extensions",
-          "negatable": true,
-          "type": "bool"
-        }
-      ],
-      "help": "Introspect a live PostgreSQL database into TOML schema",
-      "name": "introspect"
-    },
-    "revise": {
-      "effect": "mutating",
-      "flags": [
-        {
-          "env": "PGDESIGN_DB",
-          "help": "PostgreSQL connection URL for the non-retroactive DB tier (live FD discovery, pg_stat workload). When absent, the DB tier is skipped and revise exits non-zero after committing the pure tier.",
-          "name": "db",
-          "type": "str"
-        },
-        {
-          "help": "Directory containing the chain-format migrations project (defaults to project config migrations_dir, else migrations)",
-          "name": "dir",
-          "type": "str"
-        }
-      ],
-      "help": "Regenerate all outputs, chain the migration, and commit — the one-command project revision. Runs the PURE tier (build outputs, chain-mode migration, blocking normal-form and structural checks) and commits it, then runs the non-retroactive DB tier (live FD discovery, pg_stat workload).",
-      "name": "revise"
+      ]
     },
     "seed": {
-      "args": [
-        {
-          "help": "Path to TOML schema file(s) or directory for seed generation",
-          "name": "path",
-          "variadic": true
-        }
-      ],
+      "name": "seed",
+      "help": "Generate type-aware test data for all schema tables",
       "effect": "mutating",
       "flags": [
         {
-          "default": 10,
-          "help": "Number of rows to generate per table in the schema",
           "name": "rows",
-          "type": "int"
+          "help": "Number of rows to generate per table in the schema; omitted means 10",
+          "value_schema": {
+            "type": "integer"
+          },
+          "presence": "optional"
         },
         {
-          "help": "Random number generator seed for deterministic output",
           "name": "seed",
-          "type": "int"
+          "help": "Random number generator seed for deterministic output; omitted means a fresh seed is drawn and reported on stderr",
+          "value_schema": {
+            "type": "integer"
+          },
+          "presence": "optional"
         },
         {
-          "help": "Write output to a file at this path instead of stdout",
           "name": "output",
-          "type": "str"
+          "help": "Write output to a file at this path instead of stdout",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
         },
         {
-          "default": false,
-          "help": "Insert generated seed data directly into the database",
           "name": "apply",
-          "negatable": true,
-          "type": "bool"
+          "help": "Insert generated seed data directly into the database; omitted means the statements are only emitted",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
+          "negatable": true
         },
         {
-          "env": "PGDESIGN_DB",
+          "name": "db",
           "help": "PostgreSQL connection URL, required when using --apply",
-          "name": "db",
-          "type": "str"
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional",
+          "env": "PGDESIGN_DB"
         },
         {
-          "default": [],
+          "name": "schema",
           "help": "PostgreSQL schema name to filter seed generation to",
-          "name": "schema",
-          "repeatable": true,
-          "type": "str",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "optional",
           "unique": true
         },
         {
-          "choices": [
-            "insert",
-            "copy"
-          ],
-          "default": "insert",
-          "help": "SQL output format for generated seed data statements",
           "name": "format",
-          "type": "str"
-        },
-        {
-          "default": false,
-          "help": "Emit TRUNCATE CASCADE statements before inserting seeds",
-          "name": "clean",
-          "negatable": true,
-          "type": "bool"
-        },
-        {
+          "help": "SQL output format for generated seed data statements; omitted means insert",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "insert",
+              "copy"
+            ]
+          },
+          "presence": "optional",
           "choices": [
-            "normal",
-            "edge-cases"
-          ],
-          "default": "normal",
-          "help": "Data generation strategy: normal values or edge-cases",
+            {
+              "value": "insert",
+              "help": "batched INSERT statements, portable across every client"
+            },
+            {
+              "value": "copy",
+              "help": "COPY blocks, 5-10x faster to load but psql-only"
+            }
+          ]
+        },
+        {
+          "name": "clean",
+          "help": "Emit TRUNCATE CASCADE statements before inserting seeds; omitted means existing rows are left in place",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
+          "negatable": true
+        },
+        {
           "name": "mode",
-          "type": "str"
+          "help": "Data generation strategy; omitted means normal",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "edge-cases"
+            ]
+          },
+          "presence": "optional",
+          "choices": [
+            {
+              "value": "normal",
+              "help": "plausible values drawn from the declared distributions"
+            },
+            {
+              "value": "edge-cases",
+              "help": "boundary values that exercise the declared constraints"
+            }
+          ]
         }
       ],
-      "help": "Generate type-aware test data for all schema tables",
-      "name": "seed"
-    },
-    "serve": {
-      "effect": "read_only",
-      "flags": [
-        {
-          "env": "PGDESIGN_DB",
-          "help": "PostgreSQL connection URL for the target database server (omit for DB-free project mode)",
-          "name": "db",
-          "type": "str"
-        },
-        {
-          "default": 8080,
-          "help": "TCP port number for the HTTP API server to listen on",
-          "name": "port",
-          "type": "int"
-        },
-        {
-          "default": "127.0.0.1",
-          "help": "Network interface address to bind the HTTP server to. Defaults to 127.0.0.1 (loopback only). WARNING: the server has NO AUTHENTICATION; binding to a non-loopback address (e.g. 0.0.0.0) exposes the schema, database statistics, and diff endpoints to anyone who can reach that address.",
-          "name": "bind",
-          "type": "str"
-        },
-        {
-          "default": [],
-          "help": "PostgreSQL schema name to serve via the API (repeatable)",
-          "name": "schema",
-          "repeatable": true,
-          "type": "str",
-          "unique": true
-        },
-        {
-          "default": 30,
-          "help": "Maximum time in seconds for each HTTP request to complete",
-          "name": "timeout",
-          "type": "int"
-        }
-      ],
-      "help": "Start the pgdesign HTTP API server and web interface",
-      "name": "serve"
-    },
-    "stats": {
       "args": [
         {
-          "help": "TOML schema file(s) for cross-referencing with live data",
           "name": "path",
-          "required": false,
+          "help": "Path to TOML schema file(s) or directory for seed generation",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "required",
           "variadic": true
         }
-      ],
+      ]
+    },
+    "serve": {
+      "name": "serve",
+      "help": "Start the pgdesign HTTP API server and web interface",
       "effect": "read_only",
       "flags": [
         {
-          "env": "PGDESIGN_DB",
-          "help": "PostgreSQL connection URL for the target database server",
           "name": "db",
-          "type": "str"
+          "help": "PostgreSQL connection URL for the target database server (omit for DB-free project mode)",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional",
+          "env": "PGDESIGN_DB"
         },
         {
-          "default": [],
-          "help": "PostgreSQL schema name to analyze (repeatable for multiple)",
+          "name": "port",
+          "help": "TCP port number for the HTTP API server to listen on",
+          "value_schema": {
+            "type": "integer"
+          },
+          "presence": "default",
+          "default": 8080
+        },
+        {
+          "name": "bind",
+          "help": "Network interface address to bind the HTTP server to. Defaults to 127.0.0.1 (loopback only). WARNING: the server has NO AUTHENTICATION; binding to a non-loopback address (e.g. 0.0.0.0) exposes the schema, database statistics, and diff endpoints to anyone who can reach that address.",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
+          "default": "127.0.0.1"
+        },
+        {
           "name": "schema",
-          "repeatable": true,
-          "type": "str",
+          "help": "PostgreSQL schema name to serve via the API (repeatable)",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "optional",
           "unique": true
+        },
+        {
+          "name": "timeout",
+          "help": "Maximum time in seconds for each HTTP request to complete",
+          "value_schema": {
+            "type": "integer"
+          },
+          "presence": "default",
+          "default": 30
+        }
+      ]
+    },
+    "codegen": {
+      "name": "codegen",
+      "help": "Generate type-safe application code from schema definitions",
+      "effect": "mutating",
+      "flags": [
+        {
+          "name": "lang",
+          "help": "Target programming language for the generated code",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "python",
+              "zig",
+              "go",
+              "ts",
+              "java",
+              "kotlin"
+            ]
+          },
+          "presence": "required",
+          "choices": [
+            {
+              "value": "python",
+              "help": "generate Python source"
+            },
+            {
+              "value": "zig",
+              "help": "generate Zig source"
+            },
+            {
+              "value": "go",
+              "help": "generate Go source"
+            },
+            {
+              "value": "ts",
+              "help": "generate TypeScript source"
+            },
+            {
+              "value": "java",
+              "help": "generate Java source"
+            },
+            {
+              "value": "kotlin",
+              "help": "generate Kotlin source"
+            }
+          ]
+        },
+        {
+          "name": "mode",
+          "help": "Code generation mode determining what code to produce; omitted means validators",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "constants",
+              "constraints",
+              "ddl",
+              "drizzle",
+              "enums",
+              "gorm",
+              "jpa",
+              "query-layer",
+              "sqlalchemy",
+              "types",
+              "validators"
+            ]
+          },
+          "presence": "optional",
+          "choices": [
+            {
+              "value": "constants",
+              "help": "table and column name string constants"
+            },
+            {
+              "value": "constraints",
+              "help": "client-side validators derived from CHECK, NOT NULL and enum constraints"
+            },
+            {
+              "value": "ddl",
+              "help": "DDL definition tuples plus a section executor that applies them"
+            },
+            {
+              "value": "drizzle",
+              "help": "a Drizzle ORM schema module"
+            },
+            {
+              "value": "enums",
+              "help": "standalone enum definitions for the schema's enum types"
+            },
+            {
+              "value": "gorm",
+              "help": "GORM struct tags for the schema's tables"
+            },
+            {
+              "value": "jpa",
+              "help": "JPA entity classes for the schema's tables"
+            },
+            {
+              "value": "query-layer",
+              "help": "Protocol definitions with an asyncpg backend and an in-memory backend"
+            },
+            {
+              "value": "sqlalchemy",
+              "help": "SQLAlchemy 2.0 declarative models"
+            },
+            {
+              "value": "types",
+              "help": "native struct, class or interface definitions with their enums"
+            },
+            {
+              "value": "validators",
+              "help": "row-level-security policy checkers"
+            }
+          ]
+        },
+        {
+          "name": "output",
+          "help": "Write output to a file at this path instead of stdout",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
+        },
+        {
+          "name": "split-mode",
+          "help": "How to split multi-file Python DDL output",
+          "value_schema": {
+            "type": "string",
+            "enum": [
+              "faceted",
+              "self-contained"
+            ]
+          },
+          "presence": "optional",
+          "choices": [
+            {
+              "value": "faceted",
+              "help": "write one file per object kind"
+            },
+            {
+              "value": "self-contained",
+              "help": "emit a single importable module"
+            }
+          ]
+        },
+        {
+          "name": "groups",
+          "help": "Restrict generation to tables in these schema groups (matches build's per-output group filtering)",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "optional",
+          "unique": true
+        },
+        {
+          "name": "source",
+          "help": "Restrict generation to tables from these source file basenames (matches build's per-output source filtering)",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "optional",
+          "unique": true
+        },
+        {
+          "name": "check",
+          "help": "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file; omitted means the code is written",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
+          "negatable": true
         }
       ],
-      "help": "Analyze database statistics, index usage, and health",
+      "args": [
+        {
+          "name": "path",
+          "help": "Path to TOML schema file(s) or directory containing them",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "required",
+          "variadic": true
+        }
+      ]
+    },
+    "build": {
+      "name": "build",
+      "help": "Generate all configured outputs from pgdesign.toml",
+      "effect": "mutating",
+      "flags": [
+        {
+          "name": "auto-commit",
+          "help": "Automatically git commit the generated output files after a successful build; omitted means they are committed, and --no-auto-commit leaves them in the working tree",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "optional",
+          "negatable": true
+        },
+        {
+          "name": "db",
+          "help": "PostgreSQL connection URL; required only when a [output.<name>.d2] sets live_stats=true",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional",
+          "env": "PGDESIGN_DB"
+        }
+      ]
+    },
+    "revise": {
+      "name": "revise",
+      "help": "Regenerate all outputs, chain the migration, and commit — the one-command project revision. Runs the PURE tier (build outputs, chain-mode migration, blocking normal-form and structural checks) and commits it, then runs the non-retroactive DB tier (live FD discovery, pg_stat workload).",
+      "effect": "mutating",
+      "flags": [
+        {
+          "name": "db",
+          "help": "PostgreSQL connection URL for the non-retroactive DB tier (live FD discovery, pg_stat workload). When absent, the DB tier is skipped and revise exits non-zero after committing the pure tier.",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional",
+          "env": "PGDESIGN_DB"
+        },
+        {
+          "name": "dir",
+          "help": "Directory containing the chain-format migrations project; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional"
+        }
+      ]
+    },
+    "stats": {
       "name": "stats",
+      "help": "Analyze database statistics, index usage, and health",
+      "effect": "read_only",
       "payload_schema": {
         "additionalProperties": false,
         "properties": {
@@ -807,468 +1088,707 @@
           "duplicate_indexes"
         ],
         "type": "object"
-      }
-    }
-  },
-  "defaults": {
-    "app": {
-      "commands": {},
-      "config": false,
-      "deprecated": {},
-      "env_prefix": null,
-      "global_flags": [],
-      "groups": {},
-      "tag_contracts": {}
-    },
-    "arg": {
-      "choices": null,
-      "default": null,
-      "required": true,
-      "type": "str",
-      "variadic": false
-    },
-    "command": {
-      "args": [],
-      "constraints": [],
-      "flags": [],
-      "hidden": false,
-      "interactive": false,
-      "passthrough": false,
-      "tags": []
-    },
-    "flag": {
-      "choices": null,
-      "default": null,
-      "env": null,
-      "env_separator": null,
-      "hidden": false,
-      "negatable": null,
-      "repeatable": false,
-      "short": null,
-      "unique": false
-    },
-    "group": {
-      "commands": {},
-      "deprecated": {},
-      "groups": {},
-      "hidden": false,
-      "tags": []
-    },
-    "schema_version": 1
-  },
-  "global_flags": [
-    {
-      "help": "Path to pgdesign.toml (bypasses directory search)",
-      "name": "project-config",
-      "type": "str"
-    }
-  ],
-  "groups": {
-    "import": {
-      "commands": {
-        "lock": {
-          "args": [
-            {
-              "help": "Name of the single [imports] alias to lock; omit to lock every alias declared in pgdesign.toml",
-              "name": "alias",
-              "required": false
-            }
-          ],
-          "effect": "mutating",
-          "help": "Resolve each [imports] alias's git pin, vendor the referenced surface (tables + type closure) into imports/\u003calias\u003e/, and write the lockfile. Refuses to overwrite an existing lockfile — use `import update` to re-pin.",
-          "name": "lock"
-        },
-        "update": {
-          "args": [
-            {
-              "help": "Name of the single [imports] alias to re-resolve and update; omit to update every declared alias",
-              "name": "alias",
-              "required": false
-            }
-          ],
-          "effect": "mutating",
-          "help": "Re-resolve each [imports] alias's git ref, re-extract the surface your schema actually references, and rewrite the lockfile at the new commit. Each declared framework is cloned into a temp directory that is removed on return, and only the tables your schema uses are vendored. Requires an existing lockfile — use `import lock` for the first pin. Pass an alias to update just that one.",
-          "name": "update"
-        }
       },
-      "help": "Pin and vendor imported schema surfaces from other pgdesign projects",
-      "name": "import"
-    },
+      "flags": [
+        {
+          "name": "db",
+          "help": "PostgreSQL connection URL for the target database server",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "optional",
+          "env": "PGDESIGN_DB"
+        },
+        {
+          "name": "schema",
+          "help": "PostgreSQL schema name to analyze (repeatable for multiple)",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "optional",
+          "unique": true
+        }
+      ],
+      "args": [
+        {
+          "name": "path",
+          "help": "TOML schema file(s) for cross-referencing with live data",
+          "value_schema": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "presence": "optional",
+          "variadic": true
+        }
+      ]
+    }
+  },
+  "groups": {
     "migrate": {
+      "name": "migrate",
+      "help": "Database migration planning, generation, and execution",
       "commands": {
-        "apply": {
-          "consequential": true,
-          "effect": "mutating",
+        "plan": {
+          "name": "plan",
+          "help": "Preview the migration chain PURELY, without touching any database (roadmap 5.9). In a chain-mode project it enumerates the edges from GENESIS -- or from an explicit --from revision -- to the single live head, in path-finder order, listing each edge's id, slug, and op summary. Drift preview against a live database is `diff --live`'s job; per-database pending is `migrate status`'s. A legacy (semver-TOML) project keeps the old live-diff plan (requires --db) until it is upgraded to the chain.",
+          "effect": "read_only",
           "flags": [
             {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
-              "type": "str"
+              "help": "PostgreSQL connection URL (legacy-mode only; chain-mode plan is pure and ignores it)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
             },
             {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
+              "name": "from",
+              "help": "Chain-mode only: revision string to enumerate from (pure input); absent enumerates from genesis",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
               "name": "dir",
-              "type": "str"
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ],
-          "help": "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.",
-          "name": "apply"
-        },
-        "baseline": {
           "args": [
             {
-              "help": "Schema TOML file(s) or directory (chain mode; selects the schema search-path to introspect)",
               "name": "path",
-              "required": false,
+              "help": "Path to TOML schema file(s) or directory containing them",
+              "value_schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "presence": "required",
               "variadic": true
             }
-          ],
-          "consequential": true,
-          "effect": "mutating",
-          "flags": [
-            {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the target database server",
-              "name": "db",
-              "type": "str"
-            },
-            {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
-              "name": "dir",
-              "type": "str"
-            },
-            {
-              "default": "",
-              "help": "Version label for the baseline record (legacy semver-TOML mode only)",
-              "name": "version",
-              "type": "str"
-            },
-            {
-              "default": "Initial baseline",
-              "help": "Human-readable note recorded with the baseline, shown in migrate status and history output",
-              "name": "description",
-              "type": "str"
-            }
-          ],
-          "help": "Adopt an existing database onto the migration chain without executing any migration SQL — for a schema created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying that manifest, and stamps the baseline boundary (rollback-frozen); pass the schema TOML path(s) so the right search-path is introspected. Legacy semver-TOML mode records a semver --version instead. Re-baselining at the same state is a no-op.",
-          "name": "baseline"
+          ]
         },
         "generate": {
-          "args": [
-            {
-              "help": "Path to TOML schema file(s) or directory containing them",
-              "name": "path",
-              "variadic": true
-            }
-          ],
-          "effect": "mutating",
-          "flags": [
-            {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the target database server (legacy-mode only; chain-mode generate is pure)",
-              "name": "db",
-              "type": "str"
-            },
-            {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
-              "name": "dir",
-              "type": "str"
-            }
-          ],
+          "name": "generate",
           "help": "Generate versioned migration files by comparing the TOML schema against a live database. Produces up and down SQL files with risk annotations, safety linting, and expand-migrate-contract phase classification. Volatile defaults and operations on large tables are automatically detected and handled safely.",
-          "name": "generate"
-        },
-        "plan": {
-          "args": [
-            {
-              "help": "Path to TOML schema file(s) or directory containing them",
-              "name": "path",
-              "variadic": true
-            }
-          ],
-          "effect": "read_only",
-          "flags": [
-            {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL (legacy-mode only; chain-mode plan is pure and ignores it)",
-              "name": "db",
-              "type": "str"
-            },
-            {
-              "help": "Chain-mode only: revision string to enumerate from (pure input); absent enumerates from genesis",
-              "name": "from",
-              "type": "str"
-            },
-            {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
-              "name": "dir",
-              "type": "str"
-            }
-          ],
-          "help": "Preview the migration chain PURELY, without touching any database (roadmap 5.9). In a chain-mode project it enumerates the edges from GENESIS -- or from an explicit --from revision -- to the single live head, in path-finder order, listing each edge's id, slug, and op summary. Drift preview against a live database is `diff --live`'s job; per-database pending is `migrate status`'s. A legacy (semver-TOML) project keeps the old live-diff plan (requires --db) until it is upgraded to the chain.",
-          "name": "plan"
-        },
-        "rebase": {
           "effect": "mutating",
           "flags": [
             {
-              "help": "The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it",
-              "name": "head",
-              "type": "str"
+              "name": "db",
+              "help": "PostgreSQL connection URL for the target database server (legacy-mode only; chain-mode generate is pure)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
             },
             {
-              "help": "Directory containing the chain project (defaults to project config migrations_dir, else migrations)",
               "name": "dir",
-              "type": "str"
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
           ],
-          "help": "Resolve a two-head fork (chain mode). Re-parents the tail of the head NOT named by --head onto the head that IS named, re-simulating each re-parented edge's ops to recompute its revision and content-derived edge file. The rebased-away originals retire INTACT to migrations/archive/ (never rewritten or deleted), and the rebase revision-remap table (migrations/remap.json) is written so a database stamped at a rebased-away revision is served forward to the live head, never orphaned. A pure file operation: no database is required.",
-          "name": "rebase"
+          "args": [
+            {
+              "name": "path",
+              "help": "Path to TOML schema file(s) or directory containing them",
+              "value_schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "presence": "required",
+              "variadic": true
+            }
+          ]
+        },
+        "apply": {
+          "name": "apply",
+          "help": "Apply all pending migrations to the target database in order. Each migration runs inside its own transaction with advisory locking to prevent concurrent execution. Non-transactional operations like CREATE INDEX CONCURRENTLY execute outside transactions automatically. Use --dry-run to preview the SQL without executing.",
+          "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "db",
+              "help": "PostgreSQL connection URL for the target database server",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
+            },
+            {
+              "name": "dir",
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            }
+          ]
         },
         "rollback": {
-          "consequential": true,
-          "effect": "mutating",
-          "flags": [
-            {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the target database server",
-              "name": "db",
-              "type": "str"
-            },
-            {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
-              "name": "dir",
-              "type": "str"
-            },
-            {
-              "default": "",
-              "help": "Target version to rollback to (exclusive -- this version stays applied)",
-              "name": "to",
-              "type": "str"
-            }
-          ],
+          "name": "rollback",
           "help": "Rollback applied database migrations to a specified target version. Executes down migration SQL in reverse application order with advisory locking. Multi-step rollbacks verify reversibility of all steps before starting. The target version is exclusive, meaning that version stays applied after rollback completes.",
-          "name": "rollback"
-        },
-        "squash": {
           "effect": "mutating",
+          "consequential": true,
           "flags": [
             {
-              "help": "Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix)",
-              "name": "from",
-              "type": "str"
-            },
-            {
-              "help": "End of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode)",
-              "name": "to",
-              "type": "str"
-            },
-            {
-              "help": "Display slug for the consolidation edge (chain mode; auto-derived from endpoint hashes when omitted)",
-              "name": "slug",
-              "type": "str"
-            },
-            {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
-              "name": "dir",
-              "type": "str"
-            },
-            {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL (REQUIRED); the pre-upgrade guard runs against it (legacy mode also runs the M200 applied-version check)",
               "name": "db",
-              "type": "str"
+              "help": "PostgreSQL connection URL for the target database server",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
+            },
+            {
+              "name": "dir",
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "to",
+              "help": "Target version or revision to roll back to (exclusive -- it stays applied); omitted means roll back a single step",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
-          ],
-          "help": "Consolidate a range of sequential migrations. In chain mode (a migrations/chain/ project) squash mints a CONSOLIDATION EDGE whose op-list is the ordered concatenation of the range, retiring the superseded originals intact to migrations/archive/ (never a rewrite) so mid-range databases resume via the path-finder; --from/--to are revision-or-edge references. In legacy (semver-TOML) mode squash concatenates the range into one combined migration file. --db is required.",
-          "name": "squash"
+          ]
         },
         "status": {
+          "name": "status",
+          "help": "Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.",
           "effect": "read_only",
           "flags": [
             {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
-              "type": "str"
+              "help": "PostgreSQL connection URL for the target database server",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
             },
             {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
               "name": "dir",
-              "type": "str"
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             }
-          ],
-          "help": "Show which migrations have been applied to the target database and which are still pending. Reads the migration tracking table and compares it with the migrations directory to display version numbers, applied timestamps, and current execution status for each migration file.",
-          "name": "status"
+          ]
+        },
+        "squash": {
+          "name": "squash",
+          "help": "Consolidate a range of sequential migrations. In chain mode (a migrations/chain/ project) squash mints a CONSOLIDATION EDGE whose op-list is the ordered concatenation of the range, retiring the superseded originals intact to migrations/archive/ (never a rewrite) so mid-range databases resume via the path-finder; --from/--to are revision-or-edge references. In legacy (semver-TOML) mode squash concatenates the range into one combined migration file. --db is required.",
+          "effect": "mutating",
+          "flags": [
+            {
+              "name": "from",
+              "help": "Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            },
+            {
+              "name": "to",
+              "help": "End of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            },
+            {
+              "name": "slug",
+              "help": "Display slug for the consolidation edge (chain mode; auto-derived from endpoint hashes when omitted)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "dir",
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "db",
+              "help": "PostgreSQL connection URL (REQUIRED); the pre-upgrade guard runs against it (legacy mode also runs the M200 applied-version check)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
+            }
+          ]
+        },
+        "rebase": {
+          "name": "rebase",
+          "help": "Resolve a two-head fork (chain mode). Re-parents the tail of the head NOT named by --head onto the head that IS named, re-simulating each re-parented edge's ops to recompute its revision and content-derived edge file. The rebased-away originals retire INTACT to migrations/archive/ (never rewritten or deleted), and the rebase revision-remap table (migrations/remap.json) is written so a database stamped at a rebased-away revision is served forward to the live head, never orphaned. A pure file operation: no database is required.",
+          "effect": "mutating",
+          "flags": [
+            {
+              "name": "head",
+              "help": "The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            },
+            {
+              "name": "dir",
+              "help": "Directory containing the chain project; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            }
+          ]
         },
         "test": {
-          "args": [
-            {
-              "help": "Schema file(s) or directory (required with --shadow)",
-              "name": "path",
-              "required": false,
-              "variadic": true
-            }
-          ],
+          "name": "test",
+          "help": "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.",
           "effect": "mutating",
           "flags": [
             {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the staging test database",
               "name": "db",
-              "type": "str"
+              "help": "PostgreSQL connection URL for the staging test database",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
             },
             {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
               "name": "dir",
-              "type": "str"
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
-              "default": 60,
-              "help": "Maximum time in seconds before the test run is aborted",
               "name": "timeout",
-              "type": "int"
+              "help": "Maximum time in seconds before the test run is aborted; omitted means 60",
+              "value_schema": {
+                "type": "integer"
+              },
+              "presence": "optional"
             },
             {
-              "default": false,
-              "help": "Test by replaying migrations into a shadow database and diffing against TOML schema",
               "name": "shadow",
-              "negatable": true,
-              "type": "bool"
+              "help": "Test by replaying migrations into a shadow database and diffing against TOML schema; omitted means the staging replay is run instead",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
             }
           ],
-          "help": "Test migrations by applying them against a staging database to verify correctness before production deployment. With --shadow mode, replays all migrations into a fresh database and diffs the result against the TOML schema to catch drift between migration files and schema definitions.",
-          "name": "test"
+          "args": [
+            {
+              "name": "path",
+              "help": "Schema file(s) or directory (required with --shadow)",
+              "value_schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "presence": "optional",
+              "variadic": true
+            }
+          ]
+        },
+        "baseline": {
+          "name": "baseline",
+          "help": "Adopt an existing database onto the migration chain without executing any migration SQL — for a schema created by other means, or one that has intentionally drifted from the TOML. In chain mode it introspects the live database, synthesizes a genesis edge carrying that manifest, and stamps the baseline boundary (rollback-frozen); pass the schema TOML path(s) so the right search-path is introspected. Legacy semver-TOML mode records a semver --version instead. Re-baselining at the same state is a no-op.",
+          "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "db",
+              "help": "PostgreSQL connection URL for the target database server",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
+            },
+            {
+              "name": "dir",
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "version",
+              "help": "Version label for the baseline record (legacy semver-TOML mode only); omitted is an error in that mode and ignored in chain mode",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "description",
+              "help": "Human-readable note recorded with the baseline, shown in migrate status and history output; omitted means \"Initial baseline\"",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            }
+          ],
+          "args": [
+            {
+              "name": "path",
+              "help": "Schema TOML file(s) or directory (chain mode; selects the schema search-path to introspect)",
+              "value_schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "presence": "optional",
+              "variadic": true
+            }
+          ]
         },
         "upgrade": {
+          "name": "upgrade",
+          "help": "One-time adoption of a legacy (semver-TOML) database onto the on-disk chain. Verifies the schema TOML matches the live database exactly (refusing to stamp over drift), folds the existing pgdesign_migrations rows into the chain journal, writes the content-addressed prefix edge, and stamps this database's upgrade boundary in a single transaction. Requires a clean working tree for the schema files when inside a git repository. Run once per database; a fresh database uses `migrate apply` directly.",
+          "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "db",
+              "help": "PostgreSQL connection URL for the database to upgrade",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
+            },
+            {
+              "name": "dir",
+              "help": "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            }
+          ],
           "args": [
             {
-              "help": "Path to TOML schema file(s) or directory containing them",
               "name": "path",
+              "help": "Path to TOML schema file(s) or directory containing them",
+              "value_schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "presence": "required",
               "variadic": true
             }
-          ],
-          "consequential": true,
-          "effect": "mutating",
-          "flags": [
-            {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the database to upgrade",
-              "name": "db",
-              "type": "str"
-            },
-            {
-              "help": "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)",
-              "name": "dir",
-              "type": "str"
-            }
-          ],
-          "help": "One-time adoption of a legacy (semver-TOML) database onto the on-disk chain. Verifies the schema TOML matches the live database exactly (refusing to stamp over drift), folds the existing pgdesign_migrations rows into the chain journal, writes the content-addressed prefix edge, and stamps this database's upgrade boundary in a single transaction. Requires a clean working tree for the schema files when inside a git repository. Run once per database; a fresh database uses `migrate apply` directly.",
-          "name": "upgrade"
+          ]
         }
-      },
-      "help": "Database migration planning, generation, and execution",
-      "name": "migrate"
+      }
+    },
+    "import": {
+      "name": "import",
+      "help": "Pin and vendor imported schema surfaces from other pgdesign projects",
+      "commands": {
+        "lock": {
+          "name": "lock",
+          "help": "Resolve each [imports] alias's git pin, vendor the referenced surface (tables + type closure) into imports/<alias>/, and write the lockfile. Refuses to overwrite an existing lockfile — use `import update` to re-pin.",
+          "effect": "mutating",
+          "args": [
+            {
+              "name": "alias",
+              "help": "Name of the single [imports] alias to lock; omit to lock every alias declared in pgdesign.toml",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            }
+          ]
+        },
+        "update": {
+          "name": "update",
+          "help": "Re-resolve each [imports] alias's git ref, re-extract the surface your schema actually references, and rewrite the lockfile at the new commit. Each declared framework is cloned into a temp directory that is removed on return, and only the tables your schema uses are vendored. Requires an existing lockfile — use `import lock` for the first pin. Pass an alias to update just that one.",
+          "effect": "mutating",
+          "args": [
+            {
+              "name": "alias",
+              "help": "Name of the single [imports] alias to re-resolve and update; omit to update every declared alias",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            }
+          ]
+        }
+      }
     },
     "testdb": {
+      "name": "testdb",
+      "help": "Manage ephemeral test databases for schema testing",
       "commands": {
-        "gc": {
-          "consequential": true,
+        "setup": {
+          "name": "setup",
+          "help": "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.",
           "effect": "mutating",
           "flags": [
             {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the target database server",
               "name": "db",
-              "type": "str"
+              "help": "PostgreSQL connection URL for the target database server",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
             },
             {
-              "help": "Drop databases older than this duration (e.g., 2h, 30m)",
-              "name": "older-than",
-              "type": "str"
+              "name": "ddl",
+              "help": "Path to the SQL DDL file to apply to the test database",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
             }
-          ],
+          ]
+        },
+        "teardown": {
+          "name": "teardown",
+          "help": "Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.",
+          "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "db",
+              "help": "PostgreSQL connection URL for the target database server",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
+            }
+          ]
+        },
+        "gc": {
+          "name": "gc",
           "help": "Drop orphaned test databases that were not properly torn down after test runs. Scans the PostgreSQL server for databases matching the pgdesign test naming pattern and removes those older than the specified duration. Useful for cleaning up after interrupted or failed test runs in CI and local development.",
-          "name": "gc"
+          "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "db",
+              "help": "PostgreSQL connection URL for the target database server",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional",
+              "env": "PGDESIGN_DB"
+            },
+            {
+              "name": "older-than",
+              "help": "Drop databases older than this duration (e.g., 2h, 30m)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            }
+          ]
         },
         "init": {
+          "name": "init",
+          "help": "Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.",
           "effect": "mutating",
           "flags": [
             {
-              "default": [],
-              "help": "Target programming language(s) for wrapper generation",
               "name": "language",
-              "repeatable": true,
-              "type": "str",
+              "help": "Target programming language(s) for wrapper generation",
+              "value_schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "presence": "required",
               "unique": true
             },
             {
-              "help": "Name of the SQL output section (for disambiguation)",
               "name": "output",
-              "type": "str"
+              "help": "Name of the SQL output section (for disambiguation)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
-              "default": false,
-              "help": "Overwrite existing wrapper files without prompting",
               "name": "force-overwrite",
-              "negatable": true,
-              "type": "bool"
+              "help": "Overwrite existing wrapper files without prompting; omitted means an existing file is left alone and reported",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
             },
             {
-              "help": "CI provider for workflow generation (e.g., github-actions)",
               "name": "ci",
-              "type": "str"
+              "help": "CI provider for workflow generation (e.g., github-actions)",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
             },
             {
-              "default": false,
-              "help": "Include pg_partman installation step in CI workflow",
               "name": "partman",
-              "negatable": true,
-              "type": "bool"
+              "help": "Include pg_partman installation step in CI workflow; omitted means the step is not emitted",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
             }
-          ],
-          "help": "Generate test database wrapper code for consumer projects that need to run integration tests against a pgdesign-managed schema. Produces language-specific helper modules with setup and teardown functions that create ephemeral databases, apply DDL, and clean up automatically after each test run.",
-          "name": "init"
-        },
-        "setup": {
-          "effect": "mutating",
-          "flags": [
-            {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the target database server",
-              "name": "db",
-              "type": "str"
-            },
-            {
-              "help": "Path to the SQL DDL file to apply to the test database",
-              "name": "ddl",
-              "type": "str"
-            }
-          ],
-          "help": "Create an ephemeral test database on the PostgreSQL server and apply the specified DDL schema to it. The database is created with a unique name containing a timestamp and random suffix to allow parallel test execution. Returns the connection URL for the new database.",
-          "name": "setup"
-        },
-        "teardown": {
-          "consequential": true,
-          "effect": "mutating",
-          "flags": [
-            {
-              "env": "PGDESIGN_DB",
-              "help": "PostgreSQL connection URL for the target database server",
-              "name": "db",
-              "type": "str"
-            }
-          ],
-          "help": "Drop an ephemeral test database that was previously created by testdb setup. Terminates any remaining connections to the database before dropping it. Should be called in test cleanup to prevent orphaned databases from accumulating on the PostgreSQL server over time.",
-          "name": "teardown"
+          ]
         }
-      },
-      "help": "Manage ephemeral test databases for schema testing",
-      "name": "testdb"
+      }
     }
   },
-  "help": "PostgreSQL schema compiler",
+  "checks": {
+    "build": {
+      "tags": [
+        "build"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "validation"
+      ]
+    },
+    "coverage": {
+      "tags": [
+        "coverage"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "validation"
+      ]
+    },
+    "design": {
+      "tags": [
+        "design"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "validation"
+      ]
+    },
+    "imports": {
+      "tags": [
+        "imports"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "validation"
+      ]
+    },
+    "nf": {
+      "tags": [
+        "nf"
+      ],
+      "severity": "warn",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": []
+    },
+    "revision": {
+      "tags": [
+        "revision"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "validation"
+      ]
+    },
+    "structural": {
+      "tags": [
+        "design"
+      ],
+      "severity": "warn",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [
+        "validation"
+      ]
+    },
+    "validation": {
+      "tags": [
+        "validation"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": []
+    },
+    "workload": {
+      "tags": [
+        "workload"
+      ],
+      "severity": "warn",
+      "fast": false,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [
+        "validation"
+      ]
+    }
+  },
   "infra": {
     "connections": [
       {
@@ -1276,9 +1796,5 @@
         "help": "PostgreSQL connection URL for database-backed commands and checks"
       }
     ]
-  },
-  "name": "pgdesign",
-  "project_id": "github.com/smm-h/pgdesign",
-  "schema_version": 1,
-  "version": ""
+  }
 }
