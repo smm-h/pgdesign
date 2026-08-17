@@ -82,7 +82,7 @@
   },
   "project_id": "github.com/smm-h/pgdesign",
   "name": "pgdesign",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "help": "PostgreSQL schema compiler",
   "global_flags": [
     {

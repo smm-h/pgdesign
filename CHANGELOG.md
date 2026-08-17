@@ -2,6 +2,60 @@
 
 # Changelog
 
+## 0.27.0
+
+Every CLI flag and argument now declares whether it is required, optional or defaulted, no mutating command hides a default, and `generate --format json` keeps its exact bytes under `--json`.
+
+<details>
+<summary>Context</summary>
+
+pgdesign moved onto go-strictcli 0.33, whose flag system makes presence an
+explicit, mandatory declaration on every flag and positional argument and bans
+a value default on any declaration of a mutating command: absence must never
+resolve to a value the invocation did not state, because on a mutating command
+a value the framework picked is a value the framework writes. Every switch that
+carried such a default now declares itself optional and names its fallback in
+its own help text, resolved in one place rather than scattered through the
+handlers.
+
+Two real defects fell out of doing this honestly rather than mechanically.
+`fmt` resolved --table-order and --column-order by comparing the parsed value
+against the default string, so an explicitly typed value could not be told from
+an absent flag and pgdesign.toml silently overrode it. And `generate --format
+json --json` appended the framework's machine envelope to stdout right after
+the hash-verified schema document, so the stream carried two concatenated JSON
+documents; `generate` now declares that its stdout is the artifact, which moves
+the envelope to stderr and leaves every format's bytes untouched.
+
+The choices lists became value-plus-help records in the same pass, so --help
+and the CLI reference explain what each format, mode and language actually
+produces, and the codegen mode registry became one table that the map, the
+sorted name list and the choice help all derive from.
+
+</details>
+
+### Breaking
+
+- **Machine output moved to the framework envelope.** `diff` and `stats` no longer declare their own `--json` flag: `--json` is now owned by strictcli and selects machine mode for every command. In machine mode stdout carries one document -- the envelope -- and each command's former JSON output is its `payload` member, validated against a schema the command declares. Anything parsing the old bare JSON must read `.payload` instead. Human output is unchanged, and `generate --format json` is untouched: that document is hash-verified by its reader and is never wrapped.
+
+### Features
+
+- Clearer `pgdesign import update` help text, and a tighter `migrate baseline` description.
+- **Every flag and argument now states its presence, and every choice explains itself.** `--help` and the generated CLI reference mark each flag and positional argument `required`, `optional` or `default: <v>`, and each constrained value (`--format`, `--mode`, `--lang`, `--split-mode`, `--table-order`, `--column-order`) carries a one-line description of what it does. Flags a command always needed -- `migrate squash --from`/`--to`, `migrate rebase --head`, `codegen --lang`, `testdb setup --ddl`, `testdb gc --older-than`, `testdb init --language` -- are now refused up front when absent instead of failing partway through with an ad-hoc message, and switches that used to carry an invisible default name their fallback in their own help text.
+
+### Fixes
+
+- **Documentation site builds again.** pgdesign's docs now have a home page, intra-doc links resolve under the current output scheme, and the API reference pages no longer carry stray extra top-level headings.
+- **Blog post link fixed.** The content-addressed-schemas post now links the live documentation site instead of the retired `pgdesign.smmh.dev` subdomain.
+- **`fmt` no longer lets pgdesign.toml override an explicit ordering flag.** `--table-order dependency` and `--column-order pk_fk_alpha` were resolved by comparing the parsed value against the default string, so an explicitly typed value was indistinguishable from an absent flag and `[format]` in pgdesign.toml silently won. Precedence is now flag > config > the documented fallback.
+- **`generate --format json --json` no longer corrupts the schema document.** The framework's machine envelope was written to stdout right after the document, so the stream carried two concatenated JSON documents and any reader hashing it saw a different digest. `generate` now declares that its stdout is the artifact: in machine mode the envelope goes to stderr and the document keeps its exact bytes, for every format it emits.
+
+## 1.0.0
+
+### Breaking
+
+- **Renamed from pgspec to pgdesign.**
+
 ## 0.26.0
 
 New codegen, diff and introspect guides; the `@v0` install pin; generated test wrappers that handle unix-socket connection URLs.
@@ -45,12 +99,6 @@ do.
 
 - **Install with `@v0`, not `@latest`.** The Go module proxy permanently serves a `v1.0.0` for this module that was never a real release, so `go install github.com/smm-h/pgdesign/cmd/pgdesign@latest` installed it in preference to every real version. Every install instruction now pins `@v0`, and the docs explain why the phantom version cannot be retracted.
 - **Generated test wrappers handle unix-socket connection URLs.** The generated TypeScript wrapper dropped the username when rewriting a socket DSN (`postgresql://someuser@/db?host=/run/postgresql`), silently connecting as the process owner instead. The Java and Kotlin wrappers built `jdbc:postgresql://null/db` from the same URL and failed much later with an opaque driver error; they now refuse it up front, since the PostgreSQL JDBC driver has no unix-socket transport.
-
-## 1.0.0
-
-### Breaking
-
-- **Renamed from pgspec to pgdesign.**
 
 ## 0.25.3
 
