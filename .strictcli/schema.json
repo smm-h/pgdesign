@@ -605,7 +605,7 @@
         },
         {
           "name": "mode",
-          "help": "Data generation strategy; omitted means normal",
+          "help": "Data generation strategy for the generated column values; omitted means normal",
           "value_schema": {
             "type": "string",
             "enum": [
@@ -820,7 +820,7 @@
         },
         {
           "name": "split-mode",
-          "help": "How to split multi-file Python DDL output",
+          "help": "How to split multi-file Python DDL output; only meaningful with --mode ddl --lang python",
           "value_schema": {
             "type": "string",
             "enum": [
