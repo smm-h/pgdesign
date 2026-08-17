@@ -92,8 +92,12 @@ func registerSeedCmd(app *strictcli.App) {
 				return strictcli.Exit(exitCode)
 			}
 
-			rows := kwargs["rows"].(int)
-			apply := kwargs["apply"].(bool)
+			// seed is mutating, so no flag may declare a value default
+			// (contract §27.1). Each switch declares Optional() and names its
+			// fallback in its own help text; these calls are where absence
+			// becomes that fallback.
+			rows := optInt(kwargs["rows"], 10)
+			apply := optBool(kwargs["apply"], false)
 			outputPath := ""
 			if v := kwargsOptString(kwargs, "output"); v != nil {
 				outputPath = *v
@@ -102,9 +106,9 @@ func registerSeedCmd(app *strictcli.App) {
 			if v := kwargsOptString(kwargs, "db"); v != nil {
 				dbURL = *v
 			}
-			format := kwargs["format"].(string)
-			clean := kwargs["clean"].(bool)
-			mode := kwargs["mode"].(string)
+			format := optStr(kwargs["format"], "insert")
+			clean := optBool(kwargs["clean"], false)
+			mode := optStr(kwargs["mode"], "normal")
 
 			if apply && dbURL == "" {
 				fmt.Fprintln(os.Stderr, "error: --db is required when using --apply")
@@ -222,18 +226,24 @@ func registerSeedCmd(app *strictcli.App) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.IntFlag("rows", "Number of rows to generate per table in the schema", strictcli.Default(10)),
-			strictcli.IntFlag("seed", "Random number generator seed for deterministic output", strictcli.Default(nil)),
-			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.BoolFlag("apply", "Insert generated seed data directly into the database", strictcli.Default(false)),
-			strictcli.StringFlag("db", "PostgreSQL connection URL, required when using --apply", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("schema", "PostgreSQL schema name to filter seed generation to", strictcli.Repeatable(), strictcli.Unique(true)),
-			strictcli.StringFlag("format", "SQL output format for generated seed data statements", strictcli.Default("insert"), strictcli.Choices("insert", "copy")),
-			strictcli.BoolFlag("clean", "Emit TRUNCATE CASCADE statements before inserting seeds", strictcli.Default(false)),
-			strictcli.StringFlag("mode", "Data generation strategy: normal values or edge-cases", strictcli.Default("normal"), strictcli.Choices("normal", "edge-cases")),
+			strictcli.IntFlag("rows", "Number of rows to generate per table in the schema; omitted means 10", strictcli.Optional()),
+			strictcli.IntFlag("seed", "Random number generator seed for deterministic output; omitted means a fresh seed is drawn and reported on stderr", strictcli.Optional()),
+			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Optional()),
+			strictcli.BoolFlag("apply", "Insert generated seed data directly into the database; omitted means the statements are only emitted", strictcli.Optional()),
+			strictcli.StringFlag("db", "PostgreSQL connection URL, required when using --apply", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("schema", "PostgreSQL schema name to filter seed generation to", strictcli.Optional(), strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.StringFlag("format", "SQL output format for generated seed data statements; omitted means insert", strictcli.Optional(), strictcli.Choices(
+				strictcli.Ch("insert", "batched INSERT statements, portable across every client"),
+				strictcli.Ch("copy", "COPY blocks, 5-10x faster to load but psql-only"),
+			)),
+			strictcli.BoolFlag("clean", "Emit TRUNCATE CASCADE statements before inserting seeds; omitted means existing rows are left in place", strictcli.Optional()),
+			strictcli.StringFlag("mode", "Data generation strategy; omitted means normal", strictcli.Optional(), strictcli.Choices(
+				strictcli.Ch("normal", "plausible values drawn from the declared distributions"),
+				strictcli.Ch("edge-cases", "boundary values that exercise the declared constraints"),
+			)),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Path to TOML schema file(s) or directory for seed generation", strictcli.Variadic()),
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory for seed generation", strictcli.ArgRequired(), strictcli.Variadic()),
 		),
 	)
 }

@@ -22,16 +22,26 @@ func registerCodegenCmd(app *strictcli.App) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Choices("python", "zig", "go", "ts", "java", "kotlin")),
-			strictcli.StringFlag("mode", "Code generation mode determining what code to produce", strictcli.Default("validators"), strictcli.Choices(toIfaces(SupportedModeNames())...)),
-			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.StringFlag("split-mode", "How to split multi-file Python DDL output: 'faceted' writes one file per object kind, 'self-contained' emits a single importable module", strictcli.Default(nil), strictcli.Choices("faceted", "self-contained")),
-			strictcli.ListFlag(strictcli.TypeStr, "groups", "Restrict generation to tables in these schema groups (matches build's per-output group filtering)", strictcli.Default(nil), strictcli.Unique(true)),
-			strictcli.ListFlag(strictcli.TypeStr, "source", "Restrict generation to tables from these source file basenames (matches build's per-output source filtering)", strictcli.Default(nil), strictcli.Unique(true)),
-			strictcli.BoolFlag("check", "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file", strictcli.Default(false)),
+			strictcli.StringFlag("lang", "Target programming language for the generated code", strictcli.Required(), strictcli.Choices(
+				strictcli.Ch("python", "generate Python source"),
+				strictcli.Ch("zig", "generate Zig source"),
+				strictcli.Ch("go", "generate Go source"),
+				strictcli.Ch("ts", "generate TypeScript source"),
+				strictcli.Ch("java", "generate Java source"),
+				strictcli.Ch("kotlin", "generate Kotlin source"),
+			)),
+			strictcli.StringFlag("mode", "Code generation mode determining what code to produce; omitted means validators", strictcli.Optional(), strictcli.Choices(SupportedModeChoices()...)),
+			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Optional()),
+			strictcli.StringFlag("split-mode", "How to split multi-file Python DDL output", strictcli.Optional(), strictcli.Choices(
+				strictcli.Ch("faceted", "write one file per object kind"),
+				strictcli.Ch("self-contained", "emit a single importable module"),
+			)),
+			strictcli.ListFlag(strictcli.TypeStr, "groups", "Restrict generation to tables in these schema groups (matches build's per-output group filtering)", strictcli.Optional(), strictcli.Unique(true)),
+			strictcli.ListFlag(strictcli.TypeStr, "source", "Restrict generation to tables from these source file basenames (matches build's per-output source filtering)", strictcli.Optional(), strictcli.Unique(true)),
+			strictcli.BoolFlag("check", "Verify generated code on disk is up to date without writing anything; requires --output, exits 1 on any missing, stale, or orphan file; omitted means the code is written", strictcli.Optional()),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.ArgRequired(), strictcli.Variadic()),
 		),
 	)
 }
@@ -61,12 +71,15 @@ func runCodegen(configOverride *string, quiet bool, kwargs map[string]interface{
 	}
 
 	lang := kwargs["lang"].(string)
-	mode := kwargs["mode"].(string)
+	// --mode and --check declare Optional() rather than a default: codegen is a
+	// mutating command, so the framework refuses a value default (contract
+	// §27.1). Their help text names the fallback each resolves to here.
+	mode := optStr(kwargs["mode"], "validators")
 	splitMode := ""
 	if v := kwargsOptString(kwargs, "split_mode"); v != nil {
 		splitMode = *v
 	}
-	checkOnly := kwargs["check"].(bool)
+	checkOnly := optBool(kwargs["check"], false)
 	outputPath := ""
 	if v := kwargsOptString(kwargs, "output"); v != nil {
 		outputPath = *v

@@ -166,11 +166,11 @@ func registerStatsCmd(app *strictcli.App) {
 		handleStats,
 		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("schema", "PostgreSQL schema name to analyze (repeatable for multiple)", strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("schema", "PostgreSQL schema name to analyze (repeatable for multiple)", strictcli.Optional(), strictcli.Repeatable(), strictcli.Unique(true)),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "TOML schema file(s) for cross-referencing with live data", strictcli.Variadic(), strictcli.ArgRequired(false)),
+			strictcli.NewArg("path", "TOML schema file(s) for cross-referencing with live data", strictcli.ArgOptional(), strictcli.Variadic()),
 		),
 		strictcli.PayloadSchema(statsPayloadSchema),
 	)

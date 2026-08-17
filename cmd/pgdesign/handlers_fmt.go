@@ -22,21 +22,19 @@ func registerFmtCmd(app *strictcli.App) {
 				return strictcli.Exit(1)
 			}
 
-			tableOrder := kwargs["table_order"].(string)
-			if tableOrder == "dependency" && cfg.Format.TableOrder != "" {
-				tableOrder = cfg.Format.TableOrder
-			}
-			columnOrder := kwargs["column_order"].(string)
-			if columnOrder == "pk_fk_alpha" && cfg.Format.ColumnOrder != "" {
-				columnOrder = cfg.Format.ColumnOrder
-			}
-
+			// Precedence is flag > pgdesign.toml [format] > the fallback each
+			// flag's help names. The flags declare Optional() rather than a
+			// default (fmt is mutating; contract §27.1 forbids a value default),
+			// which also removes the sentinel this used to read: the old code
+			// compared the resolved value against the default string, so an
+			// explicit `--table-order dependency` was indistinguishable from an
+			// absent flag and was overridden by the config.
 			fmtConfig := &format.Config{
-				TableOrder:  tableOrder,
-				ColumnOrder: columnOrder,
+				TableOrder:  optStr(kwargs["table_order"], firstNonEmpty(cfg.Format.TableOrder, "dependency")),
+				ColumnOrder: optStr(kwargs["column_order"], firstNonEmpty(cfg.Format.ColumnOrder, "pk_fk_alpha")),
 			}
 
-			check := kwargs["check"].(bool)
+			check := optBool(kwargs["check"], false)
 
 			info, err := os.Stat(target)
 			if err != nil {
@@ -51,12 +49,20 @@ func registerFmtCmd(app *strictcli.App) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.BoolFlag("check", "Check if file is already formatted (exit 1 if not)", strictcli.Default(false)),
-			strictcli.StringFlag("table-order", "Table ordering strategy: dependency-based or alphabetical", strictcli.Default("dependency"), strictcli.Choices("dependency", "alphabetical")),
-			strictcli.StringFlag("column-order", "Column ordering: pk_fk_alpha, alphabetical, fk_last, or preserve", strictcli.Default("pk_fk_alpha"), strictcli.Choices("pk_fk_alpha", "alphabetical", "fk_last", "preserve")),
+			strictcli.BoolFlag("check", "Check if file is already formatted (exit 1 if not); omitted means the file is rewritten in place", strictcli.Optional()),
+			strictcli.StringFlag("table-order", "Table ordering strategy; omitted means [format].table_order from pgdesign.toml, else dependency", strictcli.Optional(), strictcli.Choices(
+				strictcli.Ch("dependency", "order tables so a table follows the tables it depends on"),
+				strictcli.Ch("alphabetical", "order tables by name"),
+			)),
+			strictcli.StringFlag("column-order", "Column ordering; omitted means [format].column_order from pgdesign.toml, else pk_fk_alpha", strictcli.Optional(), strictcli.Choices(
+				strictcli.Ch("pk_fk_alpha", "primary key first, then foreign keys, then the rest alphabetically"),
+				strictcli.Ch("alphabetical", "order every column by name"),
+				strictcli.Ch("fk_last", "order columns alphabetically with the foreign keys moved to the end"),
+				strictcli.Ch("preserve", "leave the declared column order untouched"),
+			)),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Path to the TOML schema file or directory to format"),
+			strictcli.NewArg("path", "Path to the TOML schema file or directory to format", strictcli.ArgRequired()),
 		),
 	)
 }

@@ -38,8 +38,8 @@ func registerReviseCmd(app *strictcli.App) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the non-retroactive DB tier (live FD discovery, pg_stat workload). When absent, the DB tier is skipped and revise exits non-zero after committing the pure tier.", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("dir", "Directory containing the chain-format migrations project (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the non-retroactive DB tier (live FD discovery, pg_stat workload). When absent, the DB tier is skipped and revise exits non-zero after committing the pure tier.", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing the chain-format migrations project; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
 		),
 	)
 }

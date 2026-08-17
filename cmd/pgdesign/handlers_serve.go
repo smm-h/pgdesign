@@ -89,10 +89,10 @@ func registerServeCmd(app *strictcli.App) {
 		},
 		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server (omit for DB-free project mode)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server (omit for DB-free project mode)", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 			strictcli.IntFlag("port", "TCP port number for the HTTP API server to listen on", strictcli.Default(8080)),
 			strictcli.StringFlag("bind", "Network interface address to bind the HTTP server to. Defaults to 127.0.0.1 (loopback only). WARNING: the server has NO AUTHENTICATION; binding to a non-loopback address (e.g. 0.0.0.0) exposes the schema, database statistics, and diff endpoints to anyone who can reach that address.", strictcli.Default("127.0.0.1")),
-			strictcli.StringFlag("schema", "PostgreSQL schema name to serve via the API (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.StringFlag("schema", "PostgreSQL schema name to serve via the API (repeatable)", strictcli.Optional(), strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.IntFlag("timeout", "Maximum time in seconds for each HTTP request to complete", strictcli.Default(30)),
 		),
 	)

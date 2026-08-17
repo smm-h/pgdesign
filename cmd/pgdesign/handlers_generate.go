@@ -86,11 +86,24 @@ func registerGenerateCmd(app *strictcli.App) {
 		strictcli.WithFlags(
 			strictcli.BoolFlag("idempotent", "Add IF NOT EXISTS guards to all generated DDL statements", strictcli.Default(false)),
 			strictcli.BoolFlag("comments", "Include COMMENT ON statements in the generated output", strictcli.Default(true)),
-			strictcli.StringFlag("format", "Output format for the generated schema representation", strictcli.Default("sql"), strictcli.Choices("sql", "json", "d2", "svg", "doc", "graphql")),
+			// generate is read_only, so declared defaults stay legal here
+			// (contract §27.1 keys the ban on classification). The choices
+			// became value-plus-help records at strictcli 0.33; the "json"
+			// document's own bytes are pinned by
+			// TestGenerateJSONIsByteExactOnStdout and are untouched by any of
+			// this.
+			strictcli.StringFlag("format", "Output format for the generated schema representation", strictcli.Default("sql"), strictcli.Choices(
+				strictcli.Ch("sql", "PostgreSQL DDL statements"),
+				strictcli.Ch("json", "the canonical whole-model envelope (format_version, revision, model), hash-verifiable by its reader"),
+				strictcli.Ch("d2", "a D2 entity-relationship diagram source"),
+				strictcli.Ch("svg", "the D2 diagram rendered to SVG"),
+				strictcli.Ch("doc", "human-readable schema documentation"),
+				strictcli.Ch("graphql", "GraphQL SDL with types, relations, enums and custom scalars"),
+			)),
 			strictcli.BoolFlag("strict-nf", "Promote normal form violations to errors instead of warnings", strictcli.Default(false)),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.ArgRequired(), strictcli.Variadic()),
 		),
 	)
 }

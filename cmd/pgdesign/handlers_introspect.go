@@ -68,7 +68,10 @@ func registerIntrospectCmd(app *strictcli.App) {
 				fmt.Print(string(data))
 			}
 
-			extensions := kwargs["extensions"].(bool)
+			// introspect is mutating (--output writes a file), so --extensions
+			// declares Optional() rather than Default(false) and names its
+			// fallback in its own help (contract §27.1).
+			extensions := optBool(kwargs["extensions"], false)
 			if extensions {
 				conn, err := pgx.Connect(bgCtx, dbURL)
 				if err != nil {
@@ -154,10 +157,10 @@ func registerIntrospectCmd(app *strictcli.App) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("schema", "PostgreSQL schema name(s) to introspect (repeatable)", strictcli.Repeatable(), strictcli.Unique(true)),
-			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Default(nil)),
-			strictcli.BoolFlag("extensions", "Discover extension types, functions, and opclasses", strictcli.Default(false)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("schema", "PostgreSQL schema name(s) to introspect (repeatable); omitted means public", strictcli.Optional(), strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.StringFlag("output", "Write output to a file at this path instead of stdout", strictcli.Optional()),
+			strictcli.BoolFlag("extensions", "Discover extension types, functions, and opclasses; omitted means they are not discovered", strictcli.Optional()),
 		),
 	)
 }

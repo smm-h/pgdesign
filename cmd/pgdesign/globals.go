@@ -11,7 +11,52 @@ import "github.com/smm-h/strictcli/go/strictcli"
 // framework and delivered on the Context. Handlers read ctx.Quiet(); declaring
 // it as a flag at any level is a registration-time hard error.
 func registerGlobals(app *strictcli.App) {
-	app.GlobalFlag(strictcli.StringFlag("project-config", "Path to pgdesign.toml (bypasses directory search)", strictcli.Default(nil)))
+	app.GlobalFlag(strictcli.StringFlag("project-config", "Path to pgdesign.toml (bypasses directory search)", strictcli.Optional()))
+}
+
+// optBool, optStr and optInt resolve an optional flag's absence to the fallback
+// its own help text declares.
+//
+// strictcli's mutating-default ban (contract §27.1) forbids Default() on any
+// flag or positional arg of a command declaring effect="mutating": absence must
+// never resolve to a value the invocation did not state, because on a mutating
+// command a value the framework picked is a value the framework writes. Every
+// pgdesign switch that used to carry a Default() on a mutating command now
+// declares Optional() and NAMES its fallback in its own help text, and these
+// three functions are the only place where absence becomes that fallback — so
+// no code further down ever receives a nil it would misread as a zero value.
+func optBool(v interface{}, fallback bool) bool {
+	if v == nil {
+		return fallback
+	}
+	return v.(bool)
+}
+
+func optStr(v interface{}, fallback string) string {
+	if v == nil {
+		return fallback
+	}
+	return v.(string)
+}
+
+func optInt(v interface{}, fallback int) int {
+	if v == nil {
+		return fallback
+	}
+	return v.(int)
+}
+
+// firstNonEmpty returns the first non-empty string, or "" when there is none.
+// It composes with optStr where a flag's documented fallback is itself layered
+// (an absent flag reads the project config, and an absent config entry reads a
+// literal).
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // kwargsConfigOverride extracts the project-config global flag from kwargs.
@@ -56,7 +101,7 @@ func kwargsOptString(kwargs map[string]interface{}, key string) *string {
 }
 
 // kwargsDBURL extracts the resolved value of a ConnectionURLFlag-bound --db
-// flag. The flag is optional at parse time (Default(nil)) with a PGDESIGN_DB env
+// flag. The flag declares Optional() with a PGDESIGN_DB env
 // fallback handled by the framework (cli > env, hermetic-suppressed); this
 // returns "" when neither the flag nor the env supplied a value, so a command
 // that requires a database can enforce it loudly at the handler.
@@ -78,7 +123,7 @@ func kwargsOptInt(kwargs map[string]interface{}, key string) *int {
 }
 
 // resolveMigrationsDir resolves the effective migrations directory using the
-// Default(nil)+was-set pattern (the `output` flag is the blueprint). dirFlag is
+// Optional()+was-set pattern (the `output` flag is the blueprint). dirFlag is
 // the raw --dir flag value: nil when the user did not pass --dir, a pointer to
 // the exact string when they did. An explicit flag ALWAYS wins verbatim -- even
 // "--dir migrations" -- so it is distinguishable from the unset default. Only
@@ -92,13 +137,4 @@ func resolveMigrationsDir(dirFlag *string, cfgDir string) string {
 		return cfgDir
 	}
 	return "migrations"
-}
-
-// toIfaces converts []string to []interface{} for strictcli.Choices().
-func toIfaces(ss []string) []interface{} {
-	out := make([]interface{}, len(ss))
-	for i, s := range ss {
-		out[i] = s
-	}
-	return out
 }

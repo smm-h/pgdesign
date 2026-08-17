@@ -6,34 +6,70 @@ import (
 
 	"github.com/smm-h/pgdesign/internal/codegen"
 	"github.com/smm-h/pgdesign/pkg/genkit"
+	"github.com/smm-h/strictcli/go/strictcli"
 )
+
+// codegenMode is one row of the codegen mode registry: the mode's name, the
+// one-line description the CLI publishes for it, and the languages it supports.
+//
+// The single table below is the one authority. The mode->languages map, the
+// sorted name list and the `--mode` choices records are all derived from it, so
+// a mode cannot exist in the CLI's vocabulary without a description, or be
+// described without being generatable.
+type codegenMode struct {
+	name  string
+	help  string
+	langs []string
+}
+
+var allLangs = []string{"go", "java", "kotlin", "python", "ts", "zig"}
+
+var codegenModeRegistry = []codegenMode{
+	{"constants", "table and column name string constants", allLangs},
+	{"constraints", "client-side validators derived from CHECK, NOT NULL and enum constraints", allLangs},
+	{"ddl", "DDL definition tuples plus a section executor that applies them", []string{"python"}},
+	{"drizzle", "a Drizzle ORM schema module", []string{"ts"}},
+	{"enums", "standalone enum definitions for the schema's enum types", allLangs},
+	{"gorm", "GORM struct tags for the schema's tables", []string{"go"}},
+	{"jpa", "JPA entity classes for the schema's tables", []string{"java"}},
+	{"query-layer", "Protocol definitions with an asyncpg backend and an in-memory backend", []string{"python"}},
+	{"sqlalchemy", "SQLAlchemy 2.0 declarative models", []string{"python"}},
+	{"types", "native struct, class or interface definitions with their enums", allLangs},
+	{"validators", "row-level-security policy checkers", allLangs},
+}
 
 // SupportedModes returns a map of codegen mode to the languages it supports.
 func SupportedModes() map[string][]string {
-	return map[string][]string{
-		"validators":  {"go", "java", "kotlin", "python", "ts", "zig"},
-		"constants":   {"go", "java", "kotlin", "python", "ts", "zig"},
-		"types":       {"go", "java", "kotlin", "python", "ts", "zig"},
-		"constraints": {"go", "java", "kotlin", "python", "ts", "zig"},
-		"gorm":        {"go"},
-		"drizzle":     {"ts"},
-		"sqlalchemy":  {"python"},
-		"jpa":         {"java"},
-		"ddl":         {"python"},
-		"query-layer": {"python"},
-		"enums":       {"go", "java", "kotlin", "python", "ts", "zig"},
+	modes := make(map[string][]string, len(codegenModeRegistry))
+	for _, m := range codegenModeRegistry {
+		modes[m.name] = m.langs
 	}
+	return modes
 }
 
 // SupportedModeNames returns a sorted list of valid codegen mode names.
 func SupportedModeNames() []string {
-	modes := SupportedModes()
-	names := make([]string, 0, len(modes))
-	for m := range modes {
-		names = append(names, m)
+	names := make([]string, 0, len(codegenModeRegistry))
+	for _, m := range codegenModeRegistry {
+		names = append(names, m.name)
 	}
 	sort.Strings(names)
 	return names
+}
+
+// SupportedModeChoices returns the `--mode` choices records, in the sorted order
+// SupportedModeNames publishes, each carrying its registry description.
+func SupportedModeChoices() []strictcli.ChoiceValue {
+	byName := make(map[string]string, len(codegenModeRegistry))
+	for _, m := range codegenModeRegistry {
+		byName[m.name] = m.help
+	}
+	names := SupportedModeNames()
+	choices := make([]strictcli.ChoiceValue, 0, len(names))
+	for _, n := range names {
+		choices = append(choices, strictcli.Ch(n, byName[n]))
+	}
+	return choices
 }
 
 // SelectGenerator returns the genkit.Generator for the given language and mode.

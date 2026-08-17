@@ -25,10 +25,6 @@ func registerTestdbSetupCmd(g *strictcli.Group) {
 			}
 
 			ddlPath := kwargs["ddl"].(string)
-			if ddlPath == "" {
-				fmt.Fprintln(os.Stderr, "error: --ddl is required for testdb setup")
-				return strictcli.Exit(1)
-			}
 
 			ddlFile, err := os.Open(ddlPath)
 			if err != nil {
@@ -55,8 +51,8 @@ func registerTestdbSetupCmd(g *strictcli.Group) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("ddl", "Path to the SQL DDL file to apply to the test database"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("ddl", "Path to the SQL DDL file to apply to the test database", strictcli.Required()),
 		),
 	)
 }
@@ -98,7 +94,7 @@ func registerTestdbTeardownCmd(g *strictcli.Group) {
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithConsequential(),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),
 	)
 }
@@ -113,10 +109,6 @@ func registerTestdbGCCmd(g *strictcli.Group) {
 			}
 
 			olderThanStr := kwargs["older_than"].(string)
-			if olderThanStr == "" {
-				fmt.Fprintln(os.Stderr, "error: --older-than is required for testdb gc")
-				return strictcli.Exit(1)
-			}
 
 			olderThan, err := time.ParseDuration(olderThanStr)
 			if err != nil {
@@ -165,8 +157,8 @@ func registerTestdbGCCmd(g *strictcli.Group) {
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithConsequential(),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("older-than", "Drop databases older than this duration (e.g., 2h, 30m)"),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("older-than", "Drop databases older than this duration (e.g., 2h, 30m)", strictcli.Required()),
 		),
 	)
 }
@@ -176,11 +168,10 @@ func registerTestdbInitCmd(g *strictcli.Group) {
 		func(ctx *strictcli.Context, kwargs map[string]interface{}) strictcli.Outcome {
 			cfgOverride := kwargsConfigOverride(kwargs)
 
+			// --language declares Required(), so the framework refuses an
+			// invocation that supplies none; the handler only has to check the
+			// values themselves.
 			languages := kwargsStrSlice(kwargs["language"])
-			if len(languages) == 0 {
-				fmt.Fprintln(os.Stderr, "error: at least one --language is required")
-				return strictcli.Exit(1)
-			}
 
 			supported := make(map[string]bool)
 			for _, lang := range testdb.SupportedLanguages() {
@@ -194,7 +185,10 @@ func registerTestdbInitCmd(g *strictcli.Group) {
 				}
 			}
 
-			force := kwargs["force_overwrite"].(bool)
+			// testdb init is mutating, so --force-overwrite and --partman
+			// declare Optional() rather than a value default (contract §27.1);
+			// their help text names the fallback resolved here.
+			force := optBool(kwargs["force_overwrite"], false)
 			outputName := ""
 			if v := kwargsOptString(kwargs, "output"); v != nil {
 				outputName = *v
@@ -203,7 +197,7 @@ func registerTestdbInitCmd(g *strictcli.Group) {
 			if v := kwargsOptString(kwargs, "ci"); v != nil {
 				ciProvider = *v
 			}
-			partman := kwargs["partman"].(bool)
+			partman := optBool(kwargs["partman"], false)
 
 			cwd, err := os.Getwd()
 			if err != nil {
@@ -359,11 +353,11 @@ func registerTestdbInitCmd(g *strictcli.Group) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("language", "Target programming language(s) for wrapper generation", strictcli.Repeatable(), strictcli.Unique(true)),
-			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Default(nil)),
-			strictcli.BoolFlag("force-overwrite", "Overwrite existing wrapper files without prompting", strictcli.Default(false)),
-			strictcli.StringFlag("ci", "CI provider for workflow generation (e.g., github-actions)", strictcli.Default(nil)),
-			strictcli.BoolFlag("partman", "Include pg_partman installation step in CI workflow", strictcli.Default(false)),
+			strictcli.StringFlag("language", "Target programming language(s) for wrapper generation", strictcli.Required(), strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.StringFlag("output", "Name of the SQL output section (for disambiguation)", strictcli.Optional()),
+			strictcli.BoolFlag("force-overwrite", "Overwrite existing wrapper files without prompting; omitted means an existing file is left alone and reported", strictcli.Optional()),
+			strictcli.StringFlag("ci", "CI provider for workflow generation (e.g., github-actions)", strictcli.Optional()),
+			strictcli.BoolFlag("partman", "Include pg_partman installation step in CI workflow; omitted means the step is not emitted", strictcli.Optional()),
 		),
 	)
 }

@@ -168,12 +168,12 @@ func registerDiffCmd(app *strictcli.App) {
 		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.PayloadSchema(diffPayloadSchema),
 		strictcli.WithFlags(
-			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("against", "Path to TOML schema file or directory to compare against", strictcli.Default(nil)),
-			strictcli.StringFlag("base", "Git ref to compare the current schema against (e.g., main)", strictcli.Default(nil)),
+			strictcli.StringFlag("live", "PostgreSQL connection URL for live database comparison", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("against", "Path to TOML schema file or directory to compare against", strictcli.Optional()),
+			strictcli.StringFlag("base", "Git ref to compare the current schema against (e.g., main)", strictcli.Optional()),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.ArgRequired(), strictcli.Variadic()),
 		),
 	)
 }

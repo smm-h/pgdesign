@@ -7,9 +7,9 @@ import (
 
 func strptr(s string) *string { return &s }
 
-// TestResolveMigrationsDir pins the Default(nil)+was-set resolution used at all
-// nine migrations-dir sites (8 migrate subcommands + serve). The load-bearing
-// case is the ambiguity fix: an explicit "--dir migrations" must be honored
+// TestResolveMigrationsDir pins the Optional()+was-set resolution used at all
+// nine migrations-dir sites (8 migrate subcommands + serve). The case that
+// everything rests on is the ambiguity fix: an explicit "--dir migrations" must be honored
 // verbatim and NOT be overridden by the project config's migrations_dir. The
 // old sentinel logic (dir == "migrations" && cfg != "") could not tell an
 // explicit "migrations" from the default, so config silently won.

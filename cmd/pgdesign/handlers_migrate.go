@@ -70,12 +70,12 @@ func registerMigratePlanCmd(g *strictcli.Group) {
 		},
 		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL (legacy-mode only; chain-mode plan is pure and ignores it)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("from", "Chain-mode only: revision string to enumerate from (pure input); absent enumerates from genesis", strictcli.Default(nil)),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL (legacy-mode only; chain-mode plan is pure and ignores it)", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("from", "Chain-mode only: revision string to enumerate from (pure input); absent enumerates from genesis", strictcli.Optional()),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.ArgRequired(), strictcli.Variadic()),
 		),
 	)
 }
@@ -333,11 +333,11 @@ func registerMigrateGenerateCmd(g *strictcli.Group) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server (legacy-mode only; chain-mode generate is pure)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server (legacy-mode only; chain-mode generate is pure)", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.ArgRequired(), strictcli.Variadic()),
 		),
 	)
 }
@@ -557,8 +557,8 @@ func registerMigrateApplyCmd(g *strictcli.Group) {
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithConsequential(),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
 		),
 	)
 }
@@ -740,7 +740,10 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			toVersion := kwargs["to"].(string)
+			// migrate rollback is mutating, so --to declares Optional() rather
+			// than Default("") (contract §27.1). Absence means a single-step
+			// rollback, which is what the help text states.
+			toVersion := optStr(kwargs["to"], "")
 
 			// Chain-mode project: journal-driven rollback (roadmap 5.6). Reverses
 			// recorded down-ops in reverse journal order; --to is a target REVISION.
@@ -780,9 +783,9 @@ func registerMigrateRollbackCmd(g *strictcli.Group) {
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithConsequential(),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
-			strictcli.StringFlag("to", "Target version to rollback to (exclusive -- this version stays applied)", strictcli.Default("")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
+			strictcli.StringFlag("to", "Target version or revision to roll back to (exclusive -- it stays applied); omitted means roll back a single step", strictcli.Optional()),
 		),
 	)
 }
@@ -936,8 +939,8 @@ func registerMigrateStatusCmd(g *strictcli.Group) {
 		},
 		strictcli.WithEffect(strictcli.EffectReadOnly),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
 		),
 	)
 }
@@ -994,15 +997,7 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			from := kwargs["from"].(string)
-			if from == "" {
-				fmt.Fprintln(os.Stderr, "error: --from is required")
-				return strictcli.Exit(1)
-			}
 			to := kwargs["to"].(string)
-			if to == "" {
-				fmt.Fprintln(os.Stderr, "error: --to is required")
-				return strictcli.Exit(1)
-			}
 
 			dbURL := kwargsDBURL(kwargs)
 			if dbURL == "" {
@@ -1094,11 +1089,11 @@ func registerMigrateSquashCmd(g *strictcli.Group) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("from", "Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix)"),
-			strictcli.StringFlag("to", "End of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode)"),
-			strictcli.StringFlag("slug", "Display slug for the consolidation edge (chain mode; auto-derived from endpoint hashes when omitted)", strictcli.Default(nil)),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
-			strictcli.StringFlag("db", "PostgreSQL connection URL (REQUIRED); the pre-upgrade guard runs against it (legacy mode also runs the M200 applied-version check)", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("from", "Start of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode; 'genesis', a revision string, or a live edge-id prefix)", strictcli.Required()),
+			strictcli.StringFlag("to", "End of the squash range: a semver version (legacy) or a revision-or-edge reference (chain mode)", strictcli.Required()),
+			strictcli.StringFlag("slug", "Display slug for the consolidation edge (chain mode; auto-derived from endpoint hashes when omitted)", strictcli.Optional()),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
+			strictcli.StringFlag("db", "PostgreSQL connection URL (REQUIRED); the pre-upgrade guard runs against it (legacy mode also runs the M200 applied-version check)", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
 		),
 	)
 }
@@ -1117,10 +1112,6 @@ func registerMigrateRebaseCmd(g *strictcli.Group) {
 			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
 
 			head := kwargs["head"].(string)
-			if head == "" {
-				fmt.Fprintln(os.Stderr, "error: --head is required (the head to keep and re-parent the fork's tail onto)")
-				return strictcli.Exit(1)
-			}
 
 			if !migrate.IsChainMode(dir) {
 				fmt.Fprintln(os.Stderr, "error: migrate rebase is a chain-format operation; this project has no migrations/chain/ directory")
@@ -1148,8 +1139,8 @@ func registerMigrateRebaseCmd(g *strictcli.Group) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("head", "The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it"),
-			strictcli.StringFlag("dir", "Directory containing the chain project (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+			strictcli.StringFlag("head", "The head to KEEP (a revision string or a live edge-id prefix); the OTHER head's tail is re-parented onto it", strictcli.Required()),
+			strictcli.StringFlag("dir", "Directory containing the chain project; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
 		),
 	)
 }
@@ -1166,9 +1157,12 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 				return strictcli.Exit(1)
 			}
 
-			shadow := kwargs["shadow"].(bool)
+			// migrate test is mutating, so --shadow and --timeout declare
+			// Optional() rather than value defaults (contract §27.1); their help
+			// text names the fallbacks resolved here.
+			shadow := optBool(kwargs["shadow"], false)
 			dirFlag := kwargsOptString(kwargs, "dir")
-			timeout := kwargs["timeout"].(int)
+			timeout := optInt(kwargs["timeout"], 60)
 			paths := kwargsStrSlice(kwargs["path"])
 
 			if shadow {
@@ -1354,13 +1348,13 @@ func registerMigrateTestCmd(g *strictcli.Group) {
 		},
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
-			strictcli.IntFlag("timeout", "Maximum time in seconds before the test run is aborted", strictcli.Default(60)),
-			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema", strictcli.Default(false)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the staging test database", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
+			strictcli.IntFlag("timeout", "Maximum time in seconds before the test run is aborted; omitted means 60", strictcli.Optional()),
+			strictcli.BoolFlag("shadow", "Test by replaying migrations into a shadow database and diffing against TOML schema; omitted means the staging replay is run instead", strictcli.Optional()),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Schema file(s) or directory (required with --shadow)", strictcli.Variadic(), strictcli.ArgRequired(false)),
+			strictcli.NewArg("path", "Schema file(s) or directory (required with --shadow)", strictcli.ArgOptional(), strictcli.Variadic()),
 		),
 	)
 }
@@ -1761,11 +1755,11 @@ func registerMigrateUpgradeCmd(g *strictcli.Group) {
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithConsequential(),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the database to upgrade", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the database to upgrade", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.Variadic()),
+			strictcli.NewArg("path", "Path to TOML schema file(s) or directory containing them", strictcli.ArgRequired(), strictcli.Variadic()),
 		),
 	)
 }
@@ -1789,7 +1783,10 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			}
 
 			dir := resolveMigrationsDir(kwargsOptString(kwargs, "dir"), string(cfg.Project.MigrationsDir))
-			description := kwargs["description"].(string)
+			// migrate baseline is mutating, so --description and --version
+			// declare Optional() rather than value defaults (contract §27.1);
+			// their help text names the fallbacks resolved here.
+			description := optStr(kwargs["description"], "Initial baseline")
 
 			bgCtx := context.Background()
 			conn, err := pgx.Connect(bgCtx, dbURL)
@@ -1845,7 +1842,7 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 			}
 
 			// Legacy (semver-TOML) mode: record a semver version.
-			version := kwargs["version"].(string)
+			version := optStr(kwargs["version"], "")
 			if version == "" {
 				fmt.Fprintln(os.Stderr, "error: --version is required for migrate baseline in legacy (semver-TOML) mode")
 				return strictcli.Exit(1)
@@ -1866,13 +1863,13 @@ func registerMigrateBaselineCmd(g *strictcli.Group) {
 		strictcli.WithEffect(strictcli.EffectMutating),
 		strictcli.WithConsequential(),
 		strictcli.WithFlags(
-			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Default(nil), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
-			strictcli.StringFlag("dir", "Directory containing migration files to read or write (defaults to project config migrations_dir, else migrations)", strictcli.Default(nil)),
-			strictcli.StringFlag("version", "Version label for the baseline record (legacy semver-TOML mode only)", strictcli.Default("")),
-			strictcli.StringFlag("description", "Human-readable note recorded with the baseline, shown in migrate status and history output", strictcli.Default("Initial baseline")),
+			strictcli.StringFlag("db", "PostgreSQL connection URL for the target database server", strictcli.Optional(), strictcli.ConnectionURLFlag("PGDESIGN_DB")),
+			strictcli.StringFlag("dir", "Directory containing migration files to read or write; omitted means [project].migrations_dir from pgdesign.toml, else migrations", strictcli.Optional()),
+			strictcli.StringFlag("version", "Version label for the baseline record (legacy semver-TOML mode only); omitted is an error in that mode and ignored in chain mode", strictcli.Optional()),
+			strictcli.StringFlag("description", "Human-readable note recorded with the baseline, shown in migrate status and history output; omitted means \"Initial baseline\"", strictcli.Optional()),
 		),
 		strictcli.WithArgs(
-			strictcli.NewArg("path", "Schema TOML file(s) or directory (chain mode; selects the schema search-path to introspect)", strictcli.Variadic(), strictcli.ArgRequired(false)),
+			strictcli.NewArg("path", "Schema TOML file(s) or directory (chain mode; selects the schema search-path to introspect)", strictcli.ArgOptional(), strictcli.Variadic()),
 		),
 	)
 }
