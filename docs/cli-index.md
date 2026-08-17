@@ -12,6 +12,8 @@ order: 91
 
 PostgreSQL schema compiler
 
+Version: :-: var key="project.version"
+
 ## Commands
 
 - [check](../cli-check/) -- Run project checks registered via the check framework and report results
